@@ -575,6 +575,8 @@ pub struct CrossCompileTarget {
     /// Whether the cross-compiled result should be run as a test
     /// after cross-compilation.
     pub run_after: bool,
+    /// Optional suffix to append to the file name of the code for cross compilation.
+    pub suffix: Option<String>,
 }
 
 impl Default for TestRunConfig {
@@ -607,10 +609,19 @@ impl TestRunConfig {
         }
     }
 
-    pub fn cross_compile_into(self, syntax: SyntaxChoice, run_after: bool) -> Self {
+    pub fn cross_compile_into(
+        self,
+        syntax: SyntaxChoice,
+        run_after: bool,
+        suffix: Option<String>,
+    ) -> Self {
         assert!(matches!(syntax, SyntaxChoice::ASM | SyntaxChoice::Source));
         let mut cross_compilation_targets = self.cross_compilation_targets.clone();
-        cross_compilation_targets.insert(CrossCompileTarget { syntax, run_after });
+        cross_compilation_targets.insert(CrossCompileTarget {
+            syntax,
+            run_after,
+            suffix,
+        });
         Self {
             cross_compilation_targets,
             ..self

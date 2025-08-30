@@ -1,0 +1,13 @@
+//**** Cross-compiled for `move` syntax from `tests/operator_eval/op_with_side_effect_28.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test(): bool {
+        let _t0 = 1 << 1u8;
+        let _t7 = _t0 << 1u8;
+        _t0 < _t7
+    }
+}
+
+
+//# run 0xc0ffee::m::test

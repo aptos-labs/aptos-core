@@ -1,0 +1,24 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/bug_16667.move`
+
+//# publish
+module 0xaa00::M0 {
+    struct S1 has drop {
+    }
+}
+
+
+//# publish
+module 0xaa00::M1 {
+    use 0xaa00::M0;
+    public entry fun f1() {
+        let _t0: |M0::S1| has copy + drop = |arg0| lambda__2__f1(arg0);
+        let _t1: ||M0::S1| has drop| has copy + drop = |arg0: |M0::S1| has drop| lambda__1__f1(arg0);
+        _t1(_t0);
+    }
+    fun lambda__2__f1(p0: M0::S1) {
+        ()
+    }
+    fun lambda__1__f1(p0: |M0::S1| has drop) {
+        ()
+    }
+}

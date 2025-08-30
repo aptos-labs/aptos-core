@@ -1,0 +1,29 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/nested_mutate.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct T has copy, drop {
+        y: u64,
+    }
+    struct S has copy, drop {
+        x: T,
+    }
+    fun foo(p0: S, p1: S): S {
+        let _t7 = *&(&(&p1).x).y;
+        let _t10 = &mut (&mut (&mut p0).x).y;
+        *_t10 = _t7;
+        let _t2 = *&(&(&p0).x).y;
+        let _t15 = &mut _t2;
+        *_t15 = 1;
+        p0
+    }
+    public fun test() {
+        let _t5 = S{x: T{y: 42}};
+        let _t8 = S{x: T{y: 43}};
+        let _t2 = foo(_t5, _t8);
+        if (!(*&(&(&_t2).x).y == 43)) abort 0;
+    }
+}
+
+
+//# run 0xc0ffee::m::test

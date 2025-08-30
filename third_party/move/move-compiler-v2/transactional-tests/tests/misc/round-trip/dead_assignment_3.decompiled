@@ -1,0 +1,21 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/dead_assignment_3.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun foo(p0: u64): u64 {
+        let _t1 = 2;
+        let _t2 = 0;
+        while (_t2 < p0) {
+            _t2 = _t2 + 1;
+            _t1 = 3
+        };
+        _t1
+    }
+    public fun test() {
+        if (!(foo(0) == 2)) abort 55;
+        if (!(foo(1) == 3)) abort 56;
+    }
+}
+
+
+//# run 0xc0ffee::m::test

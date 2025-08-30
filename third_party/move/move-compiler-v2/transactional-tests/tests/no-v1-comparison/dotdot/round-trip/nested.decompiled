@@ -1,0 +1,62 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/dotdot/nested.move`
+
+//# publish
+module 0x42::test {
+    enum E has drop {
+        V1 {
+            _0: u8,
+            _1: S1<u8, bool>,
+        }
+        V2 {
+            x: u8,
+            y: S0<u8, bool>,
+        }
+    }
+    struct S1<T0, T1> has drop {
+        x: T0,
+        y: T1,
+    }
+    struct S0<T0, T1> has drop {
+        _0: T0,
+        _1: T1,
+    }
+    fun extract_first_u8(p0: &E): u8 {
+        let _t1;
+        if (p0 is V1) _t1 = *&p0._0 else if (p0 is V2) _t1 = *&p0.x else abort 14566554180833181697;
+        _t1
+    }
+    fun extract_last_u8(p0: &E): u8 {
+        let _t1;
+        if (p0 is V1) _t1 = *&(&p0._1).x else if (p0 is V2) _t1 = *&(&p0.y)._0 else abort 14566554180833181697;
+        _t1
+    }
+    fun test1(): u8 {
+        let _t4 = S1<u8,bool>{x: 43u8, y: true};
+        let _t0 = E::V1{_0: 42u8, _1: _t4};
+        extract_first_u8(&_t0)
+    }
+    fun test2(): u8 {
+        let _t4 = S0<u8,bool>{_0: 43u8, _1: true};
+        let _t0 = E::V2{x: 42u8, y: _t4};
+        extract_first_u8(&_t0)
+    }
+    fun test3(): u8 {
+        let _t4 = S1<u8,bool>{x: 43u8, y: true};
+        let _t0 = E::V1{_0: 42u8, _1: _t4};
+        extract_last_u8(&_t0)
+    }
+    fun test4(): u8 {
+        let _t4 = S0<u8,bool>{_0: 43u8, _1: true};
+        let _t0 = E::V2{x: 42u8, y: _t4};
+        extract_last_u8(&_t0)
+    }
+}
+
+
+//# run --verbose -- 0x42::test::test1
+
+//# run --verbose -- 0x42::test::test2
+
+//# run --verbose -- 0x42::test::test3
+
+//# run --verbose -- 0x42::test::test4

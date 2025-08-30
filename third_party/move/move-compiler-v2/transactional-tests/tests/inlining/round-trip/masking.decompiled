@@ -1,0 +1,11 @@
+//**** Cross-compiled for `move` syntax from `tests/inlining/masking.move`
+
+//# publish
+module 0x42::Test {
+    public fun main(): u64 {
+        110
+    }
+}
+
+
+//# run 0x42::Test::main

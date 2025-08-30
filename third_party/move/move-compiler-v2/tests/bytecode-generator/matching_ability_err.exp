@@ -91,7 +91,7 @@ module 0xc0ffee::m {
     fun consume(self: Inner): bool {
         match (self) {
             Inner::Inner1{x: _} => (),
-            Inner::Inner2{x: _,y: _} => (),
+            Inner::Inner2{x: _, y: _} => (),
         };
         true
     }

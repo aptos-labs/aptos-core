@@ -1,0 +1,73 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/more_nested.move`
+
+//# publish
+module 0xc0ffee::n {
+    fun create_adder(p0: u64): |u64|(|u64|(u64)) has copy {
+        |arg0| lambda__2__create_adder(p0, arg0)
+    }
+    fun lambda__2__create_adder(p0: u64, p1: u64): |u64|(u64) {
+        |arg0| lambda__1__create_adder(p0, p1, arg0)
+    }
+    fun create_multiplier(p0: u64): |u64|(|u64|(u64)) has copy {
+        |arg0| lambda__2__create_multiplier(p0, arg0)
+    }
+    fun lambda__2__create_multiplier(p0: u64, p1: u64): |u64|(u64) {
+        |arg0| lambda__1__create_multiplier(p0, p1, arg0)
+    }
+    fun test_composed_captures() {
+        let _t3: |u64|(|u64|(u64)) has copy + drop = |arg0| lambda__2__test_composed_captures(2, arg0);
+        let _t5: |u64|(|u64|(u64)) has copy + drop = |arg0| lambda__4__test_composed_captures(2, arg0);
+        let _t1 = |arg0| lambda__6__test_composed_captures(_t3, _t5, arg0);
+        let _t10 = _t1(3);
+        if (!(_t10(4) == 54)) abort 0;
+    }
+    fun lambda__2__test_composed_captures(p0: u64, p1: u64): |u64|(u64) {
+        |arg0| lambda__1__test_composed_captures(p0, p1, arg0)
+    }
+    fun lambda__4__test_composed_captures(p0: u64, p1: u64): |u64|(u64) {
+        |arg0| lambda__3__test_composed_captures(p0, p1, arg0)
+    }
+    fun lambda__6__test_composed_captures(p0: |u64|(|u64|(u64)), p1: |u64|(|u64|(u64)), p2: u64): |u64|(u64) {
+        |arg0| lambda__5__test_composed_captures(p2, p0, p1, arg0)
+    }
+    fun test_nested_functions() {
+        let _t0 = create_adder(10);
+        let _t1 = _t0(5);
+        if (!(_t1(3) == 18)) abort 0;
+        _t0 = create_multiplier(2);
+        _t1 = _t0(3);
+        if (!(_t1(4) == 24)) abort 1;
+        let _t2 = |arg0| lambda__2__test_nested_functions(5, 3, arg0);
+        _t1 = _t2(2);
+        if (!(_t1(4) == 120)) abort 2;
+    }
+    fun lambda__2__test_nested_functions(p0: u64, p1: u64, p2: u64): |u64|(u64) {
+        |arg0| lambda__1__test_nested_functions(p2, p0, p1, arg0)
+    }
+    fun lambda__1__create_adder(p0: u64, p1: u64, p2: u64): u64 {
+        p0 + p1 + p2
+    }
+    fun lambda__1__create_multiplier(p0: u64, p1: u64, p2: u64): u64 {
+        p0 * p1 * p2
+    }
+    fun lambda__1__test_composed_captures(p0: u64, p1: u64, p2: u64): u64 {
+        p0 * p1 * p2
+    }
+    fun lambda__3__test_composed_captures(p0: u64, p1: u64, p2: u64): u64 {
+        p0 + p1 + p2
+    }
+    fun lambda__5__test_composed_captures(p0: u64, p1: |u64|(|u64|(u64)), p2: |u64|(|u64|(u64)), p3: u64): u64 {
+        let _t4 = p2(p0);
+        let _t10 = _t4(p3);
+        let _t13 = p1(p0);
+        _t13(_t10)
+    }
+    fun lambda__1__test_nested_functions(p0: u64, p1: u64, p2: u64, p3: u64): u64 {
+        p1 * p2 * p0 * p3
+    }
+}
+
+
+//# run 0xc0ffee::n::test_nested_functions
+
+//# run 0xc0ffee::n::test_composed_captures

@@ -1,0 +1,39 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/access_control/generic.move`
+
+//# publish
+module 0x42::test {
+    struct R<T0> has drop, key {
+        value: T0,
+    }
+    fun init(p0: &signer) {
+        let _t3 = R<bool>{value: true};
+        move_to<R<bool>>(p0, _t3);
+    }
+    fun fail1(): bool
+        reads R<u64>
+        acquires R
+    {
+        *&borrow_global<R<bool>>(@0x1).value
+    }
+    fun ok1(): bool
+        reads R
+        acquires R
+    {
+        *&borrow_global<R<bool>>(@0x1).value
+    }
+    fun ok2(): bool
+        reads R<bool>
+        acquires R
+    {
+        *&borrow_global<R<bool>>(@0x1).value
+    }
+}
+
+
+//# run --verbose --signers 0x1 -- 0x42::test::init
+
+//# run --verbose -- 0x42::test::ok1
+
+//# run --verbose -- 0x42::test::ok2
+
+//# run --verbose -- 0x42::test::fail1

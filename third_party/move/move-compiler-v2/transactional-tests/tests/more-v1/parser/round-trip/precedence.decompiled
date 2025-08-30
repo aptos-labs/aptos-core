@@ -1,0 +1,8 @@
+//**** Cross-compiled for `move` syntax from `tests/more-v1/parser/precedence.move`
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}

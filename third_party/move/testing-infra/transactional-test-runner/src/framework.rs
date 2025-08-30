@@ -1112,6 +1112,11 @@ where
             .remove(&target.syntax)
             .unwrap_or_default();
         if !source_lines.is_empty() {
+            let exp_suffix = if exp_suffix.is_some() {
+                exp_suffix
+            } else {
+                &target.suffix
+            };
             let path = handle_cross_compiled_output(path, target, &source_lines)?;
             if target.run_after {
                 run_test_impl::<Adapter>(config.clone(), &path, pre_compiled_deps_v2, exp_suffix)?

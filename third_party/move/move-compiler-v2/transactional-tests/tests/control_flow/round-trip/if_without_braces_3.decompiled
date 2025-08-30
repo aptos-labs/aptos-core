@@ -1,0 +1,8 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/if_without_braces_3.move`
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}

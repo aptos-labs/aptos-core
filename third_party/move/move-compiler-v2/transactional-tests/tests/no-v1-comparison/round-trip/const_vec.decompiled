@@ -1,0 +1,18 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/const_vec.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test1(): u8 {
+        let _t0 = vector[0u8, 128u8];
+        *0x1::vector::borrow<u8>(&_t0, 0)
+    }
+    public fun test2(): u8 {
+        let _t0 = vector[0u8, 128u8];
+        *0x1::vector::borrow<u8>(&_t0, 0)
+    }
+}
+
+
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::test2

@@ -1,0 +1,43 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/assign_unpack_references.move`
+
+//# publish
+module 0x42::m {
+    struct R has drop {
+        s1: S,
+        s2: S,
+    }
+    struct S has drop {
+        f: u64,
+    }
+    fun t1() {
+        let _t4 = S{f: 0};
+        let _t6 = S{f: 1};
+        let _t0 = R{s1: _t4, s2: _t6};
+        let _t1 = &_t0;
+        let _t10 = &_t1.s1;
+        let _t2 = &_t1.s2;
+        if (!(*&_t10.f == 0)) abort 0;
+        if (!(*&_t2.f == 1)) abort 1;
+    }
+    fun t2() {
+        let _t9 = S{f: 0};
+        let _t11 = S{f: 1};
+        let _t0 = R{s1: _t9, s2: _t11};
+        let _t1 = &mut _t0;
+        let _t2 = &mut _t1.s1;
+        let _t3 = &mut _t1.s2;
+        if (!(*&mut _t2.f == 0)) abort 0;
+        if (!(*&_t3.f == 1)) abort 1;
+        let _t6 = 5;
+        let _t29 = &mut _t6;
+        let _t7 = S{f: 0};
+        _t3 = &mut _t7;
+        if (!(*_t29 == 5)) abort 0;
+        if (!(*&_t3.f == 0)) abort 1;
+    }
+}
+
+
+//# run 0x42::m::t1
+
+//# run 0x42::m::t2

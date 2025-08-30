@@ -1,0 +1,11 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/cyclic_assignment_without_use.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test(p0: u64) {
+        ()
+    }
+}
+
+
+//# run 0xc0ffee::m::test --args 55

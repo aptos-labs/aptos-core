@@ -41,6 +41,7 @@ module 0xc0ffee::m {
 
 // -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::m {
+    use std::vector;
     struct TestOrder has copy, drop, store {
         price: u64,
         size: u64,

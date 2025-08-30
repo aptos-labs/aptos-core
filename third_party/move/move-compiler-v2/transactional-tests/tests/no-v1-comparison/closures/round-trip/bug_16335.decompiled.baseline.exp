@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 3-3:  run --verbose 0x42::Test::f2
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::Test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

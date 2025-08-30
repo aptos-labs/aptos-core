@@ -1,0 +1,22 @@
+//**** Cross-compiled for `move` syntax from `tests/operator_eval/op_with_side_effect_27.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test(p0: bool): bool {
+        let _t3;
+        let _t2;
+        if (p0) _t2 = false else {
+            let _t1;
+            if (p0) _t1 = false else _t1 = false;
+            p0 = _t1;
+            _t2 = p0
+        };
+        if (_t2) _t3 = true else _t3 = !!p0;
+        _t3
+    }
+}
+
+
+//# run 0xc0ffee::m::test --args true
+
+//# run 0xc0ffee::m::test --args false

@@ -1,0 +1,14 @@
+processed 2 tasks
+task 0 lines 3-7:  publish [module 0xaa00::M0 {]
+task 1 lines 10-24:  publish [module 0xaa00::M1 {]
+Error: compilation errors:
+ error: unexpected token
+   ┌─ TEMPFILE1:15:26
+   │
+15 │         let _t1: ||M0::S1| has drop| has copy + drop = |arg0: |M0::S1| has drop| lambda__1__f1(arg0);
+   │                          ^
+   │                          │
+   │                          Unexpected '|'
+   │                          Expected ';'
+
+

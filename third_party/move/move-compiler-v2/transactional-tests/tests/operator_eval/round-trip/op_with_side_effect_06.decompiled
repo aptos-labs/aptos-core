@@ -1,0 +1,20 @@
+//**** Cross-compiled for `move` syntax from `tests/operator_eval/op_with_side_effect_06.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun inc(p0: &mut u64, p1: u64): u64 {
+        *p0 = *p0 + p1;
+        *p0
+    }
+    public fun test(): u64 {
+        let _t0 = 1;
+        let _t4 = inc(&mut _t0, 5);
+        let _t7 = inc(&mut _t0, 6);
+        let _t8 = _t4 + _t7;
+        let _t11 = inc(&mut _t0, 7);
+        _t8 + _t11
+    }
+}
+
+
+//# run 0xc0ffee::m::test

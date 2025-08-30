@@ -1,0 +1,46 @@
+//**** Cross-compiled for `move` syntax from `tests/evaluation_order/side_effecting_args.move`
+
+//# publish
+module 0xdeadbeef::test {
+    fun add(p0: u64, p1: u64, p2: u64): u64 {
+        p0 + p1 + p2
+    }
+    fun inc(p0: &mut u64): u64 {
+        *p0 = *p0 + 1;
+        *p0
+    }
+    fun test1(): u64 {
+        let _t0 = 1;
+        let _t2 = _t0;
+        let _t4 = inc(&mut _t0);
+        let _t6 = inc(&mut _t0);
+        add(_t2, _t4, _t6)
+    }
+    fun test2(): u64 {
+        let _t0 = 1 + 1;
+        let _t4 = _t0;
+        _t0 = _t0 + 1;
+        add(_t4, _t0, _t0)
+    }
+    fun test3(): u64 {
+        let _t0 = 1 + 1;
+        let _t8 = _t0 + 1;
+        add(_t0, _t0, _t8)
+    }
+    fun test4(): u64 {
+        let _t0 = 1 + 1;
+        let _t4 = _t0;
+        _t0 = _t0 + 1;
+        let _t11 = _t0 + 1;
+        add(_t4, _t0, _t11)
+    }
+}
+
+
+//# run 0xdeadbeef::test::test1
+
+//# run 0xdeadbeef::test::test2
+
+//# run 0xdeadbeef::test::test3
+
+//# run 0xdeadbeef::test::test4

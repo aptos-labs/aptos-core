@@ -58,7 +58,7 @@ module 0x2::M {
     fun t0(): Box<u64> {
         let v = Container::new<u64>();
         let x = Container::get<u64>(&v);
-        let b = Box<u64>{f1: x,f2: x};
+        let b = Box<u64>{f1: x, f2: x};
         Container::put<u64>(&mut v, 0);
         b
     }

@@ -69,7 +69,7 @@ module 0x8675309::M {
     fun t0() {
         let f;
         let s2;
-        R{s1: S{f: f},s2: s2} = R{s1: S{f: 0},s2: S{f: 1}};
+        R{s1: S{f: f}, s2: s2} = R{s1: S{f: 0}, s2: S{f: 1}};
         f;
         s2;
         f = 0;
@@ -80,7 +80,7 @@ module 0x8675309::M {
     fun t1() {
         let f;
         let s2;
-        R{s1: S{f: f},s2: s2} = &R{s1: S{f: 0},s2: S{f: 1}};
+        R{s1: S{f: f}, s2: s2} = &R{s1: S{f: 0}, s2: S{f: 1}};
         f;
         s2;
         f = &0;
@@ -91,7 +91,7 @@ module 0x8675309::M {
     fun t2() {
         let f;
         let s2;
-        R{s1: S{f: f},s2: s2} = &mut R{s1: S{f: 0},s2: S{f: 1}};
+        R{s1: S{f: f}, s2: s2} = &mut R{s1: S{f: 0}, s2: S{f: 1}};
         f;
         s2;
         f = &mut 0;

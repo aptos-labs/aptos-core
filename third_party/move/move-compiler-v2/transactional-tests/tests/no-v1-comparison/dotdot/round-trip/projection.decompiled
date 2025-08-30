@@ -1,0 +1,69 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/dotdot/projection.move`
+
+//# publish
+module 0x42::test {
+    struct T<T0, T1> has drop {
+        x: T0,
+        y: T1,
+    }
+    struct S<T0, T1, T2> has drop {
+        _0: T0,
+        _1: T1,
+        _2: T2,
+    }
+    fun get_x<T0, T1: drop>(p0: T<T0, T1>): T0 {
+        let T<T0,T1>{x: _t2, y: _t3} = p0;
+        _t2
+    }
+    fun get_x_ref<T0, T1>(p0: &T<T0, T1>): &T0 {
+        &p0.x
+    }
+    fun proj_0<T0, T1: drop, T2: drop>(p0: S<T0, T1, T2>): T0 {
+        let S<T0,T1,T2>{_0: _t2, _1: _t3, _2: _t4} = p0;
+        _t2
+    }
+    fun proj_0_ref<T0, T1, T2>(p0: &S<T0, T1, T2>): &T0 {
+        &p0._0
+    }
+    fun proj_2<T0: drop, T1: drop, T2>(p0: S<T0, T1, T2>): T2 {
+        let S<T0,T1,T2>{_0: _t3, _1: _t4, _2: _t5} = p0;
+        _t5
+    }
+    fun proj_2_ref<T0, T1, T2>(p0: &S<T0, T1, T2>): &T2 {
+        &p0._2
+    }
+    fun test_get_x(): u8 {
+        get_x<u8,bool>(T<u8,bool>{x: 42u8, y: true})
+    }
+    fun test_get_x_ref(): u8 {
+        let _t0 = T<u8,bool>{x: 42u8, y: true};
+        *get_x_ref<u8,bool>(&_t0)
+    }
+    fun test_proj_0(): u8 {
+        proj_0<u8,address,bool>(S<u8,address,bool>{_0: 42u8, _1: @0x1, _2: true})
+    }
+    fun test_proj_0_ref(): u8 {
+        let _t0 = S<u8,address,bool>{_0: 42u8, _1: @0x1, _2: true};
+        *proj_0_ref<u8,address,bool>(&_t0)
+    }
+    fun test_proj_2(): bool {
+        proj_2<u64,address,bool>(S<u64,address,bool>{_0: 42, _1: @0x1, _2: true})
+    }
+    fun test_proj_2_ref(): bool {
+        let _t0 = S<u64,address,bool>{_0: 42, _1: @0x1, _2: true};
+        *proj_2_ref<u64,address,bool>(&_t0)
+    }
+}
+
+
+//# run --verbose -- 0x42::test::test_proj_0
+
+//# run --verbose -- 0x42::test::test_proj_0_ref
+
+//# run --verbose -- 0x42::test::test_proj_2
+
+//# run --verbose -- 0x42::test::test_proj_2_ref
+
+//# run --verbose -- 0x42::test::test_get_x
+
+//# run --verbose -- 0x42::test::test_get_x_ref

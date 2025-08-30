@@ -1,0 +1,42 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/consume_1.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct W has copy, drop {
+        x: u64,
+    }
+    fun consume(p0: u64) {
+        ()
+    }
+    fun consume_(p0: W) {
+        ()
+    }
+    public fun test1(p0: u64) {
+        consume(p0);
+        consume(p0);
+    }
+    public fun test2(p0: u64) {
+        consume(p0);
+        consume(p0);
+    }
+    public fun test3(p0: W) {
+        consume_(p0);
+        consume_(p0);
+    }
+    public fun test4(p0: W) {
+        consume_(p0);
+        consume_(p0);
+    }
+    public fun test5() {
+        let _t0 = W{x: 42};
+        test3(_t0);
+        test4(_t0);
+    }
+}
+
+
+//# run 0xc0ffee::m::test1 --args 42
+
+//# run 0xc0ffee::m::test2 --args 42
+
+//# run 0xc0ffee::m::test5

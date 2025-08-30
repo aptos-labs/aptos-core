@@ -1,0 +1,13 @@
+processed 1 task
+task 0 lines 3-15:  publish [module 0xcafe::Module0 {]
+Error: compilation errors:
+ error: unexpected token
+  ┌─ TEMPFILE:5:31
+  │
+5 │     public fun f1(p0: &||&u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8| has drop| has drop) {
+  │                               ^
+  │                               │
+  │                               Unexpected '&'
+  │                               Expected an identifier
+
+

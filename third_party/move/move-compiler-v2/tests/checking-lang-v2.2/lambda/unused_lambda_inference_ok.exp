@@ -14,7 +14,7 @@ module 0x8675309::M {
 // -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     public fun f() {
-        let _x : |u64|u64 has drop = |arg0| lambda__1__f(arg0);
+        let _x: |u64|u64 has drop = |arg0| lambda__1__f(arg0);
     }
     fun lambda__1__f(i: u64): u64 {
         i + 1

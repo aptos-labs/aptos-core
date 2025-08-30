@@ -1,0 +1,44 @@
+processed 4 tasks
+task 0 lines 3-106:  publish [module 0x66::fv_enum_basic {]
+Error: compilation errors:
+ error: cannot select field `_0` since it has different types in variants of enum `Mapper<u64, u64>`
+   ┌─ TEMPFILE:64:24
+   │
+64 │             let _t3 = &_t2._0;
+   │                        ^^^
+   │
+   = field `_0` has type `Version<u64, u64>` in variant `Twice` and type `|u64|u64 has copy + store` in variant `Id`
+
+error: cannot select field `_0` since it has different types in variants of enum `Mapper<u64, u64>`
+   ┌─ TEMPFILE:70:26
+   │
+70 │             let _t38 = *&_t2._0;
+   │                          ^^^
+   │
+   = field `_0` has type `Version<u64, u64>` in variant `Twice` and type `|u64|u64 has copy + store` in variant `Id`
+
+
+task 1 lines 109-109:  run 0x66::fv_enum_basic::call_square --args 7
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 111-111:  run 0x66::fv_enum_basic::test_enum_in_another_enum --signers 0x66
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 113-113:  run 0x66::fv_enum_basic::test_fun_vec --signers 0x66
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

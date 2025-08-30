@@ -1,0 +1,11 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/bug_12068.move`
+
+//# publish
+module 0x32::m {
+    public fun main() {
+        if (!(0 + 1 == 1)) abort 42;
+    }
+}
+
+
+//# run 0x32::m::main

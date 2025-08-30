@@ -1,0 +1,8 @@
+//**** Cross-compiled for `move` syntax from `tests/inlining/bug_11223.move`
+
+//# publish --print-bytecode
+module 0xcafe::vectors {
+    public entry fun guess_flips_break2(p0: vector<u8>): u64 {
+        0x1::vector::length<u8>(&p0)
+    }
+}

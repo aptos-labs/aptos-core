@@ -1,0 +1,15 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/very_large_2.move`
+
+//# publish
+module 0xcafe::Module0 {
+    public fun f1(p0: &||&u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8| has drop| has drop) {
+        ()
+    }
+    public fun f2() {
+        let _t0: ||&u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8| has drop| has drop = |arg0: |&u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8| has drop| lambda__1__f2(arg0);
+        f1(&_t0);
+    }
+    fun lambda__1__f2(p0: |&u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8| has drop) {
+        ()
+    }
+}

@@ -43,7 +43,7 @@ module 0x815::m {
     }
     fun match(c: CommonFields, t: u64): bool {
         match (c) {
-            CommonFields::Foo{x: x,y: _} => x > t,
+            CommonFields::Foo{x: x, y: _} => x > t,
             _ => false,
         }
     }

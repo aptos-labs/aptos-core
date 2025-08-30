@@ -1,0 +1,136 @@
+//**** Cross-compiled for `move` syntax from `tests/operators/arithmetic_operators_u32.move`
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1u32 + 4294967295u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 4294967295u32 + 4294967295u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0u32 - 1u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 54u32 - 100u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1147483647u32 * 2147483647u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0u32 / 0u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1u32 / 0u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 4294967294u32 / 0u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0u32 % 0u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1u32 % 0u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 4294967294u32 % 0u32;
+    }
+}

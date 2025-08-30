@@ -1,0 +1,17 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/return_in_if_branch_taken_no_else.move`
+
+//# publish
+module 0x42::Test {
+    public fun t(): u64 {
+        100
+    }
+}
+
+
+//# run
+script {
+    use 0x42::Test;
+    fun main() {
+        if (!(Test::t() == 100)) abort 42;
+    }
+}

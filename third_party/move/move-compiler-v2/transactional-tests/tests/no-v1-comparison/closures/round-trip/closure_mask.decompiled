@@ -1,0 +1,24 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/closure_mask.move`
+
+//# publish
+module 0x42::test {
+    fun if_then(p0: bool, p1: u64, p2: u64): u64 {
+        let _t3;
+        if (p0) _t3 = p1 else _t3 = p2;
+        _t3
+    }
+    public fun run(): bool {
+        let _t0 = |arg0,arg1| if_then(true, arg0, arg1);
+        let _t1 = |arg0,arg1| if_then(arg0, 10, arg1);
+        let _t2 = |arg0| if_then(false, 10, arg0);
+        let _t3 = |arg0,arg1| if_then(arg0, arg1, 20);
+        if (!(_t0(3, 4) == 3)) abort 14566554180833181696;
+        if (!(_t1(true, 22222) == 10)) abort 14566554180833181696;
+        if (!(_t2(43) == 43)) abort 14566554180833181696;
+        if (!(_t3(false, 23333) == 20)) abort 14566554180833181696;
+        true
+    }
+}
+
+
+//# run 0x42::test::run
