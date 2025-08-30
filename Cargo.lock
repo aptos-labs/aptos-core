@@ -10847,11 +10847,9 @@ dependencies = [
 [[package]]
 name = "jemalloc-sys"
 version = "0.5.4+5.3.0-patched"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac6c1946e1cea1788cbfde01c993b52a10e2da07f4bac608228d1bed20bfebf2"
+source = "git+https://github.com/wqfish/jemalloc-sys-shim?rev=bdf9d118625ac384abb9a5f70d36b3837a33d7de#bdf9d118625ac384abb9a5f70d36b3837a33d7de"
 dependencies = [
- "cc",
- "libc",
+ "tikv-jemalloc-sys",
 ]
 
 [[package]]
@@ -17756,6 +17754,16 @@ dependencies = [
  "flate2",
  "jpeg-decoder",
  "weezl",
+]
+
+[[package]]
+name = "tikv-jemalloc-sys"
+version = "0.6.0+5.3.0-1-ge13ca993e8ccb9ba9847cc330696e02839f328f7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd3c60906412afa9c2b5b5a48ca6a5abe5736aec9eb48ad05037a677e52e4e2d"
+dependencies = [
+ "cc",
+ "libc",
 ]
 
 [[package]]
