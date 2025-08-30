@@ -28,7 +28,10 @@ use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
 pub fn create_option_u64(value: Option<u64>) -> Value {
-    Value::struct_(Struct::pack(vec![Value::vector_u64(value)]))
+    match value {
+        Some(value) => Value::struct_(Struct::pack_variant(1, vec![Value::u64(value)])),
+        None => Value::struct_(Struct::pack_variant(0, vec![])),
+    }
 }
 
 /***************************************************************************************************

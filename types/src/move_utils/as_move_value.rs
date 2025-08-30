@@ -16,6 +16,11 @@ impl<T: AsMoveValue> AsMoveValue for Option<T> {
         };
 
         MoveValue::Struct(MoveStruct::Runtime(vec![MoveValue::Vector(items)]))
+        // if let Some(obj) = self.as_ref() {
+        //     MoveValue::Struct(MoveStruct::RuntimeVariant(1, vec![obj.as_move_value()]))
+        // } else {
+        //     MoveValue::Struct(MoveStruct::RuntimeVariant(0, vec![]))
+        // }
     }
 }
 

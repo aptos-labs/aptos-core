@@ -4,7 +4,7 @@
 use crate::{
     docgen::DocgenOptions,
     extended_checks,
-    natives::code::{ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy},
+    natives::code::{ModuleMetadata, PackageDep, PackageMetadata, UpgradePolicy},
     zip_metadata, zip_metadata_str,
 };
 use anyhow::bail;
@@ -544,7 +544,7 @@ impl BuiltPackage {
                 name,
                 source,
                 source_map,
-                extension: MoveOption::default(),
+                extension: Option::default(),
             })
         }
         let deps = self
@@ -584,7 +584,7 @@ impl BuiltPackage {
             manifest,
             modules,
             deps,
-            extension: MoveOption::none(),
+            extension: Option::default(),
         })
     }
 

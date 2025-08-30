@@ -33,6 +33,12 @@ pub struct Configuration {
 
 impl AsMoveValue for Configuration {
     fn as_move_value(&self) -> MoveValue {
+        // let training_wheels_pubkey = match self.training_wheels_pubkey.as_ref() {
+        //     Some(pubkey) => {
+        //         MoveValue::Struct(MoveStruct::RuntimeVariant(1, vec![pubkey.as_move_value()]))
+        //     },
+        //     None => MoveValue::Struct(MoveStruct::RuntimeVariant(0, vec![])),
+        // };
         MoveValue::Struct(MoveStruct::Runtime(vec![
             self.override_aud_vals.as_move_value(),
             self.max_signatures_per_txn.as_move_value(),

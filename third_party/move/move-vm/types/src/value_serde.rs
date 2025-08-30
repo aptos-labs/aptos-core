@@ -238,6 +238,10 @@ impl<'a> ValueSerDeContext<'a> {
     pub fn deserialize(self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
         let seed = DeserializationSeed { ctx: &self, layout };
         bcs::from_bytes_seed(seed, bytes).ok()
+        // Some(
+        //     bcs::from_bytes_seed(seed, bytes)
+        //         .unwrap_or_else(|err| panic!("Error deserializing value: {:?}", err)),
+        // )
     }
 
     /// Deserializes the bytes using the provided layout into a Move [Value], returning

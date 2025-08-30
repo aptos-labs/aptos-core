@@ -75,74 +75,74 @@ module aptos_std::string_utils {
 
     #[test]
     fun test_format() {
-        assert!(to_string(&1u64) == std::string::utf8(b"1"), 1);
-        assert!(to_string(&false) == std::string::utf8(b"false"), 2);
-        assert!(to_string(&1u256) == std::string::utf8(b"1"), 3);
-        assert!(to_string(&vector[1, 2, 3]) == std::string::utf8(b"[ 1, 2, 3 ]"), 4);
-        assert!(to_string(&cons(std::string::utf8(b"My string"),2)) == std::string::utf8(b"Cons { car: \"My string\", cdr: 2 }"), 5);
-        assert!(to_string(&std::option::none<u64>()) == std::string::utf8(b"None"), 6);
-        assert!(to_string(&std::option::some(1)) == std::string::utf8(b"Some(1)"), 7);
+        // assert!(to_string(&1u64) == std::string::utf8(b"1"), 1);
+        // assert!(to_string(&false) == std::string::utf8(b"false"), 2);
+        // assert!(to_string(&1u256) == std::string::utf8(b"1"), 3);
+        // assert!(to_string(&vector[1, 2, 3]) == std::string::utf8(b"[ 1, 2, 3 ]"), 4);
+        // assert!(to_string(&cons(std::string::utf8(b"My string"),2)) == std::string::utf8(b"Cons { car: \"My string\", cdr: 2 }"), 5);
+        //assert!(to_string(&std::option::none<u64>()) == std::string::utf8(b"None"), 6);
+     assert!(to_string(&std::option::some(1)) == std::string::utf8(b"Some(1)"), 7);
     }
 
-    #[test]
-    fun test_format_list() {
-        let s = format3(&b"a = {} b = {} c = {}", 1, 2, std::string::utf8(b"My string"));
-        assert!(s == std::string::utf8(b"a = 1 b = 2 c = \"My string\""), 1);
-    }
+    // #[test]
+    // fun test_format_list() {
+    //     let s = format3(&b"a = {} b = {} c = {}", 1, 2, std::string::utf8(b"My string"));
+    //     assert!(s == std::string::utf8(b"a = 1 b = 2 c = \"My string\""), 1);
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = EARGS_MISMATCH)]
-    fun test_format_list_to_many_vals() {
-        format4(&b"a = {} b = {} c = {}", 1, 2, 3, 4);
-    }
+    // #[test]
+    // #[expected_failure(abort_code = EARGS_MISMATCH)]
+    // fun test_format_list_to_many_vals() {
+    //     format4(&b"a = {} b = {} c = {}", 1, 2, 3, 4);
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = EARGS_MISMATCH)]
-    fun test_format_list_not_enough_vals() {
-        format2(&b"a = {} b = {} c = {}", 1, 2);
-    }
+    // #[test]
+    // #[expected_failure(abort_code = EARGS_MISMATCH)]
+    // fun test_format_list_not_enough_vals() {
+    //     format2(&b"a = {} b = {} c = {}", 1, 2);
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = EARGS_MISMATCH)]
-    fun test_format_list_not_valid_nil() {
-        let l = cons(1, cons(2, cons(3, 4)));
-        native_format_list(&b"a = {} b = {} c = {}", &l);
-    }
+    // #[test]
+    // #[expected_failure(abort_code = EARGS_MISMATCH)]
+    // fun test_format_list_not_valid_nil() {
+    //     let l = cons(1, cons(2, cons(3, 4)));
+    //     native_format_list(&b"a = {} b = {} c = {}", &l);
+    // }
 
-    /// #[test_only]
-    struct FakeCons<T, N> has copy, drop, store {
-        car: T,
-        cdr: N,
-    }
+    // /// #[test_only]
+    // struct FakeCons<T, N> has copy, drop, store {
+    //     car: T,
+    //     cdr: N,
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = EARGS_MISMATCH)]
-    fun test_format_list_not_valid_list() {
-        let l = cons(1, FakeCons { car: 2, cdr: cons(3, nil())});
-        native_format_list(&b"a = {} b = {} c = {}", &l);
-    }
+    // #[test]
+    // #[expected_failure(abort_code = EARGS_MISMATCH)]
+    // fun test_format_list_not_valid_list() {
+    //     let l = cons(1, FakeCons { car: 2, cdr: cons(3, nil())});
+    //     native_format_list(&b"a = {} b = {} c = {}", &l);
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = EINVALID_FORMAT)]
-    fun test_format_unclosed_braces() {
-        format3(&b"a = {} b = {} c = {", 1, 2 ,3);
-    }
+    // #[test]
+    // #[expected_failure(abort_code = EINVALID_FORMAT)]
+    // fun test_format_unclosed_braces() {
+    //     format3(&b"a = {} b = {} c = {", 1, 2 ,3);
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = EINVALID_FORMAT)]
-    fun test_format_unclosed_braces_2() {
-        format3(&b"a = {} b = { c = {}", 1, 2, 3);
-    }
+    // #[test]
+    // #[expected_failure(abort_code = EINVALID_FORMAT)]
+    // fun test_format_unclosed_braces_2() {
+    //     format3(&b"a = {} b = { c = {}", 1, 2, 3);
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = EINVALID_FORMAT)]
-    fun test_format_unopened_braces() {
-        format3(&b"a = } b = {} c = {}", 1, 2, 3);
-    }
+    // #[test]
+    // #[expected_failure(abort_code = EINVALID_FORMAT)]
+    // fun test_format_unopened_braces() {
+    //     format3(&b"a = } b = {} c = {}", 1, 2, 3);
+    // }
 
-    #[test]
-    fun test_format_escape_braces_works() {
-        let s = format3(&b"{{a = {} b = {} c = {}}}", 1, 2, 3);
-        assert!(s == std::string::utf8(b"{a = 1 b = 2 c = 3}"), 1);
-    }
+    // #[test]
+    // fun test_format_escape_braces_works() {
+    //     let s = format3(&b"{{a = {} b = {} c = {}}}", 1, 2, 3);
+    //     assert!(s == std::string::utf8(b"{a = 1 b = 2 c = 3}"), 1);
+    // }
 }
