@@ -23,6 +23,7 @@ members = [
     "aptos-move/aptos-sdk-builder",
     "aptos-move/aptos-transaction-benchmarks",
     "aptos-move/aptos-transaction-simulation",
+    "aptos-move/aptos-transaction-simulation-session",
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
@@ -463,6 +464,7 @@ aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
 aptos-transaction-workloads-lib = { path = "crates/transaction-workloads-lib" }
 aptos-transaction-simulation = { path = "aptos-move/aptos-transaction-simulation" }
+aptos-transaction-simulation-session = { path = "aptos-move/aptos-transaction-simulation-session" }
 aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }

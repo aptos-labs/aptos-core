@@ -158,6 +158,18 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         self.view_arguments_impl(&param_tys, ty_args, args, &mut limit)
     }
 
+    pub fn view_function_returns(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+        ty_args: &[TypeTag],
+        returns: &[Vec<u8>],
+    ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
+        let mut limit = Limiter::default();
+        let return_tys = self.resolve_function_returns(module, function, &mut limit)?;
+        self.view_arguments_impl(&return_tys, ty_args, returns, &mut limit)
+    }
+
     fn view_arguments_impl(
         &self,
         param_tys: &[FatType],
@@ -222,6 +234,31 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             if fhandle_view.name() == function {
                 return fhandle_view
                     .parameters()
+                    .0
+                    .iter()
+                    .map(|signature| {
+                        self.resolve_signature(BinaryIndexedView::Module(m), signature, limit)
+                    })
+                    .collect::<anyhow::Result<_>>();
+            }
+        }
+        Err(anyhow!("Function {:?} not found in {:?}", function, module))
+    }
+
+    fn resolve_function_returns(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<Vec<FatType>> {
+        let m = self.view_existing_module(module)?;
+        let m = m.borrow();
+        for def in m.function_defs.iter() {
+            let fhandle = m.function_handle_at(def.function);
+            let fhandle_view = FunctionHandleView::new(m, fhandle);
+            if fhandle_view.name() == function {
+                return fhandle_view
+                    .return_()
                     .0
                     .iter()
                     .map(|signature| {
