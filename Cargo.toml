@@ -937,3 +937,8 @@ futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "bac
 futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+
+# There is a circular dependency between aptos-core, aptos-indexer-processor-sdk, and aptos-indexer-processors-v2.
+# We cannot simply change the version and package for `jemalloc-sys` in one repo without affecting others, so we
+# have to keep this shim until everything uses `tikv-jemalloc-sys`.
+jemalloc-sys = { git = "https://github.com/wqfish/jemalloc-sys-shim", rev = "bdf9d118625ac384abb9a5f70d36b3837a33d7de" }
