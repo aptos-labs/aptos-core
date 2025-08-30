@@ -22,11 +22,14 @@
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{ExpData, Operation},
-    model::FunctionEnv,
+    model::{FunctionEnv, NodeId},
 };
+use std::collections::HashSet;
 
 #[derive(Default)]
-pub struct CollapsibleIf;
+pub struct CollapsibleIf {
+    reported_nodes: HashSet<NodeId>,
+}
 
 impl ExpChecker for CollapsibleIf {
     fn get_name(&self) -> String {
@@ -41,6 +44,11 @@ impl ExpChecker for CollapsibleIf {
             return;
         };
 
+        // Skip if we've already reported this node as part of a larger collapsible if
+        if self.reported_nodes.contains(outer_id) {
+            return;
+        }
+
         // Check if the outer if has no else branch (or empty else branch)
         if !matches!(outer_else.as_ref(), ExpData::Call(_, Operation::Tuple, args) if args.is_empty())
         {
@@ -48,7 +56,7 @@ impl ExpChecker for CollapsibleIf {
         }
 
         // Check if the then branch contains an if statement
-        let IfElse(.., inner_else) = then_branch.as_ref() else {
+        let IfElse(inner_id, .., inner_else) = then_branch.as_ref() else {
             return;
         };
 
@@ -58,7 +66,10 @@ impl ExpChecker for CollapsibleIf {
             return;
         }
 
-        // Report the issue
+        // Mark the inner if as reported so we don't report it separately
+        self.reported_nodes.insert(*inner_id);
+
+        // Report the issue for the outer if
         let env = function.env();
         self.report(
             env,
