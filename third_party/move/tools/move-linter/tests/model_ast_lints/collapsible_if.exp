@@ -1,0 +1,87 @@
+Aborting with compilation errors:
+exiting with env checking errors
+warning: [lint] Nested `if` statements can be collapsed into a single `if` by using logical conjunction (`&&`) of the conditions
+   ┌─ tests/model_ast_lints/collapsible_if.move:12:9
+   │
+12 │ ╭         if (a) {
+13 │ │             if (b) {
+14 │ │                 bar();
+15 │ │             }
+16 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(collapsible_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#collapsible_if.
+
+warning: [lint] Nested `if` statements can be collapsed into a single `if` by using logical conjunction (`&&`) of the conditions
+   ┌─ tests/model_ast_lints/collapsible_if.move:21:9
+   │
+21 │ ╭         if (foo(x)) {
+22 │ │             if (foo(y)) {
+23 │ │                 bar();
+24 │ │             }
+25 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(collapsible_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#collapsible_if.
+
+warning: [lint] Nested `if` statements can be collapsed into a single `if` by using logical conjunction (`&&`) of the conditions
+   ┌─ tests/model_ast_lints/collapsible_if.move:30:9
+   │
+30 │ ╭         if (x > 5) {
+31 │ │             if (y < 20) {
+32 │ │                 bar();
+33 │ │             }
+34 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(collapsible_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#collapsible_if.
+
+warning: [lint] Nested `if` statements can be collapsed into a single `if` by using logical conjunction (`&&`) of the conditions
+   ┌─ tests/model_ast_lints/collapsible_if.move:40:13
+   │
+40 │ ╭             if (b) {
+41 │ │                 if (c) {
+42 │ │                     bar();
+43 │ │                 }
+44 │ │             }
+   │ ╰─────────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(collapsible_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#collapsible_if.
+
+warning: [lint] Nested `if` statements can be collapsed into a single `if` by using logical conjunction (`&&`) of the conditions
+   ┌─ tests/model_ast_lints/collapsible_if.move:39:9
+   │
+39 │ ╭         if (a) {
+40 │ │             if (b) {
+41 │ │                 if (c) {
+42 │ │                     bar();
+43 │ │                 }
+44 │ │             }
+45 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(collapsible_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#collapsible_if.
+
+error: unknown lint check: `nested_if`
+    ┌─ tests/model_ast_lints/collapsible_if.move:102:18
+    │
+102 │     #[lint::skip(nested_if)]
+    │                  ^^^^^^^^^
+
+warning: [lint] Nested `if` statements can be collapsed into a single `if` by using logical conjunction (`&&`) of the conditions
+    ┌─ tests/model_ast_lints/collapsible_if.move:104:9
+    │
+104 │ ╭         if (a) {
+105 │ │             if (b) {
+106 │ │                 bar();
+107 │ │             }
+108 │ │         }
+    │ ╰─────────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(collapsible_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#collapsible_if.
