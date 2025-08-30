@@ -3,12 +3,18 @@
 
 use crate::state_store::state_view::hot_state_view::HotStateView;
 use aptos_experimental_layered_map::LayeredMap;
+use aptos_logger::prelude::*;
 use aptos_types::state_store::{
     hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
 };
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
+/// NOTE: this always operates on a single shard.
 pub(crate) struct HotStateLRU<'a> {
+    shard_id: usize,
     /// The entire committed hot state. While this may contain all the shards, this struct is
     /// supposed to handle a single shard.
     committed: Arc<dyn HotStateView>,
@@ -26,6 +32,7 @@ pub(crate) struct HotStateLRU<'a> {
 
 impl<'a> HotStateLRU<'a> {
     pub fn new(
+        shard_id: usize,
         committed: Arc<dyn HotStateView>,
         overlay: &'a LayeredMap<StateKey, StateSlot>,
         head: Option<StateKey>,
@@ -33,6 +40,7 @@ impl<'a> HotStateLRU<'a> {
         num_items: usize,
     ) -> Self {
         Self {
+            shard_id,
             committed,
             overlay,
             pending: HashMap::new(),
@@ -71,6 +79,7 @@ impl<'a> HotStateLRU<'a> {
             },
         }
 
+        info!("self.num_items: {} (before)", self.num_items);
         self.num_items += 1;
     }
 
@@ -86,6 +95,7 @@ impl<'a> HotStateLRU<'a> {
             Some(slot) if slot.is_hot() => slot,
             _ => return None,
         };
+        info!("shard_id: {}, old_slot: {:?}", self.shard_id, old_slot);
 
         match old_slot.prev() {
             Some(prev_key) => {
@@ -111,6 +121,7 @@ impl<'a> HotStateLRU<'a> {
             },
         }
 
+        info!("self.num_items: {} (before)", self.num_items);
         self.num_items -= 1;
         Some(old_slot)
     }
@@ -141,7 +152,12 @@ impl<'a> HotStateLRU<'a> {
         Option<StateKey>,
         usize,
     ) {
-        (self.pending, self.head, self.tail, self.num_items)
+        (
+            self.pending.into_iter().collect(),
+            self.head,
+            self.tail,
+            self.num_items,
+        )
     }
 
     #[cfg(test)]

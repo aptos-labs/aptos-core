@@ -157,16 +157,21 @@ impl DoGetExecutionOutput {
         // but we need to figure out how to properly construct `VMOutput` from block end info.
         for (transaction, output) in transactions.iter().zip_eq(transaction_outputs.iter_mut()) {
             if let Transaction::BlockEpilogue(payload) = transaction {
+                info!("epilogue payload: {:?}", payload);
                 assert!(output.status().is_kept(), "Block epilogue must be kept");
-                output.add_hotness(
-                    payload
-                        .try_get_slots_to_make_hot()
-                        .cloned()
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(|(key, slot)| (key, HotStateOp::make_hot(slot)))
-                        .collect(),
-                );
+                let promotions = payload
+                    .try_get_slots_to_make_hot()
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|(key, slot)| (key, HotStateOp::make_hot(slot)));
+                let evictions = payload
+                    .try_get_keys_to_evict()
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|(key, slot)| (key, HotStateOp::eviction(slot)));
+                output.add_hotness(promotions.chain(evictions).collect());
             }
         }
 
@@ -405,6 +410,7 @@ impl Parser {
         }
 
         let result_state = parent_state.update_with_memorized_reads(
+            Arc::clone(&base_state_view.hot),
             base_state_view.persisted_state(),
             to_commit.state_update_refs(),
             base_state_view.memorized_reads(),

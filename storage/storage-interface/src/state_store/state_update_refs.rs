@@ -23,6 +23,9 @@ pub struct PerVersionStateUpdateRefs<'kv> {
     pub num_versions: usize,
     /// Converting to Vec to Box<[]> to release over-allocated memory during construction
     /// TODO(HotState): let WriteOp always carry StateSlot, so we can use &'kv StateSlot here
+    /// TODO(wqfish): check if this is deterministic, i.e. if the order within one
+    /// version/transaction is deterministic.
+    /// Note(wqfish): this is the flattened write sets.
     pub shards: [Box<[(&'kv StateKey, StateUpdateRef<'kv>)]>; NUM_STATE_SHARDS],
 }
 
@@ -67,6 +70,16 @@ pub struct BatchedStateUpdateRefs<'kv> {
     pub first_version: Version,
     pub num_versions: usize,
     pub shards: [HashMap<&'kv StateKey, StateUpdateRef<'kv>>; NUM_STATE_SHARDS],
+}
+
+pub fn batched_updates_to_debug_str<'kv>(
+    shard: &HashMap<&'kv StateKey, StateUpdateRef<'kv>>,
+) -> String {
+    let mut out = "\n".to_string();
+    for (key, update) in shard {
+        out += &format!("\t{:?}: {:?}\n", key, update);
+    }
+    out
 }
 
 impl BatchedStateUpdateRefs<'_> {
@@ -228,14 +241,17 @@ impl<'kv> StateUpdateRefs<'kv> {
                     // we do not output hotness ops for state sync.
                     match dedupped.entry(k) {
                         Entry::Occupied(mut entry) => {
+                            let prev_version = entry.get().version;
                             let prev_op = &entry.get().state_op;
                             sample!(
                                 SampleRate::Duration(Duration::from_secs(10)),
                                 warn!(
-                                    "Key: {:?}. Previous write op: {}. Current write op: {}",
+                                    "Key: {:?}. Previous write op: {} at version {}. Current write op: {} at version {}",
                                     k,
                                     prev_op.as_ref(),
-                                    u.state_op.as_ref()
+                                    prev_version,
+                                    u.state_op.as_ref(),
+                                    u.version,
                                 )
                             );
                             if !prev_op.is_value_write_op() {

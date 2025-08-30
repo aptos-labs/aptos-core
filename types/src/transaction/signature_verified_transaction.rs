@@ -3,7 +3,7 @@
 
 use crate::{
     contract_event::ContractEvent,
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, state_slot::StateSlot},
     transaction::{
         BlockEndInfo, BlockExecutableTransaction, FeeDistribution, SignedTransaction,
         TBlockEndInfoExt, Transaction,
@@ -13,7 +13,7 @@ use crate::{
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{collections::BTreeMap, fmt::Debug};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum SignatureVerifiedTransaction {
@@ -123,6 +123,19 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
         fee_distribution: FeeDistribution,
     ) -> Self {
         Transaction::block_epilogue_v1(block_id, block_end_info, fee_distribution).into()
+    }
+
+    fn finalize_block_epilogue(
+        &mut self,
+        promotions: BTreeMap<Self::Key, StateSlot>,
+        evictions: BTreeMap<Self::Key, StateSlot>,
+    ) {
+        match self {
+            Self::Valid(Transaction::BlockEpilogue(payload)) => {
+                payload.set_promotions_and_evictions(promotions, evictions);
+            },
+            _ => panic!("fafafafafafafa"),
+        }
     }
 }
 
