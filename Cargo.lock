@@ -349,7 +349,7 @@ dependencies = [
  "bcs 0.1.4",
  "bollard",
  "chrono",
- "clap 4.5.21",
+ "clap 4.5.46",
  "clap_complete",
  "colored",
  "dashmap 7.0.0-rc2",
@@ -637,7 +637,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "bytes",
- "clap 4.5.21",
+ "clap 4.5.46",
  "csv",
  "futures",
  "itertools 0.13.0",
@@ -760,7 +760,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-types",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "criterion",
  "dashmap 7.0.0-rc2",
  "itertools 0.13.0",
@@ -810,7 +810,7 @@ dependencies = [
  "anyhow",
  "camino",
  "chrono",
- "clap 4.5.21",
+ "clap 4.5.46",
  "clap-verbosity-flag",
  "determinator",
  "env_logger",
@@ -837,7 +837,7 @@ name = "aptos-cli-common"
 version = "1.0.0"
 dependencies = [
  "anstyle",
- "clap 4.5.21",
+ "clap 4.5.46",
  "clap_complete",
 ]
 
@@ -859,7 +859,7 @@ dependencies = [
  "aptos-validator-interface",
  "aptos-vm",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "itertools 0.13.0",
  "legacy-move-compiler",
@@ -974,7 +974,7 @@ dependencies = [
  "bytes",
  "chrono",
  "claims",
- "clap 4.5.21",
+ "clap 4.5.46",
  "dashmap 7.0.0-rc2",
  "enum_dispatch",
  "fail",
@@ -1233,7 +1233,7 @@ dependencies = [
  "bcs 0.1.4",
  "byteorder",
  "claims",
- "clap 4.5.21",
+ "clap 4.5.46",
  "crossbeam-channel",
  "dashmap 7.0.0-rc2",
  "either",
@@ -1317,7 +1317,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "itertools 0.13.0",
  "rayon",
  "serde_json",
@@ -1334,7 +1334,7 @@ dependencies = [
  "aptos-logger",
  "aptos-move-debugger",
  "aptos-push-metrics",
- "clap 4.5.21",
+ "clap 4.5.46",
  "jemallocator",
  "tokio",
 ]
@@ -1554,7 +1554,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "chrono",
- "clap 4.5.21",
+ "clap 4.5.46",
  "dashmap 7.0.0-rc2",
  "derivative",
  "indicatif 0.15.0",
@@ -1592,7 +1592,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "crossbeam-channel",
  "ctrlc",
  "dashmap 7.0.0-rc2",
@@ -1662,7 +1662,7 @@ dependencies = [
  "aptos-transaction-generator-lib",
  "bcs 0.1.4",
  "chrono",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "rand 0.7.3",
  "reqwest 0.11.23",
@@ -1757,7 +1757,7 @@ dependencies = [
  "aptos-faucet-core",
  "aptos-logger",
  "aptos-sdk",
- "clap 4.5.21",
+ "clap 4.5.46",
  "tokio",
 ]
 
@@ -1773,7 +1773,7 @@ dependencies = [
  "aptos-sdk",
  "async-trait",
  "captcha",
- "clap 4.5.21",
+ "clap 4.5.46",
  "deadpool-redis",
  "enum_dispatch",
  "firebase-token",
@@ -1814,7 +1814,7 @@ dependencies = [
  "anyhow",
  "aptos-faucet-core",
  "aptos-logger",
- "clap 4.5.21",
+ "clap 4.5.46",
  "tokio",
 ]
 
@@ -1826,7 +1826,7 @@ dependencies = [
  "aptos-logger",
  "aptos-node-checker",
  "aptos-sdk",
- "clap 4.5.21",
+ "clap 4.5.46",
  "env_logger",
  "futures",
  "gcp-bigquery-client",
@@ -1864,7 +1864,7 @@ dependencies = [
  "aptos-transaction-workloads-lib",
  "async-trait",
  "chrono",
- "clap 4.5.21",
+ "clap 4.5.46",
  "either",
  "futures",
  "hex",
@@ -1909,7 +1909,7 @@ dependencies = [
  "aptos-testcases",
  "async-trait",
  "chrono",
- "clap 4.5.21",
+ "clap 4.5.46",
  "env_logger",
  "futures",
  "jemallocator",
@@ -1952,7 +1952,7 @@ dependencies = [
  "bulletproofs",
  "byteorder",
  "claims",
- "clap 4.5.21",
+ "clap 4.5.46",
  "codespan-reporting",
  "curve25519-dalek-ng",
  "either",
@@ -2017,7 +2017,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-types",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "float-cmp",
  "move-binary-format",
  "move-core-types",
@@ -2082,7 +2082,7 @@ dependencies = [
  "aptos-package-builder",
  "aptos-types",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "move-core-types",
  "move-model",
  "tempfile",
@@ -2176,7 +2176,7 @@ dependencies = [
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=62beedc881d1b76632318ceb186ee9065236468e)",
  "aptos-protos 1.3.1",
  "async-trait",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "futures-core",
  "jemallocator",
@@ -2204,7 +2204,7 @@ dependencies = [
  "aptos-protos 1.3.1",
  "aptos-transaction-filter 0.1.0",
  "async-trait",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "jemallocator",
  "once_cell",
@@ -2233,7 +2233,7 @@ dependencies = [
  "aptos-transaction-filter 0.1.0",
  "async-trait",
  "build_html",
- "clap 4.5.21",
+ "clap 4.5.46",
  "dashmap 7.0.0-rc2",
  "futures",
  "jemallocator",
@@ -2260,7 +2260,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
  "async-trait",
- "clap 4.5.21",
+ "clap 4.5.46",
  "cloud-storage",
  "jemallocator",
  "once_cell",
@@ -2280,7 +2280,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=62beedc881d1b76632318ceb186ee9065236468e)",
  "async-trait",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "jemallocator",
  "once_cell",
@@ -2299,7 +2299,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-protos 1.3.1",
  "async-trait",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "jemallocator",
  "serde",
@@ -2391,7 +2391,7 @@ dependencies = [
  "aptos-protos 1.3.1",
  "async-trait",
  "build_html",
- "clap 4.5.21",
+ "clap 4.5.46",
  "dashmap 7.0.0-rc2",
  "futures",
  "jemallocator",
@@ -2416,7 +2416,7 @@ dependencies = [
  "aptos-system-utils 0.1.0",
  "async-trait",
  "backtrace",
- "clap 4.5.21",
+ "clap 4.5.46",
  "figment",
  "prometheus",
  "serde",
@@ -2505,7 +2505,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-protos 1.3.1",
  "async-trait",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "jemallocator",
  "serde",
@@ -2534,7 +2534,7 @@ dependencies = [
  "bcs 0.1.4",
  "bigdecimal",
  "chrono",
- "clap 4.5.21",
+ "clap 4.5.46",
  "derive_builder",
  "diesel",
  "diesel-async",
@@ -2587,7 +2587,7 @@ dependencies = [
  "aptos-faucet-core",
  "aptos-indexer-grpc-utils",
  "aptos-protos 1.3.1",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "itertools 0.13.0",
  "rand 0.7.3",
@@ -3050,7 +3050,7 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "itertools 0.13.0",
  "regex",
  "reqwest 0.11.23",
@@ -3067,7 +3067,7 @@ dependencies = [
  "aptos-transaction-generator-lib",
  "aptos-transaction-workloads-lib",
  "aptos-types",
- "clap 4.5.21",
+ "clap 4.5.46",
  "rand 0.7.3",
  "serde_json",
 ]
@@ -3080,7 +3080,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm",
- "clap 4.5.21",
+ "clap 4.5.46",
  "move-cli",
  "move-model",
  "move-package",
@@ -3286,7 +3286,7 @@ dependencies = [
  "aptos-logger",
  "aptos-network",
  "aptos-types",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "serde",
  "tokio",
@@ -3332,7 +3332,7 @@ dependencies = [
  "backoff",
  "bytes",
  "chrono",
- "clap 4.5.21",
+ "clap 4.5.46",
  "diesel",
  "diesel_migrations",
  "enum_dispatch",
@@ -3408,7 +3408,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-environment",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "either",
  "fail",
  "futures",
@@ -3441,7 +3441,7 @@ dependencies = [
  "aptos-transaction-emitter-lib",
  "aptos-transaction-workloads-lib",
  "async-trait",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "once_cell",
  "poem",
@@ -3512,7 +3512,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-storage-interface",
  "aptos-types",
- "clap 4.5.21",
+ "clap 4.5.46",
 ]
 
 [[package]]
@@ -3711,7 +3711,7 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "git2 0.16.1",
  "handlebars",
@@ -3774,7 +3774,7 @@ dependencies = [
  "aptos-vm-environment",
  "bcs 0.1.4",
  "claims",
- "clap 4.5.21",
+ "clap 4.5.46",
  "colored",
  "move-core-types",
  "parking_lot 0.12.1",
@@ -3810,7 +3810,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "bytes",
- "clap 4.5.21",
+ "clap 4.5.46",
  "hex",
  "move-core-types",
  "reqwest 0.11.23",
@@ -3854,7 +3854,7 @@ dependencies = [
  "aptos-types",
  "aptos-warp-webserver",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "hex",
  "itertools 0.13.0",
@@ -3877,7 +3877,7 @@ dependencies = [
  "aptos-logger",
  "aptos-rosetta",
  "aptos-types",
- "clap 4.5.21",
+ "clap 4.5.46",
  "serde",
  "serde_json",
  "tokio",
@@ -3998,7 +3998,7 @@ dependencies = [
  "aptos-framework",
  "aptos-types",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "heck 0.4.1",
  "move-core-types",
  "once_cell",
@@ -4338,7 +4338,7 @@ dependencies = [
  "bcs 0.1.4",
  "chrono",
  "claims",
- "clap 4.5.21",
+ "clap 4.5.46",
  "debug-ignore",
  "flate2",
  "futures",
@@ -4431,7 +4431,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-logging",
- "clap 4.5.21",
+ "clap 4.5.46",
  "criterion",
  "criterion-cpu-time",
  "num_cpus",
@@ -4448,7 +4448,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-transaction-emitter-lib",
  "aptos-transaction-workloads-lib",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "rand 0.7.3",
  "tokio",
@@ -4471,7 +4471,7 @@ dependencies = [
  "aptos-types",
  "async-trait",
  "base64 0.13.1",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "hex",
  "itertools 0.13.0",
@@ -4544,7 +4544,7 @@ dependencies = [
  "aptos-logger",
  "aptos-sdk",
  "async-trait",
- "clap 4.5.21",
+ "clap 4.5.46",
  "log",
  "move-binary-format",
  "move-core-types",
@@ -4581,7 +4581,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-transaction-generator-lib",
  "async-trait",
- "clap 4.5.21",
+ "clap 4.5.46",
  "move-binary-format",
  "once_cell",
  "rand 0.7.3",
@@ -4609,7 +4609,7 @@ dependencies = [
  "aptos-vm-genesis",
  "aptos-vm-types",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "codespan-reporting",
  "datatest-stable",
  "hex",
@@ -4821,7 +4821,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-types",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "move-binary-format",
  "move-core-types",
 ]
@@ -4904,7 +4904,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "glob",
  "move-binary-format",
  "move-core-types",
@@ -4995,7 +4995,7 @@ dependencies = [
  "aptos-node",
  "aptos-types",
  "bollard",
- "clap 4.5.21",
+ "clap 4.5.46",
  "diesel",
  "diesel-async",
  "futures",
@@ -6369,7 +6369,7 @@ name = "calc-dep-sizes"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "move-binary-format",
  "move-core-types",
@@ -6670,12 +6670,12 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.21"
+version = "4.5.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb3b4b9e5a7c7514dfa52869339ee98b3156b0bfb4e8a77c4ff4babb64b1604f"
+checksum = "2c5e4fcf9c21d2e544ca1ee9d8552de13019a42aa7dbf32747fa7aaf1df76e57"
 dependencies = [
  "clap_builder",
- "clap_derive 4.5.18",
+ "clap_derive 4.5.45",
 ]
 
 [[package]]
@@ -6684,19 +6684,19 @@ version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c90e95e5bd4e8ac34fa6f37c774b0c6f8ed06ea90c79931fd448fcf941a9767"
 dependencies = [
- "clap 4.5.21",
+ "clap 4.5.46",
  "log",
 ]
 
 [[package]]
 name = "clap_builder"
-version = "4.5.21"
+version = "4.5.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b17a95aa67cc7b5ebd32aa5370189aa0d79069ef1c64ce893bd30fb24bff20ec"
+checksum = "fecb53a0e6fcfb055f686001bc2e2592fa527efaf38dbe81a6a9563562e57d41"
 dependencies = [
  "anstream",
  "anstyle",
- "clap_lex 0.7.3",
+ "clap_lex 0.7.5",
  "strsim 0.11.1",
  "terminal_size",
 ]
@@ -6707,7 +6707,7 @@ version = "4.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97aeaa95557bd02f23fbb662f981670c3d20c5a26e69f7354b28f57092437fcd"
 dependencies = [
- "clap 4.5.21",
+ "clap 4.5.46",
 ]
 
 [[package]]
@@ -6725,9 +6725,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.5.18"
+version = "4.5.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ac6a0c7b1a9e9a5186361f67dfa1b88213572f427fb9ab038efb2bd8c582dab"
+checksum = "14cb31bb0a7d536caef2639baa7fad459e15c3144efefa6dbd1c84562c4739f6"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -6746,9 +6746,9 @@ dependencies = [
 
 [[package]]
 name = "clap_lex"
-version = "0.7.3"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afb84c814227b90d6895e01398aee0d8033c00e7466aca416fb6a8e0eb19d8a7"
+checksum = "b94f61472cee1439c0b966b47e3aca9ae07e45d070759512cd390ea2bebc6675"
 
 [[package]]
 name = "clear_on_drop"
@@ -6897,7 +6897,7 @@ name = "compute-module-expansion-size"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 4.5.21",
+ "clap 4.5.46",
  "futures",
  "move-binary-format",
  "move-core-types",
@@ -9268,7 +9268,7 @@ dependencies = [
  "arbitrary",
  "base64 0.21.7",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "csv",
  "dearbitrary",
  "hex",
@@ -9390,7 +9390,7 @@ dependencies = [
  "aptos-network",
  "aptos-types",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "move-core-types",
  "rand 0.7.3",
  "serde",
@@ -10621,7 +10621,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "321f0f839cd44a4686e9504b0a62b4d69a50b62072144c71c68f5873c167b8d9"
 dependencies = [
  "ahash 0.8.11",
- "clap 4.5.21",
+ "clap 4.5.46",
  "crossbeam-channel",
  "crossbeam-utils",
  "dashmap 5.5.3",
@@ -11248,7 +11248,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "codespan-reporting",
  "hex",
  "move-binary-format",
@@ -11885,7 +11885,7 @@ name = "move-asm"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 4.5.21",
+ "clap 4.5.46",
  "codespan",
  "codespan-reporting",
  "either",
@@ -11997,7 +11997,7 @@ name = "move-bytecode-viewer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 4.5.21",
+ "clap 4.5.46",
  "crossterm 0.26.1",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -12011,7 +12011,7 @@ name = "move-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 4.5.21",
+ "clap 4.5.46",
  "codespan-reporting",
  "colored",
  "datatest-stable",
@@ -12060,7 +12060,7 @@ dependencies = [
  "abstract-domain-derive",
  "anyhow",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "codespan",
  "codespan-reporting",
  "colored",
@@ -12137,7 +12137,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "codespan",
  "colored",
  "move-binary-format",
@@ -12155,7 +12155,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "codespan",
  "codespan-reporting",
  "datatest-stable",
@@ -12178,7 +12178,7 @@ name = "move-disassembler"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 4.5.21",
+ "clap 4.5.46",
  "colored",
  "legacy-move-compiler",
  "move-binary-format",
@@ -12194,7 +12194,7 @@ name = "move-docgen"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 4.5.21",
+ "clap 4.5.46",
  "codespan",
  "codespan-reporting",
  "datatest-stable",
@@ -12239,7 +12239,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
@@ -12345,7 +12345,7 @@ name = "move-package"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 4.5.21",
+ "clap 4.5.46",
  "colored",
  "datatest-stable",
  "itertools 0.13.0",
@@ -12434,7 +12434,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "atty",
- "clap 4.5.21",
+ "clap 4.5.46",
  "codespan-reporting",
  "itertools 0.13.0",
  "legacy-move-compiler",
@@ -12512,7 +12512,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
- "clap 4.5.21",
+ "clap 4.5.46",
  "codespan-reporting",
  "itertools 0.13.0",
  "move-model",
@@ -12647,7 +12647,7 @@ dependencies = [
  "aptos-framework",
  "arbitrary",
  "bcs 0.1.4",
- "clap 4.5.21",
+ "clap 4.5.46",
  "datatest-stable",
  "dearbitrary",
  "difference",
@@ -12684,7 +12684,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "better_any",
- "clap 4.5.21",
+ "clap 4.5.46",
  "codespan-reporting",
  "colored",
  "datatest-stable",
@@ -13570,7 +13570,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-transaction-generator-lib",
- "clap 4.5.21",
+ "clap 4.5.46",
 ]
 
 [[package]]
@@ -14759,7 +14759,7 @@ dependencies = [
  "bitflags 2.9.1",
  "canonical_json",
  "chrono",
- "clap 4.5.21",
+ "clap 4.5.46",
  "const_format",
  "diesel",
  "diesel-async",
@@ -18805,7 +18805,7 @@ dependencies = [
  "errno",
  "js-sys",
  "libc",
- "rustix 0.38.28",
+ "rustix 0.37.27",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "wasm-bindgen",
  "winapi 0.3.9",

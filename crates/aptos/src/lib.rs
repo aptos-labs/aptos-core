@@ -87,7 +87,7 @@ pub struct InfoTool {}
 #[async_trait]
 impl CliCommand<BTreeMap<String, String>> for InfoTool {
     fn command_name(&self) -> &'static str {
-        "GetCLIInfo"
+        "xxxGetCLIInfo"
     }
 
     async fn execute(self) -> CliTypedResult<BTreeMap<String, String>> {
