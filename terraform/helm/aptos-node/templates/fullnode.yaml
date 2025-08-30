@@ -122,6 +122,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       initContainers:
+        {{- if empty $.Values.genesis_bucket_path }}
         - name: run-script
           image: curlimages/curl:latest
           args:
@@ -145,6 +146,31 @@ spec:
               mountPath: /opt/aptos/genesis_readonly
             - name: writable-genesis
               mountPath: /opt/aptos/genesis
+        {{- else }}
+        - name: fetch-genesis
+          image: {{ $.Values.tools.image.repo }}:{{ $.Values.tools.image.tag | default $.Values.imageTag }}
+          command:
+            - bash
+            - -c
+            - |
+              set -x
+              cp /opt/aptos/genesis_readonly/* /opt/aptos/genesis
+              if [[ ! -f /opt/aptos/genesis/genesis.blob ]]; then
+                gcloud storage cp "{{ $.Values.genesis_bucket_path }}/genesis.blob" /opt/aptos/genesis/genesis.blob
+              else
+                echo "genesis.blob found locally"
+              fi
+              ls -l /opt/aptos/genesis
+          workingDir: /tmp
+          env:
+          - name: HOME
+            value: /tmp
+          volumeMounts:
+            - name: genesis-config
+              mountPath: /opt/aptos/genesis_readonly
+            - name: writable-genesis
+              mountPath: /opt/aptos/genesis
+        {{- end }} # .Values.genesis_blob_bucket_path
       containers:
       - name: fullnode
         {{- if and $fullnode_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
@@ -258,7 +284,7 @@ spec:
         persistentVolumeClaim:
           claimName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-{{ .name }}-e{{ $.Values.chain.era }}
       {{- end }}
-      serviceAccountName: {{ include "aptos-validator.fullname" $ }}-fullnode
+      serviceAccountName: {{ include "aptos-validator.fullnodeServiceAccountName" $ }}
       {{- if $.Values.imagePullSecret }}
       imagePullSecrets:
       - name: {{ $.Values.imagePullSecret }}
