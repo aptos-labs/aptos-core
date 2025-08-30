@@ -46,31 +46,6 @@ pub static APTOS_SCHEMADB_ITER_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static APTOS_SCHEMADB_GET_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        // metric name
-        "aptos_schemadb_get_latency_seconds",
-        // metric description
-        "Aptos schemadb get latency in seconds",
-        // metric labels (dimensions)
-        &["cf_name"],
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
-    )
-    .unwrap()
-});
-
-pub static APTOS_SCHEMADB_GET_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        // metric name
-        "aptos_schemadb_get_bytes",
-        // metric description
-        "Aptos schemadb get call returned data size in bytes",
-        // metric labels (dimensions)
-        &["cf_name"]
-    )
-    .unwrap()
-});
-
 pub static APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
