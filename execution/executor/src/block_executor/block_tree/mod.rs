@@ -17,7 +17,7 @@ use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::ExecutorError;
 use aptos_infallible::Mutex;
-use aptos_logger::{debug, info};
+use aptos_logger::debug;
 use aptos_storage_interface::DbReader;
 use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
 use std::{
@@ -239,7 +239,7 @@ impl BlockTree {
 
         let root = if ledger_info.ends_epoch() {
             let epoch_genesis_id = epoch_genesis_block_id(ledger_info);
-            info!(
+            debug!(
                 LogSchema::new(LogEntry::SpeculationCache)
                     .root_block_id(epoch_genesis_id)
                     .original_reconfiguration_block_id(committed_block_id),
@@ -251,7 +251,7 @@ impl BlockTree {
                 None,
             )?
         } else {
-            info!(
+            debug!(
                 LogSchema::new(LogEntry::SpeculationCache).root_block_id(committed_block_id),
                 "Updated with a new root block",
             );

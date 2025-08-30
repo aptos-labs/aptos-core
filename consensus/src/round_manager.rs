@@ -1560,14 +1560,6 @@ impl RoundManager {
             } else {
                 ORDER_VOTE_NOT_IN_RANGE.inc();
                 sample!(
-                    SampleRate::Duration(Duration::from_secs(1)),
-                    info!(
-                        "[sampled] Received an order vote not in the 100 rounds. Order vote round: {:?}, Highest ordered round: {:?}",
-                        order_vote_msg.order_vote().ledger_info().round(),
-                        self.block_store.sync_info().highest_ordered_round()
-                    )
-                );
-                sample!(
                     SampleRate::Frequency(2),
                     debug!(
                         "Received an order vote not in the next 100 rounds. Order vote round: {:?}, Highest ordered round: {:?}",

@@ -323,7 +323,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
                 chunk_verifier,
             })?;
 
-        info!(
+        debug!(
             LogSchema::new(LogEntry::ChunkExecutor)
                 .first_version_in_request(Some(first_version))
                 .num_txns_in_request(num_txns),
@@ -383,7 +383,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .lock()
             .save_ledger_update_output(executed_chunk)?;
 
-        info!(
+        debug!(
             LogSchema::new(LogEntry::ChunkExecutor)
                 .first_version_in_request(Some(first_version))
                 .num_txns_in_request(num_txns),
