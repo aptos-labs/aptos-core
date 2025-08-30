@@ -174,7 +174,8 @@ impl AptosCargoCommand {
             AptosCargoCommand::TargetedCLITests(_) => {
                 // Run the targeted CLI tests (if necessary).
                 // First, start by calculating the affected packages.
-                let affected_package_paths = package_args.compute_target_packages()?;
+                let (direct_args, _, affected_package_paths) =
+                    self.get_args_and_affected_packages(package_args)?;
 
                 // Check if the affected packages contains the Aptos CLI
                 let mut cli_affected = false;
@@ -192,7 +193,7 @@ impl AptosCargoCommand {
                 // If the Aptos CLI is affected, run the targeted CLI tests
                 if cli_affected {
                     println!("Running the targeted CLI tests...");
-                    return run_targeted_cli_tests();
+                    return run_targeted_cli_tests(direct_args);
                 }
 
                 // Otherwise, skip the CLI tests
@@ -415,21 +416,27 @@ fn get_package_name_from_path(package_path: &str) -> String {
 }
 
 /// Runs the targeted CLI tests
-fn run_targeted_cli_tests() -> anyhow::Result<()> {
+fn run_targeted_cli_tests(direct_args: Vec<String>) -> anyhow::Result<()> {
     // First, run the CLI tests
     let mut command = Cargo::command("test");
-    command.args(["-p", APTOS_CLI_PACKAGE_NAME]);
+    command
+        .args(direct_args.clone())
+        .args(["-p", APTOS_CLI_PACKAGE_NAME]);
     command.run(false);
 
     // Next, build the CLI binary
     let mut command = Cargo::command("build");
-    command.args(["-p", APTOS_CLI_PACKAGE_NAME]);
+    command
+        .args(direct_args.clone())
+        .args(["-p", APTOS_CLI_PACKAGE_NAME]);
     command.run(false);
 
     // Finally, run the CLI --help command. Here, we ignore the exit status
     // because the CLI will return a non-zero exit status when running --help.
     let mut command = Cargo::command("run");
-    command.args(["-p", APTOS_CLI_PACKAGE_NAME]);
+    command
+        .args(direct_args)
+        .args(["-p", APTOS_CLI_PACKAGE_NAME]);
     command.run(true);
 
     Ok(())
