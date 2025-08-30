@@ -157,6 +157,11 @@ module aptos_std::big_ordered_map {
         },
     }
 
+    struct IteratorPtrWithPath<K> has copy, drop {
+        iterator: IteratorPtr<K>,
+        path: vector<u64>,
+    }
+
     /// The BigOrderedMap data structure.
     enum BigOrderedMap<K: store, V: store> has store {
         BPlusTreeMap {
@@ -359,6 +364,42 @@ module aptos_std::big_ordered_map {
         value
     }
 
+    /// Removes the entry from BigOrderedMap and returns the value which `key` maps to.
+    /// Returns none if there is no entry for `key`.
+    public fun remove_or_none<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, key: &K): Option<V> {
+        // Optimize case where only root node exists
+        // (optimizes out borrowing and path creation in `find_leaf_path`)
+        if (self.root.is_leaf) {
+            let value_option = self.root.children.remove_or_none(key);
+            if (value_option.is_some()) {
+                let Child::Leaf {
+                    value,
+                } = value_option.destroy_some();
+                return option::some(value);
+            } else {
+                value_option.destroy_none();
+                return option::none();
+            }
+        };
+
+        let path_to_leaf = self.find_leaf_path(key);
+
+        if (path_to_leaf.is_empty()) {
+            option::none()
+        } else {
+            let Child::Leaf {
+                value,
+            } = self.remove_at(path_to_leaf, key);
+            option::some(value)
+        }
+    }
+
+    public fun modify<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, key: &K, f: |&mut V|) {
+        let iter = self.find(key);
+        assert!(!iter.iter_is_end(self), error::invalid_argument(EKEY_NOT_FOUND));
+        iter.iter_modify(self, f);
+    }
+
     /// Add multiple key/value pairs to the map. The keys must not already exist.
     /// Aborts with EKEY_ALREADY_EXISTS if key already exist, or duplicate keys are passed in.
     public fun add_all<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
@@ -387,7 +428,7 @@ module aptos_std::big_ordered_map {
 
     /// Returns an iterator pointing to the first element that is greater or equal to the provided
     /// key, or an end iterator if such element doesn't exist.
-    public(friend) fun lower_bound<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): IteratorPtr<K> {
+    public fun lower_bound<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): IteratorPtr<K> {
         let leaf = self.find_leaf(key);
         if (leaf == NULL_INDEX) {
             return self.new_end_iter()
@@ -407,7 +448,7 @@ module aptos_std::big_ordered_map {
 
     /// Returns an iterator pointing to the element that equals to the provided key, or an end
     /// iterator if the key is not found.
-    public(friend) fun find<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): IteratorPtr<K> {
+    public fun find<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): IteratorPtr<K> {
         let lower_bound = self.lower_bound(key);
         if (lower_bound.iter_is_end(self)) {
             lower_bound
@@ -416,6 +457,34 @@ module aptos_std::big_ordered_map {
         } else {
             self.new_end_iter()
         }
+    }
+
+    public fun find_with_path<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): IteratorPtrWithPath<K> {
+        let leaf_path = self.find_leaf_path(key);
+        if (leaf_path.is_empty()) {
+            return IteratorPtrWithPath { iterator: self.new_end_iter(), path: vector::empty() };
+        };
+
+        let leaf = leaf_path[leaf_path.length() - 1];
+        let node = self.borrow_node(leaf);
+        assert!(node.is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+
+        let child_lower_bound = node.children.lower_bound(key);
+        if (child_lower_bound.iter_is_end(&node.children)) {
+            IteratorPtrWithPath { iterator: self.new_end_iter(), path: vector::empty() }
+        } else {
+            let iter_key = *child_lower_bound.iter_borrow_key(&node.children);
+
+            if (&iter_key == key) {
+                IteratorPtrWithPath { iterator: new_iter(leaf, child_lower_bound, iter_key), path: leaf_path }
+            } else {
+                IteratorPtrWithPath { iterator: self.new_end_iter(), path: vector::empty() }
+            }
+        }
+    }
+
+    public fun iter_with_path_get_iter<K: drop + copy + store>(self: &IteratorPtrWithPath<K>): IteratorPtr<K> {
+        self.iterator
     }
 
     /// Returns true iff the key exists in the map.
@@ -633,7 +702,7 @@ module aptos_std::big_ordered_map {
     // ========================= IteratorPtr functions ===========================
 
     /// Returns the begin iterator.
-    public(friend) fun new_begin_iter<K: copy + store, V: store>(self: &BigOrderedMap<K, V>): IteratorPtr<K> {
+    public fun new_begin_iter<K: copy + store, V: store>(self: &BigOrderedMap<K, V>): IteratorPtr<K> {
         if (self.is_empty()) {
             return IteratorPtr::End;
         };
@@ -646,12 +715,12 @@ module aptos_std::big_ordered_map {
     }
 
     /// Returns the end iterator.
-    public(friend) fun new_end_iter<K: copy + store, V: store>(self: &BigOrderedMap<K, V>): IteratorPtr<K> {
+    public fun new_end_iter<K: copy + store, V: store>(self: &BigOrderedMap<K, V>): IteratorPtr<K> {
         IteratorPtr::End
     }
 
     // Returns true iff the iterator is a begin iterator.
-    public(friend) fun iter_is_begin<K: store, V: store>(self: &IteratorPtr<K>, map: &BigOrderedMap<K, V>): bool {
+    public fun iter_is_begin<K: store, V: store>(self: &IteratorPtr<K>, map: &BigOrderedMap<K, V>): bool {
         if (self is IteratorPtr::End<K>) {
             map.is_empty()
         } else {
@@ -660,14 +729,14 @@ module aptos_std::big_ordered_map {
     }
 
     // Returns true iff the iterator is an end iterator.
-    public(friend) fun iter_is_end<K: store, V: store>(self: &IteratorPtr<K>, _map: &BigOrderedMap<K, V>): bool {
+    public fun iter_is_end<K: store, V: store>(self: &IteratorPtr<K>, _map: &BigOrderedMap<K, V>): bool {
         self is IteratorPtr::End<K>
     }
 
     /// Borrows the key given iterator points to.
     /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
     /// Note: Requires that the map is not changed after the input iterator is generated.
-    public(friend) fun iter_borrow_key<K>(self: &IteratorPtr<K>): &K {
+    public fun iter_borrow_key<K>(self: &IteratorPtr<K>): &K {
         assert!(!(self is IteratorPtr::End<K>), error::invalid_argument(EITER_OUT_OF_BOUNDS));
         &self.key
     }
@@ -675,7 +744,7 @@ module aptos_std::big_ordered_map {
     /// Borrows the value given iterator points to.
     /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
     /// Note: Requires that the map is not changed after the input iterator is generated.
-    public(friend) fun iter_borrow<K: drop + store, V: store>(self: IteratorPtr<K>, map: &BigOrderedMap<K, V>): &V {
+    public fun iter_borrow<K: drop + store, V: store>(self: IteratorPtr<K>, map: &BigOrderedMap<K, V>): &V {
         assert!(!self.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
         let IteratorPtr::Some { node_index, child_iter, key: _ } = self;
         let children = &map.borrow_node(node_index).children;
@@ -689,7 +758,7 @@ module aptos_std::big_ordered_map {
     /// In case of variable size, use either `borrow`, `copy` then `upsert`, or `remove` and `add` instead of mutable borrow.
     ///
     /// Note: Requires that the map is not changed after the input iterator is generated.
-    public(friend) fun iter_borrow_mut<K: drop + store, V: store>(self: IteratorPtr<K>, map: &mut BigOrderedMap<K, V>): &mut V {
+    public fun iter_borrow_mut<K: drop + store, V: store>(self: IteratorPtr<K>, map: &mut BigOrderedMap<K, V>): &mut V {
         assert!(map.constant_kv_size || bcs::constant_serialized_size<V>().is_some(), error::invalid_argument(EBORROW_MUT_REQUIRES_CONSTANT_VALUE_SIZE));
         assert!(!self.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
         let IteratorPtr::Some { node_index, child_iter, key: _ } = self;
@@ -697,10 +766,51 @@ module aptos_std::big_ordered_map {
         &mut child_iter.iter_borrow_mut(children).value
     }
 
+    public fun iter_modify<K: drop + store, V: store>(self: IteratorPtr<K>, map: &mut BigOrderedMap<K, V>, f: |&mut V|) {
+        assert!(!self.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
+        let IteratorPtr::Some { node_index, child_iter, key } = self;
+        let children = &mut map.borrow_node_mut(node_index).children;
+        let value_mut = &mut child_iter.iter_borrow_mut(children).value;
+        f(value_mut);
+
+        if (map.constant_kv_size) {
+            return;
+        };
+
+        // validate that after modifications size invariants hold
+        let key_size = bcs::serialized_size(&key);
+        let value_size = bcs::serialized_size(value_mut);
+        map.validate_size_and_init_max_degrees(key_size, value_size);
+    }
+
+    /// Removes the entry from BigOrderedMap and returns the value which `key` maps to.
+    /// Aborts if there is no entry for `key`.
+    public fun iter_remove<K: drop + copy + store, V: store>(self: IteratorPtrWithPath<K>, map: &mut BigOrderedMap<K, V>): V {
+        let IteratorPtrWithPath { iterator: iter, path: path_to_leaf } = self;
+        assert!(!iter.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
+        let IteratorPtr::Some { node_index: _, child_iter, key } = iter;
+
+        // Optimize case where only root node exists
+        // (optimizes out borrowing and path creation in `find_leaf_path`)
+        if (map.root.is_leaf) {
+            let Child::Leaf {
+                value,
+            } = child_iter.iter_remove(&mut map.root.children);
+            return value;
+        };
+
+        assert!(!path_to_leaf.is_empty(), error::invalid_argument(EKEY_NOT_FOUND));
+
+        let Child::Leaf {
+            value,
+        } = map.remove_at(path_to_leaf, &key);
+        value
+    }
+
     /// Returns the next iterator.
     /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
     /// Requires the map is not changed after the input iterator is generated.
-    public(friend) fun iter_next<K: drop + copy + store, V: store>(self: IteratorPtr<K>, map: &BigOrderedMap<K, V>): IteratorPtr<K> {
+    public fun iter_next<K: drop + copy + store, V: store>(self: IteratorPtr<K>, map: &BigOrderedMap<K, V>): IteratorPtr<K> {
         assert!(!(self is IteratorPtr::End<K>), error::invalid_argument(EITER_OUT_OF_BOUNDS));
 
         let node_index = self.node_index;
@@ -730,7 +840,7 @@ module aptos_std::big_ordered_map {
     /// Returns the previous iterator.
     /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the beginning.
     /// Requires the map is not changed after the input iterator is generated.
-    public(friend) fun iter_prev<K: drop + copy + store, V: store>(self: IteratorPtr<K>, map: &BigOrderedMap<K, V>): IteratorPtr<K> {
+    public fun iter_prev<K: drop + copy + store, V: store>(self: IteratorPtr<K>, map: &BigOrderedMap<K, V>): IteratorPtr<K> {
         let prev_index = if (self is IteratorPtr::End<K>) {
             map.max_leaf_index
         } else {
