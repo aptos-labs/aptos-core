@@ -36,7 +36,10 @@ proptest = { workspace = true }
 rand = { workspace = true }
 
 [target.'cfg(unix)'.dev-dependencies]
-jemallocator = { workspace = true }
+jemallocator = { version = "0.5.0", features = [
+    "profiling",
+    "unprefixed_malloc_on_supported_platforms",
+] }
 
 [features]
 fuzzing = ["aptos-types/fuzzing", "proptest"]
