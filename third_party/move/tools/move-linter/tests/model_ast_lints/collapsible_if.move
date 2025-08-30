@@ -45,6 +45,17 @@ module 0xc0ffee::m {
         }
     }
 
+    // Nested if with empty else branch
+    public fun test_warn_5(a: bool, b: bool) {
+        if (a) {
+            if (b) {
+                bar();
+            }
+        } else {
+            // Empty else branch
+        }
+    }
+
     // /****** Cases without warnings *****/
 
     // Outer if has else clause
@@ -99,7 +110,7 @@ module 0xc0ffee::m {
         }
     }
 
-    #[lint::skip(nested_if)]
+    #[lint::skip(collapsible_if)]
     public fun test_no_warn_6(a: bool, b: bool) {
         if (a) {
             if (b) {
