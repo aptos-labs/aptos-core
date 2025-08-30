@@ -45,13 +45,13 @@ Next, you can start the Pepper Service by running the `start-pepper-service.sh` 
 
 ```bash
 cd keyless/pepper/scripts
-./start-pepper-service.sh <FIRESTORE_EMULATOR_HOST> <GOOGLE_APPLICATION_CREDENTIALS> <PROJECT_ID>
+./start-pepper-service.sh <FIRESTORE_EMULATOR_HOST> <GOOGLE_APPLICATION_CREDENTIALS> <GOOGLE_PROJECT_ID>
 ```
 
 The script arguments are:
-- `<FIRESTORE_EMULATOR_HOST>`: The host and port of the Firestore emulator, e.g., `localhost:8081`.
+- `<FIRESTORE_EMULATOR_HOST>`: The host and port of the Firestore emulator, e.g., `http://localhost:8081`.
 - `<GOOGLE_APPLICATION_CREDENTIALS>`: The path to your service account credential file (in JSON format).
-- `<PROJECT_ID>`: The ID of your GCP project.
+- `<GOOGLE_PROJECT_ID>`: The ID of your GCP project.
 
 Note that the Pepper Service will run in the foreground, so you will need to keep this terminal
 window open while you interact with the Pepper Service.
@@ -66,10 +66,15 @@ To run the example client, execute the `start-pepper-client.sh` script in this r
 
 ```bash
 cd keyless/pepper/scripts
-./start-pepper-client.sh <FIRESTORE_EMULATOR_HOST> <GOOGLE_APPLICATION_CREDENTIALS> <PROJECT_ID>
+./start-pepper-client.sh <FIRESTORE_EMULATOR_HOST> <GOOGLE_APPLICATION_CREDENTIALS> <PEPPER_SERVICE_URL> <GOOGLE_PROJECT_ID> <FIRESTORE_DATABASE_ID>"
 ```
 
-The script arguments are the same as those used for starting the Pepper Service (above).
+The script arguments are:
+- `<FIRESTORE_EMULATOR_HOST>`: The host and port of the Firestore emulator, e.g., `http://localhost:8081`.
+- `<GOOGLE_APPLICATION_CREDENTIALS>`: The path to your service account credential file (in JSON format).
+- `<PEPPER_SERVICE_URL>`: The host and port of the Pepper Service, e.g., `http://localhost:8000`.
+- `<GOOGLE_PROJECT_ID>`: The ID of your GCP project.
+- `<FIRESTORE_DATABASE_ID>`: The ID of your Firestore database.
 
 Note: the client is an interactive console program, so you will need to follow the instructions
 to manually complete a session with the Pepper Service.
