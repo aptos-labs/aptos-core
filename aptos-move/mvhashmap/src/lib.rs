@@ -16,6 +16,7 @@ use move_vm_types::code::{ModuleCache, ModuleCode, SyncModuleCache, SyncScriptCa
 use serde::Serialize;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
+mod registered_dependencies;
 pub mod types;
 pub mod unsync_map;
 pub mod versioned_data;
