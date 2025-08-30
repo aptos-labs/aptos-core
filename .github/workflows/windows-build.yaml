@@ -65,5 +65,5 @@ jobs:
 
       # Build and test the Aptos CLI (if it has changed)
       - name: Build and test the CLI
-        run: cargo x targeted-cli-tests -vv
+        run: cargo x targeted-cli-tests -vv --profile cli
         shell: bash
