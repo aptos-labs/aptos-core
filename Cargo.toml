@@ -642,12 +642,12 @@ inferno = "0.11.14"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
 itertools = "0.13"
-jemallocator = { version = "0.5.4", features = [
+jemallocator = { package = "tikv-jemallocator", version = "0.6.0", features = [
     "profiling",
     "unprefixed_malloc_on_supported_platforms",
 ] }
-jemalloc-ctl = "0.5.4"
-jemalloc-sys = "0.5.4"
+jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.6.0" }
+jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.0" }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"
@@ -937,3 +937,8 @@ futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "bac
 futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+
+# There is a circular dependency between aptos-core, aptos-indexer-processor-sdk, and aptos-indexer-processors-v2,
+# so we cannot simply change the version and package for `jemalloc-sys` in one repo without running into conflicts.
+# We have to keep this shim until everything uses the same jemalloc dependency.
+jemalloc-sys = { git = "https://github.com/aptos-labs/jemalloc-sys-shim", rev = "e0920246dd74303fab9a14b990768c6ac990a59b" }
