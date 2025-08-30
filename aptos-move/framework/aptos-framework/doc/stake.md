@@ -106,6 +106,8 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Function `update_network_and_fullnode_addresses`](#0x1_stake_update_network_and_fullnode_addresses)
 -  [Function `increase_lockup`](#0x1_stake_increase_lockup)
 -  [Function `increase_lockup_with_cap`](#0x1_stake_increase_lockup_with_cap)
+-  [Function `update_lockup`](#0x1_stake_update_lockup)
+-  [Function `update_lockup_with_cap`](#0x1_stake_update_lockup_with_cap)
 -  [Function `join_validator_set`](#0x1_stake_join_validator_set)
 -  [Function `join_validator_set_internal`](#0x1_stake_join_validator_set_internal)
 -  [Function `unlock`](#0x1_stake_unlock)
@@ -3398,7 +3400,10 @@ Update the network and full node addresses of the validator. This only takes eff
 
 ## Function `increase_lockup`
 
-Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
+Update the lockup duration of the stake pool to now + the recurring lockup duration of the network.
+Note that this is named increase_lockup as an artifact of the previous implementation.
+update_lockup is now preferred unless user specifically wants to set the lockup to the recurring lockup
+duration.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="stake.md#0x1_stake_increase_lockup">increase_lockup</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
@@ -3427,8 +3432,10 @@ Similar to increase_lockup_with_cap but will use ownership capability from the s
 
 ## Function `increase_lockup_with_cap`
 
-Unlock from active delegation, it's moved to pending_inactive if locked_until_secs < current_time or
-directly inactive if it's not from an active validator.
+Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
+Note that this is named increase_lockup as an artifact of the previous implementation.
+update_lockup is now preferred unless user specifically wants to set the lockup to the recurring lockup
+duration.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_increase_lockup_with_cap">increase_lockup_with_cap</a>(owner_cap: &<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>)
@@ -3441,13 +3448,67 @@ directly inactive if it's not from an active validator.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_increase_lockup_with_cap">increase_lockup_with_cap</a>(owner_cap: &<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>) <b>acquires</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a> {
+    <b>let</b> config = <a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>();
+    <b>let</b> new_locked_until_secs = <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() + <a href="staking_config.md#0x1_staking_config_get_recurring_lockup_duration">staking_config::get_recurring_lockup_duration</a>(&config);
+    <a href="stake.md#0x1_stake_update_lockup_with_cap">update_lockup_with_cap</a>(owner_cap, new_locked_until_secs);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_stake_update_lockup"></a>
+
+## Function `update_lockup`
+
+Update the lockup duration of the stake pool to <code>new_locked_until_secs</code>.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="stake.md#0x1_stake_update_lockup">update_lockup</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_locked_until_secs: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="stake.md#0x1_stake_update_lockup">update_lockup</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_locked_until_secs: u64) <b>acquires</b> <a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>, <a href="stake.md#0x1_stake_StakePool">StakePool</a> {
+    <a href="stake.md#0x1_stake_check_stake_permission">check_stake_permission</a>(owner);
+    <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+    <a href="stake.md#0x1_stake_assert_owner_cap_exists">assert_owner_cap_exists</a>(owner_address);
+    <b>let</b> ownership_cap = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>&gt;(owner_address);
+    <a href="stake.md#0x1_stake_update_lockup_with_cap">update_lockup_with_cap</a>(ownership_cap, new_locked_until_secs);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_stake_update_lockup_with_cap"></a>
+
+## Function `update_lockup_with_cap`
+
+Similar to update_lockup but will use ownership capability from the signing account.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_update_lockup_with_cap">update_lockup_with_cap</a>(owner_cap: &<a href="stake.md#0x1_stake_OwnerCapability">stake::OwnerCapability</a>, new_locked_until_secs: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_update_lockup_with_cap">update_lockup_with_cap</a>(owner_cap: &<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>, new_locked_until_secs: u64) <b>acquires</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a> {
     <b>let</b> pool_address = owner_cap.pool_address;
     <a href="stake.md#0x1_stake_assert_stake_pool_exists">assert_stake_pool_exists</a>(pool_address);
-    <b>let</b> config = <a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>();
 
     <b>let</b> stake_pool = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
     <b>let</b> old_locked_until_secs = stake_pool.locked_until_secs;
-    <b>let</b> new_locked_until_secs = <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() + <a href="staking_config.md#0x1_staking_config_get_recurring_lockup_duration">staking_config::get_recurring_lockup_duration</a>(&config);
     <b>assert</b>!(old_locked_until_secs &lt; new_locked_until_secs, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="stake.md#0x1_stake_EINVALID_LOCKUP">EINVALID_LOCKUP</a>));
     stake_pool.locked_until_secs = new_locked_until_secs;
 
