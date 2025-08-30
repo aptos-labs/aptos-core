@@ -419,17 +419,20 @@ fn run_targeted_cli_tests() -> anyhow::Result<()> {
     // First, run the CLI tests
     let mut command = Cargo::command("test");
     command.args(["-p", APTOS_CLI_PACKAGE_NAME]);
+    command.args(["--profile", "cli"]);
     command.run(false);
 
     // Next, build the CLI binary
     let mut command = Cargo::command("build");
     command.args(["-p", APTOS_CLI_PACKAGE_NAME]);
+    command.args(["--profile", "cli"]);
     command.run(false);
 
     // Finally, run the CLI --help command. Here, we ignore the exit status
     // because the CLI will return a non-zero exit status when running --help.
     let mut command = Cargo::command("run");
     command.args(["-p", APTOS_CLI_PACKAGE_NAME]);
+    command.args(["--profile", "cli"]);
     command.run(true);
 
     Ok(())

@@ -46,5 +46,7 @@ rustflags = [
   "-C",
   "force-unwind-tables=yes",
   "-C",
+  "debuginfo=0",
+  "-C",
   "link-arg=/STACK:8000000" # Set stack to 8 MB
 ]
