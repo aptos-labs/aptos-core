@@ -86,6 +86,8 @@ pub struct MoveHarness {
     pub max_gas_per_txn: u64,
 }
 
+unsafe impl Send for MoveHarness {}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum BlockSplit {
     Whole,
@@ -381,6 +383,11 @@ impl MoveHarness {
     /// Runs a transaction and return gas used.
     pub fn evaluate_gas(&mut self, account: &Account, payload: TransactionPayload) -> u64 {
         let txn = self.create_transaction_payload(account, payload);
+        self.evaluate_gas_signed(txn)
+    }
+
+    /// Runs a transaction and return gas used.
+    pub fn evaluate_gas_signed(&mut self, txn: SignedTransaction) -> u64 {
         let output = self.run_raw(txn);
         assert_success!(output.status().to_owned());
         output.gas_used()
@@ -393,6 +400,14 @@ impl MoveHarness {
         payload: TransactionPayload,
     ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let txn = self.create_transaction_payload(account, payload);
+        self.evaluate_gas_with_profiler_signed(txn)
+    }
+
+    /// Runs a transaction with the gas profiler.
+    pub fn evaluate_gas_with_profiler_signed(
+        &mut self,
+        txn: SignedTransaction,
+    ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let (output, gas_log) = self
             .executor
             .execute_transaction_with_gas_profiler(txn, &AuxiliaryInfo::default())

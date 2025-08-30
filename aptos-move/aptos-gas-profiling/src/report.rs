@@ -170,6 +170,20 @@ impl TransactionGasLog {
             Value::Array(aggregated.ops.into_iter().map(convert_op).collect()),
         );
         data.insert(
+            "methods".to_string(),
+            Value::Array(aggregated.methods.into_iter().map(convert_op).collect()),
+        );
+        data.insert(
+            "methods_self".to_string(),
+            Value::Array(
+                aggregated
+                    .methods_self
+                    .into_iter()
+                    .map(convert_op)
+                    .collect(),
+            ),
+        );
+        data.insert(
             "reads".to_string(),
             Value::Array(
                 aggregated

@@ -153,7 +153,7 @@ pub struct CounterState {
 }
 
 #[async_trait]
-pub trait ReliableTransactionSubmitter: Sync + Send {
+pub trait ReliableTransactionSubmitter: Send + Sync {
     async fn get_account_balance(&self, account_address: AccountAddress) -> Result<u64>;
 
     async fn query_sequence_number(&self, account_address: AccountAddress) -> Result<u64>;

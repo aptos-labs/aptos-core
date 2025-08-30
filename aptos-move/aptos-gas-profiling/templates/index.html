@@ -130,6 +130,48 @@
         {{else}}
         (No operations to show.)
         {{/if}}
+        <br/>
+        {{#if methods}}
+        <table>
+            <tr>
+                <th><b>Methods (gas including children)</b></th>
+                <th style="text-align: right"><b>Number of Hits</b></th>
+                <th style="text-align: right"><b>Cost in Gas Units</b></th>
+                <th style="text-align: right"><b>Percentage</b></th>
+            </tr>
+            {{#each methods}}
+            <tr>
+                <td>{{name}}</td>
+                <td style="text-align: right">{{hits}}</td>
+                <td style="text-align: right">{{cost}}</td>
+                <td style="text-align: right">{{percentage}}</td>
+            </tr>
+            {{/each}}
+        </table>
+        {{else}}
+        (No methods to show.)
+        {{/if}}
+        <br/>
+        {{#if methods_self}}
+        <table>
+            <tr>
+                <th><b>Methods (only local gas)</b></th>
+                <th style="text-align: right"><b>Number of Hits</b></th>
+                <th style="text-align: right"><b>Cost in Gas Units</b></th>
+                <th style="text-align: right"><b>Percentage</b></th>
+            </tr>
+            {{#each methods_self}}
+            <tr>
+                <td>{{name}}</td>
+                <td style="text-align: right">{{hits}}</td>
+                <td style="text-align: right">{{cost}}</td>
+                <td style="text-align: right">{{percentage}}</td>
+            </tr>
+            {{/each}}
+        </table>
+        {{else}}
+        (No methods to show.)
+        {{/if}}
         <h4>State Reads</h4>
         {{#if reads}}
         <table>
