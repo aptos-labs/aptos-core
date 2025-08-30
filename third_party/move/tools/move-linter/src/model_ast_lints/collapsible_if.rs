@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module implements an expression linter that checks for nested if statements
+//! This module implements an expression linter that checks for collapsible if statements
 //! that can be simplified using the `&&` operator.
 //!
 //! For example:
@@ -26,11 +26,11 @@ use move_model::{
 };
 
 #[derive(Default)]
-pub struct NestedIf;
+pub struct CollapsibleIf;
 
-impl ExpChecker for NestedIf {
+impl ExpChecker for CollapsibleIf {
     fn get_name(&self) -> String {
-        "nested_if".to_string()
+        "collapsible_if".to_string()
     }
 
     fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {

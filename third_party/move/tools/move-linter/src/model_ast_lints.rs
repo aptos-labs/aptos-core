@@ -7,6 +7,7 @@ mod aborting_overflow_checks;
 mod almost_swapped;
 mod assert_const;
 mod blocks_in_conditions;
+mod collapsible_if;
 mod cyclomatic_complexity;
 mod empty_if;
 mod equal_operands_in_bin_op;
@@ -16,7 +17,6 @@ mod needless_bool;
 mod needless_deref_ref;
 mod needless_ref_deref;
 mod needless_ref_in_field_access;
-mod nested_if;
 mod needless_return;
 mod nonminimal_bool;
 mod self_assignment;
@@ -45,7 +45,7 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),
         Box::<needless_ref_deref::NeedlessRefDeref>::default(),
         Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
-        Box::<nested_if::NestedIf>::default(),
+        Box::<collapsible_if::CollapsibleIf>::default(),
         Box::<needless_return::NeedlessReturn>::default(),
         Box::<nonminimal_bool::NonminimalBool>::default(),
         Box::<self_assignment::SelfAssignment>::default(),
