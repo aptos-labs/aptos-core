@@ -63,7 +63,7 @@ impl ExpChecker for NestedIf {
         self.report(
             env,
             &env.get_node_loc(*outer_id),
-            "Nested if statements can be simplified using `&&`. Consider combining the conditions: `if (condition1 && condition2) { ... }`",
+            "Nested `if` statements can be collapsed into a single `if` by using logical conjunction (`&&`) of the conditions"
         );
     }
 }
