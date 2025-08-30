@@ -202,7 +202,7 @@ module aptos_experimental::clearinghouse_test {
             |_account, order_id, _is_bid, _price, _size, _order_metadata| {
                 place_maker_order(order_id);
             },
-            |_account, _order_id, _is_bid, _remaining_size| {
+            |_account, _order_id, _is_bid, _remaining_size, _order_metadata| {
                 cleanup_order(_order_id);
             },
             |account, is_bid, _remaining_size| {
@@ -233,7 +233,7 @@ module aptos_experimental::clearinghouse_test {
             |_account, _order_id, _is_bid, _price, _size, _order_metadata| {
                 // place_maker_order is not used in this test
             },
-            |_account, _order_id, _is_bid, _remaining_size| {
+            |_account, _order_id, _is_bid, _remaining_size, _order_metadata| {
                 cleanup_order(_order_id);
             },
             |account, is_bid, _remaining_size| {
