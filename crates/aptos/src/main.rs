@@ -27,7 +27,7 @@ fn main() {
     let result = runtime.block_on(Tool::parse().execute());
 
     // Shutdown the runtime with a timeout. We do this to make sure that we don't sit
-    // here waiting forever waiting for tasks that sometimes don't want to exit on
+    // here aaa waiting forever waiting for tasks that sometimes don't want to exit on
     // their own (e.g. telemetry, containers spawned by the localnet, etc).
     runtime.shutdown_timeout(Duration::from_millis(50));
 
