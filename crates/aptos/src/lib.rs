@@ -78,7 +78,7 @@ impl Tool {
     }
 }
 
-/// Show build information about the CLI
+/// Show build information about the CLI.
 ///
 /// This is useful for debugging as well as determining what versions are compatible with the CLI
 #[derive(Parser)]
