@@ -36,6 +36,21 @@ This module defines the Option type and its methods to represent and handle an o
 -  [Function `any`](#0x1_option_any)
 -  [Function `destroy`](#0x1_option_destroy)
 -  [Specification](#@Specification_1)
+    -  [Function `none`](#@Specification_1_none)
+    -  [Function `some`](#@Specification_1_some)
+    -  [Function `from_vec`](#@Specification_1_from_vec)
+    -  [Function `is_none`](#@Specification_1_is_none)
+    -  [Function `is_some`](#@Specification_1_is_some)
+    -  [Function `contains`](#@Specification_1_contains)
+    -  [Function `borrow`](#@Specification_1_borrow)
+    -  [Function `borrow_with_default`](#@Specification_1_borrow_with_default)
+    -  [Function `get_with_default`](#@Specification_1_get_with_default)
+    -  [Function `fill`](#@Specification_1_fill)
+    -  [Function `borrow_mut`](#@Specification_1_borrow_mut)
+    -  [Function `destroy_with_default`](#@Specification_1_destroy_with_default)
+    -  [Function `destroy_some`](#@Specification_1_destroy_some)
+    -  [Function `destroy_none`](#@Specification_1_destroy_none)
+    -  [Function `to_vec`](#@Specification_1_to_vec)
 
 
 <pre><code><b>use</b> <a href="mem.md#0x1_mem">0x1::mem</a>;
@@ -237,7 +252,7 @@ Return true if <code>self</code> does not hold a value
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_is_none">is_none</a>&lt;Element&gt;(self: &<a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): bool {
-    self is Option::None
+    self is Option::None&lt;Element&gt;
 }
 </code></pre>
 
@@ -262,7 +277,7 @@ Return true if <code>self</code> holds a value
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_is_some">is_some</a>&lt;Element&gt;(self: &<a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): bool {
-    self is Option::Some
+    self is Option::Some&lt;Element&gt;
 }
 </code></pre>
 
@@ -539,6 +554,18 @@ Different from swap(), swap_or_fill() allows for <code>self</code> not holding a
 
 <pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_swap_or_fill">swap_or_fill</a>&lt;Element&gt;(self: &<b>mut</b> <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;, e: Element): <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt; {
     <a href="mem.md#0x1_mem_replace">mem::replace</a>(self, Option::Some { e })
+    // match (self) {
+    //     Option::None =&gt; {
+    //         //self.e = e;
+    //         *self = Option::Some { e };
+    //         <a href="option.md#0x1_option_none">none</a>()
+    //     }
+    //     Option::Some { e } =&gt; {
+    //         <b>let</b> <b>old</b> = e;
+    //         self.e = el;
+    //         <b>old</b>
+    //     }
+    // }
 }
 </code></pre>
 
@@ -928,45 +955,37 @@ Utility function to destroy an option that is not droppable.
 
 
 
-<a id="0x1_option_spec_is_some"></a>
-
-
-<pre><code><b>fun</b> <a href="option.md#0x1_option_spec_is_some">spec_is_some</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): bool {
-   <b>true</b>
-}
+<pre><code><b>pragma</b> aborts_if_is_strict;
 </code></pre>
 
 
 
 
-<a id="0x1_option_spec_is_none"></a>
+<a id="0x1_option_AbortsIfNone"></a>
 
 
-<pre><code><b>fun</b> <a href="option.md#0x1_option_spec_is_none">spec_is_none</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): bool {
-   <b>false</b>
+<pre><code><b>schema</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt; {
+    self: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;;
+    <b>aborts_if</b> <a href="option.md#0x1_option_spec_is_none">spec_is_none</a>(self) <b>with</b> <a href="option.md#0x1_option_EOPTION_NOT_SET">EOPTION_NOT_SET</a>;
 }
 </code></pre>
 
 
 
+<a id="@Specification_1_none"></a>
 
-<a id="0x1_option_spec_borrow"></a>
+### Function `none`
 
 
-<pre><code><b>fun</b> <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): Element {
-   <b>abort</b> 0
-}
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_none">none</a>&lt;Element&gt;(): <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;
 </code></pre>
 
 
 
 
-<a id="0x1_option_spec_some"></a>
-
-
-<pre><code><b>fun</b> <a href="option.md#0x1_option_spec_some">spec_some</a>&lt;Element&gt;(e: Element): <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt; {
-   <b>abort</b> 0
-}
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_none">spec_none</a>&lt;Element&gt;();
 </code></pre>
 
 
@@ -976,8 +995,129 @@ Utility function to destroy an option that is not droppable.
 
 
 <pre><code><b>fun</b> <a href="option.md#0x1_option_spec_none">spec_none</a>&lt;Element&gt;(): <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt; {
-   <b>abort</b> 0
+   Option::None
 }
+</code></pre>
+
+
+
+<a id="@Specification_1_some"></a>
+
+### Function `some`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_some">some</a>&lt;Element&gt;(e: Element): <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_some">spec_some</a>(e);
+</code></pre>
+
+
+
+
+<a id="0x1_option_spec_some"></a>
+
+
+<pre><code><b>fun</b> <a href="option.md#0x1_option_spec_some">spec_some</a>&lt;Element&gt;(e: Element): <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt; {
+   Option::Some { e }
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_from_vec"></a>
+
+### Function `from_vec`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_from_vec">from_vec</a>&lt;Element&gt;(vec: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> vec.length() &gt; 1;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_none"></a>
+
+### Function `is_none`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_is_none">is_none</a>&lt;Element&gt;(self: &<a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_is_none">spec_is_none</a>(self);
+</code></pre>
+
+
+
+
+<a id="0x1_option_spec_is_none"></a>
+
+
+<pre><code><b>fun</b> <a href="option.md#0x1_option_spec_is_none">spec_is_none</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): bool {
+   self is Option::None&lt;Element&gt;
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_is_some"></a>
+
+### Function `is_some`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_is_some">is_some</a>&lt;Element&gt;(self: &<a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(self);
+</code></pre>
+
+
+
+
+<a id="0x1_option_spec_is_some"></a>
+
+
+<pre><code><b>fun</b> <a href="option.md#0x1_option_spec_is_some">spec_is_some</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): bool {
+   self is Option::Some&lt;Element&gt;
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_contains"></a>
+
+### Function `contains`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_contains">contains</a>&lt;Element&gt;(self: &<a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;, e_ref: &Element): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_contains">spec_contains</a>(self, e_ref);
 </code></pre>
 
 
@@ -987,8 +1127,179 @@ Utility function to destroy an option that is not droppable.
 
 
 <pre><code><b>fun</b> <a href="option.md#0x1_option_spec_contains">spec_contains</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;, e: Element): bool {
-   <b>false</b>
+   (self is Option::Some&lt;Element&gt;) && <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self) == e
 }
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow"></a>
+
+### Function `borrow`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_borrow">borrow</a>&lt;Element&gt;(self: &<a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;): &Element
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self);
+</code></pre>
+
+
+
+
+<a id="0x1_option_spec_borrow"></a>
+
+
+<pre><code><b>fun</b> <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): Element;
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow_with_default"></a>
+
+### Function `borrow_with_default`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_borrow_with_default">borrow_with_default</a>&lt;Element&gt;(self: &<a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;, default_ref: &Element): &Element
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(self)) <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self) <b>else</b> default_ref);
+</code></pre>
+
+
+
+<a id="@Specification_1_get_with_default"></a>
+
+### Function `get_with_default`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_get_with_default">get_with_default</a>&lt;Element: <b>copy</b>, drop&gt;(self: &<a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;, default: Element): Element
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(self)) <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self) <b>else</b> default);
+</code></pre>
+
+
+
+<a id="@Specification_1_fill"></a>
+
+### Function `fill`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_fill">fill</a>&lt;Element&gt;(self: &<b>mut</b> <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;, e: Element)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(self) <b>with</b> <a href="option.md#0x1_option_EOPTION_IS_SET">EOPTION_IS_SET</a>;
+<b>ensures</b> <a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(self);
+<b>ensures</b> <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self) == e;
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow_mut"></a>
+
+### Function `borrow_mut`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_borrow_mut">borrow_mut</a>&lt;Element&gt;(self: &<b>mut</b> <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;): &<b>mut</b> Element
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self);
+<b>ensures</b> self == <b>old</b>(self);
+</code></pre>
+
+
+
+<a id="@Specification_1_destroy_with_default"></a>
+
+### Function `destroy_with_default`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_destroy_with_default">destroy_with_default</a>&lt;Element: drop&gt;(self: <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;, default: Element): Element
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(self)) <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self) <b>else</b> default);
+</code></pre>
+
+
+
+<a id="@Specification_1_destroy_some"></a>
+
+### Function `destroy_some`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_destroy_some">destroy_some</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;): Element
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self);
+</code></pre>
+
+
+
+<a id="@Specification_1_destroy_none"></a>
+
+### Function `destroy_none`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_destroy_none">destroy_none</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(self) <b>with</b> <a href="option.md#0x1_option_EOPTION_IS_SET">EOPTION_IS_SET</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_to_vec"></a>
+
+### Function `to_vec`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_to_vec">to_vec</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(self)) <a href="vector.md#0x1_vector">vector</a>[<a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self)] <b>else</b> <a href="vector.md#0x1_vector_empty">vector::empty</a>());
 </code></pre>
 
 

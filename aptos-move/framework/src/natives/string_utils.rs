@@ -9,6 +9,7 @@ use aptos_native_interface::{
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_std::iterable::Iterable;
+use itertools::Itertools;
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     account_address::AccountAddress,
@@ -312,22 +313,20 @@ fn native_format_impl(
                 && type_.module.as_str() == "option"
                 && type_.address == AccountAddress::ONE
             {
-                let mut v = strct
-                    .unpack()?
-                    .next()
-                    .unwrap()
-                    .value_as::<Vector>()?
-                    .unpack_unchecked()?;
-                if v.is_empty() {
+                let mut vv = strct.unpack()?.collect_vec();
+                if vv[0].equals(&Value::u16(0))? {
+                    assert!(vv.len() == 1);
                     out.push_str("None");
                 } else {
+                    assert!(vv.len() == 2);
                     out.push_str("Some(");
                     let inner_ty = if let MoveTypeLayout::Vector(inner_ty) = &fields[0].layout {
                         inner_ty.deref()
                     } else {
                         unreachable!()
                     };
-                    native_format_impl(context, inner_ty, v.pop().unwrap(), depth, out)?;
+                    let v2 = vv.pop().unwrap();
+                    native_format_impl(context, inner_ty, v2, depth, out)?;
                     out.push(')');
                 }
                 return Ok(());
@@ -347,6 +346,30 @@ fn native_format_impl(
             )?;
             out.push('}');
         },
+        // MoveTypeLayout::Struct(MoveStructLayout::WithTypesAndVariants { type_, variants }) => {
+        //     let strct = val.value_as::<Struct>()?;
+        //     if type_.name.as_str() == "Option"
+        //         && type_.module.as_str() == "option"
+        //         && type_.address == AccountAddress::ONE
+        //     {
+        //         println!("strct: {:?}", strct);
+        //         return Ok(());
+        //     }
+        //     if context.type_tag {
+        //         write!(out, "{} {{", type_.to_canonical_string()).unwrap();
+        //     } else {
+        //         write!(out, "{} {{", type_.name.as_str()).unwrap();
+        //     };
+        //     format_vector(
+        //         context,
+        //         variants.iter(),
+        //         strct.unpack()?.collect(),
+        //         depth,
+        //         !context.single_line,
+        //         out,
+        //     )?;
+        //     out.push('}');
+        // },
         MoveTypeLayout::Struct(MoveStructLayout::WithFields(fields)) => {
             let strct = val.value_as::<Struct>()?;
             out.push('{');
@@ -487,7 +510,6 @@ fn native_format(
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
-
     let ty = context
         .type_to_fully_annotated_layout(&ty_args[0])?
         .ok_or_else(|| SafeNativeError::Abort {

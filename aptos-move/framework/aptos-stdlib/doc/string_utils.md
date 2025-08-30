@@ -8,9 +8,7 @@ A module for formatting move values as strings.
 
 -  [Struct `Cons`](#0x1_string_utils_Cons)
 -  [Struct `NIL`](#0x1_string_utils_NIL)
--  [Struct `FakeCons`](#0x1_string_utils_FakeCons)
-    -  [[test_only]](#@[test_only]_0)
--  [Constants](#@Constants_1)
+-  [Constants](#@Constants_0)
 -  [Function `to_string`](#0x1_string_utils_to_string)
 -  [Function `to_string_with_canonical_addresses`](#0x1_string_utils_to_string_with_canonical_addresses)
 -  [Function `to_string_with_integer_types`](#0x1_string_utils_to_string_with_integer_types)
@@ -27,17 +25,17 @@ A module for formatting move values as strings.
 -  [Function `list4`](#0x1_string_utils_list4)
 -  [Function `native_format`](#0x1_string_utils_native_format)
 -  [Function `native_format_list`](#0x1_string_utils_native_format_list)
--  [Specification](#@Specification_2)
-    -  [Function `to_string`](#@Specification_2_to_string)
-    -  [Function `to_string_with_canonical_addresses`](#@Specification_2_to_string_with_canonical_addresses)
-    -  [Function `to_string_with_integer_types`](#@Specification_2_to_string_with_integer_types)
-    -  [Function `debug_string`](#@Specification_2_debug_string)
-    -  [Function `format1`](#@Specification_2_format1)
-    -  [Function `format2`](#@Specification_2_format2)
-    -  [Function `format3`](#@Specification_2_format3)
-    -  [Function `format4`](#@Specification_2_format4)
-    -  [Function `native_format`](#@Specification_2_native_format)
-    -  [Function `native_format_list`](#@Specification_2_native_format_list)
+-  [Specification](#@Specification_1)
+    -  [Function `to_string`](#@Specification_1_to_string)
+    -  [Function `to_string_with_canonical_addresses`](#@Specification_1_to_string_with_canonical_addresses)
+    -  [Function `to_string_with_integer_types`](#@Specification_1_to_string_with_integer_types)
+    -  [Function `debug_string`](#@Specification_1_debug_string)
+    -  [Function `format1`](#@Specification_1_format1)
+    -  [Function `format2`](#@Specification_1_format2)
+    -  [Function `format3`](#@Specification_1_format3)
+    -  [Function `format4`](#@Specification_1_format4)
+    -  [Function `native_format`](#@Specification_1_native_format)
+    -  [Function `native_format_list`](#@Specification_1_native_format_list)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -105,45 +103,7 @@ A module for formatting move values as strings.
 
 </details>
 
-<a id="0x1_string_utils_FakeCons"></a>
-
-## Struct `FakeCons`
-
-
-<a id="@[test_only]_0"></a>
-
-### [test_only]
-
-
-
-<pre><code><b>struct</b> <a href="string_utils.md#0x1_string_utils_FakeCons">FakeCons</a>&lt;T, N&gt; <b>has</b> <b>copy</b>, drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>car: T</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>cdr: N</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a id="@Constants_1"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
@@ -557,12 +517,12 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 </details>
 
-<a id="@Specification_2"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a id="@Specification_2_to_string"></a>
+<a id="@Specification_1_to_string"></a>
 
 ### Function `to_string`
 
@@ -579,7 +539,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 
-<a id="@Specification_2_to_string_with_canonical_addresses"></a>
+<a id="@Specification_1_to_string_with_canonical_addresses"></a>
 
 ### Function `to_string_with_canonical_addresses`
 
@@ -596,7 +556,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 
-<a id="@Specification_2_to_string_with_integer_types"></a>
+<a id="@Specification_1_to_string_with_integer_types"></a>
 
 ### Function `to_string_with_integer_types`
 
@@ -613,7 +573,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 
-<a id="@Specification_2_debug_string"></a>
+<a id="@Specification_1_debug_string"></a>
 
 ### Function `debug_string`
 
@@ -630,7 +590,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 
-<a id="@Specification_2_format1"></a>
+<a id="@Specification_1_format1"></a>
 
 ### Function `format1`
 
@@ -647,7 +607,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 
-<a id="@Specification_2_format2"></a>
+<a id="@Specification_1_format2"></a>
 
 ### Function `format2`
 
@@ -664,7 +624,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 
-<a id="@Specification_2_format3"></a>
+<a id="@Specification_1_format3"></a>
 
 ### Function `format3`
 
@@ -681,7 +641,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 
-<a id="@Specification_2_format4"></a>
+<a id="@Specification_1_format4"></a>
 
 ### Function `format4`
 
@@ -698,7 +658,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 
-<a id="@Specification_2_native_format"></a>
+<a id="@Specification_1_native_format"></a>
 
 ### Function `native_format`
 
@@ -716,7 +676,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 
-<a id="@Specification_2_native_format_list"></a>
+<a id="@Specification_1_native_format_list"></a>
 
 ### Function `native_format_list`
 

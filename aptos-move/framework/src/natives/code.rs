@@ -27,37 +27,37 @@ use std::{
     str::FromStr,
 };
 
-/// A wrapper around the representation of a Move Option, which is a vector with 0 or 1 element.
-/// TODO: move this elsewhere for reuse?
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub enum MoveOption<T> {
-    None,
-    Some(T),
-}
+// /// A wrapper around the representation of a Move Option, which is a vector with 0 or 1 element.
+// /// TODO: move this elsewhere for reuse?
+// #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+// pub enum MoveOption<T> {
+//     None,
+//     Some(T),
+// }
 
-impl<T> Default for MoveOption<T> {
-    fn default() -> Self {
-        MoveOption::none()
-    }
-}
+// impl<T> Default for MoveOption<T> {
+//     fn default() -> Self {
+//         MoveOption::none()
+//     }
+// }
 
-impl<T> MoveOption<T> {
-    pub fn none() -> Self {
-        Self::None
-    }
+// impl<T> MoveOption<T> {
+//     pub fn none() -> Self {
+//         Self::None
+//     }
 
-    pub fn some(x: T) -> Self {
-        Self::Some(x)
-    }
+//     pub fn some(x: T) -> Self {
+//         Self::Some(x)
+//     }
 
-    pub fn is_none(&self) -> bool {
-        matches!(self, Self::None)
-    }
+//     pub fn is_none(&self) -> bool {
+//         matches!(self, Self::None)
+//     }
 
-    pub fn is_some(&self) -> bool {
-        !self.is_none()
-    }
-}
+//     pub fn is_some(&self) -> bool {
+//         !self.is_none()
+//     }
+// }
 
 /// The package registry at the given address.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -83,7 +83,7 @@ pub struct PackageMetadata {
     pub manifest: Vec<u8>,
     pub modules: Vec<ModuleMetadata>,
     pub deps: Vec<PackageDep>,
-    pub extension: MoveOption<Any>,
+    pub extension: Option<Any>,
 }
 
 impl fmt::Display for PackageMetadata {
@@ -121,7 +121,7 @@ pub struct ModuleMetadata {
     pub source: Vec<u8>,
     #[serde(with = "serde_bytes")]
     pub source_map: Vec<u8>,
-    pub extension: MoveOption<Any>,
+    pub extension: Option<Any>,
 }
 
 impl fmt::Display for ModuleMetadata {

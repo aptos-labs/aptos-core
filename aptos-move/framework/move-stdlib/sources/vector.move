@@ -91,6 +91,10 @@ module std::vector {
         v.push_back(e);
         v
     }
+    spec singleton {
+        aborts_if false;
+        ensures result == vec(e);
+    }
 
     /// Reverses the order of the elements in the vector `self` in place.
     public fun reverse<Element>(self: &mut vector<Element>) {
@@ -130,6 +134,9 @@ module std::vector {
         }
     }
     spec append {
+        pragma intrinsic = true;
+    }
+    spec is_empty {
         pragma intrinsic = true;
     }
 

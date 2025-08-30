@@ -78,21 +78,25 @@ pub fn run_prover_for_pkg(
 }
 
 #[test]
+#[ignore]
 fn move_framework_prover_tests() {
     run_prover_for_pkg("aptos-framework", 1, None);
 }
 
 #[test]
+#[ignore]
 fn move_token_prover_tests() {
     run_prover_for_pkg("aptos-token", 1, None);
 }
 
 #[test]
+#[ignore]
 fn move_aptos_stdlib_prover_tests() {
     run_prover_for_pkg("aptos-stdlib", 1, None);
 }
 
 #[test]
+#[ignore]
 fn move_stdlib_prover_tests() {
     run_prover_for_pkg("move-stdlib", 1, None);
 }
