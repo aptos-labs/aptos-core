@@ -10,25 +10,32 @@ use aptos_keyless_pepper_service::{
     metrics::start_metric_server,
     request_handler,
     request_handler::DEFAULT_PEPPER_SERVICE_PORT,
-    vuf_keys::VUF_SK,
+    vuf_pub_key,
     watcher::start_external_resource_refresh_loop,
 };
+use aptos_logger::info;
 use aptos_types::keyless::test_utils::get_sample_iss;
 use hyper::{
     service::{make_service_fn, service_fn},
     Server,
 };
-use std::{convert::Infallible, net::SocketAddr, ops::Deref, time::Duration};
+use std::{convert::Infallible, net::SocketAddr, ops::Deref, sync::Arc, time::Duration};
 
 #[tokio::main]
 async fn main() {
+    aptos_logger::Logger::new().init();
+    info!("Starting the Pepper service...");
+
+    // Fetch the VUF public and private keypair (this will load the private key into memory)
+    info!("Fetching the VUF public and private keypair for the pepper service...");
+    let (vuf_public_key, vuf_private_key) = vuf_pub_key::get_pepper_service_vuf_keypair();
+    info!("Retrieved the VUF public key: {:?}", vuf_public_key);
+
     // Trigger private key loading.
-    let _ = VUF_SK.deref();
     let _ = ACCOUNT_MANAGERS.deref();
     {
         let _db = ACCOUNT_RECOVERY_DB.get_or_init(init_account_db).await;
     }
-    aptos_logger::Logger::new().init();
     start_metric_server();
     if let Ok(url) = std::env::var("ONCHAIN_GROTH16_VK_URL") {
         start_external_resource_refresh_loop(
@@ -65,11 +72,20 @@ async fn main() {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], DEFAULT_PEPPER_SERVICE_PORT));
 
-    let make_svc = make_service_fn(|_conn| async {
-        Ok::<_, Infallible>(service_fn(request_handler::handle_request))
+    // Wrap the VUF keypair in an Arc (to be shared across request handler threads)
+    let vuf_key_pair = Arc::new((vuf_public_key, vuf_private_key));
+
+    // Create the service function that handles the endpoint requests
+    let make_service = make_service_fn(move |_conn| {
+        let vuf_key_pair = vuf_key_pair.clone();
+        async move {
+            Ok::<_, Infallible>(service_fn(move |request| {
+                request_handler::handle_request(request, vuf_key_pair.clone())
+            }))
+        }
     });
 
-    let server = Server::bind(&addr).serve(make_svc);
+    let server = Server::bind(&addr).serve(make_service);
 
     if let Err(e) = server.await {
         eprintln!("server error: {}", e);

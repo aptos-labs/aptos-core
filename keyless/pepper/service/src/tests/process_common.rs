@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{process_common, ProcessingFailure};
+use crate::{error::PepperServiceError, process_common, tests::utils};
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
     keyless::{
@@ -13,7 +13,10 @@ use aptos_types::{
     },
     transaction::authenticator::EphemeralPublicKey,
 };
+use std::ops::Deref;
 use uuid::Uuid;
+
+// TODO: clean this up and add missing tests!
 
 #[tokio::test]
 async fn process_common_should_fail_if_max_exp_data_secs_overflowed() {
@@ -29,9 +32,13 @@ async fn process_common_should_fail_if_max_exp_data_secs_overflowed() {
         SAMPLE_NONCE.as_str(),
     );
 
+    let vuf_keypair = utils::create_vuf_public_private_keypair();
+    let (_, vuf_private_key) = vuf_keypair.deref();
+
     let jwt = get_sample_jwt_token_from_payload(&jwt_payload);
 
     let process_result = process_common(
+        vuf_private_key,
         &session_id,
         jwt,
         EphemeralPublicKey::ed25519(pk),
@@ -45,6 +52,6 @@ async fn process_common_should_fail_if_max_exp_data_secs_overflowed() {
     )
     .await;
     assert!(
-        matches!(process_result, Err(ProcessingFailure::BadRequest(e)) if e.as_str() == "max_exp_data_secs overflowed")
+        matches!(process_result, Err(PepperServiceError::BadRequest(e)) if e.as_str() == "max_exp_data_secs overflowed")
     );
 }

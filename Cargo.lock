@@ -2827,6 +2827,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha3 0.9.1",
+ "thiserror",
  "tokio",
  "uuid 1.11.0",
 ]

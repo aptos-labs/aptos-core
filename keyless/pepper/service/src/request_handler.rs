@@ -2,12 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    groth16_vk::ONCHAIN_GROTH16_VK,
-    keyless_config::ONCHAIN_KEYLESS_CONFIG,
-    vuf_keys::PEPPER_VUF_VERIFICATION_KEY_JSON,
-    HandlerTrait,
-    ProcessingFailure::{BadRequest, InternalError},
-    V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
+    error::PepperServiceError, groth16_vk::ONCHAIN_GROTH16_VK,
+    keyless_config::ONCHAIN_KEYLESS_CONFIG, HandlerTrait, V0FetchHandler, V0SignatureHandler,
+    V0VerifyHandler,
 };
 use aptos_build_info::build_information;
 use aptos_keyless_pepper_common::BadPepperRequestError;
@@ -21,7 +18,7 @@ use hyper::{
     Body, Method, Request, Response, StatusCode,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use std::{convert::Infallible, fmt::Debug, ops::Deref};
+use std::{convert::Infallible, fmt::Debug, ops::Deref, sync::Arc};
 
 // Default port for the pepper service
 pub const DEFAULT_PEPPER_SERVICE_PORT: u16 = 8000;
@@ -64,6 +61,7 @@ const UNEXPECTED_ERROR_MESSAGE: &str = "An unexpected error was encountered!";
 async fn call_dedicated_request_handler<TRequest, TResponse, TRequestHandler>(
     origin: String,
     request: Request<Body>,
+    vuf_private_key: &ark_bls12_381::Fr,
     request_handler: &TRequestHandler,
 ) -> Result<Response<Body>, Infallible>
 where
@@ -92,7 +90,10 @@ where
     };
 
     // Invoke the handler and generate the response
-    match request_handler.handle(pepper_request).await {
+    match request_handler
+        .handle(vuf_private_key, pepper_request)
+        .await
+    {
         Ok(pepper_response) => {
             info!(
                 "Pepper request processed successfully! Origin: {}, handler: {}",
@@ -108,7 +109,7 @@ where
             };
             generate_json_response(origin, StatusCode::OK, response_body)
         },
-        Err(BadRequest(error)) => {
+        Err(PepperServiceError::BadRequest(error)) => {
             let error_string = format!(
                 "Pepper request processing failed with bad request: {}",
                 error
@@ -127,9 +128,16 @@ where
             };
             generate_bad_request_response(origin, error_message)
         },
-        Err(InternalError(error)) => {
+        Err(PepperServiceError::InternalError(error)) => {
             error!(
                 "Pepper request processing failed with internal error: {}",
+                error
+            );
+            generate_internal_server_error_response(origin)
+        },
+        Err(PepperServiceError::UnexpectedError(error)) => {
+            error!(
+                "Pepper request processing failed with unexpected error: {}",
                 error
             );
             generate_internal_server_error_response(origin)
@@ -270,7 +278,10 @@ fn generate_text_response(
 }
 
 /// Handles the given request and returns a response
-pub async fn handle_request(request: Request<Body>) -> Result<Response<Body>, Infallible> {
+pub async fn handle_request(
+    request: Request<Body>,
+    vuf_keypair: Arc<(String, ark_bls12_381::Fr)>,
+) -> Result<Response<Body>, Infallible> {
     // Get the request origin
     let origin = get_request_origin(&request);
 
@@ -293,27 +304,43 @@ pub async fn handle_request(request: Request<Body>) -> Result<Response<Body>, In
                 return generate_cached_resource_response(origin, request_method, groth16_vk);
             },
             VUF_PUB_KEY_PATH => {
-                return generate_json_response(
-                    origin,
-                    StatusCode::OK,
-                    PEPPER_VUF_VERIFICATION_KEY_JSON.deref().clone(),
-                )
+                let (vuf_pub_key, _) = vuf_keypair.deref();
+                return generate_json_response(origin, StatusCode::OK, vuf_pub_key.clone());
             },
             _ => { /* Continue below */ },
         };
     }
 
     // Handle any POST requests
+    let (_, vuf_priv_key) = vuf_keypair.deref();
     if request_method == Method::POST {
         match request.uri().path() {
             FETCH_PATH => {
-                return call_dedicated_request_handler(origin, request, &V0FetchHandler).await
+                return call_dedicated_request_handler(
+                    origin,
+                    request,
+                    vuf_priv_key,
+                    &V0FetchHandler,
+                )
+                .await
             },
             SIGNATURE_PATH => {
-                return call_dedicated_request_handler(origin, request, &V0SignatureHandler).await
+                return call_dedicated_request_handler(
+                    origin,
+                    request,
+                    vuf_priv_key,
+                    &V0SignatureHandler,
+                )
+                .await
             },
             VERIFY_PATH => {
-                return call_dedicated_request_handler(origin, request, &V0VerifyHandler).await
+                return call_dedicated_request_handler(
+                    origin,
+                    request,
+                    vuf_priv_key,
+                    &V0VerifyHandler,
+                )
+                .await
             },
             _ => { /* Continue below */ },
         };
