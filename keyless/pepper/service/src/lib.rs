@@ -4,10 +4,9 @@
 use crate::{
     account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
     account_managers::ACCOUNT_MANAGERS,
+    error::PepperServiceError,
     groth16_vk::ONCHAIN_GROTH16_VK,
     keyless_config::ONCHAIN_KEYLESS_CONFIG,
-    vuf_keys::VUF_SK,
-    ProcessingFailure::{BadRequest, InternalError},
 };
 use aptos_crypto::{
     asymmetric_encryption::{
@@ -42,51 +41,53 @@ use firestore::{async_trait, paths, struct_path::path};
 use jsonwebtoken::{Algorithm::RS256, DecodingKey, Validation};
 use jwk::get_federated_jwk;
 use rand::thread_rng;
-use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 pub mod account_db;
 pub mod account_managers;
+pub mod error;
 pub mod groth16_vk;
 pub mod jwk;
 pub mod keyless_config;
 pub mod metrics;
 pub mod request_handler;
-pub mod vuf_keys;
+pub mod utils;
+pub mod vuf_pub_key;
 pub mod watcher;
 
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod unit_tests;
 
 pub type Issuer = String;
 pub type KeyID = String;
 
-#[derive(Debug, Deserialize, Serialize)]
-pub enum ProcessingFailure {
-    BadRequest(String),
-    InternalError(String),
-}
-
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/637'/0'/0'/0'";
 
 #[async_trait]
-pub trait HandlerTrait<REQ, RES>: Send + Sync {
+pub trait HandlerTrait<TRequest, TResponse>: Send + Sync {
     /// Returns the name of the handler (e.g., the type name). This is useful for logging.
     fn get_handler_name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
 
-    async fn handle(&self, request: REQ) -> Result<RES, ProcessingFailure>;
+    // TODO: is there a way we can remove the vuf_private_key param here?
+    async fn handle(
+        &self,
+        vuf_private_key: &ark_bls12_381::Fr,
+        request: TRequest,
+    ) -> Result<TResponse, PepperServiceError>;
 }
 
 pub struct V0FetchHandler;
 
 #[async_trait]
 impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
-    async fn handle(&self, request: PepperRequest) -> Result<PepperResponse, ProcessingFailure> {
+    async fn handle(
+        &self,
+        vuf_private_key: &ark_bls12_381::Fr,
+        request: PepperRequest,
+    ) -> Result<PepperResponse, PepperServiceError> {
         let session_id = Uuid::new_v4();
         let PepperRequest {
             jwt,
@@ -98,6 +99,7 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
         } = request;
 
         let (_pepper_base, pepper, address) = process_common(
+            vuf_private_key,
             &session_id,
             jwt,
             epk,
@@ -122,7 +124,11 @@ pub struct V0SignatureHandler;
 
 #[async_trait]
 impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
-    async fn handle(&self, request: PepperRequest) -> Result<SignatureResponse, ProcessingFailure> {
+    async fn handle(
+        &self,
+        vuf_private_key: &ark_bls12_381::Fr,
+        request: PepperRequest,
+    ) -> Result<SignatureResponse, PepperServiceError> {
         let session_id = Uuid::new_v4();
         let PepperRequest {
             jwt,
@@ -134,6 +140,7 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
         } = request;
 
         let (pepper_base, _pepper, _address) = process_common(
+            vuf_private_key,
             &session_id,
             jwt,
             epk,
@@ -156,7 +163,7 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
 #[macro_export]
 macro_rules! invalid_signature {
     ($message:expr) => {
-        BadRequest($message.to_owned())
+        PepperServiceError::BadRequest($message.to_owned())
     };
 }
 
@@ -164,7 +171,11 @@ pub struct V0VerifyHandler;
 
 #[async_trait]
 impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
-    async fn handle(&self, request: VerifyRequest) -> Result<VerifyResponse, ProcessingFailure> {
+    async fn handle(
+        &self,
+        _: &ark_bls12_381::Fr,
+        request: VerifyRequest,
+    ) -> Result<VerifyResponse, PepperServiceError> {
         let VerifyRequest {
             public_key,
             signature,
@@ -191,19 +202,25 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
                 .map_err(|_| invalid_signature!("The ephemeral keypair has expired"))?;
             ephemeral_signature
                 .verify_arbitrary_msg(&message, ephemeral_pubkey)
-                .map_err(|e| BadRequest(format!("Ephemeral sig check failed: {e}")))?;
-            let jwt_header = signature
-                .parse_jwt_header()
-                .map_err(|e| BadRequest(format!("JWT header decoding error: {e}")))?;
+                .map_err(|e| {
+                    PepperServiceError::BadRequest(format!("Ephemeral sig check failed: {e}"))
+                })?;
+            let jwt_header = signature.parse_jwt_header().map_err(|e| {
+                PepperServiceError::BadRequest(format!("JWT header decoding error: {e}"))
+            })?;
             let jwk = jwk::cached_decoding_key_as_rsa(iss_val, &jwt_header.kid)
-                .map_err(|e| BadRequest(format!("JWK not found: {e}")))?;
+                .map_err(|e| PepperServiceError::BadRequest(format!("JWK not found: {e}")))?;
             let config_api_repr =
                 { ONCHAIN_KEYLESS_CONFIG.read().as_ref().cloned() }.ok_or_else(|| {
-                    InternalError("API keyless config not cached locally.".to_string())
+                    PepperServiceError::InternalError(
+                        "API keyless config not cached locally.".to_string(),
+                    )
                 })?;
-            let config = config_api_repr
-                .to_rust_repr()
-                .map_err(|e| InternalError(format!("Could not parse API keyless config: {e}")))?;
+            let config = config_api_repr.to_rust_repr().map_err(|e| {
+                PepperServiceError::InternalError(format!(
+                    "Could not parse API keyless config: {e}"
+                ))
+            })?;
             let training_wheels_pk = match &config.training_wheels_pubkey {
                 None => None,
                 // This takes ~4.4 microseconds, so we are not too concerned about speed here.
@@ -270,10 +287,16 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
 
                             let onchain_groth16_vk =
                                 { ONCHAIN_GROTH16_VK.read().as_ref().cloned() }.ok_or_else(
-                                    || InternalError("No Groth16 VK cached locally.".to_string()),
+                                    || {
+                                        PepperServiceError::InternalError(
+                                            "No Groth16 VK cached locally.".to_string(),
+                                        )
+                                    },
                                 )?;
                             let ark_groth16_pvk = onchain_groth16_vk.to_ark_pvk().map_err(|e| {
-                                InternalError(format!("Onchain-to-ark convertion err: {e}"))
+                                PepperServiceError::InternalError(format!(
+                                    "Onchain-to-ark convertion err: {e}"
+                                ))
                             })?;
                             let result =
                                 zksig.verify_groth16_proof(public_inputs_hash, &ark_groth16_pvk);
@@ -307,6 +330,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
 }
 
 async fn process_common(
+    vuf_private_key: &ark_bls12_381::Fr,
     session_id: &Uuid,
     jwt: String,
     epk: EphemeralPublicKey,
@@ -317,7 +341,7 @@ async fn process_common(
     encrypts_pepper: bool,
     aud: Option<String>,
     should_update_account_recovery_db: bool,
-) -> Result<(Vec<u8>, Vec<u8>, AccountAddress), ProcessingFailure> {
+) -> Result<(Vec<u8>, Vec<u8>, AccountAddress), PepperServiceError> {
     let config = Configuration::new_for_devnet();
 
     let derivation_path = if let Some(path) = derivation_path {
@@ -325,27 +349,31 @@ async fn process_common(
     } else {
         DEFAULT_DERIVATION_PATH.to_owned()
     };
-    let checked_derivation_path =
-        get_aptos_derivation_path(&derivation_path).map_err(|e| BadRequest(e.to_string()))?;
+    let checked_derivation_path = get_aptos_derivation_path(&derivation_path)
+        .map_err(|e| PepperServiceError::BadRequest(e.to_string()))?;
 
     let curve25519_pk_point = match &epk {
         EphemeralPublicKey::Ed25519 { public_key } => public_key
             .to_compressed_edwards_y()
             .decompress()
-            .ok_or_else(|| BadRequest("the pk point is off-curve".to_string()))?,
+            .ok_or_else(|| {
+                PepperServiceError::BadRequest("the pk point is off-curve".to_string())
+            })?,
         _ => {
-            return Err(BadRequest("Only Ed25519 epk is supported".to_string()));
+            return Err(PepperServiceError::BadRequest(
+                "Only Ed25519 epk is supported".to_string(),
+            ));
         },
     };
 
     let claims = aptos_keyless_pepper_common::jwt::parse(jwt.as_str())
-        .map_err(|e| BadRequest(format!("JWT decoding error: {e}")))?;
+        .map_err(|e| PepperServiceError::BadRequest(format!("JWT decoding error: {e}")))?;
     let now_secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
     if exp_date_secs <= now_secs {
-        return Err(BadRequest("epk expired".to_string()));
+        return Err(PepperServiceError::BadRequest("epk expired".to_string()));
     }
 
     let (max_exp_data_secs, overflowed) = claims
@@ -353,10 +381,14 @@ async fn process_common(
         .iat
         .overflowing_add(config.max_exp_horizon_secs);
     if overflowed {
-        return Err(BadRequest("max_exp_data_secs overflowed".to_string()));
+        return Err(PepperServiceError::BadRequest(
+            "max_exp_data_secs overflowed".to_string(),
+        ));
     }
     if exp_date_secs >= max_exp_data_secs {
-        return Err(BadRequest("epk expiry date too far".to_string()));
+        return Err(PepperServiceError::BadRequest(
+            "epk expiry date too far".to_string(),
+        ));
     }
 
     let actual_uid_key = if let Some(uid_key) = uid_key.as_ref() {
@@ -366,15 +398,13 @@ async fn process_common(
     };
 
     let uid_val = if actual_uid_key == "email" {
-        claims
-            .claims
-            .email
-            .clone()
-            .ok_or_else(|| BadRequest("`email` required but not found in jwt".to_string()))?
+        claims.claims.email.clone().ok_or_else(|| {
+            PepperServiceError::BadRequest("`email` required but not found in jwt".to_string())
+        })?
     } else if actual_uid_key == "sub" {
         claims.claims.sub.clone()
     } else {
-        return Err(BadRequest(format!(
+        return Err(PepperServiceError::BadRequest(format!(
             "unsupported uid key: {}",
             actual_uid_key
         )));
@@ -382,16 +412,20 @@ async fn process_common(
 
     let recalculated_nonce =
         OpenIdSig::reconstruct_oauth_nonce(epk_blinder.as_slice(), exp_date_secs, &epk, &config)
-            .map_err(|e| BadRequest(format!("nonce reconstruction error: {e}")))?;
+            .map_err(|e| {
+                PepperServiceError::BadRequest(format!("nonce reconstruction error: {e}"))
+            })?;
 
     if claims.claims.nonce != recalculated_nonce {
-        return Err(BadRequest("with nonce mismatch".to_string()));
+        return Err(PepperServiceError::BadRequest(
+            "with nonce mismatch".to_string(),
+        ));
     }
 
     let key_id = claims
         .header
         .kid
-        .ok_or_else(|| BadRequest("missing kid in JWT".to_string()))?;
+        .ok_or_else(|| PepperServiceError::BadRequest("missing kid in JWT".to_string()))?;
 
     let cached_key = jwk::cached_decoding_key_as_rsa(&claims.claims.iss, &key_id);
 
@@ -399,10 +433,10 @@ async fn process_common(
         Ok(key) => key,
         Err(_) => get_federated_jwk(&jwt)
             .await
-            .map_err(|e| BadRequest(format!("JWK not found: {e}")))?,
+            .map_err(|e| PepperServiceError::BadRequest(format!("JWK not found: {e}")))?,
     };
     let jwk_decoding_key = DecodingKey::from_rsa_components(&jwk.n, &jwk.e)
-        .map_err(|e| BadRequest(format!("JWK not found: {e}")))?;
+        .map_err(|e| PepperServiceError::BadRequest(format!("JWK not found: {e}")))?;
 
     let mut validation_with_sig_verification = Validation::new(RS256);
     validation_with_sig_verification.validate_exp = false; // Don't validate the exp time
@@ -411,7 +445,9 @@ async fn process_common(
         &jwk_decoding_key,
         &validation_with_sig_verification,
     ) // Signature verification happens here.
-    .map_err(|e| BadRequest(format!("JWT signature verification failed: {e}")))?;
+    .map_err(|e| {
+        PepperServiceError::BadRequest(format!("JWT signature verification failed: {e}"))
+    })?;
 
     // If the pepper request is is from an account manager, and has a target aud specified, compute the pepper for the target aud.
     let mut aud_overridden = false;
@@ -445,19 +481,24 @@ async fn process_common(
     }
 
     let input_bytes = bcs::to_bytes(&input).unwrap();
-    let (pepper_base, vuf_proof) = vuf::bls12381_g1_bls::Bls12381G1Bls::eval(&VUF_SK, &input_bytes)
-        .map_err(|e| InternalError(format!("bls12381_g1_bls eval error: {e}")))?;
+    let (pepper_base, vuf_proof) =
+        vuf::bls12381_g1_bls::Bls12381G1Bls::eval(vuf_private_key, &input_bytes).map_err(|e| {
+            PepperServiceError::InternalError(format!("bls12381_g1_bls eval error: {e}"))
+        })?;
     if !vuf_proof.is_empty() {
-        return Err(InternalError("proof size should be 0".to_string()));
+        return Err(PepperServiceError::InternalError(
+            "proof size should be 0".to_string(),
+        ));
     }
 
-    let pinkas_pepper = PinkasPepper::from_affine_bytes(&pepper_base)
-        .map_err(|_| InternalError("Failed to derive pinkas pepper".to_string()))?;
+    let pinkas_pepper = PinkasPepper::from_affine_bytes(&pepper_base).map_err(|_| {
+        PepperServiceError::InternalError("Failed to derive pinkas pepper".to_string())
+    })?;
     let master_pepper = pinkas_pepper.to_master_pepper();
     let derived_pepper = ExtendedPepper::from_seed(master_pepper.to_bytes())
-        .map_err(|e| InternalError(e.to_string()))?
+        .map_err(|e| PepperServiceError::InternalError(e.to_string()))?
         .derive(&checked_derivation_path)
-        .map_err(|e| InternalError(e.to_string()))?
+        .map_err(|e| PepperServiceError::InternalError(e.to_string()))?
         .get_pepper();
 
     let idc = IdCommitment::new_from_preimage(
@@ -466,7 +507,7 @@ async fn process_common(
         &input.uid_key,
         &input.uid_val,
     )
-    .map_err(|e| InternalError(e.to_string()))?;
+    .map_err(|e| PepperServiceError::InternalError(e.to_string()))?;
     let public_key = KeylessPublicKey {
         iss_val: input.iss,
         idc,
@@ -483,14 +524,18 @@ async fn process_common(
             &curve25519_pk_point,
             &pepper_base,
         )
-        .map_err(|e| InternalError(format!("ElGamalCurve25519Aes256Gcm enc error: {e}")))?;
+        .map_err(|e| {
+            PepperServiceError::InternalError(format!("ElGamalCurve25519Aes256Gcm enc error: {e}"))
+        })?;
         let pepper_encrypted = ElGamalCurve25519Aes256Gcm::enc(
             &mut main_rng,
             &mut aead_rng,
             &curve25519_pk_point,
             derived_pepper.to_bytes(),
         )
-        .map_err(|e| InternalError(format!("ElGamalCurve25519Aes256Gcm enc error: {e}")))?;
+        .map_err(|e| {
+            PepperServiceError::InternalError(format!("ElGamalCurve25519Aes256Gcm enc error: {e}"))
+        })?;
         Ok((pepper_base_encrypted, pepper_encrypted, address))
     } else {
         Ok((pepper_base, derived_pepper.to_bytes().to_vec(), address))
@@ -500,7 +545,7 @@ async fn process_common(
 /// Save a pepper request into the account recovery DB.
 ///
 /// TODO: once the account recovery DB flow is verified working e2e, DB error should not be ignored.
-async fn update_account_recovery_db(input: &PepperInput) -> Result<(), ProcessingFailure> {
+async fn update_account_recovery_db(input: &PepperInput) -> Result<(), PepperServiceError> {
     match ACCOUNT_RECOVERY_DB.get_or_init(init_account_db).await {
         Ok(db) => {
             let entry = AccountRecoveryDbEntry {
@@ -533,10 +578,9 @@ async fn update_account_recovery_db(input: &PepperInput) -> Result<(), Processin
             // which is defined as `first_request_unix_ms - 1_000_000_000_000_000`,
             // where 1_000_000_000_000_000 milliseconds is roughly 31710 years.
 
-            let mut txn = db
-                .begin_transaction()
-                .await
-                .map_err(|e| InternalError(format!("begin_transaction error: {e}")))?;
+            let mut txn = db.begin_transaction().await.map_err(|e| {
+                PepperServiceError::InternalError(format!("begin_transaction error: {e}"))
+            })?;
             db.fluent()
                 .update()
                 .fields(paths!(AccountRecoveryDbEntry::{iss, aud, uid_key, uid_val}))
@@ -559,7 +603,9 @@ async fn update_account_recovery_db(input: &PepperInput) -> Result<(), Processin
                     ])
                 })
                 .add_to_transaction(&mut txn)
-                .map_err(|e| InternalError(format!("add_to_transaction error: {e}")))?;
+                .map_err(|e| {
+                    PepperServiceError::InternalError(format!("add_to_transaction error: {e}"))
+                })?;
             let txn_result = txn.commit().await;
 
             if let Err(e) = txn_result {
