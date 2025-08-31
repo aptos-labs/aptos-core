@@ -2,25 +2,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::counters::HOT_STATE_OP_ACCUMULATOR_COUNTER as COUNTER;
-use aptos_logger::error;
+use aptos_logger::{error, info};
 use aptos_metrics_core::IntCounterHelper;
 use aptos_types::{
-    state_store::{state_slot::StateSlot, TStateView},
+    state_store::{
+        hot_state::HOT_STATE_MAX_ITEMS_PER_SHARD, state_slot::StateSlot, TStateView,
+        NUM_STATE_SHARDS,
+    },
     transaction::Version,
 };
-use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Debug,
+    hash::Hash,
+};
 
 pub struct BlockHotStateOpAccumulator<'base_view, Key, BaseView> {
     first_version: Version,
     base_view: &'base_view BaseView,
-    /// Keys read but never written to across the entire block are to be made hot (or refreshed
-    /// `hot_since_version` one is already hot but last refresh is far in the history) as the side
-    /// effect of the block epilogue (subject to per block limit)
-    to_make_hot: BTreeMap<Key, StateSlot>,
-    /// Keep track of all the keys that are written to across the whole block, these keys are made
-    /// hot (or have a refreshed `hot_since_version`) immediately at the version they got changed,
-    /// so no need to issue separate HotStateOps to promote them to the hot state.
-    writes: hashbrown::HashSet<Key>,
+    /// Keep track of all the keys that are read across the whole block. These keys are candidates
+    /// for hot state promotion (subject to rules such as per block limit).
+    reads: hashbrown::HashSet<Key>,
     /// To prevent the block epilogue from being too heavy.
     max_promotions_per_block: usize,
     /// Every now and then refresh `hot_since_version` for hot items to prevent them from being
@@ -54,82 +56,107 @@ where
         Self {
             first_version: base_view.next_version(),
             base_view,
-            to_make_hot: BTreeMap::new(),
-            writes: hashbrown::HashSet::new(),
+            reads: hashbrown::HashSet::new(),
             max_promotions_per_block,
             _refresh_interval_versions: refresh_interval_versions,
         }
     }
 
-    pub fn add_transaction<'a>(
-        &mut self,
-        writes: impl Iterator<Item = &'a Key>,
-        reads: impl Iterator<Item = &'a Key>,
-    ) where
-        Key: 'a,
-    {
-        for key in writes {
-            if self.to_make_hot.remove(key).is_some() {
-                COUNTER.inc_with(&["promotion_removed_by_write"]);
-            }
-            self.writes.get_or_insert_owned(key);
-        }
-
-        for key in reads {
-            if self.to_make_hot.len() >= self.max_promotions_per_block {
-                COUNTER.inc_with(&["max_promotions_per_block_hit"]);
-                continue;
-            }
-            if self.to_make_hot.contains_key(key) {
-                continue;
-            }
-            if self.writes.contains(key) {
-                continue;
-            }
-            let slot = self
-                .base_view
-                .get_state_slot(key)
-                .expect("base_view.get_slot() failed.");
-            let make_hot = match slot {
-                StateSlot::ColdVacant => {
-                    COUNTER.inc_with(&["vacant_new"]);
-                    true
-                },
-                StateSlot::HotVacant {
-                    hot_since_version, ..
-                } => {
-                    if self.should_refresh(hot_since_version) {
-                        COUNTER.inc_with(&["vacant_refresh"]);
-                        true
-                    } else {
-                        COUNTER.inc_with(&["vacant_still_hot"]);
-                        false
-                    }
-                },
-                StateSlot::ColdOccupied { .. } => {
-                    COUNTER.inc_with(&["occupied_new"]);
-                    true
-                },
-                StateSlot::HotOccupied {
-                    hot_since_version, ..
-                } => {
-                    if self.should_refresh(hot_since_version) {
-                        COUNTER.inc_with(&["occupied_refresh"]);
-                        true
-                    } else {
-                        COUNTER.inc_with(&["occupied_still_hot"]);
-                        false
-                    }
-                },
-            };
-            if make_hot {
-                self.to_make_hot.insert(key.clone(), slot);
-            }
-        }
+    pub fn add_transaction_reads(&mut self, reads: impl IntoIterator<Item = Key>) {
+        self.reads.extend(reads);
     }
 
-    pub fn get_slots_to_make_hot(&self) -> BTreeMap<Key, StateSlot> {
-        self.to_make_hot.clone()
+    pub fn get_promotions_and_evictions(
+        &self,
+        writes: hashbrown::HashSet<Key>,
+    ) -> (BTreeMap<Key, StateSlot>, BTreeMap<Key, StateSlot>) {
+        let read_only: BTreeSet<_> = self.reads.difference(&writes).collect();
+        let to_make_hot: BTreeMap<_, _> = read_only
+            .iter()
+            .filter_map(|key| self.maybe_make_hot(*key).map(|slot| ((*key).clone(), slot)))
+            .take(self.max_promotions_per_block)
+            .collect();
+        COUNTER.inc_with_by(&["total_make_hot"], to_make_hot.len() as u64);
+
+        let mut to_evict = BTreeMap::new();
+        let mut num_hot_items = self.base_view.num_hot_items();
+        for key in writes.iter().chain(read_only.iter().map(|k| *k)) {
+            if self.base_view.contains_hot_state_value(key) {
+                continue;
+            }
+            let shard_id = self.base_view.get_shard_id(key);
+            num_hot_items[shard_id] += 1;
+        }
+
+        for shard_id in 0..NUM_STATE_SHARDS {
+            // The previous key considered for eviction. Starts with `None`, which means we try to
+            // evict the oldest key first.
+            let mut prev = None;
+            info!(
+                "shard {} size before eviction: {}",
+                shard_id, num_hot_items[shard_id]
+            );
+            while num_hot_items[shard_id] > HOT_STATE_MAX_ITEMS_PER_SHARD {
+                while let Some(k) = self
+                    .base_view
+                    .get_next_old_key(shard_id, prev.as_ref())
+                    .unwrap()
+                {
+                    prev = Some(k.clone());
+                    if !writes.contains(&k) && !read_only.contains(&k) {
+                        let slot = self
+                            .base_view
+                            .get_state_slot(&k)
+                            .expect("base_view.get_slot() should not fail for keys to evict");
+                        to_evict.insert(k, slot);
+                        num_hot_items[shard_id] -= 1;
+                        break;
+                    }
+                }
+            }
+        }
+
+        (to_make_hot, to_evict)
+    }
+
+    fn maybe_make_hot(&self, key: &Key) -> Option<StateSlot> {
+        let slot = self
+            .base_view
+            .get_state_slot(key)
+            .expect("base_view.get_slot() should not fail for keys to make hot");
+
+        match &slot {
+            StateSlot::ColdVacant => {
+                COUNTER.inc_with(&["vacant_new"]);
+                Some(slot)
+            },
+            StateSlot::HotVacant {
+                hot_since_version, ..
+            } => {
+                if self.should_refresh(*hot_since_version) {
+                    COUNTER.inc_with(&["vacant_refresh"]);
+                    Some(slot)
+                } else {
+                    COUNTER.inc_with(&["vacant_still_hot"]);
+                    None
+                }
+            },
+            StateSlot::ColdOccupied { .. } => {
+                COUNTER.inc_with(&["occupied_new"]);
+                Some(slot)
+            },
+            StateSlot::HotOccupied {
+                hot_since_version, ..
+            } => {
+                if self.should_refresh(*hot_since_version) {
+                    COUNTER.inc_with(&["occupied_refresh"]);
+                    Some(slot)
+                } else {
+                    COUNTER.inc_with(&["occupied_still_hot"]);
+                    None
+                }
+            },
+        }
     }
 
     pub fn should_refresh(&self, hot_since_version: Version) -> bool {
