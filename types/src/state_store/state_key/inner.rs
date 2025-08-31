@@ -94,7 +94,7 @@ impl Debug for StateKeyInner {
                     f,
                     "StateKey::TableItem {{ handle: {:x}, key: {} }}",
                     handle.0,
-                    hex::encode(key),
+                    hex::encode(key).trim_start_matches('0'),
                 )
             },
             StateKeyInner::Raw(bytes) => {
