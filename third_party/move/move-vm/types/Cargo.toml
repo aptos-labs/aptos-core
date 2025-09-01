@@ -28,6 +28,7 @@ sha3 = { workspace = true }
 smallbitvec = { workspace = true }
 smallvec = { workspace = true }
 triomphe = { workspace = true }
+typed-arena = { workspace = true }
 
 [dev-dependencies]
 claims = { workspace = true }
