@@ -6,13 +6,22 @@ use aptos_aggregator::{
     bounded_math::SignedU128,
     delayed_change::DelayedChange,
     delayed_field_extension::DelayedFieldData,
-    delta_change_set::DeltaOp,
+    delta_change_set::{serialize, DeltaOp},
     resolver::{AggregatorV1Resolver, DelayedFieldResolver},
 };
-use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata};
+use aptos_gas_meter::AptosGasMeter;
+use aptos_types::{
+    state_store::{state_key::StateKey, state_value::StateValueMetadata},
+    write_set::{WriteOp, WriteOpSize},
+};
+use aptos_vm_types::{
+    change_set::WriteOpInfo,
+    storage::{change_set_configs::ChangeSetSizeTracker, space_pricing::ChargeAndRefund},
+};
 use better_any::{Tid, TidAble};
-use move_binary_format::errors::PartialVMResult;
+use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::value::MoveTypeLayout;
+use move_vm_runtime::native_extensions::VersionControlledNativeExtension;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     cell::RefCell,
@@ -54,6 +63,24 @@ pub struct NativeAggregatorContext<'a> {
     pub(crate) delayed_field_data: RefCell<DelayedFieldData>,
 }
 
+impl<'a> VersionControlledNativeExtension for NativeAggregatorContext<'a> {
+    fn undo(&mut self) {
+        self.delayed_field_data.borrow_mut().undo();
+        self.aggregator_v1_data.borrow_mut().undo();
+    }
+
+    fn save(&mut self) {
+        self.delayed_field_data.borrow_mut().undo();
+        self.aggregator_v1_data.borrow_mut().save();
+    }
+
+    fn update(&mut self, txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        // Note: nothing to update for delayed fields.
+        self.txn_hash = *txn_hash;
+        self.aggregator_v1_data.borrow_mut().update();
+    }
+}
+
 impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
@@ -78,6 +105,109 @@ impl<'a> NativeAggregatorContext<'a> {
         self.txn_hash
     }
 
+    pub fn materialize_write_op_info(
+        &self,
+        new_slot_metadata: &Option<StateValueMetadata>,
+    ) -> PartialVMResult<HashSet<DelayedFieldID>> {
+        self.aggregator_v1_data
+            .borrow_mut()
+            .materialize_write_op_info(self.aggregator_v1_resolver, new_slot_metadata)?;
+        let delayed_field_ids = self.delayed_field_data.borrow_mut().materialize();
+        Ok(delayed_field_ids)
+    }
+
+    pub fn charge_write_ops(
+        &self,
+        change_set_size_tracker: &mut ChangeSetSizeTracker,
+        gas_meter: &mut impl AptosGasMeter,
+    ) -> VMResult<()> {
+        let mut aggregator_v1_data = self.aggregator_v1_data.borrow_mut();
+        for res in aggregator_v1_data.write_ops_info_iter() {
+            let (key, metadata_mut, op_size, prev_size) = res?;
+            if let Some(pricing) = change_set_size_tracker.disk_pricing {
+                let ChargeAndRefund { charge, refund } = pricing.charge_refund_write_op(
+                    change_set_size_tracker.txn_gas_params.unwrap(),
+                    WriteOpInfo {
+                        key,
+                        op_size,
+                        prev_size: prev_size.unwrap_or(0),
+                        metadata_mut,
+                    },
+                );
+                change_set_size_tracker.write_fee += charge;
+                change_set_size_tracker.total_refund += refund;
+            }
+            change_set_size_tracker.record_write_op(key, op_size)?;
+            gas_meter.charge_io_gas_for_write(key, &op_size)?;
+        }
+        Ok(())
+    }
+
+    pub fn take_writes(
+        &self,
+    ) -> VMResult<(
+        BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+        BTreeMap<StateKey, WriteOp>,
+        BTreeMap<StateKey, DeltaOp>,
+    )> {
+        let mut aggregator_v1_write_set = BTreeMap::new();
+        let mut aggregator_v1_delta_set = BTreeMap::new();
+
+        let mut aggregator_v1_data = self.aggregator_v1_data.borrow_mut();
+        for res in aggregator_v1_data.take_materialized_writes() {
+            let (id, aggregator, meta, size) = res?;
+            let state_key = id.0;
+            match aggregator {
+                None => {
+                    let write_op = WriteOp::deletion(meta.ok_or_else(|| {
+                        PartialVMError::new_invariant_violation("unreachable")
+                            .finish(Location::Undefined)
+                    })?);
+                    aggregator_v1_write_set.insert(state_key, write_op);
+                },
+                Some(aggregator) => {
+                    let (value, state, limit, history) = aggregator.into();
+
+                    match state {
+                        AggregatorState::Data => {
+                            let bytes = serialize(&value).into();
+                            let meta = meta.ok_or_else(|| {
+                                PartialVMError::new_invariant_violation("unreachable")
+                                    .finish(Location::Undefined)
+                            })?;
+                            let write_op = match size {
+                                WriteOpSize::Creation { .. } => WriteOp::creation(bytes, meta),
+                                WriteOpSize::Modification { .. } => {
+                                    WriteOp::modification(bytes, meta)
+                                },
+                                WriteOpSize::Deletion => unreachable!(),
+                            };
+                            aggregator_v1_write_set.insert(state_key, write_op);
+                        },
+                        AggregatorState::PositiveDelta => {
+                            let history = history.unwrap();
+                            let plus = SignedU128::Positive(value);
+                            let delta_op = DeltaOp::new(plus, limit, history);
+                            aggregator_v1_delta_set.insert(state_key, delta_op);
+                        },
+                        AggregatorState::NegativeDelta => {
+                            let history = history.unwrap();
+                            let minus = SignedU128::Negative(value);
+                            let delta_op = DeltaOp::new(minus, limit, history);
+                            aggregator_v1_delta_set.insert(state_key, delta_op);
+                        },
+                    };
+                },
+            }
+        }
+
+        Ok((
+            self.delayed_field_data.borrow_mut().take_latest(),
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set,
+        ))
+    }
+
     /// Returns all changes made within this context (i.e. by a single
     /// transaction).
     pub fn into_change_set(self) -> PartialVMResult<AggregatorChangeSet> {
@@ -86,12 +216,17 @@ impl<'a> NativeAggregatorContext<'a> {
             delayed_field_data,
             ..
         } = self;
-        let (_, destroyed_aggregators, aggregators) = aggregator_v1_data.into_inner().into();
-
         let mut aggregator_v1_changes = BTreeMap::new();
 
         // First, process all writes and deltas.
-        for (id, aggregator) in aggregators {
+        for (id, maybe_aggregator) in aggregator_v1_data.into_inner().into() {
+            let aggregator = match maybe_aggregator {
+                Some(aggregator) => aggregator,
+                None => {
+                    aggregator_v1_changes.insert(id.0, AggregatorChangeV1::Delete);
+                    continue;
+                },
+            };
             let (value, state, limit, history) = aggregator.into();
 
             let change = match state {
@@ -110,11 +245,6 @@ impl<'a> NativeAggregatorContext<'a> {
                 },
             };
             aggregator_v1_changes.insert(id.0, change);
-        }
-
-        // Additionally, do not forget to delete destroyed values from storage.
-        for id in destroyed_aggregators {
-            aggregator_v1_changes.insert(id.0, AggregatorChangeV1::Delete);
         }
 
         let delayed_field_changes = delayed_field_data.into_inner().into();
@@ -164,7 +294,7 @@ mod test {
     use aptos_types::delayed_fields::{
         calculate_width_for_integer_embedded_string, SnapshotToStringFormula,
     };
-    use claims::{assert_matches, assert_ok, assert_ok_eq, assert_some_eq};
+    use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq, assert_some_eq};
 
     fn get_test_resolver_v1() -> FakeAggregatorView {
         let mut state_view = FakeAggregatorView::default();
@@ -194,10 +324,10 @@ mod test {
     fn test_set_up_v1(context: &NativeAggregatorContext) {
         let mut aggregator_data = context.aggregator_v1_data.borrow_mut();
 
-        aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(100), 100);
-        aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(200), 200);
-        aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(300), 300);
-        aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(400), 400);
+        assert_ok!(aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(100), 100));
+        assert_ok!(aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(200), 200));
+        assert_ok!(aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(300), 300));
+        assert_ok!(aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(400), 400));
 
         assert_ok!(aggregator_data.get_aggregator(aggregator_v1_id_for_test(100), 100));
         assert_ok!(aggregator_data.get_aggregator(aggregator_v1_id_for_test(200), 200));
@@ -214,10 +344,11 @@ mod test {
             .unwrap()
             .add(200));
 
-        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(100));
-        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(300));
-        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(500));
-        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(800));
+        assert_ok!(aggregator_data.remove_aggregator(aggregator_v1_id_for_test(100)));
+        assert_ok!(aggregator_data.remove_aggregator(aggregator_v1_id_for_test(300)));
+        assert_ok!(aggregator_data.remove_aggregator(aggregator_v1_id_for_test(500)));
+        assert_ok!(aggregator_data.remove_aggregator(aggregator_v1_id_for_test(800)));
+        assert_err!(aggregator_data.remove_aggregator(aggregator_v1_id_for_test(800)));
     }
 
     #[test]

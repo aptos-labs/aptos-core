@@ -121,6 +121,7 @@ pub mod system_module_names;
 pub mod testing;
 pub mod transaction_metadata;
 mod transaction_validation;
+pub mod v2;
 pub mod validator_txns;
 pub mod verifier;
 
@@ -139,7 +140,7 @@ use aptos_types::{
     },
     vm_status::VMStatus,
 };
-use move_vm_runtime::ModuleStorage;
+use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use std::{marker::Sync, sync::Arc};
 pub use verifier::view_function::determine_is_view;
 
@@ -150,7 +151,7 @@ pub trait VMValidator {
         &self,
         transaction: SignedTransaction,
         state_view: &impl StateView,
-        module_storage: &impl ModuleStorage,
+        module_storage: &impl AptosModuleStorage,
     ) -> VMValidatorResult;
 }
 

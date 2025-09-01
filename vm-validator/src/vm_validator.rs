@@ -14,19 +14,22 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
-    state_store::{state_key::StateKey, MoveResourceExt, StateView},
+    state_store::{
+        state_key::StateKey, state_value::StateValueMetadata, MoveResourceExt, StateView,
+    },
     transaction::{SignedTransaction, VMValidatorResult},
     vm::modules::AptosModuleExtension,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::{v2::AptosVMv2, AptosVM};
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use fail::fail_point;
 use move_binary_format::{
-    errors::{Location, PartialVMError, VMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
 };
-use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{identifier::IdentStr, language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache, WithHash},
@@ -229,6 +232,20 @@ impl<S: StateView> ModuleCodeBuilder for ValidationState<S> {
     }
 }
 
+impl<S: StateView> AptosModuleStorage for ValidationState<S> {
+    fn unmetered_get_module_state_value_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
+        Ok(self
+            .state_view
+            .get_state_value(&StateKey::module(address, module_name))
+            .map_err(|err| module_storage_error!(address, module_name, err).to_partial())?
+            .map(|s| s.metadata().clone()))
+    }
+}
+
 struct VMValidator {
     db_reader: Arc<dyn DbReader>,
     state: ValidationState<CachedDbStateView>,
@@ -327,15 +344,31 @@ impl TransactionValidation for PooledVMValidator {
         let vm_validator_locked = vm_validator.lock().unwrap();
 
         use aptos_vm::VMValidator;
-        let vm = AptosVM::new(
-            &vm_validator_locked.state.environment,
-            &vm_validator_locked.state.state_view,
-        );
-        Ok(vm.validate_transaction(
-            txn,
-            &vm_validator_locked.state.state_view,
-            &vm_validator_locked.state,
-        ))
+        Ok(
+            if vm_validator_locked
+                .state
+                .environment
+                .features()
+                .is_aptos_vm_v2_enabled()
+            {
+                let vm = AptosVM::new(
+                    &vm_validator_locked.state.environment,
+                    &vm_validator_locked.state.state_view,
+                );
+                vm.validate_transaction(
+                    txn,
+                    &vm_validator_locked.state.state_view,
+                    &vm_validator_locked.state,
+                )
+            } else {
+                let vm = AptosVMv2::new(&vm_validator_locked.state.environment);
+                vm.validate_transaction(
+                    txn,
+                    &vm_validator_locked.state.state_view,
+                    &vm_validator_locked.state,
+                )
+            },
+        )
     }
 
     fn restart(&mut self) -> Result<()> {

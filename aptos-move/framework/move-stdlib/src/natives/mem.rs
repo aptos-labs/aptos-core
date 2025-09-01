@@ -47,6 +47,9 @@ fn native_swap(
     let left = safely_pop_arg!(args, Reference);
     let right = safely_pop_arg!(args, Reference);
 
+    // TODO: this does not provide very strong invariants, revisit.
+    context.data_cache().copy_on_write(&left)?;
+    context.data_cache().copy_on_write(&right)?;
     left.swap_values(right)?;
 
     Ok(smallvec![])

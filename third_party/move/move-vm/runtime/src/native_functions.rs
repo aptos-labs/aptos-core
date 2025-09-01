@@ -258,6 +258,10 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         self.traversal_context
     }
 
+    pub fn data_cache(&mut self) -> &mut dyn NativeMoveVmDataCache {
+        self.data_store
+    }
+
     pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter {
         FunctionValueExtensionAdapter {
             module_storage: self.module_storage,

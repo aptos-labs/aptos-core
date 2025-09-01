@@ -60,6 +60,16 @@ impl VMOutput {
         }
     }
 
+    /// Returns the output when transaction is discarded.
+    pub fn discarded(status_code: StatusCode) -> Self {
+        Self {
+            change_set: VMChangeSet::empty(),
+            module_write_set: ModuleWriteSet::empty(),
+            fee_statement: FeeStatement::zero(),
+            status: TransactionStatus::Discard(status_code),
+        }
+    }
+
     pub fn aggregator_v1_delta_set(&self) -> &BTreeMap<StateKey, DeltaOp> {
         self.change_set.aggregator_v1_delta_set()
     }

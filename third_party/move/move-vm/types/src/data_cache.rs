@@ -18,6 +18,8 @@ pub trait NativeMoveVmDataCache {
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<(bool, Option<NumBytes>)>;
+
+    fn copy_on_write(&mut self, reference: &Reference) -> PartialVMResult<()>;
 }
 
 pub trait MoveVmDataCache: NativeMoveVmDataCache {
@@ -58,8 +60,6 @@ pub trait MoveVmDataCache: NativeMoveVmDataCache {
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<Value>;
-
-    fn copy_on_write(&mut self, reference: &Reference) -> PartialVMResult<()>;
 
     fn vector_copy_on_write(&mut self, reference: &VectorRef) -> PartialVMResult<()>;
 }
