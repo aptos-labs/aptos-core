@@ -70,13 +70,7 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
 });
 
 fn set_property(cf_name: &str, db: &DB) -> Result<()> {
-    if !skip_reporting_cf(cf_name) {
-        for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
-            ROCKSDB_PROPERTIES
-                .with_label_values(&[cf_name, aptos_rocksdb_property_name])
-                .set(db.get_property(cf_name, rockdb_property_name)? as i64);
-        }
-    }
+    if !skip_reporting_cf(cf_name) {}
     Ok(())
 }
 
@@ -86,15 +80,7 @@ const SHARD_NAME_BY_ID: [&str; NUM_STATE_SHARDS] = [
 
 fn set_shard_property(cf_name: ColumnFamilyName, db: &DB, shard: usize) -> Result<()> {
     if !skip_reporting_cf(cf_name) {
-        for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
-            ROCKSDB_SHARD_PROPERTIES
-                .with_label_values(&[
-                    SHARD_NAME_BY_ID[shard],
-                    cf_name,
-                    aptos_rocksdb_property_name,
-                ])
-                .set(db.get_property(cf_name, rockdb_property_name)? as i64);
-        }
+        for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {}
     }
     Ok(())
 }
@@ -104,10 +90,6 @@ fn update_rocksdb_properties(
     state_merkle_db: &StateMerkleDb,
     state_kv_db: &StateKvDb,
 ) -> Result<()> {
-    let _timer = OTHER_TIMERS_SECONDS
-        .with_label_values(&["update_rocksdb_properties"])
-        .start_timer();
-
     let enable_storage_sharding = state_kv_db.enabled_sharding();
 
     if enable_storage_sharding {

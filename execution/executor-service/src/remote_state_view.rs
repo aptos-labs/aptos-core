@@ -117,9 +117,6 @@ impl RemoteStateViewClient {
 
     pub fn init_for_block(&self, state_keys: Vec<StateKey>) {
         *self.state_view.write().unwrap() = RemoteStateView::new();
-        REMOTE_EXECUTOR_REMOTE_KV_COUNT
-            .with_label_values(&[&self.shard_id.to_string(), "prefetch_kv"])
-            .inc_by(state_keys.len() as u64);
         self.pre_fetch_state_values(state_keys, false);
     }
 
@@ -187,18 +184,9 @@ impl TStateView for RemoteStateViewClient {
         let state_view_reader = self.state_view.read().unwrap();
         if state_view_reader.has_state_key(state_key) {
             // If the key is already in the cache then we return it.
-            let _timer = REMOTE_EXECUTOR_TIMER
-                .with_label_values(&[&self.shard_id.to_string(), "prefetch_wait"])
-                .start_timer();
             return state_view_reader.get_state_value(state_key);
         }
         // If the value is not already in the cache then we pre-fetch it and wait for it to arrive.
-        let _timer = REMOTE_EXECUTOR_TIMER
-            .with_label_values(&[&self.shard_id.to_string(), "non_prefetch_wait"])
-            .start_timer();
-        REMOTE_EXECUTOR_REMOTE_KV_COUNT
-            .with_label_values(&[&self.shard_id.to_string(), "non_prefetch_kv"])
-            .inc();
         self.pre_fetch_state_values(vec![state_key.clone()], true);
         state_view_reader.get_state_value(state_key)
     }
@@ -245,18 +233,8 @@ impl RemoteStateValueReceiver {
         message: Message,
         state_view: Arc<RwLock<RemoteStateView>>,
     ) {
-        let _timer = REMOTE_EXECUTOR_TIMER
-            .with_label_values(&[&shard_id.to_string(), "kv_responses"])
-            .start_timer();
-        let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
-            .with_label_values(&[&shard_id.to_string(), "kv_resp_deser"])
-            .start_timer();
         let response: RemoteKVResponse = bcs::from_bytes(&message.data).unwrap();
-        drop(bcs_deser_timer);
 
-        REMOTE_EXECUTOR_REMOTE_KV_COUNT
-            .with_label_values(&[&shard_id.to_string(), "kv_responses"])
-            .inc();
         let state_view_lock = state_view.read().unwrap();
         trace!(
             "Received state values for shard {} with size {}",

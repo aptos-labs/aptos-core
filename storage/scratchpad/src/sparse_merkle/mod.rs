@@ -268,10 +268,6 @@ impl SparseMerkleTree {
         since_smt: &Self,
         shard_id: u8,
     ) -> HashMap<NibblePath, HashValue> {
-        let _timer = TIMER
-            .with_label_values(&["new_node_hashes_since"])
-            .start_timer();
-
         assert!(since_smt.is_family(self));
 
         let mut node_hashes = HashMap::new();

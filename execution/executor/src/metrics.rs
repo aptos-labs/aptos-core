@@ -268,6 +268,7 @@ pub fn update_counters_for_processed_chunk<T>(
 ) where
     T: TransactionProvider,
 {
+    return;
     let detailed_counters = AptosVM::get_processed_transactions_detailed_counters();
     let detailed_counters_label = if detailed_counters { "true" } else { "false" };
     if transactions.len() != transaction_outputs.len() {

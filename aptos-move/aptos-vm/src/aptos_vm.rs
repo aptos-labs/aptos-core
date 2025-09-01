@@ -2854,9 +2854,6 @@ impl AptosVM {
                     TransactionStatus::Discard(_) => Some("discarded"),
                     TransactionStatus::Retry => None,
                 };
-                if let Some(label) = counter_label {
-                    USER_TRANSACTIONS_EXECUTED.with_label_values(&[label]).inc();
-                }
                 (vm_status, output)
             },
             Transaction::StateCheckpoint(_) => {
@@ -3125,10 +3122,6 @@ impl VMValidator for AptosVM {
                 VMValidatorResult::new(None, txn.gas_unit_price()),
             ),
         };
-
-        TRANSACTIONS_VALIDATED
-            .with_label_values(&[counter_label])
-            .inc();
 
         result
     }

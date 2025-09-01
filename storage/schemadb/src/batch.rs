@@ -29,20 +29,7 @@ impl BatchStats {
         *self.num_deletes.entry(cf_name).or_default() += 1
     }
 
-    fn commit(&self) {
-        for (cf_name, put_sizes) in &self.put_sizes {
-            for put_size in put_sizes {
-                APTOS_SCHEMADB_PUT_BYTES_SAMPLED
-                    .with_label_values(&[cf_name])
-                    .observe(*put_size as f64);
-            }
-        }
-        for (cf_name, num_deletes) in &self.num_deletes {
-            APTOS_SCHEMADB_DELETES_SAMPLED
-                .with_label_values(&[cf_name])
-                .inc_by(*num_deletes as u64);
-        }
-    }
+    fn commit(&self) {}
 }
 
 #[derive(Debug)]

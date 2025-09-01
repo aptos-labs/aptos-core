@@ -259,7 +259,6 @@ impl TStateView for CachedStateView {
     }
 
     fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateSlot> {
-        let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
         COUNTER.inc_with(&["sv_total_get"]);
 
         // First check if requested key is already memorized.

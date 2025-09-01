@@ -27,6 +27,11 @@ pub enum LedgerCounter {
 }
 
 impl LedgerCounter {
+    const STR_EVENTS_CREATED: &'static str = "events_created";
+    const STR_NEW_STATE_LEAVES: &'static str = "new_state_leaves";
+    const STR_NEW_STATE_NODES: &'static str = "new_state_nodes";
+    const STR_STALE_STATE_LEAVES: &'static str = "stale_state_leaves";
+    const STR_STALE_STATE_NODES: &'static str = "stale_state_nodes";
     const VARIANTS: [LedgerCounter; LedgerCounter::NUM_VARIANTS] = [
         LedgerCounter::EventsCreated,
         LedgerCounter::NewStateLeaves,
@@ -34,12 +39,6 @@ impl LedgerCounter {
         LedgerCounter::NewStateNodes,
         LedgerCounter::StaleStateNodes,
     ];
-
-    const STR_EVENTS_CREATED: &'static str = "events_created";
-    const STR_NEW_STATE_LEAVES: &'static str = "new_state_leaves";
-    const STR_STALE_STATE_LEAVES: &'static str = "stale_state_leaves";
-    const STR_NEW_STATE_NODES: &'static str = "new_state_nodes";
-    const STR_STALE_STATE_NODES: &'static str = "stale_state_nodes";
 
     pub fn name(self) -> &'static str {
         match self {
@@ -145,11 +144,7 @@ impl LedgerCounters {
 
     /// Bump Prometheus counters.
     pub fn bump_op_counters(&self) {
-        for counter in &LedgerCounter::VARIANTS {
-            LEDGER_COUNTER
-                .with_label_values(&[counter.name()])
-                .set(self.get(*counter) as i64);
-        }
+        for counter in &LedgerCounter::VARIANTS {}
     }
 
     /// Get the value of `counter`.
