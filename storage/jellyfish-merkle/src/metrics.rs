@@ -3,26 +3,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_int_counter, register_int_counter_vec, register_int_gauge, IntCounter, IntCounterVec,
-    IntGauge,
+    make_local_int_counter, make_local_int_counter_vec, register_int_gauge, IntGauge,
 };
 use once_cell::sync::Lazy;
 
-pub static APTOS_JELLYFISH_LEAF_ENCODED_BYTES: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "aptos_jellyfish_leaf_encoded_bytes",
-        "Aptos jellyfish leaf encoded bytes in total"
-    )
-    .unwrap()
-});
+make_local_int_counter!(
+    pub,
+    APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
+    "aptos_jellyfish_leaf_encoded_bytes",
+    "Aptos jellyfish leaf encoded bytes in total",
+);
 
-pub static APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "aptos_jellyfish_internal_encoded_bytes",
-        "Aptos jellyfish total internal nodes encoded in bytes"
-    )
-    .unwrap()
-});
+make_local_int_counter!(
+    pub,
+    APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES,
+    "aptos_jellyfish_internal_encoded_bytes",
+    "Aptos jellyfish total internal nodes encoded in bytes"
+);
 
 pub static APTOS_JELLYFISH_LEAF_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
@@ -32,22 +29,20 @@ pub static APTOS_JELLYFISH_LEAF_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static APTOS_JELLYFISH_LEAF_DELETION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "aptos_jellyfish_leaf_deletion_count",
-        "The number of deletions happened in JMT."
-    )
-    .unwrap()
-});
+make_local_int_counter!(
+    pub,
+    APTOS_JELLYFISH_LEAF_DELETION_COUNT,
+    "aptos_jellyfish_leaf_deletion_count",
+    "The number of deletions happened in JMT."
+);
 
-pub static COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        // metric name
-        "aptos_jellyfish_counter",
-        // metric description
-        "Various counters for the JellyfishMerkleTree",
-        // metric labels (dimensions)
-        &["name"],
-    )
-    .unwrap()
-});
+make_local_int_counter_vec!(
+    pub,
+    COUNTER,
+    // metric name
+    "aptos_jellyfish_counter",
+    // metric description
+    "Various counters for the JellyfishMerkleTree",
+    // metric labels (dimensions)
+    &["name"],
+);

@@ -4,26 +4,22 @@
 #![forbid(unsafe_code)]
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec,
-    IntCounterVec,
+    exponential_buckets, make_local_histogram_vec, make_local_int_counter_vec,
 };
-use once_cell::sync::Lazy;
 
-pub static TIMER: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_executor_benchmark_timer_seconds",
-        "Various timers for performance analysis.",
-        &["name"],
-        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
-    )
-    .unwrap()
-});
+make_local_histogram_vec!(
+    pub,
+    TIMER,
+    "aptos_executor_benchmark_timer_seconds",
+    "Various timers for performance analysis.",
+    &["name"],
+    exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
+);
 
-pub static NUM_TXNS: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "aptos_executor_benchmark_num_txns",
-        "# of transactions received by each stage.",
-        &["stage"]
-    )
-    .unwrap()
-});
+make_local_int_counter_vec!(
+    pub,
+    NUM_TXNS,
+    "aptos_executor_benchmark_num_txns",
+    "# of transactions received by each stage.",
+    &["stage"]
+);

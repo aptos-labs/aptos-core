@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
-    register_int_counter_vec, register_int_gauge, Histogram, HistogramVec, IntCounter,
-    IntCounterVec, IntGauge,
+    exponential_buckets, make_local_histogram_vec, make_local_int_counter,
+    make_local_int_counter_vec, register_histogram, register_int_gauge, Histogram, HistogramVec,
+    IntGauge,
 };
 use once_cell::sync::Lazy;
 
@@ -43,45 +43,41 @@ pub static BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS: Lazy<Histogram> = Lazy
     .unwrap()
 });
 
-/// Count the number of transactions that brake invariants of VM.
-pub static TRANSACTIONS_INVARIANT_VIOLATION: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "aptos_vm_transactions_invariant_violation",
-        "Number of transactions that broke VM invariant",
-    )
-    .unwrap()
-});
+// Count the number of transactions that brake invariants of VM.
+make_local_int_counter!(
+    pub,
+    TRANSACTIONS_INVARIANT_VIOLATION,
+    "aptos_vm_transactions_invariant_violation",
+    "Number of transactions that broke VM invariant",
+);
 
-/// Count the number of transactions validated, with a "status" label to
-/// distinguish success or failure results.
-pub static TRANSACTIONS_VALIDATED: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "aptos_vm_transactions_validated",
-        "Number of transactions validated",
-        &["status"]
-    )
-    .unwrap()
-});
+// Count the number of transactions validated, with a "status" label to
+// distinguish success or failure results.
+make_local_int_counter_vec!(
+    pub,
+    TRANSACTIONS_VALIDATED,
+    "aptos_vm_transactions_validated",
+    "Number of transactions validated",
+    &["status"]
+);
 
-/// Count the number of user transactions executed, with a "status" label to
-/// distinguish completed vs. discarded transactions.
-pub static USER_TRANSACTIONS_EXECUTED: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "aptos_vm_user_transactions_executed",
-        "Number of user transactions executed",
-        &["status"]
-    )
-    .unwrap()
-});
+// Count the number of user transactions executed, with a "status" label to
+// distinguish completed vs. discarded transactions.
+make_local_int_counter_vec!(
+    pub,
+    USER_TRANSACTIONS_EXECUTED,
+    "aptos_vm_user_transactions_executed",
+    "Number of user transactions executed",
+    &["status"]
+);
 
-/// Count the number of system transactions executed.
-pub static SYSTEM_TRANSACTIONS_EXECUTED: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "aptos_vm_system_transactions_executed",
-        "Number of system transactions executed"
-    )
-    .unwrap()
-});
+// Count the number of system transactions executed.
+make_local_int_counter!(
+    pub,
+    SYSTEM_TRANSACTIONS_EXECUTED,
+    "aptos_vm_system_transactions_executed",
+    "Number of system transactions executed"
+);
 
 const NUM_BLOCK_TRANSACTIONS_BUCKETS: [f64; 24] = [
     5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 200.0, 400.0, 800.0, 1200.0, 1800.0, 2500.0, 3300.0,
@@ -139,12 +135,11 @@ pub static TXN_GAS_USAGE: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static TIMER: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_vm_timer_seconds",
-        "Various timers for performance analysis.",
-        &["name"],
-        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
-    )
-    .unwrap()
-});
+make_local_histogram_vec!(
+    pub,
+    TIMER,
+    "aptos_vm_timer_seconds",
+    "Various timers for performance analysis.",
+    &["name"],
+    exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
+);

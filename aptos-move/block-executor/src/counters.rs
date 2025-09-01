@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_avg_counter_vec, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, register_int_gauge, Histogram, HistogramVec,
-    IntCounter, IntCounterVec, IntGauge, TimerHelper,
+    exponential_buckets, make_local_histogram_vec, make_local_int_counter,
+    make_local_int_counter_vec, register_avg_counter_vec, register_histogram, register_int_gauge,
+    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, TimerHelper,
 };
 use aptos_mvhashmap::BlockStateStats;
 use aptos_types::fee_statement::FeeStatement;
@@ -61,43 +61,39 @@ pub static BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Count of times the module publishing fallback was triggered in parallel execution.
-pub static MODULE_PUBLISHING_FALLBACK_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "aptos_execution_module_publishing_fallback_count",
-        "Count times module was read and written in parallel execution (sequential fallback)"
-    )
-    .unwrap()
-});
+// Count of times the module publishing fallback was triggered in parallel execution.
+make_local_int_counter!(
+    pub,
+    MODULE_PUBLISHING_FALLBACK_COUNT,
+    "aptos_execution_module_publishing_fallback_count",
+    "Count times module was read and written in parallel execution (sequential fallback)"
+);
 
-/// Count of speculative transaction re-executions due to a failed validation.
-pub static SPECULATIVE_ABORT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "aptos_execution_speculative_abort_count",
-        "Number of speculative aborts in parallel execution (leading to re-execution)"
-    )
-    .unwrap()
-});
+// Count of speculative transaction re-executions due to a failed validation.
+make_local_int_counter!(
+    pub,
+    SPECULATIVE_ABORT_COUNT,
+    "aptos_execution_speculative_abort_count",
+    "Number of speculative aborts in parallel execution (leading to re-execution)"
+);
 
-/// Count of times the BlockSTM is early halted due to exceeding the per-block gas limit.
-pub static EXCEED_PER_BLOCK_GAS_LIMIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "aptos_execution_gas_limit_count",
-        "Count of times the BlockSTM is early halted due to exceeding the per-block gas limit",
-        &["mode"]
-    )
-    .unwrap()
-});
+// Count of times the BlockSTM is early halted due to exceeding the per-block gas limit.
+make_local_int_counter_vec!(
+    pub,
+    EXCEED_PER_BLOCK_GAS_LIMIT_COUNT,
+    "aptos_execution_gas_limit_count",
+    "Count of times the BlockSTM is early halted due to exceeding the per-block gas limit",
+    &["mode"]
+);
 
-/// Count of times the BlockSTM is early halted due to exceeding the per-block output size limit.
-pub static EXCEED_PER_BLOCK_OUTPUT_LIMIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "aptos_execution_output_limit_count",
-        "Count of times the BlockSTM is early halted due to exceeding the per-block output size limit",
-        &["mode"]
-    )
-    .unwrap()
-});
+// Count of times the BlockSTM is early halted due to exceeding the per-block output size limit.
+make_local_int_counter_vec!(
+    pub,
+    EXCEED_PER_BLOCK_OUTPUT_LIMIT_COUNT,
+    "aptos_execution_output_limit_count",
+    "Count of times the BlockSTM is early halted due to exceeding the per-block output size limit",
+    &["mode"]
+);
 
 pub static PARALLEL_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
@@ -174,56 +170,51 @@ pub static DEPENDENCY_WAIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_execution_block_gas",
-        "Histogram for different block gas costs (execution, io, storage, storage fee, non-storage)",
-        &["mode", "stage"],
-        gas_buckets(),
-    )
-    .unwrap()
-});
+make_local_histogram_vec!(
+    pub,
+    BLOCK_GAS,
+    "aptos_execution_block_gas",
+    "Histogram for different block gas costs (execution, io, storage, storage fee, non-storage)",
+    &["mode", "stage"],
+    gas_buckets(),
+);
 
-pub static EFFECTIVE_BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_execution_effective_block_gas",
-        "Histogram for different effective block gas costs - used for evaluating block gas limit. \
+make_local_histogram_vec!(
+    pub,
+    EFFECTIVE_BLOCK_GAS,
+    "aptos_execution_effective_block_gas",
+    "Histogram for different effective block gas costs - used for evaluating block gas limit. \
         This can be different from actual gas consumed in a block, due to applied adjustements",
-        &["mode"],
-        gas_buckets(),
-    )
-    .unwrap()
-});
+    &["mode"],
+    gas_buckets(),
+);
 
-pub static APPROX_BLOCK_OUTPUT_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_execution_approx_block_output_size",
-        "Histogram for different approx block output sizes - used for evaluating block output limit.",
-        &["mode"],
-        output_buckets(),
-    )
-    .unwrap()
-});
+make_local_histogram_vec!(
+    pub,
+    APPROX_BLOCK_OUTPUT_SIZE,
+    "aptos_execution_approx_block_output_size",
+    "Histogram for different approx block output sizes - used for evaluating block output limit.",
+    &["mode"],
+    output_buckets(),
+);
 
-pub static TXN_GAS: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_execution_txn_gas",
-        "Histogram for different average txn gas costs (execution, io, storage, storage fee, non-storage)",
-        &["mode", "stage"],
-        gas_buckets(),
-    )
-    .unwrap()
-});
+make_local_histogram_vec!(
+    pub,
+    TXN_GAS,
+    "aptos_execution_txn_gas",
+    "Histogram for different average txn gas costs (execution, io, storage, storage fee, non-storage)",
+    &["mode", "stage"],
+    gas_buckets(),
+);
 
-pub static BLOCK_COMMITTED_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_execution_block_committed_txns",
-        "The per-block committed txns (Block STM)",
-        &["mode"],
-        exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
-    )
-    .unwrap()
-});
+make_local_histogram_vec!(
+    pub,
+    BLOCK_COMMITTED_TXNS,
+    "aptos_execution_block_committed_txns",
+    "The per-block committed txns (Block STM)",
+    &["mode"],
+    exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+);
 
 pub static BLOCK_VIEW_DISTINCT_KEYS: Lazy<HistogramVec> = Lazy::new(|| {
     register_avg_counter_vec(
@@ -367,14 +358,13 @@ pub static STRUCT_NAME_INDEX_MAP_NUM_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static HOT_STATE_OP_ACCUMULATOR_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        // metric name
-        "aptos_hot_state_op_accumulator_counter",
-        // metric description
-        "Various counters for BlockHotStateOpAccumulator",
-        // metric labels (dimensions)
-        &["name"],
-    )
-    .unwrap()
-});
+make_local_int_counter_vec!(
+    pub,
+    HOT_STATE_OP_ACCUMULATOR_COUNTER,
+    // metric name
+    "aptos_hot_state_op_accumulator_counter",
+    // metric description
+    "Various counters for BlockHotStateOpAccumulator",
+    // metric labels (dimensions)
+    &["name"],
+);
