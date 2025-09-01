@@ -242,29 +242,35 @@ pub static BLOCK_VIEW_BASE_VALUES_MEMORY_USAGE: Lazy<HistogramVec> = Lazy::new(|
 });
 
 fn observe_gas(counter: &Lazy<HistogramVec>, mode_str: &str, fee_statement: &FeeStatement) {
-    counter
-        .with_label_values(&[mode_str, GasType::TOTAL_GAS])
-        .observe(fee_statement.gas_used() as f64);
+    counter.observe_with(
+        &[mode_str, GasType::TOTAL_GAS],
+        fee_statement.gas_used() as f64,
+    );
 
-    counter
-        .with_label_values(&[mode_str, GasType::EXECUTION_GAS])
-        .observe(fee_statement.execution_gas_used() as f64);
+    counter.observe_with(
+        &[mode_str, GasType::EXECUTION_GAS],
+        fee_statement.execution_gas_used() as f64,
+    );
 
-    counter
-        .with_label_values(&[mode_str, GasType::IO_GAS])
-        .observe(fee_statement.io_gas_used() as f64);
+    counter.observe_with(
+        &[mode_str, GasType::IO_GAS],
+        fee_statement.io_gas_used() as f64,
+    );
 
-    counter
-        .with_label_values(&[mode_str, GasType::NON_STORAGE_GAS])
-        .observe((fee_statement.execution_gas_used() + fee_statement.io_gas_used()) as f64);
+    counter.observe_with(
+        &[mode_str, GasType::NON_STORAGE_GAS],
+        (fee_statement.execution_gas_used() + fee_statement.io_gas_used()) as f64,
+    );
 
-    counter
-        .with_label_values(&[mode_str, GasType::STORAGE_FEE])
-        .observe(fee_statement.storage_fee_used() as f64);
+    counter.observe_with(
+        &[mode_str, GasType::STORAGE_FEE],
+        fee_statement.storage_fee_used() as f64,
+    );
 
-    counter
-        .with_label_values(&[mode_str, GasType::STORAGE_FEE_REFUND])
-        .observe(fee_statement.storage_fee_refund() as f64);
+    counter.observe_with(
+        &[mode_str, GasType::STORAGE_FEE_REFUND],
+        fee_statement.storage_fee_refund() as f64,
+    );
 }
 
 pub(crate) fn update_block_gas_counters(

@@ -23,6 +23,7 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_metrics_core::IntCounterHelper;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{definition::NodeInProof, SparseMerkleInternalNode, SparseMerkleLeafNode},
