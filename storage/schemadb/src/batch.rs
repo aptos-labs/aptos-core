@@ -7,7 +7,7 @@ use crate::{
     ColumnFamilyName, DB,
 };
 use aptos_drop_helper::DropHelper;
-use aptos_metrics_core::TimerHelper;
+use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_storage_interface::Result as DbResult;
 use std::{
     collections::HashMap,
@@ -32,15 +32,11 @@ impl BatchStats {
     fn commit(&self) {
         for (cf_name, put_sizes) in &self.put_sizes {
             for put_size in put_sizes {
-                APTOS_SCHEMADB_PUT_BYTES_SAMPLED
-                    .with_label_values(&[cf_name])
-                    .observe(*put_size as f64);
+                APTOS_SCHEMADB_PUT_BYTES_SAMPLED.observe_with(&[cf_name], *put_size as f64);
             }
         }
         for (cf_name, num_deletes) in &self.num_deletes {
-            APTOS_SCHEMADB_DELETES_SAMPLED
-                .with_label_values(&[cf_name])
-                .inc_by(*num_deletes as u64);
+            APTOS_SCHEMADB_DELETES_SAMPLED.inc_with_by(&[cf_name], *num_deletes as u64);
         }
     }
 }
