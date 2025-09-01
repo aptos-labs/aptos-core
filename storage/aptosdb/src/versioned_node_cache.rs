@@ -40,10 +40,6 @@ impl VersionedNodeCache {
     }
 
     pub fn add_version(&self, version: Version, nodes: NodeCache) {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["version_cache_add"])
-            .start_timer();
-
         let mut locked = self.inner.write();
         if !locked.is_empty() {
             let (last_version, _) = locked.back().unwrap();
@@ -58,10 +54,6 @@ impl VersionedNodeCache {
     }
 
     pub fn maybe_evict_version(&self, lru_cache: &LruNodeCache) {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["version_cache_evict"])
-            .start_timer();
-
         let to_evict = {
             let locked = self.inner.read();
             if locked.len() > Self::NUM_VERSIONS_TO_CACHE {

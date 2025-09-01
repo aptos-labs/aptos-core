@@ -433,9 +433,6 @@ where
                 "Err"
             },
         };
-        API_LATENCY_SECONDS
-            .with_label_values(&[api_name, res_type])
-            .observe(timer.elapsed().as_secs_f64());
         ENTERED_GAUGED_API.with(|entered| entered.set(false));
 
         res

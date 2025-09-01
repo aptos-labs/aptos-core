@@ -241,31 +241,7 @@ pub static BLOCK_VIEW_BASE_VALUES_MEMORY_USAGE: Lazy<HistogramVec> = Lazy::new(|
     )
 });
 
-fn observe_gas(counter: &Lazy<HistogramVec>, mode_str: &str, fee_statement: &FeeStatement) {
-    counter
-        .with_label_values(&[mode_str, GasType::TOTAL_GAS])
-        .observe(fee_statement.gas_used() as f64);
-
-    counter
-        .with_label_values(&[mode_str, GasType::EXECUTION_GAS])
-        .observe(fee_statement.execution_gas_used() as f64);
-
-    counter
-        .with_label_values(&[mode_str, GasType::IO_GAS])
-        .observe(fee_statement.io_gas_used() as f64);
-
-    counter
-        .with_label_values(&[mode_str, GasType::NON_STORAGE_GAS])
-        .observe((fee_statement.execution_gas_used() + fee_statement.io_gas_used()) as f64);
-
-    counter
-        .with_label_values(&[mode_str, GasType::STORAGE_FEE])
-        .observe(fee_statement.storage_fee_used() as f64);
-
-    counter
-        .with_label_values(&[mode_str, GasType::STORAGE_FEE_REFUND])
-        .observe(fee_statement.storage_fee_refund() as f64);
-}
+fn observe_gas(_counter: &Lazy<HistogramVec>, _mode_str: &str, _fee_statement: &FeeStatement) {}
 
 pub(crate) fn update_block_gas_counters(
     accumulated_fee_statement: &FeeStatement,
@@ -281,17 +257,6 @@ pub(crate) fn update_block_gas_counters(
     };
 
     observe_gas(&BLOCK_GAS, mode_str, accumulated_fee_statement);
-    BLOCK_COMMITTED_TXNS
-        .with_label_values(&[mode_str])
-        .observe(num_committed as f64);
-
-    EFFECTIVE_BLOCK_GAS
-        .with_label_values(&[mode_str])
-        .observe(accumulated_effective_gas as f64);
-
-    APPROX_BLOCK_OUTPUT_SIZE
-        .with_label_values(&[mode_str])
-        .observe(accumulated_approx_output_size as f64);
 }
 
 pub(crate) fn update_txn_gas_counters(txn_fee_statements: &Vec<FeeStatement>, is_parallel: bool) {
@@ -312,26 +277,6 @@ pub(crate) fn update_state_counters(block_state_stats: BlockStateStats, is_paral
     } else {
         Mode::SEQUENTIAL
     };
-
-    BLOCK_VIEW_DISTINCT_KEYS
-        .with_label_values(&[mode_str, "resource"])
-        .observe(block_state_stats.num_resources as f64);
-    BLOCK_VIEW_DISTINCT_KEYS
-        .with_label_values(&[mode_str, "resource_group"])
-        .observe(block_state_stats.num_resource_groups as f64);
-    BLOCK_VIEW_DISTINCT_KEYS
-        .with_label_values(&[mode_str, "delayed_field"])
-        .observe(block_state_stats.num_delayed_fields as f64);
-    BLOCK_VIEW_DISTINCT_KEYS
-        .with_label_values(&[mode_str, "module"])
-        .observe(block_state_stats.num_modules as f64);
-
-    BLOCK_VIEW_BASE_VALUES_MEMORY_USAGE
-        .with_label_values(&[mode_str, "resource"])
-        .observe(block_state_stats.base_resources_size as f64);
-    BLOCK_VIEW_BASE_VALUES_MEMORY_USAGE
-        .with_label_values(&[mode_str, "delayed_field"])
-        .observe(block_state_stats.base_delayed_fields_size as f64);
 }
 
 pub static GLOBAL_MODULE_CACHE_SIZE_IN_BYTES: Lazy<IntGauge> = Lazy::new(|| {
