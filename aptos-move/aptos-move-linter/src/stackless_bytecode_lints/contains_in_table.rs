@@ -1,12 +1,38 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module implements a stackless-bytecode linter that checks for unsafe usage of table operations.
-//! Specifically, it detects:
-//! 1. `table::borrow` calls without checking if the key exists first (should use `table::contains`)
-//! 2. `table::add` calls that might fail if the key already exists (should use `table::upsert` or check with `table::contains`)
+//! Contains-in-Table Safety Detector
 //!
-//! This helps prevent runtime errors when working with tables in Move code.
+//! This detector implements a flow-sensitive analysis to prevent runtime failures in table operations
+//! by ensuring proper existence checks before accessing table entries. It detects two main violation patterns:
+//!
+//! 1. **Unsafe borrow**: `table::borrow(t, k)` without prior `table::contains(t, k)` check
+//! 2. **Unsafe add**: `table::add(t, k, v)` without ensuring key doesn't exist
+//!
+//! ## Analysis Architecture
+//!
+//! The detector uses a three-pass analysis combining value flow tracking with control flow sensitivity:
+//!
+//! ### Pass 1: Value Equivalence Analysis
+//! Builds assignment chains and reference relationships using `AssignmentTracker` to determine
+//! when different temporary variables refer to the same logical table/key values. This enables
+//! matching table operations across complex assignment patterns and field accesses.
+//!
+//! ### Pass 2: Control Flow & State Propagation
+//! Performs flow-sensitive analysis of branches conditioned on `table::contains()` calls.
+//! Tracks positive/negative table existence knowledge through conditional branches, handling
+//! both direct conditions (`if (contains(t,k))`) and negated ones (`if (!contains(t,k))`).
+//! Knowledge is propagated via a branch stack that accumulates constraints along control paths.
+//!
+//! ### Pass 3: Safety Validation
+//! Validates each table operation against accumulated branch knowledge, using value equivalence
+//! to match operations with prior existence checks. Reports violations when operations cannot
+//! be proven safe based on the current control flow context.
+//!
+//! ## Key Limitations
+//! - **Intra-procedural only**: No cross-function analysis
+//! - **Public functions only**: Private functions assumed to have validated inputs
+//! - **Single-pass CFG traversal**: May miss complex control flow patterns
 
 use std::collections::HashMap;
 
@@ -20,24 +46,36 @@ use move_stackless_bytecode::{
     stackless_bytecode::{Bytecode, Label, Operation},
 };
 
-/// Represents what we know about table state in a specific branch
+/// Branch-sensitive table existence knowledge
+///
+/// Represents what we know about table key existence within a specific control flow branch.
+/// This knowledge is derived from `table::contains()` call conditions and accumulated as
+/// we traverse through conditional branches.
 #[derive(Debug, Clone)]
 struct BranchKnowledge {
-    /// Table/key pairs we know exist (if condition was contains call)
+    /// Table/key pairs we know exist in this branch (from positive contains checks)
     known_existing: Vec<(TempIndex, TempIndex)>, // (table_temp, key_temp)
-    /// Table/key pairs we know don't exist
+    /// Table/key pairs we know don't exist in this branch (from negative contains checks)
     known_not_existing: Vec<(TempIndex, TempIndex)>,
 }
 
-/// Analysis state for tracking control flow and table operations
+/// Global analysis state tracking control flow and table operations
+///
+/// Maintains the state needed for flow-sensitive analysis of table operations across
+/// control flow boundaries. Combines tracking of contains call results with branch-sensitive
+/// knowledge propagation.
 struct AnalysisState {
-    /// Map from temp variables to contains calls: result_temp -> (table_temp, key_temp)
+    /// Maps contains call results to their arguments: result_temp -> (table_temp, key_temp)
+    /// Used to identify when branch conditions are based on table existence checks
     contains_calls: HashMap<TempIndex, (TempIndex, TempIndex)>,
-    /// Map from temp variables to negated contains calls: negated_result_temp -> original_contains_temp
+    /// Maps negated contains results to original contains temp: !result_temp -> result_temp
+    /// Handles negated conditions like `if (!table::contains(t, k))`
     negated_contains: HashMap<TempIndex, TempIndex>,
-    /// Current branch knowledge stack
+    /// Stack of branch knowledge accumulated along current control path
+    /// Each entry represents constraints learned from a conditional branch
     branch_stack: Vec<BranchKnowledge>,
-    /// Map from label to branch knowledge when entering that label
+    /// Maps control flow labels to branch knowledge when entering that label
+    /// Enables restoration of appropriate knowledge state when jumping to labels
     label_knowledge: HashMap<Label, Vec<BranchKnowledge>>,
 }
 
@@ -64,7 +102,7 @@ impl StacklessBytecodeChecker for ContainsInTable {
     }
 
     fn check(&self, target: &FunctionTarget) {
-        // Only analyze public functions
+        // Only analyze public functions - private functions assumed to have validated inputs
         if target.func_env.visibility() != Visibility::Public {
             return;
         }
@@ -78,20 +116,27 @@ impl StacklessBytecodeChecker for ContainsInTable {
             label_knowledge: HashMap::new(),
         };
 
-        // First pass: build assignment tracking
+        // === PASS 1: Value Equivalence Analysis ===
+        // Build assignment tracking to determine when temporaries hold equivalent values.
+        // This enables matching table operations with their corresponding contains checks.
         for bytecode in code.iter() {
             assignment_tracker.process_bytecode(bytecode);
         }
 
-        // Second pass: analyze control flow and table operations
+        // === PASS 2: Control Flow & State Propagation ===
+        // Flow-sensitive analysis tracking table existence knowledge through branches.
+        // Identifies contains-based conditions and propagates positive/negative existence
+        // knowledge to appropriate branch targets. Handles both normal and negated conditions.
         for bytecode in code.iter() {
             match bytecode {
                 Bytecode::Label(_, label) => {
+                    // Restore branch knowledge when entering a labeled block
                     if let Some(knowledge) = state.label_knowledge.get(label) {
                         state.branch_stack = knowledge.clone();
                     }
                 },
                 Bytecode::Branch(_, then_label, else_label, condition_temp) => {
+                    // Propagate table existence knowledge based on contains call conditions
                     self.handle_branch(&mut state, *then_label, *else_label, *condition_temp);
                 },
                 Bytecode::Call(attr_id, dests, operation, srcs, _) => {
@@ -112,7 +157,7 @@ impl StacklessBytecodeChecker for ContainsInTable {
                                 self.get_function_name(target, *module_id, *function_id);
                             let loc = target.get_bytecode_loc(*attr_id);
 
-                            // Track contains calls
+                            // Track contains calls for branch analysis
                             if self.is_table_function(&function_name, "contains") {
                                 if let (Some(dest), Some(table_arg), Some(key_arg)) = (
                                     dests.first(),
@@ -123,7 +168,7 @@ impl StacklessBytecodeChecker for ContainsInTable {
                                 }
                             }
 
-                            // Check borrow calls
+                            // Validate table operations against accumulated branch knowledge
                             if self.is_table_function(&function_name, "borrow") {
                                 if let (Some(table_arg), Some(key_arg)) =
                                     (Self::get_table_instance(srcs), Self::get_key_argument(srcs))
@@ -140,7 +185,6 @@ impl StacklessBytecodeChecker for ContainsInTable {
                                 }
                             }
 
-                            // Check add calls
                             if self.is_table_function(&function_name, "add") {
                                 if let (Some(table_arg), Some(key_arg)) =
                                     (Self::get_table_instance(srcs), Self::get_key_argument(srcs))
@@ -168,7 +212,11 @@ impl StacklessBytecodeChecker for ContainsInTable {
 }
 
 impl ContainsInTable {
-    /// Handle branch instructions and set up branch knowledge
+    /// Propagate table existence knowledge through conditional branches
+    ///
+    /// When branching on contains call results, this creates appropriate BranchKnowledge
+    /// for each target label, encoding positive/negative existence information based on
+    /// the branch condition. Handles both direct and negated contains conditions.
     fn handle_branch(
         &self,
         state: &mut AnalysisState,
@@ -202,6 +250,10 @@ impl ContainsInTable {
     }
 
     /// Set up branch knowledge for a contains call (normal or negated)
+    ///
+    /// Creates BranchKnowledge instances for true/false branches based on contains semantics.
+    /// For normal contains: true branch knows key exists, false branch knows key doesn't exist.
+    /// For negated contains: logic is flipped.
     fn setup_branch_knowledge_for_contains(
         &self,
         state: &mut AnalysisState,
@@ -253,7 +305,11 @@ impl ContainsInTable {
         state.label_knowledge.insert(else_label, else_knowledge);
     }
 
-    /// Check if a borrow operation is safe
+    /// Validate that a borrow operation is safe in the current control flow context
+    ///
+    /// Searches accumulated branch knowledge for positive existence evidence matching
+    /// the borrow arguments (using value equivalence). Returns true if any branch
+    /// context guarantees the key exists in the table.
     fn is_safe_borrow(
         &self,
         state: &AnalysisState,
@@ -274,7 +330,11 @@ impl ContainsInTable {
         false
     }
 
-    /// Check if an add operation is safe (key should not exist)
+    /// Validate that an add operation is safe in the current control flow context
+    ///
+    /// Searches accumulated branch knowledge for negative existence evidence matching
+    /// the add arguments. Returns true if any branch context guarantees the key
+    /// does not exist in the table, making the add operation safe.
     fn is_safe_add(
         &self,
         state: &AnalysisState,
