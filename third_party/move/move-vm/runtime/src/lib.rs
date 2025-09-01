@@ -7,7 +7,6 @@
 
 //! The core Move VM logic.
 
-pub mod data_cache;
 mod interpreter;
 mod loader;
 pub mod logging;
@@ -26,6 +25,7 @@ mod debug;
 mod access_control;
 mod frame;
 mod frame_type_cache;
+pub mod legacy;
 mod reentrancy_checker;
 mod runtime_type_checks;
 mod storage;

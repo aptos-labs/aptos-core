@@ -37,8 +37,8 @@ use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
-    data_cache::TransactionDataCache,
     dispatch_loader,
+    legacy::data_cache::{LegacyMoveVmDataCache, LegacyMoveVmDataCacheAdapter},
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
@@ -435,7 +435,7 @@ impl SimpleVMTestAdapter<'_> {
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
         let mut extensions = NativeContextExtensions::default();
-        let mut data_cache = TransactionDataCache::empty();
+        let mut data_cache = LegacyMoveVmDataCache::empty();
 
         let return_values = dispatch_loader!(code_storage, loader, {
             let legacy_loader_config = LegacyLoaderConfig::unmetered();
@@ -459,12 +459,11 @@ impl SimpleVMTestAdapter<'_> {
             MoveVM::execute_loaded_function(
                 function,
                 args,
-                &mut data_cache,
+                &mut LegacyMoveVmDataCacheAdapter::new(&mut data_cache, &self.storage, &loader),
                 &mut gas_meter,
                 &mut traversal_context,
                 &mut extensions,
                 &loader,
-                &self.storage,
             )?
         });
 
