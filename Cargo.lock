@@ -743,6 +743,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "parking_lot 0.12.1",
+ "prometheus",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
@@ -3032,6 +3033,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "claims",
+ "once_cell",
+ "paste",
  "prometheus",
 ]
 

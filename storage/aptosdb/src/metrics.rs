@@ -3,9 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram_vec, register_int_counter, register_int_counter_vec,
-    register_int_gauge, register_int_gauge_vec, HistogramVec, IntCounter, IntCounterVec, IntGauge,
-    IntGaugeVec,
+    exponential_buckets, make_local_histogram_vec, make_local_int_counter,
+    make_local_int_counter_vec, register_int_gauge, register_int_gauge_vec, IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -21,13 +20,12 @@ pub static LEDGER_COUNTER: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static COMMITTED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "aptos_storage_committed_txns",
-        "Aptos storage committed transactions"
-    )
-    .unwrap()
-});
+make_local_int_counter!(
+    pub,
+    COMMITTED_TXNS,
+    "aptos_storage_committed_txns",
+    "Aptos storage committed transactions"
+);
 
 pub static LATEST_TXN_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
@@ -104,44 +102,41 @@ pub static PRUNER_BATCH_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static API_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        // metric name
-        "aptos_storage_api_latency_seconds",
-        // metric description
-        "Aptos storage api latency in seconds",
-        // metric labels (dimensions)
-        &["api_name", "result"],
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
-    )
-    .unwrap()
-});
+make_local_histogram_vec!(
+    pub,
+    API_LATENCY_SECONDS,
+    // metric name
+    "aptos_storage_api_latency_seconds",
+    // metric description
+    "Aptos storage api latency in seconds",
+    // metric labels (dimensions)
+    &["api_name", "result"],
+    exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
+);
 
-pub static OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        // metric name
-        "aptos_storage_other_timers_seconds",
-        // metric description
-        "Various timers below public API level.",
-        // metric labels (dimensions)
-        &["name"],
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
-    )
-    .unwrap()
-});
+make_local_histogram_vec!(
+    pub,
+    OTHER_TIMERS_SECONDS,
+    // metric name
+    "aptos_storage_other_timers_seconds",
+    // metric description
+    "Various timers below public API level.",
+    // metric labels (dimensions)
+    &["name"],
+    exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
+);
 
-pub static NODE_CACHE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        // metric name
-        "aptos_storage_node_cache_seconds",
-        // metric description
-        "Latency of node cache.",
-        // metric labels (dimensions)
-        &["tag", "name"],
-        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
-    )
-    .unwrap()
-});
+make_local_histogram_vec!(
+    pub,
+    NODE_CACHE_SECONDS,
+    // metric name
+    "aptos_storage_node_cache_seconds",
+    // metric description
+    "Latency of node cache.",
+    // metric labels (dimensions)
+    &["tag", "name"],
+    exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+);
 
 /// Rocksdb metrics
 pub static ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
@@ -220,15 +215,14 @@ pub(crate) static BACKUP_STATE_SNAPSHOT_LEAF_IDX: Lazy<IntGauge> = Lazy::new(|| 
     .unwrap()
 });
 
-pub static BACKUP_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_backup_handler_timers_seconds",
-        "Various timers for performance analysis.",
-        &["name"],
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
-    )
-    .unwrap()
-});
+make_local_histogram_vec!(
+    pub,
+    BACKUP_TIMER,
+    "aptos_backup_handler_timers_seconds",
+    "Various timers for performance analysis.",
+    &["name"],
+    exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
+);
 
 pub static CONCURRENCY_GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -243,14 +237,13 @@ pub static GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!("aptos_storage_gauge", "Various gauges", &["name"]).unwrap()
 });
 
-pub static COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        // metric name
-        "aptos_storage_counter",
-        // metric description
-        "Various counters for Aptos DB / storage.",
-        // metric labels (dimensions)
-        &["name"],
-    )
-    .unwrap()
-});
+make_local_int_counter_vec!(
+    pub,
+    COUNTER,
+    // metric name
+    "aptos_storage_counter",
+    // metric description
+    "Various counters for Aptos DB / storage.",
+    // metric labels (dimensions)
+    &["name"],
+);
