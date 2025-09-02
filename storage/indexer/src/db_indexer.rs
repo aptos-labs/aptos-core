@@ -21,6 +21,7 @@ use aptos_db_indexer_schemas::{
     },
 };
 use aptos_logger::warn;
+use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader, Result,
@@ -407,8 +408,7 @@ impl DBIndexer {
 
     /// Process a batch of transactions that is within the range of  `start_version` to `end_version`. Left inclusive, right exclusive.
     pub fn process_a_batch(&self, start_version: Version, end_version: Version) -> Result<Version> {
-        let _timer: aptos_metrics_core::HistogramTimer =
-            TIMER.with_label_values(&["process_a_batch"]).start_timer();
+        let _timer: aptos_metrics_core::HistogramTimer = TIMER.timer_with(&["process_a_batch"]);
         let mut version = start_version;
         let num_transactions = self.get_num_of_transactions(version, end_version)?;
         // This promises num_transactions should be readable from main db
@@ -553,9 +553,7 @@ impl DBIndexer {
         &self,
         v2: &ContractEventV2,
     ) -> Result<Option<ContractEventV1>> {
-        let _timer = TIMER
-            .with_label_values(&["translate_event_v2_to_v1"])
-            .start_timer();
+        let _timer = TIMER.timer_with(&["translate_event_v2_to_v1"]);
         if let Some(translator) = self
             .event_v2_translation_engine
             .translators

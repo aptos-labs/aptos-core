@@ -431,9 +431,7 @@ impl StateMerkleDb {
         }
 
         let (shard_root_node, tree_update_batch) = {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["jmt_update"])
-                .start_timer();
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_update"]);
 
             self.batch_put_value_set_for_shard(
                 shard_id,
@@ -789,8 +787,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
                 .db_by_key(node_key)
                 .get::<JellyfishMerkleNodeSchema>(node_key)?;
             NODE_CACHE_SECONDS
-                .with_label_values(&[tag, "cache_disabled"])
-                .observe(start_time.elapsed().as_secs_f64());
+                .observe_with(&[tag, "cache_disabled"], start_time.elapsed().as_secs_f64());
             return Ok(node_opt);
         }
         if let Some(node_cache) = self
@@ -800,17 +797,17 @@ impl TreeReader<StateKey> for StateMerkleDb {
             .get_version(node_key.version())
         {
             let node = node_cache.get(node_key).cloned();
-            NODE_CACHE_SECONDS
-                .with_label_values(&[tag, "versioned_cache_hit"])
-                .observe(start_time.elapsed().as_secs_f64());
+            NODE_CACHE_SECONDS.observe_with(
+                &[tag, "versioned_cache_hit"],
+                start_time.elapsed().as_secs_f64(),
+            );
             return Ok(node);
         }
 
         if let Some(lru_cache) = &self.lru_cache {
             if let Some(node) = lru_cache.get(node_key) {
                 NODE_CACHE_SECONDS
-                    .with_label_values(&[tag, "lru_cache_hit"])
-                    .observe(start_time.elapsed().as_secs_f64());
+                    .observe_with(&[tag, "lru_cache_hit"], start_time.elapsed().as_secs_f64());
                 return Ok(Some(node));
             }
         }
@@ -823,9 +820,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
                 lru_cache.put(node_key.clone(), node.clone());
             }
         }
-        NODE_CACHE_SECONDS
-            .with_label_values(&[tag, "cache_miss"])
-            .observe(start_time.elapsed().as_secs_f64());
+        NODE_CACHE_SECONDS.observe_with(&[tag, "cache_miss"], start_time.elapsed().as_secs_f64());
         Ok(node_opt)
     }
 
@@ -848,9 +843,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
 
 impl TreeWriter<StateKey> for StateMerkleDb {
     fn write_node_batch(&self, node_batch: &NodeBatch) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["tree_writer_write_batch"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["tree_writer_write_batch"]);
         // Get the top level batch and sharded batch from raw NodeBatch
         let mut top_level_batch = SchemaBatch::new();
         let mut jmt_shard_batches: Vec<SchemaBatch> = Vec::with_capacity(NUM_STATE_SHARDS);
