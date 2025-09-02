@@ -1,0 +1,30 @@
+//# publish
+module 0x99::not_trusted
+
+fun increment(x: u64): u64
+    move_loc x
+    ld_u64 1
+    add
+    ret
+
+//# publish
+module 0x9::trusted
+use 0x99::not_trusted
+
+public fun run()
+    ld_u64 2
+    call not_trusted::increment // The u64 should be removed from type stack
+    pop
+    ret
+
+//# publish
+module 0x99::app
+use 0x9::trusted
+
+public fun run(): u32
+    ld_u32 22                  // puts u32 on the type stack
+    call trusted::run          // expect to not leak through u64 from increment
+    ret
+
+
+//# run --verbose 0x99::app::run
