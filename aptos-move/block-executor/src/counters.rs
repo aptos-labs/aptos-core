@@ -241,7 +241,7 @@ pub static BLOCK_VIEW_BASE_VALUES_MEMORY_USAGE: Lazy<HistogramVec> = Lazy::new(|
     )
 });
 
-fn observe_gas(counter: &Lazy<HistogramVec>, mode_str: &str, fee_statement: &FeeStatement) {
+fn observe_gas(counter: &'static Lazy<HistogramVec>, mode_str: &str, fee_statement: &FeeStatement) {
     counter.observe_with(
         &[mode_str, GasType::TOTAL_GAS],
         fee_statement.gas_used() as f64,
