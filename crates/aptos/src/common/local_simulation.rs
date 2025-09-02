@@ -150,6 +150,7 @@ pub fn profile_transaction_using_debugger(
 
     let human_readable_name = match entry_point {
         FrameName::Script => "script".to_string(),
+        FrameName::TransactionBatch => "transaction batch".to_string(),
         FrameName::Function {
             module_id, name, ..
         } => {

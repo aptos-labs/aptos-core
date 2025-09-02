@@ -44,7 +44,7 @@ pub enum ExecutionGasEvent {
 
 /// An enum representing the name of a call frame.
 /// Could be either a script or a function.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FrameName {
     Script,
     Function {
@@ -52,6 +52,7 @@ pub enum FrameName {
         name: Identifier,
         ty_args: Vec<TypeTag>,
     },
+    TransactionBatch,
 }
 
 /// A struct containing information about a function call, including the name of the
@@ -157,8 +158,8 @@ pub struct StorageFees {
 pub struct TransactionGasLog {
     pub exec_io: ExecutionAndIOCosts,
     pub storage: StorageFees,
+    pub multi_txn: bool,
 }
-
 pub struct GasEventIter<'a> {
     stack: SmallVec<[(&'a CallFrame, usize); 16]>,
 }
@@ -204,6 +205,14 @@ impl CallFrame {
     pub fn new_script() -> Self {
         Self {
             name: FrameName::Script,
+            events: vec![],
+            native_gas: 0.into(),
+        }
+    }
+
+    pub fn new_transaction_batch() -> Self {
+        Self {
+            name: FrameName::TransactionBatch,
             events: vec![],
             native_gas: 0.into(),
         }

@@ -9,6 +9,7 @@ mod misc;
 mod profiler;
 mod render;
 mod report;
+mod unique_stack;
 
 pub use log::{FrameName, TransactionGasLog};
 pub use profiler::GasProfiler;
