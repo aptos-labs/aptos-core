@@ -10,7 +10,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_drop_helper::ArcAsyncDrop;
 use aptos_infallible::Mutex;
-use aptos_metrics_core::IntGaugeHelper;
+use aptos_metrics_core::IntGaugeVecHelper;
 use std::{marker::PhantomData, sync::Arc};
 
 #[derive(Debug)]
