@@ -8,11 +8,11 @@ module 0x1::vector {
     public native fun destroy_empty<Element>(self: vector<Element>);
     public native fun swap<Element>(self: &mut vector<Element>, i: u64, j: u64);
     public fun contains<Element>(self: &vector<Element>, e: &Element): bool {
-        let _t2;
-        _t2 = 0;
+        let _t2 = 0;
+        let _t3 = length<Element>(self);
         'l0: loop {
             loop {
-                if (!(_t2 < length<Element>(self))) break 'l0;
+                if (!(_t2 < _t3)) break 'l0;
                 if (borrow<Element>(self, _t2) == e) break;
                 _t2 = _t2 + 1
             };
@@ -21,11 +21,11 @@ module 0x1::vector {
         false
     }
     public fun index_of<Element>(self: &vector<Element>, e: &Element): (bool, u64) {
-        let _t2;
-        _t2 = 0;
+        let _t2 = 0;
+        let _t3 = length<Element>(self);
         'l0: loop {
             loop {
-                if (!(_t2 < length<Element>(self))) break 'l0;
+                if (!(_t2 < _t3)) break 'l0;
                 if (borrow<Element>(self, _t2) == e) break;
                 _t2 = _t2 + 1
             };
@@ -37,9 +37,8 @@ module 0x1::vector {
         range_with_step(start, end, 1)
     }
     public fun range_with_step(start: u64, end: u64, step: u64): vector<u64> {
-        let _t3;
         if (!(step > 0)) abort 131075;
-        _t3 = empty<u64>();
+        let _t3 = empty<u64>();
         while (start < end) {
             push_back<u64>(&mut _t3, start);
             start = start + step
@@ -51,20 +50,21 @@ module 0x1::vector {
         reverse_append<Element>(self, other);
     }
     public fun reverse<Element>(self: &mut vector<Element>) {
-        reverse_slice<Element>(self, 0, length<Element>(/*freeze*/self));
+        let _t1 = length<Element>(freeze(self));
+        reverse_slice<Element>(self, 0, _t1);
     }
     public fun reverse_append<Element>(self: &mut vector<Element>, other: vector<Element>) {
-        let _t2;
-        _t2 = length<Element>(&other);
+        let _t2 = length<Element>(&other);
         while (_t2 > 0) {
-            push_back<Element>(self, pop_back<Element>(&mut other));
-            _t2 = _t2 - 1
+            let _t10 = pop_back<Element>(&mut other);
+            push_back<Element>(self, _t10);
+            _t2 = _t2 - 1;
+            continue
         };
         destroy_empty<Element>(other);
     }
     public fun insert<Element>(self: &mut vector<Element>, i: u64, e: Element) {
-        let _t3;
-        _t3 = length<Element>(/*freeze*/self);
+        let _t3 = length<Element>(freeze(self));
         if (!(i <= _t3)) abort 131072;
         push_back<Element>(self, e);
         while (i < _t3) {
@@ -76,32 +76,33 @@ module 0x1::vector {
         length<Element>(self) == 0
     }
     public fun remove<Element>(self: &mut vector<Element>, i: u64): Element {
-        let _t2;
-        _t2 = length<Element>(/*freeze*/self);
+        let _t2 = length<Element>(freeze(self));
         if (i >= _t2) abort 131072;
-        while (i < _t2 - 1) {
+        _t2 = _t2 - 1;
+        while (i < _t2) {
+            let _t18 = i;
             i = i + 1;
-            swap<Element>(self, i, i)
+            swap<Element>(self, _t18, i);
+            continue
         };
         pop_back<Element>(self)
     }
     public fun remove_value<Element>(self: &mut vector<Element>, val: &Element): vector<Element> {
         let _t3;
-        let _t12;
-        let _t8;
-        let _t7;
-        (_t7,_t8) = index_of<Element>(/*freeze*/self, val);
+        let (_t7,_t8) = index_of<Element>(freeze(self), val);
         if (_t7) {
-            _t12 = empty<Element>();
-            push_back<Element>(&mut _t12, remove<Element>(self, _t8));
+            let _t11 = remove<Element>(self, _t8);
+            let _t12 = empty<Element>();
+            push_back<Element>(&mut _t12, _t11);
             _t3 = _t12
         } else _t3 = empty<Element>();
         _t3
     }
     public fun reverse_slice<Element>(self: &mut vector<Element>, left: u64, right: u64) {
         if (!(left <= right)) abort 131073;
+        let _t8 = left == right;
         'l0: loop {
-            if (!(left == right)) {
+            if (!_t8) {
                 right = right - 1;
                 loop {
                     if (!(left < right)) break 'l0;
@@ -114,7 +115,8 @@ module 0x1::vector {
         };
     }
     public fun rotate<Element>(self: &mut vector<Element>, rot: u64): u64 {
-        rotate_slice<Element>(self, 0, rot, length<Element>(/*freeze*/self))
+        let _t2 = length<Element>(freeze(self));
+        rotate_slice<Element>(self, 0, rot, _t2)
     }
     public fun rotate_slice<Element>(self: &mut vector<Element>, left: u64, rot: u64, right: u64): u64 {
         reverse_slice<Element>(self, left, rot);
@@ -123,76 +125,48 @@ module 0x1::vector {
         left + (right - rot)
     }
     public fun singleton<Element>(e: Element): vector<Element> {
-        let _t1;
-        _t1 = empty<Element>();
+        let _t1 = empty<Element>();
         push_back<Element>(&mut _t1, e);
         _t1
     }
     public fun slice<Element: copy>(self: &vector<Element>, start: u64, end: u64): vector<Element> {
-        let _t4;
         let _t3;
         if (start <= end) _t3 = end <= length<Element>(self) else _t3 = false;
         if (!_t3) abort 131076;
-        _t4 = empty<Element>();
+        let _t4 = empty<Element>();
         while (start < end) {
-            push_back<Element>(&mut _t4, *borrow<Element>(self, start));
-            start = start + 1
+            let _t17 = &mut _t4;
+            let _t21 = *borrow<Element>(self, start);
+            push_back<Element>(_t17, _t21);
+            start = start + 1;
+            continue
         };
         _t4
     }
     public fun swap_remove<Element>(self: &mut vector<Element>, i: u64): Element {
-        if (is_empty<Element>(/*freeze*/self)) abort 131072;
-        swap<Element>(self, i, length<Element>(/*freeze*/self) - 1);
+        if (is_empty<Element>(freeze(self))) abort 131072;
+        let _t2 = length<Element>(freeze(self)) - 1;
+        swap<Element>(self, i, _t2);
         pop_back<Element>(self)
     }
     public fun trim<Element>(self: &mut vector<Element>, new_len: u64): vector<Element> {
-        let _t2;
-        _t2 = trim_reverse<Element>(self, new_len);
+        let _t2 = trim_reverse<Element>(self, new_len);
         reverse<Element>(&mut _t2);
         _t2
     }
     public fun trim_reverse<Element>(self: &mut vector<Element>, new_len: u64): vector<Element> {
-        let _t3;
-        let _t2;
-        _t2 = length<Element>(/*freeze*/self);
+        let _t2 = length<Element>(freeze(self));
         if (!(new_len <= _t2)) abort 131072;
-        _t3 = empty<Element>();
+        let _t3 = empty<Element>();
         while (new_len < _t2) {
-            push_back<Element>(&mut _t3, pop_back<Element>(self));
-            _t2 = _t2 - 1
+            let _t14 = &mut _t3;
+            let _t16 = pop_back<Element>(self);
+            push_back<Element>(_t14, _t16);
+            _t2 = _t2 - 1;
+            continue
         };
         _t3
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with stackless-bytecode checks failed
-error: cannot freeze value which is still mutably borrowed
-   ┌─ vector.move:54:67
-   │
-54 │         reverse_slice<Element>(self, 0, length<Element>(/*freeze*/self));
-   │         ----------------------------------------------------------^^^^--
-   │         │                      │                                  │
-   │         │                      │                                  implicitly frozen here
-   │         │                      previously mutably borrowed here
-   │         conflicting reference used here
-
-error: cannot freeze value which is still mutably borrowed
-    ┌─ vector.move:117:71
-    │
-117 │         rotate_slice<Element>(self, 0, rot, length<Element>(/*freeze*/self))
-    │         --------------------------------------------------------------^^^^--
-    │         │                     │                                       │
-    │         │                     │                                       implicitly frozen here
-    │         │                     previously mutably borrowed here
-    │         conflicting reference used here
-
-error: cannot freeze value which is still mutably borrowed
-    ┌─ vector.move:145:58
-    │
-145 │         swap<Element>(self, i, length<Element>(/*freeze*/self) - 1);
-    │         -------------------------------------------------^^^^------
-    │         │             │                                  │
-    │         │             │                                  implicitly frozen here
-    │         │             previously mutably borrowed here
-    │         conflicting reference used here
+============ recompilation succeeded ========

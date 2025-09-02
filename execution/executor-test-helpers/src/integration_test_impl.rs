@@ -33,7 +33,7 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        AuxiliaryInfo, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo,
+        AuxiliaryInfo, AuxiliaryInfoTrait, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo,
         Transaction::{self, UserTransaction},
         TransactionListWithProofV2, TransactionWithProof, WriteSetPayload,
     },

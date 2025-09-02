@@ -186,5 +186,5 @@ fn runtime_reentrancy_check() {
     )
     .unwrap_err()
     .major_status();
-    assert_eq!(status, StatusCode::FUNCTION_RESOLUTION_FAILURE);
+    assert_eq!(status, StatusCode::LINKER_ERROR);
 }

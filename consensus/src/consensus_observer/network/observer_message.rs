@@ -748,7 +748,7 @@ impl BlockTransactionPayload {
         let inline_batches: Vec<&BatchInfo> = match self {
             BlockTransactionPayload::QuorumStoreInlineHybrid(_, inline_batches)
             | BlockTransactionPayload::QuorumStoreInlineHybridV2(_, inline_batches) => {
-                inline_batches.iter().map(|batch_info| batch_info).collect()
+                inline_batches.iter().collect()
             },
             _ => {
                 return Err(Error::InvalidMessageError(

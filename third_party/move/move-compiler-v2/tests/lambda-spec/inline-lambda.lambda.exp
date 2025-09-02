@@ -109,9 +109,9 @@ module 0x42::Test {
         let z = 3 + y;
         {
             let (x) = (y);
-            let y = __lambda__1_inline_1_905__call_inline(x);
-            let z' = __lambda__1_inline_2_916__call_inline(z, x);
-            let w = __lambda__1_inline_3_927__call_inline(z, x);
+            let y = lambda__1_inline_1_905__call_inline(x);
+            let z' = lambda__1_inline_2_916__call_inline(z, x);
+            let w = lambda__1_inline_3_927__call_inline(z, x);
 
             /* spec {
               assert Eq<bool>(y, Gt(x, 2));
@@ -134,7 +134,7 @@ module 0x42::Test {
             }
              */
             ;
-            __lambda__1_inline_1_267__test_apply(v)
+            lambda__1_inline_1_267__test_apply(v)
         };
 
         /* spec {
@@ -151,7 +151,7 @@ module 0x42::Test {
             }
              */
             ;
-            __lambda__1_inline_1_393__test_apply(a1, a2, v)
+            lambda__1_inline_1_393__test_apply(a1, a2, v)
         };
 
         /* spec {
@@ -160,22 +160,22 @@ module 0x42::Test {
          */
         ;
     }
-    fun __lambda__1_inline_1_905__call_inline(x: u64): bool {
+    fun lambda__1_inline_1_905__call_inline(x: u64): bool {
         x > 2
     }
-    fun __lambda__1_inline_2_916__call_inline(z: u64, x: u64): bool {
+    fun lambda__1_inline_2_916__call_inline(z: u64, x: u64): bool {
         x > z
     }
-    fun __lambda__1_inline_3_927__call_inline(z: u64, x: u64): bool {
+    fun lambda__1_inline_3_927__call_inline(z: u64, x: u64): bool {
         while (z > 0) {
             let _x = x + 1;
         };
         x > 5
     }
-    fun __lambda__1_inline_1_267__test_apply(v: u64): bool {
+    fun lambda__1_inline_1_267__test_apply(v: u64): bool {
         v >= 0
     }
-    fun __lambda__1_inline_1_393__test_apply(a1: u64, a2: u64, v: u64): bool {
+    fun lambda__1_inline_1_393__test_apply(a1: u64, a2: u64, v: u64): bool {
         v != a1 + a2
     }
 }

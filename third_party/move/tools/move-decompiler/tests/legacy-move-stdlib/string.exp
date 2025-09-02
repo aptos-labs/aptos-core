@@ -11,22 +11,26 @@ module 0x1::string {
         &self.bytes
     }
     public fun index_of(self: &String, r: &String): u64 {
-        internal_index_of(&self.bytes, &r.bytes)
+        let _t3 = &self.bytes;
+        let _t5 = &r.bytes;
+        internal_index_of(_t3, _t5)
     }
     native fun internal_index_of(v: &vector<u8>, r: &vector<u8>): u64;
     public fun append(self: &mut String, r: String) {
-        vector::append<u8>(&mut self.bytes, *&(&r).bytes);
+        let _t3 = &mut self.bytes;
+        let _t6 = *&(&r).bytes;
+        vector::append<u8>(_t3, _t6);
     }
     public fun insert(self: &mut String, at: u64, o: String) {
-        let _t6;
         let _t4;
-        let _t3;
-        _t3 = &self.bytes;
+        let _t3 = &self.bytes;
         if (at <= vector::length<u8>(_t3)) _t4 = internal_is_char_boundary(_t3, at) else _t4 = false;
         if (!_t4) abort 2;
-        _t6 = sub_string(/*freeze*/self, 0, at);
+        let _t5 = length(freeze(self));
+        let _t6 = sub_string(freeze(self), 0, at);
+        let _t7 = sub_string(freeze(self), at, _t5);
         append(&mut _t6, o);
-        append(&mut _t6, sub_string(/*freeze*/self, at, length(/*freeze*/self)));
+        append(&mut _t6, _t7);
         *self = _t6;
     }
     native fun internal_is_char_boundary(v: &vector<u8>, i: u64): bool;
@@ -34,8 +38,7 @@ module 0x1::string {
         let _t7;
         let _t6;
         let _t5;
-        let _t3;
-        _t3 = &self.bytes;
+        let _t3 = &self.bytes;
         if (j <= vector::length<u8>(_t3)) _t5 = i <= j else _t5 = false;
         if (_t5) _t6 = internal_is_char_boundary(_t3, i) else _t6 = false;
         if (_t6) _t7 = internal_is_char_boundary(_t3, j) else _t7 = false;
@@ -46,7 +49,8 @@ module 0x1::string {
         vector::is_empty<u8>(&self.bytes)
     }
     public fun append_utf8(self: &mut String, bytes: vector<u8>) {
-        append(self, utf8(bytes));
+        let _t4 = utf8(bytes);
+        append(self, _t4);
     }
     public fun utf8(bytes: vector<u8>): String {
         if (!internal_check_utf8(&bytes)) abort 1;

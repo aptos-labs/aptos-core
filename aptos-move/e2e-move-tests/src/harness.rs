@@ -30,9 +30,9 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
     },
     transaction::{
-        EntryFunction, Multisig, MultisigTransactionPayload, Script, SignedTransaction,
-        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
-        ViewFunctionOutput,
+        AuxiliaryInfo, EntryFunction, Multisig, MultisigTransactionPayload, Script,
+        SignedTransaction, TransactionArgument, TransactionOutput, TransactionPayload,
+        TransactionStatus, ViewFunctionOutput,
     },
     AptosCoinType,
 };
@@ -196,6 +196,16 @@ impl MoveHarness {
     ) -> Self {
         let mut h = Self::new();
         h.enable_features(enabled_features, disabled_features);
+        h
+    }
+
+    pub fn new_with_lazy_loading(enable_lazy_loading: bool) -> Self {
+        let mut h = MoveHarness::new();
+        if enable_lazy_loading {
+            h.enable_features(vec![FeatureFlag::ENABLE_LAZY_LOADING], vec![]);
+        } else {
+            h.enable_features(vec![], vec![FeatureFlag::ENABLE_LAZY_LOADING]);
+        }
         h
     }
 
@@ -385,7 +395,7 @@ impl MoveHarness {
         let txn = self.create_transaction_payload(account, payload);
         let (output, gas_log) = self
             .executor
-            .execute_transaction_with_gas_profiler(txn)
+            .execute_transaction_with_gas_profiler(txn, &AuxiliaryInfo::default())
             .unwrap();
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
@@ -701,7 +711,7 @@ impl MoveHarness {
         let txn = self.create_publish_package(account, path, None, |_| {});
         let (output, gas_log) = self
             .executor
-            .execute_transaction_with_gas_profiler(txn)
+            .execute_transaction_with_gas_profiler(txn, &AuxiliaryInfo::default())
             .unwrap();
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
@@ -884,16 +894,8 @@ impl MoveHarness {
     /// Enables features
     pub fn enable_features(&mut self, enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
         let acc = self.aptos_framework_account();
-        let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
-        let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         self.executor
-            .exec("features", "change_feature_flags_internal", vec![], vec![
-                MoveValue::Signer(*acc.address())
-                    .simple_serialize()
-                    .unwrap(),
-                bcs::to_bytes(&enabled).unwrap(),
-                bcs::to_bytes(&disabled).unwrap(),
-            ]);
+            .enable_features(acc.address(), enabled, disabled);
     }
 
     fn override_one_gas_param(&mut self, param: &str, param_value: u64) {

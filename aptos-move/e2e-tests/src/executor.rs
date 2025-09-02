@@ -50,8 +50,9 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionExecutableRef,
-        TransactionOutput, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        AuxiliaryInfo, BlockOutput, ExecutionStatus, SignedTransaction, Transaction,
+        TransactionExecutableRef, TransactionOutput, TransactionStatus, VMValidatorResult,
+        ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -882,6 +883,7 @@ impl FakeExecutor {
     pub fn execute_transaction_with_gas_profiler(
         &self,
         txn: SignedTransaction,
+        auxiliary_info: &AuxiliaryInfo,
     ) -> anyhow::Result<(TransactionOutput, TransactionGasLog)> {
         let txn = txn
             .check_signature()
@@ -919,6 +921,7 @@ impl FakeExecutor {
                 };
                 gas_profiler
             },
+            auxiliary_info,
         )?;
 
         Ok((
@@ -1398,6 +1401,22 @@ impl FakeExecutor {
         ]);
 
         account
+    }
+
+    /// Enables and disables specified features, committing the result to the state.
+    pub fn enable_features(
+        &mut self,
+        signer: &AccountAddress,
+        enabled: Vec<FeatureFlag>,
+        disabled: Vec<FeatureFlag>,
+    ) {
+        let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
+        let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
+        self.exec("features", "change_feature_flags_internal", vec![], vec![
+            MoveValue::Signer(*signer).simple_serialize().unwrap(),
+            bcs::to_bytes(&enabled).unwrap(),
+            bcs::to_bytes(&disabled).unwrap(),
+        ]);
     }
 }
 

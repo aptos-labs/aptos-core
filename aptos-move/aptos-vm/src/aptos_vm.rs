@@ -68,16 +68,16 @@ use aptos_types::{
         TimedFeatureFlag, TimedFeatures,
     },
     randomness::Randomness,
-    state_store::{state_key::StateKey, StateView, TStateView},
+    state_store::{StateView, TStateView},
     transaction::{
         authenticator::{AbstractionAuthData, AnySignature, AuthenticationProof},
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
         signature_verified_transaction::SignatureVerifiedTransaction,
-        BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
-        MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
-        TransactionArgument, TransactionExecutableRef, TransactionExtraConfig, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
-        WriteSetPayload,
+        AuxiliaryInfo, AuxiliaryInfoTrait, BlockOutput, EntryFunction, ExecutionError,
+        ExecutionStatus, ModuleBundle, MultisigTransactionPayload, ReplayProtector, Script,
+        SignedTransaction, Transaction, TransactionArgument, TransactionExecutableRef,
+        TransactionExtraConfig, TransactionOutput, TransactionPayload, TransactionStatus,
+        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
     vm::module_metadata::{
         get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
@@ -1545,8 +1545,7 @@ impl AptosVM {
         // Lazy loading otherwise.
 
         // With lazy loading, we will check only immediate dependencies for linking checks,
-        // not the whole transitive dependencies closure, so charge gas here for them.
-        // TODO(lazy-loading): Add a test for this when PRs are connected end to end.
+        // not the whole dependencies closure, so charge gas here for them.
         for (dep_addr, dep_name) in modules
             .iter()
             .flat_map(|module| module.immediate_dependencies_iter())
@@ -1573,7 +1572,6 @@ impl AptosVM {
             .iter()
             .flat_map(|module| module.immediate_friends_iter())
         {
-            // TODO(lazy-loading): Add a test for this when PRs are connected end to end.
             if !module_ids_in_bundle.contains(&(friend_addr, friend_name)) {
                 let msg = format!(
                     "Module {}::{} is declared as a friend and should be part of the \
@@ -2026,13 +2024,14 @@ impl AptosVM {
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
         make_gas_meter: F,
+        auxiliary_info: &AuxiliaryInfo,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
         C: AptosCodeStorage + BlockSynchronizationKillSwitch,
         G: AptosGasMeter,
         F: FnOnce(u64, VMGasParameters, StorageGasParameters, bool, Gas, &'a C) -> G,
     {
-        let txn_metadata = TransactionMetadata::new(txn);
+        let txn_metadata = TransactionMetadata::new(txn, auxiliary_info);
 
         let is_approved_gov_script = is_approved_gov_script(resolver, txn, &txn_metadata);
 
@@ -2080,6 +2079,7 @@ impl AptosVM {
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
         modify_gas_meter: F,
+        auxiliary_info: &AuxiliaryInfo,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
         F: FnOnce(ProdGasMeter<'a, NoopBlockSynchronizationKillSwitch>) -> G,
@@ -2105,6 +2105,7 @@ impl AptosVM {
                     &NoopBlockSynchronizationKillSwitch {},
                 ))
             },
+            auxiliary_info,
         )
     }
 
@@ -2115,6 +2116,7 @@ impl AptosVM {
         code_storage: &(impl AptosCodeStorage + BlockSynchronizationKillSwitch),
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
+        auxiliary_info: &AuxiliaryInfo,
     ) -> (VMStatus, VMOutput) {
         match self.execute_user_transaction_with_custom_gas_meter(
             resolver,
@@ -2122,6 +2124,7 @@ impl AptosVM {
             txn,
             log_context,
             make_prod_gas_meter,
+            auxiliary_info,
         ) {
             Ok((vm_status, vm_output, _gas_meter)) => (vm_status, vm_output),
             Err(vm_status) => {
@@ -2736,6 +2739,7 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         code_storage: &(impl AptosCodeStorage + BlockSynchronizationKillSwitch),
         log_context: &AdapterLogSchema,
+        auxiliary_info: &AuxiliaryInfo,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         assert!(!self.is_simulation, "VM has to be created for execution");
 
@@ -2778,8 +2782,13 @@ impl AptosVM {
             Transaction::UserTransaction(txn) => {
                 fail_point!("aptos_vm::execution::user_transaction");
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
-                let (vm_status, output) =
-                    self.execute_user_transaction(resolver, code_storage, txn, log_context);
+                let (vm_status, output) = self.execute_user_transaction(
+                    resolver,
+                    code_storage,
+                    txn,
+                    log_context,
+                    auxiliary_info,
+                );
 
                 if let StatusType::InvariantViolation = vm_status.status_type() {
                     match vm_status.status_code() {
@@ -2893,11 +2902,11 @@ impl AptosVMBlockExecutor {
     /// one of them.
     pub fn execute_block_with_config(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         state_view: &(impl StateView + Sync),
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         fail_point!("aptos_vm_block_executor::execute_block_with_config", |_| {
             Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -2915,7 +2924,7 @@ impl AptosVMBlockExecutor {
         let result = AptosVMBlockExecutorWrapper::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-            DefaultTxnProvider<SignatureVerifiedTransaction>,
+            DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         >(
             txn_provider,
             state_view,
@@ -2941,11 +2950,11 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
 
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
                 blockstm_v2: false,
@@ -3053,7 +3062,8 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
         };
-        let txn_data = TransactionMetadata::new(&txn);
+        let auxiliary_info = AuxiliaryInfo::new_empty();
+        let txn_data = TransactionMetadata::new(&txn, &auxiliary_info);
 
         let resolver = self.as_move_resolver(&state_view);
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
@@ -3149,8 +3159,13 @@ impl AptosSimulationVM {
         let resolver = state_view.as_move_resolver();
         let code_storage = state_view.as_aptos_code_storage(&env);
 
-        let (vm_status, vm_output) =
-            vm.execute_user_transaction(&resolver, &code_storage, transaction, &log_context);
+        let (vm_status, vm_output) = vm.execute_user_transaction(
+            &resolver,
+            &code_storage,
+            transaction,
+            &log_context,
+            &AuxiliaryInfo::new_empty(),
+        );
         let txn_output = vm_output
             .try_materialize_into_transaction_output(&resolver)
             .expect("Materializing aggregator V1 deltas should never fail");

@@ -3,7 +3,7 @@
 
 use crate::txn_provider::TxnProvider;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::transaction::{AuxiliaryInfo, BlockExecutableTransaction as Transaction};
+use aptos_types::transaction::{AuxiliaryInfoTrait, BlockExecutableTransaction as Transaction};
 use once_cell::sync::OnceCell;
 
 pub struct BlockingTxnProvider<T: Transaction + std::fmt::Debug> {
@@ -24,7 +24,9 @@ impl<T: Transaction + std::fmt::Debug> BlockingTxnProvider<T> {
     }
 }
 
-impl<T: Transaction + std::fmt::Debug> TxnProvider<T> for BlockingTxnProvider<T> {
+impl<T: Transaction + std::fmt::Debug, A: AuxiliaryInfoTrait> TxnProvider<T, A>
+    for BlockingTxnProvider<T>
+{
     fn num_txns(&self) -> usize {
         self.txns.len()
     }
@@ -33,7 +35,7 @@ impl<T: Transaction + std::fmt::Debug> TxnProvider<T> for BlockingTxnProvider<T>
         self.txns[idx as usize].wait()
     }
 
-    fn get_auxiliary_info(&self, _idx: TxnIndex) -> &AuxiliaryInfo {
+    fn get_auxiliary_info(&self, _idx: TxnIndex) -> A {
         // TODO: The whole struct seems to be dead code for now, implement this when necessary.
         unimplemented!()
     }

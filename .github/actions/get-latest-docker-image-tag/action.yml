@@ -23,18 +23,23 @@ runs:
         ref: ${{ inputs.branch }}
         path: checkout_branch
         fetch-depth: 0
+
     - uses: ./checkout_branch/.github/actions/python-setup # use python-setup from that branch
       with:
         pyproject_directory: checkout_branch/testsuite
+
     - name: Determine image tag
       id: determine-test-image-tag
-      # Forge relies on the default and failpoints variants
-      run: |
-        variants=(${{ inputs.variants }}) # split the variants string into an array
-        variants_args=()
-        for variant in "${variants[@]}"; do
-          variants_args+=("--variant" "$variant")
-        done
-        ./testrun find_latest_image.py "${variants_args[@]}"
-      shell: bash
       working-directory: checkout_branch/testsuite # the checkout_branch is a subdirectory
+      uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
+      with:
+        max_attempts: 5
+        timeout_minutes: 20
+        command: |
+          cd checkout_branch/testsuite
+          variants=(${{ inputs.variants }}) # split the variants string into an array
+          variants_args=()
+          for variant in "${variants[@]}"; do
+            variants_args+=("--variant" "$variant")
+          done
+          ./testrun find_latest_image.py "${variants_args[@]}"

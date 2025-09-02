@@ -29,8 +29,8 @@ use aptos_types::{
     state_store::{state_key::StateKey, StateView},
     transaction::{
         block_epilogue::BlockEndInfo, signature_verified_transaction::SignatureVerifiedTransaction,
-        BlockOutput, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionOutput,
-        TransactionStatus,
+        AuxiliaryInfo, BlockOutput, ExecutionStatus, Transaction, TransactionAuxiliaryData,
+        TransactionOutput, TransactionStatus,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSetMut},
@@ -80,11 +80,11 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
 
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         let block_epilogue_txn = Transaction::block_epilogue_v0(
             transaction_slice_metadata
                 .append_state_checkpoint_to_block()
@@ -121,8 +121,7 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
 
         Ok(BlockOutput::new(
             transaction_outputs,
-            Some(block_epilogue_txn),
-            BTreeMap::new(),
+            Some(block_epilogue_txn.into()),
         ))
     }
 }

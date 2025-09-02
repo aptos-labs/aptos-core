@@ -15,15 +15,15 @@ module 0x99::enum_complex {
         }
     }
     fun admin_id(self: &Entity): u64 {
-        let _t8;
-        let _t6;
         let _t3;
-        let _t1;
-        let _t2;
-        let _t5;
         'l0: loop {
+            let _t8;
+            let _t2;
             if (!((self is Institution) && (&self.admin is Superuser))) {
+                let _t6;
+                let _t1;
                 loop {
+                    let _t5;
                     if (self is Institution) {
                         _t5 = &self.admin;
                         if (_t5 is User) {
@@ -71,6 +71,7 @@ module 0x99::enum_complex {
                     _t3 = _t6 + 5;
                     break 'l0
                 };
+                _t8 = *_t2;
                 _t1 = self;
                 loop {
                     if (_t1 is Person) {
@@ -87,7 +88,7 @@ module 0x99::enum_complex {
                     _t6 = 0;
                     break
                 };
-                _t3 = *_t2 + _t6;
+                _t3 = _t8 + _t6;
                 break
             };
             loop {
@@ -111,7 +112,6 @@ module 0x99::enum_complex {
         _t3
     }
 }
-
 module 0x99::enum_simple {
     enum Shape {
         Circle {
@@ -123,24 +123,22 @@ module 0x99::enum_simple {
         }
     }
     fun destroy_empty(self: Shape): bool {
-        let _t15;
-        let _t14;
         let _t2;
-        let _t8;
-        let _t1;
-        _t1 = &self;
+        let _t1 = &self;
         if (_t1 is Circle) {
-            Shape::Circle{radius: _t8} = self;
+            let Shape::Circle{radius: _t8} = self;
             _t2 = true
         } else if (_t1 is Rectangle) {
-            Shape::Rectangle{width: _t14,height: _t15} = self;
+            let Shape::Rectangle{width: _t14,height: _t15} = self;
             _t2 = false
         } else abort 14566554180833181697;
         _t2
     }
     fun example_destroy_shapes() {
-        destroy_empty(Shape::Circle{radius: 0});
-        destroy_empty(Shape::Rectangle{width: 0,height: 0});
+        let _t2 = Shape::Circle{radius: 0};
+        let _t0 = Shape::Rectangle{width: 0,height: 0};
+        let _t6 = destroy_empty(_t2);
+        let _t8 = destroy_empty(_t0);
     }
 }
 

@@ -30,9 +30,9 @@ use aptos_types::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
         transaction_slice_metadata::TransactionSliceMetadata,
     },
-    state_store::{state_key::StateKey, StateView},
+    state_store::StateView,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
         TransactionOutput,
     },
 };
@@ -41,10 +41,7 @@ use aptos_vm::{
     AptosVM, VMBlockExecutor,
 };
 use move_core_types::vm_status::VMStatus;
-use std::{
-    collections::BTreeMap,
-    sync::{mpsc::channel, Arc},
-};
+use std::sync::{mpsc::channel, Arc};
 
 pub struct PtxBlockExecutor;
 
@@ -55,11 +52,11 @@ impl VMBlockExecutor for PtxBlockExecutor {
 
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         let _timer = TIMER.timer_with(&["block_total"]);
 
         let concurrency_level = AptosVM::get_concurrency_level();
@@ -109,7 +106,7 @@ impl VMBlockExecutor for PtxBlockExecutor {
             ret_clone.lock().replace(txn_outputs);
         });
         let ret = ret.lock().take().unwrap();
-        Ok(BlockOutput::new(ret, None, BTreeMap::new()))
+        Ok(BlockOutput::new(ret, None))
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(

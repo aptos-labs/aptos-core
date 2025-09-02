@@ -251,6 +251,7 @@ members = [
     "third_party/move/tools/move-package",
     "third_party/move/tools/move-package-cache",
     "third_party/move/tools/move-package-manifest",
+    "third_party/move/tools/move-package-resolver",
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
     "tools/calc-dep-sizes",
@@ -288,7 +289,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.80.1"
+rust-version = "1.85"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -641,6 +642,12 @@ inferno = "0.11.14"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
 itertools = "0.13"
+jemallocator = { version = "0.5.4", features = [
+    "profiling",
+    "unprefixed_malloc_on_supported_platforms",
+] }
+jemalloc-ctl = "0.5.4"
+jemalloc-sys = "0.5.4"
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"
@@ -740,7 +747,7 @@ reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rlimit = "0.10.2"
-rocksdb = { version = "0.22.0", features = ["lz4"] }
+rocksdb = { version = "0.24.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
 rstest = "0.15.0"

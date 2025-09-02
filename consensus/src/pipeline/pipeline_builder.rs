@@ -29,7 +29,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::Mutex;
-use aptos_logger::{debug, error, info, warn};
+use aptos_logger::{error, info, trace, warn};
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -51,6 +51,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
+
 static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -123,6 +124,7 @@ pub struct PipelineBuilder {
     txn_notifier: Arc<dyn TxnNotifier>,
     pre_commit_status: Arc<Mutex<PreCommitStatus>>,
     order_vote_enabled: bool,
+    persisted_auxiliary_info_version: u8,
 }
 
 fn spawn_shared_fut<
@@ -192,9 +194,12 @@ impl Tracker {
     }
 
     fn log_start(&self) {
-        debug!(
+        trace!(
             "[Pipeline] Block {} {} {} enters {}",
-            self.block_id, self.epoch, self.round, self.name
+            self.block_id,
+            self.epoch,
+            self.round,
+            self.name
         );
     }
 
@@ -210,7 +215,7 @@ impl Tracker {
         counters::PIPELINE_TRACING
             .with_label_values(&[self.name, "work_time"])
             .observe(work_time.as_secs_f64());
-        debug!(
+        trace!(
             "[Pipeline] Block {} {} {} finishes {}, waits {}ms, takes {}ms",
             self.block_id,
             self.epoch,
@@ -241,6 +246,7 @@ impl PipelineBuilder {
         txn_notifier: Arc<dyn TxnNotifier>,
         enable_pre_commit: bool,
         order_vote_enabled: bool,
+        persisted_auxiliary_info_version: u8,
     ) -> Self {
         Self {
             block_preparer,
@@ -254,6 +260,7 @@ impl PipelineBuilder {
             txn_notifier,
             pre_commit_status: Arc::new(Mutex::new(PreCommitStatus::new(0, enable_pre_commit))),
             order_vote_enabled,
+            persisted_auxiliary_info_version,
         }
     }
 
@@ -393,6 +400,7 @@ impl PipelineBuilder {
                 self.is_randomness_enabled,
                 self.validators.clone(),
                 self.block_executor_onchain_config.clone(),
+                self.persisted_auxiliary_info_version,
             ),
             None,
         );
@@ -551,6 +559,7 @@ impl PipelineBuilder {
         is_randomness_enabled: bool,
         validator: Arc<[AccountAddress]>,
         onchain_execution_config: BlockExecutorConfigFromOnchain,
+        persisted_auxiliary_info_version: u8,
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
@@ -585,22 +594,32 @@ impl PipelineBuilder {
         let proposer_index = block
             .author()
             .and_then(|proposer| validator.iter().position(|&v| v == proposer));
-        let auxiliary_info = txns
+
+        let auxiliary_info: Vec<_> = txns
             .iter()
-            .map(|txn| {
-                txn.borrow_into_inner().try_as_signed_user_txn().map_or(
-                    AuxiliaryInfo::new_empty(),
-                    |_| {
-                        AuxiliaryInfo::new(
-                            PersistedAuxiliaryInfo::None,
-                            proposer_index.map(|index| EphemeralAuxiliaryInfo {
-                                proposer_index: index as u64,
-                            }),
-                        )
+            .enumerate()
+            .map(|(txn_index, txn)| {
+                let persisted_auxiliary_info = match persisted_auxiliary_info_version {
+                    0 => PersistedAuxiliaryInfo::None,
+                    1 => PersistedAuxiliaryInfo::V1 {
+                        transaction_index: txn_index as u32,
                     },
-                )
+                    _ => unimplemented!("Unsupported persisted auxiliary info version"),
+                };
+
+                let ephemeral_auxiliary_info = txn
+                    .borrow_into_inner()
+                    .try_as_signed_user_txn()
+                    .and_then(|_| {
+                        proposer_index.map(|index| EphemeralAuxiliaryInfo {
+                            proposer_index: index as u64,
+                        })
+                    });
+
+                AuxiliaryInfo::new(persisted_auxiliary_info, ephemeral_auxiliary_info)
             })
             .collect();
+
         let start = Instant::now();
         tokio::task::spawn_blocking(move || {
             executor

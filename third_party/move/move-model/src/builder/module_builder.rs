@@ -116,10 +116,7 @@ pub enum SpecBlockContext {
 impl SpecBlockContext {
     pub fn allow_old(&self) -> bool {
         use SpecBlockContext::*;
-        match self {
-            FunctionCodeV2(_, _, _) => false, // TODO(#16256): add support of old(..) to spec of lambda expression
-            _ => true,
-        }
+        !matches!(self, FunctionCodeV2(_, _, None))
     }
 
     pub fn name(&self) -> Option<&QualifiedSymbol> {
@@ -1184,6 +1181,11 @@ impl ModuleBuilder<'_, '_> {
                 },
                 EA::SpecBlockMember_::Update { lhs, rhs } => {
                     self.def_ana_global_var_update(loc, &context, lhs, rhs)
+                },
+                EA::SpecBlockMember_::Pragma { properties }
+                    if matches!(context, SpecBlockContext::FunctionCodeV2(.., Some(..))) =>
+                {
+                    self.def_ana_pragma(loc, &context, properties);
                 },
                 _ => {
                     self.parent.error(loc, "item not allowed");
