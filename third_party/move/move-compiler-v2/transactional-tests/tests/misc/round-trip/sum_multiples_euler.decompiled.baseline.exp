@@ -1,0 +1,3 @@
+processed 2 tasks
+task 0 lines 3-22:  publish [module 0xc0ffee::sum_multiples {]
+task 1 lines 25-25:  run 0xc0ffee::sum_multiples::test_sum_multiples

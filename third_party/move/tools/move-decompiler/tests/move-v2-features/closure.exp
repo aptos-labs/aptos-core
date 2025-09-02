@@ -29,7 +29,7 @@ module 0x99::basic_struct {
         _t1
     }
     public fun test_driver(acc: &signer) {
-        let _t1 : |&||(u64)|(u64) has copy + drop + store = |arg0| test(arg0);
+        let _t1: |&||(u64)|(u64) has copy + drop + store = |arg0| test(arg0);
         add_resource_with_struct(acc, _t1);
     }
 }
@@ -52,21 +52,21 @@ module 0x99::lambda_basic {
         f(x)
     }
     fun no_name_clash(x: u64, c: u64): u64 {
-        let _t4 : |u64|u64 has copy + drop = |arg0| lambda__1__no_name_clash(c, arg0);
+        let _t4: |u64|u64 has copy + drop = |arg0| lambda__1__no_name_clash(c, arg0);
         map(x, _t4)
     }
     fun lambda__1__no_name_clash(c: u64, y: u64): u64 {
         y + c
     }
     fun with_name_clash1(x: u64, c: u64): u64 {
-        let _t4 : |u64|u64 has copy + drop = |arg0| lambda__1__with_name_clash1(c, arg0);
+        let _t4: |u64|u64 has copy + drop = |arg0| lambda__1__with_name_clash1(c, arg0);
         map(x, _t4)
     }
     fun lambda__1__with_name_clash1(c: u64, x: u64): u64 {
         x + c
     }
     fun with_name_clash2(x: u64, c: u64): u64 {
-        let _t4 : |u64|u64 has copy + drop = |arg0| lambda__1__with_name_clash2(c, arg0);
+        let _t4: |u64|u64 has copy + drop = |arg0| lambda__1__with_name_clash2(c, arg0);
         map(x, _t4)
     }
     fun lambda__1__with_name_clash2(c: u64, x: u64): u64 {
@@ -78,7 +78,9 @@ module 0x99::lambda_fun_wrapper {
         _0: |u64|(u64) has drop,
     }
     fun t1(): bool {
-        Work{_0: |arg0| lambda__1__t1(arg0)} == Work{_0: |arg0| lambda__2__t1(arg0)}
+        let _t1 = Work{_0: |arg0| lambda__1__t1(arg0)};
+        let _t3 = Work{_0: |arg0| lambda__2__t1(arg0)};
+        _t1 == _t3
     }
     fun lambda__1__t1(x: u64): u64 {
         x + 1
@@ -107,7 +109,7 @@ module 0x99::lambda_generics {
         let _t4 = f(s);
     }
     fun test_receiver_inference(s: S<u64>) {
-        inlined<u64>(|arg0| id(arg0), s);
+        inlined<u64>(|arg0| id<u64>(arg0), s);
     }
 }
 module 0x99::lambda_inline {
@@ -124,7 +126,14 @@ module 0x99::lambda_inline1 {
         let _t17 = _t2 * _t0;
         _t2 = _t2 + 1;
         _t1 = _t1 + 1;
-        _t2 = _t17 + _t1 + 3 * _t2 + 5 * _t1 + 7 * (_t0 + 1);
+        _t0 = _t0 + 1;
+        let _t28 = _t17 + _t1;
+        let _t31 = 3 * _t2;
+        let _t32 = _t28 + _t31;
+        let _t35 = 5 * _t1;
+        let _t36 = _t32 + _t35;
+        let _t39 = 7 * _t0;
+        _t2 = _t36 + _t39;
         if (!(_t2 == 9637)) abort _t2;
     }
 }
@@ -135,15 +144,17 @@ module 0x99::lambda_no_param {
 }
 module 0x99::lambda_no_param1 {
     public fun test() {
-        let _t0 : |u64, u64|u64 has copy + drop = |arg0,arg1| lambda__1__test(arg0, arg1);
-        let _t1 : |u64, u64|u64 has copy + drop = |arg0,arg1| lambda__2__test(arg0, arg1);
+        let _t0: |u64, u64|u64 has copy + drop = |arg0,arg1| lambda__1__test(arg0, arg1);
+        let _t1: |u64, u64|u64 has copy + drop = |arg0,arg1| lambda__2__test(arg0, arg1);
         if (!(foo(_t0, _t1, 10, 100) == 110)) abort 0;
     }
     fun lambda__1__test(x: u64, param_1: u64): u64 {
         x
     }
     fun foo(f: |u64, u64|(u64), g: |u64, u64|(u64), x: u64, _y: u64): u64 {
-        f(x, _y) + g(x, _y)
+        let _t7 = f(x, _y);
+        let _t11 = g(x, _y);
+        _t7 + _t11
     }
     fun lambda__2__test(param_0: u64, y: u64): u64 {
         y
@@ -157,7 +168,7 @@ module 0x99::lambda_pattern {
         f(s, x)
     }
     fun pattern(s: S<u64>, x: u64): u64 {
-        let _t4 : |S<u64>, u64|u64 has copy + drop = |arg0,arg1| lambda__1__pattern(arg0, arg1);
+        let _t4: |S<u64>, u64|u64 has copy + drop = |arg0,arg1| lambda__1__pattern(arg0, arg1);
         consume<u64>(s, x, _t4)
     }
     fun lambda__1__pattern(param_0: S<u64>, _y: u64): u64 {
@@ -174,16 +185,17 @@ module 0x99::nested_lambda {
         f(x)
     }
     fun nested(x: u64, c: u64): u64 {
-        let _t4 : |u64|u64 has copy + drop = |arg0| lambda__2__nested(c, arg0);
+        let _t4: |u64|u64 has copy + drop = |arg0| lambda__2__nested(c, arg0);
         map1(x, _t4)
     }
     fun lambda__2__nested(c: u64, y: u64): u64 {
         let _t5 = (y - c) as u8;
-        let _t7 : |u8|u8 has copy + drop = |arg0| lambda__1__nested(c, arg0);
+        let _t7: |u8|u8 has copy + drop = |arg0| lambda__1__nested(c, arg0);
         map2(_t5, _t7) as u64
     }
     fun lambda__1__nested(c: u64, y: u8): u8 {
-        y + (c as u8)
+        let _t4 = c as u8;
+        y + _t4
     }
 }
 

@@ -183,6 +183,7 @@ module 0xcafe::vectors {
 
 // -- Sourcified model before first bytecode pipeline
 module 0xcafe::vectors {
+    use std::vector;
     public entry fun guess_flips(flips: vector<u8>) {
         {
             let (flips) = (&flips);

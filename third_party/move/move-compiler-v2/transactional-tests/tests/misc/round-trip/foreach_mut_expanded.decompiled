@@ -1,0 +1,21 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/foreach_mut_expanded.move`
+
+//# publish
+module 0x42::m {
+    fun test_for_each_mut() {
+        let _t0 = vector[1, 2, 3];
+        let _t1 = 0;
+        let _t2 = 0x1::vector::length<u64>(&_t0);
+        let _t3 = &mut _t0;
+        while (_t1 < _t2) {
+            let _t5 = 0x1::vector::borrow_mut<u64>(_t3, _t1);
+            *_t5 = 2;
+            _t1 = _t1 + 1;
+            continue
+        };
+        if (!(_t0 == vector[2, 2, 2])) abort 0;
+    }
+}
+
+
+//# run 0x42::m::test_for_each_mut

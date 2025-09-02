@@ -1,0 +1,59 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/field_access_closure.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct Func1 has copy, drop {
+        bar: ||(u64) has copy + drop,
+    }
+    enum Func2 has copy, drop {
+        V1 {
+            bar: |u64|(u64) has copy + drop,
+        }
+        V2 {
+            bar: |u64|(u64) has copy + drop,
+            x: u64,
+        }
+    }
+    struct Func3 has copy, drop {
+        _0: ||(u64) has copy + drop,
+    }
+    fun test1(): u64 {
+        let _t0 = Func1{bar: || lambda__1__test1()};
+        let _t5 = *&(&_t0).bar;
+        _t5()
+    }
+    fun lambda__1__test1(): u64 {
+        42
+    }
+    fun test2(): u64 {
+        let _t0 = Func2::V1{bar: |arg0| lambda__1__test2(arg0)};
+        let _t1 = Func2::V2{bar: |arg0| lambda__2__test2(arg0), x: 44};
+        let _t10 = *&(&_t0).bar;
+        let _t11 = _t10(42);
+        let _t14 = *&(&_t1).x;
+        let _t17 = *&(&_t1).bar;
+        let _t18 = _t17(_t14);
+        _t11 + _t18
+    }
+    fun lambda__1__test2(p0: u64): u64 {
+        p0
+    }
+    fun lambda__2__test2(p0: u64): u64 {
+        p0 + 1
+    }
+    fun test3(): u64 {
+        let _t0 = Func3{_0: || lambda__1__test3()};
+        let _t5 = *&(&_t0)._0;
+        _t5()
+    }
+    fun lambda__1__test3(): u64 {
+        42
+    }
+}
+
+
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::test2
+
+//# run 0xc0ffee::m::test3

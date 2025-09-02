@@ -1,0 +1,22 @@
+//**** Cross-compiled for `move` syntax from `tests/simplifier/simplifier_test1.move`
+
+//# publish
+module 0x8675::M {
+    public fun test(): u64 {
+        test1(10)
+    }
+    fun test1(p0: u64): u64 {
+        let _t1 = p0;
+        let _t2 = 0;
+        while (p0 > 0) {
+            let _t3 = p0;
+            p0 = p0 - 1;
+            _t2 = _t2 + _t3;
+            continue
+        };
+        p0 + _t1 + _t2
+    }
+}
+
+
+//# run 0x8675::M::test

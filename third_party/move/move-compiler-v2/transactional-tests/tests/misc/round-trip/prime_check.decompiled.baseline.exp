@@ -1,0 +1,3 @@
+processed 2 tasks
+task 0 lines 3-40:  publish [module 0xc0ffee::prime {]
+task 1 lines 43-43:  run 0xc0ffee::prime::test_is_prime

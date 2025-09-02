@@ -1,0 +1,26 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/enum/bug-14296.move`
+
+//# publish
+module 0x42::test {
+    enum E has drop {
+        V1 {
+            x: u8,
+            y: S1<u8, bool>,
+        }
+        V2 {
+            x: u8,
+            y: S0,
+        }
+    }
+    struct S1<T0, T1> has drop {
+        x: T0,
+        y: T1,
+    }
+    struct S0 has drop {
+    }
+    fun extract_last_u8(p0: &E): u8 {
+        let _t1;
+        if (p0 is V1) _t1 = *&(&p0.y).x else if (p0 is V2) _t1 = 1u8 else abort 14566554180833181697;
+        _t1
+    }
+}

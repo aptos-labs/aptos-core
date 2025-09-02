@@ -1,0 +1,44 @@
+processed 7 tasks
+task 0 lines 3-34:  publish [module 0xc0ffee::m {]
+task 1 lines 37-37:  run 0xc0ffee::m::test1
+Error: Function execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(453),
+    location: 0x1::bcs,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 0)],
+}
+task 2 lines 39-39:  run 0xc0ffee::m::test2
+task 3 lines 41-41:  run 0xc0ffee::m::test3
+task 4 lines 43-104:  publish [module 0xc0ffee::n {]
+Error: compilation errors:
+ error: unexpected token
+   ┌─ TEMPFILE1:48:23
+   │
+48 │         let _t7: ||u64|(u64)|u64 has copy + drop = |arg0| lambda__13__test(p0, arg0);
+   │                       ^
+   │                       │
+   │                       Unexpected '|'
+   │                       Expected ';'
+
+
+task 5 lines 107-107:  run 0xc0ffee::n::test --args 42
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 6 lines 109-1142:  publish [module 0xc0ffee::o {]
+Error: compilation errors:
+ error: unexpected token
+    ┌─ TEMPFILE2:114:23
+    │
+114 │         let _t7: ||u64|(u64)|u64 has copy + drop = |arg0| lambda__256__test(p0, arg0);
+    │                       ^
+    │                       │
+    │                       Unexpected '|'
+    │                       Expected ';'
+
+

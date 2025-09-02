@@ -1,0 +1,6 @@
+processed 3 tasks
+task 0 lines 3-71:  publish [module 0x8675::M {]
+task 1 lines 74-74:  run 0x8675::M::test
+return values: 11
+task 2 lines 76-76:  run 0x8675::M::testb
+return values: 11

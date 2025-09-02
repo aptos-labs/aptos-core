@@ -122,7 +122,8 @@ module 0x1::vector {
         reverse_slice<Element>(self, left, rot);
         reverse_slice<Element>(self, rot, right);
         reverse_slice<Element>(self, left, right);
-        left + (right - rot)
+        let _t16 = right - rot;
+        left + _t16
     }
     public fun singleton<Element>(e: Element): vector<Element> {
         let _t1 = empty<Element>();
@@ -131,7 +132,10 @@ module 0x1::vector {
     }
     public fun slice<Element: copy>(self: &vector<Element>, start: u64, end: u64): vector<Element> {
         let _t3;
-        if (start <= end) _t3 = end <= length<Element>(self) else _t3 = false;
+        if (start <= end) {
+            let _t10 = length<Element>(self);
+            _t3 = end <= _t10
+        } else _t3 = false;
         if (!_t3) abort 131076;
         let _t4 = empty<Element>();
         while (start < end) {

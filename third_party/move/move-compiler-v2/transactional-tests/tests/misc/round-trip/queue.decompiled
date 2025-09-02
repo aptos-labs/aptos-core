@@ -1,0 +1,32 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/queue.move`
+
+//# publish
+module 0x42::queue {
+    use 0x1::vector;
+    struct Queue<T0> has drop, key {
+        data: vector<T0>,
+    }
+    public fun create<T0>(): Queue<T0> {
+        Queue<T0>{data: vector::empty<T0>()}
+    }
+    public fun dequeue<T0>(p0: &mut Queue<T0>): T0 {
+        vector::remove<T0>(&mut p0.data, 0)
+    }
+    public fun enqueue<T0>(p0: &mut Queue<T0>, p1: T0) {
+        vector::push_back<T0>(&mut p0.data, p1);
+    }
+    public fun test_queue_operations() {
+        let _t0 = create<u64>();
+        enqueue<u64>(&mut _t0, 40);
+        enqueue<u64>(&mut _t0, 41);
+        enqueue<u64>(&mut _t0, 42);
+        if (!(dequeue<u64>(&mut _t0) == 40)) abort 1;
+        enqueue<u64>(&mut _t0, 43);
+        if (!(dequeue<u64>(&mut _t0) == 41)) abort 2;
+        if (!(dequeue<u64>(&mut _t0) == 42)) abort 3;
+        if (!(dequeue<u64>(&mut _t0) == 43)) abort 4;
+    }
+}
+
+
+//# run 0x42::queue::test_queue_operations

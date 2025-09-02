@@ -1,0 +1,20 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/break_continue_for_loop.move`
+
+//# run
+script {
+    fun main() {
+        let _t0 = 0;
+        let _t1 = 0;
+        let _t2 = false;
+        loop {
+            if (_t2) _t1 = _t1 + 1 else _t2 = true;
+            if (!(_t1 < 10)) break;
+            _t0 = _t0 + 1;
+            if (_t0 >= 15) break;
+            _t0 = _t0 + 2;
+            if (_t1 % 2 == 0) continue;
+            _t0 = _t0 * 2
+        };
+        if (!(_t0 == 16)) abort _t0;
+    }
+}
