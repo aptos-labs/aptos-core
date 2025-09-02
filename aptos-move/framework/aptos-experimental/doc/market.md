@@ -1408,8 +1408,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     emit_order_open: bool,
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ): <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
-    // Validate that the order is valid from position management perspective
-    <b>if</b> (time_in_force == immediate_or_cancel()) {
+    <b>if</b> (time_in_force == immediate_or_cancel() && trigger_condition.is_none()) {
         <b>return</b> self.<a href="market.md#0x7_market_cancel_single_order_internal">cancel_single_order_internal</a>(
             user_addr,
             limit_price,

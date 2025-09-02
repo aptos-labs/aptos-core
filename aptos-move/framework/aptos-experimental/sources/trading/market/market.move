@@ -448,8 +448,7 @@ module aptos_experimental::market {
         emit_order_open: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
-        // Validate that the order is valid from position management perspective
-        if (time_in_force == immediate_or_cancel()) {
+        if (time_in_force == immediate_or_cancel() && trigger_condition.is_none()) {
             return self.cancel_single_order_internal(
                 user_addr,
                 limit_price,
