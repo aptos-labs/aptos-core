@@ -1,13 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::watcher::{unhexlify_api_bytes, ExternalResource};
+use crate::{cached_resources::CachedResource, utils};
 use anyhow::{anyhow, Result};
-use aptos_infallible::RwLock;
 use aptos_types::keyless::Configuration;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct TrainingWheelsPubKey {
@@ -28,7 +25,7 @@ impl OnChainKeylessConfiguration {
             .training_wheels_pubkey
             .vec
             .first()
-            .map(|v| unhexlify_api_bytes(v.as_str()))
+            .map(|v| utils::unhexlify_api_bytes(v.as_str()))
             .transpose()
             .map_err(|e| anyhow!("to_rust_repr() failed with unhexlify err: {e}"))?;
         let ret = Configuration {
@@ -47,7 +44,7 @@ impl OnChainKeylessConfiguration {
     }
 }
 
-impl ExternalResource for OnChainKeylessConfiguration {
+impl CachedResource for OnChainKeylessConfiguration {
     fn resource_name() -> String {
         "OnChainKeylessConfiguration".to_string()
     }
@@ -64,6 +61,3 @@ pub struct ConfigData {
     pub override_aud_vals: Vec<String>,
     pub training_wheels_pubkey: TrainingWheelsPubKey,
 }
-
-pub static ONCHAIN_KEYLESS_CONFIG: Lazy<Arc<RwLock<Option<OnChainKeylessConfiguration>>>> =
-    Lazy::new(|| Arc::new(RwLock::new(None)));

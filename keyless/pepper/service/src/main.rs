@@ -4,14 +4,14 @@
 use aptos_keyless_pepper_service::{
     account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
     account_managers::ACCOUNT_MANAGERS,
-    groth16_vk::ONCHAIN_GROTH16_VK,
+    cached_resources,
+    cached_resources::CachedResources,
     jwk::{self, parse_jwks, DECODING_KEY_CACHE},
-    keyless_config::ONCHAIN_KEYLESS_CONFIG,
-    metrics::start_metric_server,
+    metrics,
+    metrics::DEFAULT_METRICS_SERVER_PORT,
     request_handler,
     request_handler::DEFAULT_PEPPER_SERVICE_PORT,
     vuf_pub_key,
-    watcher::start_external_resource_refresh_loop,
 };
 use aptos_logger::info;
 use aptos_types::keyless::test_utils::get_sample_iss;
@@ -23,33 +23,25 @@ use std::{convert::Infallible, net::SocketAddr, ops::Deref, sync::Arc, time::Dur
 
 #[tokio::main]
 async fn main() {
+    // Start the logger
     aptos_logger::Logger::new().init();
     info!("Starting the Pepper service...");
+
+    // Start the metrics server
+    start_metrics_server();
 
     // Fetch the VUF public and private keypair (this will load the private key into memory)
     info!("Fetching the VUF public and private keypair for the pepper service...");
     let (vuf_public_key, vuf_private_key) = vuf_pub_key::get_pepper_service_vuf_keypair();
     info!("Retrieved the VUF public key: {:?}", vuf_public_key);
 
+    // Start the cached resource fetcher
+    let cached_resources = cached_resources::start_cached_resource_fetcher();
+
     // Trigger private key loading.
     let _ = ACCOUNT_MANAGERS.deref();
     {
         let _db = ACCOUNT_RECOVERY_DB.get_or_init(init_account_db).await;
-    }
-    start_metric_server();
-    if let Ok(url) = std::env::var("ONCHAIN_GROTH16_VK_URL") {
-        start_external_resource_refresh_loop(
-            &url,
-            Duration::from_secs(10),
-            ONCHAIN_GROTH16_VK.clone(),
-        );
-    }
-    if let Ok(url) = std::env::var("ONCHAIN_KEYLESS_CONFIG_URL") {
-        start_external_resource_refresh_loop(
-            &url,
-            Duration::from_secs(10),
-            ONCHAIN_KEYLESS_CONFIG.clone(),
-        );
     }
 
     // TODO: JWKs should be from on-chain states?
@@ -70,24 +62,56 @@ async fn main() {
         parse_jwks(test_jwk).expect("test jwk should parse"),
     );
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], DEFAULT_PEPPER_SERVICE_PORT));
+    // Start the pepper service
+    let vuf_keypair = Arc::new((vuf_public_key, vuf_private_key));
+    start_pepper_service(vuf_keypair, cached_resources).await;
+}
 
-    // Wrap the VUF keypair in an Arc (to be shared across request handler threads)
-    let vuf_key_pair = Arc::new((vuf_public_key, vuf_private_key));
+// Starts a simple metrics server
+fn start_metrics_server() {
+    let _handle = tokio::spawn(async move {
+        info!("Starting metrics server request handler...");
+
+        // Create a service function that handles the metrics requests
+        let make_service = make_service_fn(|_conn| async {
+            Ok::<_, Infallible>(service_fn(metrics::handle_request))
+        });
+
+        // Bind the socket address, and start the server
+        let socket_addr = SocketAddr::from(([0, 0, 0, 0], DEFAULT_METRICS_SERVER_PORT));
+        let server = Server::bind(&socket_addr).serve(make_service);
+        if let Err(error) = server.await {
+            eprintln!("Metrics server error! Error: {}", error);
+        }
+    });
+}
+
+// Starts the pepper service
+async fn start_pepper_service(
+    vuf_keypair: Arc<(String, ark_bls12_381::Fr)>,
+    cached_resources: CachedResources,
+) {
+    info!("Starting the Pepper service request handler...");
 
     // Create the service function that handles the endpoint requests
     let make_service = make_service_fn(move |_conn| {
-        let vuf_key_pair = vuf_key_pair.clone();
+        let vuf_keypair = vuf_keypair.clone();
+        let cached_resources = cached_resources.clone();
         async move {
             Ok::<_, Infallible>(service_fn(move |request| {
-                request_handler::handle_request(request, vuf_key_pair.clone())
+                request_handler::handle_request(
+                    request,
+                    vuf_keypair.clone(),
+                    cached_resources.clone(),
+                )
             }))
         }
     });
 
-    let server = Server::bind(&addr).serve(make_service);
-
-    if let Err(e) = server.await {
-        eprintln!("server error: {}", e);
+    // Bind the socket address, and start the server
+    let socket_addr = SocketAddr::from(([0, 0, 0, 0], DEFAULT_PEPPER_SERVICE_PORT));
+    let server = Server::bind(&socket_addr).serve(make_service);
+    if let Err(error) = server.await {
+        eprintln!("Pepper service error! Error: {}", error);
     }
 }
