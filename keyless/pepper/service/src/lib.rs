@@ -4,9 +4,8 @@
 use crate::{
     account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
     account_managers::ACCOUNT_MANAGERS,
+    cached_resources::CachedResources,
     error::PepperServiceError,
-    groth16_vk::ONCHAIN_GROTH16_VK,
-    keyless_config::ONCHAIN_KEYLESS_CONFIG,
 };
 use aptos_crypto::{
     asymmetric_encryption::{
@@ -46,6 +45,7 @@ use uuid::Uuid;
 
 pub mod account_db;
 pub mod account_managers;
+pub mod cached_resources;
 pub mod error;
 pub mod groth16_vk;
 pub mod jwk;
@@ -54,7 +54,6 @@ pub mod metrics;
 pub mod request_handler;
 pub mod utils;
 pub mod vuf_pub_key;
-pub mod watcher;
 
 #[cfg(test)]
 mod tests;
@@ -75,6 +74,7 @@ pub trait HandlerTrait<TRequest, TResponse>: Send + Sync {
     async fn handle(
         &self,
         vuf_private_key: &ark_bls12_381::Fr,
+        cached_resources: CachedResources,
         request: TRequest,
     ) -> Result<TResponse, PepperServiceError>;
 }
@@ -86,6 +86,7 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
     async fn handle(
         &self,
         vuf_private_key: &ark_bls12_381::Fr,
+        _cached_resources: CachedResources,
         request: PepperRequest,
     ) -> Result<PepperResponse, PepperServiceError> {
         let session_id = Uuid::new_v4();
@@ -127,6 +128,7 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
     async fn handle(
         &self,
         vuf_private_key: &ark_bls12_381::Fr,
+        _cached_resources: CachedResources,
         request: PepperRequest,
     ) -> Result<SignatureResponse, PepperServiceError> {
         let session_id = Uuid::new_v4();
@@ -174,6 +176,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
     async fn handle(
         &self,
         _: &ark_bls12_381::Fr,
+        cached_resources: CachedResources,
         request: VerifyRequest,
     ) -> Result<VerifyResponse, PepperServiceError> {
         let VerifyRequest {
@@ -210,8 +213,9 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
             })?;
             let jwk = jwk::cached_decoding_key_as_rsa(iss_val, &jwt_header.kid)
                 .map_err(|e| PepperServiceError::BadRequest(format!("JWK not found: {e}")))?;
-            let config_api_repr =
-                { ONCHAIN_KEYLESS_CONFIG.read().as_ref().cloned() }.ok_or_else(|| {
+            let config_api_repr = cached_resources
+                .read_on_chain_keyless_configuration()
+                .ok_or_else(|| {
                     PepperServiceError::InternalError(
                         "API keyless config not cached locally.".to_string(),
                     )
@@ -286,13 +290,11 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
                             }
 
                             let onchain_groth16_vk =
-                                { ONCHAIN_GROTH16_VK.read().as_ref().cloned() }.ok_or_else(
-                                    || {
-                                        PepperServiceError::InternalError(
-                                            "No Groth16 VK cached locally.".to_string(),
-                                        )
-                                    },
-                                )?;
+                                cached_resources.read_on_chain_groth16_vk().ok_or_else(|| {
+                                    PepperServiceError::InternalError(
+                                        "No Groth16 VK cached locally.".to_string(),
+                                    )
+                                })?;
                             let ark_groth16_pvk = onchain_groth16_vk.to_ark_pvk().map_err(|e| {
                                 PepperServiceError::InternalError(format!(
                                     "Onchain-to-ark convertion err: {e}"

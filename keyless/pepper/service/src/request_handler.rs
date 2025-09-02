@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::PepperServiceError, groth16_vk::ONCHAIN_GROTH16_VK,
-    keyless_config::ONCHAIN_KEYLESS_CONFIG, HandlerTrait, V0FetchHandler, V0SignatureHandler,
-    V0VerifyHandler,
+    cached_resources::CachedResources, error::PepperServiceError, HandlerTrait, V0FetchHandler,
+    V0SignatureHandler, V0VerifyHandler,
 };
 use aptos_build_info::build_information;
 use aptos_keyless_pepper_common::BadPepperRequestError;
@@ -62,6 +61,7 @@ async fn call_dedicated_request_handler<TRequest, TResponse, TRequestHandler>(
     origin: String,
     request: Request<Body>,
     vuf_private_key: &ark_bls12_381::Fr,
+    cached_resources: CachedResources,
     request_handler: &TRequestHandler,
 ) -> Result<Response<Body>, Infallible>
 where
@@ -91,7 +91,7 @@ where
 
     // Invoke the handler and generate the response
     match request_handler
-        .handle(vuf_private_key, pepper_request)
+        .handle(vuf_private_key, cached_resources, pepper_request)
         .await
     {
         Ok(pepper_response) => {
@@ -281,6 +281,7 @@ fn generate_text_response(
 pub async fn handle_request(
     request: Request<Body>,
     vuf_keypair: Arc<(String, ark_bls12_381::Fr)>,
+    cached_resources: CachedResources,
 ) -> Result<Response<Body>, Infallible> {
     // Get the request origin
     let origin = get_request_origin(&request);
@@ -296,11 +297,11 @@ pub async fn handle_request(
         match request.uri().path() {
             ABOUT_PATH => return generate_about_response(origin),
             KEYLESS_CONFIG_PATH => {
-                let keyless_config = ONCHAIN_KEYLESS_CONFIG.read().as_ref().cloned();
+                let keyless_config = cached_resources.read_on_chain_keyless_configuration();
                 return generate_cached_resource_response(origin, request_method, keyless_config);
             },
             GROTH16_VK_PATH => {
-                let groth16_vk = ONCHAIN_GROTH16_VK.read().as_ref().cloned();
+                let groth16_vk = cached_resources.read_on_chain_groth16_vk();
                 return generate_cached_resource_response(origin, request_method, groth16_vk);
             },
             VUF_PUB_KEY_PATH => {
@@ -320,6 +321,7 @@ pub async fn handle_request(
                     origin,
                     request,
                     vuf_priv_key,
+                    cached_resources.clone(),
                     &V0FetchHandler,
                 )
                 .await
@@ -329,6 +331,7 @@ pub async fn handle_request(
                     origin,
                     request,
                     vuf_priv_key,
+                    cached_resources.clone(),
                     &V0SignatureHandler,
                 )
                 .await
@@ -338,6 +341,7 @@ pub async fn handle_request(
                     origin,
                     request,
                     vuf_priv_key,
+                    cached_resources.clone(),
                     &V0VerifyHandler,
                 )
                 .await
