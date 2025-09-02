@@ -1,0 +1,27 @@
+//# publish
+module 0xc0ffee::corner_cases
+
+public fun fun3(): u64
+    local x: u64
+    local r2: &mut u64
+    local r1: &mut u64
+    local r3: &mut u64
+    ld_u64 0
+    st_loc x
+    mut_borrow_loc x
+    st_loc r2
+    mut_borrow_loc x
+    st_loc r1
+    mut_borrow_loc x
+    st_loc r3
+    ld_u64 5
+    move_loc r2
+    write_ref
+    move_loc r3
+    read_ref
+    move_loc r1
+    read_ref
+    add
+    ret
+
+//# run 0xc0ffee::corner_cases::fun3 --verbose
