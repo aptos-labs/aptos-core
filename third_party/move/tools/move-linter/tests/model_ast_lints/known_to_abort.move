@@ -224,4 +224,3 @@ module 0xc0ffee::m {
         x << 254
     }
 }
-
