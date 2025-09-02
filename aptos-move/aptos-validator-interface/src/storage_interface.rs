@@ -69,12 +69,13 @@ impl AptosValidatorInterface for DBDebuggerInterface {
             .map(|res| res.map_err(Into::into))
             .collect::<Result<Vec<_>>>()?;
 
-        // Get auxiliary infos for each version
-        let mut auxiliary_infos = Vec::with_capacity(limit as usize);
-        for version in start..start + limit {
-            let aux_info = self.0.get_persisted_auxiliary_info_by_version(version)?;
-            auxiliary_infos.push(aux_info);
-        }
+        // Get auxiliary infos using iterator for better performance
+        let aux_info_iter = self
+            .0
+            .get_persisted_auxiliary_info_iterator(start, limit as usize)?;
+        let auxiliary_infos = aux_info_iter
+            .map(|res| res.map_err(Into::into))
+            .collect::<Result<Vec<_>>>()?;
 
         ensure!(txns.len() == txn_infos.len());
         ensure!(txns.len() == auxiliary_infos.len());
@@ -131,12 +132,13 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         start: Version,
         limit: u64,
     ) -> Result<Vec<PersistedAuxiliaryInfo>> {
-        // Get auxiliary info for each version individually to handle missing data
-        let mut result = Vec::with_capacity(limit as usize);
-        for version in start..start + limit {
-            let aux_info = self.0.get_persisted_auxiliary_info_by_version(version)?;
-            result.push(aux_info);
-        }
+        // Use iterator for more efficient batch retrieval
+        let aux_info_iter = self
+            .0
+            .get_persisted_auxiliary_info_iterator(start, limit as usize)?;
+        let result = aux_info_iter
+            .map(|res| res.map_err(Into::into))
+            .collect::<Result<Vec<_>>>()?;
         Ok(result)
     }
 }

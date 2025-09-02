@@ -185,7 +185,8 @@ impl TStateView for DebuggerStateView {
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
-        unimplemented!()
+        // For debugger, we don't track exact usage statistics, so return default usage
+        Ok(StateStorageUsage::new_untracked())
     }
 
     fn next_version(&self) -> Version {
