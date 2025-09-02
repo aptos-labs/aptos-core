@@ -89,7 +89,7 @@ use crate::sparse_merkle::{
 };
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
-use aptos_metrics_core::IntGaugeVecHelper;
+use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
     proof::SparseMerkleProofExt,
@@ -268,9 +268,7 @@ impl SparseMerkleTree {
         since_smt: &Self,
         shard_id: u8,
     ) -> HashMap<NibblePath, HashValue> {
-        let _timer = TIMER
-            .with_label_values(&["new_node_hashes_since"])
-            .start_timer();
+        let _timer = TIMER.timer_with(&["new_node_hashes_since"]);
 
         assert!(since_smt.is_family(self));
 

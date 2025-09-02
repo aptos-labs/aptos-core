@@ -9,6 +9,7 @@ use aptos_block_partitioner::{BlockPartitioner, PartitionerConfig};
 use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::info;
+use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_types::{
     block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
     transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
@@ -70,12 +71,10 @@ impl BlockPreparationStage {
         let block_id = HashValue::random();
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             self.sig_verify_pool.install(|| {
-                let _timer = TIMER.with_label_values(&["sig_verify"]).start_timer();
+                let _timer = TIMER.timer_with(&["sig_verify"]);
 
                 let num_txns = txns.len();
-                NUM_TXNS
-                    .with_label_values(&["sig_verify"])
-                    .inc_by(num_txns as u64);
+                NUM_TXNS.inc_with_by(&["sig_verify"], num_txns as u64);
 
                 txns.into_par_iter()
                     .with_min_len(optimal_min_len(num_txns, SIG_VERIFY_RAYON_MIN_THRESHOLD))
@@ -85,12 +84,10 @@ impl BlockPreparationStage {
         let block: ExecutableBlock = match &self.maybe_partitioner {
             None => (block_id, sig_verified_txns).into(),
             Some(partitioner) => {
-                NUM_TXNS
-                    .with_label_values(&["partition"])
-                    .inc_by(sig_verified_txns.len() as u64);
+                NUM_TXNS.inc_with_by(&["partition"], sig_verified_txns.len() as u64);
                 let analyzed_transactions =
                     sig_verified_txns.into_iter().map(|t| t.into()).collect();
-                let timer = TIMER.with_label_values(&["partition"]).start_timer();
+                let timer = TIMER.timer_with(&["partition"]);
                 let partitioned_txns =
                     partitioner.partition(analyzed_transactions, self.num_executor_shards);
                 timer.stop_and_record();
