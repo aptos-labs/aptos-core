@@ -58,6 +58,7 @@ impl Display for FrameName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Script => write!(f, "<script>"),
+            Self::TransactionBatch => write!(f, "<transaction batch>"),
             Self::Function {
                 module_id,
                 name: fn_name,
