@@ -177,6 +177,7 @@ pub fn aptos_prod_vm_config(
             .is_call_tree_and_instruction_vm_cache_enabled(),
         enable_lazy_loading: features.is_lazy_loading_enabled(),
         enable_depth_checks,
+        optimize_trusted_code: features.is_trusted_code_enabled(),
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

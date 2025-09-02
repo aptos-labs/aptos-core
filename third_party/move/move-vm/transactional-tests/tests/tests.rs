@@ -65,7 +65,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             vm_config: vm_config_for_tests(
                 VerifierConfig::unbounded().set_scope(VerificationScope::Nothing),
             ),
-            include: &["/function_values_safety/"],
+            include: &["/function_values_safety/", "/trusted_code/"],
             exclude: &[],
         },
         TestConfig {
@@ -83,6 +83,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
                 "/lazy_loading/",
                 "/paranoid-tests/",
                 "/function_values_safety/",
+                "/trusted_code/",
             ],
         },
     ]
@@ -92,6 +93,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
 fn vm_config_for_tests(verifier_config: VerifierConfig) -> VMConfig {
     VMConfig {
         paranoid_type_checks: true,
+        optimize_trusted_code: true,
         verifier_config,
         ..VMConfig::default()
     }
@@ -107,6 +109,7 @@ const SEPARATE_BASELINE: &[&str] = &[
     "/function_values_safety/",
     "/module_publishing/",
     "/re_entrancy/",
+    "/trusted_code/",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {
