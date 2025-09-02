@@ -246,8 +246,12 @@ impl AptosValidatorInterface for RestDebuggerInterface {
             println!("Got {}/{} txns from RestApi.", txns.len(), limit);
         }
 
-        // REST API doesn't provide auxiliary info, so return None for all transactions
-        let auxiliary_infos = vec![PersistedAuxiliaryInfo::None; txns.len()];
+        // Get auxiliary info from REST client
+        let auxiliary_infos = self
+            .0
+            .get_persisted_auxiliary_infos(start, limit)
+            .await
+            .map_err(|e| anyhow!("Failed to get auxiliary info: {}", e))?;
 
         Ok((txns, txn_infos, auxiliary_infos))
     }
@@ -363,11 +367,12 @@ impl AptosValidatorInterface for RestDebuggerInterface {
 
     async fn get_persisted_auxiliary_infos(
         &self,
-        _start: Version,
-        _limit: u64,
+        start: Version,
+        limit: u64,
     ) -> Result<Vec<PersistedAuxiliaryInfo>> {
-        Err(anyhow::anyhow!(
-            "Getting persisted auxiliary infos is not supported via REST API. Use DB interface instead."
-        ))
+        self.0
+            .get_persisted_auxiliary_infos(start, limit)
+            .await
+            .map_err(|e| anyhow!(e))
     }
 }

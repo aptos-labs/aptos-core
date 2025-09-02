@@ -114,7 +114,8 @@ impl DbReader for AptosDB {
     ) -> Result<PersistedAuxiliaryInfo> {
         gauged_api("get_persisted_auxiliary_info_by_version", || {
             self.error_if_ledger_pruned("PersistedAuxiliaryInfo", version)?;
-            Ok(self.ledger_db
+            Ok(self
+                .ledger_db
                 .persisted_auxiliary_info_db()
                 .get_persisted_auxiliary_info(version)?
                 .unwrap_or(PersistedAuxiliaryInfo::None))
