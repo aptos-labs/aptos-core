@@ -18,6 +18,7 @@ use crate::{
     runtime_ref_checks::{FullRuntimeRefCheck, NoRuntimeRefCheck, RefCheckState, RuntimeRefCheck},
     runtime_type_checks::{
         verify_pack_closure, FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck,
+        UntrustedOnlyRuntimeTypeCheck,
     },
     storage::{
         loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
@@ -26,6 +27,7 @@ use crate::{
     trace, LoadedFunction, RuntimeEnvironment,
 };
 use fail::fail_point;
+use itertools::Itertools;
 use move_binary_format::{
     errors,
     errors::*,
@@ -58,7 +60,7 @@ use std::{
     cell::RefCell,
     cmp::min,
     collections::{btree_map, VecDeque},
-    fmt::Write,
+    fmt::{Debug, Write},
     rc::Rc,
 };
 
@@ -190,7 +192,18 @@ where
         // Note: we have organized the code below from most-likely config to least-likely config.
         if interpreter.vm_config.paranoid_type_checks && !interpreter.vm_config.paranoid_ref_checks
         {
-            interpreter.dispatch_execute_main::<FullRuntimeTypeCheck, NoRuntimeRefCheck>(
+            if interpreter.vm_config.optimize_trusted_code {
+                interpreter.dispatch_execute_main::<UntrustedOnlyRuntimeTypeCheck>(
+                    data_cache,
+                    resource_resolver,
+                    gas_meter,
+                    traversal_context,
+                    extensions,
+                    function,
+                    args,
+                )
+            } else {
+                interpreter.dispatch_execute_main::<FullRuntimeTypeCheck, NoRuntimeRefCheck>(
                 data_cache,
                 resource_resolver,
                 gas_meter,
@@ -215,14 +228,15 @@ where
             && !interpreter.vm_config.paranoid_ref_checks
         {
             interpreter.dispatch_execute_main::<NoRuntimeTypeCheck, NoRuntimeRefCheck>(
-                data_cache,
-                resource_resolver,
-                gas_meter,
-                traversal_context,
-                extensions,
-                function,
-                args,
-            )
+                    data_cache,
+                    resource_resolver,
+                    gas_meter,
+                    traversal_context,
+                    extensions,
+                    function,
+                    args,
+                )
+            }
         } else {
             interpreter.dispatch_execute_main::<NoRuntimeTypeCheck, FullRuntimeRefCheck>(
                 data_cache,
@@ -394,9 +408,42 @@ where
                         .charge_drop_frame(non_ref_vals.iter())
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
-                    if RTTCheck::should_perform_checks() {
-                        self.check_return_tys(&mut current_frame)
+                    // If the returning function has runtime checks on, the return types
+                    // will be on the caller stack.
+                    let caller_has_rt_checks = self
+                        .call_stack
+                        .0
+                        .last()
+                        .map(|f| RTTCheck::should_perform_checks(&f.function.function))
+                        .unwrap_or_default();
+                    let callee_has_rt_checks =
+                        RTTCheck::should_perform_checks(&current_frame.function.function);
+                    if callee_has_rt_checks {
+                        self.check_return_tys::<RTTCheck>(&mut current_frame)
                             .map_err(|e| set_err_info!(current_frame, e))?;
+                        if !caller_has_rt_checks {
+                            // The callee has pushed return types, but they aren't used by
+                            // the caller, so need to be removed.
+                            self.operand_stack
+                                .popn_tys(current_frame.function.return_tys().len() as u16)
+                                .map_err(|e| set_err_info!(current_frame, e))?;
+                        }
+                    } else if caller_has_rt_checks {
+                        // We are not runtime checking this function, but in the caller,
+                        // so we must push the return types of the function onto the type stack,
+                        // following the runtime type checking protocol.
+                        let ty_args = current_frame.function.ty_args();
+                        for mut ret_ty in current_frame.function.return_tys().iter().cloned() {
+                            if !ty_args.is_empty() {
+                                ret_ty = current_frame
+                                    .ty_builder()
+                                    .create_ty_with_subst(&ret_ty, ty_args)
+                                    .map_err(|e| set_err_info!(current_frame, e))?
+                            }
+                            self.operand_stack
+                                .push_ty(ret_ty)
+                                .map_err(|e| set_err_info!(current_frame, e))?
+                        }
                     }
 
                     self.access_control
@@ -717,12 +764,17 @@ where
     }
 
     // Check whether the values on the operand stack have the expected return types.
-    fn check_return_tys(&self, current_frame: &mut Frame) -> PartialVMResult<()> {
+    fn check_return_tys<RTTCheck: RuntimeTypeCheck>(
+        &self,
+        current_frame: &mut Frame,
+    ) -> PartialVMResult<()> {
         let expected_ret_tys = current_frame.function.return_tys();
-        if self.call_stack.0.is_empty() && self.operand_stack.types.len() != expected_ret_tys.len()
+        if !RTTCheck::is_partial_checker()
+            && self.call_stack.0.is_empty()
+            && self.operand_stack.types.len() != expected_ret_tys.len()
         {
-            // This is the outermost call on the stack, the type stack must contain exactly
-            // the expected number of returns.
+            // If we have full stack available and this is the outermost call on the stack, the
+            // type stack must contain exactly the expected number of returns.
             return Err(PartialVMError::new_invariant_violation(
                 "unbalanced stack at end of execution",
             )
@@ -740,7 +792,7 @@ where
                 let expected_inst = self
                     .vm_config
                     .ty_builder
-                    .create_ty_with_subst(expected, current_frame.function.ty_args())?;
+                    .create_ty_with_subst(expected, ty_args)?;
                 given.paranoid_check_assignable(&expected_inst)?;
             }
         }
@@ -772,6 +824,7 @@ where
 
         let mut frame = self
             .make_call_frame::<RTTCheck, RTRCheck, RTCaches>(
+                current_frame,
                 gas_meter,
                 function,
                 call_type,
@@ -808,6 +861,7 @@ where
         RTCaches: RuntimeCacheTraits,
     >(
         &mut self,
+        current_frame: &Frame,
         gas_meter: &mut impl GasMeter,
         function: Rc<LoadedFunction>,
         call_type: CallType,
@@ -818,6 +872,8 @@ where
         let num_locals = function.local_tys().len();
         let mut locals = Locals::new(num_locals);
         let num_param_tys = function.param_tys().len();
+        // Whether the function making this frame performs checks.
+        let should_check = RTTCheck::should_perform_checks(&current_frame.function.function);
         for i in (0..num_param_tys).rev() {
             let is_captured = mask.is_captured(i);
             let value = if is_captured {
@@ -830,10 +886,10 @@ where
             };
             locals.store_loc(i, value, self.vm_config.check_invariant_in_swap_loc)?;
 
-            let ty_args = function.ty_args();
-            if RTTCheck::should_perform_checks() && !is_captured {
+            if should_check && !is_captured {
                 // Only perform paranoid type check for actual operands on the stack.
                 // Captured arguments are already verified against function signature.
+                let ty_args = function.ty_args();
                 let ty = self.operand_stack.pop_ty()?;
                 let expected_ty = &function.local_tys()[i];
                 if !ty_args.is_empty() {
@@ -940,7 +996,7 @@ where
 
         let mut arg_tys = VecDeque::new();
         let ty_args = function.ty_args();
-        if RTTCheck::should_perform_checks() {
+        if RTTCheck::should_perform_checks(&current_frame.function.function) {
             for i in (0..num_param_tys).rev() {
                 let expected_ty = &function.param_tys()[i];
                 if !mask.is_captured(i) {
@@ -1002,7 +1058,9 @@ where
                     self.operand_stack.push(value)?;
                 }
 
-                if RTTCheck::should_perform_checks() {
+                // If the caller requires checks, push return types of native function to
+                // satisfy runtime check protocol.
+                if RTTCheck::should_perform_checks(&current_frame.function.function) {
                     for ty in function.return_tys() {
                         let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
                         self.operand_stack.push_ty(ty)?;
@@ -1067,17 +1125,16 @@ where
                         != target_func.param_tys()
                 {
                     return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
-                        .with_message(
-                            "Invoking private or friend function during dispatch".to_string(),
-                        ));
+                        .with_message("Invoking function with incompatible type".to_string()));
                 }
 
                 for value in args {
                     self.operand_stack.push(value)?;
                 }
 
-                // Maintaining the type stack for the paranoid mode using calling convention mentioned above.
-                if RTTCheck::should_perform_checks() {
+                // If the current function requires runtime checks, setup the type stack with the
+                // argument types
+                if RTTCheck::should_perform_checks(&current_frame.function.function) {
                     arg_tys.pop_back();
                     for ty in arg_tys {
                         self.operand_stack.push_ty(ty)?;
@@ -1641,6 +1698,17 @@ pub(crate) struct Stack {
     types: Vec<Type>,
 }
 
+impl Debug for Stack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "values = \n  {}\n types = \n  {}\n",
+            self.value.iter().map(|v| format!("{:?}", v)).join(", "),
+            self.types.iter().map(|v| format!("{:?}", v)).join(", "),
+        )
+    }
+}
+
 impl Stack {
     /// Create a new empty operand stack.
     fn new() -> Self {
@@ -1709,32 +1777,36 @@ impl Stack {
 
     /// Pop a type off the stack or abort execution if the stack is empty.
     pub(crate) fn pop_ty(&mut self) -> PartialVMResult<Type> {
-        self.types
-            .pop()
-            .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))
+        self.types.pop().ok_or_else(|| {
+            PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
+                .with_message("runtime type stack empty")
+        })
     }
 
     pub(crate) fn top_ty(&mut self) -> PartialVMResult<&Type> {
-        self.types
-            .last()
-            .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))
+        self.types.last().ok_or_else(|| {
+            PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
+                .with_message("runtime type stack empty")
+        })
     }
 
     /// Pop n types off the stack.
     pub(crate) fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<Type>> {
-        let remaining_stack_size = self
-            .types
-            .len()
-            .checked_sub(n as usize)
-            .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))?;
+        let remaining_stack_size = self.types.len().checked_sub(n as usize).ok_or_else(|| {
+            PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
+                .with_message("runtime type stack empty")
+        })?;
         let args = self.types.split_off(remaining_stack_size);
         Ok(args)
     }
 
     fn last_n_tys(&self, n: usize) -> PartialVMResult<&[Type]> {
         if self.types.len() < n {
-            return Err(PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
-                .with_message("Failed to get last n arguments on the argument stack".to_string()));
+            return Err(
+                PartialVMError::new(StatusCode::EMPTY_VALUE_STACK).with_message(
+                    "Failed to get last n arguments on the runtime type stack".to_string(),
+                ),
+            );
         }
         let len = self.types.len();
         Ok(&self.types[(len - n)..])
@@ -1876,7 +1948,10 @@ impl Frame {
                 // The reason for this design is we charge gas during instruction execution and we want to perform checks only after
                 // proper gas has been charged for each instruction.
 
-                RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
+                RTTCheck::check_operand_stack_balance(
+                    &self.function.function,
+                    &interpreter.operand_stack,
+                )?;
                 RTTCheck::pre_execution_type_stack_transition(
                     self,
                     &mut interpreter.operand_stack,
@@ -2350,7 +2425,7 @@ impl Frame {
                             )
                             .map(Rc::new)?;
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
-                        if RTTCheck::should_perform_checks() {
+                        if RTTCheck::should_perform_checks(&self.function.function) {
                             verify_pack_closure(
                                 self.ty_builder(),
                                 &mut interpreter.operand_stack,
@@ -2403,7 +2478,7 @@ impl Frame {
                             .operand_stack
                             .push(Value::closure(Box::new(lazy_function), captured))?;
 
-                        if RTTCheck::should_perform_checks() {
+                        if RTTCheck::should_perform_checks(&self.function.function) {
                             verify_pack_closure(
                                 self.ty_builder(),
                                 &mut interpreter.operand_stack,
@@ -2796,7 +2871,7 @@ impl Frame {
                     instruction,
                     frame_cache,
                 )?;
-                RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
+                RTTCheck::check_operand_stack_balance(&self.function.function, &interpreter.operand_stack)?;
                 RTRCheck::post_execution_transition(
                     self,
                     instruction,

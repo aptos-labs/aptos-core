@@ -12976,6 +12976,7 @@ dependencies = [
  "fxhash",
  "hashbrown 0.14.3",
  "hex",
+ "itertools 0.13.0",
  "lazy_static",
  "legacy-move-compiler",
  "lru",

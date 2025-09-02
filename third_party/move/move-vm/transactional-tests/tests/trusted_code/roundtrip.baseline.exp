@@ -1,0 +1,28 @@
+processed 4 tasks
+task 0 lines 1-8:  publish [module 0x99::not_trusted]
+task 1 lines 10-18:  publish [module 0x9::trusted]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000009::trusted'. Got VMError: {
+    major_status: LOOKUP_FAILED,
+    sub_status: None,
+    location: 0x9::trusted,
+    indices: [(FunctionHandle, 1)],
+    offsets: [],
+}
+task 2 lines 20-27:  publish [module 0x99::app]
+Error: error: unknown module `0000000000000000000000000000000000000000000000000000000000000009::trusted`
+   ┌─ test:25:5
+   │
+25 │     call trusted::run          // expect to not leak through u64 from increment
+   │     ^^^^^^^^^^^^^^^^^
+
+
+task 3 lines 30-30:  run --verbose 0x99::app::run
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::app doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
