@@ -189,6 +189,7 @@ pub fn aptos_prod_vm_config(
             .is_call_tree_and_instruction_vm_cache_enabled(),
         enable_lazy_loading: features.is_lazy_loading_enabled(),
         enable_depth_checks,
+        optimize_trusted_code: features.is_trusted_code_enabled(),
         paranoid_ref_checks,
     };
 

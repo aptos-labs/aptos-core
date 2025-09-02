@@ -1,5 +1,5 @@
 //# publish
-module 0x2.A {
+module 0x22.A {
   struct A has drop { v: u64 }
 
   public make_a(): Self.A {
@@ -19,7 +19,7 @@ module 0x2.A {
 }
 
 //# run --signers 0x1
-import 0x2.A;
+import 0x22.A;
 main(account: signer) {
 label b0:
     A.call(10, true, 8u8);
@@ -28,7 +28,7 @@ label b0:
 
 
 //# run --signers 0x1
-import 0x2.A;
+import 0x22.A;
 main(account: signer) {
 label b0:
     A.call(true, true, 8u8);
@@ -36,7 +36,7 @@ label b0:
 }
 
 //# run --signers 0x1
-import 0x2.A;
+import 0x22.A;
 main(account: signer) {
 label b0:
     A.call(10, true, true);
@@ -44,7 +44,7 @@ label b0:
 }
 
 //# run --signers 0x1
-import 0x2.A;
+import 0x22.A;
 main(account: signer) {
     let a: A.A;
 label b0:
@@ -54,7 +54,7 @@ label b0:
 }
 
 //# run --signers 0x1
-import 0x2.A;
+import 0x22.A;
 main(account: signer) {
     let a: A.A;
 label b0:
