@@ -108,7 +108,7 @@ impl Display for Closure {
 impl VMValueCast<Closure> for Value {
     fn cast(self) -> PartialVMResult<Closure> {
         match self.0 {
-            ValueImpl::ClosureValue(c) => Ok(c),
+            ValueImpl::ClosureValue(c) => Ok(*c),
             v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                 .with_message(format!("cannot cast {:?} to closure", v))),
         }

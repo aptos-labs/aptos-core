@@ -62,7 +62,7 @@ pub fn benchmark_transaction_using_debugger(
     );
 
     let time_cold = {
-        let n = 15;
+        let n = 101;
 
         let mut times = vec![];
         for _i in 0..n {
