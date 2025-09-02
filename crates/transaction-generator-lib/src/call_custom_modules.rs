@@ -14,7 +14,10 @@ use aptos_sdk::{
 use async_trait::async_trait;
 use log::{error, info};
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
-use std::{borrow::Borrow, sync::Arc};
+use std::{
+    borrow::Borrow,
+    sync::{Arc, Mutex},
+};
 
 // Fn + Send + Sync, as it will be called from multiple threads simultaneously
 // if you need any coordination, use Arc<RwLock<X>> fields
@@ -134,19 +137,21 @@ pub struct CustomModulesDelegationGeneratorCreator {
     txn_factory: TransactionFactory,
     packages: Arc<Vec<(Package, LocalAccount)>>,
     txn_generator: Arc<TransactionGeneratorWorker>,
+    rng: Option<Mutex<StdRng>>,
 }
 
 impl CustomModulesDelegationGeneratorCreator {
-    #[allow(dead_code)]
     pub fn new_raw(
         txn_factory: TransactionFactory,
         packages: Arc<Vec<(Package, LocalAccount)>>,
         txn_generator: Arc<TransactionGeneratorWorker>,
+        rng: Option<StdRng>,
     ) -> Self {
         Self {
             txn_factory,
             packages,
             txn_generator,
+            rng: rng.map(Mutex::new),
         }
     }
 
@@ -182,6 +187,7 @@ impl CustomModulesDelegationGeneratorCreator {
             txn_factory,
             packages: Arc::new(packages),
             txn_generator: worker,
+            rng: None,
         }
     }
 
@@ -192,7 +198,25 @@ impl CustomModulesDelegationGeneratorCreator {
         packages: &[(Package, LocalAccount)],
         workload: &mut dyn UserModuleTransactionGenerator,
     ) -> Arc<TransactionGeneratorWorker> {
-        let mut rng = StdRng::from_entropy();
+        Self::create_worker_with_rng(
+            init_txn_factory,
+            root_account,
+            txn_executor,
+            packages,
+            workload,
+            StdRng::from_entropy(),
+        )
+        .await
+    }
+
+    pub async fn create_worker_with_rng(
+        init_txn_factory: TransactionFactory,
+        root_account: &dyn RootAccountHandle,
+        txn_executor: &dyn ReliableTransactionSubmitter,
+        packages: &[(Package, LocalAccount)],
+        workload: &mut dyn UserModuleTransactionGenerator,
+        mut rng: StdRng,
+    ) -> Arc<TransactionGeneratorWorker> {
         let mut requests_initialize = Vec::with_capacity(packages.len());
 
         for (package, publisher) in packages.iter() {
@@ -235,9 +259,15 @@ impl CustomModulesDelegationGeneratorCreator {
         let mut requests_create = Vec::with_capacity(num_modules);
         let mut accounts = Vec::new();
 
-        let publisher_balance = publisher_balance.unwrap_or(
-            4 * init_txn_factory.get_gas_unit_price() * init_txn_factory.get_max_gas_amount(),
+        let min_balance =
+            2 * init_txn_factory.get_gas_unit_price() * init_txn_factory.get_max_gas_amount();
+        let publisher_balance = publisher_balance.unwrap_or(2 * min_balance);
+        assert!(
+            publisher_balance >= min_balance,
+            "Balance requested for publisher must be at least {} to cover for MAX_GAS",
+            min_balance
         );
+
         let total_funds = (num_modules as u64) * publisher_balance;
         root_account
             .approve_funds(total_funds, "funding publishers")
@@ -325,8 +355,14 @@ impl CustomModulesDelegationGeneratorCreator {
 
 impl TransactionGeneratorCreator for CustomModulesDelegationGeneratorCreator {
     fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+        let rng = self.rng.as_ref().map_or_else(StdRng::from_entropy, |rng| {
+            let mut lock = rng.lock().unwrap();
+            let rng_ref: &mut StdRng = &mut lock;
+            StdRng::from_rng(rng_ref).unwrap()
+        });
+
         Box::new(CustomModulesDelegationGenerator::new(
-            StdRng::from_entropy(),
+            rng,
             self.txn_factory.clone(),
             self.packages.clone(),
             self.txn_generator.clone(),

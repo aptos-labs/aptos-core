@@ -119,9 +119,9 @@ use std::{
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
 const PROPOSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
-/// Number of rounds we expect storage to be ahead of the proposer round,
+/// Number of rounds we expect storage to be behind the proposer round,
 /// used for fetching data from DB.
-const PROPOSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 10;
+const PROPOSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 30;
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {

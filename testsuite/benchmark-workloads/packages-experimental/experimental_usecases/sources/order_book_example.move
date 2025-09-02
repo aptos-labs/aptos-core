@@ -4,8 +4,7 @@ module 0xABCD::order_book_example {
     use std::option;
     use std::vector;
     use std::table::{Self, Table};
-    use aptos_experimental::single_order_types::{Self};
-    use aptos_experimental::order_book_types::{OrderIdType, good_till_cancelled};
+    use aptos_experimental::order_book_types::{OrderIdType, good_till_cancelled, OrderMatch};
     use aptos_experimental::order_book;
     use aptos_experimental::order_book::OrderBook;
 
@@ -78,13 +77,13 @@ module 0xABCD::order_book_example {
         orig_size: u64,
         remaining_size: u64,
         is_bid: bool,
-    ): vector<single_order_types::SingleOrderMatch<Empty>> {
+    ): vector<OrderMatch<Empty>> {
         let trigger_condition = option::none();
         let match_results = vector::empty();
         while (remaining_size > 0) {
             if (!order_book.is_taker_order(price, is_bid, trigger_condition)) {
                 order_book.place_maker_order(
-                    order_book::new_order_request(
+                    order_book::new_single_order_request(
                         account,
                         order_id,
                         option::none(),

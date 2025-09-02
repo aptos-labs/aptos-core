@@ -38,10 +38,7 @@ tokio = { workspace = true }
 url = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-jemallocator = { version = "0.5.0", features = [
-    "profiling",
-    "unprefixed_malloc_on_supported_platforms",
-] }
+jemallocator = { workspace = true }
 
 [[bin]]
 name = "forge"

@@ -334,6 +334,7 @@ impl WorkflowTxnGeneratorCreator {
                     txn_factory.clone(),
                     packages.clone(),
                     delegation_worker,
+                    None,
                 )),
                 prev_pool.clone(),
                 Some(next_pool.clone()),
@@ -359,7 +360,6 @@ impl WorkflowTxnGeneratorCreator {
         root_account: &dyn RootAccountHandle,
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
-        _initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
         cur_phase: Arc<AtomicUsize>,
         progress_type: WorkflowProgress,
     ) -> Self {

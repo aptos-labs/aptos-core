@@ -95,7 +95,7 @@ pub fn benchmark_transaction_using_debugger(
         let mut times = vec![];
         let n = 15;
 
-        for _i in 0..n {
+        for i in 0..n {
             // Reuse the existing VM with warm code cache so to measure only the
             // execution time.
             let t1 = Instant::now();

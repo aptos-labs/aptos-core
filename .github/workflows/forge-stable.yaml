@@ -3,6 +3,7 @@ name: Continuous Forge Tests - Stable
 
 # We have various Forge Stable tests here, that test out different situations and workloads.
 #
+#
 # Dashboard showing historical results: https://grafana.aptoslabs.com/d/bdnt45ggsg000f/forge-stable-performance?orgId=1
 
 # Tests are named based on how they are set up, some of the common flavors are:
@@ -121,7 +122,7 @@ on:
       - "testsuite/find_latest_image.py"
 
 concurrency:
-  group: forge-stable-${{ format('{0}-{1}-{2}-{3}', github.ref_name, inputs.GIT_SHA, inputs.IMAGE_TAG, inputs.TEST_NAME) }}
+  group: forge-stable-${{ format('{0}-{1}-{2}-{3}', github.ref_name, inputs.GIT_SHA || github.sha || github.head_ref || github.ref, inputs.IMAGE_TAG, inputs.TEST_NAME) }}
   cancel-in-progress: true
 
 env:

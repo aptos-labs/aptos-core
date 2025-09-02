@@ -33,10 +33,7 @@ rand = { workspace = true }
 rocksdb = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-jemallocator = { version = "0.5.0", features = [
-    "profiling",
-    "unprefixed_malloc_on_supported_platforms",
-] }
+jemallocator = { workspace = true }
 
 [lib]
 bench = false
