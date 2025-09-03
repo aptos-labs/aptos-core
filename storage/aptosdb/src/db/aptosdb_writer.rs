@@ -20,7 +20,7 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_metrics_core::TimerHelper;
+use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{
     chunk_to_commit::ChunkToCommit, db_ensure as ensure, AptosDbError, DbReader, DbWriter, Result,
