@@ -17,6 +17,7 @@ to synchronize configuration changes for the validators.
 -  [Function `enable_reconfiguration`](#0x1_reconfiguration_enable_reconfiguration)
 -  [Function `reconfiguration_enabled`](#0x1_reconfiguration_reconfiguration_enabled)
 -  [Function `reconfigure`](#0x1_reconfiguration_reconfigure)
+-  [Function `update_configuration`](#0x1_reconfiguration_update_configuration)
 -  [Function `last_reconfiguration_time`](#0x1_reconfiguration_last_reconfiguration_time)
 -  [Function `current_epoch`](#0x1_reconfiguration_current_epoch)
 -  [Function `emit_genesis_reconfiguration_event`](#0x1_reconfiguration_emit_genesis_reconfiguration_event)
@@ -421,6 +422,33 @@ Signal validators to start using new configuration. Must be called from friend c
     );
 
     <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_finish">reconfiguration_state::on_reconfig_finish</a>();
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_reconfiguration_update_configuration"></a>
+
+## Function `update_configuration`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_update_configuration">update_configuration</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, epoch: u64, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_update_configuration">update_configuration</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, epoch: u64, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64) <b>acquires</b> <a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>let</b> conf = <b>borrow_global_mut</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework);
+    conf.epoch = epoch;
+    conf.last_reconfiguration_time = <a href="timestamp.md#0x1_timestamp">timestamp</a>;
 }
 </code></pre>
 
