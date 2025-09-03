@@ -158,6 +158,13 @@ module aptos_framework::reconfiguration {
         reconfiguration_state::on_reconfig_finish();
     }
 
+    public fun update_configuration(aptos_framework: &signer, epoch: u64, timestamp: u64) acquires Configuration {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        let conf = borrow_global_mut<Configuration>(@aptos_framework);
+        conf.epoch = epoch;
+        conf.last_reconfiguration_time = timestamp;
+    }
+
     public fun last_reconfiguration_time(): u64 acquires Configuration {
         borrow_global<Configuration>(@aptos_framework).last_reconfiguration_time
     }
