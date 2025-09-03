@@ -18,7 +18,7 @@ use aptos_config::config::{
 };
 use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
 use aptos_logger::prelude::*;
-use aptos_metrics_core::IntGaugeHelper;
+use aptos_metrics_core::IntGaugeVecHelper;
 use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_storage_interface::{
     block_info::BlockInfo, db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader,
