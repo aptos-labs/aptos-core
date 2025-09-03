@@ -19,6 +19,7 @@ use crate::{
 use anyhow::anyhow;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
+use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
 use rayon::prelude::*;
@@ -46,9 +47,7 @@ impl DBPruner for StateKvPruner {
     }
 
     fn prune(&self, max_versions: usize) -> Result<Version> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["state_kv_pruner__prune"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_kv_pruner__prune"]);
 
         let mut progress = self.progress();
         let target_version = self.target_version();

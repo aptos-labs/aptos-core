@@ -13,6 +13,7 @@ use aptos_executor::{
 };
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::prelude::*;
+use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
@@ -86,9 +87,7 @@ where
                 .transaction_accumulator
                 .root_hash();
             let num_input_txns = output.num_input_transactions();
-            NUM_TXNS
-                .with_label_values(&["commit"])
-                .inc_by(num_input_txns as u64);
+            NUM_TXNS.inc_with_by(&["commit"], num_input_txns as u64);
 
             let version = output.expect_last_version();
             let commit_start = Instant::now();
@@ -139,7 +138,7 @@ fn report_block(
             GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
             BLOCK_EXECUTION_WORKFLOW_WHOLE.get_sample_sum() - GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
             COMMIT_BLOCKS.get_sample_sum(),
-            API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum(),
+            API_LATENCY_SECONDS.with_borrow(|x| x.shared().get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum()),
         );
     const NANOS_PER_SEC: f64 = 1_000_000_000.0;
     info!(
@@ -150,7 +149,7 @@ fn report_block(
                 / total_versions,
             COMMIT_BLOCKS.get_sample_sum() * NANOS_PER_SEC
                 / total_versions,
-            API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum() * NANOS_PER_SEC
+            API_LATENCY_SECONDS.with_borrow(|x| x.shared().get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum()) * NANOS_PER_SEC
                 / total_versions,
         );
 }

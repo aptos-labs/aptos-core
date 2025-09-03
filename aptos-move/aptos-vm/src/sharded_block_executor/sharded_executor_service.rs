@@ -20,6 +20,7 @@ use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManager, txn_provider::default::DefaultTxnProvider,
 };
 use aptos_logger::{info, trace};
+use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorLocalConfig},
@@ -190,11 +191,11 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         let mut result = vec![];
         for (round, sub_block) in transactions.into_sub_blocks().into_iter().enumerate() {
             let _timer = SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS
-                .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
-                .start_timer();
-            SHARDED_BLOCK_EXECUTOR_TXN_COUNT
-                .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
-                .observe(sub_block.transactions.len() as f64);
+                .timer_with(&[&self.shard_id.to_string(), &round.to_string()]);
+            SHARDED_BLOCK_EXECUTOR_TXN_COUNT.observe_with(
+                &[&self.shard_id.to_string(), &round.to_string()],
+                sub_block.transactions.len() as f64,
+            );
             info!(
                 "executing sub block for shard {} and round {}, number of txns {}",
                 self.shard_id,
@@ -234,8 +235,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         num_txns
                     );
                     let exe_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
-                        .with_label_values(&[&self.shard_id.to_string(), "execute_block"])
-                        .start_timer();
+                        .timer_with(&[&self.shard_id.to_string(), "execute_block"]);
                     let ret = self.execute_block(
                         transactions,
                         state_view.as_ref(),
@@ -250,8 +250,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     drop(exe_timer);
 
                     let _result_tx_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
-                        .with_label_values(&[&self.shard_id.to_string(), "result_tx"])
-                        .start_timer();
+                        .timer_with(&[&self.shard_id.to_string(), "result_tx"]);
                     self.coordinator_client.send_execution_result(ret);
                 },
                 ExecutorShardCommand::Stop => {
@@ -259,16 +258,18 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 },
             }
         }
-        let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
-            .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
-            .unwrap()
-            .get_sample_sum();
-        info!(
-            "Shard {} is shutting down; On shard execution tps {} txns/s ({} txns / {} s)",
-            self.shard_id,
-            (num_txns as f64 / exe_time),
-            num_txns,
-            exe_time
-        );
+        // let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS.with_borrow(|x| {
+        //     x.shared()
+        //         .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
+        //         .unwrap()
+        //         .get_sample_sum()
+        // });
+        // info!(
+        //     "Shard {} is shutting down; On shard execution tps {} txns/s ({} txns / {} s)",
+        //     self.shard_id,
+        //     (num_txns as f64 / exe_time),
+        //     num_txns,
+        //     exe_time
+        // );
     }
 }

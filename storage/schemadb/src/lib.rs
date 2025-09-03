@@ -30,6 +30,7 @@ use crate::{
 };
 use anyhow::format_err;
 use aptos_logger::prelude::*;
+use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{AptosDbError, Result as DbResult};
 use batch::{IntoRawBatch, NativeBatch, WriteBatch};
 use iterator::{ScanDirection, SchemaIterator};
@@ -194,17 +195,16 @@ impl DB {
 
     /// Reads single record by key.
     pub fn get<S: Schema>(&self, schema_key: &S::Key) -> DbResult<Option<S::Value>> {
-        let _timer = APTOS_SCHEMADB_GET_LATENCY_SECONDS
-            .with_label_values(&[S::COLUMN_FAMILY_NAME])
-            .start_timer();
+        let _timer = APTOS_SCHEMADB_GET_LATENCY_SECONDS.timer_with(&[S::COLUMN_FAMILY_NAME]);
 
         let k = <S::Key as KeyCodec<S>>::encode_key(schema_key)?;
         let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
 
         let result = self.inner.get_cf(cf_handle, k).into_db_res()?;
-        APTOS_SCHEMADB_GET_BYTES
-            .with_label_values(&[S::COLUMN_FAMILY_NAME])
-            .observe(result.as_ref().map_or(0.0, |v| v.len() as f64));
+        APTOS_SCHEMADB_GET_BYTES.observe_with(
+            &[S::COLUMN_FAMILY_NAME],
+            result.as_ref().map_or(0.0, |v| v.len() as f64),
+        );
 
         result
             .map(|raw_value| <S::Value as ValueCodec<S>>::decode_value(&raw_value))
@@ -265,9 +265,8 @@ impl DB {
     }
 
     fn write_schemas_inner(&self, batch: impl IntoRawBatch, option: &WriteOptions) -> DbResult<()> {
-        let _timer = APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS
-            .with_label_values(&[&self.name])
-            .start_timer();
+        let labels = [self.name.as_str()];
+        let _timer = APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS.timer_with(&labels);
 
         let raw_batch = batch.into_raw_batch(self)?;
 
@@ -277,9 +276,7 @@ impl DB {
             .into_db_res()?;
 
         raw_batch.stats.commit();
-        APTOS_SCHEMADB_BATCH_COMMIT_BYTES
-            .with_label_values(&[&self.name])
-            .observe(serialized_size as f64);
+        APTOS_SCHEMADB_BATCH_COMMIT_BYTES.observe_with(&[&self.name], serialized_size as f64);
 
         Ok(())
     }
