@@ -96,7 +96,6 @@ module aptos_experimental::market {
     const EINVALID_TAKER_POSITION_UPDATE: u64 = 10;
     const EINVALID_LIQUIDATION: u64 = 11;
     const ENOT_ORDER_CREATOR: u64 = 12;
-    const EMETADATA_MISSING_FOR_SINGLE_ORDER: u64 = 13;
 
     const PRE_CANCELLATION_TRACKER_KEY: u8 = 0;
     const U64_MAX: u64 = 0xffffffffffffffff;
@@ -628,12 +627,8 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         if (book_type == single_order_book_type()) {
-            if (metadata.is_none()) {
-                abort EMETADATA_MISSING_FOR_SINGLE_ORDER;
-            };
-            let metadata_value = *metadata.borrow();
             callbacks.cleanup_order(
-                user_addr, order_id, is_bid, remaining_size, metadata_value
+                user_addr, order_id, is_bid, remaining_size, metadata.destroy_some()
             );
         } else {
             callbacks.cleanup_bulk_orders(
@@ -661,18 +656,18 @@ module aptos_experimental::market {
                 .get_single_match_for_taker(price, *remaining_size, is_bid);
         let (maker_order, maker_matched_size) = result.destroy_order_match();
         if (!self.config.allow_self_trade && maker_order.get_account_from_match_details() == user_addr) {
-                self.cancel_maker_order_internal(
-                    &maker_order,
-                    maker_order.get_client_order_id_from_match_details(),
-                    maker_order.get_account_from_match_details(),
-                    maker_order.get_order_id_from_match_details(),
-                    std::string::utf8(b"Disallowed self trading"),
-                    maker_matched_size,
-                    maker_order.get_metadata_from_match_details(),
-                    maker_order.get_time_in_force_from_match_details(),
-                    callbacks
-                );
-                return option::none();
+            self.cancel_maker_order_internal(
+                &maker_order,
+                maker_order.get_client_order_id_from_match_details(),
+                maker_order.get_account_from_match_details(),
+                maker_order.get_order_id_from_match_details(),
+                std::string::utf8(b"Disallowed self trading"),
+                maker_matched_size,
+                maker_order.get_metadata_from_match_details(),
+                maker_order.get_time_in_force_from_match_details(),
+                callbacks
+            );
+            return option::none();
         };
         let fill_id = self.next_fill_id();
         let settle_result = callbacks.settle_trade(
@@ -697,23 +692,23 @@ module aptos_experimental::market {
             fill_sizes.push_back(settled_size);
                 // Event for taker fill
             self.emit_event_for_order(
-                    order_id,
-                    client_order_id,
-                    user_addr,
-                    orig_size,
-                    *remaining_size,
-                    settled_size,
-                    maker_order.get_price_from_match_details(),
-                    is_bid,
-                    true,
-                    market_types::order_status_filled(),
-                    &std::string::utf8(b""),
-                    option::some(metadata),
-                    option::none(), // trigger_condition
-                    time_in_force,
-                    callbacks
-                );
-                // Event for maker fill
+                order_id,
+                client_order_id,
+                user_addr,
+                orig_size,
+                *remaining_size,
+                settled_size,
+                maker_order.get_price_from_match_details(),
+                is_bid,
+                true,
+                market_types::order_status_filled(),
+                &std::string::utf8(b""),
+                option::some(metadata),
+                option::none(), // trigger_condition
+                time_in_force,
+                callbacks
+            );
+            // Event for maker fill
             self.emit_event_for_order(
                 maker_order.get_order_id_from_match_details(),
                 maker_order.get_client_order_id_from_match_details(),
