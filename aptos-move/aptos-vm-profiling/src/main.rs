@@ -10,7 +10,7 @@ mod profile_aptos_vm;
 mod profile_move_vm;
 mod valgrind;
 
-const BUILD_PROFILE: &str = "release";
+const BUILD_PROFILE: &str = "performance";
 static PATH_CRATE_ROOT: Lazy<&Path> = Lazy::new(|| Path::new(env!("CARGO_MANIFEST_DIR")));
 
 #[derive(Parser, Debug)]

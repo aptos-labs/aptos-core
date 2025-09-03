@@ -66,6 +66,7 @@ where
     /// Checks the depth of a type. If the type is too deep, returns an error. Note that the type
     /// must be non-generic, i.e., all type substitutions must be performed. If needed, the check
     /// traverses multiple modules where inner structs and their fields are defined.
+    #[inline(always)]
     pub(crate) fn check_depth_of_type(
         &self,
         gas_meter: &mut impl DependencyGasMeter,
