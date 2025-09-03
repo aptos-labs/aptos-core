@@ -18,7 +18,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    validator_signer::ValidatorSigner,
+    on_chain_config::OnChainConsensusConfig, validator_signer::ValidatorSigner,
 };
 use fail::fail_point;
 use std::{boxed::Box, sync::Arc, time::Duration};
@@ -44,7 +44,7 @@ struct MutableState {
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     transaction_deduper: Arc<dyn TransactionDeduper>,
     is_randomness_enabled: bool,
-    order_vote_enabled: bool,
+    consensus_onchain_config: OnChainConsensusConfig,
     persisted_auxiliary_info_version: u8,
 }
 
@@ -87,7 +87,7 @@ impl ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled,
-            order_vote_enabled,
+            consensus_onchain_config,
             persisted_auxiliary_info_version,
         } = self
             .state
@@ -113,7 +113,7 @@ impl ExecutionProxy {
             payload_manager,
             self.txn_notifier.clone(),
             self.enable_pre_commit,
-            order_vote_enabled,
+            &consensus_onchain_config,
             persisted_auxiliary_info_version,
         )
     }
@@ -233,7 +233,7 @@ impl StateComputer for ExecutionProxy {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
-        order_vote_enabled: bool,
+        consensus_onchain_config: OnChainConsensusConfig,
         persisted_auxiliary_info_version: u8,
     ) {
         *self.state.write() = Some(MutableState {
@@ -247,7 +247,7 @@ impl StateComputer for ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled: randomness_enabled,
-            order_vote_enabled,
+            consensus_onchain_config,
             persisted_auxiliary_info_version,
         });
     }
