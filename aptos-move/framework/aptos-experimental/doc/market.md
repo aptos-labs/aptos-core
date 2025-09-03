@@ -647,15 +647,6 @@ TimeBased(time): The order is triggered when the current time is greater than or
 
 
 
-<a id="0x7_market_EMETADATA_MISSING_FOR_SINGLE_ORDER"></a>
-
-
-
-<pre><code><b>const</b> <a href="market.md#0x7_market_EMETADATA_MISSING_FOR_SINGLE_ORDER">EMETADATA_MISSING_FOR_SINGLE_ORDER</a>: u64 = 13;
-</code></pre>
-
-
-
 <a id="0x7_market_ENOT_ORDER_CREATOR"></a>
 
 
@@ -1353,10 +1344,10 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
     <b>if</b> (self.config.allow_events_emission) {
         <b>let</b> metadata_bytes = <b>if</b> (metadata.is_some()) {
-                callbacks.get_order_metadata_bytes(metadata.destroy_some())
-            } <b>else</b> {
-                <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>()
-            };
+            callbacks.get_order_metadata_bytes(metadata.destroy_some())
+        } <b>else</b> {
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>()
+        };
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
             <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
                 parent: self.parent,
@@ -1656,12 +1647,8 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ) {
     <b>if</b> (book_type == single_order_book_type()) {
-        <b>if</b> (metadata.is_none()) {
-            <b>abort</b> <a href="market.md#0x7_market_EMETADATA_MISSING_FOR_SINGLE_ORDER">EMETADATA_MISSING_FOR_SINGLE_ORDER</a>;
-        };
-        <b>let</b> metadata_value = *metadata.borrow();
         callbacks.cleanup_order(
-            user_addr, order_id, is_bid, remaining_size, metadata_value
+            user_addr, order_id, is_bid, remaining_size, metadata.destroy_some()
         );
     } <b>else</b> {
         callbacks.cleanup_bulk_orders(
@@ -1709,18 +1696,18 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             .get_single_match_for_taker(price, *remaining_size, is_bid);
     <b>let</b> (maker_order, maker_matched_size) = result.destroy_order_match();
     <b>if</b> (!self.config.allow_self_trade && maker_order.get_account_from_match_details() == user_addr) {
-            self.<a href="market.md#0x7_market_cancel_maker_order_internal">cancel_maker_order_internal</a>(
-                &maker_order,
-                maker_order.get_client_order_id_from_match_details(),
-                maker_order.get_account_from_match_details(),
-                maker_order.get_order_id_from_match_details(),
-                std::string::utf8(b"Disallowed self trading"),
-                maker_matched_size,
-                maker_order.get_metadata_from_match_details(),
-                maker_order.get_time_in_force_from_match_details(),
-                callbacks
-            );
-            <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+        self.<a href="market.md#0x7_market_cancel_maker_order_internal">cancel_maker_order_internal</a>(
+            &maker_order,
+            maker_order.get_client_order_id_from_match_details(),
+            maker_order.get_account_from_match_details(),
+            maker_order.get_order_id_from_match_details(),
+            std::string::utf8(b"Disallowed self trading"),
+            maker_matched_size,
+            maker_order.get_metadata_from_match_details(),
+            maker_order.get_time_in_force_from_match_details(),
+            callbacks
+        );
+        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
     };
     <b>let</b> fill_id = self.<a href="market.md#0x7_market_next_fill_id">next_fill_id</a>();
     <b>let</b> settle_result = callbacks.settle_trade(
@@ -1743,25 +1730,25 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         *remaining_size -= settled_size;
         unsettled_maker_size -= settled_size;
         fill_sizes.push_back(settled_size);
-            // Event for taker fill
+        // Event for taker fill
         self.<a href="market.md#0x7_market_emit_event_for_order">emit_event_for_order</a>(
-                order_id,
-                client_order_id,
-                user_addr,
-                orig_size,
-                *remaining_size,
-                settled_size,
-                maker_order.get_price_from_match_details(),
-                is_bid,
-                <b>true</b>,
-                <a href="market_types.md#0x7_market_types_order_status_filled">market_types::order_status_filled</a>(),
-                &std::string::utf8(b""),
-                <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(metadata),
-                <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
-                time_in_force,
-                callbacks
-            );
-            // Event for maker fill
+            order_id,
+            client_order_id,
+            user_addr,
+            orig_size,
+            *remaining_size,
+            settled_size,
+            maker_order.get_price_from_match_details(),
+            is_bid,
+            <b>true</b>,
+            <a href="market_types.md#0x7_market_types_order_status_filled">market_types::order_status_filled</a>(),
+            &std::string::utf8(b""),
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(metadata),
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
+            time_in_force,
+            callbacks
+        );
+        // Event for maker fill
         self.<a href="market.md#0x7_market_emit_event_for_order">emit_event_for_order</a>(
             maker_order.get_order_id_from_match_details(),
             maker_order.get_client_order_id_from_match_details(),

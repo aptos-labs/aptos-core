@@ -404,10 +404,10 @@ module aptos_experimental::market {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
             let metadata_bytes = if (metadata.is_some()) {
-                    callbacks.get_order_metadata_bytes(metadata.destroy_some())
-                } else {
-                    vector::empty()
-                };
+                callbacks.get_order_metadata_bytes(metadata.destroy_some())
+            } else {
+                vector::empty()
+            };
             event::emit(
                 OrderEvent {
                     parent: self.parent,
@@ -690,7 +690,7 @@ module aptos_experimental::market {
             *remaining_size -= settled_size;
             unsettled_maker_size -= settled_size;
             fill_sizes.push_back(settled_size);
-                // Event for taker fill
+            // Event for taker fill
             self.emit_event_for_order(
                 order_id,
                 client_order_id,
