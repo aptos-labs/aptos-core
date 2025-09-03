@@ -105,7 +105,10 @@ fn update_rocksdb_properties(
     state_merkle_db: &StateMerkleDb,
     state_kv_db: &StateKvDb,
 ) -> Result<()> {
-    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["update_rocksdb_properties"]);
+    // return Ok(());
+
+    let labels = ["update_rocksdb_properties"];
+    let _timer = OTHER_TIMERS_SECONDS.timer_with(&labels);
 
     let enable_storage_sharding = state_kv_db.enabled_sharding();
 
