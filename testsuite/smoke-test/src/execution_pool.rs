@@ -42,6 +42,9 @@ pub async fn assert_on_chain_consensus_config_window_size(
         OnChainConsensusConfig::V4 { window_size, .. } => {
             assert_eq!(window_size, expected_window_size)
         },
+        OnChainConsensusConfig::V5 { window_size, .. } => {
+            assert_eq!(window_size, expected_window_size)
+        },
     }
 }
 

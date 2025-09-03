@@ -34,6 +34,7 @@ use aptos_storage_interface::state_store::state_view::cached_state_view::CachedS
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    on_chain_config::OnChainConsensusConfig,
     randomness::Randomness,
     state_store::StateViewId,
     transaction::{
@@ -130,6 +131,7 @@ pub struct PipelineBuilder {
     pre_commit_status: Arc<Mutex<PreCommitStatus>>,
     order_vote_enabled: bool,
     persisted_auxiliary_info_version: u8,
+    rand_check_enabled: bool,
     module_cache: Arc<Mutex<Option<ValidationState<CachedStateView>>>>,
 }
 
@@ -251,7 +253,7 @@ impl PipelineBuilder {
         payload_manager: Arc<dyn TPayloadManager>,
         txn_notifier: Arc<dyn TxnNotifier>,
         enable_pre_commit: bool,
-        order_vote_enabled: bool,
+        consensus_onchain_config: &OnChainConsensusConfig,
         persisted_auxiliary_info_version: u8,
     ) -> Self {
         let module_cache = Arc::new(Mutex::new(None));
@@ -266,8 +268,9 @@ impl PipelineBuilder {
             payload_manager,
             txn_notifier,
             pre_commit_status: Arc::new(Mutex::new(PreCommitStatus::new(0, enable_pre_commit))),
-            order_vote_enabled,
+            order_vote_enabled: consensus_onchain_config.order_vote_enabled(),
             persisted_auxiliary_info_version,
+            rand_check_enabled: consensus_onchain_config.rand_check_enabled(),
             module_cache,
         }
     }
@@ -400,6 +403,7 @@ impl PipelineBuilder {
                 self.executor.clone(),
                 block.clone(),
                 self.is_randomness_enabled,
+                self.rand_check_enabled,
                 self.module_cache.clone(),
             ),
             Some(&mut abort_handles),
@@ -571,6 +575,7 @@ impl PipelineBuilder {
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
         is_randomness_enabled: bool,
+        rand_check_enabled: bool,
         module_cache: Arc<Mutex<Option<ValidationState<CachedStateView>>>>,
     ) -> TaskResult<Option<Randomness>> {
         let mut tracker = Tracker::start_waiting("rand_check", &block);
@@ -587,7 +592,7 @@ impl PipelineBuilder {
             .map_err(anyhow::Error::from)?;
 
         let mut has_randomness = false;
-        {
+        if rand_check_enabled {
             let mut cache_guard = module_cache.lock();
             if let Some(cache_mut) = cache_guard.as_mut() {
                 // flush the cache if the execution state view is not linear
@@ -604,7 +609,7 @@ impl PipelineBuilder {
             } else {
                 *cache_guard = Some(ValidationState::new(parent_state_view));
             }
-            let cache_ref = cache_guard.as_mut().unwrap();
+            let cache_ref = cache_guard.as_mut().expect("just set");
 
             for txn in user_txns.iter() {
                 if let Some(txn) = txn.borrow_into_inner().try_as_signed_user_txn() {
@@ -630,21 +635,27 @@ impl PipelineBuilder {
                     }
                 }
             }
+            let label = if has_randomness { "true" } else { "false" };
+            counters::RAND_BLOCK.with_label_values(&[label]).inc();
+            if has_randomness {
+                info!(
+                    "[Pipeline] Block {} {} {} has randomness txn",
+                    block.id(),
+                    block.epoch(),
+                    block.round()
+                );
+            }
         }
-        let label = if has_randomness { "true" } else { "false" };
-        counters::RAND_BLOCK.with_label_values(&[label]).inc();
-        // TODO: add a on-chain config to skip waiting if no randomness is needed
-        if has_randomness {
-            info!(
-                "[Pipeline] Block {} {} {} has randomness txn",
-                block.id(),
-                block.epoch(),
-                block.round()
-            );
-        }
-        let maybe_rand = rand_rx
-            .await
-            .map_err(|_| anyhow!("randomness tx cancelled"))?;
+        // if rand check is enabled and no txn requires randomness, we skip waiting for randomness
+        let mut tracker = Tracker::start_waiting("rand_gen", &block);
+        tracker.start_working();
+        let maybe_rand = if rand_check_enabled && !has_randomness {
+            None
+        } else {
+            rand_rx
+                .await
+                .map_err(|_| anyhow!("randomness tx cancelled"))?
+        };
         Ok(maybe_rand)
     }
 
