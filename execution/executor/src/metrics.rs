@@ -6,7 +6,7 @@ use aptos_logger::{prelude::*, sample, warn};
 use aptos_metrics_core::{
     exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
     register_int_counter_vec, register_int_gauge_vec, Histogram, HistogramVec, IntCounter,
-    IntCounterVec, IntGaugeVec,
+    IntCounterVec, IntGaugeVec, TimerHelper,
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -281,9 +281,7 @@ pub fn update_counters_for_processed_chunk<T>(
     for (txn, output) in transactions.iter().zip(transaction_outputs.iter()) {
         if detailed_counters {
             if let Ok(size) = bcs::serialized_size(output) {
-                PROCESSED_TXNS_OUTPUT_SIZE
-                    .with_label_values(&[process_type])
-                    .observe(size as f64);
+                PROCESSED_TXNS_OUTPUT_SIZE.observe_with(&[process_type], size as f64);
             }
         }
 
@@ -429,8 +427,7 @@ pub fn update_counters_for_processed_chunk<T>(
                 }
 
                 PROCESSED_TXNS_NUM_AUTHENTICATORS
-                    .with_label_values(&[process_type])
-                    .observe(signature_count as f64);
+                    .observe_with(&[process_type], signature_count as f64);
             }
 
             let payload_type = if user_txn.payload().is_multisig() {
