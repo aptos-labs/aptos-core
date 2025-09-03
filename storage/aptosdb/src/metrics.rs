@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram_vec, register_int_counter, register_int_counter_vec,
-    register_int_gauge, register_int_gauge_vec, HistogramVec, IntCounter, IntCounterVec, IntGauge,
-    IntGaugeVec,
+    exponential_buckets, make_thread_local_histogram_vec, register_histogram_vec,
+    register_int_counter, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
+    HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -130,18 +130,17 @@ pub static OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static NODE_CACHE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        // metric name
-        "aptos_storage_node_cache_seconds",
-        // metric description
-        "Latency of node cache.",
-        // metric labels (dimensions)
-        &["tag", "name"],
-        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
-    )
-    .unwrap()
-});
+make_thread_local_histogram_vec!(
+    pub,
+    NODE_CACHE_SECONDS,
+    // metric name
+    "aptos_storage_node_cache_seconds",
+    // metric description
+    "Latency of node cache.",
+    // metric labels (dimensions)
+    &["tag", "name"],
+    exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+);
 
 /// Rocksdb metrics
 pub static ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {

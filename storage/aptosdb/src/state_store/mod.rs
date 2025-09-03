@@ -860,7 +860,9 @@ impl StateStore {
         enable_sharding: bool,
         ignore_state_cache_miss: bool,
     ) {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&[&format!("put_stale_kv_index__{shard_id}")]);
+        let label = format!("put_stale_kv_index__{shard_id}");
+        let labels = [label.as_str()];
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&labels);
 
         let mut iter = updates.iter();
         for version in first_version..first_version + num_versions as Version {
