@@ -5,7 +5,7 @@
 use crate::metrics::{COUNTER, GAUGE, OTHER_TIMERS_SECONDS};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_metrics_core::{IntCounterHelper, IntGaugeHelper, TimerHelper};
+use aptos_metrics_core::{IntCounterVecHelper, IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
     state::State, state_view::hot_state_view::HotStateView,
 };
