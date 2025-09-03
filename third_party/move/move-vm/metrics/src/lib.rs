@@ -15,6 +15,7 @@ pub trait Timer {
 }
 
 impl Timer for HistogramVec {
+    #[inline(always)]
     fn timer_with_label(&self, label: &str) -> HistogramTimer {
         self.with_label_values(&[label]).start_timer()
     }

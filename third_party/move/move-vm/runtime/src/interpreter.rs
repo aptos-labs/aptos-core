@@ -1058,44 +1058,6 @@ where
         }
     }
 
-    /// Perform a binary operation to two values at the top of the stack.
-    fn binop<F, T>(&mut self, f: F) -> PartialVMResult<()>
-    where
-        Value: VMValueCast<T>,
-        F: FnOnce(T, T) -> PartialVMResult<Value>,
-    {
-        let rhs = self.operand_stack.pop_as::<T>()?;
-        let lhs = self.operand_stack.pop_as::<T>()?;
-        let result = f(lhs, rhs)?;
-        self.operand_stack.push(result)
-    }
-
-    /// Perform a binary operation for integer values.
-    fn binop_int<F>(&mut self, f: F) -> PartialVMResult<()>
-    where
-        F: FnOnce(IntegerValue, IntegerValue) -> PartialVMResult<IntegerValue>,
-    {
-        self.binop(|lhs, rhs| {
-            Ok(match f(lhs, rhs)? {
-                IntegerValue::U8(x) => Value::u8(x),
-                IntegerValue::U16(x) => Value::u16(x),
-                IntegerValue::U32(x) => Value::u32(x),
-                IntegerValue::U64(x) => Value::u64(x),
-                IntegerValue::U128(x) => Value::u128(x),
-                IntegerValue::U256(x) => Value::u256(x),
-            })
-        })
-    }
-
-    /// Perform a binary operation for boolean values.
-    fn binop_bool<F, T>(&mut self, f: F) -> PartialVMResult<()>
-    where
-        Value: VMValueCast<T>,
-        F: FnOnce(T, T) -> PartialVMResult<bool>,
-    {
-        self.binop(|lhs, rhs| Ok(Value::bool(f(lhs, rhs)?)))
-    }
-
     /// Creates a data cache entry for the specified address-type pair. Charges gas for the number
     /// of bytes loaded.
     fn create_and_charge_data_cache_entry(
@@ -1587,6 +1549,7 @@ pub(crate) struct Stack {
 
 impl Stack {
     /// Create a new empty operand stack.
+    #[inline(always)]
     fn new() -> Self {
         Stack {
             value: vec![],
@@ -1596,6 +1559,7 @@ impl Stack {
 
     /// Push a `Value` on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
+    #[inline(always)]
     fn push(&mut self, value: Value) -> PartialVMResult<()> {
         if self.value.len() < OPERAND_STACK_SIZE_LIMIT {
             self.value.push(value);
@@ -1606,6 +1570,7 @@ impl Stack {
     }
 
     /// Pop a `Value` off the stack or abort execution if the stack is empty.
+    #[inline(always)]
     fn pop(&mut self) -> PartialVMResult<Value> {
         self.value
             .pop()
@@ -1614,6 +1579,7 @@ impl Stack {
 
     /// Pop a `Value` of a given type off the stack. Abort if the value is not of the given
     /// type or if the stack is empty.
+    #[inline(always)]
     fn pop_as<T>(&mut self) -> PartialVMResult<T>
     where
         Value: VMValueCast<T>,
@@ -1622,6 +1588,7 @@ impl Stack {
     }
 
     /// Pop n values off the stack.
+    #[inline(always)]
     fn popn(&mut self, n: u16) -> PartialVMResult<Vec<Value>> {
         let remaining_stack_size = self
             .value
@@ -1632,6 +1599,7 @@ impl Stack {
         Ok(args)
     }
 
+    #[inline(always)]
     fn last_n(&self, n: usize) -> PartialVMResult<impl ExactSizeIterator<Item = &Value> + Clone> {
         if self.value.len() < n {
             return Err(PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
@@ -1642,6 +1610,7 @@ impl Stack {
 
     /// Push a type on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
+    #[inline(always)]
     pub(crate) fn push_ty(&mut self, ty: Type) -> PartialVMResult<()> {
         if self.types.len() < OPERAND_STACK_SIZE_LIMIT {
             self.types.push(ty);
@@ -1652,12 +1621,14 @@ impl Stack {
     }
 
     /// Pop a type off the stack or abort execution if the stack is empty.
+    #[inline(always)]
     pub(crate) fn pop_ty(&mut self) -> PartialVMResult<Type> {
         self.types
             .pop()
             .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))
     }
 
+    #[inline(always)]
     pub(crate) fn top_ty(&mut self) -> PartialVMResult<&Type> {
         self.types
             .last()
@@ -1665,6 +1636,7 @@ impl Stack {
     }
 
     /// Pop n types off the stack.
+    #[inline(always)]
     pub(crate) fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<Type>> {
         let remaining_stack_size = self
             .types
@@ -1675,6 +1647,7 @@ impl Stack {
         Ok(args)
     }
 
+    #[inline(always)]
     fn last_n_tys(&self, n: usize) -> PartialVMResult<&[Type]> {
         if self.types.len() < n {
             return Err(PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
@@ -1684,6 +1657,7 @@ impl Stack {
         Ok(&self.types[(len - n)..])
     }
 
+    #[inline(always)]
     pub(crate) fn check_balance(&self) -> PartialVMResult<()> {
         if self.types.len() != self.value.len() {
             return Err(
@@ -1819,6 +1793,31 @@ impl Frame {
                     instruction,
                     frame_cache,
                 )?;
+
+                macro_rules! binop_int {
+                    ($op: expr) => {{
+                        let rhs = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let lhs = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let result = match $op(lhs, rhs)? {
+                            IntegerValue::U8(x) => Value::u8(x),
+                            IntegerValue::U16(x) => Value::u16(x),
+                            IntegerValue::U32(x) => Value::u32(x),
+                            IntegerValue::U64(x) => Value::u64(x),
+                            IntegerValue::U128(x) => Value::u128(x),
+                            IntegerValue::U256(x) => Value::u256(x),
+                        };
+                        interpreter.operand_stack.push(result)
+                    }}
+                }
+
+                macro_rules! binop_bool {
+                    ($op: expr) => {{
+                        let rhs = interpreter.operand_stack.pop_as()?;
+                        let lhs = interpreter.operand_stack.pop_as()?;
+                        let result: bool = $op(lhs, rhs)?;
+                        interpreter.operand_stack.push(Value::bool(result))
+                    }}
+                }
 
                 match instruction {
                     Bytecode::Pop => {
@@ -2398,35 +2397,35 @@ impl Frame {
                     // Arithmetic Operations
                     Bytecode::Add => {
                         gas_meter.charge_simple_instr(S::Add)?;
-                        interpreter.binop_int(IntegerValue::add_checked)?
+                        binop_int!(IntegerValue::add_checked)?
                     },
                     Bytecode::Sub => {
                         gas_meter.charge_simple_instr(S::Sub)?;
-                        interpreter.binop_int(IntegerValue::sub_checked)?
+                        binop_int!(IntegerValue::sub_checked)?
                     },
                     Bytecode::Mul => {
                         gas_meter.charge_simple_instr(S::Mul)?;
-                        interpreter.binop_int(IntegerValue::mul_checked)?
+                        binop_int!(IntegerValue::mul_checked)?
                     },
                     Bytecode::Mod => {
                         gas_meter.charge_simple_instr(S::Mod)?;
-                        interpreter.binop_int(IntegerValue::rem_checked)?
+                        binop_int!(IntegerValue::rem_checked)?
                     },
                     Bytecode::Div => {
                         gas_meter.charge_simple_instr(S::Div)?;
-                        interpreter.binop_int(IntegerValue::div_checked)?
+                        binop_int!(IntegerValue::div_checked)?
                     },
                     Bytecode::BitOr => {
                         gas_meter.charge_simple_instr(S::BitOr)?;
-                        interpreter.binop_int(IntegerValue::bit_or)?
+                        binop_int!(IntegerValue::bit_or)?
                     },
                     Bytecode::BitAnd => {
                         gas_meter.charge_simple_instr(S::BitAnd)?;
-                        interpreter.binop_int(IntegerValue::bit_and)?
+                        binop_int!(IntegerValue::bit_and)?
                     },
                     Bytecode::Xor => {
                         gas_meter.charge_simple_instr(S::Xor)?;
-                        interpreter.binop_int(IntegerValue::bit_xor)?
+                        binop_int!(IntegerValue::bit_xor)?
                     },
                     Bytecode::Shl => {
                         gas_meter.charge_simple_instr(S::Shl)?;
@@ -2446,27 +2445,35 @@ impl Frame {
                     },
                     Bytecode::Or => {
                         gas_meter.charge_simple_instr(S::Or)?;
-                        interpreter.binop_bool(|l, r| Ok(l || r))?
+                        #[inline(always)]
+                        fn bool_or(lhs: bool, rhs: bool) -> PartialVMResult<bool> {
+                            Ok(lhs || rhs)
+                        }
+                        binop_bool!(bool_or)?
                     },
                     Bytecode::And => {
                         gas_meter.charge_simple_instr(S::And)?;
-                        interpreter.binop_bool(|l, r| Ok(l && r))?
+                        #[inline(always)]
+                        fn bool_and(lhs: bool, rhs: bool) -> PartialVMResult<bool> {
+                            Ok(lhs && rhs)
+                        }
+                        binop_bool!(bool_and)?
                     },
                     Bytecode::Lt => {
                         gas_meter.charge_simple_instr(S::Lt)?;
-                        interpreter.binop_bool(IntegerValue::lt)?
+                        binop_bool!(IntegerValue::lt)?
                     },
                     Bytecode::Gt => {
                         gas_meter.charge_simple_instr(S::Gt)?;
-                        interpreter.binop_bool(IntegerValue::gt)?
+                        binop_bool!(IntegerValue::gt)?
                     },
                     Bytecode::Le => {
                         gas_meter.charge_simple_instr(S::Le)?;
-                        interpreter.binop_bool(IntegerValue::le)?
+                        binop_bool!(IntegerValue::le)?
                     },
                     Bytecode::Ge => {
                         gas_meter.charge_simple_instr(S::Ge)?;
-                        interpreter.binop_bool(IntegerValue::ge)?
+                        binop_bool!(IntegerValue::ge)?
                     },
                     Bytecode::Abort => {
                         gas_meter.charge_simple_instr(S::Abort)?;
