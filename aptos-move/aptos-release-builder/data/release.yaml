@@ -10,6 +10,5 @@ proposals:
     update_sequence:
       - Framework:
           bytecode_version: 6
-          git_hash: ~
       - Gas:
           new: current
