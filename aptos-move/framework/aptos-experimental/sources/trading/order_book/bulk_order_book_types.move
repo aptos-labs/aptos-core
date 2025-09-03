@@ -76,7 +76,7 @@ module aptos_experimental::bulk_order_book_types {
     enum BulkOrderRequest has copy, drop {
         V1 {
             account: address,
-            sequence_number: u64, // sequence number for order validation
+            order_sequence_number: u64, // sequence number for order validation
             bid_prices: vector<u64>, // prices for each levels of the order
             bid_sizes: vector<u64>, // sizes for each levels of the order
             ask_prices: vector<u64>, // prices for each levels of the order
@@ -106,7 +106,7 @@ module aptos_experimental::bulk_order_book_types {
             order_id: OrderIdType,
             account: address,
             unique_priority_idx: UniqueIdxType,
-            sequence_number: u64, // sequence number for order validation
+            order_sequence_number: u64, // sequence number for order validation
             orig_bid_size: u64, // original size of the bid order
             orig_ask_size: u64, // original size of the ask order
             total_remaining_bid_size: u64, // remaining size of the bid order
@@ -136,7 +136,7 @@ module aptos_experimental::bulk_order_book_types {
         unique_priority_idx: UniqueIdxType,
         order_req: BulkOrderRequest, best_bid_price: Option<u64>, best_ask_price: Option<u64>,
     ): BulkOrder {
-        let BulkOrderRequest::V1 { account, sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes } = order_req;
+        let BulkOrderRequest::V1 { account, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes } = order_req;
         let bid_price_crossing_idx = discard_price_crossing_levels(&bid_prices, best_ask_price, true);
         let ask_price_crossing_idx = discard_price_crossing_levels(&ask_prices, best_bid_price, false);
         let (post_only_bid_prices, post_only_bid_sizes) = if (bid_price_crossing_idx > 0) {
@@ -158,7 +158,7 @@ module aptos_experimental::bulk_order_book_types {
             order_id,
             account,
             unique_priority_idx,
-            sequence_number,
+            order_sequence_number,
             orig_bid_size,
             orig_ask_size,
             total_remaining_bid_size: orig_bid_size, // Initially, the remaining size is the original size
@@ -198,7 +198,7 @@ module aptos_experimental::bulk_order_book_types {
         assert!(ask_prices.length() == ask_sizes.length(), EINVLID_MM_ORDER_REQUEST);
         let req = BulkOrderRequest::V1 {
             account,
-            sequence_number,
+            order_sequence_number: sequence_number,
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -218,14 +218,14 @@ module aptos_experimental::bulk_order_book_types {
     public fun get_sequence_number_from_order_request(
         order_req: &BulkOrderRequest
     ): u64 {
-        let BulkOrderRequest::V1 { sequence_number, .. } = order_req;
+        let BulkOrderRequest::V1 { order_sequence_number: sequence_number, .. } = order_req;
         *sequence_number
     }
 
     public fun get_sequence_number_from_bulk_order(
         order: &BulkOrder
     ): u64 {
-        let BulkOrder::V1 { sequence_number, .. } = order;
+        let BulkOrder::V1 { order_sequence_number: sequence_number, .. } = order;
         *sequence_number
     }
 
