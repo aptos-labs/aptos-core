@@ -136,7 +136,7 @@ impl State {
         self.hot_state_metadata[shard_id].num_items
     }
 
-    pub fn update(
+    fn update(
         &self,
         persisted: &State,
         updates: &BatchedStateUpdateRefs,
