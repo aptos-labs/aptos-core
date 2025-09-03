@@ -272,6 +272,15 @@ Main bulk order book container that manages all orders and their matching.
 
 
 
+<a id="0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>: u64 = 13;
+</code></pre>
+
+
+
 <a id="0x7_bulk_order_book_E_NOT_ACTIVE_ORDER"></a>
 
 
@@ -827,9 +836,12 @@ The first price levels of both bid and ask sides will be activated in the active
     order_req: BulkOrderRequest&lt;M&gt;
 ) : OrderIdType {
     <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = get_account_from_order_request(&order_req);
+    <b>let</b> new_sequence_number = aptos_experimental::bulk_order_book_types::get_sequence_number_from_order_request(&order_req);
     <b>let</b> existing_order = self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
     <b>let</b> order_id = <b>if</b> (existing_order) {
         <b>let</b> old_order = self.orders.remove(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+        <b>let</b> existing_sequence_number = aptos_experimental::bulk_order_book_types::get_sequence_number_from_bulk_order(&old_order);
+        <b>assert</b>!(new_sequence_number &gt; existing_sequence_number, <a href="bulk_order_book.md#0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>);
         <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &old_order);
         old_order.get_order_id()
     } <b>else</b> {
