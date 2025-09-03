@@ -11,7 +11,7 @@ use aptos_types::{
 };
 use arr_macro::arr;
 use itertools::Itertools;
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
+use rayon::prelude::*;
 use std::{
     collections::{hash_map::Entry, HashMap},
     time::Duration,
@@ -46,10 +46,13 @@ impl<'kv> PerVersionStateUpdateRefs<'kv> {
             versions_seen += 1;
 
             for (key, write_op) in update_iter.into_iter() {
-                shards[key.get_shard_id()].push((key, StateUpdateRef {
-                    version,
-                    state_op: write_op,
-                }));
+                shards[key.get_shard_id()].push((
+                    key,
+                    StateUpdateRef {
+                        version,
+                        state_op: write_op,
+                    },
+                ));
             }
         }
         assert_eq!(versions_seen, num_versions);
@@ -101,7 +104,8 @@ impl BatchedStateUpdateRefs<'_> {
 
 #[derive(Debug)]
 pub struct StateUpdateRefs<'kv> {
-    pub per_version: PerVersionStateUpdateRefs<'kv>,
+    pub per_version1: Option<PerVersionStateUpdateRefs<'kv>>,
+    pub per_version2: Option<PerVersionStateUpdateRefs<'kv>>,
     /// Batched updates (updates for the same keys are merged) from the
     /// beginning of the block/chunk to the last checkpoint (if it exists).
     pub for_last_checkpoint: Option<BatchedStateUpdateRefs<'kv>>,
@@ -136,13 +140,28 @@ impl<'kv> StateUpdateRefs<'kv> {
         num_versions: usize,
         last_checkpoint_index: Option<usize>,
     ) -> Self {
-        let per_version =
-            PerVersionStateUpdateRefs::index(first_version, updates_by_version, num_versions);
+        let mut updates_by_version = updates_by_version.into_iter();
+        let per_version1 = last_checkpoint_index.map(|index| {
+            PerVersionStateUpdateRefs::index(
+                first_version,
+                updates_by_version.by_ref().take(index + 1),
+                index + 1,
+            )
+        });
+        let per_version2 = match last_checkpoint_index {
+            Some(num) if num == num_versions => None,
+            _ => Some(PerVersionStateUpdateRefs::index(
+                first_version,
+                updates_by_version,
+                num_versions - last_checkpoint_index.map_or(0, |index| index + 1),
+            )),
+        };
 
-        let (for_last_checkpoint, for_latest) =
-            Self::collect_updates(&per_version, last_checkpoint_index);
+        let for_last_checkpoint = per_version1.as_ref().map(|pv| Self::collect_updates(pv));
+        let for_latest = per_version2.as_ref().map(|pv| Self::collect_updates(pv));
         Self {
-            per_version,
+            per_version1,
+            per_version2,
             for_last_checkpoint,
             for_latest,
         }
@@ -156,60 +175,21 @@ impl<'kv> StateUpdateRefs<'kv> {
 
     fn collect_updates(
         per_version_updates: &PerVersionStateUpdateRefs<'kv>,
-        last_checkpoint_index: Option<usize>,
-    ) -> (
-        Option<BatchedStateUpdateRefs<'kv>>,
-        Option<BatchedStateUpdateRefs<'kv>>,
-    ) {
+    ) -> BatchedStateUpdateRefs<'kv> {
         let _timer = TIMER.timer_with(&["index_state_updates__collect_batch"]);
 
-        let mut shard_iters = per_version_updates
-            .shards
-            .iter()
-            .map(|shard| shard.iter().cloned())
-            .collect::<Vec<_>>();
+        let first_version = per_version_updates.first_version;
+        let num_versions = per_version_updates.num_versions;
 
-        let mut first_version_to_collect = per_version_updates.first_version;
-        let mut remaining_versions = per_version_updates.num_versions;
-        let updates_for_last_checkpoint = last_checkpoint_index.map(|idx| {
-            let num_versions = idx + 1;
-            let ret = Self::collect_some_updates(
-                first_version_to_collect,
-                num_versions,
-                &mut shard_iters,
-            );
-            first_version_to_collect += num_versions as Version;
-            remaining_versions -= num_versions;
-            ret
-        });
-        let updates_for_latest = if remaining_versions == 0 {
-            None
-        } else {
-            Some(Self::collect_some_updates(
-                first_version_to_collect,
-                remaining_versions,
-                &mut shard_iters,
-            ))
-        };
-
-        // Assert that all updates are consumed.
-        assert!(shard_iters.iter_mut().all(|iter| iter.next().is_none()));
-
-        (updates_for_last_checkpoint, updates_for_latest)
-    }
-
-    fn collect_some_updates(
-        first_version: Version,
-        num_versions: usize,
-        shard_iters: &mut [impl Iterator<Item = (&'kv StateKey, StateUpdateRef<'kv>)> + Clone + Send],
-    ) -> BatchedStateUpdateRefs<'kv> {
         let mut ret = BatchedStateUpdateRefs::new_empty(first_version, num_versions);
         // exclusive
         let end_version = first_version + num_versions as Version;
-        shard_iters
-            .par_iter_mut()
+        per_version_updates
+            .shards
+            .par_iter()
+            .map(|shard| shard.iter().cloned())
             .zip_eq(ret.shards.par_iter_mut())
-            .for_each(|(shard_iter, dedupped)| {
+            .for_each(|(mut shard_iter, dedupped)| {
                 // n.b. take_while_ref so that in the next step we can process the rest of the
                 // entries from the iters.
                 for (k, u) in shard_iter.take_while_ref(|(_k, u)| u.version < end_version) {

@@ -66,7 +66,7 @@ impl StateSummary {
             .is_descendant_of(&other.global_state_summary)
     }
 
-    pub fn update(
+    fn update(
         &self,
         persisted: &ProvableStateSummary,
         updates: &BatchedStateUpdateRefs,
