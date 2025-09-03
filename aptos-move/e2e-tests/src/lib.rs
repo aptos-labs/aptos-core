@@ -17,7 +17,7 @@ pub mod compile;
 pub mod execution_strategies;
 pub mod executor;
 pub mod gas_costs;
-mod golden_outputs;
+pub mod golden_outputs;
 pub mod loader;
 
 pub fn assert_status_eq(s1: &KeptVMStatus, s2: &KeptVMStatus) -> bool {
