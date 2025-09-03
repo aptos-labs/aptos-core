@@ -12,6 +12,7 @@ use crate::{
     keyless::{KeylessPublicKey, KeylessSignature},
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
+    state_store::state_slot::StateSlot,
     transaction::authenticator::{
         AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
         TransactionAuthenticator,
@@ -3034,6 +3035,12 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
     ) -> Self {
         unimplemented!()
     }
+
+    fn finalize_block_epilogue(
+        &mut self,
+        promotions: BTreeMap<Self::Key, StateSlot>,
+        evictions: BTreeMap<Self::Key, StateSlot>,
+    );
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
