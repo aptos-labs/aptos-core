@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_block_executor::types::{InputOutputKey, ReadWriteSummary};
 use aptos_gas_algebra::GasQuantity;
 use aptos_gas_profiling::TransactionGasLog;
 use aptos_language_e2e_tests::account::Account;
@@ -22,7 +23,7 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     fee_statement::FeeStatement,
-    transaction::{SignedTransaction, TransactionExecutableRef},
+    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction, TransactionExecutableRef},
 };
 use e2e_move_tests::MoveHarnessSend;
 use std::{
@@ -103,6 +104,9 @@ impl CalibrationRunner {
         execute_block_expect_success(to_skip_txns, &mut self.harness);
 
         let mut aggregate_gas_log: Option<TransactionGasLog> = None;
+
+        let mut read_write_sets = vec![];
+
         for i in 0..to_evaluate {
             let txn = generate_next();
             let cur_name = if to_evaluate > 1 {
@@ -116,8 +120,17 @@ impl CalibrationRunner {
             } else {
                 name.clone()
             };
-            let log = self.run_with_tps_estimate_signed(&cur_name, txn, tps);
+            let (log, fee_statement) = self.run_with_tps_estimate_signed(&cur_name, txn, tps);
+
             if let Some(mut log) = log {
+                let reads = log.exec_io.call_graph.get_reads().into_iter().map(InputOutputKey::Resource).collect();
+                let writes = log.exec_io.write_set_transient.iter().map(|w| InputOutputKey::Resource(w.key.clone())).collect();
+
+                let exe_and_io_gas = fee_statement.map_or(0, |fee_statement| {
+                    fee_statement.execution_gas_used() + fee_statement.io_gas_used()
+                });
+
+                read_write_sets.push((cur_name, exe_and_io_gas, ReadWriteSummary::<SignatureVerifiedTransaction>::new(reads, writes)));
                 log.exec_io.call_graph = log.exec_io.call_graph.fold_unique_stack();
                 aggregate_gas_log = Some(
                     if let Some(aggregate_gas_log) = aggregate_gas_log {
@@ -140,18 +153,43 @@ impl CalibrationRunner {
                 );
             }
         }
+
+
+        if !read_write_sets.is_empty() {
+            let mut gas = vec![];
+            let mut end_gas = vec![];
+            for cur in 1..to_evaluate {
+                let cur_gas = read_write_sets[cur].1;
+                gas.push(cur_gas);
+                let mut start = 0;
+                println!("== Conflicts for txn [{}] {} == ", cur, &read_write_sets[cur].0);
+                for prev in 0..cur {
+                    let cur_rw = &read_write_sets[cur].2;
+                    let prev_rw = &read_write_sets[prev].2;
+                    let conflicts = cur_rw.find_conflicts(prev_rw);
+                    if !conflicts.is_empty() {
+                        println!("[{}] {} {:?}", prev, conflicts.len(), conflicts);
+                        start = start.max(end_gas[prev]);
+                    }
+                }
+                end_gas.push(start + cur_gas);
+                println!("Takes {} gas, finishes after {} gas", cur_gas, start + cur_gas);
+            }
+            println!("End gas: {:?}, total gas: {}", end_gas, gas.iter().sum::<u64>());
+        }
     }
 
     #[cfg(test)]
     fn run(&mut self, function: &str, account: &Account, payload: TransactionPayload) {
-        if !self.profile_gas {
-            print_gas_cost(function, self.harness.evaluate_gas(account, payload));
+        let (gas_used, fee_statement) = if !self.profile_gas {
+            self.harness.evaluate_gas(account, payload)
         } else {
             let (log, gas_used, fee_statement) =
                 self.harness.evaluate_gas_with_profiler(account, payload);
             save_profiling_results(function, &log);
-            print_gas_cost_with_statement(function, gas_used, fee_statement);
-        }
+            (gas_used, fee_statement)
+        };
+        print_gas_cost_with_statement(function, gas_used, fee_statement);
     }
 
     #[cfg(test)]
@@ -163,7 +201,8 @@ impl CalibrationRunner {
         tps: f64,
     ) {
         if !self.profile_gas {
-            print_gas_cost(function, self.harness.evaluate_gas(account, payload));
+            let (gas_used, fee_statement) = self.harness.evaluate_gas(account, payload);
+            print_gas_cost_with_statement(function, gas_used, fee_statement);
         } else {
             let (log, gas_used, fee_statement) =
                 self.harness.evaluate_gas_with_profiler(account, payload);
@@ -183,10 +222,11 @@ impl CalibrationRunner {
         function: &str,
         txn: SignedTransaction,
         tps: f64,
-    ) -> Option<TransactionGasLog> {
+    ) -> (Option<TransactionGasLog>, Option<FeeStatement>) {
         if !self.profile_gas {
-            print_gas_cost(function, self.harness.evaluate_gas_signed(txn));
-            None
+            let (gas_used, fee_statement) = self.harness.evaluate_gas_signed(txn);
+            print_gas_cost_with_statement(function, gas_used, fee_statement);
+            (None, fee_statement)
         } else {
             let (log, gas_used, fee_statement) =
                 self.harness.evaluate_gas_with_profiler_signed(txn);
@@ -198,7 +238,7 @@ impl CalibrationRunner {
                 summarize_exe_and_io(&log),
                 tps,
             );
-            Some(log)
+            (Some(log), fee_statement)
         }
     }
 
@@ -425,7 +465,6 @@ pub fn print_gas_cost(function: &str, gas_units: u64) {
     );
 }
 
-#[cfg(test)]
 fn print_gas_cost_with_statement(
     function: &str,
     gas_units: u64,

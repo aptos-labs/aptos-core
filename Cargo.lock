@@ -3068,6 +3068,7 @@ name = "aptos-move-e2e-benchmark"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-executor",
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-gas-algebra",

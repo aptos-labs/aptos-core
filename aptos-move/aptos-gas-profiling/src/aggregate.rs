@@ -3,10 +3,11 @@
 
 use crate::{
     erased::Node,
-    log::{ExecutionAndIOCosts, ExecutionGasEvent},
+    log::{CallFrame, ExecutionAndIOCosts, ExecutionGasEvent},
     render::{Render, TableKey},
 };
 use aptos_gas_algebra::{GasQuantity, GasScalingFactor, InternalGas, InternalGasUnit};
+use aptos_types::state_store::state_key::StateKey;
 use std::collections::{btree_map, BTreeMap};
 
 /// Represents an aggregation of execution gas events, including the count and total gas costs for each type of event.
@@ -179,5 +180,22 @@ fn compute_method_self_cost(
 
     if !node.children.is_empty() {
         insert_or_add(methods, node.text.clone(), sum);
+    }
+}
+
+impl CallFrame {
+    pub fn get_reads(&self) -> Vec<StateKey> {
+        let mut result = vec![];
+        for event in &self.events {
+            match event {
+                ExecutionGasEvent::Loc(_)
+                | ExecutionGasEvent::Bytecode { .. }
+                | ExecutionGasEvent::CreateTy { .. }
+                | ExecutionGasEvent::CallNative { .. } => {}, // handle table reads?
+                ExecutionGasEvent::Call(call_frame) => result.append(&mut call_frame.get_reads()),
+                ExecutionGasEvent::LoadResource { addr, ty, .. } => result.push(StateKey::resource(addr, ty.struct_tag().unwrap()).unwrap()),
+            }
+        }
+        result
     }
 }

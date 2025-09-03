@@ -386,16 +386,16 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
     }
 
     /// Runs a transaction and return gas used.
-    pub fn evaluate_gas(&mut self, account: &Account, payload: TransactionPayload) -> u64 {
+    pub fn evaluate_gas(&mut self, account: &Account, payload: TransactionPayload) -> (u64, Option<FeeStatement>) {
         let txn = self.create_transaction_payload(account, payload);
         self.evaluate_gas_signed(txn)
     }
 
     /// Runs a transaction and return gas used.
-    pub fn evaluate_gas_signed(&mut self, txn: SignedTransaction) -> u64 {
+    pub fn evaluate_gas_signed(&mut self, txn: SignedTransaction) -> (u64, Option<FeeStatement>) {
         let output = self.run_raw(txn);
         assert_success!(output.status().to_owned());
-        output.gas_used()
+        (output.gas_used(), output.try_extract_fee_statement().unwrap())
     }
 
     /// Runs a transaction with the gas profiler.
