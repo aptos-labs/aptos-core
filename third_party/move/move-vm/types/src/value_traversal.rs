@@ -3,7 +3,7 @@
 
 use crate::{
     delayed_values::error::code_invariant_error,
-    values::{Closure, Container, Value, ValueImpl},
+    values::{Closure, Value, ValueImpl},
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
@@ -33,27 +33,24 @@ fn find_identifiers_in_value_impl(
         | ValueImpl::Bool(_)
         | ValueImpl::Address(_) => {},
 
-        ValueImpl::Container(c) => match &**c {
-            Container::Locals(_) => {
-                return Err(PartialVMError::new(
-                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                ))
-            },
+        ValueImpl::Locals(_) => {
+            return Err(PartialVMError::new(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            ))
+        },
+        ValueImpl::VecU8(_)
+        | ValueImpl::VecU64(_)
+        | ValueImpl::VecU128(_)
+        | ValueImpl::VecBool(_)
+        | ValueImpl::VecAddress(_)
+        | ValueImpl::VecU16(_)
+        | ValueImpl::VecU32(_)
+        | ValueImpl::VecU256(_) => {},
 
-            Container::VecU8(_)
-            | Container::VecU64(_)
-            | Container::VecU128(_)
-            | Container::VecBool(_)
-            | Container::VecAddress(_)
-            | Container::VecU16(_)
-            | Container::VecU32(_)
-            | Container::VecU256(_) => {},
-
-            Container::Vec(v) | Container::Struct(v) => {
-                for val in v.borrow().iter() {
-                    find_identifiers_in_value_impl(val, identifiers)?;
-                }
-            },
+        ValueImpl::Vec(v) | ValueImpl::Struct(v) => {
+            for val in v.borrow().iter() {
+                find_identifiers_in_value_impl(val, identifiers)?;
+            }
         },
 
         ValueImpl::ClosureValue(c) => {
