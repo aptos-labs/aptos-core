@@ -22,7 +22,7 @@ use aptos_executor_types::{
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
-use aptos_metrics_core::TimerHelper;
+use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
     state::LedgerState, state_view::cached_state_view::CachedStateView,
 };

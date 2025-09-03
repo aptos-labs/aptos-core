@@ -16,6 +16,7 @@ use crate::{
     log_schema::AdapterLogSchema,
 };
 use aptos_logger::{prelude::*, Level};
+use aptos_metrics_core::IntCounterHelper;
 use aptos_speculative_state_helper::{SpeculativeEvent, SpeculativeEvents};
 use arc_swap::ArcSwapOption;
 use once_cell::sync::Lazy;
@@ -164,7 +165,7 @@ pub fn clear_speculative_txn_logs(txn_idx: usize) {
 macro_rules! alert {
     ($($args:tt)+) => {
 	error!($($args)+);
-	CRITICAL_ERRORS.inc();
+	<::std::thread::LocalKey<::std::cell::RefCell<::aptos_metrics_core::LocalIntCounter>> as ::aptos_metrics_core::IntCounterHelper>::inc(&CRITICAL_ERRORS);
     };
 }
 

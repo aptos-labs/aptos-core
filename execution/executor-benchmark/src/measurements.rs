@@ -36,13 +36,17 @@ struct GasMeasurement {
 
 impl GasMeasurement {
     pub fn sequential_gas_counter(gas_type: &str) -> Histogram {
-        block_executor_counters::TXN_GAS
-            .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL, gas_type])
+        block_executor_counters::TXN_GAS.with_borrow(|x| {
+            x.shared()
+                .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL, gas_type])
+        })
     }
 
     pub fn parallel_gas_counter(gas_type: &str) -> Histogram {
-        block_executor_counters::TXN_GAS
-            .with_label_values(&[block_executor_counters::Mode::PARALLEL, gas_type])
+        block_executor_counters::TXN_GAS.with_borrow(|x| {
+            x.shared()
+                .with_label_values(&[block_executor_counters::Mode::PARALLEL, gas_type])
+        })
     }
 
     pub fn now() -> GasMeasurement {
@@ -62,21 +66,30 @@ impl GasMeasurement {
         let gas_count = Self::sequential_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count()
             + Self::parallel_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count();
 
-        let effective_block_gas = block_executor_counters::EFFECTIVE_BLOCK_GAS
-            .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL])
-            .get_sample_sum()
-            + block_executor_counters::EFFECTIVE_BLOCK_GAS
-                .with_label_values(&[block_executor_counters::Mode::PARALLEL])
-                .get_sample_sum();
+        let effective_block_gas =
+            block_executor_counters::EFFECTIVE_BLOCK_GAS.with_borrow(|x| {
+                x.shared()
+                    .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL])
+                    .get_sample_sum()
+            }) + block_executor_counters::EFFECTIVE_BLOCK_GAS.with_borrow(|x| {
+                x.shared()
+                    .with_label_values(&[block_executor_counters::Mode::PARALLEL])
+                    .get_sample_sum()
+            });
 
-        let approx_block_output = block_executor_counters::APPROX_BLOCK_OUTPUT_SIZE
-            .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL])
-            .get_sample_sum()
-            + block_executor_counters::APPROX_BLOCK_OUTPUT_SIZE
-                .with_label_values(&[block_executor_counters::Mode::PARALLEL])
-                .get_sample_sum();
+        let approx_block_output =
+            block_executor_counters::APPROX_BLOCK_OUTPUT_SIZE.with_borrow(|x| {
+                x.shared()
+                    .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL])
+                    .get_sample_sum()
+            }) + block_executor_counters::APPROX_BLOCK_OUTPUT_SIZE.with_borrow(|x| {
+                x.shared()
+                    .with_label_values(&[block_executor_counters::Mode::PARALLEL])
+                    .get_sample_sum()
+            });
 
-        let speculative_abort_count = block_executor_counters::SPECULATIVE_ABORT_COUNT.get();
+        let speculative_abort_count =
+            block_executor_counters::SPECULATIVE_ABORT_COUNT.with_borrow(|x| x.shared().get());
 
         Self {
             gas,
@@ -133,13 +146,21 @@ struct ExecutionTimeMeasurement {
 
 impl ExecutionTimeMeasurement {
     pub fn now() -> Self {
-        let output_size = PROCESSED_TXNS_OUTPUT_SIZE
-            .with_label_values(&["execution"])
-            .get_sample_sum();
+        let output_size = PROCESSED_TXNS_OUTPUT_SIZE.with_borrow(|x| {
+            x.shared()
+                .with_label_values(&["execution"])
+                .get_sample_sum()
+        });
 
-        let sig_verify_total = TIMER.with_label_values(&["sig_verify"]).get_sample_sum();
-        let partitioning_total = TIMER.with_label_values(&["partition"]).get_sample_sum();
-        let execution_total = TIMER.with_label_values(&["execute"]).get_sample_sum();
+        let sig_verify_total = TIMER.with_borrow(|x| {
+            x.shared()
+                .with_label_values(&["sig_verify"])
+                .get_sample_sum()
+        });
+        let partitioning_total =
+            TIMER.with_borrow_mut(|x| x.with_label_values(&["partition"]).get_sample_sum());
+        let execution_total =
+            TIMER.with_borrow_mut(|x| x.with_label_values(&["execute"]).get_sample_sum());
         let block_executor_total = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum();
         let block_executor_inner_total = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.get_sample_sum();
 
@@ -148,9 +169,11 @@ impl ExecutionTimeMeasurement {
             .map(|(_prefix, _top_level, other_label)| {
                 (
                     *other_label,
-                    OTHER_TIMERS
-                        .with_label_values(&[other_label])
-                        .get_sample_sum(),
+                    OTHER_TIMERS.with_borrow(|x| {
+                        x.shared()
+                            .with_label_values(&[other_label])
+                            .get_sample_sum()
+                    }),
                 )
             })
             .collect::<HashMap<_, _>>();

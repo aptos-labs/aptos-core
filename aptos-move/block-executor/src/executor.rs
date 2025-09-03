@@ -32,6 +32,7 @@ use aptos_aggregator::{
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{error, info};
+use aptos_metrics_core::IntCounterHelper;
 use aptos_mvhashmap::{
     types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
