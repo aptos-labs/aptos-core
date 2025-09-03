@@ -6,7 +6,7 @@
 
 use crate::{
     account::{Account, AccountData},
-    golden_outputs::GoldenOutputs,
+    golden_outputs::{GoldenOutputs, OutputLogger},
 };
 use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
@@ -135,12 +135,12 @@ fn empty_in_memory_state_store() -> FakeExecutorStateStore {
 /// Provides an environment to run a VM instance.
 ///
 /// This struct is a mock in-memory implementation of the Aptos executor.
-pub struct FakeExecutor {
+pub struct FakeExecutorImpl<O: OutputLogger> {
     state_store: FakeExecutorStateStore,
     event_store: Vec<ContractEvent>,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     block_time: u64,
-    executed_output: Option<GoldenOutputs>,
+    executed_output: Option<O>,
     trace_dir: Option<PathBuf>,
     rng: KeyGen,
     /// If set, determines whether to execute a comparison test with the parallel block executor.
@@ -149,6 +149,8 @@ pub struct FakeExecutor {
     executor_mode: Option<ExecutorMode>,
     allow_block_executor_fallback: bool,
 }
+
+pub type FakeExecutor = FakeExecutorImpl<GoldenOutputs>;
 
 pub enum GasMeterType {
     RegularGasMeter,
@@ -194,7 +196,7 @@ pub enum ExecFuncTimerDynamicArgs {
     DistinctSignersAndFixed(Vec<AccountAddress>),
 }
 
-impl FakeExecutor {
+impl<O: OutputLogger> FakeExecutorImpl<O> {
     /// Creates an executor from a genesis [`WriteSet`].
     pub fn from_genesis(write_set: &WriteSet, chain_id: ChainId) -> Self {
         let executor_thread_pool = Arc::new(
@@ -207,7 +209,7 @@ impl FakeExecutor {
         let state_store = empty_in_memory_state_store();
         state_store.set_chain_id(chain_id).unwrap();
 
-        let mut executor = FakeExecutor {
+        let mut executor = Self {
             state_store,
             event_store: Vec::new(),
             executor_thread_pool,
@@ -231,7 +233,7 @@ impl FakeExecutor {
         let state_store = empty_in_memory_state_store();
         state_store.set_chain_id(chain_id).unwrap();
 
-        let mut executor = FakeExecutor {
+        let mut executor = Self {
             state_store,
             event_store: Vec::new(),
             executor_thread_pool,
@@ -374,7 +376,7 @@ impl FakeExecutor {
                 .build()
                 .unwrap(),
         );
-        FakeExecutor {
+        Self {
             state_store: empty_in_memory_state_store(),
             event_store: Vec::new(),
             executor_thread_pool,
@@ -385,22 +387,6 @@ impl FakeExecutor {
             executor_mode: None,
             allow_block_executor_fallback: true,
         }
-    }
-
-    pub fn set_golden_file(&mut self, test_name: &str) {
-        // 'test_name' includes ':' in the names, lets re-write these to be '_'s so that these
-        // files can persist on windows machines.
-        let file_name = test_name.replace(':', "_");
-        self.executed_output = Some(GoldenOutputs::new(&file_name));
-        self.set_tracing(test_name, file_name)
-    }
-
-    pub fn set_golden_file_at(&mut self, path: &str, test_name: &str) {
-        // 'test_name' includes ':' in the names, lets re-write these to be '_'s so that these
-        // files can persist on windows machines.
-        let file_name = test_name.replace(':', "_");
-        self.executed_output = Some(GoldenOutputs::new_at_path(PathBuf::from(path), &file_name));
-        self.set_tracing(test_name, file_name)
     }
 
     fn set_tracing(&mut self, test_name: &str, file_name: String) {
@@ -1417,6 +1403,24 @@ impl FakeExecutor {
             bcs::to_bytes(&enabled).unwrap(),
             bcs::to_bytes(&disabled).unwrap(),
         ]);
+    }
+}
+
+impl FakeExecutorImpl<GoldenOutputs> {
+    pub fn set_golden_file(&mut self, test_name: &str) {
+        // 'test_name' includes ':' in the names, lets re-write these to be '_'s so that these
+        // files can persist on windows machines.
+        let file_name = test_name.replace(':', "_");
+        self.executed_output = Some(GoldenOutputs::new(&file_name));
+        self.set_tracing(test_name, file_name)
+    }
+
+    pub fn set_golden_file_at(&mut self, path: &str, test_name: &str) {
+        // 'test_name' includes ':' in the names, lets re-write these to be '_'s so that these
+        // files can persist on windows machines.
+        let file_name = test_name.replace(':', "_");
+        self.executed_output = Some(GoldenOutputs::new_at_path(PathBuf::from(path), &file_name));
+        self.set_tracing(test_name, file_name)
     }
 }
 

@@ -8,7 +8,11 @@ use std::{cell::RefCell, fmt::Debug, fs::File, io::Write, path::PathBuf};
 
 pub const GOLDEN_DIR_PATH: &str = "goldens";
 
-pub(crate) struct GoldenOutputs {
+pub trait OutputLogger {
+    fn log(&self, msg: &str);
+}
+
+pub struct GoldenOutputs {
     #[allow(dead_code)]
     mint: Mint,
     file: RefCell<File>,
@@ -35,8 +39,10 @@ impl GoldenOutputs {
         );
         Self { mint, file }
     }
+}
 
-    pub fn log(&self, msg: &str) {
+impl OutputLogger for GoldenOutputs {
+    fn log(&self, msg: &str) {
         self.file.borrow_mut().write_all(msg.as_bytes()).unwrap();
     }
 }
@@ -45,4 +51,10 @@ impl Debug for GoldenOutputs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "")
     }
+}
+
+pub struct NoOutputLogger {}
+
+impl OutputLogger for NoOutputLogger {
+    fn log(&self, _msg: &str) {}
 }
