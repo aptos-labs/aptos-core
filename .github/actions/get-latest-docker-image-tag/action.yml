@@ -30,7 +30,6 @@ runs:
 
     - name: Determine image tag
       id: determine-test-image-tag
-      working-directory: checkout_branch/testsuite # the checkout_branch is a subdirectory
       uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
       with:
         max_attempts: 5
