@@ -442,7 +442,7 @@ impl BufferManager {
         } else {
             sample!(
                 SampleRate::Frequency(2),
-                info!(
+                debug!(
                     "Advance execution root from {:?} to {:?}",
                     cursor, self.execution_root
                 )
@@ -465,7 +465,7 @@ impl BufferManager {
             });
         sample!(
             SampleRate::Frequency(2),
-            info!(
+            debug!(
                 "Advance signing root from {:?} to {:?}",
                 cursor, self.signing_root
             )
@@ -535,7 +535,7 @@ impl BufferManager {
                     // this persisting request will result in BlockNotFound
                     self.reset().await;
                 }
-                info!("Advance head to {:?}", self.buffer.head_cursor());
+                debug!("Advance head to {:?}", self.buffer.head_cursor());
                 self.previous_commit_time = Instant::now();
                 return;
             }
