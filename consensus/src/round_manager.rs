@@ -165,7 +165,7 @@ impl UnverifiedEvent {
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
             UnverifiedEvent::BatchMsg(b) => {
                 if !self_message {
-                    b.verify(peer_id, max_num_batches)?;
+                    b.verify(peer_id, max_num_batches, validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["batch"])
                         .observe(start_time.elapsed().as_secs_f64());
