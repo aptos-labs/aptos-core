@@ -18,6 +18,7 @@ use crate::{
 use anyhow::Result;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{ColumnFamilyName, DB};
 use aptos_types::state_store::NUM_STATE_SHARDS;
 use once_cell::sync::Lazy;
@@ -104,9 +105,7 @@ fn update_rocksdb_properties(
     state_merkle_db: &StateMerkleDb,
     state_kv_db: &StateKvDb,
 ) -> Result<()> {
-    let _timer = OTHER_TIMERS_SECONDS
-        .with_label_values(&["update_rocksdb_properties"])
-        .start_timer();
+    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["update_rocksdb_properties"]);
 
     let enable_storage_sharding = state_kv_db.enabled_sharding();
 

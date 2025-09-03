@@ -11,6 +11,7 @@ use anyhow::{bail, Result};
 use aptos_block_executor::{
     counters::BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, txn_provider::default::DefaultTxnProvider,
 };
+use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{
@@ -537,9 +538,7 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
             .db_util
             .new_state_key_object_resource_group(&sender_store_address);
         let mut sender_fa_store_object = {
-            let _timer = TIMER
-                .with_label_values(&["read_sender_fa_store"])
-                .start_timer();
+            let _timer = TIMER.timer_with(&["read_sender_fa_store"]);
             match DbAccessUtil::get_resource_group(&sender_fa_store_object_key, state_view)? {
                 Some(sender_fa_store_object) => sender_fa_store_object,
                 None => bail!("sender fa store missing"),
@@ -589,9 +588,7 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
     ) -> Result<()> {
         let sender_coin_store_key = self.db_util.new_state_key_aptos_coin(&sender_address);
         let sender_coin_store_opt = {
-            let _timer = TIMER
-                .with_label_values(&["read_sender_coin_store"])
-                .start_timer();
+            let _timer = TIMER.timer_with(&["read_sender_coin_store"]);
             DbAccessUtil::get_apt_coin_store(&sender_coin_store_key, state_view)?
         };
         let mut sender_coin_store = match sender_coin_store_opt {
