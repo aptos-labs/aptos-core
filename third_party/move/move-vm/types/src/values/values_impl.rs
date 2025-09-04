@@ -2733,9 +2733,9 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
 }
 
 impl VectorRef {
-    pub fn length_as_usize(&self, type_param: &Type) -> PartialVMResult<usize> {
+    pub fn length_as_usize(&self) -> PartialVMResult<usize> {
         let c: &Container = self.0.container();
-        check_elem_layout(type_param, c)?;
+        //check_elem_layout(type_param, c)?;
 
         let len = match c {
             Container::VecU8(r) => r.borrow().len(),
@@ -2752,13 +2752,13 @@ impl VectorRef {
         Ok(len)
     }
 
-    pub fn len(&self, type_param: &Type) -> PartialVMResult<Value> {
-        Ok(Value::u64(self.length_as_usize(type_param)? as u64))
+    pub fn len(&self) -> PartialVMResult<Value> {
+        Ok(Value::u64(self.length_as_usize()? as u64))
     }
 
-    pub fn push_back(&self, e: Value, type_param: &Type) -> PartialVMResult<()> {
+    pub fn push_back(&self, e: Value) -> PartialVMResult<()> {
         let c = self.0.container();
-        check_elem_layout(type_param, c)?;
+        // check_elem_layout(type_param, c)?;
 
         match c {
             Container::VecU8(r) => r.borrow_mut().push(e.value_as()?),
@@ -2777,9 +2777,9 @@ impl VectorRef {
         Ok(())
     }
 
-    pub fn borrow_elem(&self, idx: usize, type_param: &Type) -> PartialVMResult<Value> {
+    pub fn borrow_elem(&self, idx: usize) -> PartialVMResult<Value> {
         let c = self.0.container();
-        check_elem_layout(type_param, c)?;
+        // check_elem_layout(type_param, c)?;
         if idx >= c.len() {
             return Err(PartialVMError::new(StatusCode::VECTOR_OPERATION_ERROR)
                 .with_sub_status(INDEX_OUT_OF_BOUNDS));
@@ -2796,9 +2796,9 @@ impl VectorRef {
         }
     }
 
-    pub fn pop(&self, type_param: &Type) -> PartialVMResult<Value> {
+    pub fn pop(&self) -> PartialVMResult<Value> {
         let c = self.0.container();
-        check_elem_layout(type_param, c)?;
+        // check_elem_layout(type_param, c)?;
 
         macro_rules! err_pop_empty_vec {
             () => {
@@ -2851,9 +2851,9 @@ impl VectorRef {
         Ok(res)
     }
 
-    pub fn swap(&self, idx1: usize, idx2: usize, type_param: &Type) -> PartialVMResult<()> {
+    pub fn swap(&self, idx1: usize, idx2: usize) -> PartialVMResult<()> {
         let c = self.0.container();
-        check_elem_layout(type_param, c)?;
+        // check_elem_layout(type_param, c)?;
 
         macro_rules! swap {
             ($v:expr) => {{
@@ -2898,7 +2898,7 @@ impl VectorRef {
         length: usize,
         to_self: &Self,
         insert_position: usize,
-        type_param: &Type,
+        // type_param: &Type,
     ) -> PartialVMResult<()> {
         let from_c = from_self.0.container();
         let to_c = to_self.0.container();
@@ -2907,8 +2907,8 @@ impl VectorRef {
         // (unlike other vector functions that are bytecodes)
         // TODO: potentially unnecessary, can be removed - as these are only required for
         // bytecode instructions, as types are checked when native functions are called.
-        check_elem_layout(type_param, from_c)?;
-        check_elem_layout(type_param, to_c)?;
+        // check_elem_layout(type_param, from_c)?;
+        // check_elem_layout(type_param, to_c)?;
 
         macro_rules! move_range {
             ($from:expr, $to:expr) => {{
@@ -3071,8 +3071,8 @@ impl Vector {
         Ok(elements)
     }
 
-    pub fn unpack(self, type_param: &Type, expected_num: u64) -> PartialVMResult<Vec<Value>> {
-        check_elem_layout(type_param, &self.0)?;
+    pub fn unpack(self, expected_num: u64) -> PartialVMResult<Vec<Value>> {
+        // check_elem_layout(type_param, &self.0)?;
         let elements = self.unpack_unchecked()?;
         if expected_num as usize == elements.len() {
             Ok(elements)
@@ -3082,8 +3082,8 @@ impl Vector {
         }
     }
 
-    pub fn destroy_empty(self, type_param: &Type) -> PartialVMResult<()> {
-        self.unpack(type_param, 0)?;
+    pub fn destroy_empty(self, _type_param: &Type) -> PartialVMResult<()> {
+        self.unpack(0)?;
         Ok(())
     }
 
