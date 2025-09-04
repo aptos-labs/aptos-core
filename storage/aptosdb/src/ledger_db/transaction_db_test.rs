@@ -137,8 +137,8 @@ pub(crate) fn init_db(
 ) -> Vec<Transaction> {
     let txns = gens
         .into_iter()
-        .map(|(index, gen)| {
-            Transaction::UserTransaction(gen.materialize(*index, &mut universe).into_inner())
+        .map(|(index, txn_gen)| {
+            Transaction::UserTransaction(txn_gen.materialize(*index, &mut universe).into_inner())
         })
         .collect::<Vec<_>>();
 
