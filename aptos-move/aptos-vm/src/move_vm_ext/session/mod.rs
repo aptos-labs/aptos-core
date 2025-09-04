@@ -38,8 +38,8 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig,
-    data_cache::TransactionDataCache,
     dispatch_loader,
+    legacy::data_cache::{LegacyMoveVmDataCache, LegacyMoveVmDataCacheAdapter},
     module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
@@ -69,7 +69,7 @@ type ChangeSet = Changes<BytesWithResourceLayout>;
 pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
 
 pub struct SessionExt<'r, R> {
-    data_cache: TransactionDataCache,
+    data_cache: LegacyMoveVmDataCache,
     extensions: NativeContextExtensions<'r>,
     pub(crate) resolver: &'r R,
     is_storage_slot_metadata_enabled: bool,
@@ -119,7 +119,7 @@ where
 
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
-            data_cache: TransactionDataCache::empty(),
+            data_cache: LegacyMoveVmDataCache::empty(),
             extensions,
             resolver,
             is_storage_slot_metadata_enabled,
@@ -148,12 +148,15 @@ where
             MoveVM::execute_loaded_function(
                 func,
                 args,
-                &mut self.data_cache,
+                &mut LegacyMoveVmDataCacheAdapter::new(
+                    &mut self.data_cache,
+                    self.resolver,
+                    &loader,
+                ),
                 gas_meter,
                 traversal_context,
                 &mut self.extensions,
                 &loader,
-                self.resolver,
             )
         })
     }
@@ -169,12 +172,11 @@ where
         MoveVM::execute_loaded_function(
             func,
             args,
-            &mut self.data_cache,
+            &mut LegacyMoveVmDataCacheAdapter::new(&mut self.data_cache, self.resolver, loader),
             gas_meter,
             traversal_context,
             &mut self.extensions,
             loader,
-            self.resolver,
         )
     }
 

@@ -5,7 +5,6 @@
 use crate::{
     access_control::AccessControlState,
     config::VMConfig,
-    data_cache::{DataCacheEntry, TransactionDataCache},
     frame::Frame,
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
@@ -42,14 +41,14 @@ use move_core_types::{
     },
 };
 use move_vm_types::{
+    data_cache::MoveVmDataCache,
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
     loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
     natives::function::NativeResult,
-    resolver::ResourceResolver,
     values::{
-        self, AbstractFunction, Closure, GlobalValue, IntegerValue, Locals, Reference, SignerRef,
-        Struct, StructRef, VMValueCast, Value, Vector, VectorRef,
+        self, AbstractFunction, Closure, IntegerValue, Locals, Reference, SignerRef, Struct,
+        StructRef, VMValueCast, Value, Vector, VectorRef,
     },
     views::TypeView,
 };
@@ -124,11 +123,10 @@ impl Interpreter {
     pub(crate) fn entrypoint<LoaderImpl>(
         function: LoadedFunction,
         args: Vec<Value>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         loader: &LoaderImpl,
         ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
         layout_converter: &LayoutConverter<LoaderImpl>,
-        resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -143,7 +141,6 @@ impl Interpreter {
             loader,
             ty_depth_checker,
             layout_converter,
-            resource_resolver,
             gas_meter,
             traversal_context,
             extensions,
@@ -160,11 +157,10 @@ where
     pub(crate) fn entrypoint(
         function: LoadedFunction,
         args: Vec<Value>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         loader: &LoaderImpl,
         ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
         layout_converter: &LayoutConverter<LoaderImpl>,
-        resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -186,7 +182,6 @@ where
         if interpreter.vm_config.paranoid_type_checks {
             interpreter.dispatch_execute_main::<FullRuntimeTypeCheck>(
                 data_cache,
-                resource_resolver,
                 gas_meter,
                 traversal_context,
                 extensions,
@@ -196,7 +191,6 @@ where
         } else {
             interpreter.dispatch_execute_main::<NoRuntimeTypeCheck>(
                 data_cache,
-                resource_resolver,
                 gas_meter,
                 traversal_context,
                 extensions,
@@ -254,8 +248,7 @@ where
 
     fn dispatch_execute_main<RTTCheck: RuntimeTypeCheck>(
         self,
-        data_cache: &mut TransactionDataCache,
-        resource_resolver: &impl ResourceResolver,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -265,7 +258,6 @@ where
         if self.vm_config.use_call_tree_and_instruction_cache {
             self.execute_main::<RTTCheck, AllRuntimeCaches>(
                 data_cache,
-                resource_resolver,
                 gas_meter,
                 traversal_context,
                 extensions,
@@ -275,7 +267,6 @@ where
         } else {
             self.execute_main::<RTTCheck, NoRuntimeCaches>(
                 data_cache,
-                resource_resolver,
                 gas_meter,
                 traversal_context,
                 extensions,
@@ -293,8 +284,7 @@ where
     /// at the top of the stack (return). If the call stack is empty execution is completed.
     fn execute_main<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         mut self,
-        data_cache: &mut TransactionDataCache,
-        resource_resolver: &impl ResourceResolver,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -338,7 +328,6 @@ where
                 .execute_code::<RTTCheck, RTCaches>(
                     &mut self,
                     data_cache,
-                    resource_resolver,
                     gas_meter,
                     traversal_context,
                 )
@@ -456,7 +445,6 @@ where
                         self.call_native::<RTTCheck, RTCaches>(
                             &mut current_frame,
                             data_cache,
-                            resource_resolver,
                             gas_meter,
                             traversal_context,
                             extensions,
@@ -561,7 +549,6 @@ where
                         self.call_native::<RTTCheck, RTCaches>(
                             &mut current_frame,
                             data_cache,
-                            resource_resolver,
                             gas_meter,
                             traversal_context,
                             extensions,
@@ -648,7 +635,6 @@ where
                         self.call_native::<RTTCheck, RTCaches>(
                             &mut current_frame,
                             data_cache,
-                            resource_resolver,
                             gas_meter,
                             traversal_context,
                             extensions,
@@ -816,8 +802,7 @@ where
     fn call_native<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         current_frame: &mut Frame,
-        data_cache: &mut TransactionDataCache,
-        resource_resolver: &impl ResourceResolver,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -829,7 +814,6 @@ where
         self.call_native_impl::<RTTCheck, RTCaches>(
             current_frame,
             data_cache,
-            resource_resolver,
             gas_meter,
             traversal_context,
             extensions,
@@ -858,8 +842,7 @@ where
     fn call_native_impl<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         current_frame: &mut Frame,
-        data_cache: &mut TransactionDataCache,
-        resource_resolver: &impl ResourceResolver,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -916,7 +899,6 @@ where
         let mut native_context = NativeContext::new(
             self,
             data_cache,
-            resource_resolver,
             self.loader.unmetered_module_storage(),
             extensions,
             gas_meter,
@@ -1096,93 +1078,20 @@ where
         self.binop(|lhs, rhs| Ok(Value::bool(f(lhs, rhs)?)))
     }
 
-    /// Creates a data cache entry for the specified address-type pair. Charges gas for the number
-    /// of bytes loaded.
-    fn create_and_charge_data_cache_entry(
-        &self,
-        resource_resolver: &impl ResourceResolver,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        addr: AccountAddress,
-        ty: &Type,
-    ) -> PartialVMResult<DataCacheEntry> {
-        let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
-            self.loader,
-            self.layout_converter,
-            gas_meter,
-            traversal_context,
-            self.loader.unmetered_module_storage(),
-            resource_resolver,
-            &addr,
-            ty,
-        )?;
-        gas_meter.charge_load_resource(
-            addr,
-            TypeWithRuntimeEnvironment {
-                ty,
-                runtime_environment: self.loader.runtime_environment(),
-            },
-            entry.value().view(),
-            bytes_loaded,
-        )?;
-        Ok(entry)
-    }
-
-    /// Loads a resource from the data store and return the number of bytes read from the storage.
-    fn load_resource<'c>(
-        &self,
-        data_cache: &'c mut TransactionDataCache,
-        resource_resolver: &impl ResourceResolver,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        addr: AccountAddress,
-        ty: &Type,
-    ) -> PartialVMResult<&'c mut GlobalValue> {
-        if !data_cache.contains_resource(&addr, ty) {
-            let entry = self.create_and_charge_data_cache_entry(
-                resource_resolver,
-                gas_meter,
-                traversal_context,
-                addr,
-                ty,
-            )?;
-            data_cache.insert_resource(addr, ty.clone(), entry)?;
-        }
-        data_cache.get_resource_mut(&addr, ty)
-    }
-
     /// BorrowGlobal (mutable and not) opcode.
     fn borrow_global(
         &mut self,
         is_mut: bool,
         is_generic: bool,
-        data_cache: &mut TransactionDataCache,
-        resource_resolver: &impl ResourceResolver,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
+        let res =
+            data_cache.borrow_global(gas_meter, traversal_context, is_generic, is_mut, addr, ty);
         let runtime_environment = self.loader.runtime_environment();
-        let res = self
-            .load_resource(
-                data_cache,
-                resource_resolver,
-                gas_meter,
-                traversal_context,
-                addr,
-                ty,
-            )?
-            .borrow_global();
-        gas_meter.charge_borrow_global(
-            is_mut,
-            is_generic,
-            TypeWithRuntimeEnvironment {
-                ty,
-                runtime_environment,
-            },
-            res.is_ok(),
-        )?;
         self.check_access(
             runtime_environment,
             if is_mut {
@@ -1235,31 +1144,14 @@ where
     fn exists(
         &mut self,
         is_generic: bool,
-        data_cache: &mut TransactionDataCache,
-        resource_resolver: &impl ResourceResolver,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
         let runtime_environment = self.loader.runtime_environment();
-        let gv = self.load_resource(
-            data_cache,
-            resource_resolver,
-            gas_meter,
-            traversal_context,
-            addr,
-            ty,
-        )?;
-        let exists = gv.exists()?;
-        gas_meter.charge_exists(
-            is_generic,
-            TypeWithRuntimeEnvironment {
-                ty,
-                runtime_environment,
-            },
-            exists,
-        )?;
+        let exists = data_cache.exists(gas_meter, traversal_context, is_generic, addr, ty)?;
         self.check_access(runtime_environment, AccessKind::Reads, ty, addr)?;
         self.operand_stack.push(Value::bool(exists))?;
         Ok(())
@@ -1269,50 +1161,15 @@ where
     fn move_from(
         &mut self,
         is_generic: bool,
-        data_cache: &mut TransactionDataCache,
-        resource_resolver: &impl ResourceResolver,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
+        let resource = data_cache.move_from(gas_meter, traversal_context, is_generic, addr, ty)?;
         let runtime_environment = self.loader.runtime_environment();
-        let resource = match self
-            .load_resource(
-                data_cache,
-                resource_resolver,
-                gas_meter,
-                traversal_context,
-                addr,
-                ty,
-            )?
-            .move_from()
-        {
-            Ok(resource) => {
-                gas_meter.charge_move_from(
-                    is_generic,
-                    TypeWithRuntimeEnvironment {
-                        ty,
-                        runtime_environment,
-                    },
-                    Some(&resource),
-                )?;
-                self.check_access(runtime_environment, AccessKind::Writes, ty, addr)?;
-                resource
-            },
-            Err(err) => {
-                let val: Option<&Value> = None;
-                gas_meter.charge_move_from(
-                    is_generic,
-                    TypeWithRuntimeEnvironment {
-                        ty,
-                        runtime_environment,
-                    },
-                    val,
-                )?;
-                return Err(err.with_message(format!("Failed to move resource from {:?}", addr)));
-            },
-        };
+        self.check_access(runtime_environment, AccessKind::Writes, ty, addr)?;
         self.operand_stack.push(resource)?;
         Ok(())
     }
@@ -1321,52 +1178,17 @@ where
     fn move_to(
         &mut self,
         is_generic: bool,
-        data_cache: &mut TransactionDataCache,
-        resource_resolver: &impl ResourceResolver,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
         resource: Value,
     ) -> PartialVMResult<()> {
+        data_cache.move_to(gas_meter, traversal_context, is_generic, addr, ty, resource)?;
         let runtime_environment = self.loader.runtime_environment();
-        let gv = self.load_resource(
-            data_cache,
-            resource_resolver,
-            gas_meter,
-            traversal_context,
-            addr,
-            ty,
-        )?;
-        // NOTE(Gas): To maintain backward compatibility, we need to charge gas after attempting
-        //            the move_to operation.
-        match gv.move_to(resource) {
-            Ok(()) => {
-                gas_meter.charge_move_to(
-                    is_generic,
-                    TypeWithRuntimeEnvironment {
-                        ty,
-                        runtime_environment,
-                    },
-                    gv.view().unwrap(),
-                    true,
-                )?;
-                self.check_access(runtime_environment, AccessKind::Writes, ty, addr)?;
-                Ok(())
-            },
-            Err((err, resource)) => {
-                gas_meter.charge_move_to(
-                    is_generic,
-                    TypeWithRuntimeEnvironment {
-                        ty,
-                        runtime_environment,
-                    },
-                    &resource,
-                    false,
-                )?;
-                Err(err.with_message(format!("Failed to move resource into {:?}", addr)))
-            },
-        }
+        self.check_access(runtime_environment, AccessKind::Writes, ty, addr)?;
+        Ok(())
     }
 
     //
@@ -1741,15 +1563,13 @@ impl Frame {
     fn execute_code<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         interpreter: &mut InterpreterImpl<impl Loader>,
-        data_cache: &mut TransactionDataCache,
-        resource_resolver: &impl ResourceResolver,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<ExitCode> {
         self.execute_code_impl::<RTTCheck, RTCaches>(
             interpreter,
             data_cache,
-            resource_resolver,
             gas_meter,
             traversal_context,
         )
@@ -1766,8 +1586,7 @@ impl Frame {
     fn execute_code_impl<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         interpreter: &mut InterpreterImpl<impl Loader>,
-        data_cache: &mut TransactionDataCache,
-        resource_resolver: &impl ResourceResolver,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> PartialVMResult<ExitCode> {
@@ -2524,7 +2343,6 @@ impl Frame {
                             is_mut,
                             false,
                             data_cache,
-                            resource_resolver,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2541,7 +2359,6 @@ impl Frame {
                             is_mut,
                             true,
                             data_cache,
-                            resource_resolver,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2554,7 +2371,6 @@ impl Frame {
                         interpreter.exists(
                             false,
                             data_cache,
-                            resource_resolver,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2568,7 +2384,6 @@ impl Frame {
                         interpreter.exists(
                             true,
                             data_cache,
-                            resource_resolver,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2581,7 +2396,6 @@ impl Frame {
                         interpreter.move_from(
                             false,
                             data_cache,
-                            resource_resolver,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2595,7 +2409,6 @@ impl Frame {
                         interpreter.move_from(
                             true,
                             data_cache,
-                            resource_resolver,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2614,7 +2427,6 @@ impl Frame {
                         interpreter.move_to(
                             false,
                             data_cache,
-                            resource_resolver,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2635,7 +2447,6 @@ impl Frame {
                         interpreter.move_to(
                             true,
                             data_cache,
-                            resource_resolver,
                             gas_meter,
                             traversal_context,
                             addr,
