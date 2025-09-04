@@ -1,21 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics_core::{register_int_counter, IntCounter};
-use once_cell::sync::Lazy;
+use aptos_metrics_core::make_thread_local_int_counter;
 
-/// Count the number of errors. This is not intended for display on a dashboard,
-/// but rather for triggering alerts.
-pub static CRITICAL_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!("aptos_vm_critical_errors", "Number of critical errors").unwrap()
-});
+// Count the number of errors. This is not intended for display on a dashboard,
+// but rather for triggering alerts.
+make_thread_local_int_counter!(
+    pub,
+    CRITICAL_ERRORS,
+    "aptos_vm_critical_errors",
+    "Number of critical errors"
+);
 
-/// Count the number of errors within the speculative logging logic / implementation.
-/// Intended to trigger lower priority / urgency alerts.
-pub static SPECULATIVE_LOGGING_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "aptos_vm_speculative_logging_errors",
-        "Number of errors in speculative logging implementation"
-    )
-    .unwrap()
-});
+// Count the number of errors within the speculative logging logic / implementation.
+// Intended to trigger lower priority / urgency alerts.
+make_thread_local_int_counter!(
+    pub,
+    SPECULATIVE_LOGGING_ERRORS,
+    "aptos_vm_speculative_logging_errors",
+    "Number of errors in speculative logging implementation"
+);

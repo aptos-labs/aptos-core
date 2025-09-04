@@ -138,7 +138,7 @@ fn report_block(
             GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
             BLOCK_EXECUTION_WORKFLOW_WHOLE.get_sample_sum() - GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
             COMMIT_BLOCKS.get_sample_sum(),
-            API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum(),
+            API_LATENCY_SECONDS.with_borrow(|x| x.shared().get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum()),
         );
     const NANOS_PER_SEC: f64 = 1_000_000_000.0;
     info!(
@@ -149,7 +149,7 @@ fn report_block(
                 / total_versions,
             COMMIT_BLOCKS.get_sample_sum() * NANOS_PER_SEC
                 / total_versions,
-            API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum() * NANOS_PER_SEC
+            API_LATENCY_SECONDS.with_borrow(|x| x.shared().get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum()) * NANOS_PER_SEC
                 / total_versions,
         );
 }

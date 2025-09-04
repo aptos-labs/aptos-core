@@ -8,6 +8,7 @@ use crate::{
     scheduler_status::ExecutionStatuses,
 };
 use aptos_infallible::Mutex;
+use aptos_metrics_core::IntCounterHelper;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::error::{code_invariant_error, PanicError};
 use aptos_vm_logging::clear_speculative_txn_logs;

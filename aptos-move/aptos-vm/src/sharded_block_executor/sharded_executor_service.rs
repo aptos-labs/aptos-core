@@ -258,16 +258,18 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 },
             }
         }
-        let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
-            .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
-            .unwrap()
-            .get_sample_sum();
-        info!(
-            "Shard {} is shutting down; On shard execution tps {} txns/s ({} txns / {} s)",
-            self.shard_id,
-            (num_txns as f64 / exe_time),
-            num_txns,
-            exe_time
-        );
+        // let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS.with_borrow(|x| {
+        //     x.shared()
+        //         .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
+        //         .unwrap()
+        //         .get_sample_sum()
+        // });
+        // info!(
+        //     "Shard {} is shutting down; On shard execution tps {} txns/s ({} txns / {} s)",
+        //     self.shard_id,
+        //     (num_txns as f64 / exe_time),
+        //     num_txns,
+        //     exe_time
+        // );
     }
 }
