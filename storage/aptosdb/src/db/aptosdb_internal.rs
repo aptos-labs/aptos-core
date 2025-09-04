@@ -18,7 +18,7 @@ use aptos_config::config::{
 };
 use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
 use aptos_logger::prelude::*;
-use aptos_metrics_core::IntGaugeHelper;
+use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_storage_interface::{
     block_info::BlockInfo, db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader,
@@ -433,9 +433,7 @@ where
                 "Err"
             },
         };
-        API_LATENCY_SECONDS
-            .with_label_values(&[api_name, res_type])
-            .observe(timer.elapsed().as_secs_f64());
+        API_LATENCY_SECONDS.observe_with(&[api_name, res_type], timer.elapsed().as_secs_f64());
         ENTERED_GAUGED_API.with(|entered| entered.set(false));
 
         res

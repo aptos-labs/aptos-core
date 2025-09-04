@@ -3,7 +3,7 @@
 
 use crate::counters::HOT_STATE_OP_ACCUMULATOR_COUNTER as COUNTER;
 use aptos_logger::error;
-use aptos_metrics_core::IntCounterHelper;
+use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{
     state_store::{state_slot::StateSlot, TStateView},
     transaction::Version,

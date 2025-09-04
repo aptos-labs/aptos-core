@@ -177,13 +177,9 @@ impl StateKvDb {
         state_kv_metadata_batch: Option<SchemaBatch>,
         sharded_state_kv_batches: ShardedStateKvSchemaBatch,
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["state_kv_db__commit"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_kv_db__commit"]);
         {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["state_kv_db__commit_shards"])
-                .start_timer();
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_kv_db__commit_shards"]);
             THREAD_MANAGER.get_io_pool().scope(|s| {
                 let mut batches = sharded_state_kv_batches.into_iter();
                 for shard_id in 0..NUM_STATE_SHARDS {
