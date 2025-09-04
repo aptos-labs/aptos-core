@@ -2814,7 +2814,6 @@ dependencies = [
  "ark-groth16",
  "ark-serialize",
  "bcs 0.1.4",
- "dashmap 7.0.0-rc2",
  "firestore",
  "hex",
  "hyper 0.14.28",

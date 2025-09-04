@@ -6,7 +6,6 @@ use crate::{
 };
 use aptos_infallible::RwLock;
 use aptos_logger::{info, warn};
-use reqwest::Client;
 use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};
 
@@ -14,7 +13,6 @@ use std::{sync::Arc, time::Duration};
 const ENV_ONCHAIN_KEYLESS_CONFIG_URL: &str = "ONCHAIN_KEYLESS_CONFIG_URL";
 const ENV_ONCHAIN_GROTH16_VK_URL: &str = "ONCHAIN_GROTH16_VK_URL";
 const RESOURCE_FETCH_INTERVAL_SECS: u64 = 10;
-const RESOURCE_FETCH_TIMEOUT_SECS: u64 = 10;
 
 /// A simple trait for resources that can be cached and refreshed
 pub trait CachedResource {
@@ -102,10 +100,7 @@ fn start_external_resource_refresh_loop<
     );
 
     // Create the request client
-    let client = Client::builder()
-        .timeout(Duration::from_secs(RESOURCE_FETCH_TIMEOUT_SECS))
-        .build()
-        .expect("Failed to build the HTTP client!");
+    let client = utils::create_request_client();
 
     // Start the resource fetcher loop
     tokio::spawn(async move {

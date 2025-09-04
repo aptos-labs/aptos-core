@@ -10,10 +10,11 @@ use std::convert::Infallible;
 // Default port for the metrics service
 pub const DEFAULT_METRICS_SERVER_PORT: u16 = 8080;
 
+// Histogram for tracking time taken to fetch JWKs by issuer and result
 pub static JWK_FETCH_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "keyless_pepper_service_jwk_fetch_seconds",
-        "Seconds taken to process pepper requests by scheme and result.",
+        "Time taken to fetch keyless pepper service jwks",
         &["issuer", "succeeded"],
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 24).unwrap()
     )

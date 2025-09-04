@@ -30,7 +30,6 @@ ark-ff = { workspace = true }
 ark-groth16 = { workspace = true }
 ark-serialize = { workspace = true }
 bcs = { workspace = true }
-dashmap = { workspace = true }
 firestore = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
