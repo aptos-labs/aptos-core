@@ -22,6 +22,7 @@ use aptos_types::{
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, TypeTag},
+    u256::U256,
 };
 
 type Bytes = Vec<u8>;

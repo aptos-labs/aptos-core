@@ -1217,9 +1217,6 @@ Can be called only by the framework
         }
     );
 
-    // Initialize authorization number map
-    <a href="sched_txns_auth_num.md#0x1_sched_txns_auth_num_initialize">sched_txns_auth_num::initialize</a>(framework);
-
     // Initialize queue
     <b>let</b> queue = <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
         schedule_map: <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_reusable">big_ordered_map::new_with_reusable</a>(),
@@ -1839,6 +1836,8 @@ Constructor
             &scheduled_config
         )
     };
+
+    <a href="scheduled_txns.md#0x1_scheduled_txns_get_auth_num">get_auth_num</a>(sender_addr); // Lazy initialization <b>if</b> needed
 
     // Validate the auth token
     <a href="scheduled_txns.md#0x1_scheduled_txns_validate_auth_token">validate_auth_token</a>(sender_addr, scheduled_time_ms, &auth_token);

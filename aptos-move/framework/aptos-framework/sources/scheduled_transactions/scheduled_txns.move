@@ -286,9 +286,6 @@ module aptos_framework::scheduled_txns {
             }
         );
 
-        // Initialize authorization number map
-        sched_txns_auth_num::initialize(framework);
-
         // Initialize queue
         let queue = ScheduleQueue {
             schedule_map: big_ordered_map::new_with_reusable(),
@@ -568,6 +565,8 @@ module aptos_framework::scheduled_txns {
                 &scheduled_config
             )
         };
+
+        get_auth_num(sender_addr); // Lazy initialization if needed
 
         // Validate the auth token
         validate_auth_token(sender_addr, scheduled_time_ms, &auth_token);
@@ -1088,6 +1087,7 @@ module aptos_framework::scheduled_txns {
         transaction_fee::store_aptos_coin_mint_cap_for_test(fx, mint);
         let user_addr = signer::address_of(user);
         aptos_framework::aptos_account::create_account(user_addr);
+        aptos_framework::sched_txns_auth_num::initialize(fx);
         initialize(fx);
         timestamp::set_time_has_started_for_testing(fx);
         timestamp::update_global_time_for_test(curr_mock_time_ms);

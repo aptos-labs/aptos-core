@@ -24,7 +24,7 @@ use crate::{
     state_store::state_key::StateKey,
     transaction::{
         ChangeSet, EntryFunction, ExecutionStatus, IndexedTransactionSummary, Module, Multisig,
-        MultisigTransactionPayload, RawTransaction, ReplayProtector, Script,
+        MultisigTransactionPayload, RawTransaction, ReplayProtector, ScheduledTxnConfig, Script,
         SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
         TransactionAuxiliaryData, TransactionExecutable, TransactionExtraConfig, TransactionInfo,
         TransactionListWithProof, TransactionPayload, TransactionPayloadInner, TransactionStatus,
@@ -528,11 +528,12 @@ impl Arbitrary for TransactionExtraConfig {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: ()) -> Self::Strategy {
-        (any::<Option<AccountAddress>>(), any::<Option<u64>>())
+        (any::<Option<AccountAddress>>(), any::<Option<u64>>(), any::<Option<ScheduledTxnConfig>>())
             .prop_map(
-                |(multisig_address, replay_protection_nonce)| TransactionExtraConfig::V1 {
+                |(multisig_address, replay_protection_nonce, scheduled_txn_auth_token)| TransactionExtraConfig::V1 {
                     multisig_address,
                     replay_protection_nonce,
+                    scheduled_txn_auth_token,
                 },
             )
             .boxed()

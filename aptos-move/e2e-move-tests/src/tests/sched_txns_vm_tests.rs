@@ -6,16 +6,28 @@ use aptos_framework::BuildOptions;
 use aptos_transaction_simulation::Account;
 use aptos_types::{
     account_address::AccountAddress,
+    on_chain_config::FeatureFlag,
     transaction::{
-        scheduled_txn::ScheduledTransactionInfoWithKey, AbortInfo, ExecutionStatus,
-        TransactionOutput, TransactionStatus,
+        scheduled_txn::ScheduledTransactionInfoWithKey, AbortInfo, EntryFunction, ExecutionStatus,
+        ScheduledTxnConfig, TransactionExecutable, TransactionExtraConfig, TransactionOutput,
+        TransactionPayload, TransactionPayloadInner, TransactionStatus,
     },
 };
-use move_core_types::{value::MoveValue, vm_status::AbortLocation};
+use move_core_types::{ident_str, value::MoveValue, vm_status::AbortLocation};
+use move_core_types::value::serialize_values;
 
 fn setup_test_env() -> (MoveHarness, Account, u64) {
     let build_options = BuildOptions::move_2().set_latest_language();
     let mut h = MoveHarness::new();
+
+    // Enable all default features plus additional ones for scheduled transactions
+    let mut features = FeatureFlag::default_features();
+    features.extend(vec![
+        FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
+        FeatureFlag::TRANSACTION_PAYLOAD_V2,
+        FeatureFlag::ENABLE_FUNCTION_VALUES,
+    ]);
+    h.enable_features(features, vec![]);
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
@@ -31,13 +43,15 @@ fn setup_test_env() -> (MoveHarness, Account, u64) {
     (h, acc, current_time_ms)
 }
 
-fn get_scheduled_txns(h: &mut MoveHarness, acc: &Account) -> Vec<ScheduledTransactionInfoWithKey> {
+fn get_scheduled_txns(h: &mut MoveHarness, acc: &Account, block_timestamp_ms: u64) -> Vec<ScheduledTransactionInfoWithKey> {
+    let args = vec![
+        MoveValue::Address(*acc.address()),
+        MoveValue::U64(block_timestamp_ms)
+    ];
     let result = h.execute_view_function(
         str::parse("0xcafe::scheduled_txns_usage::get_stored_sched_txns").unwrap(),
         vec![],
-        vec![MoveValue::Address(*acc.address())
-            .simple_serialize()
-            .unwrap()],
+        serialize_values(&args),
     );
 
     bcs::from_bytes::<Vec<ScheduledTransactionInfoWithKey>>(
@@ -125,9 +139,13 @@ fn test_basic_execute() {
         actual_deduction, expected_deduction
     );
 
-    let scheduled_txns = get_scheduled_txns(&mut h, &acc);
+    let scheduled_txns = get_scheduled_txns(&mut h, &acc, current_time_ms + 5000);
     assert_eq!(scheduled_txns.len(), num_txns);
     let outputs = execute_scheduled_txns(&mut h, scheduled_txns);
+    // print all output status
+    for (i, output) in outputs.iter().enumerate() {
+        println!("Output {} status: {:?}", i, output.status());
+    }
     assert!(outputs
         .iter()
         .all(|output| output.status().status().unwrap().is_success()));
@@ -175,7 +193,7 @@ fn test_user_func_abort() {
     );
     assert_success!(result);
 
-    let scheduled_txns = get_scheduled_txns(&mut h, &acc);
+    let scheduled_txns = get_scheduled_txns(&mut h, &acc, current_time_ms + 5000);
     assert_eq!(scheduled_txns.len(), 1);
     let output = execute_scheduled_txns(&mut h, scheduled_txns);
     assert_eq!(
@@ -212,7 +230,7 @@ fn test_run_and_cancel_race_condition() {
     );
     assert_success!(result);
 
-    let scheduled_txns = get_scheduled_txns(&mut h, &acc);
+    let scheduled_txns = get_scheduled_txns(&mut h, &acc, current_time_ms + 5000);
     assert_eq!(scheduled_txns.len(), 1);
     let outputs = execute_scheduled_txns(&mut h, scheduled_txns);
     assert!(outputs
@@ -264,7 +282,7 @@ fn test_cancel_and_run_race_condition() {
     );
     assert_success!(result);
 
-    let scheduled_txns = get_scheduled_txns(&mut h, &acc);
+    let scheduled_txns = get_scheduled_txns(&mut h, &acc, current_time_ms + 5000);
     assert_eq!(scheduled_txns.len(), 1);
 
     let txn_to_cancel = &scheduled_txns[0];
@@ -326,7 +344,7 @@ fn test_cancel_without_execution() {
     );
 
     // Verify the transaction was scheduled
-    let scheduled_txns = get_scheduled_txns(&mut h, &acc);
+    let scheduled_txns = get_scheduled_txns(&mut h, &acc, current_time_ms + 5000);
     assert_eq!(scheduled_txns.len(), 1);
 
     // Cancel the first scheduled transaction (no args needed, function picks first from BigOrderedMap)
@@ -366,18 +384,47 @@ fn test_cancel_without_execution() {
 #[test]
 fn test_mod_publish_error() {
     let (mut h, acc, current_time_ms) = setup_test_env();
+    let delay_ms = 1000u64;
+    let gas_amount = 1000u64;
+    let gas_unit_price = 100u64;
+    let user_func_idx = 0u64;
+
+    // Create a ScheduledTxnConfig for the transaction
+    let scheduled_txn_config = ScheduledTxnConfig {
+        allow_rescheduling: true,
+        expiration_time: current_time_ms + 100000,
+        authorization_seqno: 1,
+    };
+
+    // Create a TransactionPayload with the scheduled transaction auth token
+    let entry_function = EntryFunction::new(
+        str::parse("0xcafe::scheduled_txns_usage").unwrap(),
+        ident_str!("create_and_add_custom_txn_template").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&current_time_ms).unwrap(),
+            bcs::to_bytes(&delay_ms).unwrap(),
+            bcs::to_bytes(&gas_amount).unwrap(),
+            bcs::to_bytes(&gas_unit_price).unwrap(),
+            bcs::to_bytes(&user_func_idx).unwrap(),
+        ],
+    );
+
+    let payload = TransactionPayload::Payload(TransactionPayloadInner::V1 {
+        executable: TransactionExecutable::EntryFunction(entry_function),
+        extra_config: TransactionExtraConfig::V1 {
+            multisig_address: None,
+            replay_protection_nonce: None,
+            scheduled_txn_auth_token: Some(scheduled_txn_config),
+        },
+    });
 
     // Create a scheduled transaction where the user function attempts to publish a module
-    let result = h.run_entry_function(
-        &acc,
-        str::parse("0xcafe::scheduled_txns_usage::create_and_add_module_pub_txn").unwrap(),
-        vec![],
-        vec![bcs::to_bytes(&current_time_ms).unwrap()],
-    );
+    let result = h.run_transaction_payload(&acc, payload);
     assert_success!(result);
 
     // Get the scheduled transactions
-    let scheduled_txns = get_scheduled_txns(&mut h, &acc);
+    let scheduled_txns = get_scheduled_txns(&mut h, &acc, current_time_ms + 5000);
     assert_eq!(scheduled_txns.len(), 1);
 
     // Execute the scheduled transaction and expect it to return abort status
@@ -420,4 +467,57 @@ fn test_mod_publish_error() {
             status
         ),
     }
+}
+
+#[test]
+fn test_resched() {
+    let (mut h, acc, current_time_ms) = setup_test_env();
+    let delay_ms = 1000u64;
+    let gas_amount = 1000u64;
+    let gas_unit_price = 100u64;
+    let user_func_idx = 1u64;
+
+    // Create a ScheduledTxnConfig for the transaction
+    let scheduled_txn_config = ScheduledTxnConfig {
+        allow_rescheduling: true,
+        expiration_time: current_time_ms + 100000,
+        authorization_seqno: 1,
+    };
+
+    // Create a TransactionPayload with the scheduled transaction auth token
+    let entry_function = EntryFunction::new(
+        str::parse("0xcafe::scheduled_txns_usage").unwrap(),
+        ident_str!("create_and_add_custom_txn_template").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&current_time_ms).unwrap(),
+            bcs::to_bytes(&delay_ms).unwrap(),
+            bcs::to_bytes(&gas_amount).unwrap(),
+            bcs::to_bytes(&gas_unit_price).unwrap(),
+            bcs::to_bytes(&user_func_idx).unwrap(),
+        ],
+    );
+
+    let payload = TransactionPayload::Payload(TransactionPayloadInner::V1 {
+        executable: TransactionExecutable::EntryFunction(entry_function),
+        extra_config: TransactionExtraConfig::V1 {
+            multisig_address: None,
+            replay_protection_nonce: None,
+            scheduled_txn_auth_token: Some(scheduled_txn_config),
+        },
+    });
+
+    // Create a scheduled transaction where the user function attempts to publish a module
+    let result = h.run_transaction_payload(&acc, payload);
+    assert_success!(result);
+
+    // Get the scheduled transactions
+    let scheduled_txns = get_scheduled_txns(&mut h, &acc, current_time_ms + 5000);
+    assert_eq!(scheduled_txns.len(), 1);
+
+    // Execute the scheduled transaction and expect it to return abort status
+    let outputs = execute_scheduled_txns(&mut h, scheduled_txns);
+    assert_eq!(outputs.len(), 1);
+    println!("Output status: {:?}", outputs[0].status());
+    assert!(outputs[0].status().status().unwrap().is_success());
 }
