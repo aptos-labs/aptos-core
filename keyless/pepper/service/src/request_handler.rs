@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cached_resources::CachedResources, error::PepperServiceError, HandlerTrait, V0FetchHandler,
-    V0SignatureHandler, V0VerifyHandler,
+    cached_resources::CachedResources, error::PepperServiceError, jwk::JWKCache, HandlerTrait,
+    V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
 };
 use aptos_build_info::build_information;
 use aptos_keyless_pepper_common::BadPepperRequestError;
@@ -26,6 +26,7 @@ pub const DEFAULT_PEPPER_SERVICE_PORT: u16 = 8000;
 // Note: if you update these paths, please also update the "ALL_PATHS" array below.
 pub const ABOUT_PATH: &str = "/about";
 pub const GROTH16_VK_PATH: &str = "/cached/groth16-vk";
+pub const JWK_PATH: &str = "/cached/jwk";
 pub const KEYLESS_CONFIG_PATH: &str = "/cached/keyless-config";
 pub const FETCH_PATH: &str = "/v0/fetch";
 pub const SIGNATURE_PATH: &str = "/v0/signature";
@@ -33,9 +34,10 @@ pub const VERIFY_PATH: &str = "/v0/verify";
 pub const VUF_PUB_KEY_PATH: &str = "/v0/vuf-pub-key";
 
 // An array of all known endpoints/paths
-pub const ALL_PATHS: [&str; 7] = [
+pub const ALL_PATHS: [&str; 8] = [
     ABOUT_PATH,
     GROTH16_VK_PATH,
+    JWK_PATH,
     KEYLESS_CONFIG_PATH,
     FETCH_PATH,
     SIGNATURE_PATH,
@@ -61,6 +63,7 @@ async fn call_dedicated_request_handler<TRequest, TResponse, TRequestHandler>(
     origin: String,
     request: Request<Body>,
     vuf_private_key: &ark_bls12_381::Fr,
+    jwk_cache: JWKCache,
     cached_resources: CachedResources,
     request_handler: &TRequestHandler,
 ) -> Result<Response<Body>, Infallible>
@@ -91,7 +94,7 @@ where
 
     // Invoke the handler and generate the response
     match request_handler
-        .handle(vuf_private_key, cached_resources, pepper_request)
+        .handle(vuf_private_key, jwk_cache, cached_resources, pepper_request)
         .await
     {
         Ok(pepper_response) => {
@@ -183,6 +186,7 @@ fn generate_bad_request_response(
 fn generate_cached_resource_response<T: Serialize>(
     origin: String,
     request_method: &Method,
+    path: &str,
     cached_resource: Option<T>,
 ) -> Result<Response<Body>, Infallible> {
     if let Some(cached_resource) = cached_resource {
@@ -196,7 +200,7 @@ fn generate_cached_resource_response<T: Serialize>(
         }
     } else {
         // The cached resource was not found, return a missing resource error
-        generate_not_found_response(origin, request_method, KEYLESS_CONFIG_PATH)
+        generate_not_found_response(origin, request_method, path)
     }
 }
 
@@ -220,6 +224,22 @@ fn generate_json_response(
         .body(Body::from(body_str))
         .expect("Failed to build JSON response!");
     Ok(response)
+}
+
+/// Generates a response with the cached JWKs as JSON
+fn generate_jwt_cache_response(
+    origin: String,
+    jwk_cache: JWKCache,
+) -> Result<Response<Body>, Infallible> {
+    let jwk_cache = jwk_cache.lock().deref().clone();
+    match serde_json::to_string_pretty(&jwk_cache) {
+        Ok(response_body) => generate_json_response(origin, StatusCode::OK, response_body),
+        Err(error) => {
+            // Failed to serialize the JWK cache, return a server error
+            error!("Failed to serialize to JSON response: {}", error);
+            generate_internal_server_error_response(origin.clone())
+        },
+    }
 }
 
 /// Generates a 405 response for invalid methods on known paths
@@ -281,6 +301,7 @@ fn generate_text_response(
 pub async fn handle_request(
     request: Request<Body>,
     vuf_keypair: Arc<(String, ark_bls12_381::Fr)>,
+    jwk_cache: JWKCache,
     cached_resources: CachedResources,
 ) -> Result<Response<Body>, Infallible> {
     // Get the request origin
@@ -296,13 +317,26 @@ pub async fn handle_request(
     if request_method == Method::GET {
         match request.uri().path() {
             ABOUT_PATH => return generate_about_response(origin),
-            KEYLESS_CONFIG_PATH => {
-                let keyless_config = cached_resources.read_on_chain_keyless_configuration();
-                return generate_cached_resource_response(origin, request_method, keyless_config);
-            },
             GROTH16_VK_PATH => {
                 let groth16_vk = cached_resources.read_on_chain_groth16_vk();
-                return generate_cached_resource_response(origin, request_method, groth16_vk);
+                return generate_cached_resource_response(
+                    origin,
+                    request_method,
+                    GROTH16_VK_PATH,
+                    groth16_vk,
+                );
+            },
+            JWK_PATH => {
+                return generate_jwt_cache_response(origin, jwk_cache);
+            },
+            KEYLESS_CONFIG_PATH => {
+                let keyless_config = cached_resources.read_on_chain_keyless_configuration();
+                return generate_cached_resource_response(
+                    origin,
+                    request_method,
+                    KEYLESS_CONFIG_PATH,
+                    keyless_config,
+                );
             },
             VUF_PUB_KEY_PATH => {
                 let (vuf_pub_key, _) = vuf_keypair.deref();
@@ -321,7 +355,8 @@ pub async fn handle_request(
                     origin,
                     request,
                     vuf_priv_key,
-                    cached_resources.clone(),
+                    jwk_cache,
+                    cached_resources,
                     &V0FetchHandler,
                 )
                 .await
@@ -331,7 +366,8 @@ pub async fn handle_request(
                     origin,
                     request,
                     vuf_priv_key,
-                    cached_resources.clone(),
+                    jwk_cache,
+                    cached_resources,
                     &V0SignatureHandler,
                 )
                 .await
@@ -341,7 +377,8 @@ pub async fn handle_request(
                     origin,
                     request,
                     vuf_priv_key,
-                    cached_resources.clone(),
+                    jwk_cache,
+                    cached_resources,
                     &V0VerifyHandler,
                 )
                 .await

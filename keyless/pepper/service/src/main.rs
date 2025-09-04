@@ -6,7 +6,7 @@ use aptos_keyless_pepper_service::{
     account_managers::ACCOUNT_MANAGERS,
     cached_resources,
     cached_resources::CachedResources,
-    jwk::{self, parse_jwks, DECODING_KEY_CACHE},
+    jwk::{self, JWKCache},
     metrics,
     metrics::DEFAULT_METRICS_SERVER_PORT,
     request_handler,
@@ -14,12 +14,11 @@ use aptos_keyless_pepper_service::{
     vuf_pub_key,
 };
 use aptos_logger::info;
-use aptos_types::keyless::test_utils::get_sample_iss;
 use hyper::{
     service::{make_service_fn, service_fn},
     Server,
 };
-use std::{convert::Infallible, net::SocketAddr, ops::Deref, sync::Arc, time::Duration};
+use std::{convert::Infallible, net::SocketAddr, ops::Deref, sync::Arc};
 
 #[tokio::main]
 async fn main() {
@@ -38,33 +37,18 @@ async fn main() {
     // Start the cached resource fetcher
     let cached_resources = cached_resources::start_cached_resource_fetcher();
 
-    // Trigger private key loading.
+    // Initialize the account recovery database
     let _ = ACCOUNT_MANAGERS.deref();
     {
         let _db = ACCOUNT_RECOVERY_DB.get_or_init(init_account_db).await;
     }
 
-    // TODO: JWKs should be from on-chain states?
-    jwk::start_jwk_refresh_loop(
-        "https://accounts.google.com",
-        "https://www.googleapis.com/oauth2/v3/certs",
-        Duration::from_secs(10),
-    );
-    jwk::start_jwk_refresh_loop(
-        "https://appleid.apple.com",
-        "https://appleid.apple.com/auth/keys",
-        Duration::from_secs(10),
-    );
-
-    let test_jwk = include_str!("../../../../types/src/jwks/rsa/secure_test_jwk.json");
-    DECODING_KEY_CACHE.insert(
-        get_sample_iss(),
-        parse_jwks(test_jwk).expect("test jwk should parse"),
-    );
+    // Start the JWK fetchers
+    let jwk_cache = jwk::start_jwk_fetchers();
 
     // Start the pepper service
     let vuf_keypair = Arc::new((vuf_public_key, vuf_private_key));
-    start_pepper_service(vuf_keypair, cached_resources).await;
+    start_pepper_service(vuf_keypair, jwk_cache, cached_resources).await;
 }
 
 // Starts a simple metrics server
@@ -89,19 +73,25 @@ fn start_metrics_server() {
 // Starts the pepper service
 async fn start_pepper_service(
     vuf_keypair: Arc<(String, ark_bls12_381::Fr)>,
+    jwk_cache: JWKCache,
     cached_resources: CachedResources,
 ) {
-    info!("Starting the Pepper service request handler...");
+    info!(
+        "Starting the Pepper service request handler on port {}...",
+        DEFAULT_PEPPER_SERVICE_PORT
+    );
 
     // Create the service function that handles the endpoint requests
     let make_service = make_service_fn(move |_conn| {
         let vuf_keypair = vuf_keypair.clone();
+        let jwk_cache = jwk_cache.clone();
         let cached_resources = cached_resources.clone();
         async move {
             Ok::<_, Infallible>(service_fn(move |request| {
                 request_handler::handle_request(
                     request,
                     vuf_keypair.clone(),
+                    jwk_cache.clone(),
                     cached_resources.clone(),
                 )
             }))
