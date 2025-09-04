@@ -103,6 +103,16 @@ impl ShardedDbPathConfig {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub enum StatsLevel {
+    DisableAll,
+    ExceptHistogramOrTimers,
+    ExceptTimers,
+    ExceptDetailedTimers,
+    ExceptTimeForMutex,
+    All,
+}
+
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
@@ -124,6 +134,10 @@ pub struct RocksdbConfig {
     /// Whether to pin L0 filters and indexes in memory. Only makes sense if
     /// `cache_index_and_filter_blocks` is `true`.
     pub pin_l0_filter_and_index_blocks_in_cache: bool,
+    /// The level of details for statistics. Higher level might cause more overhead.
+    pub stats_level: StatsLevel,
+    /// If not zero, dump stats to LOG every this many seconds.
+    pub stats_dump_period_sec: u32,
 }
 
 impl RocksdbConfig {
@@ -153,6 +167,8 @@ impl Default for RocksdbConfig {
             cache_index_and_filter_blocks: true,
             // L0 index/filter blocks are usually small and used frequently.
             pin_l0_filter_and_index_blocks_in_cache: true,
+            stats_level: StatsLevel::DisableAll,
+            stats_dump_period_sec: 600,
         }
     }
 }
@@ -679,7 +695,7 @@ impl ConfigSanitizer for StorageConfig {
 mod test {
     use crate::config::{
         config_optimizer::ConfigOptimizer, NodeConfig, NodeType, PersistableConfig, PrunerConfig,
-        RocksdbConfig, ShardPathConfig, ShardedDbPathConfig, StorageConfig,
+        RocksdbConfig, ShardPathConfig, ShardedDbPathConfig, StatsLevel, StorageConfig,
     };
     use aptos_types::chain_id::ChainId;
 
