@@ -38,7 +38,7 @@ pub const EFEATURE_NOT_ENABLED: u64 = 2;
  **************************************************************************************************/
 fn native_move_range(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     if !context
@@ -64,8 +64,8 @@ fn native_move_range(
     // We need to charge before executing, so fetching and checking sizes here.
     // We repeat fetching and checking of the sizes inside VectorRef::move_range call as well.
     // Not sure if possible to combine (as we are never doing charging there).
-    let to_len = to.length_as_usize(&ty_args[0])?;
-    let from_len = from.length_as_usize(&ty_args[0])?;
+    let to_len = to.length_as_usize()?;
+    let from_len = from.length_as_usize()?;
 
     if removal_position
         .checked_add(length)
@@ -98,7 +98,7 @@ fn native_move_range(
         length,
         &to,
         insert_position,
-        &ty_args[0],
+        // &ty_args[0],
     )?;
 
     Ok(smallvec![])
