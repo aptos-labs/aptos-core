@@ -410,12 +410,21 @@ impl<
         &mut self,
         sync_target_notification: ConsensusSyncTargetNotification,
     ) -> Result<(), Error> {
-        // Update the sync target notification metrics
-        let latest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
+        // Fetch the pre-committed and committed versions
+        let latest_pre_committed_version =
+            utils::fetch_pre_committed_version(self.storage.clone())?;
+        let latest_synced_ledger_info =
+            utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
+        let latest_committed_version = latest_synced_ledger_info.ledger_info().version();
+
+        // Update the sync target notification logs and metrics
         info!(
             LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
-                "Received a consensus sync target notification! Target version: {:?}. Latest synced version: {:?}",
-                sync_target_notification.get_target(), latest_synced_version,
+                "Received a consensus sync target notification! Target: {:?}. \
+                Latest pre-committed version: {}. Latest committed version: {}.",
+                sync_target_notification.get_target(),
+                latest_pre_committed_version,
+                latest_committed_version,
             ))
         );
         metrics::increment_counter(
@@ -424,10 +433,12 @@ impl<
         );
 
         // Initialize a new sync request
-        let latest_synced_ledger_info =
-            utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
         self.consensus_notification_handler
-            .initialize_sync_target_request(sync_target_notification, latest_synced_ledger_info)
+            .initialize_sync_target_request(
+                sync_target_notification,
+                latest_pre_committed_version,
+                latest_synced_ledger_info,
+            )
             .await
     }
 
