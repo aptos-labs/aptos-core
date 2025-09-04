@@ -545,6 +545,7 @@ debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
 derivation-path = "0.2.0"
 derive_builder = "0.20.0"
+derive-getters = "0.5.0"
 determinator = "0.12.0"
 derive_more = "0.99.11"
 diesel = "2.1"
