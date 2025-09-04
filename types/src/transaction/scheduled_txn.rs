@@ -42,6 +42,8 @@ pub struct ScheduledTransactionInfoWithKey {
     pub max_gas_amount: u64,
     /// Unit price of gas for this transaction
     pub gas_unit_price: u64,
+    /// Timestamp when the transaction is executed
+    pub block_timestamp_ms: u64,
     /// Key to the scheduled txn in the Schedule queue
     pub key: ScheduleMapKey,
 }
@@ -53,13 +55,14 @@ pub static SCHEDULED_TRANSACTIONS_MODULE_INFO: Lazy<ScheduledTxnsModuleInfo> =
         framework_address: AccountAddress::from_hex_literal("0x1").unwrap(),
         base_gas_amount: 100,
         module_name: Identifier::new("scheduled_txns").unwrap(),
+        user_func_wrapper_module_name: Identifier::new("user_func_wrapper").unwrap(),
         get_ready_transactions_name: Identifier::new("get_ready_transactions").unwrap(),
         get_ready_transactions_with_limit_name: Identifier::new(
             "get_ready_transactions_with_limit",
         )
         .unwrap(),
         mark_txn_to_remove_name: Identifier::new("mark_txn_to_remove").unwrap(),
-        execute_user_function_wrapper_name: Identifier::new("execute_user_function_wrapper")
+        execute_user_function_name: Identifier::new("execute_user_function")
             .unwrap(),
         pause_scheduled_txns_name: Identifier::new("pause_scheduled_txns").unwrap(),
     });
@@ -70,15 +73,20 @@ pub struct ScheduledTxnsModuleInfo {
     pub framework_address: AccountAddress,
     pub base_gas_amount: u64,
     pub module_name: Identifier,
+    pub user_func_wrapper_module_name: Identifier,
     pub get_ready_transactions_name: Identifier,
     pub get_ready_transactions_with_limit_name: Identifier,
     pub mark_txn_to_remove_name: Identifier,
-    pub execute_user_function_wrapper_name: Identifier,
+    pub execute_user_function_name: Identifier,
     pub pause_scheduled_txns_name: Identifier,
 }
 
 impl ScheduledTxnsModuleInfo {
     pub fn module_id(&self) -> ModuleId {
         ModuleId::new(self.module_addr, self.module_name.clone())
+    }
+
+    pub fn user_func_wrapper_module_id(&self) -> ModuleId {
+        ModuleId::new(self.module_addr, self.user_func_wrapper_module_name.clone())
     }
 }

@@ -368,6 +368,58 @@ fn native_multisig_payload_internal(
     }
 }
 
+fn native_payload_config_internal(
+    context: &mut SafeNativeContext,
+    mut _ty_args: Vec<Type>,
+    _args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    context.charge(TRANSACTION_CONTEXT_MULTISIG_PAYLOAD_BASE)?; // Reuse same gas cost
+
+    let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
+
+    if let Some(transaction_context) = user_transaction_context_opt {
+        if let Some(payload_config) = transaction_context.payload_config() {
+            // Create TransactionPayloadConfig struct
+            let multisig_address = if let Some(addr) = payload_config.multisig_address {
+                create_option_some_value(Value::address(addr))
+            } else {
+                create_option_none()
+            };
+
+            let replay_protection_nonce = if let Some(nonce) = payload_config.replay_protection_nonce {
+                create_option_some_value(Value::u64(nonce))
+            } else {
+                create_option_none()
+            };
+
+            let scheduled_txn_auth_token = if let Some(config) = payload_config.scheduled_txn_auth_token {
+                let scheduled_config = Value::struct_(Struct::pack(vec![
+                    Value::bool(config.allow_rescheduling),
+                    Value::u64(config.expiration_time),
+                    Value::u64(config.authorization_seqno),
+                ]));
+                create_option_some_value(scheduled_config)
+            } else {
+                create_option_none()
+            };
+
+            let payload_config_struct = Value::struct_(Struct::pack(vec![
+                multisig_address,
+                replay_protection_nonce,
+                scheduled_txn_auth_token,
+            ]));
+
+            Ok(smallvec![create_option_some_value(payload_config_struct)])
+        } else {
+            Ok(smallvec![create_option_none()])
+        }
+    } else {
+        Err(SafeNativeError::Abort {
+            abort_code: error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+        })
+    }
+}
+
 fn get_user_transaction_context_opt_from_context<'a>(
     context: &'a SafeNativeContext,
 ) -> &'a Option<UserTransactionContext> {
@@ -404,6 +456,10 @@ pub fn make_all(
         (
             "multisig_payload_internal",
             native_multisig_payload_internal,
+        ),
+        (
+            "payload_config_internal",
+            native_payload_config_internal,
         ),
     ];
 

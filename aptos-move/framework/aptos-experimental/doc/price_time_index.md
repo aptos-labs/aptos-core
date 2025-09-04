@@ -174,21 +174,21 @@ There is a code bug that breaks internal invariant
 
 
 
-<a id="0x7_price_time_index_EINVALID_MAKER_ORDER"></a>
-
-
-
-<pre><code><b>const</b> <a href="price_time_index.md#0x7_price_time_index_EINVALID_MAKER_ORDER">EINVALID_MAKER_ORDER</a>: u64 = 1;
-</code></pre>
-
-
-
 <a id="0x7_price_time_index_U64_MAX"></a>
 
 ========= Active OrderBook ===========
 
 
 <pre><code><b>const</b> <a href="price_time_index.md#0x7_price_time_index_U64_MAX">U64_MAX</a>: u64 = 18446744073709551615;
+</code></pre>
+
+
+
+<a id="0x7_price_time_index_EINVALID_MAKER_ORDER"></a>
+
+
+
+<pre><code><b>const</b> <a href="price_time_index.md#0x7_price_time_index_EINVALID_MAKER_ORDER">EINVALID_MAKER_ORDER</a>: u64 = 1;
 </code></pre>
 
 

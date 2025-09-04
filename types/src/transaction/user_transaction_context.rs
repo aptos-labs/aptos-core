@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_core_types::account_address::AccountAddress;
+use super::ScheduledTxnConfig;
 
 #[derive(Debug)]
 pub struct UserTransactionContext {
@@ -14,6 +15,14 @@ pub struct UserTransactionContext {
     entry_function_payload: Option<EntryFunctionPayload>,
     multisig_payload: Option<MultisigPayload>,
     disallow_module_publishing: bool,
+    payload_config: Option<PayloadConfig>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PayloadConfig {
+    pub multisig_address: Option<AccountAddress>,
+    pub replay_protection_nonce: Option<u64>,
+    pub scheduled_txn_auth_token: Option<ScheduledTxnConfig>,
 }
 
 impl UserTransactionContext {
@@ -38,6 +47,33 @@ impl UserTransactionContext {
             entry_function_payload,
             multisig_payload,
             disallow_module_publishing,
+            payload_config: None,
+        }
+    }
+
+    pub fn new_with_payload_config(
+        sender: AccountAddress,
+        secondary_signers: Vec<AccountAddress>,
+        gas_payer: AccountAddress,
+        max_gas_amount: u64,
+        gas_unit_price: u64,
+        chain_id: u8,
+        entry_function_payload: Option<EntryFunctionPayload>,
+        multisig_payload: Option<MultisigPayload>,
+        disallow_module_publishing: bool,
+        payload_config: Option<PayloadConfig>,
+    ) -> Self {
+        Self {
+            sender,
+            secondary_signers,
+            gas_payer,
+            max_gas_amount,
+            gas_unit_price,
+            chain_id,
+            entry_function_payload,
+            multisig_payload,
+            disallow_module_publishing,
+            payload_config,
         }
     }
 
@@ -75,6 +111,10 @@ impl UserTransactionContext {
 
     pub fn disallow_module_publishing(&self) -> bool {
         self.disallow_module_publishing
+    }
+
+    pub fn payload_config(&self) -> Option<PayloadConfig> {
+        self.payload_config.clone()
     }
 }
 

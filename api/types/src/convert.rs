@@ -366,6 +366,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 aptos_types::transaction::TransactionExtraConfig::V1 {
                     multisig_address,
                     replay_protection_nonce: _,
+                    scheduled_txn_auth_token: _,
                 } => {
                     if let Some(multisig_address) = multisig_address {
                         match executable {
@@ -766,6 +767,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         extra_config: ExtraConfig::V1 {
                             multisig_address: None,
                             replay_protection_nonce: Some(nonce),
+                            scheduled_txn_auth_token: None,
                         },
                     })
                 } else {
@@ -779,6 +781,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         extra_config: ExtraConfig::V1 {
                             multisig_address: None,
                             replay_protection_nonce: Some(nonce),
+                            scheduled_txn_auth_token: None,
                         },
                     })
                 } else {
@@ -804,6 +807,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         extra_config: ExtraConfig::V1 {
                             multisig_address: Some(multisig.multisig_address.into()),
                             replay_protection_nonce: Some(nonce),
+                            scheduled_txn_auth_token: None,
                         },
                     })
                 } else {

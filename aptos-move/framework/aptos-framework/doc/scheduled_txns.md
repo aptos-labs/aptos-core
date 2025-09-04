@@ -1249,9 +1249,6 @@ Can be called only by the framework
         }
     );
 
-    // Initialize sender sequence number map
-    <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_initialize">sched_txns_sender_seqno::initialize</a>(framework);
-
     // Initialize queue
     <b>let</b> queue = <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
         schedule_map: <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_reusable">big_ordered_map::new_with_reusable</a>(),
@@ -1471,7 +1468,7 @@ Stop, remove and refund all scheduled txns
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_SHUTDOWN_ATTEMPT">EINVALID_SHUTDOWN_ATTEMPT</a>)
     );
     aux_data.module_status = ScheduledTxnsModuleStatus::ShutdownComplete;
-    <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_destroy_sender_seqno_map">sched_txns_sender_seqno::destroy_sender_seqno_map</a>();
+    <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_reset_sender_seqno_map">sched_txns_sender_seqno::reset_sender_seqno_map</a>();
 
     // Clean up <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>
     <b>let</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a> { remove_tbl } = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>&gt;(@aptos_framework);
@@ -1873,6 +1870,8 @@ Constructor
             &scheduled_config
         )
     };
+
+    <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno">get_sender_seqno</a>(sender_addr); // Lazy initialization <b>if</b> needed
 
     // Validate the auth token
     <a href="scheduled_txns.md#0x1_scheduled_txns_validate_auth_token">validate_auth_token</a>(sender_addr, scheduled_time_ms, &auth_token);
