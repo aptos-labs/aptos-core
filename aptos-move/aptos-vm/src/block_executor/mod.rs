@@ -193,6 +193,9 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
         writes
     }
 
+    /// CAUTION: The methods below should never be called after incorporating materialized output,
+    /// as that consumes vm_output.
+
     // TODO: get rid of the cloning data-structures in the following APIs.
     fn resource_group_write_set(
         &self,
@@ -232,10 +235,10 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
             .collect()
     }
 
-    fn for_each_resource_group_key_and_tags<F>(&self, mut callback: F) -> Result<(), PanicError>
-    where
-        F: FnMut(&StateKey, HashSet<&StructTag>) -> Result<(), PanicError>,
-    {
+    fn for_each_resource_group_key_and_tags(
+        &self,
+        callback: &mut dyn FnMut(&StateKey, HashSet<&StructTag>) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
         for (key, tags) in self
             .guard
             .resource_write_set()
@@ -398,29 +401,52 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         })
     }
 
+    fn check_materialization(&self) -> Result<bool, PanicError> {
+        if let Some(output) = self.committed_output.get() {
+            if output.status().is_retry() {
+                return Err(code_invariant_error(
+                    "Committed output must not have is_retry set.",
+                ));
+            }
+            Ok(true)
+        } else {
+            if !self
+                .vm_output
+                .read()
+                .as_ref()
+                .map_or(false, |output| output.status().is_retry())
+            {
+                return Err(code_invariant_error(
+                    "Non-committed output must exist with is_retry set.",
+                ));
+            }
+            Ok(false)
+        }
+    }
+
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
         materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
         materialized_events: Vec<ContractEvent>,
     ) -> Result<(), PanicError> {
-        assert!(
-            self.committed_output
-                .set(
-                    self.vm_output
-                        .write()
-                        .take()
-                        .expect("Output must be set to incorporate materialized data")
-                        .into_transaction_output_with_materialized_write_set(
-                            aggregator_v1_writes,
-                            materialized_resource_write_set,
-                            materialized_events,
-                        )?,
+        self.committed_output
+            .set(
+                self.vm_output
+                    .write()
+                    .take()
+                    .expect("Output must be set to incorporate materialized data")
+                    .into_transaction_output_with_materialized_write_set(
+                        aggregator_v1_writes,
+                        materialized_resource_write_set,
+                        materialized_events,
+                    )?,
+            )
+            .map_err(|_| {
+                code_invariant_error(
+                    "Could not combine VMOutput with the materialized resource and event data",
                 )
-                .is_ok(),
-            "Could not combine VMOutput with the materialized resource and event data"
-        );
-        Ok(())
+            })
     }
 
     fn set_txn_output_for_non_dynamic_change_set(&self) {
