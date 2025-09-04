@@ -10,7 +10,8 @@ use aptos_gas_schedule::{
 };
 use aptos_language_e2e_tests::{
     account::{Account, TransactionBuilder},
-    executor::FakeExecutor,
+    executor::FakeExecutorImpl,
+    golden_outputs::{GoldenOutputs, NoOutputLogger, OutputLogger},
 };
 use aptos_rest_client::AptosBaseUrl;
 use aptos_transaction_simulation::SimulationStateStore;
@@ -76,15 +77,21 @@ static CACHED_BUILT_PACKAGES: Lazy<Mutex<HashMap<PathBuf, Arc<anyhow::Result<Bui
 /// NOTE: This harness currently is a wrapper around existing legacy e2e testing infra. We
 /// eventually plan to retire the legacy code, and are rather keen to know what of the legacy
 /// test infra we want to maintain and also which existing tests to preserve.
-pub struct MoveHarness {
+pub struct MoveHarnessImpl<O: OutputLogger> {
     /// The executor being used.
-    pub executor: FakeExecutor,
+    pub executor: FakeExecutorImpl<O>,
     /// The last counted transaction sequence number, by account address.
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 
     pub default_gas_unit_price: u64,
     pub max_gas_per_txn: u64,
 }
+
+pub type MoveHarness = MoveHarnessImpl<GoldenOutputs>;
+
+// MoveHarness variant that is Send: can be used in async context/across threads,
+// without GoldenFiles (which are not Send)
+pub type MoveHarnessSend = MoveHarnessImpl<NoOutputLogger>;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum BlockSplit {
@@ -93,21 +100,21 @@ pub enum BlockSplit {
     SplitIntoThree { first_len: usize, second_len: usize },
 }
 
-impl MoveHarness {
+impl<O: OutputLogger> MoveHarnessImpl<O> {
     const DEFAULT_MAX_GAS_PER_TXN: u64 = 2_000_000;
 
     /// Creates a new harness.
     pub fn new() -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
-            executor: FakeExecutor::from_head_genesis(),
+            executor: FakeExecutorImpl::from_head_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
-    pub fn new_with_executor(executor: FakeExecutor) -> Self {
+    pub fn new_with_executor(executor: FakeExecutorImpl<O>) -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor,
@@ -120,7 +127,7 @@ impl MoveHarness {
     pub fn new_with_validators(count: u64) -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
-            executor: FakeExecutor::from_head_genesis_with_count(count),
+            executor: FakeExecutorImpl::from_head_genesis_with_count(count),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
@@ -130,7 +137,7 @@ impl MoveHarness {
     pub fn new_testnet() -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
-            executor: FakeExecutor::from_testnet_genesis(),
+            executor: FakeExecutorImpl::from_testnet_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
@@ -155,9 +162,9 @@ impl MoveHarness {
 
         let executor = match api_key {
             Some(api_key) => {
-                FakeExecutor::from_remote_state_with_api_key(network_url, txn_id, api_key)
+                FakeExecutorImpl::from_remote_state_with_api_key(network_url, txn_id, api_key)
             },
-            None => FakeExecutor::from_remote_state(network_url, txn_id),
+            None => FakeExecutorImpl::from_remote_state(network_url, txn_id),
         };
 
         let gas_schedule: GasScheduleV2 = executor.state_store().get_on_chain_config().unwrap();
@@ -200,7 +207,7 @@ impl MoveHarness {
     }
 
     pub fn new_with_lazy_loading(enable_lazy_loading: bool) -> Self {
-        let mut h = MoveHarness::new();
+        let mut h = Self::new();
         if enable_lazy_loading {
             h.enable_features(vec![FeatureFlag::ENABLE_LAZY_LOADING], vec![]);
         } else {
@@ -212,7 +219,7 @@ impl MoveHarness {
     pub fn new_mainnet() -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
-            executor: FakeExecutor::from_mainnet_genesis(),
+            executor: FakeExecutorImpl::from_mainnet_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
@@ -1025,8 +1032,8 @@ impl MoveHarness {
         block_split: BlockSplit,
         txn_block: Vec<(u64, SignedTransaction)>,
     ) -> Vec<TransactionOutput> {
-        fn run_and_check_block(
-            harness: &mut MoveHarness,
+        fn run_and_check_block<O: OutputLogger>(
+            harness: &mut MoveHarnessImpl<O>,
             txn_block: Vec<(u64, SignedTransaction)>,
             offset: usize,
         ) -> Vec<TransactionOutput> {
@@ -1146,7 +1153,7 @@ macro_rules! enable_golden {
     };
 }
 
-impl MoveHarness {
+impl MoveHarnessImpl<GoldenOutputs> {
     /// Internal function to support the `enable_golden` macro.
     pub fn internal_set_golden(&mut self, file_macro_value: &str, function_macro_value: &str) {
         // The result of `std::file!` gives us a name relative to the project root,
