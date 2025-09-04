@@ -11,23 +11,22 @@ use aptos_types::{
 };
 use arr_macro::arr;
 use itertools::Itertools;
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
+use rayon::prelude::*;
 use std::{
     collections::{hash_map::Entry, HashMap},
     time::Duration,
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PerVersionStateUpdateRefs<'kv> {
     pub first_version: Version,
     pub num_versions: usize,
-    /// Converting to Vec to Box<[]> to release over-allocated memory during construction
     /// TODO(HotState): let WriteOp always carry StateSlot, so we can use &'kv StateSlot here
-    pub shards: [Box<[(&'kv StateKey, StateUpdateRef<'kv>)]>; NUM_STATE_SHARDS],
+    pub shards: [Vec<(&'kv StateKey, StateUpdateRef<'kv>)>; NUM_STATE_SHARDS],
 }
 
 impl<'kv> PerVersionStateUpdateRefs<'kv> {
-    pub fn index<
+    fn index<
         UpdateIter: IntoIterator<Item = (&'kv StateKey, &'kv BaseStateOp)>,
         VersionIter: IntoIterator<Item = UpdateIter>,
     >(
@@ -56,7 +55,11 @@ impl<'kv> PerVersionStateUpdateRefs<'kv> {
 
         Self {
             first_version,
-            shards: shards.map(|shard| shard.into_boxed_slice()),
+            shards: shards.map(|mut shard| {
+                // Release over-allocated memory during construction.
+                shard.shrink_to_fit();
+                shard
+            }),
             num_versions,
         }
     }
@@ -70,7 +73,7 @@ pub struct BatchedStateUpdateRefs<'kv> {
 }
 
 impl BatchedStateUpdateRefs<'_> {
-    pub fn new_empty(first_version: Version, num_versions: usize) -> Self {
+    fn new_empty(first_version: Version, num_versions: usize) -> Self {
         Self {
             first_version,
             num_versions,
@@ -102,15 +105,22 @@ impl BatchedStateUpdateRefs<'_> {
 #[derive(Debug)]
 pub struct StateUpdateRefs<'kv> {
     pub per_version: PerVersionStateUpdateRefs<'kv>,
-    /// Batched updates (updates for the same keys are merged) from the
-    /// beginning of the block/chunk to the last checkpoint (if it exists).
-    pub for_last_checkpoint: Option<BatchedStateUpdateRefs<'kv>>,
-    /// Batched updates from the version after last check point to last version
-    /// (`None` if the last version is a checkpoint, e.g. in a regular block).
-    pub for_latest: Option<BatchedStateUpdateRefs<'kv>>,
+    /// Updates from the beginning of the block/chunk to the last checkpoint (if it exists).
+    for_last_checkpoint: Option<(PerVersionStateUpdateRefs<'kv>, BatchedStateUpdateRefs<'kv>)>,
+    /// Updates from the version after last checkpoint to last version (`None` if the last version
+    /// is a checkpoint, e.g. in a regular block).
+    for_latest: Option<(PerVersionStateUpdateRefs<'kv>, BatchedStateUpdateRefs<'kv>)>,
 }
 
 impl<'kv> StateUpdateRefs<'kv> {
+    pub(crate) fn for_last_checkpoint_batched(&self) -> Option<&BatchedStateUpdateRefs<'kv>> {
+        self.for_last_checkpoint.as_ref().map(|x| &x.1)
+    }
+
+    pub(crate) fn for_latest_batched(&self) -> Option<&BatchedStateUpdateRefs<'kv>> {
+        self.for_latest.as_ref().map(|x| &x.1)
+    }
+
     pub fn index_write_sets(
         first_version: Version,
         write_sets: impl IntoIterator<Item = &'kv WriteSet>,
@@ -136,83 +146,87 @@ impl<'kv> StateUpdateRefs<'kv> {
         num_versions: usize,
         last_checkpoint_index: Option<usize>,
     ) -> Self {
-        let per_version =
-            PerVersionStateUpdateRefs::index(first_version, updates_by_version, num_versions);
+        let mut updates_by_version = updates_by_version.into_iter();
+        let mut num_versions_for_last_checkpoint = 0;
 
-        let (for_last_checkpoint, for_latest) =
-            Self::collect_updates(&per_version, last_checkpoint_index);
+        let for_last_checkpoint = last_checkpoint_index.map(|index| {
+            num_versions_for_last_checkpoint = index + 1;
+            let per_version = PerVersionStateUpdateRefs::index(
+                first_version,
+                updates_by_version
+                    .by_ref()
+                    .take(num_versions_for_last_checkpoint),
+                num_versions_for_last_checkpoint,
+            );
+            let batched = Self::batch_updates(&per_version);
+            (per_version, batched)
+        });
+
+        let for_latest = match last_checkpoint_index {
+            Some(index) if index + 1 == num_versions => None,
+            _ => {
+                assert!(num_versions_for_last_checkpoint < num_versions);
+                let per_version = PerVersionStateUpdateRefs::index(
+                    first_version + num_versions_for_last_checkpoint as Version,
+                    updates_by_version,
+                    num_versions - num_versions_for_last_checkpoint,
+                );
+                let batched = Self::batch_updates(&per_version);
+                Some((per_version, batched))
+            },
+        };
+
         Self {
-            per_version,
+            per_version: Self::concat_per_version_updates(
+                for_last_checkpoint.as_ref().map(|x| &x.0),
+                for_latest.as_ref().map(|x| &x.0),
+            ),
             for_last_checkpoint,
             for_latest,
+        }
+    }
+
+    fn concat_per_version_updates(
+        for_last_checkpoint: Option<&PerVersionStateUpdateRefs<'kv>>,
+        for_latest: Option<&PerVersionStateUpdateRefs<'kv>>,
+    ) -> PerVersionStateUpdateRefs<'kv> {
+        match for_last_checkpoint {
+            Some(for_last_checkpoint) => {
+                let mut all = for_last_checkpoint.clone();
+                if let Some(for_latest) = for_latest {
+                    all.num_versions += for_latest.num_versions;
+                    for (dest, src) in all.shards.iter_mut().zip_eq(for_latest.shards.iter()) {
+                        dest.extend_from_slice(src);
+                    }
+                }
+                all
+            },
+            None => for_latest.cloned().expect("At least one should be Some."),
         }
     }
 
     pub fn last_inner_checkpoint_index(&self) -> Option<usize> {
         self.for_last_checkpoint
             .as_ref()
-            .map(|updates| updates.num_versions - 1)
+            .map(|updates| updates.1.num_versions - 1)
     }
 
-    fn collect_updates(
+    fn batch_updates(
         per_version_updates: &PerVersionStateUpdateRefs<'kv>,
-        last_checkpoint_index: Option<usize>,
-    ) -> (
-        Option<BatchedStateUpdateRefs<'kv>>,
-        Option<BatchedStateUpdateRefs<'kv>>,
-    ) {
+    ) -> BatchedStateUpdateRefs<'kv> {
         let _timer = TIMER.timer_with(&["index_state_updates__collect_batch"]);
 
-        let mut shard_iters = per_version_updates
-            .shards
-            .iter()
-            .map(|shard| shard.iter().cloned())
-            .collect::<Vec<_>>();
+        let first_version = per_version_updates.first_version;
+        let num_versions = per_version_updates.num_versions;
 
-        let mut first_version_to_collect = per_version_updates.first_version;
-        let mut remaining_versions = per_version_updates.num_versions;
-        let updates_for_last_checkpoint = last_checkpoint_index.map(|idx| {
-            let num_versions = idx + 1;
-            let ret = Self::collect_some_updates(
-                first_version_to_collect,
-                num_versions,
-                &mut shard_iters,
-            );
-            first_version_to_collect += num_versions as Version;
-            remaining_versions -= num_versions;
-            ret
-        });
-        let updates_for_latest = if remaining_versions == 0 {
-            None
-        } else {
-            Some(Self::collect_some_updates(
-                first_version_to_collect,
-                remaining_versions,
-                &mut shard_iters,
-            ))
-        };
-
-        // Assert that all updates are consumed.
-        assert!(shard_iters.iter_mut().all(|iter| iter.next().is_none()));
-
-        (updates_for_last_checkpoint, updates_for_latest)
-    }
-
-    fn collect_some_updates(
-        first_version: Version,
-        num_versions: usize,
-        shard_iters: &mut [impl Iterator<Item = (&'kv StateKey, StateUpdateRef<'kv>)> + Clone + Send],
-    ) -> BatchedStateUpdateRefs<'kv> {
         let mut ret = BatchedStateUpdateRefs::new_empty(first_version, num_versions);
-        // exclusive
-        let end_version = first_version + num_versions as Version;
-        shard_iters
-            .par_iter_mut()
+        per_version_updates
+            .shards
+            .par_iter()
+            .map(|shard| shard.iter().cloned())
             .zip_eq(ret.shards.par_iter_mut())
             .for_each(|(shard_iter, dedupped)| {
-                // n.b. take_while_ref so that in the next step we can process the rest of the
-                // entries from the iters.
-                for (k, u) in shard_iter.take_while_ref(|(_k, u)| u.version < end_version) {
+                for (k, u) in shard_iter {
                     // If it's a value write op (Creation/Modification/Deletion), just insert and
                     // overwrite the previous op.
                     if u.state_op.is_value_write_op() {
