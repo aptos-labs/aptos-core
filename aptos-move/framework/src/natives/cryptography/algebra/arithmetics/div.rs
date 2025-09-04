@@ -19,7 +19,7 @@ use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, ops::Div, rc::Rc};
 
 macro_rules! ark_div_internal {
-    ($context:expr, $args:ident, $ark_typ:ty, $ark_func:ident, $gas_eq:expr, $gas_div:expr) => {{
+    ($context:expr_2021, $args:ident, $ark_typ:ty, $ark_func:ident, $gas_eq:expr_2021, $gas_div:expr_2021) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
         safe_borrow_element!($context, handle_1, $ark_typ, element_1_ptr, element_1);

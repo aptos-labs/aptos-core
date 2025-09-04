@@ -265,7 +265,7 @@ impl CliCommand<String> for RenameProfile {
                     "Profile {} already exists",
                     self.new_profile_name
                 )))
-            } else if let Some(profile_config) = profiles.remove(&self.profile) {
+            } else { match profiles.remove(&self.profile) { Some(profile_config) => {
                 profiles.insert(self.new_profile_name.clone(), profile_config);
                 config.save().map_err(|err| {
                     CliError::UnexpectedError(format!(
@@ -277,12 +277,12 @@ impl CliCommand<String> for RenameProfile {
                     "Renamed profile {} to {}",
                     self.profile, self.new_profile_name
                 ))
-            } else {
+            } _ => {
                 Err(CliError::CommandArgumentError(format!(
                     "Profile {} does not exist",
                     self.profile
                 )))
-            }
+            }}}
         } else {
             Err(CliError::CommandArgumentError(
                 "Config has no profiles".to_string(),

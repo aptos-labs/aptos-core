@@ -18,7 +18,7 @@ use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
 macro_rules! ark_eq_internal {
-    ($context:ident, $args:ident, $ark_typ:ty, $gas:expr) => {{
+    ($context:ident, $args:ident, $ark_typ:ty, $gas:expr_2021) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
         safe_borrow_element!($context, handle_1, $ark_typ, element_1_ptr, element_1);

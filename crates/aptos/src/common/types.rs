@@ -395,14 +395,14 @@ impl CliConfig {
 
         // If no profile was given, use `default`
         if let Some(profile) = profile {
-            if let Some(account_profile) = config.remove_profile(profile) {
+            match config.remove_profile(profile) { Some(account_profile) => {
                 Ok(Some(account_profile))
-            } else {
+            } _ => {
                 Err(CliError::CommandArgumentError(format!(
                     "Profile {} not found",
                     profile
                 )))
-            }
+            }}
         } else {
             Ok(config.remove_profile(DEFAULT_PROFILE))
         }
@@ -841,7 +841,7 @@ impl PrivateKeyInputOptions {
         // 1. CLI inputs
         // 2. Profile
         // 3. Derived
-        if let Some(private_key) = self.extract_private_key_cli(encoding)? {
+        match self.extract_private_key_cli(encoding)? { Some(private_key) => {
             // If we use the CLI inputs, then we should derive or use the address from the input
             if let Some(address) = maybe_address {
                 Ok((private_key.public_key(), address))
@@ -849,7 +849,7 @@ impl PrivateKeyInputOptions {
                 let address = account_address_from_public_key(&private_key.public_key());
                 Ok((private_key.public_key(), address))
             }
-        } else if let Some((Some(public_key), maybe_config_address)) = CliConfig::load_profile(
+        } _ => if let Some((Some(public_key), maybe_config_address)) = CliConfig::load_profile(
             profile.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
         )?
@@ -867,7 +867,7 @@ impl PrivateKeyInputOptions {
             Err(CliError::CommandArgumentError(
                 "One of ['--private-key', '--private-key-file'], or ['public_key'] must present in profile".to_string(),
             ))
-        }
+        }}
     }
 
     /// Extract address
@@ -885,11 +885,11 @@ impl PrivateKeyInputOptions {
             return Ok(address);
         }
 
-        if let Some(private_key) = self.extract_private_key_cli(encoding)? {
+        match self.extract_private_key_cli(encoding)? { Some(private_key) => {
             // If we use the CLI inputs, then we should derive or use the address from the input
             let address = account_address_from_public_key(&private_key.public_key());
             Ok(address)
-        } else if let Some((Some(public_key), maybe_config_address)) = CliConfig::load_profile(
+        } _ => if let Some((Some(public_key), maybe_config_address)) = CliConfig::load_profile(
             profile.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
         )?
@@ -905,7 +905,7 @@ impl PrivateKeyInputOptions {
             Err(CliError::CommandArgumentError(
                 "One of ['--private-key', '--private-key-file'], or ['public_key'] must present in profile".to_string(),
             ))
-        }
+        }}
     }
 
     /// Extract private key from CLI args with fallback to config
@@ -919,7 +919,7 @@ impl PrivateKeyInputOptions {
         // 1. CLI inputs
         // 2. Profile
         // 3. Derived
-        if let Some(key) = self.extract_private_key_cli(encoding)? {
+        match self.extract_private_key_cli(encoding)? { Some(key) => {
             // If we use the CLI inputs, then we should derive or use the address from the input
             if let Some(address) = maybe_address {
                 Ok((key, address))
@@ -927,12 +927,12 @@ impl PrivateKeyInputOptions {
                 let address = account_address_from_public_key(&key.public_key());
                 Ok((key, address))
             }
-        } else if let Some((Some(key), maybe_config_address)) = CliConfig::load_profile(
+        } _ => { match CliConfig::load_profile(
             profile.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
         )?
         .map(|p| (p.private_key, p.account))
-        {
+        { Some((Some(key), maybe_config_address)) => {
             match (maybe_address, maybe_config_address) {
                 (Some(address), _) => Ok((key, address)),
                 (_, Some(address)) => Ok((key, address)),
@@ -941,11 +941,11 @@ impl PrivateKeyInputOptions {
                     Ok((key, address))
                 },
             }
-        } else {
+        } _ => {
             Err(CliError::CommandArgumentError(
                 "One of ['--private-key', '--private-key-file'] must be used".to_string(),
             ))
-        }
+        }}}}
     }
 
     /// Extract private key from CLI args with fallback to config
@@ -954,20 +954,20 @@ impl PrivateKeyInputOptions {
         encoding: EncodingType,
         profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PrivateKey> {
-        if let Some(key) = self.extract_private_key_cli(encoding)? {
+        match self.extract_private_key_cli(encoding)? { Some(key) => {
             Ok(key)
-        } else if let Some(Some(private_key)) = CliConfig::load_profile(
+        } _ => { match CliConfig::load_profile(
             profile.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
         )?
         .map(|p| p.private_key)
-        {
+        { Some(Some(private_key)) => {
             Ok(private_key)
-        } else {
+        } _ => {
             Err(CliError::CommandArgumentError(
                 "One of ['--private-key', '--private-key-file'] must be used".to_string(),
             ))
-        }
+        }}}}
     }
 
     /// Extract private key from CLI args
@@ -1007,18 +1007,18 @@ impl ExtractEd25519PublicKey for PrivateKeyInputOptions {
         profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PublicKey> {
         // 1. Get the private key, and derive the public key
-        let private_key = if let Some(key) = self.extract_private_key_cli(encoding)? {
+        let private_key = match self.extract_private_key_cli(encoding)? { Some(key) => {
             Some(key)
-        } else if let Some(Some(private_key)) = CliConfig::load_profile(
+        } _ => { match CliConfig::load_profile(
             profile.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
         )?
         .map(|p| p.private_key)
-        {
+        { Some(Some(private_key)) => {
             Some(private_key)
-        } else {
+        } _ => {
             None
-        };
+        }}}};
 
         // 2. Get the public key from the config profile
         // 3. Else error
@@ -1371,17 +1371,16 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
             .map(|p| p.account)
     {
         Ok(account_address)
-    } else if let Some(Some(private_key)) =
-        CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
+    } else { match CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
             .map(|p| p.private_key)
-    {
+    { Some(Some(private_key)) => {
         let public_key = private_key.public_key();
         Ok(account_address_from_public_key(&public_key))
-    } else {
+    } _ => {
         Err(CliError::CommandArgumentError(
             "'--account' or '--profile' after using aptos init must be provided".to_string(),
         ))
-    }
+    }}}
 }
 
 /// A wrapper around `AccountAddress` to allow for "_"
@@ -1406,17 +1405,16 @@ pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, Cl
         Ok(None)
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(Some(account_address))
-    } else if let Some(Some(private_key)) =
-        CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
+    } else { match CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
             .map(|p| p.private_key)
-    {
+    { Some(Some(private_key)) => {
         let public_key = private_key.public_key();
         Ok(Some(account_address_from_public_key(&public_key)))
-    } else {
+    } _ => {
         Err(CliError::CommandArgumentError(
             "Invalid Move manifest account address".to_string(),
         ))
-    }
+    }}}
 }
 
 /// A common trait for all CLI commands to have consistent outputs
@@ -1819,21 +1817,21 @@ impl TransactionOptions {
             || self.private_key_options.private_key_file.is_some()
         {
             Ok(AccountType::Local)
-        } else if let Some(profile) = CliConfig::load_profile(
+        } else { match CliConfig::load_profile(
             self.profile_options.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
-        )? {
+        )? { Some(profile) => {
             if profile.private_key.is_some() {
                 Ok(AccountType::Local)
             } else {
                 Ok(AccountType::HardwareWallet)
             }
-        } else {
+        } _ => {
             Err(CliError::CommandArgumentError(
                 "One of ['--private-key', '--private-key-file'] or profile must be used"
                     .to_string(),
             ))
-        }
+        }}}
     }
 
     /// Retrieves the private key and the associated address

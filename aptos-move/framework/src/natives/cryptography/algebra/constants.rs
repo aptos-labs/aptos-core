@@ -21,7 +21,7 @@ use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
 
 macro_rules! ark_constant_op_internal {
-    ($context:expr, $ark_typ:ty, $ark_func:ident, $gas:expr) => {{
+    ($context:expr_2021, $ark_typ:ty, $ark_func:ident, $gas:expr_2021) => {{
         $context.charge($gas)?;
         let new_element = <$ark_typ>::$ark_func();
         let new_handle = store_element!($context, new_element)?;

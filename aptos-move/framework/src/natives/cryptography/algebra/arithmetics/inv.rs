@@ -19,7 +19,7 @@ use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
 
 macro_rules! ark_inverse_internal {
-    ($context:expr, $args:ident, $ark_typ:ty, $gas:expr) => {{
+    ($context:expr_2021, $args:ident, $ark_typ:ty, $gas:expr_2021) => {{
         let handle = safely_pop_arg!($args, u64) as usize;
         safe_borrow_element!($context, handle, $ark_typ, element_ptr, element);
         $context.charge($gas)?;

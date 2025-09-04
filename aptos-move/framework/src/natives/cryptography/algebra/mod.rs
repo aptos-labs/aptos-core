@@ -90,7 +90,7 @@ impl TryFrom<TypeTag> for Structure {
 
 #[macro_export]
 macro_rules! structure_from_ty_arg {
-    ($context:expr, $typ:expr) => {{
+    ($context:expr_2021, $typ:expr_2021) => {{
         let type_tag = $context.type_to_type_tag($typ)?;
         Structure::try_from(type_tag).ok()
     }};
@@ -204,7 +204,7 @@ impl AlgebraContext {
 /// Abort the VM execution with invariant violation if anything above fails.
 #[macro_export]
 macro_rules! safe_borrow_element {
-    ($context:expr, $handle:expr, $typ:ty, $ptr_out:ident, $ref_out:ident) => {
+    ($context:expr_2021, $handle:expr_2021, $typ:ty, $ptr_out:ident, $ref_out:ident) => {
         let $ptr_out = $context
             .extensions()
             .get::<AlgebraContext>()
@@ -220,7 +220,7 @@ macro_rules! safe_borrow_element {
 
 #[macro_export]
 macro_rules! store_element {
-    ($context:expr, $obj:expr) => {{
+    ($context:expr_2021, $obj:expr_2021) => {{
         let context = &mut $context.extensions_mut().get_mut::<AlgebraContext>();
         let new_size = context.bytes_used + std::mem::size_of_val(&$obj);
         if new_size > MEMORY_LIMIT_IN_BYTES {
@@ -256,7 +256,7 @@ fn feature_flag_from_structure(structure_opt: Option<Structure>) -> Option<Featu
 
 #[macro_export]
 macro_rules! abort_unless_arithmetics_enabled_for_structure {
-    ($context:ident, $structure_opt:expr) => {
+    ($context:ident, $structure_opt:expr_2021) => {
         let flag_opt = feature_flag_from_structure($structure_opt);
         abort_unless_feature_flag_enabled!($context, flag_opt);
     };
@@ -264,7 +264,7 @@ macro_rules! abort_unless_arithmetics_enabled_for_structure {
 
 #[macro_export]
 macro_rules! abort_unless_feature_flag_enabled {
-    ($context:ident, $flag_opt:expr) => {
+    ($context:ident, $flag_opt:expr_2021) => {
         match $flag_opt {
             Some(flag) if $context.get_feature_flags().is_enabled(flag) => {
                 // Continue.

@@ -2273,11 +2273,11 @@ fn get_fee_statement_from_event(events: &[ContractEvent]) -> Vec<FeeStatement> {
     events
         .iter()
         .filter_map(|event| {
-            if let Ok(Some(fee_statement)) = event.try_v2_typed(&FEE_STATEMENT_EVENT_TYPE) {
+            match event.try_v2_typed(&FEE_STATEMENT_EVENT_TYPE) { Ok(Some(fee_statement)) => {
                 Some(fee_statement)
-            } else {
+            } _ => {
                 None
-            }
+            }}
         })
         .collect()
 }

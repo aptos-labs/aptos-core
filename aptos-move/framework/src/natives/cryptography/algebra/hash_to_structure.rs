@@ -38,14 +38,14 @@ fn feature_flag_of_hash_to_structure(
 }
 
 macro_rules! abort_unless_hash_to_structure_enabled {
-    ($context:ident, $structure_opt:expr, $suite_opt:expr) => {
+    ($context:ident, $structure_opt:expr_2021, $suite_opt:expr_2021) => {
         let flag_opt = feature_flag_of_hash_to_structure($structure_opt, $suite_opt);
         abort_unless_feature_flag_enabled!($context, flag_opt);
     };
 }
 
 macro_rules! suite_from_ty_arg {
-    ($context:expr, $typ:expr) => {{
+    ($context:expr_2021, $typ:expr_2021) => {{
         let type_tag = $context.type_to_type_tag($typ).unwrap();
         HashToStructureSuite::try_from(type_tag).ok()
     }};
@@ -53,12 +53,12 @@ macro_rules! suite_from_ty_arg {
 
 macro_rules! hash_to_bls12381gx_cost {
     (
-        $dst_len: expr,
-        $msg_len: expr,
-        $dst_shortening_base: expr,
-        $dst_shortening_per_byte: expr,
-        $mapping_base: expr,
-        $mapping_per_byte: expr
+        $dst_len: expr_2021,
+        $msg_len: expr_2021,
+        $dst_shortening_base: expr_2021,
+        $dst_shortening_per_byte: expr_2021,
+        $mapping_base: expr_2021,
+        $mapping_per_byte: expr_2021
         $(,)?
     ) => {{
         let dst_len: usize = $dst_len;

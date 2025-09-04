@@ -138,14 +138,14 @@ impl PersistentSafetyStorage {
             return self.internal_store.get(SAFETY_DATA).map(|v| v.value)?;
         }
 
-        if let Some(cached_safety_data) = self.cached_safety_data.clone() {
+        match self.cached_safety_data.clone() { Some(cached_safety_data) => {
             Ok(cached_safety_data)
-        } else {
+        } _ => {
             let _timer = counters::start_timer("get", SAFETY_DATA);
             let safety_data: SafetyData = self.internal_store.get(SAFETY_DATA).map(|v| v.value)?;
             self.cached_safety_data = Some(safety_data.clone());
             Ok(safety_data)
-        }
+        }}
     }
 
     pub fn set_safety_data(&mut self, data: SafetyData) -> Result<(), Error> {

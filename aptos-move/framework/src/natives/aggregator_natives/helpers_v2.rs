@@ -25,7 +25,7 @@ const DERIVED_STRING_SNAPSHOT_VALUE_FIELD_INDEX: usize = 0;
 const _DERIVED_STRING_SNAPSHOT_PADDING_FIELD_INDEX: usize = 1;
 
 macro_rules! get_value_impl {
-    ($func_name:ident, $idx:expr, $e:expr) => {
+    ($func_name:ident, $idx:expr_2021, $e:expr_2021) => {
         pub(crate) fn $func_name(struct_ref: &StructRef, ty: &Type) -> SafeNativeResult<u128> {
             Ok(match ty {
                 Type::U128 => safely_get_struct_field_as!(struct_ref, $idx, u128),
@@ -55,7 +55,7 @@ get_value_impl!(
 );
 
 macro_rules! get_value_as_id_impl {
-    ($func_name:ident, $idx:expr, $e:expr) => {
+    ($func_name:ident, $idx:expr_2021, $e:expr_2021) => {
         pub(crate) fn $func_name(
             struct_ref: &StructRef,
             ty: &Type,

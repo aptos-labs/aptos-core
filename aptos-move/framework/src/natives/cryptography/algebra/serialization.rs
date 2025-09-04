@@ -55,14 +55,14 @@ pub fn feature_flag_of_serialization_format(
 }
 
 macro_rules! abort_unless_serialization_format_enabled {
-    ($context:ident, $format_opt:expr) => {
+    ($context:ident, $format_opt:expr_2021) => {
         let flag_opt = feature_flag_of_serialization_format($format_opt);
         abort_unless_feature_flag_enabled!($context, flag_opt);
     };
 }
 
 macro_rules! format_from_ty_arg {
-    ($context:expr, $typ:expr) => {{
+    ($context:expr_2021, $typ:expr_2021) => {{
         let type_tag = $context.type_to_type_tag($typ)?;
         SerializationFormat::try_from(type_tag).ok()
     }};
@@ -70,12 +70,12 @@ macro_rules! format_from_ty_arg {
 
 macro_rules! serialize_element {
     (
-        $context:expr,
+        $context:expr_2021,
         $args:ident,
-        $structure_to_match:expr,
-        $format_to_match:expr,
-        [$(($field_structure:pat, $field_format:pat, $field_ty:ty, $field_serialization_func:ident,$reverse:expr, $field_serialization_gas:expr)),* $(,)?],
-        [$(($curve_structure:pat,$curve_format:pat, $curve_ty:ty, $curve_serialization_func:ident, $curve_serialization_gas:expr, $into_affine_gas:expr)),* $(,)?]
+        $structure_to_match:expr_2021,
+        $format_to_match:expr_2021,
+        [$(($field_structure:pat, $field_format:pat, $field_ty:ty, $field_serialization_func:ident,$reverse:expr_2021, $field_serialization_gas:expr_2021)),* $(,)?],
+        [$(($curve_structure:pat,$curve_format:pat, $curve_ty:ty, $curve_serialization_func:ident, $curve_serialization_gas:expr_2021, $into_affine_gas:expr_2021)),* $(,)?]
     ) => {
         match ($structure_to_match, $format_to_match) {
         $(
@@ -295,7 +295,7 @@ pub fn serialize_internal(
 
 /// Macros that implements `deserialize_internal()` using arkworks libraries.
 macro_rules! ark_deserialize_internal {
-    ($context:expr, $bytes:expr, $ark_typ:ty, $ark_deser_func:ident, $gas:expr) => {{
+    ($context:expr_2021, $bytes:expr_2021, $ark_typ:ty, $ark_deser_func:ident, $gas:expr_2021) => {{
         $context.charge($gas)?;
         match <$ark_typ>::$ark_deser_func($bytes) {
             Ok(element) => {
@@ -314,7 +314,7 @@ macro_rules! ark_deserialize_internal {
 }
 
 macro_rules! ark_ec_point_deserialize_internal {
-    ($context:expr, $bytes:expr, $typ:ty, $deser_func:ident, $gas:expr) => {{
+    ($context:expr_2021, $bytes:expr_2021, $typ:ty, $deser_func:ident, $gas:expr_2021) => {{
         $context.charge($gas)?;
         match <$typ>::$deser_func($bytes) {
             Ok(element) => {

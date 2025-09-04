@@ -96,12 +96,12 @@ impl CliCommand<()> for InitTool {
             .unwrap_or(DEFAULT_PROFILE);
 
         // Select profile we're using
-        let mut profile_config = if let Some(profile_config) = config.remove_profile(profile_name) {
+        let mut profile_config = match config.remove_profile(profile_name) { Some(profile_config) => {
             prompt_yes_with_override(&format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", profile_name), self.prompt_options)?;
             profile_config
-        } else {
+        } _ => {
             ProfileConfig::default()
-        };
+        }};
         eprintln!("Configuring for profile {}", profile_name);
 
         // Choose a network
@@ -210,13 +210,13 @@ impl CliCommand<()> for InitTool {
             // Private key stays in ledger
             None
         } else {
-            let ed25519_private_key = if let Some(key) = self
+            let ed25519_private_key = match self
                 .private_key_options
                 .extract_private_key_cli(self.encoding_options.encoding)?
-            {
+            { Some(key) => {
                 eprintln!("Using command line argument for private key");
                 key
-            } else {
+            } _ => {
                 eprintln!("Enter your private key as a hex literal (0x...) [Current: {} | No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
                 let input = read_line("Private key")?;
                 let input = input.trim();
@@ -236,7 +236,7 @@ impl CliCommand<()> for InitTool {
                         CliError::UnableToParse("Ed25519PrivateKey", err.to_string())
                     })?
                 }
-            };
+            }};
 
             Some(ed25519_private_key)
         };

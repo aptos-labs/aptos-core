@@ -36,7 +36,7 @@ fn feature_flag_of_casting(
 }
 
 macro_rules! abort_unless_casting_enabled {
-    ($context:ident, $super_opt:expr, $sub_opt:expr) => {
+    ($context:ident, $super_opt:expr_2021, $sub_opt:expr_2021) => {
         let flag_opt = feature_flag_of_casting($super_opt, $sub_opt);
         abort_unless_feature_flag_enabled!($context, flag_opt);
     };

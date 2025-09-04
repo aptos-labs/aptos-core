@@ -294,10 +294,10 @@ pub async fn get_stake_balances(
     const STAKE_POOL: &str = "0x1::stake::StakePool";
 
     // Retreive the pool resource
-    if let Ok(response) = rest_client
+    match rest_client
         .get_account_resource_at_version_bcs::<StakePool>(pool_address, STAKE_POOL, version)
         .await
-    {
+    { Ok(response) => {
         let stake_pool = response.into_inner();
 
         // Stake isn't allowed for base accounts
@@ -375,9 +375,9 @@ pub async fn get_stake_balances(
         } else {
             Ok(None)
         }
-    } else {
+    } _ => {
         Ok(None)
-    }
+    }}
 }
 
 /// Retrieve delegation stake balances for a given owner, pool, and version

@@ -39,21 +39,21 @@ fn feature_flag_of_pairing(
 }
 
 macro_rules! abort_unless_pairing_enabled {
-    ($context:ident, $g1_opt:expr, $g2_opt:expr, $gt_opt:expr) => {
+    ($context:ident, $g1_opt:expr_2021, $g2_opt:expr_2021, $gt_opt:expr_2021) => {
         let flag_opt = feature_flag_of_pairing($g1_opt, $g2_opt, $gt_opt);
         abort_unless_feature_flag_enabled!($context, flag_opt);
     };
 }
 macro_rules! pairing_internal {
     (
-        $context:expr,
+        $context:expr_2021,
         $args:ident,
         $pairing:ty,
         $g1_projective:ty,
         $g2_projective:ty,
-        $pairing_gas_cost:expr,
-        $g1_proj_to_affine_gas_cost:expr,
-        $g2_proj_to_affine_gas_cost:expr
+        $pairing_gas_cost:expr_2021,
+        $g1_proj_to_affine_gas_cost:expr_2021,
+        $g2_proj_to_affine_gas_cost:expr_2021
     ) => {{
         let g2_element_handle = safely_pop_arg!($args, u64) as usize;
         let g1_element_handle = safely_pop_arg!($args, u64) as usize;
@@ -83,15 +83,15 @@ macro_rules! pairing_internal {
 }
 macro_rules! multi_pairing_internal {
     (
-        $context:expr,
+        $context:expr_2021,
         $args:ident,
         $pairing:ty,
         $g1_projective:ty,
         $g2_projective:ty,
-        $multi_pairing_base_gas:expr,
-        $multi_pairing_per_pair_gas:expr,
-        $g1_proj_to_affine_gas:expr,
-        $g2_proj_to_affine_gas:expr
+        $multi_pairing_base_gas:expr_2021,
+        $multi_pairing_per_pair_gas:expr_2021,
+        $g1_proj_to_affine_gas:expr_2021,
+        $g2_proj_to_affine_gas:expr_2021
     ) => {{
         let g2_element_handles = safely_pop_arg!($args, Vec<u64>);
         let g1_element_handles = safely_pop_arg!($args, Vec<u64>);

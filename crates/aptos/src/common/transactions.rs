@@ -95,21 +95,21 @@ impl TxnOptions {
     pub fn get_transaction_account_type(&self) -> CliTypedResult<AccountType> {
         if self.private_key_options.has_key_or_file() {
             Ok(AccountType::Local)
-        } else if let Some(profile) = CliConfig::load_profile(
+        } else { match CliConfig::load_profile(
             self.profile_options.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
-        )? {
+        )? { Some(profile) => {
             if profile.private_key.is_some() {
                 Ok(AccountType::Local)
             } else {
                 Ok(AccountType::HardwareWallet)
             }
-        } else {
+        } _ => {
             Err(CliError::CommandArgumentError(
                 "One of ['--private-key', '--private-key-file'] or a profile must be used"
                     .to_string(),
             ))
-        }
+        }}}
     }
 
     /// Retrieves the private key and the associated address

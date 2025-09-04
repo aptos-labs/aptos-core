@@ -115,14 +115,14 @@ fn create_aggregator_with_max_value(
     aggregator_value_ty: &Type,
     max_value: u128,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    let value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+    let value = match get_context_data(context) { Some((resolver, mut delayed_field_data)) => {
         let width = get_width_by_type(aggregator_value_ty, EUNSUPPORTED_AGGREGATOR_TYPE)?;
         let id = resolver.generate_delayed_field_id(width);
         delayed_field_data.create_new_aggregator(id);
         Value::delayed_value(id)
-    } else {
+    } _ => {
         create_value_by_type(aggregator_value_ty, 0, EUNSUPPORTED_AGGREGATOR_TYPE)?
-    };
+    }};
 
     let max_value =
         create_value_by_type(aggregator_value_ty, max_value, EUNSUPPORTED_AGGREGATOR_TYPE)?;
@@ -183,7 +183,7 @@ fn native_try_add(
 
     let max_value = get_aggregator_max_value(&aggregator, aggregator_value_ty)?;
 
-    let success = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+    let success = match get_context_data(context) { Some((resolver, mut delayed_field_data)) => {
         let id = get_aggregator_value_as_id(&aggregator, aggregator_value_ty, resolver)?;
         delayed_field_data.try_add_or_check_delta(
             id,
@@ -192,7 +192,7 @@ fn native_try_add(
             resolver,
             true,
         )?
-    } else {
+    } _ => {
         let lhs = get_aggregator_value(&aggregator, aggregator_value_ty)?;
         match BoundedMath::new(max_value).unsigned_add(lhs, rhs) {
             Ok(result) => {
@@ -206,7 +206,7 @@ fn native_try_add(
             },
             Err(_) => false,
         }
-    };
+    }};
 
     Ok(smallvec![Value::bool(success)])
 }
@@ -229,7 +229,7 @@ fn native_try_sub(
 
     let max_value = get_aggregator_max_value(&aggregator, aggregator_value_ty)?;
 
-    let success = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+    let success = match get_context_data(context) { Some((resolver, mut delayed_field_data)) => {
         let id = get_aggregator_value_as_id(&aggregator, aggregator_value_ty, resolver)?;
         delayed_field_data.try_add_or_check_delta(
             id,
@@ -238,7 +238,7 @@ fn native_try_sub(
             resolver,
             true,
         )?
-    } else {
+    } _ => {
         let lhs = get_aggregator_value(&aggregator, aggregator_value_ty)?;
         match BoundedMath::new(max_value).unsigned_subtract(lhs, rhs) {
             Ok(result) => {
@@ -252,7 +252,7 @@ fn native_try_sub(
             },
             Err(_) => false,
         }
-    };
+    }};
 
     Ok(smallvec![Value::bool(success)])
 }
@@ -272,7 +272,7 @@ fn native_is_at_least_impl(
 
     let max_value = get_aggregator_max_value(&aggregator, aggregator_value_ty)?;
 
-    let success = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+    let success = match get_context_data(context) { Some((resolver, mut delayed_field_data)) => {
         let id = get_aggregator_value_as_id(&aggregator, aggregator_value_ty, resolver)?;
         delayed_field_data.try_add_or_check_delta(
             id,
@@ -281,12 +281,12 @@ fn native_is_at_least_impl(
             resolver,
             false,
         )?
-    } else {
+    } _ => {
         let lhs = get_aggregator_value(&aggregator, aggregator_value_ty)?;
         BoundedMath::new(max_value)
             .unsigned_subtract(lhs, rhs)
             .is_ok()
-    };
+    }};
 
     Ok(smallvec![Value::bool(success)])
 }
@@ -307,12 +307,12 @@ fn native_read(
     let aggregator_value_ty = &ty_args[0];
     let aggregator = safely_pop_arg!(args, StructRef);
 
-    let value = if let Some((resolver, delayed_field_data)) = get_context_data(context) {
+    let value = match get_context_data(context) { Some((resolver, delayed_field_data)) => {
         let id = get_aggregator_value_as_id(&aggregator, aggregator_value_ty, resolver)?;
         delayed_field_data.read_aggregator(id, resolver)?
-    } else {
+    } _ => {
         get_aggregator_value(&aggregator, aggregator_value_ty)?
-    };
+    }};
 
     // Paranoid check to make sure read result makes sense.
     let max_value = get_aggregator_max_value(&aggregator, aggregator_value_ty)?;
@@ -343,21 +343,21 @@ fn native_snapshot(
     let aggregator_value_ty = &ty_args[0];
     let aggregator = safely_pop_arg!(args, StructRef);
 
-    let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+    let result_value = match get_context_data(context) { Some((resolver, mut delayed_field_data)) => {
         let width = get_width_by_type(aggregator_value_ty, EUNSUPPORTED_AGGREGATOR_TYPE)?;
         let id = get_aggregator_value_as_id(&aggregator, aggregator_value_ty, resolver)?;
         let max_value = get_aggregator_max_value(&aggregator, aggregator_value_ty)?;
 
         let snapshot_id = delayed_field_data.snapshot(id, max_value, width, resolver)?;
         Value::delayed_value(snapshot_id)
-    } else {
+    } _ => {
         let value = get_aggregator_value(&aggregator, aggregator_value_ty)?;
         create_value_by_type(
             aggregator_value_ty,
             value,
             EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
         )?
-    };
+    }};
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![result_value]))])
 }
@@ -382,18 +382,18 @@ fn native_create_snapshot(
         EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
     )?;
 
-    let snapshot_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context)
-    {
+    let snapshot_value = match get_context_data(context)
+    { Some((resolver, mut delayed_field_data)) => {
         let width = get_width_by_type(snapshot_value_ty, EUNSUPPORTED_AGGREGATOR_TYPE)?;
         let snapshot_id = delayed_field_data.create_new_snapshot(value, width, resolver);
         Value::delayed_value(snapshot_id)
-    } else {
+    } _ => {
         create_value_by_type(
             snapshot_value_ty,
             value,
             EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
         )?
-    };
+    }};
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
         snapshot_value
@@ -430,12 +430,12 @@ fn native_read_snapshot(
     let snapshot_value_ty = &ty_args[0];
     let snapshot = safely_pop_arg!(args, StructRef);
 
-    let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+    let result_value = match get_context_data(context) { Some((resolver, mut delayed_field_data)) => {
         let id = get_snapshot_value_as_id(&snapshot, snapshot_value_ty, resolver)?;
         delayed_field_data.read_snapshot(id, resolver)?
-    } else {
+    } _ => {
         get_snapshot_value(&snapshot, snapshot_value_ty)?
-    };
+    }};
 
     Ok(smallvec![create_value_by_type(
         snapshot_value_ty,
@@ -471,14 +471,14 @@ fn native_read_derived_string(
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_READ_SNAPSHOT_BASE)?;
 
-    let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+    let result_value = match get_context_data(context) { Some((resolver, mut delayed_field_data)) => {
         let derived_string_snapshot = safely_pop_arg!(args, Reference);
         let id = get_derived_string_snapshot_value_as_id(derived_string_snapshot, resolver)?;
         delayed_field_data.read_derived(id, resolver)?
-    } else {
+    } _ => {
         let derived_string_snapshot = safely_pop_arg!(args, StructRef);
         get_derived_string_snapshot_value(&derived_string_snapshot)?
-    };
+    }};
 
     Ok(smallvec![create_string_value(result_value)])
 }
@@ -508,14 +508,14 @@ fn native_create_derived_string(
     }
 
     let derived_string_snapshot =
-        if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+        match get_context_data(context) { Some((resolver, mut delayed_field_data)) => {
             let id = delayed_field_data.create_new_derived(value_bytes, resolver)?;
             Value::delayed_value(id)
-        } else {
+        } _ => {
             let width = calculate_width_for_constant_string(value_bytes.len());
             bytes_and_width_to_derived_string_struct(value_bytes, width)
                 .map_err(SafeNativeError::InvariantViolation)?
-        };
+        }};
 
     Ok(smallvec![derived_string_snapshot])
 }
@@ -559,14 +559,13 @@ fn native_derive_string_concat(
         });
     }
 
-    let derived_string_snapshot = if let Some((resolver, mut delayed_field_data)) =
-        get_context_data(context)
-    {
+    let derived_string_snapshot = match get_context_data(context)
+    { Some((resolver, mut delayed_field_data)) => {
         let id = get_snapshot_value_as_id(&snapshot, snapshot_value_ty, resolver)?;
         let derived_string_snapshot_id =
             delayed_field_data.derive_string_concat(id, prefix, suffix, resolver)?;
         Value::delayed_value(derived_string_snapshot_id)
-    } else {
+    } _ => {
         let snapshot_width =
             get_width_by_type(snapshot_value_ty, EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE)?;
         let width = calculate_width_for_integer_embedded_string(
@@ -578,7 +577,7 @@ fn native_derive_string_concat(
         let snapshot_value = get_snapshot_value(&snapshot, snapshot_value_ty)?;
         let output = SnapshotToStringFormula::Concat { prefix, suffix }.apply_to(snapshot_value);
         bytes_and_width_to_derived_string_struct(output, width)?
-    };
+    }};
 
     Ok(smallvec![derived_string_snapshot])
 }

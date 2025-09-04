@@ -22,7 +22,7 @@ use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
 
 macro_rules! store_element {
-    ($context:expr, $obj:expr) => {{
+    ($context:expr_2021, $obj:expr_2021) => {{
         let context = &mut $context.extensions_mut().get_mut::<AlgebraContext>();
         let new_size = context.bytes_used + std::mem::size_of_val(&$obj);
         if new_size > MEMORY_LIMIT_IN_BYTES {
@@ -39,7 +39,7 @@ macro_rules! store_element {
 
 #[cfg(feature = "testing")]
 macro_rules! ark_rand_internal {
-    ($context:expr, $typ:ty) => {{
+    ($context:expr_2021, $typ:ty) => {{
         let element = <$typ>::rand(&mut test_rng());
         match store_element!($context, element) {
             Ok(new_handle) => Ok(smallvec![Value::u64(new_handle as u64)]),

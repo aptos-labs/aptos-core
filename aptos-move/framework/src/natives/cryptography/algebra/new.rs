@@ -18,7 +18,7 @@ use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
 
 macro_rules! from_u64_internal {
-    ($context:expr, $args:ident, $typ:ty, $gas:expr) => {{
+    ($context:expr_2021, $args:ident, $typ:ty, $gas:expr_2021) => {{
         let value = safely_pop_arg!($args, u64);
         $context.charge($gas)?;
         let element = <$typ>::from(value as u64);

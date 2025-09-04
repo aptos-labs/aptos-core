@@ -347,9 +347,9 @@ impl BytecodeCommand {
         };
         let source_map = {
             let source_map_path = bytecode_path.with_extension(SOURCE_MAP_EXTENSION);
-            if let Ok(source_map) = source_map_from_file(&source_map_path) {
+            match source_map_from_file(&source_map_path) { Ok(source_map) => {
                 Some(source_map)
-            } else {
+            } _ => {
                 let source_map_path = source_map_path
                     .components()
                     .map(|elt| {
@@ -361,7 +361,7 @@ impl BytecodeCommand {
                     })
                     .collect::<PathBuf>();
                 source_map_from_file(&source_map_path).ok()
-            }
+            }}
         };
 
         let disassembler_options = DisassemblerOptions {

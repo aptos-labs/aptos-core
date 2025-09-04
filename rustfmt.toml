@@ -1,5 +1,6 @@
 combine_control_expr = false
 edition = "2021"
+style_edition = "2021"
 imports_granularity = "Crate"
 format_macro_matchers = true
 group_imports = "One"

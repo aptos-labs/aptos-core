@@ -47,14 +47,14 @@ fn feature_flag_of_group_scalar_mul(
 }
 
 macro_rules! abort_unless_group_scalar_mul_enabled {
-    ($context:ident, $group_opt:expr, $scalar_field_opt:expr) => {
+    ($context:ident, $group_opt:expr_2021, $scalar_field_opt:expr_2021) => {
         let flag_opt = feature_flag_of_group_scalar_mul($group_opt, $scalar_field_opt);
         abort_unless_feature_flag_enabled!($context, flag_opt);
     };
 }
 
 macro_rules! ark_scalar_mul_internal {
-    ($context:expr, $args:ident, $group_typ:ty, $scalar_typ:ty, $op:ident, $gas:expr) => {{
+    ($context:expr_2021, $args:ident, $group_typ:ty, $scalar_typ:ty, $op:ident, $gas:expr_2021) => {{
         let scalar_handle = safely_pop_arg!($args, u64) as usize;
         let element_handle = safely_pop_arg!($args, u64) as usize;
         safe_borrow_element!($context, element_handle, $group_typ, element_ptr, element);
@@ -78,7 +78,7 @@ fn ark_msm_window_size(num_entries: usize) -> usize {
 
 /// The approximate cost model of <https://github.com/arkworks-rs/algebra/blob/v0.4.0/ec/src/scalar_mul/variable_base/mod.rs#L89>.
 macro_rules! ark_msm_bigint_wnaf_cost {
-    ($cost_add:expr, $cost_double:expr, $num_entries:expr $(,)?) => {{
+    ($cost_add:expr_2021, $cost_double:expr_2021, $num_entries:expr_2021 $(,)?) => {{
         let num_entries: usize = $num_entries;
         let window_size = ark_msm_window_size(num_entries);
         let num_windows = 255_usize.div_ceil(window_size);
@@ -186,11 +186,11 @@ pub fn scalar_mul_internal(
 
 macro_rules! ark_msm_internal {
     (
-        $context:expr,
+        $context:expr_2021,
         $args:ident,
-        $proj_to_affine_cost:expr,
-        $proj_add_cost:expr,
-        $proj_double_cost:expr,
+        $proj_to_affine_cost:expr_2021,
+        $proj_add_cost:expr_2021,
+        $proj_double_cost:expr_2021,
         $element_typ:ty,
         $scalar_typ:ty
     ) => {{

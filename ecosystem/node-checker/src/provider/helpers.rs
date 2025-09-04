@@ -26,7 +26,7 @@ pub const MISSING_PROVIDER_MESSAGE: &str = "Incomplete request";
 /// anywhere else.
 #[macro_export]
 macro_rules! get_provider {
-    ($provider_option:expr, $required:expr, $provider_type:ty) => {
+    ($provider_option:expr_2021, $required:expr_2021, $provider_type:ty) => {
         match $provider_option {
             Some(ref provider) => provider,
             None => {

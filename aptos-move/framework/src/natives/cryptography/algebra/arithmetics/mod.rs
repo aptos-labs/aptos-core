@@ -13,7 +13,7 @@ pub mod sub;
 
 #[macro_export]
 macro_rules! ark_binary_op_internal {
-    ($context:expr, $args:ident, $ark_typ:ty, $ark_func:ident, $gas:expr) => {{
+    ($context:expr_2021, $args:ident, $ark_typ:ty, $ark_func:ident, $gas:expr_2021) => {{
         let handle_2 = aptos_native_interface::safely_pop_arg!($args, u64) as usize;
         let handle_1 = aptos_native_interface::safely_pop_arg!($args, u64) as usize;
         safe_borrow_element!($context, handle_1, $ark_typ, element_1_ptr, element_1);
@@ -27,7 +27,7 @@ macro_rules! ark_binary_op_internal {
 
 #[macro_export]
 macro_rules! ark_unary_op_internal {
-    ($context:expr, $args:ident, $ark_typ:ty, $ark_func:ident, $gas:expr) => {{
+    ($context:expr_2021, $args:ident, $ark_typ:ty, $ark_func:ident, $gas:expr_2021) => {{
         let handle = aptos_native_interface::safely_pop_arg!($args, u64) as usize;
         safe_borrow_element!($context, handle, $ark_typ, element_ptr, element);
         $context.charge($gas)?;
