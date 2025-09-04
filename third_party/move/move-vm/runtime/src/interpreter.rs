@@ -2190,6 +2190,7 @@ impl Frame {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
                         let value = interpreter.operand_stack.pop()?;
                         gas_meter.charge_write_ref(&value, reference.value_view())?;
+                        data_cache.copy_on_write(&reference)?;
                         reference.write_ref(value)?;
                     },
                     Bytecode::CastU8 => {
@@ -2521,6 +2522,7 @@ impl Frame {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
                         let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
+                        data_cache.vector_copy_on_write(&vec_ref)?;
                         let res = vec_ref.pop(ty);
                         gas_meter.charge_vec_pop_back(make_ty!(ty), res.as_ref().ok())?;
                         interpreter.operand_stack.push(res?)?;

@@ -37,6 +37,7 @@ pub mod code;
 pub mod data_cache;
 pub mod delayed_values;
 pub mod gas;
+pub mod global_values;
 pub mod loaded_data;
 pub mod module_traversal;
 pub mod natives;

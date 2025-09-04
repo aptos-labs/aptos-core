@@ -367,6 +367,11 @@ where
             (exists, None)
         })
     }
+
+    fn copy_on_write(&mut self, _reference: &Reference) -> PartialVMResult<()> {
+        // Note: legacy data cache had no support for CoW.
+        Ok(())
+    }
 }
 
 impl<'a, LoaderImpl> MoveVmDataCache for LegacyMoveVmDataCacheAdapter<'a, LoaderImpl>
@@ -496,11 +501,6 @@ where
             res.is_ok(),
         )?;
         res
-    }
-
-    fn copy_on_write(&mut self, _reference: &Reference) -> PartialVMResult<()> {
-        // Note: legacy data cache had no support for CoW.
-        Ok(())
     }
 
     fn vector_copy_on_write(&mut self, _reference: &VectorRef) -> PartialVMResult<()> {

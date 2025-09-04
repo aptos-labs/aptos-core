@@ -113,7 +113,26 @@ static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
 mod tests {
     use crate::extensions::{new_extensions, set_extension_hook};
     use better_any::{Tid, TidAble};
-    use move_vm_runtime::native_extensions::NativeContextExtensions;
+    use move_vm_runtime::native_extensions::{
+        NativeContextExtensions, VersionControlledNativeExtension,
+    };
+
+    #[derive(Tid)]
+    struct TestExtension();
+
+    impl VersionControlledNativeExtension for TestExtension {
+        fn undo(&mut self) {
+            unimplemented!("Irrelevant for the tests")
+        }
+
+        fn save(&mut self) {
+            unimplemented!("Irrelevant for the tests")
+        }
+
+        fn update(&mut self, _txn_hash: &[u8; 32], _script_hash: &[u8]) {
+            unimplemented!("Irrelevant for the tests")
+        }
+    }
 
     /// A test that extension hooks work as expected.
     #[test]
@@ -122,9 +141,6 @@ mod tests {
         let ext = new_extensions();
         let _e = ext.get::<TestExtension>();
     }
-
-    #[derive(Tid)]
-    struct TestExtension();
 
     fn my_hook(ext: &mut NativeContextExtensions) {
         ext.add(TestExtension())

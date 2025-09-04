@@ -6,6 +6,7 @@
 
 use crate::{
     delayed_values::delayed_field_id::{DelayedFieldID, TryFromMoveValue, TryIntoMoveValue},
+    global_values::ValuePtr,
     loaded_data::runtime_types::Type,
     value_serde::ValueSerDeContext,
     values::function_values_impl::{AbstractFunction, Closure, ClosureVisitor},
@@ -143,6 +144,12 @@ pub(crate) enum Container {
 pub(crate) enum ContainerRef {
     Local(Container),
     Global {
+        /// Current container reference.
+        container: Container,
+        /// Pointer to the global slot from which this reference is derived.
+        ptr: ValuePtr,
+    },
+    LegacyGlobal {
         status: Rc<RefCell<GlobalDataStatus>>,
         container: Container,
     },
@@ -341,12 +348,17 @@ fn take_unique_ownership<T: Debug>(r: Rc<RefCell<T>>) -> PartialVMResult<T> {
 impl ContainerRef {
     fn container(&self) -> &Container {
         match self {
-            Self::Local(container) | Self::Global { container, .. } => container,
+            Self::Local(container)
+            | Self::LegacyGlobal { container, .. }
+            | Self::Global { container, .. } => container,
         }
     }
 
     fn mark_dirty(&self) {
-        if let Self::Global { status, .. } = self {
+        // No need to mark as dirty in non-legacy flow.
+        // TODO: Is it still the case? Yes, we may or may not create CoW, we probably should also
+        //   have status, revisit
+        if let Self::LegacyGlobal { status, .. } = self {
             *status.borrow_mut() = GlobalDataStatus::Dirty
         }
     }
@@ -406,7 +418,7 @@ impl ValueImpl {
  *
  **************************************************************************************/
 impl ValueImpl {
-    fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
+    pub(crate) fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
         use ValueImpl::*;
 
         check_depth(depth, max_depth)?;
@@ -512,9 +524,26 @@ impl ContainerRef {
     fn copy_by_ref(&self) -> Self {
         match self {
             Self::Local(container) => Self::Local(container.copy_by_ref()),
-            Self::Global { status, container } => Self::Global {
+            Self::LegacyGlobal { status, container } => Self::LegacyGlobal {
                 status: Rc::clone(status),
                 container: container.copy_by_ref(),
+            },
+            Self::Global { container, ptr } => Self::Global {
+                container: container.copy_by_ref(),
+                ptr: ptr.clone(),
+            },
+        }
+    }
+
+    fn copy_on_write(&mut self, current_version: u32) -> PartialVMResult<()> {
+        match self {
+            Self::Local(_) => Ok(()),
+            Self::LegacyGlobal { .. } => {
+                unreachable!("CoW is not supported for legacy global values")
+            },
+            Self::Global { ptr, .. } => {
+                ptr.copy_on_write(current_version)?;
+                Ok(())
             },
         }
     }
@@ -1249,11 +1278,22 @@ impl ReferenceImpl {
             Self::IndexedRef(r) => r.write_ref(x),
         }
     }
+
+    fn copy_on_write(&mut self, current_version: u32) -> PartialVMResult<()> {
+        match self {
+            Self::ContainerRef(r) => r.copy_on_write(current_version),
+            Self::IndexedRef(r) => r.container_ref.copy_on_write(current_version),
+        }
+    }
 }
 
 impl Reference {
     pub fn write_ref(self, x: Value) -> PartialVMResult<()> {
         self.0.write_ref(x)
+    }
+
+    pub fn copy_on_write(&mut self, current_version: u32) -> PartialVMResult<()> {
+        self.0.copy_on_write(current_version)
     }
 }
 
@@ -1522,9 +1562,13 @@ impl ContainerRef {
                     ValueImpl::Container(container) => {
                         let r = match self {
                             Self::Local(_) => Self::Local(container.copy_by_ref()),
-                            Self::Global { status, .. } => Self::Global {
+                            Self::LegacyGlobal { status, .. } => Self::LegacyGlobal {
                                 status: Rc::clone(status),
                                 container: container.copy_by_ref(),
+                            },
+                            Self::Global { container, ptr } => ContainerRef::Global {
+                                container: container.copy_by_ref(),
+                                ptr: ptr.clone(),
                             },
                         };
                         ValueImpl::ContainerRef(r)
@@ -1863,6 +1907,7 @@ impl Value {
 
     /// Create a "unowned" reference to a signer value (&signer) for populating the &signer in
     /// execute function
+    // TODO: decide how to use legacy vs new.
     pub fn master_signer_reference(x: AccountAddress) -> Self {
         Self(ValueImpl::ContainerRef(ContainerRef::Local(
             Container::master_signer(x),
@@ -2752,6 +2797,10 @@ impl VectorRef {
         Ok(len)
     }
 
+    pub fn copy_on_write(&mut self, current_version: u32) -> PartialVMResult<()> {
+        self.0.copy_on_write(current_version)
+    }
+
     pub fn len(&self, type_param: &Type) -> PartialVMResult<Value> {
         Ok(Value::u64(self.length_as_usize(type_param)? as u64))
     }
@@ -3390,10 +3439,12 @@ impl GlobalValueImpl {
             Self::Fresh { fields } => Ok(ValueImpl::ContainerRef(ContainerRef::Local(
                 Container::Struct(Rc::clone(fields)),
             ))),
-            Self::Cached { fields, status } => Ok(ValueImpl::ContainerRef(ContainerRef::Global {
-                container: Container::Struct(Rc::clone(fields)),
-                status: Rc::clone(status),
-            })),
+            Self::Cached { fields, status } => {
+                Ok(ValueImpl::ContainerRef(ContainerRef::LegacyGlobal {
+                    container: Container::Struct(Rc::clone(fields)),
+                    status: Rc::clone(status),
+                }))
+            },
         }
     }
 
@@ -3566,10 +3617,13 @@ impl Display for ContainerRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Local(_) => write!(f, "(&container)"),
-            Self::Global {
+            Self::LegacyGlobal {
                 status,
                 container: _,
             } => write!(f, "(&container -- {:?})", &*status.borrow()),
+            Self::Global { .. } => {
+                write!(f, "(&container, global)")
+            },
         }
     }
 }
@@ -4519,6 +4573,8 @@ impl ContainerRef {
 
         let (container, is_global) = match self {
             Local(container) => (container, false),
+            // TODO: Is this a bug?
+            LegacyGlobal { container, .. } => (container, false),
             Global { container, .. } => (container, false),
         };
 
@@ -4535,6 +4591,8 @@ impl IndexedRef {
 
         let (container, is_global) = match &self.container_ref {
             Local(container) => (container, false),
+            // TODO: Is this a bug?
+            LegacyGlobal { container, .. } => (container, false),
             Global { container, .. } => (container, false),
         };
 
@@ -4831,7 +4889,7 @@ pub mod prop {
                     })
                     .boxed(),
             },
-            L::Struct(_struct_layout @ MoveStructLayout::RuntimeVariants(variants)) => {
+            L::Struct(MoveStructLayout::RuntimeVariants(variants)) => {
                 // Randomly choose a variant index
                 let variant_count = variants.len();
                 let variants = variants.clone();

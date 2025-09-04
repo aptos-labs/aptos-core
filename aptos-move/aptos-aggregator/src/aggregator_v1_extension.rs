@@ -3,18 +3,21 @@
 
 use crate::{
     bounded_math::{BoundedMath, SignedU128},
+    delta_change_set::serialize,
     delta_math::DeltaHistory,
     resolver::AggregatorV1Resolver,
     types::{DelayedFieldsSpeculativeError, DeltaApplicationFailureReason},
 };
 use aptos_types::{
     error::expect_ok,
-    state_store::{state_key::StateKey, table::TableHandle},
+    state_store::{state_key::StateKey, state_value::StateValueMetadata, table::TableHandle},
+    write_set::WriteOpSize,
     PeerId,
 };
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::errors::{PartialVMError, PartialVMResult, VMResult};
 use move_core_types::vm_status::StatusCode;
-use std::collections::{BTreeMap, BTreeSet};
+use move_vm_types::global_values::{VersionController, VersionedCell, VersionedOnceCell};
+use std::collections::{btree_map::Entry, BTreeMap};
 
 /// When `Addition` operation overflows the `limit`.
 pub(crate) const EADD_OVERFLOW: u64 = 0x02_0001;
@@ -52,7 +55,7 @@ pub enum AggregatorState {
 }
 
 /// Internal aggregator data structure.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Aggregator {
     // Describes a value of an aggregator.
     value: u128,
@@ -276,87 +279,306 @@ impl Aggregator {
     }
 }
 
+struct AggregatorItem {
+    aggregator: VersionedCell<Option<Aggregator>>,
+    metadata_and_size: VersionedOnceCell<(StateValueMetadata, WriteOpSize, Option<u64>)>,
+}
+
 /// Stores all information about aggregators (how many have been created or
 /// removed), what are their states, etc. per single transaction).
 #[derive(Default)]
 pub struct AggregatorData {
-    // All aggregators that were created in the current transaction, stored as ids.
-    // Used to filter out aggregators that were created and destroyed in the
-    // within a single transaction.
-    new_aggregators: BTreeSet<AggregatorID>,
-    // All aggregators that were destroyed in the current transaction, stored as ids.
-    destroyed_aggregators: BTreeSet<AggregatorID>,
-    // All aggregator instances that exist in the current transaction.
-    aggregators: BTreeMap<AggregatorID, Aggregator>,
+    /// Stores the current version of data and controls saves/undos.
+    version_controller: VersionController,
+    /// All aggregators accessed at this transaction.
+    aggregators: BTreeMap<AggregatorID, AggregatorItem>,
+    aggregators_count: u32,
 }
 
 impl AggregatorData {
+    /// Records an undo request for the data. All undoing will be done lazily when aggregators are
+    /// actually accessed.
+    pub fn undo(&mut self) {
+        self.version_controller.undo();
+    }
+
+    /// Records a save request for the data. All saving will be done lazily when aggregators are
+    /// actually accessed.
+    pub fn save(&mut self) {
+        self.version_controller.save();
+    }
+
+    /// Resets count in aggregator data.
+    pub fn update(&mut self) {
+        self.aggregators_count = 0;
+    }
+
     /// Returns a mutable reference to an aggregator with `id` and a `max_value`.
     /// If transaction that is currently executing did not initialize it, a new aggregator instance is created.
     /// Note: when we say "aggregator instance" here we refer to Rust struct and
     /// not to the Move aggregator.
+    // TODO: we need better APIs to CoW efficiently.
     pub fn get_aggregator(
         &mut self,
         id: AggregatorID,
         max_value: u128,
     ) -> PartialVMResult<&mut Aggregator> {
-        let aggregator = self.aggregators.entry(id).or_insert(Aggregator {
-            value: 0,
-            state: AggregatorState::PositiveDelta,
-            max_value,
-            history: Some(DeltaHistory::new()),
-        });
+        let current_version = self.version_controller.current_version();
+        let initialize_aggregator = || {
+            Some(Aggregator {
+                value: 0,
+                state: AggregatorState::PositiveDelta,
+                max_value,
+                history: Some(DeltaHistory::new()),
+            })
+        };
+        let requires_initialization = match self.aggregators.get_mut(&id) {
+            None => true,
+            Some(item) => item.aggregator.latest(current_version).is_none(),
+        };
+        if requires_initialization {
+            return Ok(match self.aggregators.entry(id) {
+                Entry::Vacant(entry) => entry
+                    .insert(AggregatorItem {
+                        aggregator: VersionedCell::new(initialize_aggregator(), current_version),
+                        metadata_and_size: VersionedOnceCell::empty(),
+                    })
+                    .aggregator
+                    .latest_cow(current_version)
+                    .expect("Aggregator exists in a slot")
+                    .as_mut()
+                    .expect("Aggregator instance is set when initialized"),
+                Entry::Occupied(entry) => entry
+                    .into_mut()
+                    .aggregator
+                    .set(initialize_aggregator(), current_version)?
+                    .as_mut()
+                    .expect("Aggregator instance is set when initialized"),
+            });
+        }
+
+        let aggregator = self
+            .aggregators
+            .get_mut(&id)
+            .expect("Aggregator slot exists")
+            .aggregator
+            .latest_cow(current_version)
+            .expect("Aggregator slot contains a value")
+            .as_mut()
+            .ok_or_else(|| {
+                let msg = "Aggregator cannot be accessed if it was deleted";
+                PartialVMError::new_invariant_violation(msg)
+            })?;
         Ok(aggregator)
     }
 
-    /// Returns the number of aggregators that are used in the current transaction.
-    pub fn num_aggregators(&self) -> u128 {
-        self.aggregators.len() as u128
+    /// Returns the current aggregator count for handle creation.
+    pub fn aggregator_count(&self) -> u32 {
+        self.aggregators_count
     }
 
     /// Creates and a new Aggregator with a given `id` and a `max_value`. The value
     /// of a new aggregator is always known, therefore it is created in a data
     /// state, with a zero-initialized value.
-    pub fn create_new_aggregator(&mut self, id: AggregatorID, max_value: u128) {
-        let aggregator = Aggregator {
-            value: 0,
-            state: AggregatorState::Data,
-            max_value,
-            history: None,
+    pub fn create_new_aggregator(
+        &mut self,
+        id: AggregatorID,
+        max_value: u128,
+    ) -> PartialVMResult<()> {
+        let current_version = self.version_controller.current_version();
+        let initialize_aggregator = || {
+            Some(Aggregator {
+                value: 0,
+                state: AggregatorState::Data,
+                max_value,
+                history: None,
+            })
         };
-        self.aggregators.insert(id.clone(), aggregator);
-        self.new_aggregators.insert(id);
+
+        match self.aggregators.entry(id.clone()) {
+            Entry::Vacant(entry) => {
+                entry.insert(AggregatorItem {
+                    aggregator: VersionedCell::new(initialize_aggregator(), current_version),
+                    metadata_and_size: VersionedOnceCell::empty(),
+                });
+            },
+            Entry::Occupied(entry) => {
+                let item = entry.into_mut();
+                match item.aggregator.latest_cow(current_version) {
+                    // Should not happen: if aggregator exists, it is not possible to create a new
+                    // instance which maps to the same ID. If it does not exist, it is not possible
+                    // to re-create it with the same ID.
+                    Some(_) => {
+                        unreachable!("Aggregator cannot be created twice");
+                    },
+                    // Item's aggregator value is not set - initialize (below).
+                    None => (),
+                }
+
+                item.aggregator
+                    .set(initialize_aggregator(), current_version)?;
+            },
+        }
+
+        self.aggregators_count += 1;
+        Ok(())
     }
 
     /// If aggregator has been used in this transaction, it is removed. Otherwise,
     /// it is marked for deletion.
-    pub fn remove_aggregator(&mut self, id: AggregatorID) {
-        // Aggregator no longer in use during this transaction: remove it.
-        self.aggregators.remove(&id);
-
-        if self.new_aggregators.contains(&id) {
-            // Aggregator has been created in the same transaction. Therefore, no
-            // side-effects.
-            self.new_aggregators.remove(&id);
-        } else {
-            // Otherwise, aggregator has been created somewhere else.
-            self.destroyed_aggregators.insert(id);
+    pub fn remove_aggregator(&mut self, id: AggregatorID) -> PartialVMResult<()> {
+        let current_version = self.version_controller.current_version();
+        match self.aggregators.entry(id) {
+            Entry::Vacant(entry) => {
+                entry.insert(AggregatorItem {
+                    aggregator: VersionedCell::new(None, current_version),
+                    metadata_and_size: VersionedOnceCell::empty(),
+                });
+            },
+            Entry::Occupied(entry) => {
+                let item = entry.into_mut();
+                match item.aggregator.latest_cow(current_version) {
+                    Some(aggregator) => {
+                        if aggregator.take().is_none() {
+                            unreachable!("Aggregator cannot be deleted twice");
+                        }
+                        return Ok(());
+                    },
+                    // This slot is empty and requires initialization (handled below).
+                    None => (),
+                }
+                item.aggregator.set(None, current_version)?;
+            },
         }
+        Ok(())
     }
 
     /// Unpacks aggregator data.
-    pub fn into(
-        self,
-    ) -> (
-        BTreeSet<AggregatorID>,
-        BTreeSet<AggregatorID>,
-        BTreeMap<AggregatorID, Aggregator>,
-    ) {
-        (
-            self.new_aggregators,
-            self.destroyed_aggregators,
-            self.aggregators,
-        )
+    pub fn into(self) -> impl Iterator<Item = (AggregatorID, Option<Aggregator>)> {
+        let current_version = self.version_controller.current_version();
+        self.aggregators
+            .into_iter()
+            .filter_map(move |(id, mut item)| {
+                item.aggregator
+                    .take_latest(current_version)
+                    .map(|aggregator| (id, aggregator))
+            })
+    }
+
+    /// Materializes latest values of aggregators, computing their side effects (either [WriteOp]s
+    /// or [DeltaOp]s). Returns an error if any materialization fail.
+    pub fn materialize_write_op_info(
+        &mut self,
+        aggregator_view: &dyn AggregatorV1Resolver,
+        new_slot_metadata: &Option<StateValueMetadata>,
+    ) -> PartialVMResult<()> {
+        let current_version = self.version_controller.current_version();
+        for (id, item) in self.aggregators.iter_mut() {
+            if !item
+                .metadata_and_size
+                .needs_derived_recomputation(&mut item.aggregator, current_version)
+            {
+                continue;
+            }
+
+            let aggregator = match item
+                .aggregator
+                .latest(current_version)
+                .expect("aggregator must exist after check")
+            {
+                Some(aggregator) => aggregator,
+                None => {
+                    let state_value_metadata =
+                        aggregator_view.get_aggregator_v1_state_value_metadata(&id.0)?;
+                    let state_value_metadata = state_value_metadata.ok_or_else(|| {
+                        // Note: if aggregator is deleted, its metadata must exist. If it does not,
+                        // it must be due to speculation.
+                        PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+                    })?;
+                    let prev_size = aggregator_view.get_aggregator_v1_state_value_size(&id.0)?;
+
+                    item.metadata_and_size.set(
+                        (state_value_metadata, WriteOpSize::Deletion, prev_size),
+                        current_version,
+                    )?;
+                    continue;
+                },
+            };
+
+            match &aggregator.state {
+                AggregatorState::PositiveDelta | AggregatorState::NegativeDelta => (),
+                AggregatorState::Data => {
+                    let write_len = serialize(&aggregator.value).len() as u64;
+                    let prev_size = aggregator_view.get_aggregator_v1_state_value_size(&id.0)?;
+
+                    let state_value_metadata =
+                        aggregator_view.get_aggregator_v1_state_value_metadata(&id.0)?;
+                    let res = match state_value_metadata {
+                        Some(metadata) => {
+                            (metadata, WriteOpSize::Modification { write_len }, prev_size)
+                        },
+                        None => {
+                            // Note: aggregator writes historically did not distinguish between
+                            // creation and modification.
+                            match new_slot_metadata {
+                                None => (
+                                    StateValueMetadata::none(),
+                                    WriteOpSize::Creation { write_len },
+                                    prev_size,
+                                ),
+                                Some(metadata) => (
+                                    metadata.clone(),
+                                    WriteOpSize::Creation { write_len },
+                                    prev_size,
+                                ),
+                            }
+                        },
+                    };
+                    item.metadata_and_size.set(res, current_version)?;
+                },
+            };
+        }
+
+        Ok(())
+    }
+
+    /// Returns the materialized values of aggregators ([WriteOp]s). Should only be called after
+    /// materialization. Returns a non-materialized value is encountered.
+    pub fn write_ops_info_iter(
+        &mut self,
+    ) -> impl Iterator<Item = VMResult<(&StateKey, &mut StateValueMetadata, WriteOpSize, Option<u64>)>>
+    {
+        // TODO: do materialize here.
+
+        let current_version = self.version_controller.current_version();
+        self.aggregators.iter_mut().filter_map(move |(id, item)| {
+            // TODO:
+            //   We should skip deltas, but ideally we should assert materialization has been
+            //   done.
+            let (metadata, size, prev_size) = item.metadata_and_size.get_mut(current_version)?;
+            Some(Ok((&id.0, metadata, *size, *prev_size)))
+        })
+    }
+
+    pub fn take_materialized_writes<'a>(
+        &'a mut self,
+    ) -> impl Iterator<
+        Item = VMResult<(
+            AggregatorID,
+            Option<Aggregator>,
+            Option<StateValueMetadata>,
+            WriteOpSize,
+        )>,
+    > + 'a {
+        let current_version = self.version_controller.current_version();
+        self.aggregators.iter_mut().filter_map(move |(id, item)| {
+            let aggregator = item.aggregator.take_latest(current_version)?;
+            let (metadata, s) = item
+                .metadata_and_size
+                .take_latest(current_version)
+                .map(|(m, s, _)| (m, s))?;
+            Some(Ok((id.clone(), aggregator, Some(metadata), s)))
+        })
     }
 }
 
@@ -404,7 +626,9 @@ mod test {
     fn test_materialize_known() {
         let resolver = FakeAggregatorView::default();
         let mut aggregator_data = AggregatorData::default();
-        aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(200), 200);
+        aggregator_data
+            .create_new_aggregator(aggregator_v1_id_for_test(200), 200)
+            .unwrap();
 
         let aggregator = aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(200), 200)
@@ -493,7 +717,9 @@ mod test {
     #[test]
     fn test_sub_underflow() {
         let mut aggregator_data = AggregatorData::default();
-        aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(200), 200);
+        aggregator_data
+            .create_new_aggregator(aggregator_v1_id_for_test(200), 200)
+            .unwrap();
 
         // +0 to -601 is impossible!
         let aggregator = aggregator_data
@@ -591,7 +817,9 @@ mod test {
 
         // Validation panics if history is not set. This is an invariant
         // violation and should never happen.
-        aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(200), 200);
+        aggregator_data
+            .create_new_aggregator(aggregator_v1_id_for_test(200), 200)
+            .unwrap();
         let aggregator = aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(200), 200)
             .expect("Getting an aggregator should succeed");

@@ -233,6 +233,16 @@ impl WriteOp {
         self.as_state_value_opt().map(StateValue::bytes)
     }
 
+    pub fn set_bytes(&mut self, bytes: Bytes) {
+        use BaseStateOp::*;
+
+        match &mut self.0 {
+            Creation(v) | Modification(v) => v.set_bytes(bytes),
+            Deletion(_) => (),
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
+        }
+    }
+
     /// Size not counting metadata.
     pub fn bytes_size(&self) -> usize {
         self.bytes().map_or(0, Bytes::len)
@@ -355,6 +365,7 @@ impl Serialize for WriteOp {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub enum WriteOpSize {
     Creation { write_len: u64 },
     Modification { write_len: u64 },

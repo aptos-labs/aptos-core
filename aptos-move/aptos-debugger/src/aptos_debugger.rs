@@ -24,7 +24,8 @@ use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
 };
 use aptos_vm::{
-    aptos_vm::AptosVMBlockExecutor, data_cache::AsMoveResolver, AptosVM, VMBlockExecutor,
+    aptos_vm::AptosVMBlockExecutor, data_cache::AsMoveResolver, v2::AptosVMv2, AptosVM,
+    VMBlockExecutor,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -134,40 +135,55 @@ impl AptosDebugger {
         }
 
         let env = AptosEnvironment::new(&state_view);
-        let vm = AptosVM::new(&env, &state_view);
+
         let resolver = state_view.as_move_resolver();
         let code_storage = state_view.as_aptos_code_storage(&env);
 
-        let (status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
-            &resolver,
-            &code_storage,
-            &txn,
-            &log_context,
-            |gas_meter| {
-                let gas_profiler = match txn
-                    .executable_ref()
-                    .expect("Module bundle payload has been removed")
-                {
-                    TransactionExecutableRef::Script(_) => GasProfiler::new_script(gas_meter),
-                    TransactionExecutableRef::EntryFunction(entry_func) => {
-                        GasProfiler::new_function(
-                            gas_meter,
-                            entry_func.module().clone(),
-                            entry_func.function().to_owned(),
-                            entry_func.ty_args().to_vec(),
-                        )
-                    },
-                    TransactionExecutableRef::Empty => {
-                        // TODO[Orderless]: Implement this
-                        unimplemented!("not supported yet")
-                    },
-                };
-                gas_profiler
-            },
-            &auxiliary_info,
-        )?;
+        let make_gas_profiler = |gas_meter| {
+            let gas_profiler = match txn
+                .executable_ref()
+                .expect("Module bundle payload has been removed")
+            {
+                TransactionExecutableRef::Script(_) => GasProfiler::new_script(gas_meter),
+                TransactionExecutableRef::EntryFunction(entry_func) => GasProfiler::new_function(
+                    gas_meter,
+                    entry_func.module().clone(),
+                    entry_func.function().to_owned(),
+                    entry_func.ty_args().to_vec(),
+                ),
+                TransactionExecutableRef::Empty => {
+                    // TODO[Orderless]: Implement this
+                    unimplemented!("not supported yet")
+                },
+            };
+            gas_profiler
+        };
 
-        Ok((status, output, gas_profiler.finish()))
+        Ok(if env.features().is_aptos_vm_v2_enabled() {
+            let vm = AptosVMv2::new(&env);
+            let (output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
+                &resolver,
+                &code_storage,
+                &log_context,
+                &txn,
+                make_gas_profiler,
+                &auxiliary_info,
+            )?;
+            // TODO: Figure out what status should go here.
+            (VMStatus::Executed, output, gas_profiler.finish())
+        } else {
+            let vm = AptosVM::new(&env, &state_view);
+            let (status, output, gas_profiler) = vm
+                .execute_user_transaction_with_modified_gas_meter(
+                    &resolver,
+                    &code_storage,
+                    &txn,
+                    &log_context,
+                    make_gas_profiler,
+                    &auxiliary_info,
+                )?;
+            (status, output, gas_profiler.finish())
+        })
     }
 
     pub async fn execute_past_transactions(

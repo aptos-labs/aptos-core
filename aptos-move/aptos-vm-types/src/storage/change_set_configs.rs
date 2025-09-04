@@ -1,9 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::change_set::ChangeSetInterface;
-use aptos_gas_schedule::AptosGasParameters;
-use move_binary_format::errors::{Location, PartialVMError};
+use crate::{change_set::ChangeSetInterface, storage::space_pricing::DiskSpacePricing};
+use aptos_gas_algebra::Fee;
+use aptos_gas_schedule::{AptosGasParameters, TransactionGasParameters};
+use aptos_types::{
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
+};
+use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
 #[derive(Clone, Debug)]
@@ -84,46 +88,91 @@ impl ChangeSetConfigs {
     }
 
     pub fn check_change_set(&self, change_set: &impl ChangeSetInterface) -> Result<(), VMStatus> {
-        let storage_write_limit_reached = |maybe_message: Option<&str>| {
-            let mut err = PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED);
-            if let Some(message) = maybe_message {
-                err = err.with_message(message.to_string())
-            }
-            Err(err.finish(Location::Undefined).into_vm_status())
-        };
-
         if self.max_write_ops_per_transaction != 0
             && change_set.num_write_ops() as u64 > self.max_write_ops_per_transaction
         {
-            return storage_write_limit_reached(Some("Too many write ops."));
+            return storage_write_limit_reached_err(Some("Too many write ops."))
+                .map_err(|err| err.into_vm_status());
         }
 
-        let mut write_set_size = 0;
+        let mut tracker = ChangeSetSizeTracker::new(self, None, None);
         for (key, op_size) in change_set.write_set_size_iter() {
-            if let Some(len) = op_size.write_len() {
-                let write_op_size = len + (key.size() as u64);
-                if write_op_size > self.max_bytes_per_write_op {
-                    return storage_write_limit_reached(None);
-                }
-                write_set_size += write_op_size;
-            }
-            if write_set_size > self.max_bytes_all_write_ops_per_transaction {
-                return storage_write_limit_reached(None);
-            }
+            tracker.record_write_op(key, op_size)?;
         }
 
-        let mut total_event_size = 0;
         for event in change_set.events_iter() {
-            let size = event.event_data().len() as u64;
-            if size > self.max_bytes_per_event {
-                return storage_write_limit_reached(None);
-            }
-            total_event_size += size;
-            if total_event_size > self.max_bytes_all_events_per_transaction {
-                return storage_write_limit_reached(None);
-            }
+            tracker.record_event(event)?;
         }
 
+        Ok(())
+    }
+}
+
+fn storage_write_limit_reached_err(maybe_msg: Option<&str>) -> VMResult<()> {
+    let mut err = PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED);
+    if let Some(message) = maybe_msg {
+        err = err.with_message(message.to_string())
+    }
+    Err(err.finish(Location::Undefined))
+}
+
+pub struct ChangeSetSizeTracker<'a> {
+    pub write_fee: Fee,
+    pub total_refund: Fee,
+    num_write_ops: u64,
+    write_set_size: u64,
+    total_event_size: u64,
+    configs: &'a ChangeSetConfigs,
+    pub disk_pricing: Option<&'a DiskSpacePricing>,
+    pub txn_gas_params: Option<&'a TransactionGasParameters>,
+}
+
+impl<'a> ChangeSetSizeTracker<'a> {
+    pub fn new(
+        configs: &'a ChangeSetConfigs,
+        disk_pricing: Option<&'a DiskSpacePricing>,
+        txn_gas_params: Option<&'a TransactionGasParameters>,
+    ) -> Self {
+        Self {
+            write_fee: Fee::new(0),
+            total_refund: Fee::new(0),
+            num_write_ops: 0,
+            write_set_size: 0,
+            total_event_size: 0,
+            configs,
+            disk_pricing,
+            txn_gas_params,
+        }
+    }
+
+    pub fn record_event(&mut self, event: &ContractEvent) -> VMResult<()> {
+        let size = event.event_data().len() as u64;
+        if size > self.configs.max_bytes_per_event {
+            return storage_write_limit_reached_err(None);
+        }
+        self.total_event_size += size;
+        if self.total_event_size > self.configs.max_bytes_all_events_per_transaction {
+            return storage_write_limit_reached_err(None);
+        }
+        Ok(())
+    }
+
+    pub fn record_write_op(&mut self, key: &StateKey, write_op_size: WriteOpSize) -> VMResult<()> {
+        self.num_write_ops += 1;
+        if self.num_write_ops > self.configs.max_write_ops_per_transaction {
+            return storage_write_limit_reached_err(Some("Too many write ops."));
+        }
+
+        if let Some(len) = write_op_size.write_len() {
+            let write_op_size = len + (key.size() as u64);
+            if write_op_size > self.configs.max_bytes_per_write_op {
+                return storage_write_limit_reached_err(None);
+            }
+            self.write_set_size += write_op_size;
+        }
+        if self.write_set_size > self.configs.max_bytes_all_write_ops_per_transaction {
+            return storage_write_limit_reached_err(None);
+        }
         Ok(())
     }
 }
