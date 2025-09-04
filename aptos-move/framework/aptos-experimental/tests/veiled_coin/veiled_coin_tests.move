@@ -31,7 +31,10 @@ module aptos_experimental::veiled_coin_tests {
     #[test_only]
     use aptos_experimental::helpers::generate_elgamal_keypair;
     #[test_only]
-    use aptos_experimental::sigma_protos::{serialize_withdrawal_subproof, prove_withdrawal};
+    use aptos_experimental::sigma_protos::{
+        serialize_withdrawal_subproof,
+        prove_withdrawal
+    };
     #[test_only]
     use aptos_experimental::sigma_protos;
 
@@ -78,7 +81,6 @@ module aptos_experimental::veiled_coin_tests {
         // store for the `sender`.
         coin::create_fake_money(
             &aptos_fx,
-            sender,
             veiled_coin::cast_u32_to_u64_amount(sender_amount + recipient_amount)
         );
         println(b"Created fake money inside @aptos_framework");
