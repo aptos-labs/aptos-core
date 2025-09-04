@@ -52,6 +52,7 @@ use move_vm_types::{
     values::Value,
 };
 use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
+use move_vm_types::gas::UnmeteredGasMeter;
 
 pub mod respawned_session;
 pub mod session_id;
@@ -132,14 +133,15 @@ where
         function_name: &IdentStr,
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
-        gas_meter: &mut impl GasMeter,
+        _gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
+        let mut gas_meter = UnmeteredGasMeter;
         dispatch_loader!(module_storage, loader, {
             let func = loader.load_instantiated_function(
                 &LegacyLoaderConfig::unmetered(),
-                gas_meter,
+                &mut gas_meter,
                 traversal_context,
                 module_id,
                 function_name,
@@ -149,7 +151,7 @@ where
                 func,
                 args,
                 &mut self.data_cache,
-                gas_meter,
+                &mut gas_meter,
                 traversal_context,
                 &mut self.extensions,
                 &loader,
@@ -162,15 +164,16 @@ where
         &mut self,
         func: LoadedFunction,
         args: Vec<impl Borrow<[u8]>>,
-        gas_meter: &mut impl GasMeter,
+        _gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         loader: &impl Loader,
     ) -> VMResult<SerializedReturnValues> {
+        let mut gas_meter = UnmeteredGasMeter;
         MoveVM::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
-            gas_meter,
+            &mut gas_meter,
             traversal_context,
             &mut self.extensions,
             loader,
