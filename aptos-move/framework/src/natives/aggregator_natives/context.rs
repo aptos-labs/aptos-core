@@ -13,6 +13,7 @@ use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetad
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::MoveTypeLayout;
+use move_vm_runtime::native_extensions::SessionListener;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     cell::RefCell,
@@ -47,7 +48,7 @@ pub struct AggregatorChangeSet {
 /// Note: table resolver is reused for fine-grained storage access.
 #[derive(Tid)]
 pub struct NativeAggregatorContext<'a> {
-    txn_hash: [u8; 32],
+    session_hash: [u8; 32],
     pub(crate) aggregator_v1_resolver: &'a dyn AggregatorV1Resolver,
     pub(crate) aggregator_v1_data: RefCell<AggregatorData>,
     pub(crate) delayed_field_optimization_enabled: bool,
@@ -55,17 +56,32 @@ pub struct NativeAggregatorContext<'a> {
     pub(crate) delayed_field_data: RefCell<DelayedFieldData>,
 }
 
+impl<'a> SessionListener for NativeAggregatorContext<'a> {
+    fn start(&mut self, session_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        self.session_hash = *session_hash;
+        // TODO(sessions): implement
+    }
+
+    fn finish(&mut self) {
+        // TODO(sessions): implement
+    }
+
+    fn abort(&mut self) {
+        // TODO(sessions): implement
+    }
+}
+
 impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
     pub fn new(
-        txn_hash: [u8; 32],
+        session_hash: [u8; 32],
         aggregator_v1_resolver: &'a dyn AggregatorV1Resolver,
         delayed_field_optimization_enabled: bool,
         delayed_field_resolver: &'a dyn DelayedFieldResolver,
     ) -> Self {
         Self {
-            txn_hash,
+            session_hash,
             aggregator_v1_resolver,
             aggregator_v1_data: Default::default(),
             delayed_field_resolver,
@@ -74,9 +90,9 @@ impl<'a> NativeAggregatorContext<'a> {
         }
     }
 
-    /// Returns the hash of transaction associated with this context.
-    pub fn txn_hash(&self) -> [u8; 32] {
-        self.txn_hash
+    /// Returns the hash of session associated with this context.
+    pub fn session_hash(&self) -> [u8; 32] {
+        self.session_hash
     }
 
     /// Returns all changes made within this context (i.e. by a single
