@@ -252,7 +252,7 @@ impl TryFrom<RawMoveStruct> for MoveStructValue {
         }
         for (pos, val) in s.field_values.into_iter().enumerate() {
             map.insert(
-                IdentifierWrapper::from_str(&pos.to_string())?,
+                IdentifierWrapper::from_str(format!("_{}", pos).as_str())?,
                 MoveValue::try_from(val)?.json()?,
             );
         }
