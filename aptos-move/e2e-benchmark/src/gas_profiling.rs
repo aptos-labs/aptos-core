@@ -158,7 +158,7 @@ impl CalibrationRunner {
         if !read_write_sets.is_empty() {
             let mut gas = vec![];
             let mut end_gas = vec![];
-            for cur in 1..to_evaluate {
+            for cur in 0..to_evaluate {
                 let cur_gas = read_write_sets[cur].1;
                 gas.push(cur_gas);
                 let mut start = 0;
