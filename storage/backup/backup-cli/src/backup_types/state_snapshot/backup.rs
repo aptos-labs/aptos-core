@@ -272,7 +272,7 @@ impl StateSnapshotBackupController {
     async fn record_stream(
         &self,
         concurrency: usize,
-    ) -> Result<impl TryStream<Ok = Bytes, Error = anyhow::Error, Item = Result<Bytes>>> {
+    ) -> Result<impl TryStream<Ok = Bytes, Error = anyhow::Error, Item = Result<Bytes>> + use<>> {
         const CHUNK_SIZE: usize = if cfg!(test) { 2 } else { 100_000 };
 
         let count = self.client.get_state_item_count(self.version()).await?;
