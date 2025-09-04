@@ -162,18 +162,18 @@ impl LedgerStateSummary {
     ) -> Result<Self> {
         let _timer = TIMER.timer_with(&["ledger_state_summary__update"]);
 
-        let last_checkpoint = if let Some(updates) = &updates.for_last_checkpoint {
+        let last_checkpoint = if let Some(updates) = updates.for_last_checkpoint_batched() {
             self.latest.update(persisted, updates)?
         } else {
             self.last_checkpoint.clone()
         };
 
-        let base_of_latest = if updates.for_last_checkpoint.is_none() {
+        let base_of_latest = if updates.for_last_checkpoint_batched().is_none() {
             self.latest()
         } else {
             &last_checkpoint
         };
-        let latest = if let Some(updates) = &updates.for_latest {
+        let latest = if let Some(updates) = updates.for_latest_batched() {
             base_of_latest.update(persisted, updates)?
         } else {
             base_of_latest.clone()

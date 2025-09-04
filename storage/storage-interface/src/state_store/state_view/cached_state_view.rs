@@ -172,10 +172,10 @@ impl CachedStateView {
         let _timer = TIMER.timer_with(&["prime_state_cache"]);
 
         IO_POOL.install(|| {
-            if let Some(updates) = &updates.for_last_checkpoint {
+            if let Some(updates) = updates.for_last_checkpoint_batched() {
                 self.prime_cache_for_batched_updates(updates)?;
             }
-            if let Some(updates) = &updates.for_latest {
+            if let Some(updates) = updates.for_latest_batched() {
                 self.prime_cache_for_batched_updates(updates)?;
             }
             Ok(())
