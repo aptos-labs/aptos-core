@@ -6,8 +6,9 @@ use aptos_crypto::HashValue;
 use aptos_types::{
     ledger_info::LedgerInfo,
     state_store::{
-        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateViewResult, TStateView,
+        errors::StateViewError, state_key::StateKey, state_slot::StateSlot,
+        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewId,
+        StateViewResult, TStateView,
     },
     transaction::Version,
 };
@@ -23,7 +24,7 @@ pub struct DbStateView {
 }
 
 impl DbStateView {
-    fn get(&self, key: &StateKey) -> StateViewResult<Option<StateValue>> {
+    fn get(&self, key: &StateKey) -> StateViewResult<Option<(Version, StateValue)>> {
         if let Some(version) = self.version {
             if let Some(root_hash) = self.maybe_verify_against_state_root_hash {
                 // TODO(aldenhu): sample-verify proof inside DB
@@ -34,10 +35,11 @@ impl DbStateView {
                     self.db.get_state_value_with_proof_by_version(key, version)
                 {
                     proof.verify(root_hash, *key.crypto_hash_ref(), value.as_ref())?;
-                    return Ok(value);
                 }
             }
-            Ok(self.db.get_state_value_by_version(key, version)?)
+            Ok(self
+                .db
+                .get_state_value_with_version_by_version(key, version)?)
         } else {
             Ok(None)
         }
@@ -47,8 +49,18 @@ impl DbStateView {
 impl TStateView for DbStateView {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
-        self.get(state_key)
+    fn id(&self) -> StateViewId {
+        if let Some(version) = self.version {
+            StateViewId::TransactionValidation {
+                base_version: version,
+            }
+        } else {
+            StateViewId::Miscellaneous
+        }
+    }
+
+    fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateSlot> {
+        Ok(StateSlot::from_db_get(self.get(state_key)?))
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
