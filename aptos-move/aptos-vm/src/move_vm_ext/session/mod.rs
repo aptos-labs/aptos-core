@@ -47,12 +47,11 @@ use move_vm_runtime::{
     Loader, ModuleStorage, VerifiedModuleBundle,
 };
 use move_vm_types::{
-    gas::GasMeter,
+    gas::{GasMeter, UnmeteredGasMeter},
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::Value,
 };
 use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
-use move_vm_types::gas::UnmeteredGasMeter;
 
 pub mod respawned_session;
 pub mod session_id;
