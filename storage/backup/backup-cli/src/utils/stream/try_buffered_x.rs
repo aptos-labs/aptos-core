@@ -58,7 +58,7 @@ where
         // our queue of futures. Propagate errors from the stream immediately.
         while this.in_progress_queue.len() < *this.max {
             match this.stream.as_mut().poll_next(cx)? {
-                Poll::Ready(Some(fut)) => this.in_progress_queue.push(fut.into_future()),
+                Poll::Ready(Some(fut)) => this.in_progress_queue.push(TryFutureExt::into_future(fut)),
                 Poll::Ready(None) | Poll::Pending => break,
             }
         }
