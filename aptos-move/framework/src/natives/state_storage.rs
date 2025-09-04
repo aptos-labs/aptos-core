@@ -9,7 +9,9 @@ use aptos_types::{state_store::state_key::StateKey, vm_status::StatusCode};
 use aptos_vm_types::resolver::StateStorageView;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{
+    native_extensions::NativeExtensionSession, native_functions::NativeFunction,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
@@ -21,6 +23,21 @@ use std::collections::VecDeque;
 #[derive(Tid)]
 pub struct NativeStateStorageContext<'a> {
     resolver: &'a dyn StateStorageView<Key = StateKey>,
+}
+
+impl<'a> NativeExtensionSession for NativeStateStorageContext<'a> {
+    fn abort(&mut self) {
+        // No state changes to abort.
+    }
+
+    fn finish(&mut self) {
+        // No state changes to save.
+    }
+
+    fn start(&mut self, _txn_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        // This extension only carries a reference to pre-block view, so session start does not
+        // mean anything.
+    }
 }
 
 impl<'a> NativeStateStorageContext<'a> {
