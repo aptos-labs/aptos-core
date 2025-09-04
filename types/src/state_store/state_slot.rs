@@ -103,6 +103,21 @@ impl StateSlot {
         }
     }
 
+    pub fn into_state_value_and_version_opt(self) -> Option<(Version, StateValue)> {
+        match self {
+            ColdVacant | HotVacant { .. } => None,
+            ColdOccupied {
+                value_version,
+                value,
+            }
+            | HotOccupied {
+                value_version,
+                value,
+                ..
+            } => Some((value_version, value)),
+        }
+    }
+
     pub fn into_state_value_opt(self) -> Option<StateValue> {
         match self {
             ColdVacant | HotVacant { .. } => None,
