@@ -3034,6 +3034,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "claims",
+ "once_cell",
+ "paste",
  "prometheus",
 ]
 
