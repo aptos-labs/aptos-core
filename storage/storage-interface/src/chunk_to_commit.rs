@@ -58,13 +58,11 @@ impl ChunkToCommit<'_> {
     pub fn estimated_total_state_updates(&self) -> usize {
         let for_last_checkpoint = self
             .state_update_refs
-            .for_last_checkpoint
-            .as_ref()
+            .for_last_checkpoint_batched()
             .map_or(0, |x| x.len());
         let for_latest = self
             .state_update_refs
-            .for_latest
-            .as_ref()
+            .for_latest_batched()
             .map_or(0, |x| x.len());
 
         for_latest + for_last_checkpoint
