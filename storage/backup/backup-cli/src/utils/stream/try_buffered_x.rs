@@ -8,7 +8,7 @@
 use crate::utils::stream::futures_ordered_x::FuturesOrderedX;
 use core::pin::Pin;
 use futures::{
-    future::{IntoFuture, TryFuture, TryFutureExt},
+    future::{IntoFuture, TryFuture},
     stream::{Fuse, IntoStream, Stream, StreamExt, TryStream},
     task::{Context, Poll},
     TryStreamExt,
