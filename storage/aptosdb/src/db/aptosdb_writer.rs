@@ -333,7 +333,7 @@ impl AptosDB {
 
         self.state_store.put_state_updates(
             chunk.state,
-            &chunk.state_update_refs.per_version,
+            &chunk.state_update_refs.per_version_all,
             chunk.state_reads,
             &mut ledger_metadata_batch,
             &mut sharded_state_kv_batches,

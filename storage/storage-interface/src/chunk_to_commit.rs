@@ -60,12 +60,12 @@ impl ChunkToCommit<'_> {
             .state_update_refs
             .for_last_checkpoint
             .as_ref()
-            .map_or(0, |x| x.len());
+            .map_or(0, |x| x.1.len());
         let for_latest = self
             .state_update_refs
             .for_latest
             .as_ref()
-            .map_or(0, |x| x.len());
+            .map_or(0, |x| x.1.len());
 
         for_latest + for_last_checkpoint
     }

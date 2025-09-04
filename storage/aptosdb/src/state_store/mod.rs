@@ -701,7 +701,7 @@ impl StateStore {
 
         self.put_state_updates(
             &new_state,
-            &state_update_refs.per_version,
+            &state_update_refs.per_version_all,
             &reads,
             ledger_batch,
             sharded_state_kv_batches,

@@ -275,7 +275,7 @@ impl LedgerState {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
 
         let last_checkpoint = if let Some(updates) = &updates.for_last_checkpoint {
-            self.latest().update(persisted_snapshot, updates, reads)
+            self.latest().update(persisted_snapshot, &updates.1, reads)
         } else {
             self.last_checkpoint.clone()
         };
@@ -286,7 +286,7 @@ impl LedgerState {
             &last_checkpoint
         };
         let latest = if let Some(updates) = &updates.for_latest {
-            base_of_latest.update(persisted_snapshot, updates, reads)
+            base_of_latest.update(persisted_snapshot, &updates.1, reads)
         } else {
             base_of_latest.clone()
         };
