@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use aptos_logger::info;
+use aptos_metrics_core::{register_int_counter_vec, IntCounterVec};
 use aptos_storage_interface::{
     state_store::state_view::{
         cached_state_view::CachedDbStateView,
@@ -32,12 +33,22 @@ use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache, WithHash},
     module_storage_error, sha3_256,
 };
+use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
 use std::sync::{Arc, Mutex};
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
 mod vm_validator_test;
+
+pub static CACHE_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_validation_state_cache",
+        "Count of the module cache hit rate.",
+        &["type"],
+    )
+    .unwrap()
+});
 
 pub trait TransactionValidation: Send + Sync + Clone {
     type ValidationInstance: aptos_vm::VMValidator;
@@ -178,6 +189,7 @@ impl<S: StateView> ModuleCache for ValidationState<S> {
         //   Ideally, commit notification should specify if new modules should be added to the
         //   cache instead of checking the state view bytes. Revisit.
         Ok(if module.extension().hash() == &hash {
+            CACHE_COUNTER.with_label_values(&["hit"]).inc();
             Some((module, version))
         } else {
             let compiled_module = self
@@ -193,6 +205,7 @@ impl<S: StateView> ModuleCache for ValidationState<S> {
                 extension,
                 new_version,
             )?;
+            CACHE_COUNTER.with_label_values(&["miss"]).inc();
             Some((new_module_code, new_version))
         })
     }

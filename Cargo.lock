@@ -4955,6 +4955,7 @@ dependencies = [
  "aptos-executor-test-helpers",
  "aptos-gas-schedule",
  "aptos-logger",
+ "aptos-metrics-core",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
@@ -4967,6 +4968,7 @@ dependencies = [
  "move-core-types",
  "move-vm-runtime",
  "move-vm-types",
+ "once_cell",
  "rand 0.7.3",
 ]
 
