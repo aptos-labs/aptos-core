@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
@@ -14,7 +14,7 @@ use crate::{
     models::move_resources::MoveResource,
     schema::{current_objects, objects},
 };
-use aptos_api_types::{DeleteResource, WriteResource};
+use velor_api_types::{DeleteResource, WriteResource};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use field_count::FieldCount;
@@ -128,7 +128,7 @@ impl Object {
                 match Self::get_object_owner(conn, &resource.address) {
                     Ok(owner) => owner,
                     Err(_) => {
-                        aptos_logger::error!(
+                        velor_logger::error!(
                             transaction_version = txn_version,
                             lookup_key = &resource.address,
                             "Missing object owner for object. You probably should backfill db.",

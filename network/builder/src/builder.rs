@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,7 +10,7 @@
 //! authentication -- a network end-point running with remote authentication enabled will
 //! connect to or accept connections from an end-point running in authenticated mode as
 //! long as the latter is in its trusted peers set.
-use aptos_config::{
+use velor_config::{
     config::{
         DiscoveryMethod, NetworkConfig, Peer, PeerRole, PeerSet, RoleType, CONNECTION_BACKOFF_BASE,
         CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONNECTION_DELAY_MS, MAX_FRAME_SIZE,
@@ -18,10 +18,10 @@ use aptos_config::{
     },
     network_id::NetworkContext,
 };
-use aptos_event_notifications::{DbBackedOnChainConfig, EventSubscriptionService};
-use aptos_logger::prelude::*;
-use aptos_netcore::transport::tcp::TCPBufferCfg;
-use aptos_network::{
+use velor_event_notifications::{DbBackedOnChainConfig, EventSubscriptionService};
+use velor_logger::prelude::*;
+use velor_netcore::transport::tcp::TCPBufferCfg;
+use velor_network::{
     application::storage::PeersAndMetadata,
     connectivity_manager::{builder::ConnectivityManagerBuilder, ConnectivityRequest},
     constants::MAX_MESSAGE_SIZE,
@@ -38,9 +38,9 @@ use aptos_network::{
         },
     },
 };
-use aptos_network_discovery::DiscoveryChangeListener;
-use aptos_time_service::TimeService;
-use aptos_types::{chain_id::ChainId, network_address::NetworkAddress};
+use velor_network_discovery::DiscoveryChangeListener;
+use velor_time_service::TimeService;
+use velor_types::{chain_id::ChainId, network_address::NetworkAddress};
 use std::{clone::Clone, collections::HashSet, sync::Arc, time::Duration};
 use tokio::runtime::Handle;
 
@@ -288,7 +288,7 @@ impl NetworkBuilder {
         self.network_context
     }
 
-    pub fn conn_mgr_reqs_tx(&self) -> Option<aptos_channels::Sender<ConnectivityRequest>> {
+    pub fn conn_mgr_reqs_tx(&self) -> Option<velor_channels::Sender<ConnectivityRequest>> {
         self.connectivity_manager_builder
             .as_ref()
             .map(|conn_mgr_builder| conn_mgr_builder.conn_mgr_reqs_tx())

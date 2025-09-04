@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright © Aptos Foundation
+# Copyright © Velor Foundation
 # Parts of the project are originally copyright © Meta Platforms, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -7,7 +7,7 @@ has_command() {
   command -v "$1" > /dev/null 2>&1
 }
 
-# This script is used to set up a minimal environment for building the Aptos CLI and other tools.
+# This script is used to set up a minimal environment for building the Velor CLI and other tools.
 # The `dev_setup.sh` script is way too complex, and too hard to figure out what is actually happening.  This script
 # simplifies the process
 if has_command wget; then

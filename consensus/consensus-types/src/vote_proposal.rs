@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{block::Block, vote_data::VoteData};
-use aptos_crypto::hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH};
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::{
+use velor_crypto::hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH};
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_types::{
     epoch_state::EpochState,
     proof::{accumulator::InMemoryTransactionAccumulator, AccumulatorExtensionProof},
 };

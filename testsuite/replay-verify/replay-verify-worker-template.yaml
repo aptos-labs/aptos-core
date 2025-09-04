@@ -10,7 +10,7 @@ spec:
   restartPolicy: Never # Pod restarts only if it fails
   containers:
     - name: replay-verify-worker
-      image: us-docker.pkg.dev/aptos-registry/docker/tools:nightly
+      image: us-docker.pkg.dev/velor-registry/docker/tools:nightly
       volumeMounts:
         - mountPath: /mnt/archive
           name: archive
@@ -30,7 +30,7 @@ spec:
       persistentVolumeClaim:
         claimName: testnet-archive-9
   tolerations:
-  - key: aptos-workload
+  - key: velor-workload
     operator: Equal
     value: "replay-verify"
   affinity:
@@ -42,7 +42,7 @@ spec:
               operator: In
               values:
               - "c3d"
-            - key: node-restriction.kubernetes.io/aptos-workload
+            - key: node-restriction.kubernetes.io/velor-workload
               operator: In
               values:
               - "replay-verify"

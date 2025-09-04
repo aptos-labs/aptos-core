@@ -29,7 +29,7 @@ jobs:
         with:
           ref: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }}
 
-      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+      - uses: velor-chain/velor-core/.github/actions/docker-setup@main
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
@@ -39,7 +39,7 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Install grpcurl
-        uses: aptos-labs/aptos-core/.github/actions/install-grpcurl@main
+        uses: velor-chain/velor-core/.github/actions/install-grpcurl@main
 
       - name: Set up and verify indexer GRPC local docker
         shell: bash

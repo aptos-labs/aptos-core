@@ -1,0 +1,6 @@
+[package]
+name = 'add-numbers'
+version = '1.0.0'
+[dependencies.VelorFramework]
+local = '../../../..'
+subdir = 'velor-move/framework/velor-framework'

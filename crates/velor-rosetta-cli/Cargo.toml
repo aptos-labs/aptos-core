@@ -1,0 +1,26 @@
+[package]
+name = "velor-rosetta-cli"
+description = "Velor Rosetta CLI for testing"
+version = "0.0.1"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor = { workspace = true }
+velor-logger = { workspace = true }
+velor-rosetta = { workspace = true }
+velor-types = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
+

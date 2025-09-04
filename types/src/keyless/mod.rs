@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction::{
@@ -8,8 +8,8 @@ use crate::transaction::{
     SignedTransaction,
 };
 use anyhow::bail;
-use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
 use ark_serialize::CanonicalSerialize;

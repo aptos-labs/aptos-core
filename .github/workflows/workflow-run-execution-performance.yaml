@@ -128,7 +128,7 @@ jobs:
           ref: ${{ inputs.GIT_SHA }}
         if: ${{ inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true' }}
 
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - uses: velor-chain/velor-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
         if: ${{ inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true' }}

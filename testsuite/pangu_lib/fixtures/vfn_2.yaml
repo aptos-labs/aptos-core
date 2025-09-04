@@ -4,13 +4,13 @@ api:
 base:
   role: full_node
   waypoint:
-    from_file: /opt/aptos/genesis/waypoint.txt
+    from_file: /opt/velor/genesis/waypoint.txt
 execution:
-  genesis_file_location: /opt/aptos/genesis/genesis.blob
+  genesis_file_location: /opt/velor/genesis/genesis.blob
 full_node_networks:
 - discovery_method: onchain
   identity:
-    path: /opt/aptos/identites/validator-full-node-identity.yaml
+    path: /opt/velor/identites/validator-full-node-identity.yaml
     type: from_file
   listen_address: /ip4/0.0.0.0/tcp/6182
   network_id: public

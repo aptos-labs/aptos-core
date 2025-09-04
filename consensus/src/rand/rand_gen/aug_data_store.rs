@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::rand::rand_gen::{
@@ -9,9 +9,9 @@ use crate::rand::rand_gen::{
     },
 };
 use anyhow::ensure;
-use aptos_consensus_types::common::Author;
-use aptos_logger::error;
-use aptos_types::validator_signer::ValidatorSigner;
+use velor_consensus_types::common::Author;
+use velor_logger::error;
+use velor_types::validator_signer::ValidatorSigner;
 use std::{collections::HashMap, sync::Arc};
 
 pub struct AugDataStore<D> {

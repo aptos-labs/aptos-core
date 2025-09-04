@@ -1,0 +1,20 @@
+[package]
+name = "velor-openapi"
+description = "Helpers that allow structs to self-describe in an OpenAPI spec"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+percent-encoding = { workspace = true }
+poem = { workspace = true }
+poem-openapi = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

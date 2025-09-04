@@ -1,11 +1,11 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{
     CACHE_END_VERSION, CACHE_SIZE_BYTES, CACHE_SIZE_LIMIT_BYTES, CACHE_START_VERSION, COUNTER,
     LATENCY_MS,
 };
-use aptos_protos::transaction::v1::Transaction;
+use velor_protos::transaction::v1::Transaction;
 use prost::Message;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::{error, trace, warn};

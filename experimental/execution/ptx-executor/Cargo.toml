@@ -1,6 +1,6 @@
 [package]
-name = "aptos-experimental-ptx-executor"
-description = "Aptos P-Transaction Executor"
+name = "velor-experimental-ptx-executor"
+description = "Velor P-Transaction Executor"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,16 +13,16 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-block-executor = { workspace = true }
-aptos-experimental-runtimes = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
-aptos-vm-environment = { workspace = true }
-aptos-vm-logging = { workspace = true }
-aptos-vm-types = { workspace = true }
+velor-block-executor = { workspace = true }
+velor-experimental-runtimes = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true }
+velor-vm-environment = { workspace = true }
+velor-vm-logging = { workspace = true }
+velor-vm-types = { workspace = true }
 move-core-types = { workspace = true }
 once_cell = { workspace = true }
 rayon = { workspace = true }

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -20,23 +20,23 @@ use crate::{
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
 };
 use anyhow::Result;
-use aptos_config::{config::TransactionFilterConfig, network_id::PeerNetworkId};
-use aptos_consensus_types::common::RejectedTransactionSummary;
-use aptos_crypto::HashValue;
-use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::prelude::*;
-use aptos_mempool_notifications::CommittedTransaction;
-use aptos_metrics_core::HistogramTimer;
-use aptos_network::application::interface::NetworkClientInterface;
-use aptos_storage_interface::state_store::state_view::db_state_view::LatestDbStateCheckpointView;
-use aptos_types::{
+use velor_config::{config::TransactionFilterConfig, network_id::PeerNetworkId};
+use velor_consensus_types::common::RejectedTransactionSummary;
+use velor_crypto::HashValue;
+use velor_infallible::{Mutex, RwLock};
+use velor_logger::prelude::*;
+use velor_mempool_notifications::CommittedTransaction;
+use velor_metrics_core::HistogramTimer;
+use velor_network::application::interface::NetworkClientInterface;
+use velor_storage_interface::state_store::state_view::db_state_view::LatestDbStateCheckpointView;
+use velor_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     on_chain_config::{OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig},
     transaction::{ReplayProtector, SignedTransaction},
     vm_status::{DiscardedVMStatus, StatusCode},
 };
-use aptos_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
+use velor_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
 use futures::{channel::oneshot, stream::FuturesUnordered};
 use rayon::prelude::*;
 use std::{
@@ -662,7 +662,7 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
                     );
                     // gc before pulling block as extra protection against txns that may expire in consensus
                     // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
-                    let curr_time = aptos_infallible::duration_since_epoch();
+                    let curr_time = velor_infallible::duration_since_epoch();
                     mempool.gc_by_expiration_time(curr_time);
                 }
 
@@ -797,9 +797,9 @@ pub(crate) async fn process_config_update<V, P>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
-    use aptos_transaction_filters::transaction_filter::TransactionFilter;
-    use aptos_types::{
+    use velor_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+    use velor_transaction_filters::transaction_filter::TransactionFilter;
+    use velor_types::{
         chain_id::ChainId,
         transaction::{RawTransaction, Script, TransactionPayload},
     };

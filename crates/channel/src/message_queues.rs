@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics_core::IntCounterVec;
+use velor_metrics_core::IntCounterVec;
 use std::{
     collections::{HashMap, VecDeque},
     fmt::{Debug, Formatter, Result},
@@ -175,7 +175,7 @@ impl<K: Eq + Hash + Clone, T> PerKeyQueue<K, T> {
             // Remove empty per-key-queues every `POPS_PER_GC` successful dequeue
             // operations.
             //
-            // aptos-channel never removes keys from its PerKeyQueue (without
+            // velor-channel never removes keys from its PerKeyQueue (without
             // this logic). This works fine for the validator network, where we
             // have a bounded set of peers that almost never changes; however,
             // this does not work for servicing public clients, where we can have
@@ -190,7 +190,7 @@ impl<K: Eq + Hash + Clone, T> PerKeyQueue<K, T> {
             //
             // See: common/channel/src/bin/many_keys_stress_test.rs
             //
-            // For more context, see: https://github.com/aptos-labs/aptos-core/issues/5543
+            // For more context, see: https://github.com/velor-chain/velor-core/issues/5543
             self.num_popped_since_gc += 1;
             if self.num_popped_since_gc >= POPS_PER_GC {
                 self.num_popped_since_gc = 0;

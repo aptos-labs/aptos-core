@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,13 +8,13 @@ use crate::{
         wait_for_all_nodes, MAX_HEALTHY_WAIT_SECS,
     },
 };
-use aptos_config::config::{BootstrappingMode, NodeConfig, OverrideNodeConfig};
-use aptos_db::AptosDB;
-use aptos_forge::{LocalNode, LocalSwarm, Node, NodeExt, Swarm};
-use aptos_inspection_service::inspection_client::InspectionClient;
-use aptos_rest_client::Client as RestClient;
-use aptos_sdk::types::PeerId;
-use aptos_storage_interface::DbReader;
+use velor_config::config::{BootstrappingMode, NodeConfig, OverrideNodeConfig};
+use velor_db::VelorDB;
+use velor_forge::{LocalNode, LocalSwarm, Node, NodeExt, Swarm};
+use velor_inspection_service::inspection_client::InspectionClient;
+use velor_rest_client::Client as RestClient;
+use velor_sdk::types::PeerId;
+use velor_storage_interface::DbReader;
 use move_core_types::account_address::AccountAddress;
 use std::{
     sync::Arc,
@@ -46,10 +46,10 @@ pub async fn create_fullnode(full_node_config: NodeConfig, swarm: &mut LocalSwar
 pub fn enable_consensus_observer(use_consensus_observer: bool, node_config: &mut NodeConfig) {
     if use_consensus_observer {
         match node_config.base.role {
-            aptos_config::config::RoleType::Validator => {
+            velor_config::config::RoleType::Validator => {
                 node_config.consensus_observer.publisher_enabled = true;
             },
-            aptos_config::config::RoleType::FullNode => {
+            velor_config::config::RoleType::FullNode => {
                 node_config.consensus_observer.observer_enabled = true;
                 node_config.consensus_observer.publisher_enabled = true;
             },
@@ -96,7 +96,7 @@ pub async fn stop_validator_and_delete_storage(
 pub async fn test_fullnode_fast_sync(epoch_changes: bool, use_consensus_observer: bool) {
     // Create a swarm with 2 validators
     let mut swarm = SwarmBuilder::new_local(2)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(move |_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
@@ -199,8 +199,8 @@ fn verify_first_ledger_info(node: &mut LocalNode) {
     node.stop();
 
     // Verify that the ledger info exists at version 0
-    let aptos_db = AptosDB::new_for_test_with_sharding(db_path_buf.as_path(), 1 << 13);
-    aptos_db.get_epoch_ending_ledger_info(0).unwrap();
+    let velor_db = VelorDB::new_for_test_with_sharding(db_path_buf.as_path(), 1 << 13);
+    velor_db.get_epoch_ending_ledger_info(0).unwrap();
 
     // Restart the node
     node.start().unwrap();
@@ -233,20 +233,20 @@ async fn verify_pruning_metrics_after_fast_sync(
     // Fetch the pruning metrics from the node
     let state_merkle_pruner_version = node_inspection_client
         .get_node_metric_i64(
-            "aptos_pruner_versions{pruner_name=state_merkle_pruner,tag=min_readable}",
+            "velor_pruner_versions{pruner_name=state_merkle_pruner,tag=min_readable}",
         )
         .await
         .unwrap()
         .unwrap();
     let epoch_snapshot_pruner_version = node_inspection_client
         .get_node_metric_i64(
-            "aptos_pruner_versions{pruner_name=epoch_snapshot_pruner,tag=min_readable}",
+            "velor_pruner_versions{pruner_name=epoch_snapshot_pruner,tag=min_readable}",
         )
         .await
         .unwrap()
         .unwrap();
     let ledger_pruner_version = node_inspection_client
-        .get_node_metric_i64("aptos_pruner_versions{pruner_name=ledger_pruner,tag=min_readable}")
+        .get_node_metric_i64("velor_pruner_versions{pruner_name=ledger_pruner,tag=min_readable}")
         .await
         .unwrap()
         .unwrap();

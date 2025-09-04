@@ -1,15 +1,15 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{mock_tree_store::MockTreeStore, node_type::LeafNode, JellyfishMerkleTree, TestKey};
-use aptos_crypto::{
+use velor_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_storage_interface::jmt_update_refs;
-use aptos_types::{
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_storage_interface::jmt_update_refs;
+use velor_types::{
     proof::{SparseMerkleInternalNode, SparseMerkleRangeProof},
     transaction::Version,
 };

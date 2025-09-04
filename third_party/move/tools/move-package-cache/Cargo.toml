@@ -24,5 +24,5 @@ url = { workspace = true }
 
 move-core-types = { workspace = true }
 
-aptos-framework = { workspace = true }
-aptos-rest-client = { workspace = true }
+velor-framework = { workspace = true }
+velor-rest-client = { workspace = true }

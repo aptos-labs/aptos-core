@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,7 +13,7 @@ use legacy_move_compiler::{
     command_line as cli,
     shared::{
         move_compiler_warn_of_deprecation_use_env_var,
-        warn_of_deprecation_use_in_aptos_libs_env_var,
+        warn_of_deprecation_use_in_velor_libs_env_var,
     },
 };
 use move_command_line_common::env::{bool_to_str, read_env_var};
@@ -102,12 +102,12 @@ pub struct Options {
            default_value=bool_to_str(move_compiler_warn_of_deprecation_use_env_var()))]
     pub warn_deprecated: bool,
 
-    /// Show warnings about use of deprecated usage in the Aptos libraries,
+    /// Show warnings about use of deprecated usage in the Velor libraries,
     /// which we should generally not bother users with.
-    /// Note that current value of this constant is "Wdeprecation-aptos"
-    #[clap(hide(true), long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG,
-           default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
-    pub warn_of_deprecation_use_in_aptos_libs: bool,
+    /// Note that current value of this constant is "Wdeprecation-velor"
+    #[clap(hide(true), long = cli::WARN_OF_DEPRECATION_USE_IN_VELOR_LIBS_FLAG,
+           default_value=bool_to_str(warn_of_deprecation_use_in_velor_libs_env_var()))]
+    pub warn_of_deprecation_use_in_velor_libs: bool,
 
     /// Show warnings about unused functions, fields, constants, etc.
     /// Note that the current value of this constant is "Wunused"
@@ -232,9 +232,9 @@ impl Options {
         }
     }
 
-    pub fn set_warn_of_deprecation_use_in_aptos_libs(self, value: bool) -> Self {
+    pub fn set_warn_of_deprecation_use_in_velor_libs(self, value: bool) -> Self {
         Self {
-            warn_of_deprecation_use_in_aptos_libs: value,
+            warn_of_deprecation_use_in_velor_libs: value,
             ..self
         }
     }

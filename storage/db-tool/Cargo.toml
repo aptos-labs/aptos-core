@@ -1,5 +1,5 @@
 [package]
-name = "aptos-db-tool"
+name = "velor-db-tool"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,18 +13,18 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-backup-cli = { workspace = true }
-aptos-block-executor = { workspace = true }
-aptos-config = { workspace = true }
-aptos-db = { workspace = true, features = ["db-debugger"] }
-aptos-db-indexer = { workspace = true }
-aptos-executor = { workspace = true }
-aptos-executor-types = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-temppath = { workspace = true }
-aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
+velor-backup-cli = { workspace = true }
+velor-block-executor = { workspace = true }
+velor-config = { workspace = true }
+velor-db = { workspace = true, features = ["db-debugger"] }
+velor-db-indexer = { workspace = true }
+velor-executor = { workspace = true }
+velor-executor-types = { workspace = true }
+velor-logger = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-temppath = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 itertools = { workspace = true }
@@ -33,7 +33,7 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
-aptos-backup-cli = { workspace = true, features = ["testing"] }
-aptos-backup-service = { workspace = true }
-aptos-executor-test-helpers = { workspace = true }
-aptos-indexer-grpc-table-info = { workspace = true }
+velor-backup-cli = { workspace = true, features = ["testing"] }
+velor-backup-service = { workspace = true }
+velor-executor-test-helpers = { workspace = true }
+velor-indexer-grpc-table-info = { workspace = true }

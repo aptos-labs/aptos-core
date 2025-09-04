@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -14,7 +14,7 @@ use crate::{
     },
 };
 use anyhow::{bail, ensure, Error, Result};
-use aptos_crypto::{
+use velor_crypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
     hash::CryptoHash,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
@@ -22,7 +22,7 @@ use aptos_crypto::{
     traits::Signature,
     CryptoMaterialError, HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
-use aptos_crypto_derive::{CryptoHasher, DeserializeKey, SerializeKey};
+use velor_crypto_derive::{CryptoHasher, DeserializeKey, SerializeKey};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rand::{rngs::OsRng, Rng};
@@ -66,7 +66,7 @@ impl AuthenticationProof {
     }
 }
 
-/// Each transaction submitted to the Aptos blockchain contains a `TransactionAuthenticator`. During
+/// Each transaction submitted to the Velor blockchain contains a `TransactionAuthenticator`. During
 /// transaction execution, the executor will check if every `AccountAuthenticator`'s signature on
 /// the transaction hash is well-formed and whether the sha3 hash of the
 /// `AccountAuthenticator`'s `AuthenticationKeyPreimage` matches the `AuthenticationKey` stored
@@ -372,7 +372,7 @@ impl TransactionAuthenticator {
                         .iter()
                         .map(|sig| AnySignature::ed25519(sig.clone()))
                         .collect();
-                    let signatures_bitmap = aptos_bitvec::BitVec::from(signature.bitmap().to_vec());
+                    let signatures_bitmap = velor_bitvec::BitVec::from(signature.bitmap().to_vec());
                     let authenticator = MultiKeyAuthenticator {
                         public_keys,
                         signatures,
@@ -916,7 +916,7 @@ impl fmt::Display for AuthenticationKey {
 pub struct MultiKeyAuthenticator {
     public_keys: MultiKey,
     signatures: Vec<AnySignature>,
-    signatures_bitmap: aptos_bitvec::BitVec,
+    signatures_bitmap: velor_bitvec::BitVec,
 }
 
 impl MultiKeyAuthenticator {
@@ -927,7 +927,7 @@ impl MultiKeyAuthenticator {
             public_keys.len(),
         );
 
-        let mut signatures_bitmap = aptos_bitvec::BitVec::with_num_bits(public_keys.len() as u16);
+        let mut signatures_bitmap = velor_bitvec::BitVec::with_num_bits(public_keys.len() as u16);
         let mut any_signatures = vec![];
 
         for (idx, signature) in signatures {
@@ -1197,10 +1197,10 @@ impl AnySignature {
     ) -> Result<()> {
         // Verifies the ephemeral signature on (TXN [+ ZKP]). The rest of the verification,
         // i.e., [ZKPoK of] OpenID signature verification is done in
-        // `AptosVM::run_prologue`.
+        // `VelorVM::run_prologue`.
         //
         // This is because the JWK, under which the [ZKPoK of an] OpenID signature verifies,
-        // can only be fetched from on chain inside the `AptosVM`.
+        // can only be fetched from on chain inside the `VelorVM`.
         //
         // This deferred verification is what actually ensures the `signature.ephemeral_pubkey`
         // used below is the right pubkey signed by the OIDC provider.
@@ -1469,7 +1469,7 @@ mod tests {
         },
         transaction::{webauthn::AssertionSignature, SignedTransaction},
     };
-    use aptos_crypto::{
+    use velor_crypto::{
         ed25519::Ed25519PrivateKey,
         secp256k1_ecdsa,
         secp256r1_ecdsa::{PublicKey, Signature},

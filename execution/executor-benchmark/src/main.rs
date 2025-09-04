@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_block_partitioner::{
+use velor_block_partitioner::{
     pre_partition::{
         connected_component::config::ConnectedComponentPartitionerConfig,
         default_pre_partitioner_config, uniform_partitioner::config::UniformPartitionerConfig,
@@ -10,13 +10,13 @@ use aptos_block_partitioner::{
     },
     v2::config::PartitionerV2Config,
 };
-use aptos_config::config::{
+use velor_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
-use aptos_executor_benchmark::{
+use velor_executor_benchmark::{
     default_benchmark_features,
     native::{
-        aptos_vm_uncoordinated::AptosVMParallelUncoordinatedBlockExecutor,
+        velor_vm_uncoordinated::VelorVMParallelUncoordinatedBlockExecutor,
         native_config::NativeConfig,
         native_vm::NativeVMBlockExecutor,
         parallel_uncoordinated_block_executor::{
@@ -27,18 +27,18 @@ use aptos_executor_benchmark::{
     pipeline::PipelineConfig,
     BenchmarkWorkload,
 };
-use aptos_executor_service::remote_executor_client;
-use aptos_experimental_ptx_executor::PtxBlockExecutor;
+use velor_executor_service::remote_executor_client;
+use velor_experimental_ptx_executor::PtxBlockExecutor;
 #[cfg(target_os = "linux")]
-use aptos_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadManagerBuilder};
-use aptos_metrics_core::{register_int_gauge, IntGauge};
-use aptos_profiler::{ProfilerConfig, ProfilerHandler};
-use aptos_push_metrics::MetricsPusher;
-use aptos_transaction_generator_lib::WorkflowProgress;
-use aptos_transaction_workloads_lib::args::TransactionTypeArg;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
-use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
+use velor_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadManagerBuilder};
+use velor_metrics_core::{register_int_gauge, IntGauge};
+use velor_profiler::{ProfilerConfig, ProfilerHandler};
+use velor_push_metrics::MetricsPusher;
+use velor_transaction_generator_lib::WorkflowProgress;
+use velor_transaction_workloads_lib::args::TransactionTypeArg;
+use velor_types::on_chain_config::{FeatureFlag, Features};
+use velor_vm::{velor_vm::VelorVMBlockExecutor, VelorVM, VMBlockExecutor};
+use velor_vm_environment::prod_configs::set_paranoid_type_checks;
 use clap::{Parser, Subcommand, ValueEnum};
 use once_cell::sync::Lazy;
 use std::{
@@ -241,19 +241,19 @@ struct ProfilerOpt {
 
 #[derive(Parser, Debug, ValueEnum, Clone, Default)]
 enum BlockExecutorTypeOpt {
-    /// Transaction execution: AptosVM
+    /// Transaction execution: VelorVM
     /// Executing conflicts: in the input order, via BlockSTM,
     /// State: BlockSTM-provided MVHashMap-based view with caching
     #[default]
-    AptosVMWithBlockSTM,
+    VelorVMWithBlockSTM,
     /// Transaction execution: NativeVM - a simplified rust implemtation to create VMChangeSet,
     /// Executing conflicts: in the input order, via BlockSTM
     /// State: BlockSTM-provided MVHashMap-based view with caching
     NativeVMWithBlockSTM,
-    /// Transaction execution: AptosVM
+    /// Transaction execution: VelorVM
     /// Executing conflicts: All transactions execute on the state at the beginning of the block
     /// State: Raw CachedStateView
-    AptosVMParallelUncoordinated,
+    VelorVMParallelUncoordinated,
     /// Transaction execution: Native rust code producing WriteSet
     /// Executing conflicts: All transactions execute on the state at the beginning of the block
     /// State: Raw CachedStateView
@@ -465,7 +465,7 @@ where
             enable_feature,
             disable_feature,
         } => {
-            aptos_executor_benchmark::db_generator::create_db_with_accounts::<E>(
+            velor_executor_benchmark::db_generator::create_db_with_accounts::<E>(
                 num_accounts,
                 init_account_balance,
                 opt.block_size,
@@ -491,8 +491,8 @@ where
             enable_feature,
             disable_feature,
         } => {
-            // aptos_types::on_chain_config::hack_enable_default_features_for_genesis(enable_feature);
-            // aptos_types::on_chain_config::hack_disable_default_features_for_genesis(
+            // velor_types::on_chain_config::hack_enable_default_features_for_genesis(enable_feature);
+            // velor_types::on_chain_config::hack_disable_default_features_for_genesis(
             //     disable_feature,
             // );
 
@@ -523,7 +523,7 @@ where
                 }
             }
 
-            aptos_executor_benchmark::run_benchmark::<E>(
+            velor_executor_benchmark::run_benchmark::<E>(
                 opt.block_size,
                 blocks,
                 workload,
@@ -546,7 +546,7 @@ where
             num_new_accounts,
             init_account_balance,
         } => {
-            aptos_executor_benchmark::add_accounts::<E>(
+            velor_executor_benchmark::add_accounts::<E>(
                 num_new_accounts,
                 init_account_balance,
                 opt.block_size,
@@ -565,7 +565,7 @@ where
 
 fn main() {
     let opt = Opt::parse();
-    aptos_logger::Logger::new().init();
+    velor_logger::Logger::new().init();
     START_TIME.set(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -577,7 +577,7 @@ fn main() {
         .build_global()
         .expect("Failed to build rayon global thread pool.");
 
-    aptos_node_resource_metrics::register_node_metrics_collector(None);
+    velor_node_resource_metrics::register_node_metrics_collector(None);
     let _mp = MetricsPusher::start_for_local_run("executor-benchmark");
 
     let execution_threads = opt.execution_threads();
@@ -624,10 +624,10 @@ fn main() {
     if opt.skip_paranoid_checks {
         set_paranoid_type_checks(false);
     }
-    AptosVM::set_num_shards_once(execution_shards);
-    AptosVM::set_concurrency_level_once(execution_threads_per_shard);
+    VelorVM::set_num_shards_once(execution_shards);
+    VelorVM::set_concurrency_level_once(execution_threads_per_shard);
     NativeConfig::set_concurrency_level_once(execution_threads_per_shard);
-    AptosVM::set_processed_transactions_detailed_counters();
+    VelorVM::set_processed_transactions_detailed_counters();
 
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
@@ -646,14 +646,14 @@ fn main() {
     }
 
     match opt.block_executor_type {
-        BlockExecutorTypeOpt::AptosVMWithBlockSTM => {
-            run::<AptosVMBlockExecutor>(opt);
+        BlockExecutorTypeOpt::VelorVMWithBlockSTM => {
+            run::<VelorVMBlockExecutor>(opt);
         },
         BlockExecutorTypeOpt::NativeVMWithBlockSTM => {
             run::<NativeVMBlockExecutor>(opt);
         },
-        BlockExecutorTypeOpt::AptosVMParallelUncoordinated => {
-            run::<AptosVMParallelUncoordinatedBlockExecutor>(opt);
+        BlockExecutorTypeOpt::VelorVMParallelUncoordinated => {
+            run::<VelorVMParallelUncoordinatedBlockExecutor>(opt);
         },
         BlockExecutorTypeOpt::NativeParallelUncoordinated => {
             run::<NativeParallelUncoordinatedBlockExecutor<NativeRawTransactionExecutor>>(opt);
@@ -681,7 +681,7 @@ fn main() {
         let _cpu_end = cpu_profiler.end_profiling("");
     }
     if memory_profiling {
-        let _mem_end = memory_profiler.end_profiling("./target/release/aptos-executor-benchmark");
+        let _mem_end = memory_profiler.end_profiling("./target/release/velor-executor-benchmark");
     }
 }
 

@@ -1,13 +1,13 @@
 #![no_main]
 
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 mod utils;
-use aptos_language_e2e_tests::executor::FakeExecutor;
-use aptos_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
-use aptos_types::{chain_id::ChainId, write_set::WriteSet};
-use aptos_vm::AptosVM;
+use velor_language_e2e_tests::executor::FakeExecutor;
+use velor_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
+use velor_types::{chain_id::ChainId, write_set::WriteSet};
+use velor_vm::VelorVM;
 use fuzzer::{ExecVariant, RunnableState};
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
@@ -42,7 +42,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     let deserializer_config = DeserializerConfig::default();
 
     for m in input.dep_modules.iter_mut() {
-        // m.metadata = vec![]; // we could optimize metadata to only contain aptos metadata
+        // m.metadata = vec![]; // we could optimize metadata to only contain velor metadata
         // m.version = VERSION_MAX;
 
         // reject bad modules fast lite
@@ -103,7 +103,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         packages.push(cur)
     }
 
-    AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
+    VelorVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
     let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(
         &VM,
         ChainId::mainnet(),

@@ -12,7 +12,7 @@ template["spec"]["completions"] = 1
 # if given an extra argument, take it as pvc name
 if len(sys.argv) == 2:
   for volume in template["spec"]["template"]["spec"]["volumes"]:
-    if volume["name"] == "aptos-data":
+    if volume["name"] == "velor-data":
       volume["persistentVolumeClaim"] = {"claimName": sys.argv[1]}
 del template["spec"]["selector"]["matchLabels"]["controller-uid"]
 del template["spec"]["template"]["metadata"]["labels"]["controller-uid"]

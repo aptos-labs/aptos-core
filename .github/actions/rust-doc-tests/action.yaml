@@ -12,5 +12,5 @@ runs:
 
     # Run the rust doc tests
     - name: Run rust doc tests
-      run: cargo test --profile ci --locked --doc --workspace --exclude aptos-node-checker
+      run: cargo test --profile ci --locked --doc --workspace --exclude velor-node-checker
       shell: bash

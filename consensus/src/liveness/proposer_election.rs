@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_consensus_types::common::{Author, Round};
-use aptos_fallible::copy_from_slice::copy_slice_to_vec;
+use velor_consensus_types::common::{Author, Round};
+use velor_fallible::copy_from_slice::copy_slice_to_vec;
 use num_traits::CheckedAdd;
 use std::cmp::Ordering;
 
@@ -39,7 +39,7 @@ pub trait ProposerElection {
 // next consumes seed and returns random deterministic u64 value in [0, max) range
 fn next_in_range(state: Vec<u8>, max: u128) -> u128 {
     // hash = SHA-3-256(state)
-    let hash = aptos_crypto::HashValue::sha3_256_of(&state).to_vec();
+    let hash = velor_crypto::HashValue::sha3_256_of(&state).to_vec();
     let mut temp = [0u8; 16];
     copy_slice_to_vec(&hash[..16], &mut temp).expect("next failed");
     // return hash[0..16]

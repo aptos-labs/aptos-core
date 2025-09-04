@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -15,15 +15,15 @@ mod node_type_test;
 
 use crate::{
     get_hash,
-    metrics::{APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES},
+    metrics::{VELOR_JELLYFISH_INTERNAL_ENCODED_BYTES, VELOR_JELLYFISH_LEAF_ENCODED_BYTES},
     Key, TreeReader,
 };
 use anyhow::{ensure, Context, Result};
-use aptos_crypto::{
+use velor_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_types::{
+use velor_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{definition::NodeInProof, SparseMerkleInternalNode, SparseMerkleLeafNode},
     transaction::Version,
@@ -833,12 +833,12 @@ where
             Node::Internal(internal_node) => {
                 out.push(NodeTag::Internal as u8);
                 internal_node.serialize(&mut out)?;
-                APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES.inc_by(out.len() as u64);
+                VELOR_JELLYFISH_INTERNAL_ENCODED_BYTES.inc_by(out.len() as u64);
             },
             Node::Leaf(leaf_node) => {
                 out.push(NodeTag::Leaf as u8);
                 out.extend(bcs::to_bytes(&leaf_node)?);
-                APTOS_JELLYFISH_LEAF_ENCODED_BYTES.inc_by(out.len() as u64);
+                VELOR_JELLYFISH_LEAF_ENCODED_BYTES.inc_by(out.len() as u64);
             },
             Node::Null => {
                 out.push(NodeTag::Null as u8);

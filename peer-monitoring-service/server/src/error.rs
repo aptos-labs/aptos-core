@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
@@ -25,8 +25,8 @@ impl Error {
     }
 }
 
-impl From<aptos_network::application::error::Error> for Error {
-    fn from(error: aptos_network::application::error::Error) -> Self {
+impl From<velor_network::application::error::Error> for Error {
+    fn from(error: velor_network::application::error::Error) -> Self {
         Error::UnexpectedErrorEncountered(error.to_string())
     }
 }

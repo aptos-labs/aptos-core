@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,7 +12,7 @@ use crate::{
     nibble::{Nibble, ROOT_NIBBLE_HEIGHT},
     state_store::state_key::StateKey,
 };
-use aptos_crypto::hash::CryptoHash;
+use velor_crypto::hash::CryptoHash;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{collection::vec, prelude::*};
 use serde::{Deserialize, Serialize};

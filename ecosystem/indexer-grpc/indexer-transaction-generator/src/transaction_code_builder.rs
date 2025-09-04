@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{fs, path::Path};
@@ -93,7 +93,7 @@ impl TransactionCodeBuilder {
     pub fn add_license_in_comments(mut self) -> Self {
         self.transactions_code.push_str(
             r#"
-                    // Copyright (c) Aptos Foundation
+                    // Copyright (c) Velor Foundation
                     // SPDX-License-Identifier: Apache-2.0
                     #![allow(dead_code)]
                     #![allow(unused_variables)]

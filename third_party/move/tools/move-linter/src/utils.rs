@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module holds utility functions for the Move linter.

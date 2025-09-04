@@ -22,4 +22,4 @@ GOOGLE_PROJECT_ID=$4
 FIRESTORE_DATABASE_ID=$5
 
 # Start the pepper client example
-cargo run -p aptos-keyless-pepper-example-client-rust -- --pepper-service-url=${PEPPER_SERVICE_URL} --firestore-google-project-id=${GOOGLE_PROJECT_ID} --firestore-database-id=${FIRESTORE_DATABASE_ID}
+cargo run -p velor-keyless-pepper-example-client-rust -- --pepper-service-url=${PEPPER_SERVICE_URL} --firestore-google-project-id=${GOOGLE_PROJECT_ID} --firestore-database-id=${FIRESTORE_DATABASE_ID}

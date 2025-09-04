@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,11 +8,11 @@ mod schema;
 
 use crate::error::DbError;
 use anyhow::Result;
-use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
-use aptos_crypto::HashValue;
-use aptos_logger::prelude::*;
-use aptos_schemadb::{batch::SchemaBatch, schema::Schema, Options, DB, DEFAULT_COLUMN_FAMILY_NAME};
-use aptos_storage_interface::AptosDbError;
+use velor_consensus_types::{block::Block, quorum_cert::QuorumCert};
+use velor_crypto::HashValue;
+use velor_logger::prelude::*;
+use velor_schemadb::{batch::SchemaBatch, schema::Schema, Options, DB, DEFAULT_COLUMN_FAMILY_NAME};
+use velor_storage_interface::VelorDbError;
 pub use schema::{
     block::BlockSchema,
     dag::{CertifiedNodeSchema, DagVoteSchema, NodeSchema},
@@ -202,7 +202,7 @@ impl ConsensusDB {
     pub fn get_all<S: Schema>(&self) -> Result<Vec<(S::Key, S::Value)>, DbError> {
         let mut iter = self.db.iter::<S>()?;
         iter.seek_to_first();
-        Ok(iter.collect::<Result<Vec<(S::Key, S::Value)>, AptosDbError>>()?)
+        Ok(iter.collect::<Result<Vec<(S::Key, S::Value)>, VelorDbError>>()?)
     }
 
     pub fn get<S: Schema>(&self, key: &S::Key) -> Result<Option<S::Value>, DbError> {

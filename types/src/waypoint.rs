@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,8 +9,8 @@ use crate::{
     transaction::Version,
 };
 use anyhow::{ensure, format_err, Error, Result};
-use aptos_crypto::hash::{CryptoHash, HashValue};
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_crypto::hash::{CryptoHash, HashValue};
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};

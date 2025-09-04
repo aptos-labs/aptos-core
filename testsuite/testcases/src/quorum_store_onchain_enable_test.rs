@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{generate_onchain_config_blob, NetworkLoadTest};
 use anyhow::Ok;
-use aptos::test::CliTestFramework;
-use aptos_forge::{NetworkContextSynchronizer, NetworkTest, NodeExt, SwarmExt, Test};
-use aptos_sdk::bcs;
-use aptos_types::{
+use velor::test::CliTestFramework;
+use velor_forge::{NetworkContextSynchronizer, NetworkTest, NodeExt, SwarmExt, Test};
+use velor_sdk::bcs;
+use velor_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig},
 };
@@ -28,8 +28,8 @@ impl Test for QuorumStoreOnChainEnableTest {
 impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
     async fn test(
         &self,
-        swarm: Arc<tokio::sync::RwLock<Box<dyn aptos_forge::Swarm>>>,
-        _report: &mut aptos_forge::TestReport,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn velor_forge::Swarm>>>,
+        _report: &mut velor_forge::TestReport,
         duration: std::time::Duration,
     ) -> anyhow::Result<()> {
         let faucet_endpoint: reqwest::Url = "http://localhost:8081".parse().unwrap();
@@ -81,10 +81,10 @@ impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
         let update_consensus_config_script = format!(
             r#"
     script {{
-        use aptos_framework::aptos_governance;
-        use aptos_framework::consensus_config;
+        use velor_framework::velor_governance;
+        use velor_framework::consensus_config;
         fun main(core_resources: &signer) {{
-            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let framework_signer = velor_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
             let config_bytes = {};
             consensus_config::set(&framework_signer, config_bytes);
         }}

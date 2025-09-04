@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -14,9 +14,9 @@ use crate::{
     node_type::{Child, InternalNode, Node, NodeKey},
     TreeReader,
 };
-use aptos_crypto::HashValue;
-use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError, Result};
-use aptos_types::{
+use velor_crypto::HashValue;
+use velor_storage_interface::{db_ensure as ensure, db_other_bail, VelorDbError, Result};
+use velor_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     transaction::Version,
 };

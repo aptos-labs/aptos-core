@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -23,19 +23,19 @@ use crate::{
     txn_notifier::MempoolNotifier,
     util::time_service::ClockTimeService,
 };
-use aptos_bounded_executor::BoundedExecutor;
-use aptos_channels::aptos_channel::Receiver;
-use aptos_config::config::NodeConfig;
-use aptos_consensus_notifications::ConsensusNotificationSender;
-use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
-use aptos_executor::block_executor::BlockExecutor;
-use aptos_logger::prelude::*;
-use aptos_mempool::QuorumStoreRequest;
-use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
-use aptos_storage_interface::DbReaderWriter;
-use aptos_time_service::TimeService;
-use aptos_validator_transaction_pool::VTxnPoolState;
-use aptos_vm::aptos_vm::AptosVMBlockExecutor;
+use velor_bounded_executor::BoundedExecutor;
+use velor_channels::velor_channel::Receiver;
+use velor_config::config::NodeConfig;
+use velor_consensus_notifications::ConsensusNotificationSender;
+use velor_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
+use velor_executor::block_executor::BlockExecutor;
+use velor_logger::prelude::*;
+use velor_mempool::QuorumStoreRequest;
+use velor_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use velor_storage_interface::DbReaderWriter;
+use velor_time_service::TimeService;
+use velor_validator_transaction_pool::VTxnPoolState;
+use velor_vm::velor_vm::VelorVMBlockExecutor;
 use futures::channel::mpsc;
 use move_core_types::account_address::AccountAddress;
 use std::{collections::HashMap, sync::Arc};
@@ -49,13 +49,13 @@ pub fn start_consensus(
     network_service_events: NetworkServiceEvents<ConsensusMsg>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
-    aptos_db: DbReaderWriter,
+    velor_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     vtxn_pool: VTxnPoolState,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
-    let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
-    let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
+    let runtime = velor_runtimes::spawn_named_runtime("consensus".into(), None);
+    let storage = Arc::new(StorageWriteProxy::new(node_config, velor_db.reader.clone()));
     let quorum_store_db = Arc::new(QuorumStoreDB::new(node_config.storage.dir()));
 
     let txn_notifier = Arc::new(MempoolNotifier::new(
@@ -64,7 +64,7 @@ pub fn start_consensus(
     ));
 
     let execution_proxy = ExecutionProxy::new(
-        Arc::new(BlockExecutor::<AptosVMBlockExecutor>::new(aptos_db)),
+        Arc::new(BlockExecutor::<VelorVMBlockExecutor>::new(velor_db)),
         txn_notifier,
         state_sync_notifier,
         node_config.transaction_filters.execution_filter.clone(),
@@ -74,9 +74,9 @@ pub fn start_consensus(
     let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 
     let (timeout_sender, timeout_receiver) =
-        aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
+        velor_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
     let (self_sender, self_receiver) =
-        aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
+        velor_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
     let bounded_executor = BoundedExecutor::new(
         node_config.consensus.num_bounded_executor_tasks as usize,
@@ -108,7 +108,7 @@ pub fn start_consensus(
         quorum_store_db.clone(),
         reconfig_events,
         bounded_executor,
-        aptos_time_service::TimeService::real(),
+        velor_time_service::TimeService::real(),
         vtxn_pool,
         rand_storage,
         consensus_publisher,
@@ -134,12 +134,12 @@ pub fn start_consensus_observer(
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
-    aptos_db: DbReaderWriter,
+    velor_db: DbReaderWriter,
     reconfig_events: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
 ) {
     // Create the (dummy) consensus network client
     let (self_sender, _self_receiver) =
-        aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
+        velor_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
     let consensus_network_client = ConsensusNetworkClient::new(NetworkClient::new(
         vec![],
         vec![],
@@ -156,7 +156,7 @@ pub fn start_consensus_observer(
             node_config.consensus.mempool_executed_txn_timeout_ms,
         ));
         let execution_proxy = ExecutionProxy::new(
-            Arc::new(BlockExecutor::<AptosVMBlockExecutor>::new(aptos_db.clone())),
+            Arc::new(BlockExecutor::<VelorVMBlockExecutor>::new(velor_db.clone())),
             txn_notifier,
             state_sync_notifier,
             node_config.transaction_filters.execution_filter.clone(),
@@ -189,7 +189,7 @@ pub fn start_consensus_observer(
     let consensus_observer = ConsensusObserver::new(
         node_config.clone(),
         consensus_observer_client,
-        aptos_db.reader.clone(),
+        velor_db.reader.clone(),
         execution_client,
         state_sync_notification_sender,
         reconfig_events,

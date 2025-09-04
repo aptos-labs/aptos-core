@@ -1,5 +1,5 @@
 [package]
-name = "aptos-data-streaming-service"
+name = "velor-data-streaming-service"
 description = "The data streaming service that sends data notifications to clients"
 version = "0.1.0"
 
@@ -13,16 +13,16 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-channels = { workspace = true }
-aptos-config = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-data-client = { workspace = true }
-aptos-id-generator = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-time-service = { workspace = true }
-aptos-types = { workspace = true }
+velor-channels = { workspace = true }
+velor-config = { workspace = true }
+velor-crypto = { workspace = true }
+velor-data-client = { workspace = true }
+velor-id-generator = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-time-service = { workspace = true }
+velor-types = { workspace = true }
 arc-swap = { workspace = true }
 async-trait = { workspace = true }
 enum_dispatch = { workspace = true }
@@ -34,9 +34,9 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 
 [dev-dependencies]
-aptos-storage-service-types = { workspace = true }
-aptos-time-service = { workspace = true, features = ["testing"] }
-aptos-types = { workspace = true, features = ["fuzzing"] }
+velor-storage-service-types = { workspace = true }
+velor-time-service = { workspace = true, features = ["testing"] }
+velor-types = { workspace = true, features = ["fuzzing"] }
 claims = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }

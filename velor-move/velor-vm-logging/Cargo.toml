@@ -1,0 +1,23 @@
+[package]
+name = "velor-vm-logging"
+description = "Velor VM speculative logging utility"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+velor-crypto = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-speculative-state-helper = { workspace = true }
+velor-types = { workspace = true }
+arc-swap = { workspace = true }
+once_cell = { workspace = true }
+serde = { workspace = true }

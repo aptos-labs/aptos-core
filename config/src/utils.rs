@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::NodeConfig;
-use aptos_crypto::_once_cell::sync::Lazy;
-use aptos_logger::prelude::*;
-use aptos_types::{
+use velor_crypto::_once_cell::sync::Lazy;
+use velor_logger::prelude::*;
+use velor_types::{
     network_address::{NetworkAddress, Protocol},
     transaction::Transaction,
 };
@@ -102,14 +102,14 @@ fn try_bind(port: Option<u16>) -> ::std::io::Result<u16> {
 
 fn lock_path() -> String {
     format!(
-        "/tmp/aptos-port-counter.{}.lock",
+        "/tmp/velor-port-counter.{}.lock",
         &NEXTEST_RUN_ID.clone().unwrap()
     )
 }
 
 fn counter_path() -> String {
     format!(
-        "/tmp/aptos-port-counter.{}",
+        "/tmp/velor-port-counter.{}",
         &NEXTEST_RUN_ID.clone().unwrap()
     )
 }

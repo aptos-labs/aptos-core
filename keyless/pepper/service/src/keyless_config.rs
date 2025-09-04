@@ -1,9 +1,9 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{cached_resources::CachedResource, utils};
 use anyhow::{anyhow, Result};
-use aptos_types::keyless::Configuration;
+use velor_types::keyless::Configuration;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -19,7 +19,7 @@ pub struct OnChainKeylessConfiguration {
 }
 
 impl OnChainKeylessConfiguration {
-    pub fn to_rust_repr(&self) -> Result<aptos_types::keyless::Configuration> {
+    pub fn to_rust_repr(&self) -> Result<velor_types::keyless::Configuration> {
         let training_wheels_pubkey = self
             .data
             .training_wheels_pubkey

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright © Aptos Foundation
+# Copyright © Velor Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 # This script builds all packages in the repo individually in order to find packages that may depend on features that they didn't declare in their Cargo.toml .

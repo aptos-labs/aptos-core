@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{block::Block, quorum_cert::QuorumCert};
-use aptos_types::block_info::BlockInfo;
+use velor_types::block_info::BlockInfo;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},

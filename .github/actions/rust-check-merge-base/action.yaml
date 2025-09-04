@@ -9,7 +9,7 @@ runs:
   using: composite
   steps:
     # The source code must be checked out by the workflow that invokes this action.
-    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+    - uses: velor-chain/velor-core/.github/actions/rust-setup@main
       with:
         GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
 

@@ -1,0 +1,40 @@
+[package]
+name = "language-e2e-testsuite"
+description = "Move language e2e tests"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+velor-cached-packages = { workspace = true }
+velor-crypto = { workspace = true }
+velor-gas-algebra = { workspace = true }
+velor-gas-schedule = { workspace = true, features = ["testing"] }
+velor-language-e2e-tests = { workspace = true }
+velor-logger = { workspace = true }
+velor-transaction-simulation = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true, features = ['failpoints'] }
+velor-vm-genesis = { workspace = true }
+claims = { workspace = true }
+fail = { workspace = true, features = ['failpoints'] }
+move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
+move-core-types = { workspace = true }
+move-ir-compiler = { workspace = true }
+proptest = { workspace = true }
+test-case = { workspace = true }
+
+[features]
+default = [
+    "velor-cached-packages/fuzzing",
+    "move-core-types/fuzzing",
+    "velor-types/fuzzing",
+]

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -14,7 +14,7 @@ use crate::{
     waypoint::Waypoint,
 };
 use anyhow::{bail, ensure, format_err, Result};
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};

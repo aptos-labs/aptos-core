@@ -1,0 +1,146 @@
+// A configuration script for the Rosetta CLI provided by the Rosetta Spec
+// Create account workflow (only 1 at a time)
+create_account(1){
+    create_account{
+        // Testing network
+        create_account.network = {"network": "TESTING", "blockchain": "velor"};
+        
+        // Generate key and derive the address, saving it locally
+        key = generate_key({"curve_type": "edwards25519"});
+        account = derive({
+            "network_identifier": {{create_account.network}},
+            "public_key": {{key.public_key}}
+        });
+        save_account({
+            "account_identifier": {{account.account_identifier}},
+            "keypair": {{key}}
+        });
+
+        // Find the "faucet" loaded account
+        currency = {
+          "symbol": "APT",
+          "decimals": 8,
+          "metadata": {
+            "move_type": "0x1::velor_coin::VelorCoin"
+          }
+        };
+        print_message({"Find faucet with at least balance to create accounts": "10000000"});
+        loaded_account = find_balance({
+          "minimum_balance": {
+            "value": "10000000",
+            "currency": {{currency}}
+          }
+        });
+ 
+        // Make a create account call
+        print_message({"Create account":{{account.account_identifier.address}}, "With account":{{loaded_account.account_identifier.address}}});
+        create_account.operations = [
+            {
+                "operation_identifier": {"index": 0},
+                "type": "create_account",
+                "account": {{account.account_identifier}},
+                "metadata":{
+                    "sender": {{loaded_account.account_identifier}}
+                }
+            }
+        ];
+        create_account.confirmation_depth = 2;
+    }
+}
+
+// Request funds from the "faucet" (only one at a time)
+request_funds(1){
+  find_account{
+    currency = {
+      "symbol": "APT",
+      "decimals": 8,
+      "metadata": {
+        "move_type": "0x1::velor_coin::VelorCoin"
+      }
+    };
+    print_message({"Find faucet with at least balance": "0"});
+    random_account = find_balance({
+      "minimum_balance": {
+        "value": "0",
+        "currency": {{currency}}
+      },
+      "create_limit":1
+    });
+  },
+  request{
+    print_message({"Requesting funds from":{{random_account.account_identifier.address}}});
+    loaded_account = find_balance({
+      "account_identifier": {{random_account.account_identifier}},
+      "minimum_balance": {
+        "value": "10000000",
+        "currency": {{currency}}
+      }
+    });
+  }
+}
+
+// Transfer money between accounts
+transfer(50){
+    transfer{
+        transfer.network = {"network":"TESTING", "blockchain":"velor"};
+        currency = {
+          "symbol": "APT",
+          "decimals": 8,
+          "metadata": {
+            "move_type": "0x1::velor_coin::VelorCoin"
+          }
+        };
+
+        // Find someone who can send money
+        print_message({"Find someone to send money with balance minimum": "10000000"});
+        sender = find_balance({
+            "minimum_balance":{
+                "value": "10000000",
+                "currency": {{currency}}
+            }
+        });
+
+        // Set the receiver_amount as some value <= sender.balance - max_fee
+        max_fee = "2200";
+        available_amount = {{sender.balance.value}} - {{max_fee}};
+        receiver_amount = random_number({"minimum": "1", "maximum": {{available_amount}}});
+        sender_amount = "0" - {{receiver_amount}};
+
+
+        // Find receiver and construct operations
+        print_message({"Find someone to receive money with balance minimum": "0"});
+        receiver = find_balance({
+            "not_account_identifier": [{{sender.account_identifier}}],
+            "minimum_balance": {
+                "value": "0",
+                "currency": {{currency}}
+            },
+            "create_limit": 100,
+            "create_probability": 50
+        });
+        
+        print_message({"Transfer funds": {"sender":{{sender.account_identifier.address}}, "receiver":{{receiver.account_identifier.address}}, "amount":{{receiver_amount}}}});
+        
+        transfer.operations = [
+            {
+                "operation_identifier": {"index": 0},
+                "type":"withdraw",
+                "account": {{sender.account_identifier}},
+                "amount": {
+                    "value": {{sender_amount}},
+                    "currency": {{currency}}
+                }
+            },
+            {
+                "operation_identifier": {"index": 1},
+                "type": "deposit",
+                "account": {{receiver.account_identifier}},
+                "amount": {
+                    "value": {{receiver_amount}},
+                    "currency": {{currency}}
+                }
+            }
+        ];
+        transfer.confirmation_depth = 2;
+    }
+}

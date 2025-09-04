@@ -9,10 +9,10 @@ jobs:
     outputs:
       branch_matches: ${{ steps.check-prefix.outputs.branch_matches }}
     steps:
-      - name: Check if the branch starts with 'aptos-release'
+      - name: Check if the branch starts with 'velor-release'
         id: check-prefix
         run: |
-          if [[ "${{ github.ref }}" == refs/heads/aptos-release-* ]]; then
+          if [[ "${{ github.ref }}" == refs/heads/velor-release-* ]]; then
             echo "branch_matches=true" >> $GITHUB_OUTPUT
           else
             echo "branch_matches=false" >> $GITHUB_OUTPUT

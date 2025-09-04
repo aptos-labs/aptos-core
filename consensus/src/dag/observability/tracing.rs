@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::observability::counters;
-use aptos_infallible::duration_since_epoch;
-use aptos_metrics_core::HistogramVec;
+use velor_infallible::duration_since_epoch;
+use velor_metrics_core::HistogramVec;
 use std::time::Duration;
 
 #[derive(strum_macros::AsRefStr)]

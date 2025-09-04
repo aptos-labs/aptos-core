@@ -1,5 +1,5 @@
 module poc::scalar_is_canonical_internal {
-    use aptos_std::ristretto255::{Self};
+    use velor_std::ristretto255::{Self};
     use std::option::{Self};
 
     public entry fun main(_owner: &signer) {

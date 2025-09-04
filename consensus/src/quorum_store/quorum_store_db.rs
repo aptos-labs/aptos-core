@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,14 +9,14 @@ use crate::{
     },
 };
 use anyhow::Result;
-use aptos_crypto::HashValue;
-use aptos_logger::prelude::*;
-use aptos_schemadb::{
+use velor_crypto::HashValue;
+use velor_logger::prelude::*;
+use velor_schemadb::{
     batch::{SchemaBatch, WriteBatch},
     schema::Schema,
     Options, DB,
 };
-use aptos_types::quorum_store::BatchId;
+use velor_types::quorum_store::BatchId;
 use std::{collections::HashMap, path::Path, time::Instant};
 
 pub trait QuorumStoreStorage: Sync + Send {

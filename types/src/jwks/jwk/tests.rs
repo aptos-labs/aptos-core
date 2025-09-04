@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,7 +9,7 @@ use crate::{
     },
     move_any::{Any as MoveAny, AsMoveAny},
 };
-use aptos_crypto::HashValue;
+use velor_crypto::HashValue;
 use std::str::FromStr;
 
 #[test]

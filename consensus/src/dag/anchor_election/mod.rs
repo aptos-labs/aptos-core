@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{dag::storage::CommitEvent, liveness::leader_reputation::VotingPowerRatio};
-use aptos_consensus_types::common::{Author, Round};
+use velor_consensus_types::common::{Author, Round};
 
 pub trait AnchorElection: Send + Sync {
     fn get_anchor(&self, round: Round) -> Author;

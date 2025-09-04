@@ -1,5 +1,5 @@
 [package]
-name = "aptos-fallible"
+name = "velor-fallible"
 description = "Fallible utlities for infallible operations"
 version = "0.1.0"
 

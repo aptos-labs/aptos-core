@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::handlers::utils::THROUGHPUT_COUNTER;
-use aptos_metrics_core::IntCounterVecHelper;
-use aptos_storage_interface::{AptosDbError, Result as DbResult};
+use velor_metrics_core::IntCounterVecHelper;
+use velor_storage_interface::{VelorDbError, Result as DbResult};
 use bytes::{BufMut, Bytes, BytesMut};
 use serde::Serialize;
 
@@ -84,6 +84,6 @@ impl BytesSender {
     pub fn send_res(&self, item: BytesResult) -> DbResult<()> {
         self.bytes_tx
             .blocking_send(item)
-            .map_err(|e| AptosDbError::Other(format!("Failed to send to response stream. {e}")))
+            .map_err(|e| VelorDbError::Other(format!("Failed to send to response stream. {e}")))
     }
 }

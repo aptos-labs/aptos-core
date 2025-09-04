@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -14,16 +14,16 @@ use crate::{
     workspace_builder::workspace_root,
 };
 use anyhow::anyhow;
-use aptos_config::{
+use velor_config::{
     config::{AdminServiceConfig, InitialSafetyRulesConfig, NodeConfig},
     network_id::NetworkId,
 };
-use aptos_forge::{
+use velor_forge::{
     get_highest_synced_version, get_highest_synced_version_and_epoch,
     wait_for_all_nodes_to_catchup, LocalNode, LocalSwarm, Node, NodeExt, SwarmExt, Validator,
 };
-use aptos_temppath::TempPath;
-use aptos_types::{transaction::Transaction, waypoint::Waypoint};
+use velor_temppath::TempPath;
+use velor_types::{transaction::Transaction, waypoint::Waypoint};
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use regex::Regex;
 use reqwest::Client;
@@ -44,22 +44,22 @@ use std::{
 /// The test does the following:
 /// 1. Start a 4 node validator network, including 2 VFNs.
 /// 2. Use consensus `sync_only` mode to force all nodes to stop at the same version (i.e., emulate a halt).
-/// 3. Use the aptos CLI to generate a genesis transaction that removes the last validator from the set.
-/// 4. Use the aptos-debugger to manually apply the genesis transaction to all remaining validators.
+/// 3. Use the velor CLI to generate a genesis transaction that removes the last validator from the set.
+/// 4. Use the velor-debugger to manually apply the genesis transaction to all remaining validators.
 /// 5. Verify that the network is able to resume consensus and that the last validator is no longer in the set.
-/// 6. Use the aptos-debugger to manually apply the genesis transaction to all VFNs.
+/// 6. Use the velor-debugger to manually apply the genesis transaction to all VFNs.
 /// 7. Verify that the VFNs are able to sync with the rest of the network.
 async fn test_fullnode_genesis_transaction_flow() {
-    println!("0. Building the Aptos CLI and debugger!");
-    let aptos_debugger = workspace_builder::get_bin("aptos-debugger");
-    let aptos_cli = workspace_builder::get_bin("aptos");
+    println!("0. Building the Velor CLI and debugger!");
+    let velor_debugger = workspace_builder::get_bin("velor-debugger");
+    let velor_cli = workspace_builder::get_bin("velor");
 
     println!("1. Starting a 4 node validator network with 2 VFNs!");
     let num_validators = 4;
     let num_fullnodes = 2;
     let (mut swarm, cli_test_framework, _) = SwarmBuilder::new_local(num_validators)
         .with_num_fullnodes(num_fullnodes)
-        .with_aptos()
+        .with_velor()
         .build_with_cli(0)
         .await;
 
@@ -92,15 +92,15 @@ async fn test_fullnode_genesis_transaction_flow() {
 
     println!("5. Generating a genesis transaction that removes the last validator from the set!");
     let (genesis_blob_path, genesis_transaction) =
-        generate_genesis_transaction(&mut swarm, aptos_cli);
+        generate_genesis_transaction(&mut swarm, velor_cli);
 
     println!("6. Applying the genesis transaction to the first validator!");
     let first_validator_config = swarm.validators_mut().next().unwrap().config().clone();
     let first_validator_storage_dir = first_validator_config.storage.dir();
-    let output = Command::new(aptos_debugger.as_path())
+    let output = Command::new(velor_debugger.as_path())
         .current_dir(workspace_root())
         .args(&vec![
-            "aptos-db",
+            "velor-db",
             "bootstrap",
             first_validator_storage_dir.to_str().unwrap(),
             "--genesis-txn-file",
@@ -190,19 +190,19 @@ async fn test_fullnode_genesis_transaction_flow() {
 /// 1. Start a 5 node validator network.
 /// 2. Enable consensus `sync_only` mode for the last validator and verify that it can sync.
 /// 3. Use consensus `sync_only` mode to force all nodes to stop at the same version (i.e., emulate a halt).
-/// 4. Use the aptos CLI to generate a genesis transaction that removes the last validator from the set.
-/// 5. Use the aptos-debugger to manually apply the genesis transaction to all remaining validators.
+/// 4. Use the velor CLI to generate a genesis transaction that removes the last validator from the set.
+/// 5. Use the velor-debugger to manually apply the genesis transaction to all remaining validators.
 /// 6. Verify that the network is able to resume consensus and that the last validator is no longer in the set.
 /// 7. Verify that a failed validator node is able to db-restore and rejoin the network.
 async fn test_validator_genesis_transaction_and_db_restore_flow() {
-    println!("0. Building the Aptos CLI and debugger!");
-    let aptos_debugger = workspace_builder::get_bin("aptos-debugger");
-    let aptos_cli = workspace_builder::get_bin("aptos");
+    println!("0. Building the Velor CLI and debugger!");
+    let velor_debugger = workspace_builder::get_bin("velor-debugger");
+    let velor_cli = workspace_builder::get_bin("velor");
 
     println!("1. Starting a 5 node validator network!");
     let num_validators = 5;
     let (mut swarm, cli_test_framework, _) = SwarmBuilder::new_local(num_validators)
-        .with_aptos()
+        .with_velor()
         .build_with_cli(0)
         .await;
 
@@ -229,15 +229,15 @@ async fn test_validator_genesis_transaction_and_db_restore_flow() {
 
     println!("6. Generating a genesis transaction that removes the last validator from the set!");
     let (genesis_blob_path, genesis_transaction) =
-        generate_genesis_transaction(&mut swarm, aptos_cli);
+        generate_genesis_transaction(&mut swarm, velor_cli);
 
     println!("7. Applying the genesis transaction to the first validator!");
     let first_validator_config = swarm.validators_mut().next().unwrap().config().clone();
     let first_validator_storage_dir = first_validator_config.storage.dir();
-    let output = Command::new(aptos_debugger.as_path())
+    let output = Command::new(velor_debugger.as_path())
         .current_dir(workspace_root())
         .args(&vec![
-            "aptos-db",
+            "velor-db",
             "bootstrap",
             first_validator_storage_dir.to_str().unwrap(),
             "--genesis-txn-file",
@@ -423,7 +423,7 @@ pub(crate) async fn enable_sync_only_mode(num_nodes: usize, validator_node: &mut
 /// Generates a genesis write-set transaction that removes the last validator from the set
 fn generate_genesis_transaction(
     env: &mut LocalSwarm,
-    aptos_cli: PathBuf,
+    velor_cli: PathBuf,
 ) -> (TempPath, Transaction) {
     // Get the address of the last validator
     let last_validator_address = env
@@ -438,14 +438,14 @@ fn generate_genesis_transaction(
     let script = format!(
         r#"
         script {{
-            use aptos_framework::stake;
-            use aptos_framework::aptos_governance;
-            use aptos_framework::block;
+            use velor_framework::stake;
+            use velor_framework::velor_governance;
+            use velor_framework::block;
 
             fun main(vm_signer: &signer, framework_signer: &signer) {{
                 stake::remove_validators(framework_signer, &vector[@0x{}]);
                 block::emit_writeset_block_event(vm_signer, @0x1);
-                aptos_governance::force_end_epoch(framework_signer);
+                velor_governance::force_end_epoch(framework_signer);
             }}
     }}
     "#,
@@ -462,16 +462,16 @@ fn generate_genesis_transaction(
     let framework_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("..")
-        .join("aptos-move")
+        .join("velor-move")
         .join("framework")
-        .join("aptos-framework");
+        .join("velor-framework");
 
     // Create a temporary file to hold the genesis blob
     let genesis_blob_path = TempPath::new();
     genesis_blob_path.create_as_file().unwrap();
 
     // Generate the genesis write-set transaction
-    Command::new(aptos_cli.as_path())
+    Command::new(velor_cli.as_path())
         .current_dir(workspace_root())
         .args(&vec![
             "genesis",
@@ -517,7 +517,7 @@ fn parse_waypoint(bootstrap_command_output: &str) -> Waypoint {
         .unwrap()
         .captures(bootstrap_command_output)
         .ok_or_else(|| {
-            anyhow!("Failed to parse `aptos-debugger aptos-db bootstrap` waypoint output!")
+            anyhow!("Failed to parse `velor-debugger velor-db bootstrap` waypoint output!")
         });
     Waypoint::from_str(waypoint.unwrap()[1].into()).unwrap()
 }

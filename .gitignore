@@ -37,7 +37,7 @@ Temporary Items
 .apdisk
 
 # Generated VM config in vm-genesis
-aptos-move/vm-genesis/genesis/vm_config.toml
+velor-move/vm-genesis/genesis/vm_config.toml
 
 # Terraform
 .terraform/
@@ -61,17 +61,17 @@ build/
 
 # Do not ignore the Move build output under the releases for DPN, core, and
 # experimental -- these are the release code.
-!aptos-move/framework/DPN/releases/artifacts/**
-!aptos-move/framework/experimental/releases/artifacts/**
-!aptos-move/framework/aptos-framework/releases/artifacts/**
+!velor-move/framework/DPN/releases/artifacts/**
+!velor-move/framework/experimental/releases/artifacts/**
+!velor-move/framework/velor-framework/releases/artifacts/**
 
 # Do not ignore the Move script for the faucet.
 # https://stackoverflow.com/a/16318111/3846032
-!aptos-move/move-examples/scripts/minter/build
-aptos-move/move-examples/scripts/minter/build/*
-!aptos-move/move-examples/scripts/minter/build/Minter
-aptos-move/move-examples/scripts/minter/build/Minter/*
-!aptos-move/move-examples/scripts/minter/build/Minter/bytecode_scripts
+!velor-move/move-examples/scripts/minter/build
+velor-move/move-examples/scripts/minter/build/*
+!velor-move/move-examples/scripts/minter/build/Minter
+velor-move/move-examples/scripts/minter/build/Minter/*
+!velor-move/move-examples/scripts/minter/build/Minter/bytecode_scripts
 
 # Docker incremental build temporary files and directories
 target-out-docker
@@ -93,8 +93,8 @@ docker/compose/indexer-grpc/data-service-grpc-server.key
 .*\#
 \#*\#
 
-# Aptos CLI / local testnet files
-.aptos
+# Velor CLI / local testnet files
+.velor
 **/*.rdb
 
 # VSCode settings
@@ -114,11 +114,11 @@ __pycache__
 **/*.mrb
 
 # Profiler outputs
-aptos-move/aptos-vm-profiling/**/*.log
-aptos-move/aptos-vm-profiling/**/*.txt
+velor-move/velor-vm-profiling/**/*.log
+velor-move/velor-vm-profiling/**/*.txt
 
 # Gas profiler outputs
-aptos-move/e2e-move-tests/gas-profiling
+velor-move/e2e-move-tests/gas-profiling
 gas-profiling
 
 # replay-verify and module-verify script outputs

@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate as channel;
-use aptos_metrics_core::IntGauge;
+use velor_metrics_core::IntGauge;
 use futures::{
     executor::block_on,
     task::{noop_waker, Context, Poll},

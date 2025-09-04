@@ -1,11 +1,11 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
-use aptos_crypto::HashValue;
-use aptos_proptest_helpers::ValueGenerator;
-use aptos_types::{
+use velor_crypto::HashValue;
+use velor_proptest_helpers::ValueGenerator;
+use velor_types::{
     access_path::AccessPath,
     account_config::AccountResource,
     state_store::state_key::{inner::StateKeyInner, registry::StateKeyRegistry, StateKey},

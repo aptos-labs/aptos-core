@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
@@ -16,7 +16,7 @@ impl serde::Serialize for Transaction {
         if self.state_checkpoint_hash.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.bigquery_schema.transaction.v1.Transaction", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.bigquery_schema.transaction.v1.Transaction", len)?;
         #[allow(clippy::needless_borrow)]
         struct_ser.serialize_field("version", ToString::to_string(&self.version).as_str())?;
         #[allow(clippy::needless_borrow)]
@@ -149,7 +149,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
             type Value = Transaction;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.bigquery_schema.transaction.v1.Transaction")
+                formatter.write_str("struct velor.bigquery_schema.transaction.v1.Transaction")
             }
 
             fn visit_map<V>(self, mut map_: V) -> std::result::Result<Transaction, V::Error>
@@ -306,6 +306,6 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.bigquery_schema.transaction.v1.Transaction", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.bigquery_schema.transaction.v1.Transaction", FIELDS, GeneratedVisitor)
     }
 }

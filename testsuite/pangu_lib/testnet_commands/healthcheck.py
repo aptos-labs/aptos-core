@@ -114,7 +114,7 @@ async def _port_forwarding_health(
         curl_command = ["curl", f"localhost:{free_port}/v1/-/healthy?duration_secs=10"]
         result = await shell.gen_run(curl_command, stream_output=False)
         health_status = _parse_result("message", result)
-        if health_status == "aptos-node:ok":
+        if health_status == "velor-node:ok":
             with atomic_healthy_nodes.get_lock():
                 atomic_healthy_nodes.value += 1
         else:

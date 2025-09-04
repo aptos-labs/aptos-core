@@ -27,13 +27,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"34465468193254\"},\"deposit_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x348cd99611633b0eb8ee803016bcd26bae4ce9d2954da8ab060cd90ecea39118\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x348cd99611633b0eb8ee803016bcd26bae4ce9d2954da8ab060cd90ecea39118\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -88,7 +88,7 @@
           "data": {
             "key": "{\"collection\":\"An NFT Collection Name\",\"creator\":\"0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a\",\"name\":\"NFT Collectible #13360\"}",
             "keyType": "0x3::token::TokenDataId",
-            "value": "{\"default_properties\":{\"map\":{\"data\":[]}},\"description\":\"\",\"largest_property_version\":\"0\",\"maximum\":\"1\",\"mutability_config\":{\"description\":true,\"maximum\":true,\"properties\":true,\"royalty\":true,\"uri\":true},\"name\":\"NFT Collectible #13360\",\"royalty\":{\"payee_address\":\"0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a\",\"royalty_points_denominator\":\"100\",\"royalty_points_numerator\":\"0\"},\"supply\":\"1\",\"uri\":\"https://aptos.dev\"}",
+            "value": "{\"default_properties\":{\"map\":{\"data\":[]}},\"description\":\"\",\"largest_property_version\":\"0\",\"maximum\":\"1\",\"mutability_config\":{\"description\":true,\"maximum\":true,\"properties\":true,\"royalty\":true,\"uri\":true},\"name\":\"NFT Collectible #13360\",\"royalty\":{\"payee_address\":\"0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a\",\"royalty_points_denominator\":\"100\",\"royalty_points_numerator\":\"0\"},\"supply\":\"1\",\"uri\":\"https://velor.dev\"}",
             "valueType": "0x3::token::TokenData"
           }
         }
@@ -214,7 +214,7 @@
           }
         },
         "typeStr": "0x3::token::TokenDataCreation",
-        "data": "{\"creator\":\"0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a\",\"description\":\"\",\"id\":{\"collection\":\"An NFT Collection Name\",\"creator\":\"0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a\",\"name\":\"NFT Collectible #13360\"},\"maximum\":\"1\",\"mutability_config\":{\"description\":true,\"maximum\":true,\"properties\":true,\"royalty\":true,\"uri\":true},\"name\":\"NFT Collectible #13360\",\"property_keys\":[],\"property_types\":[],\"property_values\":[],\"royalty_payee_address\":\"0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a\",\"royalty_points_denominator\":\"100\",\"royalty_points_numerator\":\"0\",\"uri\":\"https://aptos.dev\"}"
+        "data": "{\"creator\":\"0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a\",\"description\":\"\",\"id\":{\"collection\":\"An NFT Collection Name\",\"creator\":\"0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a\",\"name\":\"NFT Collectible #13360\"},\"maximum\":\"1\",\"mutability_config\":{\"description\":true,\"maximum\":true,\"properties\":true,\"royalty\":true,\"uri\":true},\"name\":\"NFT Collectible #13360\",\"property_keys\":[],\"property_types\":[],\"property_values\":[],\"royalty_payee_address\":\"0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a\",\"royalty_points_denominator\":\"100\",\"royalty_points_numerator\":\"0\",\"uri\":\"https://velor.dev\"}"
       },
       {
         "key": {

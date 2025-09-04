@@ -17,7 +17,7 @@ def humio_secret():
             "versions",
             "access",
             "--secret=ci_humio_read_token",
-            "--project=aptos-shared-secrets",
+            "--project=velor-shared-secrets",
             "latest",
         ],
         capture_output=True,
@@ -78,7 +78,7 @@ def main():
             """
         github.job.name = "single-node-performance"
         | github.workflow.head_branch = "{branch}"
-        | "grep_json_aptos_move_vm_perf"
+        | "grep_json_velor_move_vm_perf"
         | parseJson(message)
         """.format(
                 branch=args.branch
@@ -87,7 +87,7 @@ def main():
             else """
         github.job.name = "execution-performance / single-node-performance"
         | github.workflow.head_branch = "main"
-        | "grep_json_aptos_move_vm_perf"
+        | "grep_json_velor_move_vm_perf"
         | parseJson(message)
         """
         )
@@ -122,7 +122,7 @@ def main():
             else:
                 return line.split(", ")
 
-        output_file_name = "aptos-move/e2e-benchmark/data/calibration_values.tsv"
+        output_file_name = "velor-move/e2e-benchmark/data/calibration_values.tsv"
 
     else:
         prefix = (

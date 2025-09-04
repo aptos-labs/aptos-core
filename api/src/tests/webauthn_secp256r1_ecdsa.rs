@@ -1,20 +1,20 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(test)]
 mod tests {
     use crate::tests::new_test_context_with_orderless_flags;
-    use aptos_api_test_context::current_function_name;
-    use aptos_crypto::{
+    use velor_api_test_context::current_function_name;
+    use velor_crypto::{
         ed25519::Ed25519PrivateKey,
         secp256r1_ecdsa::{
             PrivateKey as Secp256r1EcdsaPrivateKey, PublicKey as Secp256r1EcdsaPublicKey,
         },
         signing_message, HashValue, SigningKey,
     };
-    use aptos_sdk::types::LocalAccount;
-    use aptos_types::transaction::{
+    use velor_sdk::types::LocalAccount;
+    use velor_types::transaction::{
         authenticator::{
             AccountAuthenticator, AnyPublicKey, AnySignature, AuthenticationKey,
             SingleKeyAuthenticator, TransactionAuthenticator,
@@ -103,8 +103,8 @@ mod tests {
         let other = context.create_account().await;
 
         let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
-        let private_key: Secp256r1EcdsaPrivateKey = aptos_crypto::Uniform::generate(&mut rng);
-        let public_key = aptos_crypto::PrivateKey::public_key(&private_key);
+        let private_key: Secp256r1EcdsaPrivateKey = velor_crypto::Uniform::generate(&mut rng);
+        let public_key = velor_crypto::PrivateKey::public_key(&private_key);
         let address = AuthenticationKey::any_key(AnyPublicKey::secp256r1_ecdsa(public_key.clone()))
             .account_address();
 
@@ -168,8 +168,8 @@ mod tests {
         let other = context.create_account().await;
 
         let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
-        let private_key: Secp256r1EcdsaPrivateKey = aptos_crypto::Uniform::generate(&mut rng);
-        let public_key = aptos_crypto::PrivateKey::public_key(&private_key);
+        let private_key: Secp256r1EcdsaPrivateKey = velor_crypto::Uniform::generate(&mut rng);
+        let public_key = velor_crypto::PrivateKey::public_key(&private_key);
         let address = AuthenticationKey::any_key(AnyPublicKey::secp256r1_ecdsa(public_key.clone()))
             .account_address();
 

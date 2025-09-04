@@ -1,11 +1,11 @@
-// Copyright Aptos Foundation
+// Copyright Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 module 0xABCD::smart_table_picture {
     use std::signer;
     use std::vector;
-    use aptos_std::object;
-    use aptos_std::smart_table::{Self, SmartTable};
+    use velor_std::object;
+    use velor_std::smart_table::{Self, SmartTable};
 
     /// The caller tried to mutate an item outside the bounds of the vector.
     const E_INDEX_OUT_OF_BOUNDS: u64 = 1;
@@ -14,7 +14,7 @@ module 0xABCD::smart_table_picture {
         all: vector<address>,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = velor_framework::object::ObjectGroup)]
     struct Palette has key {
         pixels: SmartTable<u32, u8>,
     }

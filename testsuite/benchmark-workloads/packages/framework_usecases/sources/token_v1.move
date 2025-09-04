@@ -3,11 +3,11 @@ module 0xABCD::token_v1 {
     use std::signer;
     use std::string::{Self, String};
     use std::vector;
-    use aptos_token::token::{Self, Token, TokenId, TokenDataId};
-    use aptos_std::table::{Self, Table};
-    use aptos_framework::account;
+    use velor_token::token::{Self, Token, TokenId, TokenDataId};
+    use velor_std::table::{Self, Table};
+    use velor_framework::account;
     use std::option::{Self, Option};
-    use aptos_std::string_utils::{to_string};
+    use velor_std::string_utils::{to_string};
 
     //
     //  Code for minting Token V1
@@ -17,7 +17,7 @@ module 0xABCD::token_v1 {
     const COLLECTION_NAME: vector<u8> = b"An NFT Collection Name";
     const COLLECTION_DESCRIPTION: vector<u8> = b"An NFT Collection Description";
     const COLLECTION_URL: vector<u8> = b"";
-    const TOKEN_URI: vector<u8> = b"https://aptos.dev";
+    const TOKEN_URI: vector<u8> = b"https://velor.dev";
     const TOKEN_DESCRIPTION: vector<u8> = b"";
     const TOKEN_NAME: vector<u8> = b"NFT Collectible";
 

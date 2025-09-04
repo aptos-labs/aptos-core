@@ -2,7 +2,7 @@
 
 ![Version: 0.2.0](https://img.shields.io/badge/Version-0.2.0-informational?style=flat-square)
 
-Aptos Forge test framework
+Velor Forge test framework
 
 ## Values
 
@@ -13,7 +13,7 @@ Aptos Forge test framework
 | forge.affinity | object | `{}` |  |
 | forge.helmBucket | string | `nil` |  |
 | forge.image.pullPolicy | string | `"IfNotPresent"` |  |
-| forge.image.repo | string | `"aptos/forge"` |  |
+| forge.image.repo | string | `"velor/forge"` |  |
 | forge.image.tag | string | `nil` |  |
 | forge.nodeSelector | object | `{}` |  |
 | forge.resources.limits.cpu | int | `1` |  |

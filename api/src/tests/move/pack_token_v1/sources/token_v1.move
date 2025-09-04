@@ -2,9 +2,9 @@ module addr::token_v1 {
     use std::string::{Self, String};
     use std::signer;
     use std::bcs;
-    use aptos_token::token;
-    use aptos_token::property_map;
-    use aptos_token::token_transfers;
+    use velor_token::token;
+    use velor_token::property_map;
+    use velor_token::token_transfers;
 
     /// The ambassador token collection name
     const COLLECTION_NAME: vector<u8> = b"Ambassador Collection Name";
@@ -39,7 +39,7 @@ module addr::token_v1 {
             string::utf8(b"Hello, Token"),
             amount,
             token_max,
-            string::utf8(b"https://aptos.dev"),
+            string::utf8(b"https://velor.dev"),
             signer::address_of(creator),
             100,
             0,

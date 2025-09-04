@@ -34,10 +34,10 @@
           "stateKeyHash": "0fqoHjpri2GVyqdXW3M7JE7QxDLnmJbI/Ygji1uj/Eg=",
           "type": {
             "address": "0x4",
-            "module": "aptos_token",
-            "name": "AptosCollection"
+            "module": "velor_token",
+            "name": "VelorCollection"
           },
-          "typeStr": "0x4::aptos_token::AptosCollection",
+          "typeStr": "0x4::velor_token::VelorCollection",
           "data": "{\"mutable_description\":true,\"mutable_token_description\":true,\"mutable_token_name\":true,\"mutable_token_properties\":true,\"mutable_token_uri\":true,\"mutable_uri\":true,\"mutator_ref\":{\"vec\":[{\"self\":\"0x139e21974cb4ee185b95708bebd571d77cec25e51df5ebd242712ed09bda8ca4\"}]},\"royalty_mutator_ref\":{\"vec\":[{\"inner\":{\"self\":\"0x139e21974cb4ee185b95708bebd571d77cec25e51df5ebd242712ed09bda8ca4\"}}]},\"tokens_burnable_by_creator\":true,\"tokens_freezable_by_creator\":true}"
         }
       },
@@ -52,7 +52,7 @@
             "name": "Collection"
           },
           "typeStr": "0x4::collection::Collection",
-          "data": "{\"creator\":\"0x239589c5cfb0cc96f76fa59165a7cbb6ef99ad50d0acc34cf3a2585d861511be\",\"description\":\"A collection of explorers looking to have fun and make an impact in Web3\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x139e21974cb4ee185b95708bebd571d77cec25e51df5ebd242712ed09bda8ca4\",\"creation_num\":\"1125899906842627\"}}},\"name\":\"inAptos\",\"uri\":\"https://aptoslabs.com\"}"
+          "data": "{\"creator\":\"0x239589c5cfb0cc96f76fa59165a7cbb6ef99ad50d0acc34cf3a2585d861511be\",\"description\":\"A collection of explorers looking to have fun and make an impact in Web3\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x139e21974cb4ee185b95708bebd571d77cec25e51df5ebd242712ed09bda8ca4\",\"creation_num\":\"1125899906842627\"}}},\"name\":\"inVelor\",\"uri\":\"https://velorlabs.com\"}"
         }
       },
       {
@@ -97,13 +97,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"49668276091\"},\"deposit_events\":{\"counter\":\"51\",\"guid\":{\"id\":{\"addr\":\"0x239589c5cfb0cc96f76fa59165a7cbb6ef99ad50d0acc34cf3a2585d861511be\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"1472\",\"guid\":{\"id\":{\"addr\":\"0x239589c5cfb0cc96f76fa59165a7cbb6ef99ad50d0acc34cf3a2585d861511be\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -142,10 +142,10 @@
           "stateKeyHash": "xxZxedMTCZkucuspOLVj1qbTGJKVNpcx3pg9+pB/2Lo=",
           "type": {
             "address": "0x4",
-            "module": "aptos_token",
-            "name": "AptosToken"
+            "module": "velor_token",
+            "name": "VelorToken"
           },
-          "typeStr": "0x4::aptos_token::AptosToken",
+          "typeStr": "0x4::velor_token::VelorToken",
           "data": "{\"burn_ref\":{\"vec\":[{\"inner\":{\"vec\":[{\"self\":\"0x6dcf114ade1d8b9b813295783ac3cb379ec73406f54f5fa1b7086ebdf9748010\"}]},\"self\":{\"vec\":[]}}]},\"mutator_ref\":{\"vec\":[{\"self\":\"0x6dcf114ade1d8b9b813295783ac3cb379ec73406f54f5fa1b7086ebdf9748010\"}]},\"property_mutator_ref\":{\"self\":\"0x6dcf114ade1d8b9b813295783ac3cb379ec73406f54f5fa1b7086ebdf9748010\"},\"transfer_ref\":{\"vec\":[{\"self\":\"0x6dcf114ade1d8b9b813295783ac3cb379ec73406f54f5fa1b7086ebdf9748010\"}]}}"
         }
       },
@@ -242,12 +242,12 @@
           "function": {
             "module": {
               "address": "0x4",
-              "name": "aptos_token"
+              "name": "velor_token"
             },
             "name": "mint"
           },
           "arguments": [
-            "\"inAptos\"",
+            "\"inVelor\"",
             "\"Undefined\"",
             "\"Brian M\"",
             "\"https://slack-files.com/T032LMSJ0T0-F058LQWHE68-e0e180126f\"",
@@ -255,7 +255,7 @@
             "[]",
             "[]"
           ],
-          "entryFunctionIdStr": "0x4::aptos_token::mint"
+          "entryFunctionIdStr": "0x4::velor_token::mint"
         }
       },
       "signature": {

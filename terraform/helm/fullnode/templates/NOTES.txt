@@ -1,8 +1,8 @@
 Your {{ .Chart.Name }} deployment named {{ .Release.Name }} is now deployed.
 
-To access the JSON-RPC endpoint connect to the {{ include "aptos-fullnode.fullname" . }}-lb service:
+To access the JSON-RPC endpoint connect to the {{ include "velor-fullnode.fullname" . }}-lb service:
 
-  $ kubectl port-forward service/{{ include "aptos-fullnode.fullname" . }}-lb 8080:80 &
+  $ kubectl port-forward service/{{ include "velor-fullnode.fullname" . }}-lb 8080:80 &
   $ curl -H "Content-Type: application/json" -d '{"jsonrpc":"2.0", "method":"get_metadata","params":[],"id":1}' http://localhost:8080
 
 ---

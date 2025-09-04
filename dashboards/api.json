@@ -41,9 +41,9 @@
       "icon": "external link",
       "includeVars": true,
       "keepTime": true,
-      "tags": ["aptos-core"],
+      "tags": ["velor-core"],
       "targetBlank": true,
-      "title": "aptos-core",
+      "title": "velor-core",
       "tooltip": "",
       "type": "dashboards",
       "url": ""
@@ -102,7 +102,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by (status) (rate(aptos_api_response_status_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=~\"$status\"}[$interval]))",
+              "expr": "sum by (status) (rate(velor_api_response_status_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=~\"$status\"}[$interval]))",
               "legendFormat": "{{status}}",
               "refId": "A"
             }
@@ -156,7 +156,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=~\"$status\"}[$interval]))",
+              "expr": "sum by (operation_id) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=~\"$status\"}[$interval]))",
               "legendFormat": "{{operation_id}}",
               "refId": "A"
             }
@@ -214,7 +214,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.50, sum by (method, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\"}[$interval])))",
+              "expr": "histogram_quantile(0.50, sum by (method, le) (rate(velor_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\"}[$interval])))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-p50",
@@ -224,7 +224,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.90, sum by (method, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\"}[$interval])))",
+              "expr": "histogram_quantile(0.90, sum by (method, le) (rate(velor_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\"}[$interval])))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-p90",
@@ -234,7 +234,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum by (method, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\"}[$interval])))",
+              "expr": "histogram_quantile(0.99, sum by (method, le) (rate(velor_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\"}[$interval])))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-p99",
@@ -244,7 +244,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.50, sum by (method, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\"}[$interval])))",
+              "expr": "histogram_quantile(0.50, sum by (method, le) (rate(velor_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\"}[$interval])))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-p50",
@@ -254,7 +254,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.90, sum by (method, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\"}[$interval])))",
+              "expr": "histogram_quantile(0.90, sum by (method, le) (rate(velor_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\"}[$interval])))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-p90",
@@ -264,7 +264,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum by (method, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\"}[$interval])))",
+              "expr": "histogram_quantile(0.99, sum by (method, le) (rate(velor_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\"}[$interval])))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-p99",
@@ -324,7 +324,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\"}[$interval]))",
+              "expr": "sum by (method, le) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\"}[$interval]))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-Total",
@@ -334,7 +334,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\"}[$interval]))",
+              "expr": "sum by (method, le) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\"}[$interval]))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-Total",
@@ -344,7 +344,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\", status=~\"2.*\"}[$interval]))",
+              "expr": "sum by (method, le) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\", status=~\"2.*\"}[$interval]))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-200s",
@@ -354,7 +354,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\", status=~\"2.*\"}[$interval]))",
+              "expr": "sum by (method, le) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\", status=~\"2.*\"}[$interval]))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-200s",
@@ -364,7 +364,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\", status=~\"4.*\"}[$interval]))",
+              "expr": "sum by (method, le) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\", status=~\"4.*\"}[$interval]))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-400s",
@@ -374,7 +374,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\", status=~\"4.*\"}[$interval]))",
+              "expr": "sum by (method, le) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\", status=~\"4.*\"}[$interval]))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-400s",
@@ -384,7 +384,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\", status=~\"5.*\"}[$interval]))",
+              "expr": "sum by (method, le) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"GET\", status=~\"5.*\"}[$interval]))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-500s",
@@ -394,7 +394,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (method, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\", status=~\"5.*\"}[$interval]))",
+              "expr": "sum by (method, le) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", method=\"POST\", status=~\"5.*\"}[$interval]))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{method}}-500s",
@@ -451,7 +451,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=\"500\"}[$interval]))",
+              "expr": "sum by (operation_id) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=\"500\"}[$interval]))",
               "refId": "A"
             }
           ],
@@ -505,7 +505,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=\"500\"}[$interval])) / sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval]))",
+              "expr": "sum by (operation_id) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=\"500\"}[$interval])) / sum by (operation_id) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval]))",
               "range": true,
               "refId": "A"
             }
@@ -562,7 +562,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (handler) (rate(aptos_api_handlers_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval])) / sum by (handler) (rate(aptos_api_handlers_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval]))",
+              "expr": "sum by (handler) (rate(velor_api_handlers_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval])) / sum by (handler) (rate(velor_api_handlers_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval]))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "__auto",
@@ -622,7 +622,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (middleware) (rate(aptos_api_middleware_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval])) / sum by (middleware) (rate(aptos_api_middleware_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval]))",
+              "expr": "sum by (middleware) (rate(velor_api_middleware_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval])) / sum by (middleware) (rate(velor_api_middleware_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval]))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "__auto",
@@ -682,7 +682,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.999, sum by (middleware, le) (rate(aptos_api_middleware_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", middleware=\"cors\"}[$interval])))",
+              "expr": "histogram_quantile(0.999, sum by (middleware, le) (rate(velor_api_middleware_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", middleware=\"cors\"}[$interval])))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "__auto",
@@ -692,7 +692,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.999, sum by (middleware, le) (rate(aptos_api_middleware_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", middleware=\"nest\"}[$interval])))",
+              "expr": "histogram_quantile(0.999, sum by (middleware, le) (rate(velor_api_middleware_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", middleware=\"nest\"}[$interval])))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "__auto",
@@ -702,7 +702,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.999, sum by (handler, le) (rate(aptos_api_handlers_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", handler=\"submit_transaction\"}[$interval])))",
+              "expr": "histogram_quantile(0.999, sum by (handler, le) (rate(velor_api_handlers_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", handler=\"submit_transaction\"}[$interval])))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "__auto",
@@ -762,7 +762,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.999, sum by (operation_id, status, le) (rate(aptos_api_post_body_bytes_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval])))",
+              "expr": "histogram_quantile(0.999, sum by (operation_id, status, le) (rate(velor_api_post_body_bytes_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval])))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "__auto",
@@ -772,7 +772,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.999, sum by (operation_id, status, le) (rate(aptos_api_post_body_bytes_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval])))",
+              "expr": "histogram_quantile(0.999, sum by (operation_id, status, le) (rate(velor_api_post_body_bytes_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval])))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "__auto",
@@ -782,7 +782,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.999, sum by (operation_id, status, le) (rate(aptos_api_post_body_bytes_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval])))",
+              "expr": "histogram_quantile(0.999, sum by (operation_id, status, le) (rate(velor_api_post_body_bytes_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"}[$interval])))",
               "format": "time_series",
               "hide": false,
               "legendFormat": "__auto",
@@ -861,7 +861,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum by (operation_id, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", operation_id=~\"$operation_id\"}[$interval])))",
+          "expr": "histogram_quantile(0.50, sum by (operation_id, le) (rate(velor_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", operation_id=~\"$operation_id\"}[$interval])))",
           "format": "time_series",
           "hide": false,
           "legendFormat": "p50",
@@ -871,7 +871,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.90, sum by (operation_id, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", operation_id=~\"$operation_id\"}[$interval])))",
+          "expr": "histogram_quantile(0.90, sum by (operation_id, le) (rate(velor_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", operation_id=~\"$operation_id\"}[$interval])))",
           "format": "time_series",
           "legendFormat": "p90",
           "range": true,
@@ -880,7 +880,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum by (operation_id, le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", operation_id=~\"$operation_id\"}[$interval])))",
+          "expr": "histogram_quantile(0.99, sum by (operation_id, le) (rate(velor_api_requests_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", operation_id=~\"$operation_id\"}[$interval])))",
           "legendFormat": "p99",
           "range": true,
           "refId": "B"
@@ -945,7 +945,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by (operation_id, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", operation_id=~\"$operation_id\"}[$interval]))",
+          "expr": "sum by (operation_id, le) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", operation_id=~\"$operation_id\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "legendFormat": "total",
@@ -955,7 +955,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by (operation_id, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", operation_id=~\"$operation_id\", status=~\"2.*\"}[$interval]))",
+          "expr": "sum by (operation_id, le) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", operation_id=~\"$operation_id\", status=~\"2.*\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "legendFormat": "success",
@@ -965,7 +965,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by (operation_id, le) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", operation_id=~\"$operation_id\", status!~\"2.*\"}[$interval]))",
+          "expr": "sum by (operation_id, le) (rate(velor_api_requests_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", operation_id=~\"$operation_id\", status!~\"2.*\"}[$interval]))",
           "format": "time_series",
           "hide": false,
           "legendFormat": "error",
@@ -979,7 +979,7 @@
   ],
   "refresh": "",
   "schemaVersion": 38,
-  "tags": ["aptos-core"],
+  "tags": ["velor-core"],
   "templating": {
     "list": [
       {

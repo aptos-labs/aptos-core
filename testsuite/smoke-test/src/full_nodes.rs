@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,11 +9,11 @@ use crate::{
         MAX_CATCH_UP_WAIT_SECS, MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
     },
 };
-use aptos_config::{
+use velor_config::{
     config::{DiscoveryMethod, NodeConfig, OverrideNodeConfig, PeerRole},
     network_id::NetworkId,
 };
-use aptos_forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
+use velor_forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
 use std::time::{Duration, Instant};
 
 #[tokio::test]
@@ -115,7 +115,7 @@ async fn test_vfn_failover() {
     vfn_config.mempool.default_failovers = 0;
     let mut swarm = SwarmBuilder::new_local(4)
         .with_num_fullnodes(4)
-        .with_aptos()
+        .with_velor()
         .with_vfn_config(vfn_config)
         .build()
         .await;
@@ -284,7 +284,7 @@ async fn test_private_full_node() {
 async fn local_swarm_with_fullnodes(num_validators: usize, num_fullnodes: usize) -> LocalSwarm {
     SwarmBuilder::new_local(num_validators)
         .with_num_fullnodes(num_fullnodes)
-        .with_aptos()
+        .with_velor()
         .build()
         .await
 }

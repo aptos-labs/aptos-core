@@ -1,14 +1,14 @@
 # chaos
 
-![Version: 2.5.2+aptos0](https://img.shields.io/badge/Version-2.5.2+aptos0-informational?style=flat-square)
+![Version: 2.5.2+velor0](https://img.shields.io/badge/Version-2.5.2+velor0-informational?style=flat-square)
 
-Chaos Mesh for Aptos
+Chaos Mesh for Velor
 
 ## Requirements
 
 | Repository | Name | Version |
 |------------|------|---------|
-| https://charts.chaos-mesh.org | chaos-mesh | 2.5.2+aptos0 |
+| https://charts.chaos-mesh.org | chaos-mesh | 2.5.2+velor0 |
 
 ## Values
 

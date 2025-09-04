@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,15 +7,15 @@ use crate::{
     util::calculate_window_start_round,
 };
 use anyhow::{bail, format_err, Context, Result};
-use aptos_config::config::NodeConfig;
-use aptos_consensus_types::{
+use velor_config::config::NodeConfig;
+use velor_consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
     vote_data::VoteData, wrapped_ledger_info::WrappedLedgerInfo,
 };
-use aptos_crypto::HashValue;
-use aptos_logger::prelude::*;
-use aptos_storage_interface::DbReader;
-use aptos_types::{
+use velor_crypto::HashValue;
+use velor_logger::prelude::*;
+use velor_storage_interface::DbReader;
+use velor_types::{
     block_info::Round, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
     proof::TransactionAccumulatorSummary, transaction::Version,
 };
@@ -58,8 +58,8 @@ pub trait PersistentLivenessStorage: Send + Sync {
     /// ValidatorVerifier.
     fn retrieve_epoch_change_proof(&self, version: u64) -> Result<EpochChangeProof>;
 
-    /// Returns a handle of the aptosdb.
-    fn aptos_db(&self) -> Arc<dyn DbReader>;
+    /// Returns a handle of the velordb.
+    fn velor_db(&self) -> Arc<dyn DbReader>;
 
     // Returns a handle of the consensus db
     fn consensus_db(&self) -> Arc<ConsensusDB>;
@@ -311,7 +311,7 @@ impl RootMetadata {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_empty() -> Self {
         Self {
-            accu_hash: *aptos_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH,
+            accu_hash: *velor_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH,
             frozen_root_hashes: vec![],
             num_leaves: 0,
         }
@@ -480,13 +480,13 @@ impl RecoveryData {
 /// The proxy we use to persist data in db storage service via grpc.
 pub struct StorageWriteProxy {
     db: Arc<ConsensusDB>,
-    aptos_db: Arc<dyn DbReader>,
+    velor_db: Arc<dyn DbReader>,
 }
 
 impl StorageWriteProxy {
-    pub fn new(config: &NodeConfig, aptos_db: Arc<dyn DbReader>) -> Self {
+    pub fn new(config: &NodeConfig, velor_db: Arc<dyn DbReader>) -> Self {
         let db = Arc::new(ConsensusDB::new(config.storage.dir()));
-        StorageWriteProxy { db, aptos_db }
+        StorageWriteProxy { db, velor_db }
     }
 }
 
@@ -511,7 +511,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
 
     fn recover_from_ledger(&self) -> LedgerRecoveryData {
         let latest_ledger_info = self
-            .aptos_db
+            .velor_db
             .get_latest_ledger_info()
             .expect("Failed to get latest ledger info.");
         LedgerRecoveryData::new(latest_ledger_info)
@@ -548,11 +548,11 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         );
         // find the block corresponding to storage latest ledger info
         let latest_ledger_info = self
-            .aptos_db
+            .velor_db
             .get_latest_ledger_info()
             .expect("Failed to get latest ledger info.");
         let accumulator_summary = self
-            .aptos_db
+            .velor_db
             .get_accumulator_summary(latest_ledger_info.ledger_info().version())
             .expect("Failed to get accumulator summary.");
         let ledger_recovery_data = LedgerRecoveryData::new(latest_ledger_info);
@@ -607,15 +607,15 @@ impl PersistentLivenessStorage for StorageWriteProxy {
 
     fn retrieve_epoch_change_proof(&self, version: u64) -> Result<EpochChangeProof> {
         let (_, proofs) = self
-            .aptos_db
+            .velor_db
             .get_state_proof(version)
             .map_err(DbError::from)?
             .into_inner();
         Ok(proofs)
     }
 
-    fn aptos_db(&self) -> Arc<dyn DbReader> {
-        self.aptos_db.clone()
+    fn velor_db(&self) -> Arc<dyn DbReader> {
+        self.velor_db.clone()
     }
 
     fn consensus_db(&self) -> Arc<ConsensusDB> {

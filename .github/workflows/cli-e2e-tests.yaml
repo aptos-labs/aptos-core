@@ -1,4 +1,4 @@
-name: "Run Aptos CLI E2E tests"
+name: "Run Velor CLI E2E tests"
 on:
   # This is called from within the docker-build-test.yaml workflow since we depend
   # on the build of the image of the CLI we're testing having been built before this
@@ -20,12 +20,12 @@ on:
 # TODO: should we migrate this to a composite action, so that we can skip it
 # at the call site, and don't need to wrap each step in an if statement?
 jobs:
-  # Run the Aptos CLI examples. We run the CLI on this commit / PR against a
+  # Run the Velor CLI examples. We run the CLI on this commit / PR against a
   # local testnet using the devnet, testnet, and mainnet branches. This way
-  # we ensure that the Aptos CLI works with all 3 prod networks, at least
+  # we ensure that the Velor CLI works with all 3 prod networks, at least
   # based on the tests in the test suite.
   run-cli-tests:
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=velor-ubuntu-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
       id-token: write
@@ -35,7 +35,7 @@ jobs:
         with:
           ref: ${{ inputs.GIT_SHA }}
 
-      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+      - uses: velor-chain/velor-core/.github/actions/docker-setup@main
         if: ${{ !inputs.SKIP_JOB }}
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -48,7 +48,7 @@ jobs:
       - uses: ./.github/actions/python-setup
         if: ${{ !inputs.SKIP_JOB }}
         with:
-          pyproject_directory: crates/aptos/e2e
+          pyproject_directory: crates/velor/e2e
           poetry_version: 2.1.2
 
       # Run CLI tests against local testnet built from devnet branch.
@@ -58,7 +58,7 @@ jobs:
         with:
           max_attempts: 5
           timeout_minutes: 20
-          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network devnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-devnet
+          command: cd ./crates/velor/e2e && poetry run python main.py -d --base-network devnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/velor-e2e-tests-devnet
 
       # Run CLI tests against local testnet built from testnet branch.
       - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
@@ -67,7 +67,7 @@ jobs:
         with:
           max_attempts: 5
           timeout_minutes: 20
-          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network testnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-testnet
+          command: cd ./crates/velor/e2e && poetry run python main.py -d --base-network testnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/velor-e2e-tests-testnet
 
       # Run CLI tests against local testnet built from mainnet branch.
       - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
@@ -76,12 +76,12 @@ jobs:
         with:
           max_attempts: 5
           timeout_minutes: 20
-          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network mainnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-mainnet
+          command: cd ./crates/velor/e2e && poetry run python main.py -d --base-network mainnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/velor-e2e-tests-mainnet
 
       - name: Print local testnet logs on failure
         if: ${{ !inputs.SKIP_JOB && failure() }}
         working-directory: docker/compose/validator-testnet
-        run: docker logs aptos-tools-devnet && docker logs aptos-tools-testnet && docker logs aptos-tools-mainnet
+        run: docker logs velor-tools-devnet && docker logs velor-tools-testnet && docker logs velor-tools-mainnet
 
       # Print out whether the job was skipped.
       - run: echo "Skipping CLI E2E tests!"

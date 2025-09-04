@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
@@ -12,7 +12,7 @@ use crate::{
     util::{standardize_address, truncate_str},
 };
 use anyhow::Context;
-use aptos_api_types::WriteResource;
+use velor_api_types::WriteResource;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -10,12 +10,12 @@ use crate::{
         quorum_store_db::MockQuorumStoreDB, types::Batch,
     },
 };
-use aptos_config::config::BatchTransactionFilterConfig;
-use aptos_consensus_types::common::Author;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
-use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
-use aptos_transaction_filters::batch_transaction_filter::BatchTransactionFilter;
-use aptos_types::{
+use velor_config::config::BatchTransactionFilterConfig;
+use velor_consensus_types::common::Author;
+use velor_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+use velor_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
+use velor_transaction_filters::batch_transaction_filter::BatchTransactionFilter;
+use velor_types::{
     chain_id::ChainId,
     quorum_store::BatchId,
     transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
@@ -161,7 +161,7 @@ fn create_consensus_network_sender() -> NetworkSender {
     let consensus_network_client = ConsensusNetworkClient::new(network_client.clone());
 
     // Create the self sender and validator verifier
-    let (self_sender, _self_receiver) = aptos_channels::new_unbounded_test();
+    let (self_sender, _self_receiver) = velor_channels::new_unbounded_test();
     let validator_verifier = Arc::new(ValidatorVerifier::new(vec![]));
 
     // Create a network sender

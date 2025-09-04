@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
     service::GrpcManagerService,
 };
 use anyhow::Result;
-use aptos_protos::indexer::v1::grpc_manager_server::GrpcManagerServer;
+use velor_protos::indexer::v1::grpc_manager_server::GrpcManagerServer;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::{oneshot::channel, Mutex};
 use tonic::{codec::CompressionEncoding, transport::Server};

@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
-use aptos_crypto::HashValue;
-use aptos_drop_helper::DropHelper;
-use aptos_storage_interface::state_store::state_summary::LedgerStateSummary;
+use velor_crypto::HashValue;
+use velor_drop_helper::DropHelper;
+use velor_storage_interface::state_store::state_summary::LedgerStateSummary;
 use derive_more::Deref;
 use std::sync::Arc;
 

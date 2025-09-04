@@ -1,6 +1,6 @@
 [package]
-name = "aptos-storage-service-types"
-description = "Common types offered by the Aptos storage service"
+name = "velor-storage-service-types"
+description = "Common types offered by the Velor storage service"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,18 +13,18 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-compression = { workspace = true }
-aptos-config = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-time-service = { workspace = true }
-aptos-types = { workspace = true }
+velor-compression = { workspace = true }
+velor-config = { workspace = true }
+velor-crypto = { workspace = true }
+velor-time-service = { workspace = true }
+velor-types = { workspace = true }
 bcs = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-aptos-time-service = { workspace = true, features = ["testing"] }
+velor-time-service = { workspace = true, features = ["testing"] }
 claims = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }

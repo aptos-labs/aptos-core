@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,18 +8,18 @@ use crate::{
     metrics::NUM_TXNS,
     OverallMeasurement, TransactionCommitter, TransactionExecutor,
 };
-use aptos_block_partitioner::v2::config::PartitionerV2Config;
-use aptos_crypto::HashValue;
-use aptos_executor::block_executor::BlockExecutor;
-use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
-use aptos_infallible::Mutex;
-use aptos_logger::info;
-use aptos_metrics_core::IntCounterVecHelper;
-use aptos_types::{
+use velor_block_partitioner::v2::config::PartitionerV2Config;
+use velor_crypto::HashValue;
+use velor_executor::block_executor::BlockExecutor;
+use velor_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
+use velor_infallible::Mutex;
+use velor_logger::info;
+use velor_metrics_core::IntCounterVecHelper;
+use velor_types::{
     block_executor::partitioner::ExecutableBlock,
     transaction::{Transaction, TransactionPayload, Version},
 };
-use aptos_vm::VMBlockExecutor;
+use velor_vm::VMBlockExecutor;
 use derivative::Derivative;
 use move_core_types::language_storage::StructTag;
 use std::{

@@ -1,7 +1,7 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::remote_executor_service::ExecutorService;
-use aptos_types::block_executor::partitioner::ShardId;
+use velor_types::block_executor::partitioner::ShardId;
 use std::net::SocketAddr;
 
 /// This is a simple implementation of RemoteExecutorService that runs the executor service in a

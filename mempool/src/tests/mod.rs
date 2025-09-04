@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 // Command to run all the mempool tests:
-//      cargo test --package aptos-mempool --lib -- tests --show-output
+//      cargo test --package velor-mempool --lib -- tests --show-output
 
 #[cfg(test)]
 mod common;

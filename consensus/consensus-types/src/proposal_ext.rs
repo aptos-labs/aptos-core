@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     common::{Author, Payload, Round},
     quorum_cert::QuorumCert,
 };
-use aptos_types::validator_txn::ValidatorTransaction;
+use velor_types::validator_txn::ValidatorTransaction;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]

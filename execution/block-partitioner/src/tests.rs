@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,7 +9,7 @@ use crate::{
     v2::config::PartitionerV2Config,
     PartitionerConfig,
 };
-use aptos_types::{block_executor::partitioner::SubBlocksForShard, transaction::Transaction};
+use velor_types::{block_executor::partitioner::SubBlocksForShard, transaction::Transaction};
 use move_core_types::account_address::AccountAddress;
 use rand::{rngs::OsRng, Rng};
 use std::{collections::HashMap, sync::Mutex};

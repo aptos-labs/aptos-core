@@ -1,0 +1,42 @@
+name: "Release velor-node"
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        type: string
+        required: true
+        description: "The release tag to create. E.g. `velor-node-v0.2.3`:"
+      branch:
+        type: string
+        required: true
+        description: "The branch to cut the release from"
+      release_title:
+        type: string
+        required: false
+        description: 'Name of the release, e.g. "Velor Node Release v1.2.3":'
+
+jobs:
+  release-velor-node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - uses: actions/setup-python@v4
+
+      - name: Bump velor-node version
+        uses: velor-chain/velor-core/.github/actions/release-velor-node@main
+        with:
+          release_tag: ${{ inputs.release_tag }}
+          velor_node_cargo_toml: velor-node/Cargo.toml
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@a4f52f8033a6168103c2538976c07b467e8163bc # pin@v6.0.1
+        with:
+          add-paths: velor-node
+          title: "[velor-node] update release version"
+          body: Automated release bump for ${{ inputs.release_tag }}. Change the PR base accordingly
+          commit-message: "[velor-node] update release version"
+          branch: auto-release-${{ inputs.release_tag }}
+          delete-branch: true

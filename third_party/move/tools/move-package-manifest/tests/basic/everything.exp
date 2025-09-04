@@ -37,7 +37,7 @@ PackageManifest {
             version: Some(
                 "0.1.2",
             ),
-            location: Aptos {
+            location: Velor {
                 node_url: "mainnet",
                 package_addr: 0000000000000000000000000000000000000000000000000000000000000001,
             },

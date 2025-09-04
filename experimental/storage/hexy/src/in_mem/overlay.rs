@@ -1,12 +1,12 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     in_mem::{base::HexyBase, view::HexyView},
     NodePosition,
 };
-use aptos_crypto::HashValue;
-use aptos_experimental_layered_map::MapLayer;
+use velor_crypto::HashValue;
+use velor_experimental_layered_map::MapLayer;
 use std::sync::Arc;
 
 #[derive(Clone)]

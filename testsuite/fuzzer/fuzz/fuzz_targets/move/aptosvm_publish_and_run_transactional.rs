@@ -1,11 +1,11 @@
 #![no_main]
 
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
-use aptos_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
-use aptos_types::{
+use velor_language_e2e_tests::{account::Account, executor::FakeExecutor};
+use velor_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
+use velor_types::{
     chain_id::ChainId,
     on_chain_config::Features,
     transaction::{
@@ -14,8 +14,8 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use aptos_vm::AptosVM;
-use aptos_vm_environment::{prod_configs, prod_configs::LATEST_GAS_FEATURE_VERSION};
+use velor_vm::VelorVM;
+use velor_vm_environment::{prod_configs, prod_configs::LATEST_GAS_FEATURE_VERSION};
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
     access::ModuleAccess,
@@ -67,7 +67,7 @@ fn check_for_invariant_violation_vmerror(e: VMError) {
                 e,
                 "RUST_BACKTRACE=1 DEBUG_VM_STATUS=",
                 e.major_status(),
-                "./fuzz.sh run move_aptosvm_publish_and_run <ARTIFACT>"
+                "./fuzz.sh run move_velorvm_publish_and_run <ARTIFACT>"
             );
         }
     }
@@ -115,7 +115,7 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
     filter_modules(&input)?;
 
     let verifier_config =
-        prod_configs::aptos_prod_verifier_config(LATEST_GAS_FEATURE_VERSION, &Features::default());
+        prod_configs::velor_prod_verifier_config(LATEST_GAS_FEATURE_VERSION, &Features::default());
     let deserializer_config = DeserializerConfig::new(BYTECODE_VERSION, 255);
 
     let mut dep_modules: Vec<CompiledModule> = vec![];
@@ -189,7 +189,7 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
 
     tdbg!("verifying modules");
     for m in dep_modules.iter_mut() {
-        // m.metadata = vec![]; // we could optimize metadata to only contain aptos metadata
+        // m.metadata = vec![]; // we could optimize metadata to only contain velor metadata
         // m.version = VERSION_MAX;
 
         // reject bad modules fast
@@ -259,7 +259,7 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
         }
     }
 
-    AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
+    VelorVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
     let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(
         &VM_WRITE_SET,
         ChainId::mainnet(),

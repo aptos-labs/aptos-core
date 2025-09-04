@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
-use aptos_sdk::{
+use velor_sdk::{
     move_types::account_address::AccountAddress,
-    transaction_builder::{aptos_stdlib, TransactionFactory},
+    transaction_builder::{velor_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use rand::{rngs::StdRng, SeedableRng};
@@ -49,7 +49,7 @@ impl TransactionGenerator for BatchTransferTransactionGenerator {
                 .clone_from_pool(self.batch_size, &mut self.rng);
             requests.push(
                 account.sign_with_transaction_builder(self.txn_factory.payload(
-                    aptos_stdlib::aptos_account_batch_transfer(receivers, vec![
+                    velor_stdlib::velor_account_batch_transfer(receivers, vec![
                         self.send_amount;
                         self.batch_size
                     ]),

@@ -1,0 +1,80 @@
+# This compose file defines an Velor Validator deployment.
+# Read the README.md files for instruction on how to install velor-node
+
+services:
+  haproxy:
+    image: haproxy:3.0.2
+    volumes:
+      - type: bind
+        source: ./haproxy.cfg
+        target: /usr/local/etc/haproxy/haproxy.cfg
+      - type: bind
+        source: ./blocked.ips
+        target: /usr/local/etc/haproxy/blocked.ips
+    networks:
+      - shared
+    expose:
+      # Validator network
+      - 6180
+      # Fullnode access to validators
+      - 6181
+      # Validator Metrics
+      - 9101
+      # Haproxy internal stats
+      - 9102
+      # Disable access to rest API port 80 for validator by default
+      # - 8180
+    ports:
+      # Expose these to the outside
+      - "6180:6180"
+      - "6181:6181"
+      # Preface these with 127 to only expose them locally
+      - "127.0.0.1:9101:9101"
+      - "127.0.0.1:9102:9102"
+      # Disable access to rest API port 80 for validator by default
+      # - 8180:8180
+
+
+  validator:
+    image: "${VALIDATOR_IMAGE_REPO:-velorlabs/validator}:${IMAGE_TAG:-testnet}"
+    networks:
+      shared:
+    volumes:
+      - type: volume
+        source: velor-validator
+        target: /opt/velor/data
+      - type: bind
+        source: ./validator.yaml
+        target: /opt/velor/etc/validator.yaml
+      - type: bind
+        source: ./genesis.blob
+        target: /opt/velor/genesis/genesis.blob
+      - type: bind
+        source: ./waypoint.txt
+        target: /opt/velor/genesis/waypoint.txt
+      - type: bind
+        source: ./keys/validator-identity.yaml
+        target: /opt/velor/genesis/validator-identity.yaml
+    command: ["/usr/local/bin/velor-node", "-f", "/opt/velor/etc/validator.yaml"]
+    restart: unless-stopped
+    expose:
+      # These are only exposed on the docker internal network
+      # Validator network
+      - 6180
+      # Fullnode access to validators
+      - 6181
+      # Validator Metrics
+      - 9101
+      # Disable access to rest API port 80 for validator by default
+      # - 8080
+
+networks:
+  shared:
+    name: "velor-docker-compose-shared"
+    ipam:
+      config:
+        - subnet: 172.16.1.0/24
+
+volumes:
+  velor-validator:
+    name: velor-validator

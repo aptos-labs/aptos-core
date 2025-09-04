@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
     new_test_context, new_test_context_with_config, new_test_context_with_orderless_flags,
 };
-use aptos_api_test_context::{current_function_name, TestContext};
-use aptos_cached_packages::aptos_stdlib;
-use aptos_config::config::{NodeConfig, ViewFilter, ViewFunctionId};
-use aptos_types::account_address::AccountAddress;
+use velor_api_test_context::{current_function_name, TestContext};
+use velor_cached_packages::velor_stdlib;
+use velor_config::config::{NodeConfig, ViewFilter, ViewFunctionId};
+use velor_types::account_address::AccountAddress;
 use rstest::rstest;
 use serde_json::{json, Value};
 use std::{path::PathBuf, str::FromStr};
@@ -16,7 +16,7 @@ fn build_coin_balance_request(address: &AccountAddress) -> Value {
     json!({
         "function":"0x1::coin::balance",
         "arguments": vec![address.to_string()],
-        "type_arguments": vec!["0x1::aptos_coin::AptosCoin"],
+        "type_arguments": vec!["0x1::velor_coin::VelorCoin"],
     })
 }
 
@@ -25,7 +25,7 @@ fn build_coin_decimals_request() -> Value {
     json!({
         "function":"0x1::coin::decimals",
         "arguments": arguments,
-        "type_arguments": vec!["0x1::aptos_coin::AptosCoin"],
+        "type_arguments": vec!["0x1::velor_coin::VelorCoin"],
     })
 }
 
@@ -91,7 +91,7 @@ async fn test_view_gas_used_header(
     // Confirm the gas used header is present.
     assert!(
         resp.headers()
-            .get("X-Aptos-Gas-Used")
+            .get("X-Velor-Gas-Used")
             .unwrap()
             .to_str()
             .unwrap()
@@ -266,7 +266,7 @@ async fn test_view_error_type_resolution_error(
             json!({
                 "function":"0x1::coin::is_account_registered",
                 "arguments": vec![AccountAddress::random().to_string()],
-                "type_arguments": ["0x1::aptos_coin::NewCoin"], // Does not exist
+                "type_arguments": ["0x1::velor_coin::NewCoin"], // Does not exist
             }),
         )
         .await;
@@ -288,7 +288,7 @@ async fn test_view_does_not_exist() {
         .post(
             "/view",
             json!({
-                "function":"0x1::aptos_account::fake_function",
+                "function":"0x1::velor_account::fake_function",
                 "arguments": vec![owner.address().to_string()],
                 "type_arguments": [],
             }),
@@ -327,7 +327,7 @@ async fn test_simple_view_invalid(
         .post(
             "/view",
             json!({
-                "function":"0x1::aptos_account::assert_account_exists",
+                "function":"0x1::velor_account::assert_account_exists",
                 "arguments": vec![owner.address().to_string()],
                 "type_arguments": [],
             }),
@@ -369,7 +369,7 @@ async fn test_versioned_simple_view(
             json!({
                 "function":"0x1::coin::balance",
                 "arguments": vec![owner.address().to_string()],
-                "type_arguments": vec!["0x1::aptos_coin::AptosCoin"],
+                "type_arguments": vec!["0x1::velor_coin::VelorCoin"],
             }),
         )
         .await;
@@ -391,7 +391,7 @@ async fn test_view_tuple(use_txn_payload_v2_format: bool, use_orderless_transact
         use_txn_payload_v2_format,
         use_orderless_transactions,
     );
-    let payload = aptos_stdlib::publish_module_source(
+    let payload = velor_stdlib::publish_module_source(
         "test_module",
         r#"
         module 0xa550c18::test_module {

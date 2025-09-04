@@ -1,6 +1,6 @@
 [package]
-name = "aptos-api-test-context"
-description = "Aptos API test context"
+name = "velor-api-test-context"
+description = "Velor API test context"
 version = "0.2.0"
 
 # Workspace inherited keys
@@ -13,26 +13,26 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-api = { workspace = true }
-aptos-api-types = { workspace = true }
-aptos-cached-packages = { workspace = true }
-aptos-config = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-db = { workspace = true, features = ["fuzzing"] }
-aptos-executor = { workspace = true }
-aptos-executor-types = { workspace = true }
-aptos-framework = { workspace = true }
-aptos-genesis = { workspace = true }
-aptos-indexer-grpc-table-info = { workspace = true }
-aptos-mempool = { workspace = true, features = ["fuzzing"] }
-aptos-mempool-notifications = { workspace = true }
-aptos-sdk = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-temppath = { workspace = true }
-aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
-aptos-vm-logging = { workspace = true }
-aptos-vm-validator = { workspace = true }
+velor-api = { workspace = true }
+velor-api-types = { workspace = true }
+velor-cached-packages = { workspace = true }
+velor-config = { workspace = true }
+velor-crypto = { workspace = true }
+velor-db = { workspace = true, features = ["fuzzing"] }
+velor-executor = { workspace = true }
+velor-executor-types = { workspace = true }
+velor-framework = { workspace = true }
+velor-genesis = { workspace = true }
+velor-indexer-grpc-table-info = { workspace = true }
+velor-mempool = { workspace = true, features = ["fuzzing"] }
+velor-mempool-notifications = { workspace = true }
+velor-sdk = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-temppath = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true }
+velor-vm-logging = { workspace = true }
+velor-vm-validator = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 goldenfile = { workspace = true }

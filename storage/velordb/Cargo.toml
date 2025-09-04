@@ -1,0 +1,78 @@
+[package]
+name = "velor-db"
+description = "Velor database"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-accumulator = { workspace = true }
+velor-config = { workspace = true }
+velor-crypto = { workspace = true }
+velor-db-indexer = { workspace = true }
+velor-db-indexer-schemas = { workspace = true, features = ["fuzzing"] }
+velor-executor-types = { workspace = true }
+velor-experimental-runtimes = { workspace = true }
+velor-infallible = { workspace = true }
+velor-jellyfish-merkle = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-proptest-helpers = { workspace = true, optional = true }
+velor-resource-viewer = { workspace = true }
+velor-rocksdb-options = { workspace = true }
+velor-schemadb = { workspace = true }
+velor-scratchpad = { workspace = true }
+velor-storage-interface = { workspace = true, features = ["fuzzing"] }
+velor-temppath = { workspace = true, optional = true }
+velor-types = { workspace = true }
+arc-swap = { workspace = true }
+arr_macro = { workspace = true }
+bcs = { workspace = true }
+byteorder = { workspace = true }
+claims = { workspace = true }
+clap = { workspace = true, optional = true }
+crossbeam-channel = { workspace = true, optional = true }
+dashmap = { workspace = true }
+either = { workspace = true }
+hex = { workspace = true }
+indicatif = { workspace = true, optional = true }
+itertools = { workspace = true }
+lru = { workspace = true }
+move-core-types = { workspace = true }
+once_cell = { workspace = true }
+owo-colors = { workspace = true, optional = true }
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+static_assertions = { workspace = true }
+status-line = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+velor-block-executor = { workspace = true }
+velor-executor-types = { workspace = true }
+velor-jellyfish-merkle = { workspace = true, features = ["fuzzing"] }
+velor-proptest-helpers = { workspace = true }
+velor-schemadb = { workspace = true, features = ["fuzzing"] }
+velor-scratchpad = { workspace = true, features = ["fuzzing"] }
+velor-temppath = { workspace = true }
+velor-types = { workspace = true }
+ouroboros = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+rand = { workspace = true }
+
+[features]
+default = []
+fuzzing = ["proptest", "proptest-derive", "velor-proptest-helpers", "velor-temppath", "velor-crypto/fuzzing", "velor-jellyfish-merkle/fuzzing", "velor-types/fuzzing", "velor-executor-types/fuzzing", "velor-schemadb/fuzzing", "velor-scratchpad/fuzzing"]
+consensus-only-perf-test = []
+db-debugger = ["velor-temppath", "clap", "crossbeam-channel", "owo-colors", "indicatif"]

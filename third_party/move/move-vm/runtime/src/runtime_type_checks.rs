@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -62,7 +62,7 @@ pub(crate) trait RuntimeTypeCheck {
                 //
                 // Note: native dispatch cannot call into the same module, otherwise the reentrancy
                 // check is broken. For more details, see AIP-73:
-                //   https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-73.md
+                //   https://github.com/velor-foundation/AIPs/blob/main/aips/aip-73.md
                 if callee.is_friend_or_private() || callee.module_id() == caller.module_id() {
                     return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
                         .with_message(

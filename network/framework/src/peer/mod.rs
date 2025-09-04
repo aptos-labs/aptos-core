@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -35,12 +35,12 @@ use crate::{
     transport::{self, Connection, ConnectionMetadata},
     ProtocolId,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkContext, PeerNetworkId};
-use aptos_logger::prelude::*;
-use aptos_short_hex_str::AsShortHexStr;
-use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::PeerId;
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::network_id::{NetworkContext, PeerNetworkId};
+use velor_logger::prelude::*;
+use velor_short_hex_str::AsShortHexStr;
+use velor_time_service::{TimeService, TimeServiceTrait};
+use velor_types::PeerId;
 use futures::{
     self,
     channel::oneshot,
@@ -120,12 +120,12 @@ pub struct Peer<TSocket> {
     /// Underlying connection.
     connection: Option<TSocket>,
     /// Channel to notify PeerManager that we've disconnected.
-    connection_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
+    connection_notifs_tx: velor_channels::Sender<TransportNotification<TSocket>>,
     /// Channel to receive requests from PeerManager to send messages and rpcs.
-    peer_reqs_rx: aptos_channel::Receiver<ProtocolId, PeerRequest>,
+    peer_reqs_rx: velor_channel::Receiver<ProtocolId, PeerRequest>,
     /// Where to send inbound messages and rpcs.
     upstream_handlers:
-        Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
+        Arc<HashMap<ProtocolId, velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
     /// Inbound rpc request queue for handling requests from remote peer.
     inbound_rpcs: InboundRpcs,
     /// Outbound rpc request queue for sending requests to remote peer and handling responses.
@@ -150,10 +150,10 @@ where
         executor: Handle,
         time_service: TimeService,
         connection: Connection<TSocket>,
-        connection_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
-        peer_reqs_rx: aptos_channel::Receiver<ProtocolId, PeerRequest>,
+        connection_notifs_tx: velor_channels::Sender<TransportNotification<TSocket>>,
+        peer_reqs_rx: velor_channel::Receiver<ProtocolId, PeerRequest>,
         upstream_handlers: Arc<
-            HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
+            HashMap<ProtocolId, velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
         >,
         inbound_rpc_timeout: Duration,
         max_concurrent_inbound_rpcs: u32,
@@ -334,21 +334,21 @@ where
         max_frame_size: usize,
         max_message_size: usize,
     ) -> (
-        aptos_channel::Sender<(), NetworkMessage>,
+        velor_channel::Sender<(), NetworkMessage>,
         oneshot::Sender<()>,
     ) {
         let remote_peer_id = connection_metadata.remote_peer_id;
-        let (write_reqs_tx, mut write_reqs_rx): (aptos_channel::Sender<(), NetworkMessage>, _) =
-            aptos_channel::new(
+        let (write_reqs_tx, mut write_reqs_rx): (velor_channel::Sender<(), NetworkMessage>, _) =
+            velor_channel::new(
                 QueueStyle::KLAST,
                 1024,
                 Some(&counters::PENDING_WIRE_MESSAGES),
             );
         let (close_tx, mut close_rx) = oneshot::channel();
 
-        let (mut msg_tx, msg_rx) = aptos_channels::new(1024, &counters::PENDING_MULTIPLEX_MESSAGE);
+        let (mut msg_tx, msg_rx) = velor_channels::new(1024, &counters::PENDING_MULTIPLEX_MESSAGE);
         let (stream_msg_tx, stream_msg_rx) =
-            aptos_channels::new(1024, &counters::PENDING_MULTIPLEX_STREAM);
+            velor_channels::new(1024, &counters::PENDING_MULTIPLEX_STREAM);
 
         // this task ends when the multiplex task ends (by dropping the senders) or receiving a close instruction
         let writer_task = async move {
@@ -470,7 +470,7 @@ where
                         let sender = PeerNetworkId::new(network_id, sender);
                         match handler.push(key, ReceivedMessage::new(message, sender)) {
                             Err(_err) => {
-                                // NOTE: aptos_channel never returns other than Ok(()), but we might switch to tokio::sync::mpsc and then this would work
+                                // NOTE: velor_channel never returns other than Ok(()), but we might switch to tokio::sync::mpsc and then this would work
                                 counters::direct_send_messages(
                                     &self.network_context,
                                     DECLINED_LABEL,
@@ -561,7 +561,7 @@ where
     fn handle_inbound_message(
         &mut self,
         message: Result<MultiplexMessage, ReadError>,
-        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessage>,
+        write_reqs_tx: &mut velor_channel::Sender<(), NetworkMessage>,
     ) -> Result<(), PeerManagerError> {
         trace!(
             NetworkSchema::new(&self.network_context)
@@ -603,7 +603,7 @@ where
     fn handle_outbound_request(
         &mut self,
         request: PeerRequest,
-        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessage>,
+        write_reqs_tx: &mut velor_channel::Sender<(), NetworkMessage>,
     ) {
         trace!(
             "Peer {} PeerRequest::{:?}",
@@ -682,7 +682,7 @@ where
 
     async fn do_shutdown(
         mut self,
-        write_req_tx: aptos_channel::Sender<(), NetworkMessage>,
+        write_req_tx: velor_channel::Sender<(), NetworkMessage>,
         writer_close_tx: oneshot::Sender<()>,
         reason: DisconnectReason,
     ) {

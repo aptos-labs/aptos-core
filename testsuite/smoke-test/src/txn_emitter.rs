@@ -1,18 +1,18 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     keyless::{remove_training_wheels, spawn_network_and_execute_gov_proposals},
-    smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
+    smoke_test_environment::{new_local_swarm_with_velor, SwarmBuilder},
     utils::create_and_fund_account,
 };
 use anyhow::ensure;
-use aptos_forge::{
+use velor_forge::{
     args::TransactionTypeArg, emitter::NumAccountsMode, AccountType, EmitJobMode, EmitJobRequest,
     EntryPoints, NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats, WorkflowProgress,
 };
-use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
-use aptos_types::keyless::test_utils::{get_sample_esk, get_sample_exp_date, get_sample_jwt_token};
+use velor_sdk::{transaction_builder::TransactionFactory, types::PeerId};
+use velor_types::keyless::test_utils::{get_sample_esk, get_sample_exp_date, get_sample_jwt_token};
 use once_cell::sync::Lazy;
 use rand::{rngs::OsRng, SeedableRng};
 use std::{sync::Arc, time::Duration};
@@ -163,7 +163,7 @@ static TRANSACTION_MIX_PER_PHASE: Lazy<Vec<Vec<(TransactionType, usize)>>> = Laz
 #[ignore]
 #[tokio::test]
 async fn test_txn_emmitter() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_velor(1).await;
 
     let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
@@ -186,14 +186,14 @@ async fn test_txn_emmitter() {
 #[tokio::test]
 async fn test_keyless_txn_emmitter() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .build_with_cli(0)
         .await;
 
     let (_tw_sk, _config, _jwk, root_idx) =
         spawn_network_and_execute_gov_proposals(&mut swarm, &mut cli).await;
 
-    remove_training_wheels(&mut cli, &mut swarm.aptos_public_info(), root_idx).await;
+    remove_training_wheels(&mut cli, &mut swarm.velor_public_info(), root_idx).await;
 
     let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
@@ -215,7 +215,7 @@ async fn test_keyless_txn_emmitter() {
 #[tokio::test]
 async fn test_txn_emmitter_with_high_pending_latency() {
     let mut swarm = SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, conf, _| {
             conf.api.failpoints_enabled = true;
             conf.consensus.pipeline_backpressure.truncate(1);
@@ -252,7 +252,7 @@ async fn test_txn_emmitter_with_high_pending_latency() {
 
 #[tokio::test]
 async fn test_txn_emmitter_low_funds() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_velor(1).await;
     let account_1 = create_and_fund_account(&mut swarm, 9705100).await;
 
     let transaction_type = TransactionType::CallCustomModules {

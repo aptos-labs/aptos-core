@@ -1,18 +1,18 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     consensus::consensus_fault_tolerance::{start_traffic, ActiveTrafficGuard},
     smoke_test_environment::SwarmBuilder,
 };
-use aptos_config::config::DagFetcherConfig;
-use aptos_forge::{
+use velor_config::config::DagFetcherConfig;
+use velor_forge::{
     test_utils::consensus_utils::{
         no_failure_injection, test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
     },
     LocalSwarm, Swarm, SwarmExt,
 };
-use aptos_types::on_chain_config::{
+use velor_types::on_chain_config::{
     ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig, ValidatorTxnConfig,
     DEFAULT_WINDOW_SIZE,
 };
@@ -67,7 +67,7 @@ async fn test_no_failures() {
     let (validator_clients, public_info) = {
         (
             swarm.get_validator_clients_with_names(),
-            swarm.aptos_public_info(),
+            swarm.velor_public_info(),
         )
     };
     test_consensus_fault_tolerance(
@@ -120,7 +120,7 @@ async fn run_dag_fail_point_test(
     let (validator_clients, public_info) = {
         (
             swarm.get_validator_clients_with_names(),
-            swarm.aptos_public_info(),
+            swarm.velor_public_info(),
         )
     };
     test_consensus_fault_tolerance(

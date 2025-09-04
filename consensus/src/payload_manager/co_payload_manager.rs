@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,16 +9,16 @@ use crate::{
     },
     payload_manager::TPayloadManager,
 };
-use aptos_bitvec::BitVec;
-use aptos_config::config::BlockTransactionFilterConfig;
-use aptos_consensus_types::{
+use velor_bitvec::BitVec;
+use velor_config::config::BlockTransactionFilterConfig;
+use velor_consensus_types::{
     block::Block,
     common::{Author, Payload, Round},
 };
-use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutorError::InternalError, *};
-use aptos_infallible::Mutex;
-use aptos_types::transaction::SignedTransaction;
+use velor_crypto::HashValue;
+use velor_executor_types::{ExecutorError::InternalError, *};
+use velor_infallible::Mutex;
+use velor_types::transaction::SignedTransaction;
 use async_trait::async_trait;
 use std::{
     collections::{btree_map::Entry, BTreeMap},

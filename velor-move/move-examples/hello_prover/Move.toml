@@ -1,0 +1,10 @@
+[package]
+name = "hello_prover"
+version = "0.0.0"
+
+[dependencies]
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-framework/", rev = "main" }
+
+[addresses]
+
+

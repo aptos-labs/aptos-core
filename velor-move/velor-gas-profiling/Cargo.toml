@@ -1,0 +1,30 @@
+[package]
+name = "velor-gas-profiling"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+handlebars = { workspace = true }
+inferno = { workspace = true }
+regex = { workspace = true }
+serde_json = { workspace = true }
+smallvec = { workspace = true }
+
+velor-gas-algebra = { workspace = true }
+velor-gas-meter = { workspace = true }
+velor-gas-schedule = { workspace = true }
+velor-types = { workspace = true }
+velor-vm-types = { workspace = true }
+
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-types = { workspace = true }

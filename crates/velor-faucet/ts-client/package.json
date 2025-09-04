@@ -1,0 +1,50 @@
+{
+  "name": "@velor-chain/velor-faucet-client",
+  "description": "Generated client for the Velor faucet",
+  "license": "Apache 2.0",
+  "engines": {
+    "node": ">=11.0.0"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/velor.esm.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "prepack": "tsup",
+    "build": "tsup",
+    "test": "jest",
+    "generate-client": "openapi -i ../doc/spec.yaml -o ./src -c axios --name VelorFaucetClient --exportSchemas true --useOptions",
+    "checked-publish": "./checked_publish.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/velor-chain/velor-core.git"
+  },
+  "homepage": "https://github.com/velor-chain/velor-core",
+  "bugs": {
+    "url": "https://github.com/velor-chain/velor-core/issues"
+  },
+  "author": "velorlabs.com",
+  "keywords": [
+    "Velor",
+    "Velor Labs"
+  ],
+  "dependencies": {
+    "axios": "1.8.2",
+    "form-data": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "29.4.1",
+    "@types/node": "18.15.3",
+    "@typescript-eslint/eslint-plugin": "5.55.0",
+    "@typescript-eslint/parser": "5.55.0",
+    "dotenv": "16.0.3",
+    "jest": "29.5.0",
+    "openapi-typescript-codegen": "https://github.com/velor-chain/openapi-typescript-codegen/releases/download/v0.24.0-p1/openapi-typescript-codegen-v0.24.0-p1.tgz",
+    "ts-jest": "29.0.5",
+    "ts-loader": "9.4.2",
+    "ts-node": "10.9.1",
+    "tsup": "6.6.3",
+    "typescript": "4.9.5"
+  },
+  "version": "0.2.0"
+}

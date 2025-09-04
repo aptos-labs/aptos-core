@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,13 +9,13 @@ use crate::{
     transaction_shuffler::TransactionShuffler, txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
-use aptos_config::config::BlockTransactionFilterConfig;
-use aptos_consensus_notifications::ConsensusNotificationSender;
-use aptos_consensus_types::common::Round;
-use aptos_executor_types::BlockExecutorTrait;
-use aptos_infallible::RwLock;
-use aptos_logger::prelude::*;
-use aptos_types::{
+use velor_config::config::BlockTransactionFilterConfig;
+use velor_consensus_notifications::ConsensusNotificationSender;
+use velor_consensus_types::common::Round;
+use velor_executor_types::BlockExecutorTrait;
+use velor_infallible::RwLock;
+use velor_logger::prelude::*;
+use velor_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
     validator_signer::ValidatorSigner,

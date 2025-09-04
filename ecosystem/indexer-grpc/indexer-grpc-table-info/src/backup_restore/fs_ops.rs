@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Context;
@@ -58,7 +58,7 @@ pub fn create_tar_gz(dir_path: PathBuf, backup_file_name: &str) -> Result<PathBu
     let gz_encoder = GzEncoder::new(Vec::new(), Compression::fast());
     let tar_data = BufWriter::new(gz_encoder);
     let mut tar_builder = Builder::new(tar_data);
-    aptos_logger::info!(
+    velor_logger::info!(
         dir_path = dir_path.to_str(),
         backup_file_name = backup_file_name,
         "[Table Info] Creating a tar.gz archive from the db snapshot directory"
@@ -66,7 +66,7 @@ pub fn create_tar_gz(dir_path: PathBuf, backup_file_name: &str) -> Result<PathBu
     tar_builder
         .append_dir_all(".", &dir_path)
         .context("Tar building failed.")?;
-    aptos_logger::info!("[Table Info] Directory contents appended to the tar.gz archive");
+    velor_logger::info!("[Table Info] Directory contents appended to the tar.gz archive");
     // Finish writing the tar archive and get the compressed GzEncoder back
     let tar_data = tar_builder
         .into_inner()
@@ -82,7 +82,7 @@ pub fn create_tar_gz(dir_path: PathBuf, backup_file_name: &str) -> Result<PathBu
 
     let tar_file_name = format!("{}.tar.gz", backup_file_name);
     let tar_file_path = dir_path.join(&tar_file_name);
-    aptos_logger::info!(
+    velor_logger::info!(
         dir_path = dir_path.to_str(),
         backup_file_name = backup_file_name,
         tar_file_path = tar_file_path.to_str(),
@@ -92,7 +92,7 @@ pub fn create_tar_gz(dir_path: PathBuf, backup_file_name: &str) -> Result<PathBu
     // Write the tar.gz archive to a file
     std::fs::write(&tar_file_path, compressed_data)
         .context("Failed to write the compressed data.")?;
-    aptos_logger::info!("[Table Info] Tar.gz archive created successfully");
+    velor_logger::info!("[Table Info] Tar.gz archive created successfully");
 
     Ok(tar_file_path)
 }

@@ -86,4 +86,4 @@ volumes:
 # networks:
 #   default:
 #     external: true
-#     name: "aptos-docker-compose-shared"
+#     name: "velor-docker-compose-shared"

@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Questions and Help (on Aptos Developer Discussions)
-    url: (https://github.com/aptos-labs/aptos-developer-discussions/discussions
-    about: Support and other Questions are handled by the team and the community on Aptos Developer Discussions.
+  - name: Questions and Help (on Velor Developer Discussions)
+    url: (https://github.com/velor-chain/velor-developer-discussions/discussions
+    about: Support and other Questions are handled by the team and the community on Velor Developer Discussions.
   - name: Questions, Help and Chat (on Discord)
-    url: https://discord.gg/aptosnetwork
+    url: https://discord.gg/velornetwork
     about: Contact the development team, contributors and community on Discord

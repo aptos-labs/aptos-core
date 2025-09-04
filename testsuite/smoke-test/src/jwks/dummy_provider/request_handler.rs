@@ -1,7 +1,7 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_infallible::Mutex;
+use velor_infallible::Mutex;
 use hyper::{Body, Request};
 use move_core_types::account_address::AccountAddress;
 use std::{collections::HashSet, str::FromStr};

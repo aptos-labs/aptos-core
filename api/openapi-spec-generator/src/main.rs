@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 mod fake_context;
 
 use anyhow::Result;
-use aptos_api::{get_api_service, spec::get_spec};
+use velor_api::{get_api_service, spec::get_spec};
 use clap::{Parser, ValueEnum};
 use fake_context::get_fake_context;
 use std::{path::PathBuf, sync::Arc};

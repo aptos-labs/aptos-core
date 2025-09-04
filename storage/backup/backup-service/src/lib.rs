@@ -1,20 +1,20 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod handlers;
 
 use crate::handlers::get_routes;
-use aptos_db::AptosDB;
-use aptos_logger::prelude::*;
+use velor_db::VelorDB;
+use velor_logger::prelude::*;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::runtime::Runtime;
 
-pub fn start_backup_service(address: SocketAddr, db: Arc<AptosDB>) -> Runtime {
+pub fn start_backup_service(address: SocketAddr, db: Arc<VelorDB>) -> Runtime {
     let backup_handler = db.get_backup_handler();
     let routes = get_routes(backup_handler);
 
-    let runtime = aptos_runtimes::spawn_named_runtime("backup".into(), None);
+    let runtime = velor_runtimes::spawn_named_runtime("backup".into(), None);
 
     // Ensure that we actually bind to the socket first before spawning the
     // server tasks. This helps in tests to prevent races where a client attempts
@@ -33,9 +33,9 @@ pub fn start_backup_service(address: SocketAddr, db: Arc<AptosDB>) -> Runtime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aptos_config::utils::get_available_port;
-    use aptos_crypto::hash::HashValue;
-    use aptos_temppath::TempPath;
+    use velor_config::utils::get_available_port;
+    use velor_crypto::hash::HashValue;
+    use velor_temppath::TempPath;
     use reqwest::blocking::get;
     use std::net::{IpAddr, Ipv4Addr};
 
@@ -47,7 +47,7 @@ mod tests {
     #[test]
     fn routing_and_error_codes() {
         let tmpdir = TempPath::new();
-        let db = Arc::new(AptosDB::new_for_test(&tmpdir));
+        let db = Arc::new(VelorDB::new_for_test(&tmpdir));
         let port = get_available_port();
         let _rt = start_backup_service(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port), db);
 

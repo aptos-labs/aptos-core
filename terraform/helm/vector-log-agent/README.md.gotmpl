@@ -3,7 +3,7 @@
 This Helm chart deploys a k8s DaemonSet that collects ALL logs of a k8s cluster via [Vector](https://vector.dev/).
 The logger then sends the logs to any destination [Vector Sink](https://vector.dev/docs/reference/configuration/sinks) of your choice.
 We also provide some recommended values for the sink configuration of _some_ sinks.
-This chart is relatively generic and contains very little Aptos specific logic, except for some minor transforms under files/vector-transforms.yaml.
+This chart is relatively generic and contains very little Velor specific logic, except for some minor transforms under files/vector-transforms.yaml.
 
 ## General instructions
 

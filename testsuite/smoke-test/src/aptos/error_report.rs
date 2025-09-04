@@ -1,23 +1,23 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
-use aptos_cached_packages::aptos_stdlib;
-use aptos_forge::{AptosPublicInfo, Swarm};
-use aptos_sdk::{transaction_builder::TransactionBuilder, types::LocalAccount};
-use aptos_types::{
-    account_address::AccountAddress, account_config::aptos_test_root_address, chain_id::ChainId,
+use crate::smoke_test_environment::new_local_swarm_with_velor;
+use velor_cached_packages::velor_stdlib;
+use velor_forge::{VelorPublicInfo, Swarm};
+use velor_sdk::{transaction_builder::TransactionBuilder, types::LocalAccount};
+use velor_types::{
+    account_address::AccountAddress, account_config::velor_test_root_address, chain_id::ChainId,
 };
 
 async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
     local_account: &LocalAccount,
-    info: &mut AptosPublicInfo,
+    info: &mut VelorPublicInfo,
     f: F,
     expected: &str,
 ) {
     let payload = info
         .transaction_factory()
-        .payload(aptos_stdlib::aptos_coin_claim_mint_capability())
+        .payload(velor_stdlib::velor_coin_claim_mint_capability())
         .sequence_number(0);
     let txn = local_account.sign_transaction(f(payload).build());
     let err = format!(
@@ -34,8 +34,8 @@ async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
 
 #[tokio::test]
 async fn test_error_report() {
-    let swarm = new_local_swarm_with_aptos(1).await;
-    let mut info = swarm.aptos_public_info();
+    let swarm = new_local_swarm_with_velor(1).await;
+    let mut info = swarm.velor_public_info();
 
     let local_account = info.random_account();
     let address = local_account.address();
@@ -74,7 +74,7 @@ async fn test_error_report() {
     submit_and_check_err(
         &local_account,
         &mut info,
-        |t| t.sender(aptos_test_root_address()),
+        |t| t.sender(velor_test_root_address()),
         "SEQUENCE_NUMBER_TOO_OLD",
     )
     .await;
@@ -83,7 +83,7 @@ async fn test_error_report() {
         &local_account,
         &mut info,
         |t| {
-            t.sender(aptos_test_root_address())
+            t.sender(velor_test_root_address())
                 .sequence_number(root_account_sequence_number)
         },
         "INVALID_AUTH_KEY",

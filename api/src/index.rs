@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,7 +8,7 @@ use crate::{
     response::{BasicResponse, BasicResponseStatus, BasicResult},
     ApiTags,
 };
-use aptos_api_types::{IndexResponse, IndexResponseBcs};
+use velor_api_types::{IndexResponse, IndexResponseBcs};
 use poem_openapi::OpenApi;
 use std::sync::Arc;
 
@@ -40,7 +40,7 @@ impl IndexApi {
                 let index_response = IndexResponse::new(
                     ledger_info.clone(),
                     node_role,
-                    Some(aptos_build_info::get_git_hash()),
+                    Some(velor_build_info::get_git_hash()),
                 );
                 BasicResponse::try_from_json((
                     index_response,

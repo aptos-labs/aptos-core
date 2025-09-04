@@ -1,17 +1,17 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics::TIMER, pipeline::LedgerUpdateMessage};
-use aptos_crypto::hash::HashValue;
-use aptos_executor::block_executor::BlockExecutor;
-use aptos_executor_types::BlockExecutorTrait;
-use aptos_logger::info;
-use aptos_metrics_core::TimerHelper;
-use aptos_types::block_executor::{
+use velor_crypto::hash::HashValue;
+use velor_executor::block_executor::BlockExecutor;
+use velor_executor_types::BlockExecutorTrait;
+use velor_logger::info;
+use velor_metrics_core::TimerHelper;
+use velor_types::block_executor::{
     config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock,
 };
-use aptos_vm::VMBlockExecutor;
+use velor_vm::VMBlockExecutor;
 use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},

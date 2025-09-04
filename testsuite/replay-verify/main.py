@@ -217,8 +217,8 @@ class WorkerPod:
         ] = self.get_claim_name()
         pod_manifest["spec"]["containers"][0]["name"] = self.get_claim_name()
         pod_manifest["spec"]["containers"][0]["command"] = [
-            "aptos-debugger",
-            "aptos-db",
+            "velor-debugger",
+            "velor-db",
             "replay-on-archive",
             "--start-version",
             str(self.start_version),
@@ -691,7 +691,7 @@ def read_skip_ranges(network: str) -> tuple[int, int, list[tuple[int, int]]]:
 
     end = int(
         json.loads(
-            urllib.request.urlopen(f"https://fullnode.{network}.aptoslabs.com/v1")
+            urllib.request.urlopen(f"https://fullnode.{network}.velorlabs.com/v1")
             .read()
             .decode()
         )["ledger_version"]
@@ -752,7 +752,7 @@ def print_logs(failed_workpod_logs: list[str], txn_mismatch_logs: list[str]) -> 
 
 if __name__ == "__main__":
     args = parse_args()
-    get_kubectl_credentials("aptos-devinfra-0", "us-central1", "devinfra-usce1-0")
+    get_kubectl_credentials("velor-devinfra-0", "us-central1", "devinfra-usce1-0")
     (start, end, skip_ranges) = read_skip_ranges(args.network)
     image = get_image(args.image_tag) if args.image_tag is not None else get_image()
     run_id = f"{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}-{image[-5:]}"

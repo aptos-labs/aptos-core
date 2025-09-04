@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,7 +6,7 @@
 
 use crate::peer_manager::PeerManagerError;
 use anyhow::anyhow;
-use aptos_types::PeerId;
+use velor_types::PeerId;
 use futures::channel::{mpsc, oneshot};
 use std::io;
 use thiserror::Error;

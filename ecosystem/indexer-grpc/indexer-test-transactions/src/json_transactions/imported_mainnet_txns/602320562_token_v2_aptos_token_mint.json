@@ -34,10 +34,10 @@
           "stateKeyHash": "CAvGIn+JorPspCubgMfEQtAkeV9/F5tu2B5rOKeuWHk=",
           "type": {
             "address": "0x4",
-            "module": "aptos_token",
-            "name": "AptosCollection"
+            "module": "velor_token",
+            "name": "VelorCollection"
           },
-          "typeStr": "0x4::aptos_token::AptosCollection",
+          "typeStr": "0x4::velor_token::VelorCollection",
           "data": "{\"mutable_description\":true,\"mutable_token_description\":true,\"mutable_token_name\":true,\"mutable_token_properties\":true,\"mutable_token_uri\":true,\"mutable_uri\":true,\"mutator_ref\":{\"vec\":[{\"self\":\"0x3738dc12733429d94935a8cace840eb3615cbcc2031c6491f6616b8e58e0e7f\"}]},\"royalty_mutator_ref\":{\"vec\":[{\"inner\":{\"self\":\"0x3738dc12733429d94935a8cace840eb3615cbcc2031c6491f6616b8e58e0e7f\"}}]},\"tokens_burnable_by_creator\":true,\"tokens_freezable_by_creator\":true}"
         }
       },
@@ -97,13 +97,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"1175964450\"},\"deposit_events\":{\"counter\":\"4\",\"guid\":{\"id\":{\"addr\":\"0x12479ac53f2d918bb7ad9259bfc4fe10eb0688d4a54ef36be0c23b5174da8f21\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x12479ac53f2d918bb7ad9259bfc4fe10eb0688d4a54ef36be0c23b5174da8f21\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -142,10 +142,10 @@
           "stateKeyHash": "FbWxhzxatUIBB2owoXfv25jWL3mAwMQWkQFnexCgIT0=",
           "type": {
             "address": "0x4",
-            "module": "aptos_token",
-            "name": "AptosToken"
+            "module": "velor_token",
+            "name": "VelorToken"
           },
-          "typeStr": "0x4::aptos_token::AptosToken",
+          "typeStr": "0x4::velor_token::VelorToken",
           "data": "{\"burn_ref\":{\"vec\":[{\"inner\":{\"vec\":[{\"self\":\"0x5d42972f67d68e51862f7c1c5ece9f4135a9a3150ae08be19274b591c77587f2\"}]},\"self\":{\"vec\":[]}}]},\"mutator_ref\":{\"vec\":[{\"self\":\"0x5d42972f67d68e51862f7c1c5ece9f4135a9a3150ae08be19274b591c77587f2\"}]},\"property_mutator_ref\":{\"self\":\"0x5d42972f67d68e51862f7c1c5ece9f4135a9a3150ae08be19274b591c77587f2\"},\"transfer_ref\":{\"vec\":[{\"self\":\"0x5d42972f67d68e51862f7c1c5ece9f4135a9a3150ae08be19274b591c77587f2\"}]}}"
         }
       },
@@ -260,7 +260,7 @@
           "function": {
             "module": {
               "address": "0x4",
-              "name": "aptos_token"
+              "name": "velor_token"
             },
             "name": "mint"
           },
@@ -273,7 +273,7 @@
             "[]",
             "[]"
           ],
-          "entryFunctionIdStr": "0x4::aptos_token::mint"
+          "entryFunctionIdStr": "0x4::velor_token::mint"
         }
       },
       "signature": {

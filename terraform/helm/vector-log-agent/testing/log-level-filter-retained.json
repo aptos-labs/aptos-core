@@ -2,15 +2,15 @@
   "@timestamp.nanos": 163018,
   "kubernetes": {
     "annotations": {
-      "aptos.dev/min-log-level-to-retain": "info"
+      "velor.dev/min-log-level-to-retain": "info"
     },
     "cluster": "forge-0",
-    "container_image": "12355.dkr.ecr.asia-central-2.amazonaws.com/aptos/validator:fd60a8b334afa0eecae0824f6671ae763ca57664",
+    "container_image": "12355.dkr.ecr.asia-central-2.amazonaws.com/velor/validator:fd60a8b334afa0eecae0824f6671ae763ca57664",
     "container_name": "validator",
     "labels": {
       "app.kubernetes.io/instance": "validator-21",
       "app.kubernetes.io/name": "validator",
-      "statefulset.kubernetes.io/pod-name": "aptos-node-21-validator-0",
+      "statefulset.kubernetes.io/pod-name": "velor-node-21-validator-0",
       "forge-namespace": "forge-main"
     },
     "namespace": "forge-main",
@@ -20,9 +20,9 @@
       "topology.kubernetes.io/zone": "asia-central-2a"
     },
     "pod_ip": "192.168.127.54",
-    "pod_name": "aptos-node-21-validator-0",
-    "pod_owner": "StatefulSet/aptos-node-21-validator"
+    "pod_name": "velor-node-21-validator-0",
+    "pod_owner": "StatefulSet/velor-node-21-validator"
   },
-  "message": "{\"level\":\"INFO\",\"source\":{\"package\":\"consensus\",\"file\":\"consensus/src/round_manager.rs:794\"},\"thread_name\":\"consensus\",\"hostname\":\"aptos-node-21-validator-0\",\"namespace\":\"forge-main\",\"timestamp\":\"2022-07-25T03:20:50.815984Z\",\"data\":{\"committed_round\":17,\"info\":\"Normal operation\",\"round\":19}}",
+  "message": "{\"level\":\"INFO\",\"source\":{\"package\":\"consensus\",\"file\":\"consensus/src/round_manager.rs:794\"},\"thread_name\":\"consensus\",\"hostname\":\"velor-node-21-validator-0\",\"namespace\":\"forge-main\",\"timestamp\":\"2022-07-25T03:20:50.815984Z\",\"data\":{\"committed_round\":17,\"info\":\"Normal operation\",\"round\":19}}",
   "stream": "stdout"
 }

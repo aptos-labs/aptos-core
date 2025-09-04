@@ -1,14 +1,14 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_bitvec::BitVec;
-use aptos_config::config::BlockTransactionFilterConfig;
-use aptos_consensus_types::{
+use velor_bitvec::BitVec;
+use velor_config::config::BlockTransactionFilterConfig;
+use velor_consensus_types::{
     block::Block,
     common::{Author, Payload},
 };
-use aptos_executor_types::*;
-use aptos_types::transaction::SignedTransaction;
+use velor_executor_types::*;
+use velor_types::transaction::SignedTransaction;
 use async_trait::async_trait;
 
 mod co_payload_manager;

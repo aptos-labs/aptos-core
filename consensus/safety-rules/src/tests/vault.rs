@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{tests::suite, PersistentSafetyStorage, SafetyRulesManager};
-use aptos_secure_storage::{KVStorage, Storage, VaultStorage};
-use aptos_types::validator_signer::ValidatorSigner;
-use aptos_vault_client::dev::{self, ROOT_TOKEN};
+use velor_secure_storage::{KVStorage, Storage, VaultStorage};
+use velor_types::validator_signer::ValidatorSigner;
+use velor_vault_client::dev::{self, ROOT_TOKEN};
 
 /// A test for verifying VaultStorage properly supports the SafetyRule backend.  This test
 /// depends on running Vault, which can be done by using the provided docker run script in

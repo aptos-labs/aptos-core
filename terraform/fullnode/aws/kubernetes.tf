@@ -78,7 +78,7 @@ resource "helm_release" "fullnode" {
 
 resource "helm_release" "monitoring" {
   count       = var.enable_monitoring ? 1 : 0
-  name        = "aptos-monitoring"
+  name        = "velor-monitoring"
   chart       = local.monitoring_helm_chart_path
   max_history = 5
   wait        = false

@@ -1,0 +1,8 @@
+[package]
+name = "too_large_test"
+version = "0.0.0"
+
+[dependencies]
+VelorFramework = { local = "../../../../../framework/velor-framework" }
+VelorStdlib = { local = "../../../../../framework/velor-stdlib" }
+MoveStdlib = { local = "../../../../../framework/move-stdlib" }

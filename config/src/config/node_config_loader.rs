@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
     },
     utils::get_genesis_txn,
 };
-use aptos_types::{
+use velor_types::{
     chain_id::ChainId,
     on_chain_config::OnChainConfig,
     state_store::state_key::StateKey,

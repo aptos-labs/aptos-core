@@ -1,0 +1,8 @@
+apiVersion: v2
+name: velor-node
+version: 1.0.0
+appVersion: 1.0.0
+description: Velor blockchain node deployment
+home: https://velorlabs.com/
+sources:
+- https://github.com/velor-chain/velor-core

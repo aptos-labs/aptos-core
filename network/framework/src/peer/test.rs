@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -24,13 +24,13 @@ use crate::{
     transport::{Connection, ConnectionId, ConnectionMetadata},
     ProtocolId,
 };
-use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::{config::PeerRole, network_id::NetworkContext};
-use aptos_logger::info;
-use aptos_memsocket::MemorySocket;
-use aptos_netcore::transport::ConnectionOrigin;
-use aptos_time_service::{MockTimeService, TimeService};
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use velor_channels::{self, velor_channel, message_queues::QueueStyle};
+use velor_config::{config::PeerRole, network_id::NetworkContext};
+use velor_logger::info;
+use velor_memsocket::MemorySocket;
+use velor_netcore::transport::ConnectionOrigin;
+use velor_time_service::{MockTimeService, TimeService};
+use velor_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{
     channel::oneshot,
@@ -57,13 +57,13 @@ fn build_test_peer(
     time_service: TimeService,
     origin: ConnectionOrigin,
     upstream_handlers: Arc<
-        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
+        HashMap<ProtocolId, velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
     >,
 ) -> (
     Peer<MemorySocket>,
     PeerHandle,
     MemorySocket,
-    aptos_channels::Receiver<TransportNotification<MemorySocket>>,
+    velor_channels::Receiver<TransportNotification<MemorySocket>>,
 ) {
     let (a, b) = MemorySocket::new_pair();
     let peer_id = PeerId::random();
@@ -80,9 +80,9 @@ fn build_test_peer(
         socket: a,
     };
 
-    let (connection_notifs_tx, connection_notifs_rx) = aptos_channels::new_test(1);
+    let (connection_notifs_tx, connection_notifs_rx) = velor_channels::new_test(1);
     let (peer_reqs_tx, peer_reqs_rx) =
-        aptos_channel::new(QueueStyle::FIFO, NETWORK_CHANNEL_SIZE, None);
+        velor_channel::new(QueueStyle::FIFO, NETWORK_CHANNEL_SIZE, None);
 
     let peer = Peer::new(
         NetworkContext::mock(),
@@ -107,21 +107,21 @@ fn build_test_connected_peers(
     executor: Handle,
     time_service: TimeService,
     upstream_handlers_a: Arc<
-        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
+        HashMap<ProtocolId, velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
     >,
     upstream_handlers_b: Arc<
-        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
+        HashMap<ProtocolId, velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
     >,
 ) -> (
     (
         Peer<MemorySocket>,
         PeerHandle,
-        aptos_channels::Receiver<TransportNotification<MemorySocket>>,
+        velor_channels::Receiver<TransportNotification<MemorySocket>>,
     ),
     (
         Peer<MemorySocket>,
         PeerHandle,
-        aptos_channels::Receiver<TransportNotification<MemorySocket>>,
+        velor_channels::Receiver<TransportNotification<MemorySocket>>,
     ),
 ) {
     let (peer_a, peer_handle_a, connection_a, connection_notifs_rx_a) = build_test_peer(
@@ -160,7 +160,7 @@ fn build_network_sink_stream(
 async fn assert_disconnected_event(
     peer_id: PeerId,
     reason: DisconnectReason,
-    connection_notifs_rx: &mut aptos_channels::Receiver<TransportNotification<MemorySocket>>,
+    connection_notifs_rx: &mut velor_channels::Receiver<TransportNotification<MemorySocket>>,
 ) {
     match connection_notifs_rx.next().await {
         Some(TransportNotification::Disconnected(metadata, actual_reason)) => {
@@ -172,7 +172,7 @@ async fn assert_disconnected_event(
 }
 
 #[derive(Clone)]
-struct PeerHandle(aptos_channel::Sender<ProtocolId, PeerRequest>);
+struct PeerHandle(velor_channel::Sender<ProtocolId, PeerRequest>);
 
 impl PeerHandle {
     fn send_direct_send(&mut self, message: Message) {
@@ -203,7 +203,7 @@ impl PeerHandle {
 // Sending an outbound DirectSend should write it to the wire.
 #[test]
 fn peer_send_message() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let upstream_handlers = Arc::new(HashMap::new());
     let (peer, mut peer_handle, mut connection, _connection_notifs_rx) = build_test_peer(
@@ -244,11 +244,11 @@ fn peer_send_message() {
 }
 
 fn test_upstream_handlers() -> (
-    Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
-    aptos_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage>,
+    Arc<HashMap<ProtocolId, velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
+    velor_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage>,
 ) {
     let mut upstream_handlers = HashMap::new();
-    let (sender, receiver) = aptos_channel::new(QueueStyle::FIFO, 100, None);
+    let (sender, receiver) = velor_channel::new(QueueStyle::FIFO, 100, None);
     upstream_handlers.insert(PROTOCOL, sender);
     let upstream_handlers = Arc::new(upstream_handlers);
     (upstream_handlers, receiver)
@@ -258,7 +258,7 @@ fn test_upstream_handlers() -> (
 // an inbound DirectSend.
 #[test]
 fn peer_recv_message() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (upstream_handlers, mut receiver) = test_upstream_handlers();
     let (peer, _peer_handle, connection, _connection_notifs_rx) = build_test_peer(
@@ -310,7 +310,7 @@ fn peer_recv_message() {
 // other and then shutdown gracefully.
 #[test]
 fn peers_send_message_concurrent() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (upstream_handlers_a, mut prot_a_rx) = test_upstream_handlers();
     let (upstream_handlers_b, mut prot_b_rx) = test_upstream_handlers();
@@ -385,7 +385,7 @@ fn peers_send_message_concurrent() {
 
 #[test]
 fn peer_recv_rpc() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (upstream_handlers, mut prot_rx) = test_upstream_handlers();
     let (peer, _peer_handle, mut connection, _connection_notifs_rx) = build_test_peer(
@@ -456,7 +456,7 @@ fn peer_recv_rpc() {
 
 #[test]
 fn peer_recv_rpc_concurrent() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (upstream_handlers, mut prot_rx) = test_upstream_handlers();
     let (peer, _peer_handle, mut connection, _connection_notifs_rx) = build_test_peer(
@@ -522,7 +522,7 @@ fn peer_recv_rpc_concurrent() {
 
 #[test]
 fn peer_recv_rpc_timeout() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let mock_time = MockTimeService::new();
     let (upstream_handlers, mut prot_rx) = test_upstream_handlers();
@@ -580,7 +580,7 @@ fn peer_recv_rpc_timeout() {
 
 #[test]
 fn peer_recv_rpc_cancel() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (upstream_handlers, mut prot_rx) = test_upstream_handlers();
     let (peer, _peer_handle, mut connection, _connection_notifs_rx) = build_test_peer(
@@ -633,7 +633,7 @@ fn peer_recv_rpc_cancel() {
 
 #[test]
 fn peer_send_rpc() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let upstream_handlers = Arc::new(HashMap::new());
     let (peer, mut peer_handle, mut connection, _connection_notifs_rx) = build_test_peer(
@@ -693,7 +693,7 @@ fn peer_send_rpc() {
 
 #[test]
 fn peer_send_rpc_concurrent() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let upstream_handlers = Arc::new(HashMap::new());
     let (peer, peer_handle, mut connection, _connection_notifs_rx) = build_test_peer(
@@ -763,7 +763,7 @@ fn peer_send_rpc_concurrent() {
 
 #[test]
 fn peer_send_rpc_cancel() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let upstream_handlers = Arc::new(HashMap::new());
     let (peer, peer_handle, mut connection, _connection_notifs_rx) = build_test_peer(
@@ -824,7 +824,7 @@ fn peer_send_rpc_cancel() {
 
 #[test]
 fn peer_send_rpc_timeout() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let mock_time = MockTimeService::new();
     let upstream_handlers = Arc::new(HashMap::new());
@@ -890,7 +890,7 @@ fn peer_send_rpc_timeout() {
 // PeerManager can request a Peer to shutdown.
 #[test]
 fn peer_disconnect_request() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let upstream_handlers = Arc::new(HashMap::new());
     let (peer, peer_handle, _connection, mut connection_notifs_rx) = build_test_peer(
@@ -917,7 +917,7 @@ fn peer_disconnect_request() {
 // Peer will shutdown if the underlying connection is lost.
 #[test]
 fn peer_disconnect_connection_lost() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let upstream_handlers = Arc::new(HashMap::new());
     let (peer, _peer_handle, mut connection, mut connection_notifs_rx) = build_test_peer(
@@ -942,7 +942,7 @@ fn peer_disconnect_connection_lost() {
 
 #[test]
 fn peer_terminates_when_request_tx_has_dropped() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let upstream_handlers = Arc::new(HashMap::new());
     let (peer, peer_handle, _connection, _connection_notifs_rx) = build_test_peer(
@@ -961,7 +961,7 @@ fn peer_terminates_when_request_tx_has_dropped() {
 
 #[test]
 fn peers_send_multiplex() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (upstream_handlers_a, mut prot_a_rx) = test_upstream_handlers();
     let (upstream_handlers_b, mut prot_b_rx) = test_upstream_handlers();

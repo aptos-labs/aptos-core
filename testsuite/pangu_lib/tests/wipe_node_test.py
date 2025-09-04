@@ -12,7 +12,7 @@ class node_wipe_node(unittest.TestCase):
         #
         # Init vars
         kubernetes: SpyKubernetes = SpyKubernetes()
-        expected_command = f"rm -rf {util.APTOS_DATA_DIR}/db/{util.LEDGER_DB_NAME} {util.APTOS_DATA_DIR}/db/{util.STATE_MERKLE_DB_NAME} {util.APTOS_DATA_DIR}/db/{util.STATE_SYNC_DB_NAME}"
+        expected_command = f"rm -rf {util.VELOR_DATA_DIR}/db/{util.LEDGER_DB_NAME} {util.VELOR_DATA_DIR}/db/{util.STATE_MERKLE_DB_NAME} {util.VELOR_DATA_DIR}/db/{util.STATE_SYNC_DB_NAME}"
         stateful_set = client.V1StatefulSet(
             metadata=client.V1ObjectMeta(name="node"),
             status=client.V1StatefulSetStatus(replicas=0),

@@ -3,8 +3,8 @@ name = "pack_token_objects"
 version = "0.0.0"
 
 [dependencies]
-AptosFramework = { local = "../../../../../aptos-move/framework/aptos-framework" }
-AptosTokenObjects = { local = "../../../../../aptos-move/framework/aptos-token-objects" }
+VelorFramework = { local = "../../../../../velor-move/framework/velor-framework" }
+VelorTokenObjects = { local = "../../../../../velor-move/framework/velor-token-objects" }
 
 [addresses]
 addr = "_"

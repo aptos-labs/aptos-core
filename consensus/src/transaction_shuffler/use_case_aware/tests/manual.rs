@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction_shuffler::use_case_aware::{
@@ -7,8 +7,8 @@ use crate::transaction_shuffler::use_case_aware::{
     tests::{Account, Contract},
     Config,
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
-use aptos_types::{
+use velor_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+use velor_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
@@ -305,10 +305,10 @@ fn test_different_transaction_types() {
     transactions.push(signed_txn);
 
     // Multisig transaction with Payload
-    let multisig_payload = TransactionPayload::Multisig(aptos_types::transaction::Multisig {
+    let multisig_payload = TransactionPayload::Multisig(velor_types::transaction::Multisig {
         multisig_address: AccountAddress::from_str("0x4").unwrap(),
         transaction_payload: Some(
-            aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
+            velor_types::transaction::MultisigTransactionPayload::EntryFunction(
                 EntryFunction::new(
                     ModuleId::new(
                         AccountAddress::from_str("0x1").unwrap(),
@@ -458,10 +458,10 @@ fn test_different_transaction_types() {
     transactions.push(signed_txn);
 
     // Multisig transaction
-    let multisig_payload = TransactionPayload::Multisig(aptos_types::transaction::Multisig {
+    let multisig_payload = TransactionPayload::Multisig(velor_types::transaction::Multisig {
         multisig_address: AccountAddress::from_str("0x4").unwrap(),
         transaction_payload: Some(
-            aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
+            velor_types::transaction::MultisigTransactionPayload::EntryFunction(
                 EntryFunction::new(
                     ModuleId::new(
                         AccountAddress::from_str("0x1").unwrap(),
@@ -488,10 +488,10 @@ fn test_different_transaction_types() {
     transactions.push(signed_txn);
 
     // Add another transaction for sender 4 with Payload multisig
-    let multisig_payload = TransactionPayload::Multisig(aptos_types::transaction::Multisig {
+    let multisig_payload = TransactionPayload::Multisig(velor_types::transaction::Multisig {
         multisig_address: AccountAddress::from_str("0x4").unwrap(),
         transaction_payload: Some(
-            aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
+            velor_types::transaction::MultisigTransactionPayload::EntryFunction(
                 EntryFunction::new(
                     ModuleId::new(
                         AccountAddress::from_str("0x1").unwrap(),

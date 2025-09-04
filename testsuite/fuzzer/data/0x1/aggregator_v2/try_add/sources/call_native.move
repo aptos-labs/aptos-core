@@ -1,5 +1,5 @@
 module poc::try_add {
-    use aptos_framework::aggregator_v2;
+    use velor_framework::aggregator_v2;
 
     const U64_MAX: u64 = 18446744073709551615u64;
 

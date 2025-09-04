@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
-use aptos_transaction_generator_lib::{create_prebuilt_packages_bundle, PrebuiltPackageConfig};
+use velor_transaction_generator_lib::{create_prebuilt_packages_bundle, PrebuiltPackageConfig};
 use clap::Parser;
 use std::{
     fs, io,
@@ -24,7 +24,7 @@ struct Args {
     /// Root directory where the Rust file to access prebuilt packages will be saved.
     #[clap(long)]
     prebuilt_packages_rust_dir: PathBuf,
-    /// If true, uses local aptos-framework from aptos-core.
+    /// If true, uses local velor-framework from velor-core.
     #[clap(long)]
     use_local_std: bool,
 }

@@ -23,7 +23,7 @@ module "eks" {
   source                      = "../../modules/eks"
   region                      = var.region
   workspace_name_override     = "pfn-${local.workspace_name}"
-  eks_cluster_name            = "aptos-pfn-${local.workspace_name}"
+  eks_cluster_name            = "velor-pfn-${local.workspace_name}"
   iam_path                    = var.iam_path
   k8s_admins                  = var.k8s_admins
   k8s_admin_roles             = var.k8s_admin_roles
@@ -34,27 +34,27 @@ module "eks" {
   num_extra_instance          = var.num_extra_instance
 }
 
-data "aws_eks_cluster" "aptos" {
+data "aws_eks_cluster" "velor" {
   depends_on = [
     module.eks
   ]
-  name = "aptos-pfn-${local.workspace_name}"
+  name = "velor-pfn-${local.workspace_name}"
 }
 
-data "aws_eks_cluster_auth" "aptos" {
-  name = data.aws_eks_cluster.aptos.name
+data "aws_eks_cluster_auth" "velor" {
+  name = data.aws_eks_cluster.velor.name
 }
 
 provider "helm" {
   kubernetes {
     host                   = module.eks.kubernetes.kubernetes_host
     cluster_ca_certificate = module.eks.kubernetes.kubernetes_ca_cert
-    token                  = data.aws_eks_cluster_auth.aptos.token
+    token                  = data.aws_eks_cluster_auth.velor.token
   }
 }
 
 provider "kubernetes" {
   host                   = module.eks.kubernetes.kubernetes_host
   cluster_ca_certificate = module.eks.kubernetes.kubernetes_ca_cert
-  token                  = data.aws_eks_cluster_auth.aptos.token
+  token                  = data.aws_eks_cluster_auth.velor.token
 }

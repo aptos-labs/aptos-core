@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,7 +6,7 @@
 
 pub mod dev;
 
-use aptos_crypto::{
+use velor_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature, ED25519_PRIVATE_KEY_LENGTH},
     PrivateKey,
 };
@@ -61,8 +61,8 @@ impl From<base64::DecodeError> for Error {
     }
 }
 
-impl From<aptos_crypto::traits::CryptoMaterialError> for Error {
-    fn from(error: aptos_crypto::traits::CryptoMaterialError) -> Self {
+impl From<velor_crypto::traits::CryptoMaterialError> for Error {
+    fn from(error: velor_crypto::traits::CryptoMaterialError) -> Self {
         Self::SerializationError(format!("{}", error))
     }
 }

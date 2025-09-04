@@ -1,7 +1,7 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::authenticator::{AnyPublicKey, AnySignature, EphemeralPublicKey};
+use velor_types::transaction::authenticator::{AnyPublicKey, AnySignature, EphemeralPublicKey};
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 pub mod account_recovery_db;

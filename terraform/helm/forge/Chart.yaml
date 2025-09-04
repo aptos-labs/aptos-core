@@ -1,4 +1,4 @@
 apiVersion: v2
 name: forge
-description: Aptos Forge test framework
+description: Velor Forge test framework
 version: 0.2.0

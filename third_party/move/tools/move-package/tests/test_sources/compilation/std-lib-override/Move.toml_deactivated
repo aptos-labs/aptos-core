@@ -8,10 +8,10 @@ A = "0x42"
 
 [dev-addresses]
 
-[dependencies.AptosFramework]
-git = "https://github.com/aptos-labs/aptos-core.git"
+[dependencies.VelorFramework]
+git = "https://github.com/velor-chain/velor-core.git"
 rev = "devnet"
-subdir = "aptos-move/framework/aptos-framework"
+subdir = "velor-move/framework/velor-framework"
 
 [dependencies.B]
 local = "./deps_only"

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -37,7 +37,7 @@ use crate::{
                 TokenOwnershipV2,
             },
             v2_token_utils::{
-                AptosCollection, BurnEvent, FixedSupply, ObjectWithMetadata, PropertyMap, TokenV2,
+                VelorCollection, BurnEvent, FixedSupply, ObjectWithMetadata, PropertyMap, TokenV2,
                 TokenV2AggregatedData, TokenV2AggregatedDataMapping, TokenV2Burned, TransferEvent,
                 UnlimitedSupply,
             },
@@ -46,7 +46,7 @@ use crate::{
     schema,
     util::{parse_timestamp, standardize_address, truncate_str},
 };
-use aptos_api_types::{Transaction, TransactionPayload, WriteSetChange};
+use velor_api_types::{Transaction, TransactionPayload, WriteSetChange};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
@@ -68,7 +68,7 @@ impl TokenTransactionProcessor {
         ans_contract_address: Option<String>,
         nft_points_contract: Option<String>,
     ) -> Self {
-        aptos_logger::info!(
+        velor_logger::info!(
             ans_contract_address = ans_contract_address,
             "init TokenTransactionProcessor"
         );
@@ -188,7 +188,7 @@ fn insert_to_db(
         Vec<CurrentTokenV2Metadata>,
     ),
 ) -> Result<(), diesel::result::Error> {
-    aptos_logger::trace!(
+    velor_logger::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,
@@ -1098,7 +1098,7 @@ fn parse_v2_token(
                         token_v2_metadata_helper.insert(
                             standardize_address(&wr.address.to_string()),
                             TokenV2AggregatedData {
-                                aptos_collection: None,
+                                velor_collection: None,
                                 fixed_supply: None,
                                 object,
                                 unlimited_supply: None,
@@ -1129,10 +1129,10 @@ fn parse_v2_token(
                         {
                             aggregated_data.unlimited_supply = Some(unlimited_supply);
                         }
-                        if let Some(aptos_collection) =
-                            AptosCollection::from_write_resource(wr, txn_version).unwrap()
+                        if let Some(velor_collection) =
+                            VelorCollection::from_write_resource(wr, txn_version).unwrap()
                         {
-                            aggregated_data.aptos_collection = Some(aptos_collection);
+                            aggregated_data.velor_collection = Some(velor_collection);
                         }
                         if let Some(property_map) =
                             PropertyMap::from_write_resource(wr, txn_version).unwrap()

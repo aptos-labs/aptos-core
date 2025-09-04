@@ -1,7 +1,7 @@
 module 0xABCD::fungible_asset_example {
-    use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata};
-    use aptos_framework::object::{Self, Object};
-    use aptos_framework::primary_fungible_store;
+    use velor_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata};
+    use velor_framework::object::{Self, Object};
+    use velor_framework::primary_fungible_store;
     use std::error;
     use std::signer;
     use std::string::utf8;
@@ -12,7 +12,7 @@ module 0xABCD::fungible_asset_example {
 
     const ASSET_SYMBOL: vector<u8> = b"FA";
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = velor_framework::object::ObjectGroup)]
     /// Hold refs to control the minting, transfer and burning of fungible assets.
     struct ManagedFungibleAsset has key {
         mint_ref: MintRef,

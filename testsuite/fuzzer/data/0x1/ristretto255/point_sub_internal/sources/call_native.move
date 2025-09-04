@@ -1,5 +1,5 @@
 module poc::point_sub_internal {
-    use aptos_std::ristretto255::{Self, RistrettoPoint};
+    use velor_std::ristretto255::{Self, RistrettoPoint};
 
     public entry fun main(_owner: &signer) {
         let point1: RistrettoPoint = ristretto255::basepoint();

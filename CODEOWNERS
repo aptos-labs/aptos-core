@@ -1,36 +1,36 @@
 # **Please** keep this file ordered alphabetically by directory paths.
 
 # Owners for the `.github` directory and all its subdirectories.
-/.github/ @aptos-labs/prod-eng
+/.github/ @velor-chain/prod-eng
 
 # Owners for the `/api` directory and all its subdirectories.
 /api/ @banool @gregnazario @0xmaayan
 
-# Owners for the `/aptos-move` directory and its subdirectories:`aptos-gas`, `aptos-vm`, `framework` and `framework/aptos-stdlib/sources/cryptography`.
-/aptos-move/aptos-aggregator/ @georgemitenkov @gelash @zekun000
-/aptos-move/aptos-gas/ @vgao1996
-/aptos-move/aptos-vm/ @davidiw @wrwg @zekun000 @vgao1996 @georgemitenkov
-/aptos-move/aptos-vm/src/keyless_validation.rs @alinush @heliuchuan
-/aptos-move/aptos-vm-types/ @georgemitenkov @gelash @vgao1996
-/aptos-move/framework/ @davidiw @movekevin @wrwg
-/aptos-move/framework/aptos-framework/sources/account.move @alinush
-/aptos-move/framework/aptos-framework/sources/jwks.move @zjma
-/aptos-move/framework/aptos-framework/sources/keyless_account.move @alinush
-/aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush @zjma @mstraka100
-/aptos-move/framework/**/*.spec.move @junkil-park
-/aptos-move/framework/aptos-stdlib/sources/hash.move @alinush
+# Owners for the `/velor-move` directory and its subdirectories:`velor-gas`, `velor-vm`, `framework` and `framework/velor-stdlib/sources/cryptography`.
+/velor-move/velor-aggregator/ @georgemitenkov @gelash @zekun000
+/velor-move/velor-gas/ @vgao1996
+/velor-move/velor-vm/ @davidiw @wrwg @zekun000 @vgao1996 @georgemitenkov
+/velor-move/velor-vm/src/keyless_validation.rs @alinush @heliuchuan
+/velor-move/velor-vm-types/ @georgemitenkov @gelash @vgao1996
+/velor-move/framework/ @davidiw @movekevin @wrwg
+/velor-move/framework/velor-framework/sources/account.move @alinush
+/velor-move/framework/velor-framework/sources/jwks.move @zjma
+/velor-move/framework/velor-framework/sources/keyless_account.move @alinush
+/velor-move/framework/velor-stdlib/sources/cryptography/ @alinush @zjma @mstraka100
+/velor-move/framework/**/*.spec.move @junkil-park
+/velor-move/framework/velor-stdlib/sources/hash.move @alinush
 
-# Owner for aptos-token, cryptography natives, parallel-executor and vm-genesis.
-/aptos-move/framework/aptos-token @areshand
-/aptos-move/framework/src/natives/cryptography/ @alinush @zjma @mstraka100
-/aptos-move/framework/src/natives/aggregator_natives/ @georgemitenkov @gelash @zekun000
-/aptos-move/block-executor/ @gelash @zekun000 @sasha8 @danielxiangzl
-/aptos-move/sharded_block-executor/ @sitalkedia
-/aptos-move/mvhashmap/ @gelash @runtian-zhou @sasha8 @danielxiangzl
-/aptos-move/vm-genesis/ @davidiw @movekevin
+# Owner for velor-token, cryptography natives, parallel-executor and vm-genesis.
+/velor-move/framework/velor-token @areshand
+/velor-move/framework/src/natives/cryptography/ @alinush @zjma @mstraka100
+/velor-move/framework/src/natives/aggregator_natives/ @georgemitenkov @gelash @zekun000
+/velor-move/block-executor/ @gelash @zekun000 @sasha8 @danielxiangzl
+/velor-move/sharded_block-executor/ @sitalkedia
+/velor-move/mvhashmap/ @gelash @runtian-zhou @sasha8 @danielxiangzl
+/velor-move/vm-genesis/ @davidiw @movekevin
 
-# Owner for aptos node (to prevent things from becoming out of hand :D)
-/aptos-node/ @joshlind
+# Owner for velor node (to prevent things from becoming out of hand :D)
+/velor-node/ @joshlind
 
 # Owner for the node configs (to prevent things from becoming out of hand :D)
 /config/ @joshlind @gregnazario
@@ -44,47 +44,47 @@
 # Owners for quorum store.
 /consensus/src/quorum_store/ @bchocho @sasha8 @gelash
 
-# Owners for the `/crates/aptos` directory and all its subdirectories.
-/crates/aptos @gregnazario @banool
+# Owners for the `/crates/velor` directory and all its subdirectories.
+/crates/velor @gregnazario @banool
 
-# Owners for the `/crates/aptos-crypto*` directories.
-/crates/aptos-crypto-derive/ @alinush @zjma @mstraka100 @rex1fernando
-/crates/aptos-crypto/ @alinush @zjma @mstraka100 @rex1fernando
+# Owners for the `/crates/velor-crypto*` directories.
+/crates/velor-crypto-derive/ @alinush @zjma @mstraka100 @rex1fernando
+/crates/velor-crypto/ @alinush @zjma @mstraka100 @rex1fernando
 
-# Owners for the `/crates/aptos-faucet` directory and all its subdirectories. And other faucet, genesis, and OpenAPI-related crates.
-/crates/aptos-faucet @banool @gregnazario
-/crates/aptos-genesis @gregnazario
+# Owners for the `/crates/velor-faucet` directory and all its subdirectories. And other faucet, genesis, and OpenAPI-related crates.
+/crates/velor-faucet @banool @gregnazario
+/crates/velor-genesis @gregnazario
 
-# Owners for the aptos-logger crate
-/crates/aptos-logger @gregnazario @joshlind
+# Owners for the velor-logger crate
+/crates/velor-logger @gregnazario @joshlind
 
-/crates/aptos-open-api @banool @gregnazario
+/crates/velor-open-api @banool @gregnazario
 
-# Owners for the aptos-protos crate
-/crates/aptos-protos @banool @bowenyang007 @jillxuu @larry-aptos @rtso  @aptos-labs/ecosystem-infra
+# Owners for the velor-protos crate
+/crates/velor-protos @banool @bowenyang007 @jillxuu @larry-velor @rtso  @velor-chain/ecosystem-infra
 
-/crates/aptos-rest-client @banool @gregnazario
+/crates/velor-rest-client @banool @gregnazario
 
-# Owners for the `/aptos-rosetta` directory and related crates.
-/crates/aptos-rosetta @gregnazario
-/crates/aptos-rosetta-cli @gregnazario
+# Owners for the `/velor-rosetta` directory and related crates.
+/crates/velor-rosetta @gregnazario
+/crates/velor-rosetta-cli @gregnazario
 
-# Owners for the aptos-speculative-state-helper crate
-/crates/aptos-speculative-state-helper @gelash
+# Owners for the velor-speculative-state-helper crate
+/crates/velor-speculative-state-helper @gelash
 
 # Owners for the `telemetry` related crates.
-/crates/aptos-telemetry @ibalajiarun @geekflyer
-/crates/aptos-telemetry-service @ibalajiarun @geekflyer
+/crates/velor-telemetry @ibalajiarun @geekflyer
+/crates/velor-telemetry-service @ibalajiarun @geekflyer
 
 # Owners for the inspection-service crate
 /crates/inspection-service/ @joshlind
 
 # Owners for the `/dashboards` directory and all its subdirectories.
-/dashboards/ @aptos-labs/prod-eng
+/dashboards/ @velor-chain/prod-eng
 
 # Owners for the `/docker` directory and all its subdirectories.
-/docker/ @aptos-labs/prod-eng
-/docker/builder/docker-bake-rust-all.hcl @aptos-labs/prod-eng @aptos-labs/security
+/docker/ @velor-chain/prod-eng
+/docker/builder/docker-bake-rust-all.hcl @velor-chain/prod-eng @velor-chain/security
 
 # Owners for execution and storage.
 /execution/ @msmouse @lightmark @grao1991
@@ -96,7 +96,7 @@
 /network/ @joshlind @zekun000
 
 # Owners for the scripts
-/scripts/ @aptos-labs/prod-eng
+/scripts/ @velor-chain/prod-eng
 /scripts/authenticator_regenerate.sh @alinush @hariria @heliuchuan
 /scripts/algebra-gas/ @zjma
 
@@ -107,10 +107,10 @@
 /storage/ @msmouse @lightmark @grao1991
 
 # Owners for the `/terraform` directory and all its subdirectories.
-/terraform/ @aptos-labs/prod-eng
+/terraform/ @velor-chain/prod-eng
 
-# Owners for the `aptos-dkg` crate.
-/crates/aptos-dkg @alinush @rex1fernando
+# Owners for the `velor-dkg` crate.
+/crates/velor-dkg @alinush @rex1fernando
 
 /types/src/keyless/ @alinush @heliuchuan
 /types/src/transaction/authenticator.rs @alinush @mstraka100

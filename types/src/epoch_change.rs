@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn verify_epoch_change_proof() {
         use crate::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
-        use aptos_crypto::hash::HashValue;
+        use velor_crypto::hash::HashValue;
 
         let all_epoch: Vec<u64> = (1..=10).collect();
         let mut valid_ledger_info = vec![];

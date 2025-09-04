@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -25,7 +25,7 @@ mod stateful_set;
 mod swarm;
 
 use super::{ForgeDeployerManager, FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO};
-use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
+use velor_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 pub use cluster_helper::*;
 pub use constants::*;
 pub use fullnode::*;

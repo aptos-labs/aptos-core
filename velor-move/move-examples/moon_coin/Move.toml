@@ -1,0 +1,9 @@
+[package]
+name = "Examples"
+version = "0.0.0"
+
+[addresses]
+MoonCoin = "_"
+
+[dependencies]
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-framework", rev = "mainnet" }

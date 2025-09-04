@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -21,15 +21,15 @@ use crate::{
     },
     PeerState,
 };
-use aptos_config::{
+use velor_config::{
     config::{NodeConfig, PeerMonitoringServiceConfig, PeerRole},
     network_id::NetworkId,
 };
-use aptos_peer_monitoring_service_types::{
+use velor_peer_monitoring_service_types::{
     request::PeerMonitoringServiceRequest,
     response::{LatencyPingResponse, PeerMonitoringServiceResponse},
 };
-use aptos_time_service::TimeServiceTrait;
+use velor_time_service::TimeServiceTrait;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 

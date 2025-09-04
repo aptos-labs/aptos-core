@@ -1,0 +1,5 @@
+processed 3 tasks
+task 1 lines 4-46:  publish --private-key Alice [module Alice::game {]
+task 2 lines 48-48:  run Alice::game::test_upgrade --signers Alice --private-key Alice
+mutable inputs after call: local#0: 0
+return values: 0

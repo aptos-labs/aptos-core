@@ -1,0 +1,34 @@
+[package]
+name = "velor-move-stdlib"
+version = "0.1.1"
+edition = "2021"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Diem stdlib"
+repository = "https://github.com/diem/diem"
+homepage = "https://diem.com"
+license = "Apache-2.0"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+velor-gas-schedule = { workspace = true }
+velor-native-interface = { workspace = true }
+velor-types = { workspace = true }
+bcs = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
+sha2 = { workspace = true }
+sha3 = { workspace = true }
+smallvec = { workspace = true }
+
+[dev-dependencies]
+dir-diff = "0.3.2"
+file_diff = "1.0.0"
+move-cli = { workspace = true }
+move-package = { workspace = true }
+move-unit-test = { workspace = true }
+tempfile = { workspace = true }
+
+[features]
+testing = []

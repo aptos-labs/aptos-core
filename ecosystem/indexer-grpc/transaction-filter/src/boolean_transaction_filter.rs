@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -7,7 +7,7 @@ use crate::{
     traits::Filterable,
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
+use velor_protos::transaction::v1::{transaction::TxnData, Transaction};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -46,31 +46,31 @@ impl From<EventFilter> for BooleanTransactionFilter {
     }
 }
 
-impl From<BooleanTransactionFilter> for aptos_protos::indexer::v1::BooleanTransactionFilter {
+impl From<BooleanTransactionFilter> for velor_protos::indexer::v1::BooleanTransactionFilter {
     fn from(boolean_transaction_filter: BooleanTransactionFilter) -> Self {
         match boolean_transaction_filter {
             BooleanTransactionFilter::And(logical_and) => {
-                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                velor_protos::indexer::v1::BooleanTransactionFilter {
                     filter: Some(
-                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalAnd(
+                        velor_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalAnd(
                             logical_and.into(),
                         ),
                     ),
                 }
             },
             BooleanTransactionFilter::Or(logical_or) => {
-                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                velor_protos::indexer::v1::BooleanTransactionFilter {
                     filter: Some(
-                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalOr(
+                        velor_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalOr(
                             logical_or.into(),
                         ),
                     ),
                 }
             },
             BooleanTransactionFilter::Not(logical_not) => {
-                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                velor_protos::indexer::v1::BooleanTransactionFilter {
                     filter: Some(
-                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalNot(
+                        velor_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalNot(
                             // We do not `impl From` for `LogicalNot` because it is a recursive type that only contains a `Box<BooleanTransactionFilter>`
                             Box::new((*logical_not.not).into()),
                         ),
@@ -78,9 +78,9 @@ impl From<BooleanTransactionFilter> for aptos_protos::indexer::v1::BooleanTransa
                 }
             },
             BooleanTransactionFilter::Filter(api_filter) => {
-                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                velor_protos::indexer::v1::BooleanTransactionFilter {
                     filter: Some(
-                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
+                        velor_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
                             api_filter.into(),
                         ),
                     ),
@@ -92,7 +92,7 @@ impl From<BooleanTransactionFilter> for aptos_protos::indexer::v1::BooleanTransa
 
 impl BooleanTransactionFilter {
     pub fn new_from_proto(
-        proto_filter: aptos_protos::indexer::v1::BooleanTransactionFilter,
+        proto_filter: velor_protos::indexer::v1::BooleanTransactionFilter,
         max_filter_size: Option<usize>,
     ) -> Result<Self> {
         if let Some(max_filter_size) = max_filter_size {
@@ -110,23 +110,23 @@ impl BooleanTransactionFilter {
                 .filter
                 .ok_or(anyhow!("Oneof is not set in BooleanTransactionFilter."))?
             {
-                aptos_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
+                velor_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
                     api_filter,
                 ) => TryInto::<APIFilter>::try_into(api_filter)?.into(),
-                aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalAnd(
+                velor_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalAnd(
                     logical_and,
                 ) => BooleanTransactionFilter::And(logical_and.try_into()?),
-                aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalOr(
+                velor_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalOr(
                     logical_or,
                 ) => BooleanTransactionFilter::Or(logical_or.try_into()?),
-                aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalNot(
+                velor_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalNot(
                     logical_not,
                 ) => BooleanTransactionFilter::Not(logical_not.try_into()?),
             },
         )
     }
 
-    pub fn into_proto(self) -> aptos_protos::indexer::v1::BooleanTransactionFilter {
+    pub fn into_proto(self) -> velor_protos::indexer::v1::BooleanTransactionFilter {
         self.into()
     }
 
@@ -136,8 +136,8 @@ impl BooleanTransactionFilter {
     /// # Example
     ///
     /// ```
-    /// use aptos_transaction_filter::BooleanTransactionFilter;
-    /// use aptos_transaction_filter::filters::{EventFilterBuilder, MoveStructTagFilterBuilder, UserTransactionFilterBuilder};
+    /// use velor_transaction_filter::BooleanTransactionFilter;
+    /// use velor_transaction_filter::filters::{EventFilterBuilder, MoveStructTagFilterBuilder, UserTransactionFilterBuilder};
     ///
     /// fn example() -> Result<BooleanTransactionFilter, anyhow::Error> {
     ///   // Create a filter for user transactions where the sender is "0x1"
@@ -166,8 +166,8 @@ impl BooleanTransactionFilter {
     /// # Example
     ///
     /// ```
-    /// use aptos_transaction_filter::BooleanTransactionFilter;
-    /// use aptos_transaction_filter::filters::{EventFilterBuilder, MoveStructTagFilterBuilder, UserTransactionFilterBuilder};
+    /// use velor_transaction_filter::BooleanTransactionFilter;
+    /// use velor_transaction_filter::filters::{EventFilterBuilder, MoveStructTagFilterBuilder, UserTransactionFilterBuilder};
     ///
     /// fn example() -> Result<BooleanTransactionFilter, anyhow::Error> {
     ///   // Create a filter for user transactions where the sender is "0x1"
@@ -196,8 +196,8 @@ impl BooleanTransactionFilter {
     /// # Example
     ///
     /// ```
-    /// use aptos_transaction_filter::BooleanTransactionFilter;
-    /// use aptos_transaction_filter::filters::{EventFilterBuilder, MoveStructTagFilterBuilder, UserTransactionFilterBuilder};
+    /// use velor_transaction_filter::BooleanTransactionFilter;
+    /// use velor_transaction_filter::filters::{EventFilterBuilder, MoveStructTagFilterBuilder, UserTransactionFilterBuilder};
     ///
     /// fn example() -> Result<BooleanTransactionFilter, anyhow::Error> {
     ///   // Create a filter for user transactions where the sender is "0x1"
@@ -262,10 +262,10 @@ pub struct LogicalAnd {
     and: Vec<BooleanTransactionFilter>,
 }
 
-impl TryFrom<aptos_protos::indexer::v1::LogicalAndFilters> for LogicalAnd {
+impl TryFrom<velor_protos::indexer::v1::LogicalAndFilters> for LogicalAnd {
     type Error = anyhow::Error;
 
-    fn try_from(proto_filter: aptos_protos::indexer::v1::LogicalAndFilters) -> Result<Self> {
+    fn try_from(proto_filter: velor_protos::indexer::v1::LogicalAndFilters) -> Result<Self> {
         Ok(Self {
             and: proto_filter
                 .filters
@@ -276,9 +276,9 @@ impl TryFrom<aptos_protos::indexer::v1::LogicalAndFilters> for LogicalAnd {
     }
 }
 
-impl From<LogicalAnd> for aptos_protos::indexer::v1::LogicalAndFilters {
+impl From<LogicalAnd> for velor_protos::indexer::v1::LogicalAndFilters {
     fn from(logical_and: LogicalAnd) -> Self {
-        aptos_protos::indexer::v1::LogicalAndFilters {
+        velor_protos::indexer::v1::LogicalAndFilters {
             filters: logical_and.and.into_iter().map(Into::into).collect(),
         }
     }
@@ -302,10 +302,10 @@ pub struct LogicalOr {
     or: Vec<BooleanTransactionFilter>,
 }
 
-impl TryFrom<aptos_protos::indexer::v1::LogicalOrFilters> for LogicalOr {
+impl TryFrom<velor_protos::indexer::v1::LogicalOrFilters> for LogicalOr {
     type Error = anyhow::Error;
 
-    fn try_from(proto_filter: aptos_protos::indexer::v1::LogicalOrFilters) -> Result<Self> {
+    fn try_from(proto_filter: velor_protos::indexer::v1::LogicalOrFilters) -> Result<Self> {
         Ok(Self {
             or: proto_filter
                 .filters
@@ -316,9 +316,9 @@ impl TryFrom<aptos_protos::indexer::v1::LogicalOrFilters> for LogicalOr {
     }
 }
 
-impl From<LogicalOr> for aptos_protos::indexer::v1::LogicalOrFilters {
+impl From<LogicalOr> for velor_protos::indexer::v1::LogicalOrFilters {
     fn from(logical_or: LogicalOr) -> Self {
-        aptos_protos::indexer::v1::LogicalOrFilters {
+        velor_protos::indexer::v1::LogicalOrFilters {
             filters: logical_or.or.into_iter().map(Into::into).collect(),
         }
     }
@@ -342,11 +342,11 @@ pub struct LogicalNot {
     not: Box<BooleanTransactionFilter>,
 }
 
-impl TryFrom<Box<aptos_protos::indexer::v1::BooleanTransactionFilter>> for LogicalNot {
+impl TryFrom<Box<velor_protos::indexer::v1::BooleanTransactionFilter>> for LogicalNot {
     type Error = anyhow::Error;
 
     fn try_from(
-        proto_filter: Box<aptos_protos::indexer::v1::BooleanTransactionFilter>,
+        proto_filter: Box<velor_protos::indexer::v1::BooleanTransactionFilter>,
     ) -> Result<Self> {
         Ok(Self {
             not: Box::new(BooleanTransactionFilter::new_from_proto(
@@ -377,22 +377,22 @@ pub enum APIFilter {
     EventFilter(EventFilter),
 }
 
-impl TryFrom<aptos_protos::indexer::v1::ApiFilter> for APIFilter {
+impl TryFrom<velor_protos::indexer::v1::ApiFilter> for APIFilter {
     type Error = anyhow::Error;
 
-    fn try_from(proto_filter: aptos_protos::indexer::v1::ApiFilter) -> Result<Self> {
+    fn try_from(proto_filter: velor_protos::indexer::v1::ApiFilter) -> Result<Self> {
         Ok(
             match proto_filter
                 .filter
                 .ok_or(anyhow!("Oneof is not set in ApiFilter."))?
             {
-                aptos_protos::indexer::v1::api_filter::Filter::TransactionRootFilter(
+                velor_protos::indexer::v1::api_filter::Filter::TransactionRootFilter(
                     transaction_root_filter,
                 ) => Into::<TransactionRootFilter>::into(transaction_root_filter).into(),
-                aptos_protos::indexer::v1::api_filter::Filter::UserTransactionFilter(
+                velor_protos::indexer::v1::api_filter::Filter::UserTransactionFilter(
                     user_transaction_filter,
                 ) => Into::<UserTransactionFilter>::into(user_transaction_filter).into(),
-                aptos_protos::indexer::v1::api_filter::Filter::EventFilter(event_filter) => {
+                velor_protos::indexer::v1::api_filter::Filter::EventFilter(event_filter) => {
                     Into::<EventFilter>::into(event_filter).into()
                 },
             },
@@ -418,30 +418,30 @@ impl From<EventFilter> for APIFilter {
     }
 }
 
-impl From<APIFilter> for aptos_protos::indexer::v1::ApiFilter {
+impl From<APIFilter> for velor_protos::indexer::v1::ApiFilter {
     fn from(api_filter: APIFilter) -> Self {
         match api_filter {
             APIFilter::TransactionRootFilter(transaction_root_filter) => {
-                aptos_protos::indexer::v1::ApiFilter {
+                velor_protos::indexer::v1::ApiFilter {
                     filter: Some(
-                        aptos_protos::indexer::v1::api_filter::Filter::TransactionRootFilter(
+                        velor_protos::indexer::v1::api_filter::Filter::TransactionRootFilter(
                             transaction_root_filter.into(),
                         ),
                     ),
                 }
             },
             APIFilter::UserTransactionFilter(user_transaction_filter) => {
-                aptos_protos::indexer::v1::ApiFilter {
+                velor_protos::indexer::v1::ApiFilter {
                     filter: Some(
-                        aptos_protos::indexer::v1::api_filter::Filter::UserTransactionFilter(
+                        velor_protos::indexer::v1::api_filter::Filter::UserTransactionFilter(
                             user_transaction_filter.into(),
                         ),
                     ),
                 }
             },
-            APIFilter::EventFilter(event_filter) => aptos_protos::indexer::v1::ApiFilter {
-                filter: Some(aptos_protos::indexer::v1::api_filter::Filter::EventFilter(
-                    aptos_protos::indexer::v1::EventFilter {
+            APIFilter::EventFilter(event_filter) => velor_protos::indexer::v1::ApiFilter {
+                filter: Some(velor_protos::indexer::v1::api_filter::Filter::EventFilter(
+                    velor_protos::indexer::v1::EventFilter {
                         struct_type: event_filter.struct_type.map(Into::into),
                         data_substring_filter: event_filter.data_substring_filter,
                     },
@@ -492,14 +492,14 @@ mod test {
         UserTransactionFilterBuilder, /*UserTransactionPayloadFilterBuilder,*/
     };
 
-    // Disabled for now while we investigate an issue with lz4 in aptos-core:
-    // https://aptos-org.slack.com/archives/C04PF1X2UKY/p1718995777239809?thread_ts=1718969817.705389&cid=C04PF1X2UKY
+    // Disabled for now while we investigate an issue with lz4 in velor-core:
+    // https://velor-org.slack.com/archives/C04PF1X2UKY/p1718995777239809?thread_ts=1718969817.705389&cid=C04PF1X2UKY
     /*
     #[test]
     pub fn test_query_parsing() {
         let trf = TransactionRootFilter {
             success: Some(true),
-            txn_type: Some(aptos_protos::transaction::v1::transaction::TransactionType::User),
+            txn_type: Some(velor_protos::transaction::v1::transaction::TransactionType::User),
         };
 
         let utf = UserTransactionFilterBuilder::default()
@@ -665,23 +665,23 @@ mod test {
             )),
         ]);
 
-        let expected_proto = aptos_protos::indexer::v1::BooleanTransactionFilter {
+        let expected_proto = velor_protos::indexer::v1::BooleanTransactionFilter {
             filter: Some(
-                aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalAnd(
-                    aptos_protos::indexer::v1::LogicalAndFilters {
+                velor_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalAnd(
+                    velor_protos::indexer::v1::LogicalAndFilters {
                         filters: vec![
-                            aptos_protos::indexer::v1::BooleanTransactionFilter {
+                            velor_protos::indexer::v1::BooleanTransactionFilter {
                                 filter: Some(
-                                    aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalOr(
-                                        aptos_protos::indexer::v1::LogicalOrFilters {
+                                    velor_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalOr(
+                                        velor_protos::indexer::v1::LogicalOrFilters {
                                             filters: vec![
-                                                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                                                velor_protos::indexer::v1::BooleanTransactionFilter {
                                                     filter: Some(
-                                                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
-                                                            aptos_protos::indexer::v1::ApiFilter {
+                                                        velor_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
+                                                            velor_protos::indexer::v1::ApiFilter {
                                                                 filter: Some(
-                                                                    aptos_protos::indexer::v1::api_filter::Filter::TransactionRootFilter(
-                                                                        aptos_protos::indexer::v1::TransactionRootFilter {
+                                                                    velor_protos::indexer::v1::api_filter::Filter::TransactionRootFilter(
+                                                                        velor_protos::indexer::v1::TransactionRootFilter {
                                                                             success: Some(true),
                                                                             transaction_type: None,
                                                                         },
@@ -691,13 +691,13 @@ mod test {
                                                         ),
                                                     ),
                                                 },
-                                                aptos_protos::indexer::v1::BooleanTransactionFilter {
+                                                velor_protos::indexer::v1::BooleanTransactionFilter {
                                                     filter: Some(
-                                                        aptos_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
-                                                            aptos_protos::indexer::v1::ApiFilter {
+                                                        velor_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
+                                                            velor_protos::indexer::v1::ApiFilter {
                                                                 filter: Some(
-                                                                    aptos_protos::indexer::v1::api_filter::Filter::UserTransactionFilter(
-                                                                        aptos_protos::indexer::v1::UserTransactionFilter {
+                                                                    velor_protos::indexer::v1::api_filter::Filter::UserTransactionFilter(
+                                                                        velor_protos::indexer::v1::UserTransactionFilter {
                                                                             sender: Some(
                                                                                 "0x0011".to_string()
                                                                             ),
@@ -714,15 +714,15 @@ mod test {
                                     ),
                                 ),
                             },
-                            aptos_protos::indexer::v1::BooleanTransactionFilter {
+                            velor_protos::indexer::v1::BooleanTransactionFilter {
                                 filter: Some(
-                                    aptos_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
-                                        aptos_protos::indexer::v1::ApiFilter {
+                                    velor_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
+                                        velor_protos::indexer::v1::ApiFilter {
                                             filter: Some(
-                                                aptos_protos::indexer::v1::api_filter::Filter::EventFilter(
-                                                    aptos_protos::indexer::v1::EventFilter {
+                                                velor_protos::indexer::v1::api_filter::Filter::EventFilter(
+                                                    velor_protos::indexer::v1::EventFilter {
                                                         struct_type: Some(
-                                                            aptos_protos::indexer::v1::MoveStructTagFilter {
+                                                            velor_protos::indexer::v1::MoveStructTagFilter {
                                                                 address: Some("0x0077".to_string()),
                                                                 module: Some("roulette".to_string()),
                                                                 name: Some("spin".to_string()),
@@ -736,19 +736,19 @@ mod test {
                                     ),
                                 ),
                             },
-                            aptos_protos::indexer::v1::BooleanTransactionFilter {
+                            velor_protos::indexer::v1::BooleanTransactionFilter {
                                 filter: Some(
-                                    aptos_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalNot(
+                                    velor_protos::indexer::v1::boolean_transaction_filter::Filter::LogicalNot(
                                         Box::new(
-                                            aptos_protos::indexer::v1::BooleanTransactionFilter {
+                                            velor_protos::indexer::v1::BooleanTransactionFilter {
                                                 filter: Some(
-                                                    aptos_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
-                                                        aptos_protos::indexer::v1::ApiFilter {
+                                                    velor_protos::indexer::v1::boolean_transaction_filter::Filter::ApiFilter(
+                                                        velor_protos::indexer::v1::ApiFilter {
                                                             filter: Some(
-                                                                aptos_protos::indexer::v1::api_filter::Filter::EventFilter(
-                                                                    aptos_protos::indexer::v1::EventFilter {
+                                                                velor_protos::indexer::v1::api_filter::Filter::EventFilter(
+                                                                    velor_protos::indexer::v1::EventFilter {
                                                                         struct_type: Some(
-                                                                            aptos_protos::indexer::v1::MoveStructTagFilter {
+                                                                            velor_protos::indexer::v1::MoveStructTagFilter {
                                                                                 address: Some("0x0088".to_string()),
                                                                                 module: None,
                                                                                 name: None,

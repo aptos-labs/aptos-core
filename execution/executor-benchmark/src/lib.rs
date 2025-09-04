@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -20,23 +20,23 @@ use crate::{
     db_access::DbAccessUtil, pipeline::Pipeline, transaction_committer::TransactionCommitter,
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
-use aptos_config::config::{NodeConfig, PrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
-use aptos_db::AptosDB;
-use aptos_executor::block_executor::BlockExecutor;
-use aptos_jellyfish_merkle::metrics::{
-    APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
+use velor_config::config::{NodeConfig, PrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
+use velor_db::VelorDB;
+use velor_executor::block_executor::BlockExecutor;
+use velor_jellyfish_merkle::metrics::{
+    VELOR_JELLYFISH_INTERNAL_ENCODED_BYTES, VELOR_JELLYFISH_LEAF_ENCODED_BYTES,
 };
-use aptos_logger::{info, warn};
-use aptos_sdk::types::LocalAccount;
-use aptos_storage_interface::{
+use velor_logger::{info, warn};
+use velor_sdk::types::LocalAccount;
+use velor_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter,
 };
-use aptos_transaction_generator_lib::{
+use velor_transaction_generator_lib::{
     create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
     TransactionType::{self, CoinTransfer},
 };
-use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
+use velor_types::on_chain_config::{FeatureFlag, Features};
+use velor_vm::{velor_vm::VelorVMBlockExecutor, VelorVM, VMBlockExecutor};
 use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use measurements::{EventMeasurements, OverallMeasurement, OverallMeasuring};
@@ -63,7 +63,7 @@ pub fn default_benchmark_features() -> Features {
 
 pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
     DbReaderWriter::new(
-        AptosDB::open(
+        VelorDB::open(
             config.storage.get_dir_paths(),
             false, /* readonly */
             config.storage.storage_pruner_config,
@@ -88,7 +88,7 @@ fn create_checkpoint(
     }
     std::fs::create_dir_all(checkpoint_dir.as_ref()).unwrap();
 
-    AptosDB::create_checkpoint(source_dir, checkpoint_dir, enable_storage_sharding)
+    VelorDB::create_checkpoint(source_dir, checkpoint_dir, enable_storage_sharding)
         .expect("db checkpoint creation fails.");
 }
 
@@ -103,7 +103,7 @@ pub enum BenchmarkWorkload {
 
 enum InitializedBenchmarkWorkload {
     TransactionMix {
-        transaction_generators: Vec<Box<dyn aptos_transaction_generator_lib::TransactionGenerator>>,
+        transaction_generators: Vec<Box<dyn velor_transaction_generator_lib::TransactionGenerator>>,
         phase: Arc<AtomicUsize>,
         workload_name: String,
     },
@@ -141,7 +141,7 @@ where
         enable_storage_sharding,
     );
     let (mut config, genesis_key) =
-        aptos_genesis::test_utils::test_config_with_custom_features(init_features);
+        velor_genesis::test_utils::test_config_with_custom_features(init_features);
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
@@ -155,7 +155,7 @@ where
             if matches!(transaction_type, CoinTransfer { non_conflicting, .. } if *non_conflicting)
             {
                 // In case of non-conflicting coin transfer,
-                // `aptos_executor_benchmark::transaction_generator::TransactionGenerator` needs to hold
+                // `velor_executor_benchmark::transaction_generator::TransactionGenerator` needs to hold
                 // at least `block_size` number of accounts, all as signer only.
                 num_accounts_to_load = block_size;
                 if transactions_per_sender > 1 {
@@ -201,7 +201,7 @@ where
             let (main_signer_accounts, burner_accounts) =
                 accounts_cache.split(num_main_signer_accounts);
 
-            let (transaction_generator_creator, phase) = init_workload::<AptosVMBlockExecutor>(
+            let (transaction_generator_creator, phase) = init_workload::<VelorVMBlockExecutor>(
                 transaction_mix,
                 root_account.clone(),
                 main_signer_accounts,
@@ -309,7 +309,7 @@ where
     }
 
     // Assert there were no error log lines in the run.
-    assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
+    assert_eq!(0, velor_logger::ERROR_LOG_COUNT.get());
 
     OverallMeasurement::print_end_table(&staged_results, &overall_results);
     staged_events.print_end_table();
@@ -424,7 +424,7 @@ fn add_accounts_impl<V>(
     V: VMBlockExecutor + 'static,
 {
     let (mut config, genesis_key) =
-        aptos_genesis::test_utils::test_config_with_custom_features(init_features);
+        velor_genesis::test_utils::test_config_with_custom_features(init_features);
     config.storage.dir = output_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
@@ -485,7 +485,7 @@ fn add_accounts_impl<V>(
     );
 
     // Assert there were no error log lines in the run.
-    assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
+    assert_eq!(0, velor_logger::ERROR_LOG_COUNT.get());
 
     log_total_supply(&db.reader);
 
@@ -494,11 +494,11 @@ fn add_accounts_impl<V>(
 
     println!(
         "Total written internal nodes value size: {} bytes",
-        APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES.get()
+        VELOR_JELLYFISH_INTERNAL_ENCODED_BYTES.get()
     );
     println!(
         "Total written leaf nodes value size: {} bytes",
-        APTOS_JELLYFISH_LEAF_ENCODED_BYTES.get()
+        VELOR_JELLYFISH_LEAF_ENCODED_BYTES.get()
     );
 }
 
@@ -532,11 +532,11 @@ pub fn run_single_with_default_params(
     concurrency_level: usize,
     mode: SingleRunMode,
 ) -> SingleRunResults {
-    aptos_logger::Logger::new().init();
+    velor_logger::Logger::new().init();
 
-    AptosVM::set_num_shards_once(1);
-    AptosVM::set_concurrency_level_once(concurrency_level);
-    AptosVM::set_processed_transactions_detailed_counters();
+    VelorVM::set_num_shards_once(1);
+    VelorVM::set_concurrency_level_once(concurrency_level);
+    VelorVM::set_processed_transactions_detailed_counters();
 
     rayon::ThreadPoolBuilder::new()
         .thread_name(|index| format!("rayon-global-{}", index))
@@ -619,7 +619,7 @@ pub fn run_single_with_default_params(
         ..Default::default()
     };
 
-    create_db_with_accounts::<AptosVMBlockExecutor>(
+    create_db_with_accounts::<VelorVMBlockExecutor>(
         num_accounts,       /* num_accounts */
         100000 * 100000000, /* init_account_balance */
         10000,              /* block_size */
@@ -643,7 +643,7 @@ pub fn run_single_with_default_params(
         ..Default::default()
     };
 
-    run_benchmark::<AptosVMBlockExecutor>(
+    run_benchmark::<VelorVMBlockExecutor>(
         benchmark_block_size, /* block_size */
         num_blocks,           /* num_blocks */
         BenchmarkWorkload::TransactionMix(vec![(transaction_type, 1)]),
@@ -667,7 +667,7 @@ mod tests {
         db_generator::bootstrap_with_genesis,
         default_benchmark_features, init_db,
         native::{
-            aptos_vm_uncoordinated::AptosVMParallelUncoordinatedBlockExecutor,
+            velor_vm_uncoordinated::VelorVMParallelUncoordinatedBlockExecutor,
             native_config::NativeConfig,
             native_vm::NativeVMBlockExecutor,
             parallel_uncoordinated_block_executor::{
@@ -680,15 +680,15 @@ mod tests {
         transaction_generator::TransactionGenerator,
         BenchmarkWorkload,
     };
-    use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
-    use aptos_crypto::HashValue;
-    use aptos_executor::block_executor::BlockExecutor;
-    use aptos_executor_types::BlockExecutorTrait;
-    use aptos_sdk::{transaction_builder::aptos_stdlib, types::LocalAccount};
-    use aptos_temppath::TempPath;
-    use aptos_transaction_generator_lib::WorkflowProgress;
-    use aptos_transaction_workloads_lib::args::TransactionTypeArg;
-    use aptos_types::{
+    use velor_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
+    use velor_crypto::HashValue;
+    use velor_executor::block_executor::BlockExecutor;
+    use velor_executor_types::BlockExecutorTrait;
+    use velor_sdk::{transaction_builder::velor_stdlib, types::LocalAccount};
+    use velor_temppath::TempPath;
+    use velor_transaction_generator_lib::WorkflowProgress;
+    use velor_transaction_workloads_lib::args::TransactionTypeArg;
+    use velor_types::{
         access_path::Path,
         account_address::AccountAddress,
         on_chain_config::{FeatureFlag, Features},
@@ -698,7 +698,7 @@ mod tests {
             TransactionOutput, TransactionPayload,
         },
     };
-    use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
+    use velor_vm::{velor_vm::VelorVMBlockExecutor, VelorVM, VMBlockExecutor};
     use itertools::Itertools;
     use move_core_types::language_storage::StructTag;
     use rand::thread_rng;
@@ -709,7 +709,7 @@ mod tests {
 
     #[test]
     fn test_compare_vm_and_vm_uncoordinated() {
-        test_compare_prod_and_another_all_types::<AptosVMParallelUncoordinatedBlockExecutor>(true);
+        test_compare_prod_and_another_all_types::<VelorVMParallelUncoordinatedBlockExecutor>(true);
     }
 
     #[test]
@@ -733,13 +733,13 @@ mod tests {
         // non_fa_features.disable(FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION);
 
         test_compare_prod_and_another::<E>(values_match, non_fa_features.clone(), |address| {
-            aptos_stdlib::aptos_account_transfer(address, 1000)
+            velor_stdlib::velor_account_transfer(address, 1000)
         });
 
         test_compare_prod_and_another::<E>(
             values_match,
             non_fa_features,
-            aptos_stdlib::aptos_account_create_account,
+            velor_stdlib::velor_account_create_account,
         );
 
         let mut fa_features = default_benchmark_features();
@@ -749,17 +749,17 @@ mod tests {
         fa_features.disable(FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE);
 
         test_compare_prod_and_another::<E>(values_match, fa_features.clone(), |address| {
-            aptos_stdlib::aptos_account_fungible_transfer_only(address, 1000)
+            velor_stdlib::velor_account_fungible_transfer_only(address, 1000)
         });
 
         test_compare_prod_and_another::<E>(values_match, fa_features.clone(), |address| {
-            aptos_stdlib::aptos_account_transfer(address, 1000)
+            velor_stdlib::velor_account_transfer(address, 1000)
         });
 
         test_compare_prod_and_another::<E>(
             values_match,
             fa_features,
-            aptos_stdlib::aptos_account_create_account,
+            velor_stdlib::velor_account_create_account,
         );
     }
 
@@ -768,7 +768,7 @@ mod tests {
         features: Features,
         txn_payload_f: impl Fn(AccountAddress) -> TransactionPayload,
     ) {
-        aptos_logger::Logger::new().init();
+        velor_logger::Logger::new().init();
 
         let db_dir = TempPath::new();
 
@@ -777,14 +777,14 @@ mod tests {
         bootstrap_with_genesis(&db_dir, false, features.clone());
 
         let (mut config, genesis_key) =
-            aptos_genesis::test_utils::test_config_with_custom_features(features);
+            velor_genesis::test_utils::test_config_with_custom_features(features);
         config.storage.dir = db_dir.as_ref().to_path_buf();
         config.storage.storage_pruner_config = NO_OP_STORAGE_PRUNER_CONFIG;
         config.storage.rocksdb_configs.enable_storage_sharding = false;
 
         let (txn, vm_result) = {
             let vm_db = init_db(&config);
-            let vm_executor = BlockExecutor::<AptosVMBlockExecutor>::new(vm_db.clone());
+            let vm_executor = BlockExecutor::<VelorVMBlockExecutor>::new(vm_db.clone());
 
             let root_account = TransactionGenerator::read_root_account(genesis_key, &vm_db);
             let dst = LocalAccount::generate(&mut thread_rng());
@@ -932,7 +932,7 @@ mod tests {
     ) where
         E: VMBlockExecutor + 'static,
     {
-        aptos_logger::Logger::new().init();
+        velor_logger::Logger::new().init();
 
         let storage_dir = TempPath::new();
         let checkpoint_dir = TempPath::new();
@@ -943,7 +943,7 @@ mod tests {
         features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
         features.enable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
 
-        crate::db_generator::create_db_with_accounts::<AptosVMBlockExecutor>(
+        crate::db_generator::create_db_with_accounts::<VelorVMBlockExecutor>(
             100, /* num_accounts */
             // TODO(Gas): double check if this is correct
             100_000_000_000, /* init_account_balance */
@@ -991,15 +991,15 @@ mod tests {
 
     #[test]
     fn test_benchmark_default() {
-        test_generic_benchmark::<AptosVMBlockExecutor>(None, true);
+        test_generic_benchmark::<VelorVMBlockExecutor>(None, true);
     }
 
     #[test]
     fn test_publish_transaction() {
-        AptosVM::set_num_shards_once(1);
-        AptosVM::set_concurrency_level_once(4);
-        AptosVM::set_processed_transactions_detailed_counters();
-        test_generic_benchmark::<AptosVMBlockExecutor>(
+        VelorVM::set_num_shards_once(1);
+        VelorVM::set_concurrency_level_once(4);
+        VelorVM::set_processed_transactions_detailed_counters();
+        test_generic_benchmark::<VelorVMBlockExecutor>(
             Some(TransactionTypeArg::RepublishAndCall),
             true,
         );
@@ -1007,11 +1007,11 @@ mod tests {
 
     #[test]
     fn test_benchmark_transaction() {
-        AptosVM::set_num_shards_once(4);
-        AptosVM::set_concurrency_level_once(4);
-        AptosVM::set_processed_transactions_detailed_counters();
+        VelorVM::set_num_shards_once(4);
+        VelorVM::set_concurrency_level_once(4);
+        VelorVM::set_processed_transactions_detailed_counters();
         NativeConfig::set_concurrency_level_once(4);
-        test_generic_benchmark::<AptosVMBlockExecutor>(
+        test_generic_benchmark::<VelorVMBlockExecutor>(
             Some(TransactionTypeArg::ModifyGlobalMilestoneAggV2),
             true,
         );
@@ -1019,11 +1019,11 @@ mod tests {
 
     #[test]
     fn test_benchmark_orderless_transaction() {
-        AptosVM::set_num_shards_once(4);
-        AptosVM::set_concurrency_level_once(4);
-        AptosVM::set_processed_transactions_detailed_counters();
+        VelorVM::set_num_shards_once(4);
+        VelorVM::set_concurrency_level_once(4);
+        VelorVM::set_processed_transactions_detailed_counters();
         NativeConfig::set_concurrency_level_once(4);
-        test_generic_benchmark::<AptosVMBlockExecutor>(
+        test_generic_benchmark::<VelorVMBlockExecutor>(
             Some(TransactionTypeArg::NoOpOrderless),
             true,
         );

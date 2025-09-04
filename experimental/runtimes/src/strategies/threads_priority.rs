@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{common::set_thread_nice_value, thread_manager::ThreadManager};
-use aptos_runtimes::spawn_rayon_thread_pool_with_start_hook;
+use velor_runtimes::spawn_rayon_thread_pool_with_start_hook;
 use rayon::ThreadPool;
 
 pub(crate) struct ThreadsPriorityThreadManager {

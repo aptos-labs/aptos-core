@@ -1,5 +1,5 @@
 apiVersion: v2
-name: aptos-kube-state-metrics
+name: velor-kube-state-metrics
 version: 5.7.0
 
 dependencies:

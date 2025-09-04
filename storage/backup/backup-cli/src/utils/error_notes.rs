@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::error;
+use velor_logger::error;
 use std::fmt::{Debug, Display};
 
 pub(crate) trait ErrorNotes<T, E: Display, N: Debug> {

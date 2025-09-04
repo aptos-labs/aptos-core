@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::account_address::create_object_address;
 use move_core_types::account_address::AccountAddress;
 
-const OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR: &[u8] = b"aptos_framework::object_code_deployment";
+const OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR: &[u8] = b"velor_framework::object_code_deployment";
 
 pub fn create_object_code_deployment_address(
     creator: AccountAddress,

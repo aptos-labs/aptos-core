@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use aptos_crypto::HashValue;
-use aptos_scratchpad::SparseMerkleTree;
-use aptos_types::{
+use velor_crypto::HashValue;
+use velor_scratchpad::SparseMerkleTree;
+use velor_types::{
     account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     contract_event::ContractEvent,

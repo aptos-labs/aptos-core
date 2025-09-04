@@ -1,13 +1,13 @@
 #!/bin/bash
 
 #
-# Runs an automated genesis ceremony for validators spun up by the aptos-node helm chart
+# Runs an automated genesis ceremony for validators spun up by the velor-node helm chart
 #
 # Expect the following environment variables to be set before execution:
 # NUM_VALIDATORS
 # ERA
 # WORKSPACE: default /tmp
-# USERNAME_PREFIX: default aptos-node
+# USERNAME_PREFIX: default velor-node
 # VALIDATOR_INTERNAL_HOST_SUFFIX: default validator-lb
 # FULLNODE_INTERNAL_HOST_SUFFIX: default fullnode-lb
 #
@@ -15,16 +15,16 @@
 set -x
 
 WORKSPACE=${WORKSPACE:-/tmp}
-USERNAME_PREFIX=${USERNAME_PREFIX:-aptos-node}
+USERNAME_PREFIX=${USERNAME_PREFIX:-velor-node}
 VALIDATOR_INTERNAL_HOST_SUFFIX=${VALIDATOR_INTERNAL_HOST_SUFFIX:-validator-lb}
 FULLNODE_INTERNAL_HOST_SUFFIX=${FULLNODE_INTERNAL_HOST_SUFFIX:-fullnode-lb}
-MOVE_FRAMEWORK_DIR=${MOVE_FRAMEWORK_DIR:-"/aptos-framework/move"}
+MOVE_FRAMEWORK_DIR=${MOVE_FRAMEWORK_DIR:-"/velor-framework/move"}
 STAKE_AMOUNT=${STAKE_AMOUNT:-1}
 NUM_VALIDATORS_WITH_LARGER_STAKE=${NUM_VALIDATORS_WITH_LARGER_STAKE:0}
 LARGER_STAKE_AMOUNT=${LARGER_STAKE_AMOUNT:-1}
 # TODO: Fix the usage of this below when not set
 RANDOM_SEED=${RANDOM_SEED:-$RANDOM}
-export APTOS_DISABLE_TELEMETRY=true
+export VELOR_DISABLE_TELEMETRY=true
 
 ENABLE_MULTICLUSTER_DOMAIN_SUFFIX=${ENABLE_MULTICLUSTER_DOMAIN_SUFFIX:-false}
 MULTICLUSTER_DOMAIN_SUFFIXES_DEFAULT="forge-multiregion-1,forge-multiregion-2,forge-multiregion-3"
@@ -110,14 +110,14 @@ for i in $(seq 0 $(($NUM_VALIDATORS - 1))); do
   echo "CUR_STAKE_AMOUNT=${CUR_STAKE_AMOUNT} for ${i} validator"
 
   if [[ -z "${RANDOM_SEED}" ]]; then
-    aptos genesis generate-keys --output-dir $user_dir
+    velor genesis generate-keys --output-dir $user_dir
   else
     seed=$(printf "%064x" "$((${RANDOM_SEED_IN_DECIMAL} + i))")
     echo "seed=$seed for ${i}th validator"
-    aptos genesis generate-keys --random-seed $seed --output-dir $user_dir
+    velor genesis generate-keys --random-seed $seed --output-dir $user_dir
   fi
 
-  aptos genesis set-validator-configuration --owner-public-identity-file $user_dir/public-keys.yaml --local-repository-dir $WORKSPACE \
+  velor genesis set-validator-configuration --owner-public-identity-file $user_dir/public-keys.yaml --local-repository-dir $WORKSPACE \
     --username $username \
     --validator-host $validator_host \
     --full-node-host $fullnode_host \
@@ -125,11 +125,11 @@ for i in $(seq 0 $(($NUM_VALIDATORS - 1))); do
 done
 
 # get the framework
-# this is the directory the aptos-framework is located in the aptoslabs/tools docker image
+# this is the directory the velor-framework is located in the velorlabs/tools docker image
 cp $MOVE_FRAMEWORK_DIR/head.mrb ${WORKSPACE}/framework.mrb
 
 # run genesis
-aptos genesis generate-genesis --local-repository-dir ${WORKSPACE} --output-dir ${WORKSPACE}
+velor genesis generate-genesis --local-repository-dir ${WORKSPACE} --output-dir ${WORKSPACE}
 
 # delete all fullnode storage except for those from this era
 kubectl get pvc -o name | grep /fn- | grep -v "e${ERA}-" | xargs -r kubectl delete

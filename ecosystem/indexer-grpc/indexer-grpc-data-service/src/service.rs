@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{
@@ -8,15 +8,15 @@ use crate::metrics::{
     PROCESSED_VERSIONS_COUNT_PER_PROCESSOR, SHORT_CONNECTION_COUNT,
 };
 use anyhow::{Context, Result};
-use aptos_indexer_grpc_utils::{
+use velor_indexer_grpc_utils::{
     cache_operator::{CacheBatchGetStatus, CacheCoverageStatus, CacheOperator},
     chunk_transactions,
     compression_util::{CacheEntry, StorageFormat},
     config::IndexerGrpcFileStoreConfig,
     constants::{
         IndexerGrpcRequestMetadata, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER,
-        MESSAGE_SIZE_LIMIT, REQUEST_HEADER_APTOS_APPLICATION_NAME, REQUEST_HEADER_APTOS_EMAIL,
-        REQUEST_HEADER_APTOS_IDENTIFIER, REQUEST_HEADER_APTOS_IDENTIFIER_TYPE,
+        MESSAGE_SIZE_LIMIT, REQUEST_HEADER_VELOR_APPLICATION_NAME, REQUEST_HEADER_VELOR_EMAIL,
+        REQUEST_HEADER_VELOR_IDENTIFIER, REQUEST_HEADER_VELOR_IDENTIFIER_TYPE,
     },
     counters::{log_grpc_step, IndexerGrpcStep, NUM_MULTI_FETCH_OVERLAPPED_VERSIONS},
     file_store_operator::FileStoreOperator,
@@ -24,12 +24,12 @@ use aptos_indexer_grpc_utils::{
     time_diff_since_pb_timestamp_in_secs,
     types::RedisUrl,
 };
-use aptos_moving_average::MovingAverage;
-use aptos_protos::{
+use velor_moving_average::MovingAverage;
+use velor_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
     transaction::v1::{transaction::TxnData, Transaction},
 };
-use aptos_transaction_filter::{BooleanTransactionFilter, Filterable};
+use velor_transaction_filter::{BooleanTransactionFilter, Filterable};
 use futures::Stream;
 use prost::Message;
 use redis::Client;
@@ -64,7 +64,7 @@ const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
 
 const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
 
-const RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER: &str = "x-aptos-connection-id";
+const RESPONSE_HEADER_VELOR_CONNECTION_ID_HEADER: &str = "x-velor-connection-id";
 const SERVICE_TYPE: &str = "data_service";
 
 // Number of times to retry fetching a given txn block from the stores
@@ -217,7 +217,7 @@ impl RawData for RawDataServerWrapper {
         let mut response = Response::new(Box::pin(output_stream) as Self::GetTransactionsStream);
 
         response.metadata_mut().insert(
-            RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER,
+            RESPONSE_HEADER_VELOR_CONNECTION_ID_HEADER,
             tonic::metadata::MetadataValue::from_str(&request_metadata.request_connection_id)
                 .unwrap(),
         );
@@ -856,13 +856,13 @@ fn get_request_metadata(
     let request_metadata_pairs = vec![
         (
             "request_identifier_type",
-            REQUEST_HEADER_APTOS_IDENTIFIER_TYPE,
+            REQUEST_HEADER_VELOR_IDENTIFIER_TYPE,
         ),
-        ("request_identifier", REQUEST_HEADER_APTOS_IDENTIFIER),
-        ("request_email", REQUEST_HEADER_APTOS_EMAIL),
+        ("request_identifier", REQUEST_HEADER_VELOR_IDENTIFIER),
+        ("request_email", REQUEST_HEADER_VELOR_EMAIL),
         (
             "request_application_name",
-            REQUEST_HEADER_APTOS_APPLICATION_NAME,
+            REQUEST_HEADER_VELOR_APPLICATION_NAME,
         ),
         ("request_token", GRPC_AUTH_TOKEN_HEADER),
         ("processor_name", GRPC_REQUEST_NAME_HEADER),
@@ -1003,14 +1003,14 @@ fn strip_transactions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aptos_protos::transaction::v1::{
+    use velor_protos::transaction::v1::{
         transaction::TxnData,
         transaction_payload::{ExtraConfig, Payload},
         EntryFunctionId, EntryFunctionPayload, Event, ExtraConfigV1, MoveModuleId, Signature,
         Transaction, TransactionInfo, TransactionPayload, UserTransaction, UserTransactionRequest,
         WriteSetChange,
     };
-    use aptos_transaction_filter::{
+    use velor_transaction_filter::{
         boolean_transaction_filter::APIFilter, filters::UserTransactionFilterBuilder,
         EntryFunctionFilterBuilder, UserTransactionPayloadFilterBuilder,
     };

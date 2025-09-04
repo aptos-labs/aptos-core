@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,10 +10,10 @@ use thiserror::Error;
 pub enum Error {
     #[error("The requested data is unavailable and cannot be found in the network! Error: {0}")]
     DataIsUnavailable(String),
-    #[error("Error returned by the aptos data client: {0}")]
-    AptosDataClientError(String),
-    #[error("The response from the aptos data client is invalid! Error: {0}")]
-    AptosDataClientResponseIsInvalid(String),
+    #[error("Error returned by the velor data client: {0}")]
+    VelorDataClientError(String),
+    #[error("The response from the velor data client is invalid! Error: {0}")]
+    VelorDataClientResponseIsInvalid(String),
     #[error("An integer overflow has occurred: {0}")]
     IntegerOverflow(String),
     #[error("No data to fetch: {0}")]
@@ -29,8 +29,8 @@ impl Error {
     pub fn get_label(&self) -> &'static str {
         match self {
             Self::DataIsUnavailable(_) => "data_is_unavailable",
-            Self::AptosDataClientError(_) => "aptos_data_client_error",
-            Self::AptosDataClientResponseIsInvalid(_) => "aptos_data_client_response_is_invalid",
+            Self::VelorDataClientError(_) => "velor_data_client_error",
+            Self::VelorDataClientResponseIsInvalid(_) => "velor_data_client_response_is_invalid",
             Self::IntegerOverflow(_) => "integer_overflow",
             Self::NoDataToFetch(_) => "no_data_to_fetch",
             Self::UnexpectedErrorEncountered(_) => "unexpected_error_encountered",
@@ -39,9 +39,9 @@ impl Error {
     }
 }
 
-impl From<aptos_data_client::error::Error> for Error {
-    fn from(error: aptos_data_client::error::Error) -> Self {
-        Error::AptosDataClientError(error.to_string())
+impl From<velor_data_client::error::Error> for Error {
+    fn from(error: velor_data_client::error::Error) -> Self {
+        Error::VelorDataClientError(error.to_string())
     }
 }
 

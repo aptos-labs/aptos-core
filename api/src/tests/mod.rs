@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -24,8 +24,8 @@ mod transactions_test;
 mod view_function;
 mod webauthn_secp256r1_ecdsa;
 
-use aptos_api_test_context::{new_test_context_inner as super_new_test_context, TestContext};
-use aptos_config::config::{internal_indexer_db_config::InternalIndexerDBConfig, NodeConfig};
+use velor_api_test_context::{new_test_context_inner as super_new_test_context, TestContext};
+use velor_config::config::{internal_indexer_db_config::InternalIndexerDBConfig, NodeConfig};
 
 fn new_test_context(test_name: String) -> TestContext {
     new_test_context_with_config(test_name, NodeConfig::default(), false, false)

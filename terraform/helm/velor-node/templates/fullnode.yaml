@@ -1,0 +1,268 @@
+{{- range $i, $e := until (int .Values.numFullnodeGroups) }}
+{{- range $.Values.fullnode.groups }}
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "velor-validator.fullname" $ }}-{{$i}}-{{ .name }}
+  labels:
+    {{- include "velor-validator.labels" $ | nindent 4 }}
+    {{- include "velor-validator.multiclusterLabels" (tuple $ $i) | nindent 4 }}
+  annotations:
+    {{- with $.Values.service.fullnode.internal.annotations }}
+    {{- toYaml $.Values.service.fullnode.internal.annotations | nindent 4 }}
+    {{- end }}
+    {{- if $.Values.service.internalDomain }}
+    external-dns.alpha.kubernetes.io/hostname: vfn{{$i}}.{{ $.Values.service.internalDomain }}
+    {{- end }}
+spec:
+  selector:
+    {{- include "velor-validator.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/name: fullnode
+    app.kubernetes.io/instance: fullnode-{{$i}}
+    group: {{ .name }}
+  type: {{ $.Values.service.fullnode.internal.type }}
+  {{- if $.Values.service.fullnode.internal.headless }}
+  clusterIP: None
+  {{- end }}
+  ports:
+  - name: velornet
+    port: 6182
+  - name: metrics
+    port: 9101
+  - name: admin
+    port: 9102
+  - name: api
+    port: 8080
+
+{{- if $.Values.migrations.enable_vfn_explicit_pvc }}
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "velor-validator.fullname" $ }}-{{$i}}-{{ .name }}-e{{ $.Values.chain.era }}
+  labels:
+    {{- include "velor-validator.labels" $ | nindent 4 }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{ $.Values.fullnode.storage.class }}
+  resources:
+    requests:
+      storage: {{ $.Values.fullnode.storage.size }}
+  {{- if $.Values.fullnode.storage.labels }}
+  selector:
+    matchLabels:
+      {{- toYaml $.Values.fullnode.storage.labels | nindent 6}}
+  {{- end }}
+{{- end }}
+---
+{{ $fullnode_statefulset := lookup "apps/v1" "StatefulSet" $.Release.Namespace (printf "%s-%d-%s-e%s" (include "velor-validator.fullname" $) $i .name (toYaml $.Values.chain.era)) }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "velor-validator.fullname" $ }}-{{$i}}-{{ .name }}-e{{ $.Values.chain.era }}
+  labels:
+    {{- include "velor-validator.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: fullnode
+    app.kubernetes.io/instance: fullnode-{{$i}}
+    group: {{ .name }}
+    {{- include "velor-validator.multiclusterLabels" (tuple $ $i) | nindent 4 }}  
+spec:
+  serviceName: {{ include "velor-validator.fullname" $ }}-{{$i}}-{{ .name }}
+  replicas: {{ .replicas }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "velor-validator.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/name: fullnode
+      app.kubernetes.io/instance: fullnode-{{$i}}
+      group: {{ .name }}
+  {{- if not $.Values.migrations.enable_vfn_explicit_pvc }}
+  volumeClaimTemplates:
+  - metadata:
+      name: fn
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: {{ $.Values.fullnode.storage.class }}
+      resources:
+        requests:
+          storage: {{ $.Values.fullnode.storage.size }}
+      {{- if $.Values.fullnode.storage.labels }}
+      selector:
+        matchLabels:
+          {{- toYaml $.Values.fullnode.storage.labels | nindent 10}}
+      {{- end }}
+    {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "velor-validator.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/name: fullnode
+        app.kubernetes.io/instance: fullnode-{{$i}}
+        {{- if $.Values.chain.name }}
+        chain_name: {{ $.Values.chain.name }}
+        {{- end}}
+        group: {{ .name }}
+      annotations:
+        checksum/fullnode.yaml: {{ tpl ($.Files.Get "files/configs/fullnode.yaml") $ | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9101"
+        {{- if $.Values.metrics.destination }}
+        velor.dev/metrics-destination: {{ $.Values.metrics.destination }}
+        {{- end}}
+        {{- with $.Values.validator.podAnnotations }}
+        {{- toYaml $.Values.validator.podAnnotations | nindent 8 }}
+        {{- end }}
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: run-script
+          image: curlimages/curl:latest
+          args:
+            - sh
+            - -c
+            - |
+              set -x
+              cp /opt/velor/genesis_readonly/* /opt/velor/genesis
+              if [ ! -f /opt/velor/genesis/genesis.blob ]; then
+                genesis_blob_upload_url="{{ $.Values.genesis_blob_upload_url }}"
+                genesis_blob_upload_url="$genesis_blob_upload_url&namespace={{ $.Release.Namespace }}&method=GET"
+                echo "genesis.blob not found locally, downloading..."
+                signed_url=$(curl -s -X GET "$genesis_blob_upload_url")
+                curl -o /opt/velor/genesis/genesis.blob "$signed_url"
+              else
+                echo "genesis.blob found locally"
+              fi
+              ls -l /opt/velor/genesis
+          volumeMounts:
+            - name: genesis-config
+              mountPath: /opt/velor/genesis_readonly
+            - name: writable-genesis
+              mountPath: /opt/velor/genesis
+      containers:
+      - name: fullnode
+        {{- if and $fullnode_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
+        image: {{ (first $fullnode_statefulset.spec.template.spec.containers).image }}
+        {{- else }}
+        image: {{ $.Values.validator.image.repo }}:{{ $.Values.validator.image.tag | default $.Values.imageTag }}
+        {{- end }}
+        imagePullPolicy: {{ $.Values.validator.image.pullPolicy }}
+        args:
+          - /bin/bash
+          - -c
+          - |-
+            set -euxo pipefail
+            if [[ -f /opt/velor/data/wipe-db ]]; then
+              # Wipe DB
+              rm -rf /opt/velor/data/db
+              # Delete the command file so we only wipe the DB once
+              rm -vf /opt/velor/data/wipe-db
+            fi
+            exec /usr/local/bin/velor-node -f /opt/velor/etc/fullnode.yaml
+      {{- with $.Values.fullnode }}
+        resources:
+          {{- toYaml .resources | nindent 10 }}
+        env:
+        - name: RUST_LOG
+          value: {{ .rust_log }}
+        {{- if .force_enable_telemetry }}
+        - name: VELOR_FORCE_ENABLE_TELEMETRY
+          value: "true"
+        {{- end }}
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: KUBERNETES_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: RUST_BACKTRACE
+          value: "0"
+      {{- end }}
+        volumeMounts:
+        - name: velor-config
+          mountPath: /opt/velor/etc
+        - name: writable-genesis
+          mountPath: /opt/velor/genesis
+        {{- if $.Values.migrations.enable_vfn_explicit_pvc }}
+        - name: velor-data
+        {{- else }}
+        - name: fn
+        {{- end }}
+          mountPath: /opt/velor/data
+        ports:
+        - containerPort: 6181
+        - containerPort: 6182
+        - containerPort: 8080
+          name: api
+        - containerPort: 9101
+          name: metrics
+        - containerPort: 9102
+          name: admin
+        securityContext:
+          {{- if $.Values.enablePrivilegedMode }}
+          runAsUser: 0
+          privileged: true
+          {{- else }}
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          {{- end }}
+      {{- with $.Values.fullnode }}
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- if $.Values.enablePrivilegedMode }}
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+        {{- else }}
+        runAsNonRoot: true
+        runAsUser: 6180
+        runAsGroup: 6180
+        fsGroup: 6180
+        {{- end }}
+        seccompProfile:
+          type: RuntimeDefault
+      {{- end }}
+      volumes:
+      - name: velor-config
+        configMap:
+          name: {{ include "velor-validator.fullname" $ }}-{{$i}}
+      - name: genesis-config
+        secret:
+          secretName: {{ include "velor-validator.fullname" $ }}-{{$i}}-genesis-e{{ $.Values.chain.era }}
+      - name: writable-genesis
+        emptyDir: {}
+      {{- if $.Values.migrations.enable_vfn_explicit_pvc }}
+      - name: velor-data
+        persistentVolumeClaim:
+          claimName: {{ include "velor-validator.fullname" $ }}-{{$i}}-{{ .name }}-e{{ $.Values.chain.era }}
+      {{- end }}
+      serviceAccountName: {{ include "velor-validator.fullname" $ }}-fullnode
+      {{- if $.Values.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{ $.Values.imagePullSecret }}
+      {{- end }}
+
+{{- end }}
+{{- end }}

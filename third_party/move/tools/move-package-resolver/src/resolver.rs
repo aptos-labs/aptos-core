@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -410,7 +410,7 @@ async fn resolve_dependency(
             remote_url = url;
             (identity, Some(&remote_url))
         },
-        PackageLocation::Aptos {
+        PackageLocation::Velor {
             node_url,
             package_addr,
         } => {

@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::shared_mempool::types::{MempoolMessageId, QuorumStoreRequest};
 use anyhow::Error;
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_logger::Schema;
-use aptos_mempool_notifications::MempoolCommitNotification;
-use aptos_types::{account_address::AccountAddress, transaction::ReplayProtector};
+use velor_config::network_id::{NetworkId, PeerNetworkId};
+use velor_logger::Schema;
+use velor_mempool_notifications::MempoolCommitNotification;
+use velor_types::{account_address::AccountAddress, transaction::ReplayProtector};
 use serde::Serialize;
 use std::{fmt, fmt::Write, time::SystemTime};
 

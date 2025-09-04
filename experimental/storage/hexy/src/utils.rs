@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 /// Sorta vector of key-value pairs by the keep and then deduplicate items, keeping the last value

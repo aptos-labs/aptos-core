@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::{
@@ -15,8 +15,8 @@ use crate::dag::{
     types::NodeCertificate,
     NodeId, RpcHandler, Vote,
 };
-use aptos_config::config::DagPayloadConfig;
-use aptos_types::{
+use velor_config::config::DagPayloadConfig;
+use velor_types::{
     aggregate_signature::PartialSignatures,
     epoch_state::EpochState,
     on_chain_config::{OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig},

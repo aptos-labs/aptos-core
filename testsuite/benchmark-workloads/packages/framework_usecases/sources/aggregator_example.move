@@ -3,7 +3,7 @@
 module 0xABCD::aggregator_example {
     use std::error;
     use std::signer;
-    use aptos_framework::aggregator_v2::{Self, Aggregator};
+    use velor_framework::aggregator_v2::{Self, Aggregator};
 
     // Resource being modified doesn't exist
     const ECOUNTER_RESOURCE_NOT_PRESENT: u64 = 1;

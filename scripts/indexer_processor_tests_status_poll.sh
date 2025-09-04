@@ -21,7 +21,7 @@ else
 
     # Get the workflow runs for the repository
     response=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-    "https://api.github.com/repos/aptos-labs/aptos-indexer-processors/actions/runs?event=repository_dispatch&branch=main")
+    "https://api.github.com/repos/velor-chain/velor-indexer-processors/actions/runs?event=repository_dispatch&branch=main")
 
     # Check if the workflow_runs array exists
     workflow_runs=$(echo "$response" | jq -r '.workflow_runs')
@@ -56,7 +56,7 @@ if [ -z "$run_id" ]; then
 fi
 
 # Now that we have the run_id (cached or newly found), proceed to poll job status
-jobs_url="https://api.github.com/repos/aptos-labs/aptos-indexer-processors/actions/runs/${run_id}/jobs"
+jobs_url="https://api.github.com/repos/velor-chain/velor-indexer-processors/actions/runs/${run_id}/jobs"
 
 # Poll the job status until completion
 job_completed=false

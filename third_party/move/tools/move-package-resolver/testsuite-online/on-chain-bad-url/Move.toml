@@ -3,4 +3,4 @@ name = "Pack"
 version = "0.1.2"
 
 [dependencies]
-MoveStdlib = { aptos = "https://bad-network.mainnet.aptoslabs.com", address = "0x1" }
+MoveStdlib = { velor = "https://bad-network.mainnet.velorlabs.com", address = "0x1" }

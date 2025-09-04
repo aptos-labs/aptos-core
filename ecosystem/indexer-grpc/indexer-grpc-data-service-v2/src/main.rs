@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_indexer_grpc_data_service_v2::config::IndexerGrpcDataServiceConfig;
-use aptos_indexer_grpc_server_framework::ServerArgs;
+use velor_indexer_grpc_data_service_v2::config::IndexerGrpcDataServiceConfig;
+use velor_indexer_grpc_server_framework::ServerArgs;
 use clap::Parser;
 
 #[cfg(unix)]

@@ -3,11 +3,11 @@
 version: "3.8"
 services:
   restore:
-    image: aptoslabs/tools:nightly
+    image: velorlabs/tools:nightly
     volumes:
       - type: volume
         source: db
-        target: /opt/aptos/data
+        target: /opt/velor/data
       - type: volume
         source: tmp
         target: /tmp
@@ -15,20 +15,20 @@ services:
       # `s3.yaml` (AWS S3)
       # `gcs.yaml` (GCP GCS)
       # You can update the yaml file to specify where you want to download data from,
-      # default data resource is hosted by AptosLabs.
+      # default data resource is hosted by VelorLabs.
       - type: bind
         source: ./s3.yaml
-        target: /opt/aptos/etc/restore.yaml
+        target: /opt/velor/etc/restore.yaml
         read_only: true
     environment:
       - HOME=/tmp
       - RUST_LOG=debug
     command: >
       sh -c "
-      /usr/local/bin/aptos-debugger aptos-db restore bootstrap-db --concurrent-downloads 2 \
-        --target-db-dir /opt/aptos/data/db
-        --metadata-cache-dir /tmp/aptos-restore-metadata \
-        --command-adapter-config /opt/aptos/etc/restore.yaml
+      /usr/local/bin/velor-debugger velor-db restore bootstrap-db --concurrent-downloads 2 \
+        --target-db-dir /opt/velor/data/db
+        --metadata-cache-dir /tmp/velor-restore-metadata \
+        --command-adapter-config /opt/velor/etc/restore.yaml
       "
 
 # update the db volume name to the one you want to restore if needed
@@ -36,5 +36,5 @@ services:
 # so make sure you start this docker compose using same project name as the db you want to restore.
 volumes:
   db:
-    name: aptos-validator
+    name: velor-validator
   tmp:

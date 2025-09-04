@@ -1,9 +1,9 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::state_view::hot_state_view::HotStateView;
-use aptos_experimental_layered_map::LayeredMap;
-use aptos_types::state_store::{
+use velor_experimental_layered_map::LayeredMap;
+use velor_types::state_store::{
     hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
 };
 use std::{collections::HashMap, sync::Arc};
@@ -197,8 +197,8 @@ impl<'a, 'b> Iterator for Iter<'a, 'b> {
 mod tests {
     use super::HotStateLRU;
     use crate::state_store::state_view::hot_state_view::HotStateView;
-    use aptos_experimental_layered_map::{LayeredMap, MapLayer};
-    use aptos_types::{
+    use velor_experimental_layered_map::{LayeredMap, MapLayer};
+    use velor_types::{
         state_store::{
             hot_state::LRUEntry, state_key::StateKey, state_slot::StateSlot,
             state_value::StateValue,

@@ -6,14 +6,14 @@
 #
 # The best way to do this however is to run scripts/dev_setup.sh
 #
-# If you want to run this from anywhere in aptos-core, try adding the wrapper
+# If you want to run this from anywhere in velor-core, try adding the wrapper
 # script to your path:
 # https://gist.github.com/banool/e6a2b85e2fff067d3a215cbfaf808032
 
 # Make sure we're in the root of the repo.
 if [ ! -d ".github" ]
 then
-    echo "Please run this from the root of aptos-core!"
+    echo "Please run this from the root of velor-core!"
     exit 1
 fi
 
@@ -27,7 +27,7 @@ fi
 set -e
 set -x
 
-# Run clippy with the aptos-core specific configuration.
+# Run clippy with the velor-core specific configuration.
 cargo xclippy
 
 # Run the formatter. Note: we require the nightly

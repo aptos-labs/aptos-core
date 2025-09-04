@@ -1,15 +1,15 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     metrics, Error, LogEntry, LogEvent, LogSchema, PeerMonitorState, PeerMonitoringServiceClient,
     PeerState,
 };
-use aptos_config::{config::PeerMonitoringServiceConfig, network_id::PeerNetworkId};
-use aptos_logger::{info, sample, sample::SampleRate};
-use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
-use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
-use aptos_time_service::TimeService;
+use velor_config::{config::PeerMonitoringServiceConfig, network_id::PeerNetworkId};
+use velor_logger::{info, sample, sample::SampleRate};
+use velor_network::application::{interface::NetworkClient, metadata::PeerMetadata};
+use velor_peer_monitoring_service_types::PeerMonitoringServiceMessage;
+use velor_time_service::TimeService;
 use key_value::PeerStateKey;
 use std::{collections::HashMap, time::Duration};
 use tokio::runtime::Handle;

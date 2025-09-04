@@ -27,18 +27,18 @@ jobs:
       (github.event_name == 'schedule' && github.ref_name == 'main')
     # Note the tests run slowly due to instrutmentation. It takes CI 10 hrs
     timeout-minutes: 720
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=velor-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - uses: velor-chain/velor-core/.github/actions/rust-setup@main
       - run: rustup component add llvm-tools-preview
       - uses: taiki-e/install-action@4fedbddde88aab767a45a011661f832d68202716 # pin@v2.33.28
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov nextest --lcov --output-path lcov_unit.info -vv --ignore-run-fail --workspace --exclude smoke-test --exclude aptos-testcases
+      - run: cargo llvm-cov nextest --lcov --output-path lcov_unit.info -vv --ignore-run-fail --workspace --exclude smoke-test --exclude velor-testcases
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
           RUST_MIN_STACK: 33554432 # 32 MB of stack
@@ -57,18 +57,18 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
       (github.event_name == 'schedule' && github.ref_name == 'main')
     timeout-minutes: 720 # incremented from 240 due to execution time limit hit in cron
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=velor-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - uses: velor-chain/velor-core/.github/actions/rust-setup@main
       - run: rustup component add llvm-tools-preview
       - uses: taiki-e/install-action@4fedbddde88aab767a45a011661f832d68202716 # pin@v2.33.28
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo build --locked --package=aptos-node --features=failpoints,indexer --release && LLVM_PROFDATA_FLAGS="--failure-mode=all" LOCAL_SWARM_NODE_RELEASE=1 cargo llvm-cov nextest --lcov --output-path lcov_smoke.info -vv --ignore-run-fail --profile smoke-test -p smoke-test
+      - run: cargo build --locked --package=velor-node --features=failpoints,indexer --release && LLVM_PROFDATA_FLAGS="--failure-mode=all" LOCAL_SWARM_NODE_RELEASE=1 cargo llvm-cov nextest --lcov --output-path lcov_smoke.info -vv --ignore-run-fail --profile smoke-test -p smoke-test
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
           RUST_MIN_STACK: 33554432

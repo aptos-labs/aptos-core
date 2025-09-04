@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 #![allow(unused)]
 
 pub use super::prebuilt_packages::PreBuiltPackagesImpl;
-use aptos_framework::natives::code::{MoveOption, PackageMetadata};
-use aptos_sdk::{
+use velor_framework::natives::code::{MoveOption, PackageMetadata};
+use velor_sdk::{
     bcs,
     move_types::{
         account_address::AccountAddress, ident_str, identifier::Identifier,
@@ -15,7 +15,7 @@ use aptos_sdk::{
         transaction::{EntryFunction, Script, TransactionPayload},
     },
 };
-use aptos_transaction_generator_lib::{
+use velor_transaction_generator_lib::{
     entry_point_trait::{
         get_payload, AutomaticArgs, EntryPointTrait, MultiSigConfig, PreBuiltPackages,
     },

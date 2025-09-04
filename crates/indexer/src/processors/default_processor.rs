@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -23,7 +23,7 @@ use crate::{
     },
     schema,
 };
-use aptos_api_types::{Transaction, WriteSetChange};
+use velor_api_types::{Transaction, WriteSetChange};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
@@ -112,7 +112,7 @@ fn insert_to_db(
     ),
     object_core: (Vec<Object>, Vec<CurrentObject>),
 ) -> Result<(), diesel::result::Error> {
-    aptos_logger::trace!(
+    velor_logger::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,

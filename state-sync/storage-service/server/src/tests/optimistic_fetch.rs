@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,11 +9,11 @@ use crate::{
     storage::StorageReader,
     tests::{mock, utils},
 };
-use aptos_config::{
-    config::{AptosDataClientConfig, StorageServiceConfig},
+use velor_config::{
+    config::{VelorDataClientConfig, StorageServiceConfig},
     network_id::PeerNetworkId,
 };
-use aptos_storage_service_types::{
+use velor_storage_service_types::{
     requests::{
         DataRequest, NewTransactionOutputsWithProofRequest,
         NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
@@ -21,8 +21,8 @@ use aptos_storage_service_types::{
     },
     responses::StorageServerSummary,
 };
-use aptos_time_service::TimeService;
-use aptos_types::epoch_change::EpochChangeProof;
+use velor_time_service::TimeService;
+use velor_types::epoch_change::EpochChangeProof;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use futures::channel::oneshot;
@@ -75,7 +75,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
             Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
         let lru_response_cache = Cache::new(0);
         let request_moderator = Arc::new(RequestModerator::new(
-            AptosDataClientConfig::default(),
+            VelorDataClientConfig::default(),
             cached_storage_server_summary.clone(),
             mock::create_peers_and_metadata(vec![]),
             storage_service_config,
@@ -187,7 +187,7 @@ async fn test_peers_with_ready_optimistic_fetches_update() {
             Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
         let lru_response_cache = Cache::new(0);
         let request_moderator = Arc::new(RequestModerator::new(
-            AptosDataClientConfig::default(),
+            VelorDataClientConfig::default(),
             cached_storage_server_summary.clone(),
             mock::create_peers_and_metadata(vec![]),
             storage_service_config,
@@ -301,7 +301,7 @@ async fn test_remove_expired_optimistic_fetches() {
             Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
         let lru_response_cache = Cache::new(0);
         let request_moderator = Arc::new(RequestModerator::new(
-            AptosDataClientConfig::default(),
+            VelorDataClientConfig::default(),
             cached_storage_server_summary.clone(),
             mock::create_peers_and_metadata(vec![]),
             storage_service_config,

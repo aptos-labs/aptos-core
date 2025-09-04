@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -15,9 +15,9 @@ use crate::{
     REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT,
 };
 use anyhow::{anyhow, bail, format_err};
-use aptos_config::config::{NodeConfig, OverrideNodeConfig};
-use aptos_retrier::fixed_retry_strategy;
-use aptos_sdk::{
+use velor_config::config::{NodeConfig, OverrideNodeConfig};
+use velor_retrier::fixed_retry_strategy;
+use velor_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     move_types::account_address::AccountAddress,
     types::{chain_id::ChainId, AccountKey, LocalAccount, PeerId},
@@ -83,7 +83,7 @@ impl K8sSwarm {
         let client = validators.values().next().unwrap().rest_client();
         let key = load_root_key(root_key);
         let account_key = AccountKey::from_private_key(key);
-        let address = aptos_sdk::types::account_config::aptos_test_root_address();
+        let address = velor_sdk::types::account_config::velor_test_root_address();
         let sequence_number = query_sequence_number(&client, address).await.map_err(|e| {
             format_err!(
                 "query_sequence_number on {:?} for dd account failed: {}",
@@ -129,7 +129,7 @@ impl K8sSwarm {
         };
 
         // test hitting the configured prometheus endpoint
-        let query = "container_memory_usage_bytes{pod=\"aptos-node-0-validator-0\"}";
+        let query = "container_memory_usage_bytes{pod=\"velor-node-0-validator-0\"}";
         let r = swarm.query_metrics(query, None, None).await?;
         let ivs = r.as_instant().unwrap();
         for iv in ivs {
@@ -502,7 +502,7 @@ fn parse_service_name_from_stateful_set_name(
     stateful_set_name: &str,
     enable_haproxy: bool,
 ) -> String {
-    let re = Regex::new(r"(aptos-node-\d+)-(validator|fullnode)").unwrap();
+    let re = Regex::new(r"(velor-node-\d+)-(validator|fullnode)").unwrap();
     let cap = re.captures(stateful_set_name).unwrap();
     let service_base_name = format!("{}-{}", &cap[1], &cap[2]);
     if enable_haproxy {
@@ -595,7 +595,7 @@ pub(crate) async fn get_validators(
                     ),
                     (
                         "app.kubernetes.io/part-of".to_string(),
-                        "aptos-node".to_string(),
+                        "velor-node".to_string(),
                     ),
                 ]),
             )
@@ -625,7 +625,7 @@ pub(crate) async fn get_validator_fullnodes(
                     ("app.kubernetes.io/name".to_string(), "fullnode".to_string()),
                     (
                         "app.kubernetes.io/part-of".to_string(),
-                        "aptos-node".to_string(),
+                        "velor-node".to_string(),
                     ),
                 ]),
             )
@@ -648,11 +648,11 @@ fn parse_node_type(s: &str) -> String {
 }
 
 // gets the node index based on its associated statefulset name
-// e.g. aptos-node-<idx>-validator
-// e.g. aptos-node-<idx>-fullnode-e<era>
+// e.g. velor-node-<idx>-validator
+// e.g. velor-node-<idx>-fullnode-e<era>
 fn parse_node_index(s: &str) -> Result<usize> {
     // first get rid of the prefixes
-    let v = s.split("aptos-node-").collect::<Vec<&str>>();
+    let v = s.split("velor-node-").collect::<Vec<&str>>();
     if v.len() < 2 {
         return Err(format_err!("Failed to parse {:?} node id format", s));
     }
@@ -673,7 +673,7 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
     for node in nodes {
         // perform healthcheck with retry, returning unhealthy
         let node_name = node.name().to_string();
-        let check = aptos_retrier::retry_async(k8s_wait_nodes_strategy(), || {
+        let check = velor_retrier::retry_async(k8s_wait_nodes_strategy(), || {
             Box::pin(async move {
                 match node.rest_client().get_ledger_information().await {
                     Ok(res) => {
@@ -846,23 +846,23 @@ mod tests {
 
     #[test]
     fn test_parse_service_name_from_stateful_set_name() {
-        let validator_sts_name = "aptos-node-19-validator";
+        let validator_sts_name = "velor-node-19-validator";
         let validator_service_name =
             parse_service_name_from_stateful_set_name(validator_sts_name, false);
-        assert_eq!("aptos-node-19-validator", &validator_service_name);
+        assert_eq!("velor-node-19-validator", &validator_service_name);
         // with haproxy
         let validator_service_name =
             parse_service_name_from_stateful_set_name(validator_sts_name, true);
-        assert_eq!("aptos-node-19-validator-lb", &validator_service_name);
+        assert_eq!("velor-node-19-validator-lb", &validator_service_name);
 
-        let fullnode_sts_name = "aptos-node-0-fullnode-eforge195";
+        let fullnode_sts_name = "velor-node-0-fullnode-eforge195";
         let fullnode_service_name =
             parse_service_name_from_stateful_set_name(fullnode_sts_name, false);
-        assert_eq!("aptos-node-0-fullnode", &fullnode_service_name);
+        assert_eq!("velor-node-0-fullnode", &fullnode_service_name);
         // with haproxy
         let fullnode_service_name =
             parse_service_name_from_stateful_set_name(fullnode_sts_name, true);
-        assert_eq!("aptos-node-0-fullnode-lb", &fullnode_service_name);
+        assert_eq!("velor-node-0-fullnode-lb", &fullnode_service_name);
     }
 
     async fn create_chaos_experiments(

@@ -1,6 +1,6 @@
 {
   "title":"Reduce min stake required by 1 APT",
   "description":"Reduce min stake required to join the validator set by 1 APT",
-  "source_code_url":"https://github.com/aptos-labs/ait3-governance/proposals/sources/0-update-min-stake.move",
-  "discussion_url":"https://forum.aptoslabs.com/proposals/upgrade-potato-module-v3"
+  "source_code_url":"https://github.com/velor-chain/ait3-governance/proposals/sources/0-update-min-stake.move",
+  "discussion_url":"https://forum.velorlabs.com/proposals/upgrade-potato-module-v3"
 }

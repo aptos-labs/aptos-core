@@ -27,13 +27,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"16673484350\"},\"deposit_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x54ce130990ecf55cd12de74bff03dcfaacf63066e0945d3c415d61644303da39\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"21685\",\"guid\":{\"id\":{\"addr\":\"0x54ce130990ecf55cd12de74bff03dcfaacf63066e0945d3c415d61644303da39\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -65,13 +65,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"10\"},\"deposit_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xb7a4a81a3d513e3e18ee6bec61a001d7e18c5d92bb6645a2f21f0b0fec2531a6\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xb7a4a81a3d513e3e18ee6bec61a001d7e18c5d92bb6645a2f21f0b0fec2531a6\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -166,7 +166,7 @@
           "function": {
             "module": {
               "address": "0x1",
-              "name": "aptos_account"
+              "name": "velor_account"
             },
             "name": "transfer"
           },
@@ -174,7 +174,7 @@
             "\"0xb7a4a81a3d513e3e18ee6bec61a001d7e18c5d92bb6645a2f21f0b0fec2531a6\"",
             "\"10\""
           ],
-          "entryFunctionIdStr": "0x1::aptos_account::transfer"
+          "entryFunctionIdStr": "0x1::velor_account::transfer"
         }
       },
       "signature": {

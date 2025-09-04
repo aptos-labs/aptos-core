@@ -1,0 +1,35 @@
+[package]
+name = "velor-vm-environment"
+description = "Velor VM environment"
+version = "0.0.1"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+velor-framework = { workspace = true }
+velor-gas-algebra = { workspace = true }
+velor-gas-schedule = { workspace = true }
+velor-move-stdlib = { workspace = true }
+velor-native-interface = { workspace = true }
+velor-table-natives = { workspace = true }
+velor-types = { workspace = true }
+velor-vm-types = { workspace = true }
+bcs = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
+once_cell = { workspace = true }
+sha3 = { workspace = true }
+
+[dev-dependencies]
+velor-types = { workspace = true, features = ["testing", "fuzzing"] }
+serde = { workspace = true }

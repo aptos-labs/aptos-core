@@ -27,13 +27,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"24513481391\"},\"deposit_events\":{\"counter\":\"52\",\"guid\":{\"id\":{\"addr\":\"0x239589c5cfb0cc96f76fa59165a7cbb6ef99ad50d0acc34cf3a2585d861511be\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"1477\",\"guid\":{\"id\":{\"addr\":\"0x239589c5cfb0cc96f76fa59165a7cbb6ef99ad50d0acc34cf3a2585d861511be\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -72,10 +72,10 @@
           "stateKeyHash": "C/MNGKXJKzX/IOWpLek01ns3MheREmmejG4naZZpZn4=",
           "type": {
             "address": "0x4",
-            "module": "aptos_token",
-            "name": "AptosToken"
+            "module": "velor_token",
+            "name": "VelorToken"
           },
-          "typeStr": "0x4::aptos_token::AptosToken",
+          "typeStr": "0x4::velor_token::VelorToken",
           "data": "{\"burn_ref\":{\"vec\":[{\"inner\":{\"vec\":[{\"self\":\"0x9228cfc074cf073bf0687e558ba8cdce6f8c311269774a856d7fc87ac3c70141\"}]},\"self\":{\"vec\":[]}}]},\"mutator_ref\":{\"vec\":[{\"self\":\"0x9228cfc074cf073bf0687e558ba8cdce6f8c311269774a856d7fc87ac3c70141\"}]},\"property_mutator_ref\":{\"self\":\"0x9228cfc074cf073bf0687e558ba8cdce6f8c311269774a856d7fc87ac3c70141\"},\"transfer_ref\":{\"vec\":[{\"self\":\"0x9228cfc074cf073bf0687e558ba8cdce6f8c311269774a856d7fc87ac3c70141\"}]}}"
         }
       },

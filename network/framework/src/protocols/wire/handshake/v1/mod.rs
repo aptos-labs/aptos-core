@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines the structs transported during the network handshake protocol v1.
-//! These should serialize as per the [AptosNet Handshake v1 Specification].
+//! These should serialize as per the [VelorNet Handshake v1 Specification].
 //!
 //! During the v1 Handshake protocol, both end-points of a connection send a serialized and
 //! length-prefixed [`HandshakeMsg`] to each other. The handshake message contains a map from
@@ -11,13 +11,13 @@
 //! supported over that messaging protocol. On receipt, both ends will determine the highest
 //! intersecting messaging protocol version and use that for the remainder of the session.
 //!
-//! [AptosNet Handshake v1 Specification]: https://github.com/aptos-labs/aptos-core/blob/main/specifications/network/handshake-v1.md
+//! [VelorNet Handshake v1 Specification]: https://github.com/velor-chain/velor-core/blob/main/specifications/network/handshake-v1.md
 
 use crate::counters::{start_serialization_timer, DESERIALIZATION_LABEL, SERIALIZATION_LABEL};
 use anyhow::anyhow;
-use aptos_compression::client::CompressionClient;
-use aptos_config::{config::MAX_APPLICATION_MESSAGE_SIZE, network_id::NetworkId};
-use aptos_types::chain_id::ChainId;
+use velor_compression::client::CompressionClient;
+use velor_config::{config::MAX_APPLICATION_MESSAGE_SIZE, network_id::NetworkId};
+use velor_types::chain_id::ChainId;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -204,7 +204,7 @@ impl ProtocolId {
             Encoding::CompressedBcs(limit) => {
                 let compression_client = self.get_compression_client();
                 let bcs_bytes = self.bcs_encode(value, limit)?;
-                aptos_compression::compress(
+                velor_compression::compress(
                     bcs_bytes,
                     compression_client,
                     MAX_APPLICATION_MESSAGE_SIZE,
@@ -233,7 +233,7 @@ impl ProtocolId {
             Encoding::Bcs(limit) => self.bcs_decode(bytes, limit),
             Encoding::CompressedBcs(limit) => {
                 let compression_client = self.get_compression_client();
-                let raw_bytes = aptos_compression::decompress(
+                let raw_bytes = velor_compression::decompress(
                     &bytes.to_vec(),
                     compression_client,
                     MAX_APPLICATION_MESSAGE_SIZE,
@@ -283,11 +283,11 @@ impl fmt::Display for ProtocolId {
 /// bitvec which supports at most 256 bits.
 ///
 /// These sets are sent over-the-wire in the initial [`HandshakeMsg`] to other
-/// AptosNet peers in order to negotiate the set of common supported protocols for
-/// use on a new AptosNet connection.
+/// VelorNet peers in order to negotiate the set of common supported protocols for
+/// use on a new VelorNet connection.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct ProtocolIdSet(aptos_bitvec::BitVec);
+pub struct ProtocolIdSet(velor_bitvec::BitVec);
 
 impl ProtocolIdSet {
     pub fn empty() -> Self {
@@ -352,7 +352,7 @@ impl<'a> FromIterator<&'a ProtocolId> for ProtocolIdSet {
 // MessageProtocolVersion
 //
 
-/// Enum representing different versions of the Aptos network protocol. These
+/// Enum representing different versions of the Velor network protocol. These
 /// should be listed from old to new, old having the smallest value.  We derive
 /// [`PartialOrd`] since nodes need to find highest intersecting protocol version.
 #[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Hash, Deserialize, Serialize)]
@@ -388,13 +388,13 @@ impl fmt::Display for MessagingProtocolVersion {
 /// An enum to list the possible errors during the Atpos handshake negotiation
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum HandshakeError {
-    #[error("aptos-handshake: the received message has a different chain id: {0}, expected: {1}")]
+    #[error("velor-handshake: the received message has a different chain id: {0}, expected: {1}")]
     InvalidChainId(ChainId, ChainId),
     #[error(
-        "aptos-handshake: the received message has an different network id: {0}, expected: {1}"
+        "velor-handshake: the received message has an different network id: {0}, expected: {1}"
     )]
     InvalidNetworkId(NetworkId, NetworkId),
-    #[error("aptos-handshake: could not find an intersection of supported protocol with the peer")]
+    #[error("velor-handshake: could not find an intersection of supported protocol with the peer")]
     NoCommonProtocols,
 }
 

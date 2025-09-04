@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
@@ -104,7 +104,7 @@ pub struct PingFullnodeResponse {
     #[prost(message, optional, tag="1")]
     pub info: ::core::option::Option<super::super::super::indexer::v1::FullnodeInfo>,
 }
-/// Encoded file descriptor set for the `aptos.internal.fullnode.v1` package
+/// Encoded file descriptor set for the `velor.internal.fullnode.v1` package
 pub const FILE_DESCRIPTOR_SET: &[u8] = &[
     0x0a, 0xa1, 0x1b, 0x0a, 0x2e, 0x61, 0x70, 0x74, 0x6f, 0x73, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72,
     0x6e, 0x61, 0x6c, 0x2f, 0x66, 0x75, 0x6c, 0x6c, 0x6e, 0x6f, 0x64, 0x65, 0x2f, 0x76, 0x31, 0x2f,
@@ -326,6 +326,6 @@ pub const FILE_DESCRIPTOR_SET: &[u8] = &[
     0x0a, 0x05, 0x06, 0x00, 0x02, 0x01, 0x03, 0x12, 0x03, 0x40, 0x4e, 0x6a, 0x62, 0x06, 0x70, 0x72,
     0x6f, 0x74, 0x6f, 0x33,
 ];
-include!("aptos.internal.fullnode.v1.serde.rs");
-include!("aptos.internal.fullnode.v1.tonic.rs");
+include!("velor.internal.fullnode.v1.serde.rs");
+include!("velor.internal.fullnode.v1.tonic.rs");
 // @@protoc_insertion_point(module)

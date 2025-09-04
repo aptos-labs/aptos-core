@@ -1,10 +1,10 @@
 module poc::ecdsa_recover_internal {
-    use aptos_std::secp256k1;
+    use velor_std::secp256k1;
     use std::option;
     use std::hash;
 
     public entry fun main() {
-        let msg = b"test aptos secp256k1";
+        let msg = b"test velor secp256k1";
         let h = hash::sha2_256(msg);
         let sig = secp256k1::ecdsa_signature_from_bytes(x"f7ad936da03f948c14c542020e3c5f4e02aaacd1f20427c11aa6e2fbf8776477646bba0e1a37f9e7c777c423a1d2849baafd7ff6a9930814a43c3f80d59db56f");
         let pk_opt = secp256k1::ecdsa_recover(h, 0, &sig);

@@ -1,4 +1,4 @@
-# This defines a workflow to replay transactions on the given chain with the latest aptos node software.
+# This defines a workflow to replay transactions on the given chain with the latest velor node software.
 # In order to trigger it go to the Actions Tab of the Repo, click "replay-verify" and then "Run Workflow".
 #
 # On PR, a single test case will run. On workflow_dispatch, you may specify the CHAIN_NAME to verify.
@@ -21,13 +21,13 @@ on:
       TESTNET_BUCKET:
         required: false
         type: string
-        description: The bucket to use for testnet replay. If not specified, it will use aptos-testnet-backup.
-        default: aptos-testnet-backup
+        description: The bucket to use for testnet replay. If not specified, it will use velor-testnet-backup.
+        default: velor-testnet-backup
       MAINNET_BUCKET:
         required: false
         type: string
-        description: The bucket to use for mainnet replay. If not specified, it will use aptos-mainnet-backup.
-        default: aptos-mainnet-backup
+        description: The bucket to use for mainnet replay. If not specified, it will use velor-mainnet-backup.
+        default: velor-mainnet-backup
 
 # cancel redundant builds
 concurrency:
@@ -39,9 +39,9 @@ jobs:
   determine-test-metadata:
     runs-on: ubuntu-latest
     steps:
-      # checkout the repo first, so check-aptos-core can use it and cancel the workflow if necessary
+      # checkout the repo first, so check-velor-core can use it and cancel the workflow if necessary
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/check-aptos-core
+      - uses: ./.github/actions/check-velor-core
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
@@ -56,12 +56,12 @@ jobs:
     with:
       GIT_SHA: ${{ inputs.GIT_SHA }}
       # replay-verify config
-      BUCKET: ${{ inputs.TESTNET_BUCKET || 'aptos-testnet-backup' }}
+      BUCKET: ${{ inputs.TESTNET_BUCKET || 'velor-testnet-backup' }}
       SUB_DIR: e1
       HISTORY_START: 862000000
       # to see historical TXNS_TO_SKIP, check out ce6158ac2764ee9d4c8738a85f3bcdc6bd0cadc1
       TXNS_TO_SKIP: "0"
-      # 1195000000-122000000: https://github.com/aptos-labs/aptos-core/pull/13832
+      # 1195000000-122000000: https://github.com/velor-chain/velor-core/pull/13832
       RANGES_TO_SKIP: "1195000000-1220000000"
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
@@ -80,12 +80,12 @@ jobs:
     with:
       GIT_SHA: ${{ inputs.GIT_SHA }}
       # replay-verify config
-      BUCKET: ${{ inputs.MAINNET_BUCKET || 'aptos-mainnet-backup' }}
+      BUCKET: ${{ inputs.MAINNET_BUCKET || 'velor-mainnet-backup' }}
       SUB_DIR: e1
       HISTORY_START: 518000000
       #TXNS_TO_SKIP: 12253479 12277499 148358668
       TXNS_TO_SKIP: "0"
-      # 1197378568-1198492648: https://github.com/aptos-labs/aptos-core/pull/13832
+      # 1197378568-1198492648: https://github.com/velor-chain/velor-core/pull/13832
       RANGES_TO_SKIP: "1197378568-1198492648"
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
@@ -101,12 +101,12 @@ jobs:
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha }}
       # replay-verify config
-      BUCKET: ${{ inputs.TESTNET_BUCKET || 'aptos-testnet-backup' }}
+      BUCKET: ${{ inputs.TESTNET_BUCKET || 'velor-testnet-backup' }}
       SUB_DIR: e1
       HISTORY_START: 862000000
       # to see historical TXNS_TO_SKIP, check out ce6158ac2764ee9d4c8738a85f3bcdc6bd0cadc1
       TXNS_TO_SKIP: "0"
-      # 1195000000-1220000000: https://github.com/aptos-labs/aptos-core/pull/13832
+      # 1195000000-1220000000: https://github.com/velor-chain/velor-core/pull/13832
       RANGES_TO_SKIP: "1195000000-1220000000"
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config

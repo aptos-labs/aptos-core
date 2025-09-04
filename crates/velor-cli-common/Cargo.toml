@@ -1,0 +1,18 @@
+[package]
+name = "velor-cli-common"
+description = "Common CLI functionality for all Velor CLIs"
+version = "1.0.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anstyle = { workspace = true }
+clap = { workspace = true, features = ["unstable-styles"] }
+clap_complete = { workspace = true }

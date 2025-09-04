@@ -1,6 +1,6 @@
 [package]
-name = "aptos-db-indexer"
-description = "AptosDB Internal Indexer"
+name = "velor-db-indexer"
+description = "VelorDB Internal Indexer"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,15 +14,15 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-config = { workspace = true }
-aptos-db-indexer-schemas = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-resource-viewer = { workspace = true }
-aptos-rocksdb-options = { workspace = true }
-aptos-schemadb = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-types = { workspace = true }
+velor-config = { workspace = true }
+velor-db-indexer-schemas = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-resource-viewer = { workspace = true }
+velor-rocksdb-options = { workspace = true }
+velor-schemadb = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 dashmap = { workspace = true }
@@ -30,11 +30,11 @@ move-core-types = { workspace = true }
 once_cell = { workspace = true }
 
 [dev-dependencies]
-aptos-proptest-helpers = { workspace = true }
-aptos-schemadb = { workspace = true, features = ["fuzzing"] }
-aptos-types = { workspace = true, features = ["fuzzing"] }
+velor-proptest-helpers = { workspace = true }
+velor-schemadb = { workspace = true, features = ["fuzzing"] }
+velor-types = { workspace = true, features = ["fuzzing"] }
 rand = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["aptos-types/fuzzing", "aptos-schemadb/fuzzing"]
+fuzzing = ["velor-types/fuzzing", "velor-schemadb/fuzzing"]

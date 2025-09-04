@@ -1,0 +1,23 @@
+[package]
+name = "velor-resource-viewer"
+description = "Velor resource viewer"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true }
+velor-vm-environment = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-utils = { workspace = true }
+move-core-types = { workspace = true }
+move-resource-viewer = { workspace = true }

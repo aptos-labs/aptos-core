@@ -27,13 +27,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"645987600\"},\"deposit_events\":{\"counter\":\"16\",\"guid\":{\"id\":{\"addr\":\"0x11a5783e7b353bb3d66aba3f853418dd975e2a109b81ea05070319fdbf8aedd\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x11a5783e7b353bb3d66aba3f853418dd975e2a109b81ea05070319fdbf8aedd\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -146,7 +146,7 @@
             "name": "Collection"
           },
           "typeStr": "0x4::collection::Collection",
-          "data": "{\"creator\":\"0x14464c04472a91941854ba9ffc48691e071874a1bcb51b89ff15afa5f80b76df\",\"description\":\"subdomain of .apt names from Aptos Labs\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x30fbc956f0f38db2d314bd9c018d34be3e047a804a71e30a4e5d43d8b7c539eb\",\"creation_num\":\"1125899906842627\"}}},\"name\":\"Aptos Subdomain Names V2\",\"uri\":\"https://aptosnames.com\"}"
+          "data": "{\"creator\":\"0x14464c04472a91941854ba9ffc48691e071874a1bcb51b89ff15afa5f80b76df\",\"description\":\"subdomain of .apt names from Velor Labs\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x30fbc956f0f38db2d314bd9c018d34be3e047a804a71e30a4e5d43d8b7c539eb\",\"creation_num\":\"1125899906842627\"}}},\"name\":\"Velor Subdomain Names V2\",\"uri\":\"https://velornames.com\"}"
         }
       },
       {
@@ -188,7 +188,7 @@
             "name": "Token"
           },
           "typeStr": "0x4::token::Token",
-          "data": "{\"collection\":{\"inner\":\"0x30fbc956f0f38db2d314bd9c018d34be3e047a804a71e30a4e5d43d8b7c539eb\"},\"description\":\"This is an official Aptos Labs Name Service Name\",\"index\":\"0\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x313f04ead8fa66e70f23ea26ef3ec7fbce485f776986a06302e6283c7e2bc2f8\",\"creation_num\":\"1125899906842625\"}}},\"name\":\"\",\"uri\":\"https://www.aptosnames.com/api/mainnet/v2/metadata/abwehr1225.petra.apt\"}"
+          "data": "{\"collection\":{\"inner\":\"0x30fbc956f0f38db2d314bd9c018d34be3e047a804a71e30a4e5d43d8b7c539eb\"},\"description\":\"This is an official Velor Labs Name Service Name\",\"index\":\"0\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x313f04ead8fa66e70f23ea26ef3ec7fbce485f776986a06302e6283c7e2bc2f8\",\"creation_num\":\"1125899906842625\"}}},\"name\":\"\",\"uri\":\"https://www.velornames.com/api/mainnet/v2/metadata/abwehr1225.petra.apt\"}"
         }
       },
       {
@@ -247,13 +247,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"2827700840040\"},\"deposit_events\":{\"counter\":\"451146\",\"guid\":{\"id\":{\"addr\":\"0x78ee3915e67ef5d19fa91d1e05e60ae08751efd12ce58e23fc1109de87ea7865\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"4\",\"guid\":{\"id\":{\"addr\":\"0x78ee3915e67ef5d19fa91d1e05e60ae08751efd12ce58e23fc1109de87ea7865\",\"creation_num\":\"3\"}}}}"
         }
       },

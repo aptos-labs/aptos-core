@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     keyless::KEYLESS_ACCOUNT_MODULE_NAME, move_utils::as_move_value::AsMoveValue, serialize,
 };
-use aptos_crypto::CryptoMaterialError;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_crypto::CryptoMaterialError;
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::{Bn254, G1Affine, G2Affine};
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -18,7 +18,7 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
-/// Reflection of aptos_framework::keyless_account::Groth16VerificationKey
+/// Reflection of velor_framework::keyless_account::Groth16VerificationKey
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug, BCSCryptoHash, CryptoHasher)]
 pub struct Groth16VerificationKey {
     pub alpha_g1: Vec<u8>,

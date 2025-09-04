@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -17,10 +17,10 @@ use crate::{
     utils::{unix_timestamp_sec, GlobalRestoreOptions},
 };
 use anyhow::{anyhow, bail, ensure, Result};
-use aptos_db::state_restore::StateSnapshotRestoreMode;
-use aptos_executor_types::VerifyExecutionMode;
-use aptos_logger::prelude::*;
-use aptos_types::transaction::Version;
+use velor_db::state_restore::StateSnapshotRestoreMode;
+use velor_executor_types::VerifyExecutionMode;
+use velor_logger::prelude::*;
+use velor_types::transaction::Version;
 use clap::Parser;
 use std::sync::Arc;
 

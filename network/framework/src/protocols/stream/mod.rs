@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::protocols::wire::messaging::v1::{MultiplexMessage, NetworkMessage};
 use anyhow::{bail, ensure};
-use aptos_channels::Sender;
-use aptos_id_generator::{IdGenerator, U32IdGenerator};
+use velor_channels::Sender;
+use velor_id_generator::{IdGenerator, U32IdGenerator};
 use futures_util::SinkExt;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;

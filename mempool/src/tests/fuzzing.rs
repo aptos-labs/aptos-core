@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,18 +7,18 @@ use crate::{
     network::{BroadcastPeerPriority, MempoolSyncMsg},
     shared_mempool::{tasks, types::SharedMempool},
 };
-use aptos_config::{
+use velor_config::{
     config::{NodeConfig, NodeType},
     network_id::NetworkId,
 };
-use aptos_infallible::{Mutex, RwLock};
-use aptos_network::{
+use velor_infallible::{Mutex, RwLock};
+use velor_network::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
     protocols::wire::handshake::v1::ProtocolId::MempoolDirectSend,
 };
-use aptos_storage_interface::mock::MockDbReaderWriter;
-use aptos_types::transaction::SignedTransaction;
-use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use velor_storage_interface::mock::MockDbReaderWriter;
+use velor_types::transaction::SignedTransaction;
+use velor_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use proptest::{
     arbitrary::any,
     prelude::*,

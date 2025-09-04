@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::common::error::Error;
-use aptos_config::network_id::PeerNetworkId;
-use aptos_logger::Schema;
+use velor_config::network_id::PeerNetworkId;
+use velor_logger::Schema;
 use serde::Serialize;
 
 #[derive(Schema)]

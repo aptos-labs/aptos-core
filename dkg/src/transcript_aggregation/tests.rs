@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transcript_aggregation::TranscriptAggregationState;
-use aptos_crypto::{bls12381::bls12381_keys, Uniform};
-use aptos_infallible::duration_since_epoch;
-use aptos_reliable_broadcast::BroadcastStatus;
-use aptos_types::{
+use velor_crypto::{bls12381::bls12381_keys, Uniform};
+use velor_infallible::duration_since_epoch;
+use velor_reliable_broadcast::BroadcastStatus;
+use velor_types::{
     dkg::{real_dkg::RealDKG, DKGSessionMetadata, DKGTrait, DKGTranscript, DKGTranscriptMetadata},
     epoch_state::EpochState,
     on_chain_config::OnChainRandomnessConfig,

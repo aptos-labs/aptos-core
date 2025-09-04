@@ -1,14 +1,14 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
     utils::{get_current_consensus_config, get_current_version},
 };
-use aptos_forge::{NodeExt, SwarmExt};
-use aptos_logger::{debug, info};
-use aptos_rest_client::Client;
-use aptos_types::on_chain_config::OnChainRandomnessConfig;
+use velor_forge::{NodeExt, SwarmExt};
+use velor_logger::{debug, info};
+use velor_rest_client::Client;
+use velor_types::on_chain_config::OnChainRandomnessConfig;
 use futures::future::join_all;
 use std::{sync::Arc, time::Duration};
 
@@ -26,7 +26,7 @@ async fn dummy_validator_txns() {
             conf.consensus_config.enable_validator_txns();
             conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
-        .with_aptos()
+        .with_velor()
         .build()
         .await;
 
@@ -51,8 +51,8 @@ async fn dummy_validator_txns() {
             )
         })
         .collect::<Vec<_>>();
-    let aptos_results = join_all(tasks).await;
-    println!("aptos_results={:?}", aptos_results);
+    let velor_results = join_all(tasks).await;
+    println!("velor_results={:?}", velor_results);
 
     let version_milestone_0 = get_current_version(&validator_clients[0]).await;
     let version_milestone_1 = version_milestone_0 + 10;

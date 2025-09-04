@@ -1,0 +1,55 @@
+[package]
+name = "velor-telemetry-service"
+description = "Web service to receive telemetry from nodes and ingest it to backends"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-config = { workspace = true }
+velor-crypto = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-rest-client = { workspace = true }
+velor-types = { workspace = true }
+base64 = { workspace = true }
+bcs = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+debug-ignore = { workspace = true }
+flate2 = { workspace = true }
+futures = { workspace = true }
+gcp-bigquery-client = { workspace = true }
+jsonwebtoken = { workspace = true }
+once_cell = { workspace = true }
+prometheus = { workspace = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+reqwest = { workspace = true }
+reqwest-middleware = { workspace = true }
+reqwest-retry = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
+warp = { workspace = true }
+
+[features]
+bigquery_integration_tests = []
+
+[dev-dependencies]
+claims = { workspace = true }
+httpmock = { workspace = true }

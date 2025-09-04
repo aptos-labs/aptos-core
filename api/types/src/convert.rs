@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -17,11 +17,11 @@ use crate::{
     TransactionPayload, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_logger::{sample, sample::SampleRate};
-use aptos_resource_viewer::AptosValueAnnotator;
-use aptos_storage_interface::DbReader;
-use aptos_types::{
+use velor_crypto::{hash::CryptoHash, HashValue};
+use velor_logger::{sample, sample::SampleRate};
+use velor_resource_viewer::VelorValueAnnotator;
+use velor_storage_interface::DbReader;
+use velor_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
     contract_event::{ContractEvent, EventWithVersion},
@@ -65,7 +65,7 @@ const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
 /// This reads the underlying BCS types and ABIs to convert them into
 /// JSON outputs
 pub struct MoveConverter<'a, S> {
-    inner: AptosValueAnnotator<'a, S>,
+    inner: VelorValueAnnotator<'a, S>,
     db: Arc<dyn DbReader>,
     indexer_reader: Option<Arc<dyn IndexerReader>>,
 }
@@ -77,7 +77,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         indexer_reader: Option<Arc<dyn IndexerReader>>,
     ) -> Self {
         Self {
-            inner: AptosValueAnnotator::new(inner),
+            inner: VelorValueAnnotator::new(inner),
             db,
             indexer_reader,
         }
@@ -176,7 +176,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         timestamp: u64,
         data: TransactionOnChainData,
     ) -> Result<Transaction> {
-        use aptos_types::transaction::Transaction::{
+        use velor_types::transaction::Transaction::{
             BlockEpilogue, BlockMetadata, BlockMetadataExt, GenesisTransaction, StateCheckpoint,
             UserTransaction,
         };
@@ -236,7 +236,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     block_end_info,
                 })
             },
-            aptos_types::transaction::Transaction::ValidatorTransaction(txn) => {
+            velor_types::transaction::Transaction::ValidatorTransaction(txn) => {
                 Transaction::ValidatorTransaction((txn, info, events, timestamp).into())
             },
         })
@@ -245,9 +245,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     pub fn into_transaction_info(
         &self,
         version: u64,
-        info: &aptos_types::transaction::TransactionInfo,
+        info: &velor_types::transaction::TransactionInfo,
         accumulator_root_hash: HashValue,
-        write_set: aptos_types::write_set::WriteSet,
+        write_set: velor_types::write_set::WriteSet,
         txn_aux_data: Option<TransactionAuxiliaryData>,
     ) -> TransactionInfo {
         TransactionInfo {
@@ -273,9 +273,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
     pub fn try_into_transaction_payload(
         &self,
-        payload: aptos_types::transaction::TransactionPayload,
+        payload: velor_types::transaction::TransactionPayload,
     ) -> Result<TransactionPayload> {
-        use aptos_types::transaction::{EntryFunction, Script, TransactionPayload::*};
+        use velor_types::transaction::{EntryFunction, Script, TransactionPayload::*};
 
         let try_into_script_payload = |s: Script| -> Result<ScriptPayload> {
             let (code, ty_args, args) = s.into_inner();
@@ -334,7 +334,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             Multisig(multisig) => {
                 let transaction_payload = if let Some(payload) = multisig.transaction_payload {
                     match payload {
-                        aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
+                        velor_types::transaction::MultisigTransactionPayload::EntryFunction(
                             entry_function,
                         ) => {
                             let entry_function_payload =
@@ -352,17 +352,17 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     transaction_payload,
                 })
             },
-            Payload(aptos_types::transaction::TransactionPayloadInner::V1 {
+            Payload(velor_types::transaction::TransactionPayloadInner::V1 {
                 executable,
                 extra_config,
             }) => match extra_config {
-                aptos_types::transaction::TransactionExtraConfig::V1 {
+                velor_types::transaction::TransactionExtraConfig::V1 {
                     multisig_address,
                     replay_protection_nonce: _,
                 } => {
                     if let Some(multisig_address) = multisig_address {
                         match executable {
-                            aptos_types::transaction::TransactionExecutable::EntryFunction(
+                            velor_types::transaction::TransactionExecutable::EntryFunction(
                                 entry_function,
                             ) => TransactionPayload::MultisigPayload(MultisigPayload {
                                 multisig_address: multisig_address.into(),
@@ -372,12 +372,12 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                     ),
                                 ),
                             }),
-                            aptos_types::transaction::TransactionExecutable::Script(_) => {
+                            velor_types::transaction::TransactionExecutable::Script(_) => {
                                 bail!(
                                     "Script executable is not supported for multisig transactions"
                                 )
                             },
-                            aptos_types::transaction::TransactionExecutable::Empty => {
+                            velor_types::transaction::TransactionExecutable::Empty => {
                                 TransactionPayload::MultisigPayload(MultisigPayload {
                                     multisig_address: multisig_address.into(),
                                     transaction_payload: None,
@@ -386,15 +386,15 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         }
                     } else {
                         match executable {
-                            aptos_types::transaction::TransactionExecutable::EntryFunction(
+                            velor_types::transaction::TransactionExecutable::EntryFunction(
                                 entry_function,
                             ) => TransactionPayload::EntryFunctionPayload(
                                 try_into_entry_function_payload(entry_function)?,
                             ),
-                            aptos_types::transaction::TransactionExecutable::Script(script) => {
+                            velor_types::transaction::TransactionExecutable::Script(script) => {
                                 TransactionPayload::ScriptPayload(try_into_script_payload(script)?)
                             },
-                            aptos_types::transaction::TransactionExecutable::Empty => {
+                            velor_types::transaction::TransactionExecutable::Empty => {
                                 bail!("Empty executable is not supported for non-multisig transactions")
                             },
                         }
@@ -409,9 +409,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
     pub fn try_into_write_set_payload(
         &self,
-        payload: aptos_types::transaction::WriteSetPayload,
+        payload: velor_types::transaction::WriteSetPayload,
     ) -> Result<WriteSetPayload> {
-        use aptos_types::transaction::WriteSetPayload::*;
+        use velor_types::transaction::WriteSetPayload::*;
         let ret = match payload {
             Script { execute_as, script } => WriteSetPayload {
                 write_set: WriteSet::ScriptWriteSet(ScriptWriteSet {
@@ -664,7 +664,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             } else {
                 u64::MAX
             },
-            self.try_into_aptos_core_transaction_payload(
+            self.try_into_velor_core_transaction_payload(
                 payload,
                 replay_protection_nonce.map(|nonce| nonce.into()),
             )
@@ -676,12 +676,12 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         ))
     }
 
-    pub fn try_into_aptos_core_transaction_payload(
+    pub fn try_into_velor_core_transaction_payload(
         &self,
         payload: TransactionPayload,
         nonce: Option<u64>,
-    ) -> Result<aptos_types::transaction::TransactionPayload> {
-        use aptos_types::transaction::{
+    ) -> Result<velor_types::transaction::TransactionPayload> {
+        use velor_types::transaction::{
             TransactionExecutable as Executable, TransactionExtraConfig as ExtraConfig,
             TransactionPayload as Target, TransactionPayloadInner as TargetInner,
         };
@@ -801,7 +801,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     })
                 } else {
                     let transaction_payload: Option<
-                        aptos_types::transaction::MultisigTransactionPayload,
+                        velor_types::transaction::MultisigTransactionPayload,
                     > = if let Some(payload) = multisig.transaction_payload {
                         match payload {
                             MultisigTransactionPayload::EntryFunctionPayload(
@@ -810,7 +810,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 let entry_function: EntryFunction =
                                     try_into_entry_function(entry_func_payload)?;
                                 Some(
-                                    aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
+                                    velor_types::transaction::MultisigTransactionPayload::EntryFunction(
                                         entry_function,
                                     ),
                                 )
@@ -1161,7 +1161,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 fn log_missing_table_info(handle: TableHandle) {
     sample!(
         SampleRate::Duration(Duration::from_secs(1)),
-        aptos_logger::debug!(
+        velor_logger::debug!(
             "Table info not found for handle {:?}, can't decode table item. OK for simulation",
             handle
         )

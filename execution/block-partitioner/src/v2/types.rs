@@ -1,7 +1,7 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::block_executor::partitioner::{
+use velor_types::block_executor::partitioner::{
     RoundId, ShardId, GLOBAL_ROUND_ID, GLOBAL_SHARD_ID,
 };
 use serde::{Deserialize, Serialize};
@@ -55,7 +55,7 @@ pub type SenderIdx = usize;
 
 /// Represents positions of a txn after it is assigned to a sub-block.
 ///
-/// Different from `aptos_types::block_executor::partitioner::ShardedTxnIndex`,
+/// Different from `velor_types::block_executor::partitioner::ShardedTxnIndex`,
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ShardedTxnIndexV2 {
     pub sub_block_idx: SubBlockIdx,

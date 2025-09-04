@@ -1,18 +1,18 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod integration_test_impl;
 
-use aptos_config::config::NodeConfig;
-use aptos_crypto::{
+use velor_config::config::NodeConfig;
+use velor_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue,
 };
-use aptos_executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
-use aptos_executor_types::state_compute_result::StateComputeResult;
-use aptos_storage_interface::DbReaderWriter;
-use aptos_types::{
+use velor_executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
+use velor_executor_types::state_compute_result::StateComputeResult;
+use velor_storage_interface::DbReaderWriter;
+use velor_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
@@ -21,7 +21,7 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     waypoint::Waypoint,
 };
-use aptos_vm::VMBlockExecutor;
+use velor_vm::VMBlockExecutor;
 use std::sync::Arc;
 
 /// Helper function for test to blindly bootstrap without waypoint.

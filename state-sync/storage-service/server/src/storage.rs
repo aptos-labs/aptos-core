@@ -1,18 +1,18 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::Error, metrics::increment_network_frame_overflow};
-use aptos_config::config::StorageServiceConfig;
-use aptos_logger::debug;
-use aptos_storage_interface::{AptosDbError, DbReader, Result as StorageResult};
-use aptos_storage_service_types::{
+use velor_config::config::StorageServiceConfig;
+use velor_logger::debug;
+use velor_storage_interface::{VelorDbError, DbReader, Result as StorageResult};
+use velor_storage_service_types::{
     requests::{GetTransactionDataWithProofRequest, TransactionDataRequestType},
     responses::{
         CompleteDataRange, DataResponse, DataSummary, TransactionDataResponseType,
         TransactionDataWithProofResponse,
     },
 };
-use aptos_types::{
+use velor_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
@@ -21,11 +21,11 @@ use aptos_types::{
 use serde::Serialize;
 use std::{cmp::min, sync::Arc};
 
-/// The interface into local storage (e.g., the Aptos DB) used by the storage
+/// The interface into local storage (e.g., the Velor DB) used by the storage
 /// server to handle client requests and responses.
 pub trait StorageReaderInterface: Clone + Send + 'static {
     /// Returns a data summary of the underlying storage state.
-    fn get_data_summary(&self) -> aptos_storage_service_types::Result<DataSummary, Error>;
+    fn get_data_summary(&self) -> velor_storage_service_types::Result<DataSummary, Error>;
 
     /// Returns a list of transactions with a proof relative to the
     /// `proof_version`. The transaction list is expected to start at
@@ -38,7 +38,7 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         start_version: u64,
         end_version: u64,
         include_events: bool,
-    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
+    ) -> velor_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
 
     /// Returns a list of epoch ending ledger infos, starting at `start_epoch`
     /// and ending at the `expected_end_epoch` (inclusive). For example, if
@@ -50,7 +50,7 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         &self,
         start_epoch: u64,
         expected_end_epoch: u64,
-    ) -> aptos_storage_service_types::Result<EpochChangeProof, Error>;
+    ) -> velor_storage_service_types::Result<EpochChangeProof, Error>;
 
     /// Returns a list of transaction outputs with a proof relative to the
     /// `proof_version`. The transaction output list is expected to start at
@@ -62,7 +62,7 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         proof_version: u64,
         start_version: u64,
         end_version: u64,
-    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
+    ) -> velor_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
 
     /// Returns a list of transaction or outputs with a proof relative to the
     /// `proof_version`. The data list is expected to start at `start_version`
@@ -77,17 +77,17 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         end_version: u64,
         include_events: bool,
         max_num_output_reductions: u64,
-    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
+    ) -> velor_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
 
     /// Returns transaction data with a proof for the given request
     fn get_transaction_data_with_proof(
         &self,
         transaction_data_with_proof_request: &GetTransactionDataWithProofRequest,
-    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
+    ) -> velor_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
 
     /// Returns the number of states in the state tree at the specified version.
     fn get_number_of_states(&self, version: u64)
-        -> aptos_storage_service_types::Result<u64, Error>;
+        -> velor_storage_service_types::Result<u64, Error>;
 
     /// Returns a chunk holding a list of state values starting at the
     /// specified `start_index` and ending at `end_index` (inclusive). In
@@ -98,7 +98,7 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         version: u64,
         start_index: u64,
         end_index: u64,
-    ) -> aptos_storage_service_types::Result<StateValueChunkWithProof, Error>;
+    ) -> velor_storage_service_types::Result<StateValueChunkWithProof, Error>;
 }
 
 /// The underlying implementation of the StorageReaderInterface, used by the
@@ -124,7 +124,7 @@ impl StorageReader {
         &self,
         latest_version: Version,
         transactions_range: &Option<CompleteDataRange<Version>>,
-    ) -> aptos_storage_service_types::Result<Option<CompleteDataRange<Version>>, Error> {
+    ) -> velor_storage_service_types::Result<Option<CompleteDataRange<Version>>, Error> {
         let pruner_enabled = self
             .storage
             .is_state_merkle_pruner_enabled()
@@ -162,7 +162,7 @@ impl StorageReader {
     fn fetch_transaction_range(
         &self,
         latest_version: Version,
-    ) -> aptos_storage_service_types::Result<Option<CompleteDataRange<Version>>, Error> {
+    ) -> velor_storage_service_types::Result<Option<CompleteDataRange<Version>>, Error> {
         let first_transaction_version = self
             .storage
             .get_first_txn_version()
@@ -181,7 +181,7 @@ impl StorageReader {
     fn fetch_transaction_output_range(
         &self,
         latest_version: Version,
-    ) -> aptos_storage_service_types::Result<Option<CompleteDataRange<Version>>, Error> {
+    ) -> velor_storage_service_types::Result<Option<CompleteDataRange<Version>>, Error> {
         let first_output_version = self
             .storage
             .get_first_write_set_version()
@@ -468,7 +468,7 @@ impl StorageReader {
 }
 
 impl StorageReaderInterface for StorageReader {
-    fn get_data_summary(&self) -> aptos_storage_service_types::Result<DataSummary, Error> {
+    fn get_data_summary(&self) -> velor_storage_service_types::Result<DataSummary, Error> {
         // Fetch the latest ledger info
         let latest_ledger_info_with_sigs = self
             .storage
@@ -516,7 +516,7 @@ impl StorageReaderInterface for StorageReader {
         start_version: u64,
         end_version: u64,
         include_events: bool,
-    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
+    ) -> velor_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
         self.get_transactions_with_proof_by_size(
             proof_version,
             start_version,
@@ -530,7 +530,7 @@ impl StorageReaderInterface for StorageReader {
         &self,
         start_epoch: u64,
         expected_end_epoch: u64,
-    ) -> aptos_storage_service_types::Result<EpochChangeProof, Error> {
+    ) -> velor_storage_service_types::Result<EpochChangeProof, Error> {
         self.get_epoch_ending_ledger_infos_by_size(
             start_epoch,
             expected_end_epoch,
@@ -543,7 +543,7 @@ impl StorageReaderInterface for StorageReader {
         proof_version: u64,
         start_version: u64,
         end_version: u64,
-    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
+    ) -> velor_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
         self.get_transaction_outputs_with_proof_by_size(
             proof_version,
             start_version,
@@ -559,7 +559,7 @@ impl StorageReaderInterface for StorageReader {
         end_version: u64,
         include_events: bool,
         max_num_output_reductions: u64,
-    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
+    ) -> velor_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
         self.get_transactions_or_outputs_with_proof_by_size(
             proof_version,
             start_version,
@@ -573,7 +573,7 @@ impl StorageReaderInterface for StorageReader {
     fn get_transaction_data_with_proof(
         &self,
         transaction_data_with_proof_request: &GetTransactionDataWithProofRequest,
-    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
+    ) -> velor_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
         // Extract the data versions from the request
         let proof_version = transaction_data_with_proof_request.proof_version;
         let start_version = transaction_data_with_proof_request.start_version;
@@ -623,7 +623,7 @@ impl StorageReaderInterface for StorageReader {
     fn get_number_of_states(
         &self,
         version: u64,
-    ) -> aptos_storage_service_types::Result<u64, Error> {
+    ) -> velor_storage_service_types::Result<u64, Error> {
         let number_of_states = self
             .storage
             .get_state_item_count(version)
@@ -636,7 +636,7 @@ impl StorageReaderInterface for StorageReader {
         version: u64,
         start_index: u64,
         end_index: u64,
-    ) -> aptos_storage_service_types::Result<StateValueChunkWithProof, Error> {
+    ) -> velor_storage_service_types::Result<StateValueChunkWithProof, Error> {
         self.get_state_value_chunk_with_proof_by_size(
             version,
             start_index,
@@ -665,7 +665,7 @@ macro_rules! timed_read {
                     read_operation,
                     None,
                 );
-                result.map_err(|e| AptosDbError::Other(e.to_string()))
+                result.map_err(|e| VelorDbError::Other(e.to_string()))
             }
         )+
     };
@@ -729,7 +729,7 @@ impl DbReader for TimedStorageReader {
 
 /// Calculate `(start..=end).len()`. Returns an error if `end < start` or
 /// `end == u64::MAX`.
-fn inclusive_range_len(start: u64, end: u64) -> aptos_storage_service_types::Result<u64, Error> {
+fn inclusive_range_len(start: u64, end: u64) -> velor_storage_service_types::Result<u64, Error> {
     // len = end - start + 1
     let len = end.checked_sub(start).ok_or_else(|| {
         Error::InvalidRequest(format!("end ({}) must be >= start ({})", end, start))
@@ -746,7 +746,7 @@ fn inclusive_range_len(start: u64, end: u64) -> aptos_storage_service_types::Res
 pub(crate) fn check_overflow_network_frame<T: ?Sized + Serialize>(
     data: &T,
     max_network_frame_bytes: u64,
-) -> aptos_storage_service_types::Result<(bool, u64), Error> {
+) -> velor_storage_service_types::Result<(bool, u64), Error> {
     let num_serialized_bytes = bcs::to_bytes(&data)
         .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?
         .len() as u64;

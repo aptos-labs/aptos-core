@@ -1,6 +1,6 @@
 module poc::pairing_internal {
-    use aptos_std::crypto_algebra::{Self, Element};
-    use aptos_std::bls12381_algebra::{G1, G2, Gt};
+    use velor_std::crypto_algebra::{Self, Element};
+    use velor_std::bls12381_algebra::{G1, G2, Gt};
 
     public entry fun main(_owner: &signer) {
         let g1_element: Element<G1> = crypto_algebra::one<G1>();

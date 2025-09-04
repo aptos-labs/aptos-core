@@ -5,7 +5,7 @@ provider "kubernetes" {
   client_key             = base64decode(yamldecode(base64decode(vultr_kubernetes.k8.kube_config)).users[0].user["client-key-data"])
 }
 
-resource "kubernetes_namespace" "aptos" {
+resource "kubernetes_namespace" "velor" {
   metadata {
     name = var.k8s_namespace
   }
@@ -43,7 +43,7 @@ resource "helm_release" "fullnode" {
         tag = var.image_tag
       }
       nodeSelector = {
-        "vke.vultr.com/node-pool" = "aptos-fullnode"
+        "vke.vultr.com/node-pool" = "velor-fullnode"
       }
       storage = {
         class = var.block_storage_class

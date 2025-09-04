@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -11,30 +11,30 @@ use crate::{
         verify_commit_notification,
     },
 };
-use aptos_config::config::{NodeConfig, RoleType, StateSyncDriverConfig};
-use aptos_consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
-use aptos_data_client::client::AptosDataClient;
-use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
-use aptos_db::AptosDB;
-use aptos_event_notifications::{
+use velor_config::config::{NodeConfig, RoleType, StateSyncDriverConfig};
+use velor_consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
+use velor_data_client::client::VelorDataClient;
+use velor_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
+use velor_db::VelorDB;
+use velor_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, EventSubscriptionService,
     ReconfigNotificationListener,
 };
-use aptos_executor::chunk_executor::ChunkExecutor;
-use aptos_executor_test_helpers::bootstrap_genesis;
-use aptos_infallible::RwLock;
-use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
-use aptos_storage_interface::DbReaderWriter;
-use aptos_storage_service_client::StorageServiceClient;
-use aptos_storage_service_notifications::StorageServiceNotificationListener;
-use aptos_time_service::TimeService;
-use aptos_types::{
+use velor_executor::chunk_executor::ChunkExecutor;
+use velor_executor_test_helpers::bootstrap_genesis;
+use velor_infallible::RwLock;
+use velor_mempool_notifications::MempoolNotificationListener;
+use velor_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
+use velor_storage_interface::DbReaderWriter;
+use velor_storage_service_client::StorageServiceClient;
+use velor_storage_service_notifications::StorageServiceNotificationListener;
+use velor_time_service::TimeService;
+use velor_types::{
     event::EventKey,
     transaction::{Transaction, WriteSetPayload},
     waypoint::Waypoint,
 };
-use aptos_vm::aptos_vm::AptosVMBlockExecutor;
+use velor_vm::velor_vm::VelorVMBlockExecutor;
 use claims::{assert_err, assert_none};
 use futures::{channel::mpsc::UnboundedSender, FutureExt, SinkExt, StreamExt};
 use ntest::timeout;
@@ -330,17 +330,17 @@ async fn create_driver_for_tests(
     TimeService,
 ) {
     // Initialize the logger for tests
-    aptos_logger::Logger::init_for_testing();
+    velor_logger::Logger::init_for_testing();
 
-    // Create test aptos database
-    let db_path = aptos_temppath::TempPath::new();
+    // Create test velor database
+    let db_path = velor_temppath::TempPath::new();
     db_path.create_as_dir().unwrap();
-    let (_, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
+    let (_, db_rw) = DbReaderWriter::wrap(VelorDB::new_for_test(db_path.path()));
 
     // Bootstrap the genesis transaction
-    let (genesis, _) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let (genesis, _) = velor_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-    bootstrap_genesis::<AptosVMBlockExecutor>(&db_rw, &genesis_txn).unwrap();
+    bootstrap_genesis::<VelorVMBlockExecutor>(&db_rw, &genesis_txn).unwrap();
 
     // Create the event subscription service and subscribe to events and reconfigurations
     let mut event_subscription_service =
@@ -356,21 +356,21 @@ async fn create_driver_for_tests(
 
     // Create consensus and mempool notifiers and listeners
     let (consensus_notifier, consensus_listener) =
-        aptos_consensus_notifications::new_consensus_notifier_listener_pair(5000);
+        velor_consensus_notifications::new_consensus_notifier_listener_pair(5000);
     let (mempool_notifier, mempool_listener) =
-        aptos_mempool_notifications::new_mempool_notifier_listener_pair(100);
+        velor_mempool_notifications::new_mempool_notifier_listener_pair(100);
 
     // Create the storage service notifier and listener
     let (storage_service_notifier, storage_service_listener) =
-        aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
+        velor_storage_service_notifications::new_storage_service_notifier_listener_pair();
 
     // Create the chunk executor
-    let chunk_executor = Arc::new(ChunkExecutor::<AptosVMBlockExecutor>::new(db_rw.clone()));
+    let chunk_executor = Arc::new(ChunkExecutor::<VelorVMBlockExecutor>::new(db_rw.clone()));
 
     // Create a streaming service client
     let (streaming_service_client, _) = new_streaming_service_client_listener_pair();
 
-    // Create a test aptos data client
+    // Create a test velor data client
     let time_service = TimeService::mock();
     let network_client = StorageServiceClient::new(NetworkClient::new(
         vec![],
@@ -378,8 +378,8 @@ async fn create_driver_for_tests(
         HashMap::new(),
         PeersAndMetadata::new(&[]),
     ));
-    let (aptos_data_client, _) = AptosDataClient::new(
-        node_config.state_sync.aptos_data_client,
+    let (velor_data_client, _) = VelorDataClient::new(
+        node_config.state_sync.velor_data_client,
         node_config.base.clone(),
         time_service.clone(),
         db_rw.reader.clone(),
@@ -403,7 +403,7 @@ async fn create_driver_for_tests(
             metadata_storage,
             consensus_listener,
             event_subscription_service,
-            aptos_data_client,
+            velor_data_client,
             streaming_service_client,
             time_service.clone(),
         );

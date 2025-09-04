@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,14 +12,14 @@ use crate::{
     transport::{ConnectionId, ConnectionMetadata},
     ProtocolId,
 };
-use aptos_config::{
+use velor_config::{
     config::{Peer, PeerSet},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::{sample, sample::SampleRate, warn};
-use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
-use aptos_types::{account_address::AccountAddress, PeerId};
+use velor_infallible::{Mutex, RwLock};
+use velor_logger::{sample, sample::SampleRate, warn};
+use velor_peer_monitoring_service_types::PeerMonitoringMetadata;
+use velor_types::{account_address::AccountAddress, PeerId};
 use arc_swap::ArcSwap;
 use std::{
     collections::{hash_map::Entry, HashMap},

@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::node::{InternalNode, NodeRef, NodeStrongRef};
-use aptos_drop_helper::ArcAsyncDrop;
+use velor_drop_helper::ArcAsyncDrop;
 use std::sync::Arc;
 
 pub(crate) struct DescendantIterator<'a, K: ArcAsyncDrop, V: ArcAsyncDrop> {

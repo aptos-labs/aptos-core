@@ -22,9 +22,9 @@
       "icon": "external link",
       "includeVars": true,
       "keepTime": true,
-      "tags": ["aptos-core"],
+      "tags": ["velor-core"],
       "targetBlank": true,
-      "title": "aptos core",
+      "title": "velor core",
       "type": "dashboards"
     }
   ],
@@ -1066,7 +1066,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_peer_monitoring_service_server_requests_received{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "expr": "rate(velor_peer_monitoring_service_server_requests_received{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{request_type}}",
               "range": true,
               "refId": "A"
@@ -1115,7 +1115,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_peer_monitoring_service_server_responses_sent{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "expr": "rate(velor_peer_monitoring_service_server_responses_sent{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{response_type}}",
               "range": true,
               "refId": "A"
@@ -1166,7 +1166,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum(rate(aptos_peer_monitoring_service_server_request_latency_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\",}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(velor_peer_monitoring_service_server_request_latency_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\",}[$__rate_interval])) by (le))",
               "legendFormat": "P99",
               "range": true,
               "refId": "A"
@@ -1174,7 +1174,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.70, sum(rate(aptos_peer_monitoring_service_server_request_latency_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\",}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.70, sum(rate(velor_peer_monitoring_service_server_request_latency_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\",}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P70",
               "range": true,
@@ -1226,7 +1226,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "aptos_peer_monitoring_service_server_request_latency_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/aptos_peer_monitoring_service_server_request_latency_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "expr": "velor_peer_monitoring_service_server_request_latency_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/velor_peer_monitoring_service_server_request_latency_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{request_type}}",
               "range": true,
               "refId": "A"
@@ -1275,7 +1275,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_peer_monitoring_service_server_pending_network_events{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "expr": "rate(velor_peer_monitoring_service_server_pending_network_events{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{state}}",
               "range": true,
               "refId": "A"
@@ -1324,7 +1324,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_peer_monitoring_service_server_errors{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "expr": "rate(velor_peer_monitoring_service_server_errors{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{error_type}}",
               "range": true,
               "refId": "A"
@@ -1344,7 +1344,7 @@
   "refresh": "",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["aptos-core"],
+  "tags": ["velor-core"],
   "templating": {
     "list": [
       {

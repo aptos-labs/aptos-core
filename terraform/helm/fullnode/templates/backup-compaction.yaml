@@ -22,7 +22,7 @@ spec:
             {{- end}}
           annotations:
             {{- if $.Values.metrics.destination }}
-            aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
+            velor.dev/metrics-destination: {{ $.Values.metrics.destination }}
             {{- end}}
         spec:
           restartPolicy: Never
@@ -35,8 +35,8 @@ spec:
             {{- end }}
             imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
             command:
-            - /usr/local/bin/aptos-debugger
-            - aptos-db
+            - /usr/local/bin/velor-debugger
+            - velor-db
             - backup-maintenance
             - compact
             - --state-snapshot-file-compact-factor
@@ -46,10 +46,10 @@ spec:
             - --epoch-ending-file-compact-factor
             - "100"
             - --metadata-cache-dir
-            - /tmp/aptos-backup-compaction-metadata
+            - /tmp/velor-backup-compaction-metadata
             - --command-adapter-config
             # use the same config with the backup sts
-            - /opt/aptos/etc/{{ .Values.backup.config.location }}.yaml
+            - /opt/velor/etc/{{ .Values.backup.config.location }}.yaml
             env:
             - name: RUST_LOG
               value: "info"
@@ -69,7 +69,7 @@ spec:
             {{- toYaml .resources | nindent 14 }}
             volumeMounts:
             - name: backup-config
-              mountPath: /opt/aptos/etc
+              mountPath: /opt/velor/etc
             - name: tmp
               mountPath: /tmp
             securityContext:

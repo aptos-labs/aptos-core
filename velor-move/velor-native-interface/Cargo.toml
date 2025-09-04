@@ -1,0 +1,22 @@
+[package]
+name = "velor-native-interface"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+velor-gas-algebra = { workspace = true }
+velor-gas-schedule = { workspace = true }
+velor-types = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
+smallvec = { workspace = true }

@@ -1,16 +1,16 @@
 ---
 id: network
 title: Network
-custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/network/README.md
+custom_edit_url: https://github.com/velor-chain/velor-core/edit/main/network/README.md
 ---
 
 ## Overview
 
-For more detailed info, see the [AptosNet Specification](../documentation/specifications/network/README.md).
+For more detailed info, see the [VelorNet Specification](../documentation/specifications/network/README.md).
 
-AptosNet is the primary protocol for communication between any two nodes in the
-Aptos ecosystem. It is specifically designed to facilitate the consensus, shared
-mempool, and state sync protocols. AptosNet tries to maintain at-most one connection
+VelorNet is the primary protocol for communication between any two nodes in the
+Velor ecosystem. It is specifically designed to facilitate the consensus, shared
+mempool, and state sync protocols. VelorNet tries to maintain at-most one connection
 with each remote peer; the application protocols to that remote peer are then
 multiplexed over the single peer connection.
 
@@ -61,7 +61,7 @@ partial membership views, sophisticated failure detectors, or network overlays.
                       +----------------------+--------------------+   +---------------------+
                       |        Peer(s)       |                    |
                       +----------------------+                    |
-                      |                AptosTransport             |
+                      |                VelorTransport             |
                       +-------------------------------------------+
 ```
 
@@ -72,7 +72,7 @@ independent "tasks." The [tokio](https://tokio.rs/) framework is used as the tas
 runtime. The primary subcomponents in the network module are:
 
 * [`Network Interface`] &mdash; The interface provided to application modules
-using AptosNet.
+using VelorNet.
 
 * [`PeerManager`] &mdash; Listens for incoming connections, and dials outbound
 connections to other peers. Demultiplexes and forwards inbound messages from
@@ -84,10 +84,10 @@ components of new or closed connections. Optionally can be connected to
 writes [`NetworkMessage`]es from/to the wire. Currently, it implements the two
 protocols: DirectSend and Rpc.
 
-+ [`AptosTransport`] &mdash; A secure, reliable transport. It uses [NoiseIK] over
++ [`VelorTransport`] &mdash; A secure, reliable transport. It uses [NoiseIK] over
 TCP to negotiate an encrypted and authenticated connection between peers.
-The AptosNet version and any Aptos-specific application protocols are negotiated
-afterward using the [AptosNet Handshake Protocol].
+The VelorNet version and any Velor-specific application protocols are negotiated
+afterward using the [VelorNet Handshake Protocol].
 
 * [`ConnectivityManager`] &mdash; Establishes connections to known peers found
 via Discovery. Notifies [`PeerManager`] to make outbound dials, or disconnects based
@@ -126,15 +126,15 @@ configurable static timeout.
         │   ├── direct_send        # Protocol for fire-and-forget style message delivery
         │   ├── health_checker     # Protocol for health probing
         │   ├── rpc                # Protocol for remote procedure calls
-        │   └── wire               # Protocol for AptosNet handshakes and messaging
+        │   └── wire               # Protocol for VelorNet handshakes and messaging
         ├── transport              # The base transport layer for dialing/listening
         └── noise                  # Noise handshaking and wire integration
 
 [`NetworkConfig`]:../config/src/config/network_config.rs
 [`ConnectivityManager`]: ./src/connectivity_manager/mod.rs
-[`AptosNet Handshake Protocol`]: ../specifications/network/handshake-v1.md
+[`VelorNet Handshake Protocol`]: ../specifications/network/handshake-v1.md
 [`ValidatorSet`]: ../types/src/on_chain_config/validator_set.rs
-[`AptosTransport`]: ./src/transport/mod.rs
+[`VelorTransport`]: ./src/transport/mod.rs
 [`HealthChecker`]: ./src/protocols/health_checker/mod.rs
 [`Network Interface`]: ./src/protocols/network/mod.rs
 [`NetworkMessage`]: ./src/protocols/wire/messaging/v1/mod.rs

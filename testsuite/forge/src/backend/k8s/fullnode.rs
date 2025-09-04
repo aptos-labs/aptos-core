@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,15 +8,15 @@ use crate::{
     VALIDATOR_0_STATEFUL_SET_NAME,
 };
 use anyhow::Context;
-use aptos_config::{
+use velor_config::{
     config::{
         ApiConfig, BaseConfig, DiscoveryMethod, ExecutionConfig, NetworkConfig, NodeConfig,
         OverrideNodeConfig, RoleType, WaypointConfig,
     },
     network_id::NetworkId,
 };
-use aptos_sdk::types::PeerId;
-use aptos_short_hex_str::AsShortHexStr;
+use velor_sdk::types::PeerId;
+use velor_short_hex_str::AsShortHexStr;
 use k8s_openapi::{
     api::{
         apps::v1::{StatefulSet, StatefulSetSpec},
@@ -39,8 +39,8 @@ use std::{
 };
 use tempfile::TempDir;
 
-// these are constants given by the aptos-node helm chart
-// see terraform/helm/aptos-node/templates/validator.yaml
+// these are constants given by the velor-node helm chart
+// see terraform/helm/velor-node/templates/validator.yaml
 
 // the name of the NodeConfig for the PFN, as well as the key in the k8s ConfigMap
 // where the NodeConfig is stored
@@ -48,16 +48,16 @@ const FULLNODE_CONFIG_MAP_KEY: &str = "fullnode.yaml";
 
 // the path where the genesis is mounted in the validator
 const GENESIS_CONFIG_VOLUME_NAME: &str = "genesis-config";
-const GENESIS_CONFIG_VOLUME_PATH: &str = "/opt/aptos/genesis";
+const GENESIS_CONFIG_VOLUME_PATH: &str = "/opt/velor/genesis";
 const GENESIS_CONFIG_WRITABLE_VOLUME_NAME: &str = "writable-genesis";
 
 // the path where the config file is mounted in the fullnode
-const APTOS_CONFIG_VOLUME_NAME: &str = "aptos-config";
-const APTOS_CONFIG_VOLUME_PATH: &str = "/opt/aptos/etc";
+const VELOR_CONFIG_VOLUME_NAME: &str = "velor-config";
+const VELOR_CONFIG_VOLUME_PATH: &str = "/opt/velor/etc";
 
 // the path where the data volume is mounted in the fullnode
-const APTOS_DATA_VOLUME_NAME: &str = "aptos-data";
-const APTOS_DATA_VOLUME_PATH: &str = "/opt/aptos/data";
+const VELOR_DATA_VOLUME_NAME: &str = "velor-data";
+const VELOR_DATA_VOLUME_PATH: &str = "/opt/velor/data";
 
 /// Derive the fullnode image from the validator image. They will share the same image repo (validator), but not necessarily the version (image tag)
 fn get_fullnode_image_from_validator_image(
@@ -109,7 +109,7 @@ fn create_fullnode_persistent_volume_claim(
 
     Ok(PersistentVolumeClaim {
         metadata: ObjectMeta {
-            name: Some(APTOS_DATA_VOLUME_NAME.to_string()),
+            name: Some(VELOR_DATA_VOLUME_NAME.to_string()),
             ..ObjectMeta::default()
         },
         spec: Some(PersistentVolumeClaimSpec {
@@ -170,19 +170,19 @@ fn create_fullnode_container(
     Ok(Container {
         image: Some(fullnode_image),
         args: Some(vec![
-            "/usr/local/bin/aptos-node".to_string(),
+            "/usr/local/bin/velor-node".to_string(),
             "-f".to_string(),
-            format!("/opt/aptos/etc/{}", FULLNODE_CONFIG_MAP_KEY),
+            format!("/opt/velor/etc/{}", FULLNODE_CONFIG_MAP_KEY),
         ]),
         volume_mounts: Some(vec![
             VolumeMount {
-                mount_path: APTOS_CONFIG_VOLUME_PATH.to_string(),
-                name: APTOS_CONFIG_VOLUME_NAME.to_string(),
+                mount_path: VELOR_CONFIG_VOLUME_PATH.to_string(),
+                name: VELOR_CONFIG_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             },
             VolumeMount {
-                mount_path: APTOS_DATA_VOLUME_PATH.to_string(),
-                name: APTOS_DATA_VOLUME_NAME.to_string(),
+                mount_path: VELOR_DATA_VOLUME_PATH.to_string(),
+                name: VELOR_DATA_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             },
             VolumeMount {
@@ -211,7 +211,7 @@ fn create_fullnode_volumes(
             ..Volume::default()
         },
         Volume {
-            name: APTOS_CONFIG_VOLUME_NAME.to_string(),
+            name: VELOR_CONFIG_VOLUME_NAME.to_string(),
             config_map: Some(ConfigMapVolumeSource {
                 name: Some(fullnode_node_config_config_map_name),
                 ..ConfigMapVolumeSource::default()
@@ -307,7 +307,7 @@ pub fn get_default_pfn_node_config() -> NodeConfig {
     NodeConfig {
         base: BaseConfig {
             role: RoleType::FullNode,
-            data_dir: PathBuf::from(APTOS_DATA_VOLUME_PATH),
+            data_dir: PathBuf::from(VELOR_DATA_VOLUME_PATH),
             waypoint: WaypointConfig::FromFile(waypoint_path),
             ..BaseConfig::default()
         },
@@ -514,15 +514,15 @@ pub async fn install_public_fullnode<'a>(
 mod tests {
     use super::*;
     use crate::MockK8sResourceApi;
-    use aptos_config::config::Identity;
-    use aptos_sdk::crypto::{x25519::PrivateKey, Uniform};
+    use velor_config::config::Identity;
+    use velor_sdk::crypto::{x25519::PrivateKey, Uniform};
     use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 
-    /// Get a dummy validator persistent volume claim that looks like one created by terraform/helm/aptos-node/templates/validator.yaml
+    /// Get a dummy validator persistent volume claim that looks like one created by terraform/helm/velor-node/templates/validator.yaml
     fn get_dummy_validator_persistent_volume_claim() -> PersistentVolumeClaim {
         PersistentVolumeClaim {
             metadata: ObjectMeta {
-                name: Some("aptos-node-0-validator-e42069".to_string()),
+                name: Some("velor-node-0-validator-e42069".to_string()),
                 ..ObjectMeta::default()
             },
             spec: Some(PersistentVolumeClaimSpec {
@@ -545,7 +545,7 @@ mod tests {
         }
     }
 
-    /// Get a dummy validator stateful set that looks like one created by terraform/helm/aptos-node/templates/validator.yaml
+    /// Get a dummy validator stateful set that looks like one created by terraform/helm/velor-node/templates/validator.yaml
     fn get_dummy_validator_stateful_set() -> StatefulSet {
         let labels: BTreeMap<String, String> = [
             (
@@ -554,7 +554,7 @@ mod tests {
             ),
             (
                 "app.kubernetes.io/instance".to_string(),
-                "aptos-node-0-validator-0".to_string(),
+                "velor-node-0-validator-0".to_string(),
             ),
             (
                 "app.kubernetes.io/part-of".to_string(),
@@ -566,7 +566,7 @@ mod tests {
         .collect();
         StatefulSet {
             metadata: ObjectMeta {
-                name: Some("aptos-node-0-validator".to_string()),
+                name: Some("velor-node-0-validator".to_string()),
                 labels: Some(labels.clone()),
                 ..ObjectMeta::default()
             },
@@ -581,22 +581,22 @@ mod tests {
                         containers: vec![Container {
                             name: "validator".to_string(),
                             image: Some(
-                                "banana.fruit.aptos/potato/validator:banana_image_tag".to_string(),
+                                "banana.fruit.velor/potato/validator:banana_image_tag".to_string(),
                             ),
                             command: Some(vec![
-                                "/usr/local/bin/aptos-node".to_string(),
+                                "/usr/local/bin/velor-node".to_string(),
                                 "-f".to_string(),
-                                "/opt/aptos/etc/validator.yaml".to_string(),
+                                "/opt/velor/etc/validator.yaml".to_string(),
                             ]),
                             volume_mounts: Some(vec![
                                 VolumeMount {
-                                    mount_path: APTOS_CONFIG_VOLUME_PATH.to_string(),
-                                    name: APTOS_CONFIG_VOLUME_NAME.to_string(),
+                                    mount_path: VELOR_CONFIG_VOLUME_PATH.to_string(),
+                                    name: VELOR_CONFIG_VOLUME_NAME.to_string(),
                                     ..VolumeMount::default()
                                 },
                                 VolumeMount {
-                                    mount_path: APTOS_DATA_VOLUME_PATH.to_string(),
-                                    name: APTOS_DATA_VOLUME_NAME.to_string(),
+                                    mount_path: VELOR_DATA_VOLUME_PATH.to_string(),
+                                    name: VELOR_DATA_VOLUME_NAME.to_string(),
                                     ..VolumeMount::default()
                                 },
                                 VolumeMount {
@@ -619,7 +619,7 @@ mod tests {
     #[tokio::test]
     /// Test that we can create a node config configmap and that it contains the node config at a known data key
     async fn test_create_node_config_map() {
-        let config_map_name = "aptos-node-0-validator-0-config".to_string();
+        let config_map_name = "velor-node-0-validator-0-config".to_string();
         let node_config = NodeConfig::default();
         let override_config = OverrideNodeConfig::new_with_default_base(node_config.clone());
 
@@ -654,7 +654,7 @@ mod tests {
         );
         let pvc = PersistentVolumeClaim {
             metadata: ObjectMeta {
-                name: Some(APTOS_DATA_VOLUME_NAME.to_string()),
+                name: Some(VELOR_DATA_VOLUME_NAME.to_string()),
                 ..ObjectMeta::default()
             },
             spec: Some(PersistentVolumeClaimSpec {
@@ -684,7 +684,7 @@ mod tests {
         let peer_id = PeerId::random();
         let fullnode_name = "fullnode-".to_string() + &peer_id.to_string(); // everything should be keyed on this
         let fullnode_image = "fruit.com/banana:latest".to_string();
-        let fullnode_genesis_secret_name = format!("aptos-node-0-genesis-e{}", era);
+        let fullnode_genesis_secret_name = format!("velor-node-0-genesis-e{}", era);
         let fullnode_node_config_config_map_name = format!("{}-config", fullnode_name);
 
         let fullnode_stateful_set = create_fullnode_stateful_set(

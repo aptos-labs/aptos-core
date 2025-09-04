@@ -44,10 +44,10 @@
           "stateKeyHash": "raB+wNt/rD08QNWjFd+UCckIMZFTC+6hQ/rOVU/aWU0=",
           "type": {
             "address": "0x1",
-            "module": "aptos_governance",
+            "module": "velor_governance",
             "name": "GovernanceEvents"
           },
-          "typeStr": "0x1::aptos_governance::GovernanceEvents",
+          "typeStr": "0x1::velor_governance::GovernanceEvents",
           "data": "{\"create_proposal_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"9\"}}},\"update_config_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"10\"}}},\"vote_events\":{\"counter\":\"13\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"11\"}}}}"
         }
       },
@@ -65,13 +65,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"199727700\"},\"deposit_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xf8beaf5570741b3034306fea06f384d1353ec73587a51dd014456301d8a4d09f\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xf8beaf5570741b3034306fea06f384d1353ec73587a51dd014456301d8a4d09f\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -125,7 +125,7 @@
           "key": "0xd60280852b50c341b22bba06562a817293d7b834eac251e7600b25d8bdd9efa30000000000000000",
           "data": {
             "key": "{\"proposal_id\":\"0\",\"stake_pool\":\"0xd60280852b50c341b22bba06562a817293d7b834eac251e7600b25d8bdd9efa3\"}",
-            "keyType": "0x1::aptos_governance::RecordKey",
+            "keyType": "0x1::velor_governance::RecordKey",
             "value": "true",
             "valueType": "bool"
           }
@@ -193,7 +193,7 @@
           "function": {
             "module": {
               "address": "0x1",
-              "name": "aptos_governance"
+              "name": "velor_governance"
             },
             "name": "vote"
           },
@@ -202,7 +202,7 @@
             "\"0\"",
             "true"
           ],
-          "entryFunctionIdStr": "0x1::aptos_governance::vote"
+          "entryFunctionIdStr": "0x1::velor_governance::vote"
         }
       },
       "signature": {
@@ -241,11 +241,11 @@
           "type": "MOVE_TYPES_STRUCT",
           "struct": {
             "address": "0x1",
-            "module": "aptos_governance",
+            "module": "velor_governance",
             "name": "VoteEvent"
           }
         },
-        "typeStr": "0x1::aptos_governance::VoteEvent",
+        "typeStr": "0x1::velor_governance::VoteEvent",
         "data": "{\"num_votes\":\"100004794376617\",\"proposal_id\":\"0\",\"should_pass\":true,\"stake_pool\":\"0xd60280852b50c341b22bba06562a817293d7b834eac251e7600b25d8bdd9efa3\",\"voter\":\"0xf8beaf5570741b3034306fea06f384d1353ec73587a51dd014456301d8a4d09f\"}"
       }
     ]

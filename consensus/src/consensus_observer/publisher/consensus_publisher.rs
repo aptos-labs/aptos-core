@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
@@ -15,11 +15,11 @@ use crate::consensus_observer::{
         },
     },
 };
-use aptos_channels::aptos_channel::Receiver;
-use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
-use aptos_infallible::RwLock;
-use aptos_logger::{error, info, warn};
-use aptos_network::application::interface::NetworkClient;
+use velor_channels::velor_channel::Receiver;
+use velor_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
+use velor_infallible::RwLock;
+use velor_logger::{error, info, warn};
+use velor_network::application::interface::NetworkClient;
 use futures::StreamExt;
 use futures_channel::mpsc;
 use std::{collections::HashSet, sync::Arc, time::Duration};
@@ -355,13 +355,13 @@ mod test {
     use crate::consensus_observer::network::{
         network_events::ResponseSender, observer_message::BlockTransactionPayload,
     };
-    use aptos_config::network_id::NetworkId;
-    use aptos_crypto::HashValue;
-    use aptos_network::{
+    use velor_config::network_id::NetworkId;
+    use velor_crypto::HashValue;
+    use velor_network::{
         application::{metadata::ConnectionState, storage::PeersAndMetadata},
         transport::ConnectionMetadata,
     };
-    use aptos_types::{
+    use velor_types::{
         aggregate_signature::AggregateSignature,
         block_info::BlockInfo,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},

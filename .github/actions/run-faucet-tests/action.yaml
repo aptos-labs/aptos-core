@@ -1,6 +1,6 @@
 name: "Faucet Integration Tests"
 description: |
-  Runs the tests for the Aptos faucet against a local testnet built from a particular release branch
+  Runs the tests for the Velor faucet against a local testnet built from a particular release branch
 inputs:
   NETWORK:
     description: "The network branch for running the local testnet: devnet, testnet, or custom for a specific tag."
@@ -28,11 +28,11 @@ runs:
 
     # Set up Rust for running the integration tests.
     - name: Set up Rust
-      uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      uses: velor-chain/velor-core/.github/actions/rust-setup@main
 
     - uses: ./.github/actions/python-setup
       with:
-        pyproject_directory: crates/aptos-faucet/integration-tests
+        pyproject_directory: crates/velor-faucet/integration-tests
 
     # Run the faucet integration tests. This script will handle starting the local
     # testnet, moving the mint key where the tests expect it to be, and running the
@@ -41,7 +41,7 @@ runs:
     - name: Run integration tests
       if: ${{ inputs.NETWORK == 'custom' }}
       run: poetry run python main.py --tag ${{ inputs.IMAGE_TAG }} --base-network ${{ inputs.NETWORK }} --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
-      working-directory: crates/aptos-faucet/integration-tests
+      working-directory: crates/velor-faucet/integration-tests
       shell: bash
 
     # Run the faucet integration tests. This script will handle starting the local
@@ -51,7 +51,7 @@ runs:
     - name: Run integration tests
       if: ${{ inputs.NETWORK != 'custom' }}
       run: poetry run python main.py --base-network ${{ inputs.NETWORK }} --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
-      working-directory: crates/aptos-faucet/integration-tests
+      working-directory: crates/velor-faucet/integration-tests
       shell: bash
 
     # Print the logs from the local testnet if the tests failed.

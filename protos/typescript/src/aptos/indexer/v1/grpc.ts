@@ -1953,7 +1953,7 @@ export const GetDataServiceForRequestResponse = {
 export type GrpcManagerService = typeof GrpcManagerService;
 export const GrpcManagerService = {
   heartbeat: {
-    path: "/aptos.indexer.v1.GrpcManager/Heartbeat",
+    path: "/velor.indexer.v1.GrpcManager/Heartbeat",
     requestStream: false,
     responseStream: false,
     requestSerialize: (value: HeartbeatRequest) => Buffer.from(HeartbeatRequest.encode(value).finish()),
@@ -1962,7 +1962,7 @@ export const GrpcManagerService = {
     responseDeserialize: (value: Buffer) => HeartbeatResponse.decode(value),
   },
   getTransactions: {
-    path: "/aptos.indexer.v1.GrpcManager/GetTransactions",
+    path: "/velor.indexer.v1.GrpcManager/GetTransactions",
     requestStream: false,
     responseStream: false,
     requestSerialize: (value: GetTransactionsRequest) => Buffer.from(GetTransactionsRequest.encode(value).finish()),
@@ -1971,7 +1971,7 @@ export const GrpcManagerService = {
     responseDeserialize: (value: Buffer) => TransactionsResponse.decode(value),
   },
   getDataServiceForRequest: {
-    path: "/aptos.indexer.v1.GrpcManager/GetDataServiceForRequest",
+    path: "/velor.indexer.v1.GrpcManager/GetDataServiceForRequest",
     requestStream: false,
     responseStream: false,
     requestSerialize: (value: GetDataServiceForRequestRequest) =>
@@ -2039,7 +2039,7 @@ export interface GrpcManagerClient extends Client {
 
 export const GrpcManagerClient = makeGenericClientConstructor(
   GrpcManagerService,
-  "aptos.indexer.v1.GrpcManager",
+  "velor.indexer.v1.GrpcManager",
 ) as unknown as {
   new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): GrpcManagerClient;
   service: typeof GrpcManagerService;
@@ -2049,7 +2049,7 @@ export const GrpcManagerClient = makeGenericClientConstructor(
 export type DataServiceService = typeof DataServiceService;
 export const DataServiceService = {
   ping: {
-    path: "/aptos.indexer.v1.DataService/Ping",
+    path: "/velor.indexer.v1.DataService/Ping",
     requestStream: false,
     responseStream: false,
     requestSerialize: (value: PingDataServiceRequest) => Buffer.from(PingDataServiceRequest.encode(value).finish()),
@@ -2058,7 +2058,7 @@ export const DataServiceService = {
     responseDeserialize: (value: Buffer) => PingDataServiceResponse.decode(value),
   },
   getTransactions: {
-    path: "/aptos.indexer.v1.DataService/GetTransactions",
+    path: "/velor.indexer.v1.DataService/GetTransactions",
     requestStream: false,
     responseStream: true,
     requestSerialize: (value: GetTransactionsRequest) => Buffer.from(GetTransactionsRequest.encode(value).finish()),
@@ -2102,7 +2102,7 @@ export interface DataServiceClient extends Client {
 
 export const DataServiceClient = makeGenericClientConstructor(
   DataServiceService,
-  "aptos.indexer.v1.DataService",
+  "velor.indexer.v1.DataService",
 ) as unknown as {
   new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): DataServiceClient;
   service: typeof DataServiceService;

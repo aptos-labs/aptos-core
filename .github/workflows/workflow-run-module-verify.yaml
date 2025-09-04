@@ -42,7 +42,7 @@ jobs:
         with:
           ref: ${{ inputs.GIT_SHA }}
 
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - uses: velor-chain/velor-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
@@ -60,7 +60,7 @@ jobs:
 
       - name: Build CLI binaries in release mode
         shell: bash
-        run: cargo build --release -p aptos-debugger
+        run: cargo build --release -p velor-debugger
 
       - name: Run module-verify in parallel
         shell: bash

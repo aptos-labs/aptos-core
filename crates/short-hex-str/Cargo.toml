@@ -1,5 +1,5 @@
 [package]
-name = "aptos-short-hex-str"
+name = "velor-short-hex-str"
 description = "Short hex string encoding"
 version = "0.1.0"
 

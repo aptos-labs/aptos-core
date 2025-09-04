@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -11,15 +11,15 @@ use crate::{
         StreamRequest, StreamRequestMessage, StreamingServiceListener, TerminateStreamRequest,
     },
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
-use aptos_data_client::{
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::config::{VelorDataClientConfig, DataStreamingServiceConfig};
+use velor_data_client::{
     global_summary::{GlobalDataSummary, OptimalChunkSizes},
-    interface::AptosDataClientInterface,
+    interface::VelorDataClientInterface,
 };
-use aptos_id_generator::{IdGenerator, U64IdGenerator};
-use aptos_logger::prelude::*;
-use aptos_time_service::TimeService;
+use velor_id_generator::{IdGenerator, U64IdGenerator};
+use velor_logger::prelude::*;
+use velor_time_service::TimeService;
 use arc_swap::ArcSwap;
 use futures::StreamExt;
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
@@ -54,13 +54,13 @@ impl StreamUpdateNotification {
 /// The data streaming service that responds to data stream requests.
 pub struct DataStreamingService<T> {
     // The configuration for the data client
-    data_client_config: AptosDataClientConfig,
+    data_client_config: VelorDataClientConfig,
 
     // The configuration for the streaming service
     streaming_service_config: DataStreamingServiceConfig,
 
-    // The data client through which to fetch data from the Aptos network
-    aptos_data_client: T,
+    // The data client through which to fetch data from the Velor network
+    velor_data_client: T,
 
     // Cached global data summary
     global_data_summary: Arc<ArcSwap<GlobalDataSummary>>,
@@ -74,10 +74,10 @@ pub struct DataStreamingService<T> {
     // The stream update notifier that notifies the streaming service to check
     // the progress of the data streams. This provides a way for data streams
     // to immediately notify the streaming service when new data is ready.
-    stream_update_notifier: aptos_channel::Sender<(), StreamUpdateNotification>,
+    stream_update_notifier: velor_channel::Sender<(), StreamUpdateNotification>,
 
     // The stream update listener to listen for data stream update notifications
-    stream_update_listener: aptos_channel::Receiver<(), StreamUpdateNotification>,
+    stream_update_listener: velor_channel::Receiver<(), StreamUpdateNotification>,
 
     // Unique ID generators to maintain unique IDs across streams
     stream_id_generator: U64IdGenerator,
@@ -87,23 +87,23 @@ pub struct DataStreamingService<T> {
     time_service: TimeService,
 }
 
-impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<T> {
+impl<T: VelorDataClientInterface + Send + Clone + 'static> DataStreamingService<T> {
     pub fn new(
-        data_client_config: AptosDataClientConfig,
+        data_client_config: VelorDataClientConfig,
         streaming_service_config: DataStreamingServiceConfig,
-        aptos_data_client: T,
+        velor_data_client: T,
         stream_requests: StreamingServiceListener,
         time_service: TimeService,
     ) -> Self {
         // Create the stream update notifier and listener
         let (stream_update_notifier, stream_update_listener) =
-            aptos_channel::new(QueueStyle::LIFO, STREAM_PROGRESS_UPDATE_CHANNEL_SIZE, None);
+            velor_channel::new(QueueStyle::LIFO, STREAM_PROGRESS_UPDATE_CHANNEL_SIZE, None);
 
         // Create the streaming service
         Self {
             data_client_config,
             streaming_service_config,
-            aptos_data_client,
+            velor_data_client,
             global_data_summary: Arc::new(ArcSwap::new(Arc::new(GlobalDataSummary::empty()))),
             data_streams: HashMap::new(),
             stream_requests,
@@ -120,7 +120,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
         // Spawn a dedicated task that refreshes the global data summary
         spawn_global_data_summary_refresher(
             self.streaming_service_config,
-            self.aptos_data_client.clone(),
+            self.velor_data_client.clone(),
             self.global_data_summary.clone(),
         );
 
@@ -163,7 +163,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
     fn handle_stream_request_message(
         &mut self,
         request_message: StreamRequestMessage,
-        stream_update_notifier: aptos_channel::Sender<(), StreamUpdateNotification>,
+        stream_update_notifier: velor_channel::Sender<(), StreamUpdateNotification>,
     ) {
         if let StreamRequest::TerminateStream(request) = request_message.stream_request {
             // Process the feedback request
@@ -255,7 +255,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
     fn process_new_stream_request(
         &mut self,
         request_message: &StreamRequestMessage,
-        stream_update_notifier: aptos_channel::Sender<(), StreamUpdateNotification>,
+        stream_update_notifier: velor_channel::Sender<(), StreamUpdateNotification>,
     ) -> Result<DataStreamListener, Error> {
         // Increment the stream creation counter
         metrics::increment_counter(
@@ -265,7 +265,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
 
         // Refresh the cached global data summary
         refresh_global_data_summary(
-            self.aptos_data_client.clone(),
+            self.velor_data_client.clone(),
             self.global_data_summary.clone(),
         );
 
@@ -278,7 +278,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
             stream_id,
             &request_message.stream_request,
             stream_update_notifier,
-            self.aptos_data_client.clone(),
+            self.velor_data_client.clone(),
             self.notification_id_generator.clone(),
             &advertised_data,
             self.time_service.clone(),
@@ -407,16 +407,16 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
 }
 
 /// Spawns a task that periodically refreshes the global data summary
-fn spawn_global_data_summary_refresher<T: AptosDataClientInterface + Send + Clone + 'static>(
+fn spawn_global_data_summary_refresher<T: VelorDataClientInterface + Send + Clone + 'static>(
     data_streaming_service_config: DataStreamingServiceConfig,
-    aptos_data_client: T,
+    velor_data_client: T,
     cached_global_data_summary: Arc<ArcSwap<GlobalDataSummary>>,
 ) {
     tokio::spawn(async move {
         loop {
             // Refresh the cached global data summary
             refresh_global_data_summary(
-                aptos_data_client.clone(),
+                velor_data_client.clone(),
                 cached_global_data_summary.clone(),
             );
 
@@ -429,12 +429,12 @@ fn spawn_global_data_summary_refresher<T: AptosDataClientInterface + Send + Clon
 }
 
 /// Refreshes the global data summary and updates the cache
-fn refresh_global_data_summary<T: AptosDataClientInterface + Send + Clone + 'static>(
-    aptos_data_client: T,
+fn refresh_global_data_summary<T: VelorDataClientInterface + Send + Clone + 'static>(
+    velor_data_client: T,
     cached_global_data_summary: Arc<ArcSwap<GlobalDataSummary>>,
 ) {
     // Fetch the global data summary and update the cache
-    match fetch_global_data_summary(aptos_data_client) {
+    match fetch_global_data_summary(velor_data_client) {
         Ok(global_data_summary) => {
             // Update the cached global data summary
             cached_global_data_summary.store(Arc::new(global_data_summary));
@@ -453,11 +453,11 @@ fn refresh_global_data_summary<T: AptosDataClientInterface + Send + Clone + 'sta
 }
 
 /// Fetches and returns the global data summary from the data client
-fn fetch_global_data_summary<T: AptosDataClientInterface + Send + Clone + 'static>(
-    aptos_data_client: T,
+fn fetch_global_data_summary<T: VelorDataClientInterface + Send + Clone + 'static>(
+    velor_data_client: T,
 ) -> Result<GlobalDataSummary, Error> {
     // Fetch the global data summary from the data client
-    let global_data_summary = aptos_data_client.get_global_data_summary();
+    let global_data_summary = velor_data_client.get_global_data_summary();
 
     // Periodically log if the global data summary is empty.
     // Otherwise, verify that all optimal chunk sizes are valid.
@@ -482,7 +482,7 @@ fn verify_optimal_chunk_sizes(optimal_chunk_sizes: &OptimalChunkSizes) -> Result
         || optimal_chunk_sizes.transaction_chunk_size == 0
         || optimal_chunk_sizes.transaction_output_chunk_size == 0
     {
-        Err(Error::AptosDataClientResponseIsInvalid(format!(
+        Err(Error::VelorDataClientResponseIsInvalid(format!(
             "Found at least one optimal chunk size of zero: {:?}",
             optimal_chunk_sizes
         )))
@@ -512,8 +512,8 @@ mod streaming_service_tests {
             },
         },
     };
-    use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-    use aptos_config::config::DataStreamingServiceConfig;
+    use velor_channels::{velor_channel, message_queues::QueueStyle};
+    use velor_config::config::DataStreamingServiceConfig;
     use futures::{
         channel::{oneshot, oneshot::Receiver},
         FutureExt, StreamExt,
@@ -844,8 +844,8 @@ mod streaming_service_tests {
     }
 
     /// Creates a returns a new stream update notifier (dropping the listener)
-    fn create_stream_update_notifier() -> aptos_channel::Sender<(), StreamUpdateNotification> {
-        let (stream_update_notifier, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+    fn create_stream_update_notifier() -> velor_channel::Sender<(), StreamUpdateNotification> {
+        let (stream_update_notifier, _) = velor_channel::new(QueueStyle::LIFO, 1, None);
         stream_update_notifier
     }
 }

@@ -1,10 +1,10 @@
 provider "kubernetes" {
-  host                   = "https://${google_container_cluster.aptos.endpoint}"
-  cluster_ca_certificate = base64decode(google_container_cluster.aptos.master_auth[0].cluster_ca_certificate)
+  host                   = "https://${google_container_cluster.velor.endpoint}"
+  cluster_ca_certificate = base64decode(google_container_cluster.velor.master_auth[0].cluster_ca_certificate)
   token                  = data.google_client_config.provider.access_token
 }
 
-resource "kubernetes_namespace" "aptos" {
+resource "kubernetes_namespace" "velor" {
   metadata {
     name = var.k8s_namespace
   }
@@ -23,8 +23,8 @@ resource "kubernetes_storage_class" "ssd" {
 
 provider "helm" {
   kubernetes {
-    host                   = "https://${google_container_cluster.aptos.endpoint}"
-    cluster_ca_certificate = base64decode(google_container_cluster.aptos.master_auth[0].cluster_ca_certificate)
+    host                   = "https://${google_container_cluster.velor.endpoint}"
+    cluster_ca_certificate = base64decode(google_container_cluster.velor.master_auth[0].cluster_ca_certificate)
     token                  = data.google_client_config.provider.access_token
   }
 }
@@ -38,7 +38,7 @@ locals {
     "cloud.google.com/gke-nodepool" = "utilities"
   } : {}
   utility_tolerations = [{
-    key    = "aptos.org/nodepool"
+    key    = "velor.org/nodepool"
     value  = "utilities"
     effect = "NoExecute"
   }]
@@ -68,7 +68,7 @@ resource "helm_release" "fullnode" {
         "cloud.google.com/gke-nodepool" = "fullnodes"
       } : {}
       tolerations = [{
-        key    = "aptos.org/nodepool"
+        key    = "velor.org/nodepool"
         value  = "fullnodes"
         effect = "NoExecute"
       }]
@@ -132,7 +132,7 @@ resource "helm_release" "fullnode" {
 
 resource "helm_release" "monitoring" {
   count       = var.enable_monitoring ? 1 : 0
-  name        = "aptos-monitoring"
+  name        = "velor-monitoring"
   chart       = local.monitoring_helm_chart_path
   max_history = 5
   wait        = false

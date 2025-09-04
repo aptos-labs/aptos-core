@@ -34,10 +34,10 @@
           "stateKeyHash": "0D9j0ywVSghOmCpf6RDvjl1pLUyek4DrlhkjNa3zK4M=",
           "type": {
             "address": "0x4",
-            "module": "aptos_token",
-            "name": "AptosCollection"
+            "module": "velor_token",
+            "name": "VelorCollection"
           },
-          "typeStr": "0x4::aptos_token::AptosCollection",
+          "typeStr": "0x4::velor_token::VelorCollection",
           "data": "{\"mutable_description\":false,\"mutable_token_description\":true,\"mutable_token_name\":true,\"mutable_token_properties\":false,\"mutable_token_uri\":true,\"mutable_uri\":false,\"mutator_ref\":{\"vec\":[]},\"royalty_mutator_ref\":{\"vec\":[]},\"tokens_burnable_by_creator\":true,\"tokens_freezable_by_creator\":false}"
         }
       },
@@ -52,7 +52,7 @@
             "name": "Collection"
           },
           "typeStr": "0x4::collection::Collection",
-          "data": "{\"creator\":\"0x3fda2b751a0d209e17069ae72ccde256efeaad39e5403ea0e65ef5dcebdf6763\",\"description\":\"Congratulations, your account is eligible to receive airdrop tokens!\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1ac3cb52493947623cd727e2db9e4cfd828d5f9cd264920d253828276a5e314e\",\"creation_num\":\"1125899906842625\"}}},\"name\":\"Aptos Airdrop\",\"uri\":\"https://pwncdn.com/nft/img/collection\"}"
+          "data": "{\"creator\":\"0x3fda2b751a0d209e17069ae72ccde256efeaad39e5403ea0e65ef5dcebdf6763\",\"description\":\"Congratulations, your account is eligible to receive airdrop tokens!\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1ac3cb52493947623cd727e2db9e4cfd828d5f9cd264920d253828276a5e314e\",\"creation_num\":\"1125899906842625\"}}},\"name\":\"Velor Airdrop\",\"uri\":\"https://pwncdn.com/nft/img/collection\"}"
         }
       },
       {
@@ -97,13 +97,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"1222553200\"},\"deposit_events\":{\"counter\":\"7\",\"guid\":{\"id\":{\"addr\":\"0x3fda2b751a0d209e17069ae72ccde256efeaad39e5403ea0e65ef5dcebdf6763\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x3fda2b751a0d209e17069ae72ccde256efeaad39e5403ea0e65ef5dcebdf6763\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -202,7 +202,7 @@
           "function": {
             "module": {
               "address": "0x4",
-              "name": "aptos_token"
+              "name": "velor_token"
             },
             "name": "burn"
           },
@@ -219,7 +219,7 @@
           "arguments": [
             "{\"inner\":\"0x57a56bff4472da6c2b28149d192ef0186ff6647bc3c2ba5c28439662fdaa284d\"}"
           ],
-          "entryFunctionIdStr": "0x4::aptos_token::burn"
+          "entryFunctionIdStr": "0x4::velor_token::burn"
         }
       },
       "signature": {

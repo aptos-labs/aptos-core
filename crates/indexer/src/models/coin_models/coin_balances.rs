@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
@@ -13,7 +13,7 @@ use crate::{
     schema::{coin_balances, current_coin_balances},
     util::standardize_address,
 };
-use aptos_api_types::WriteResource as APIWriteResource;
+use velor_api_types::WriteResource as APIWriteResource;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

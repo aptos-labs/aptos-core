@@ -1,0 +1,22 @@
+[package]
+name = "velor-move-e2e-benchmark"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+velor-language-e2e-tests = { workspace = true }
+velor-logger = { workspace = true }
+velor-transaction-generator-lib = { workspace = true }
+velor-transaction-workloads-lib = { workspace = true }
+velor-types = { workspace = true }
+clap = { workspace = true }
+rand = { workspace = true }
+serde_json = { workspace = true }

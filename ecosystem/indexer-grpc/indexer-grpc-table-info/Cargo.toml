@@ -1,5 +1,5 @@
 [package]
-name = "aptos-indexer-grpc-table-info"
+name = "velor-indexer-grpc-table-info"
 version = "1.0.0"
 
 # Workspace inherited keys
@@ -13,18 +13,18 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-api = { workspace = true }
-aptos-api-types = { workspace = true }
-aptos-config = { workspace = true }
-aptos-db-indexer  = { workspace = true }
-aptos-indexer-grpc-fullnode = { workspace = true }
-aptos-indexer-grpc-utils = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-mempool = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-runtimes = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-types = { workspace = true }
+velor-api = { workspace = true }
+velor-api-types = { workspace = true }
+velor-config = { workspace = true }
+velor-db-indexer  = { workspace = true }
+velor-indexer-grpc-fullnode = { workspace = true }
+velor-indexer-grpc-utils = { workspace = true }
+velor-logger = { workspace = true }
+velor-mempool = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-runtimes = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-types = { workspace = true }
 flate2 = { workspace = true }
 futures = { workspace = true }
 google-cloud-storage = { workspace = true }

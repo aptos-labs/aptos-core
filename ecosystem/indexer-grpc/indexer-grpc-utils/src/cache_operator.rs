@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,7 +6,7 @@ use crate::{
     counters::{log_grpc_step, IndexerGrpcStep},
 };
 use anyhow::{ensure, Context};
-use aptos_protos::transaction::v1::Transaction;
+use velor_protos::transaction::v1::Transaction;
 use redis::{AsyncCommands, RedisResult};
 
 // Configurations for cache.
@@ -410,7 +410,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aptos_protos::util::timestamp::Timestamp;
+    use velor_protos::util::timestamp::Timestamp;
     use prost::Message;
     use redis_test::{MockCmd, MockRedisConnection};
 

@@ -1,6 +1,6 @@
 [package]
-name = "aptos-transaction-emitter"
-description = "Aptos transaction emitter for testing"
+name = "velor-transaction-emitter"
+description = "Velor transaction emitter for testing"
 version = "0.0.0"
 
 # Workspace inherited keys
@@ -14,11 +14,11 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-global-constants = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-sdk = { workspace = true }
-aptos-transaction-emitter-lib = { workspace = true }
-aptos-transaction-workloads-lib = { workspace = true }
+velor-global-constants = { workspace = true }
+velor-logger = { workspace = true }
+velor-sdk = { workspace = true }
+velor-transaction-emitter-lib = { workspace = true }
+velor-transaction-workloads-lib = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 rand = { workspace = true }

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -11,16 +11,16 @@ use crate::{
     tests::common::{self, TestTransaction},
     MempoolClientRequest, MempoolClientSender, MempoolSyncMsg, QuorumStoreRequest,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::{
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::{
     config::NodeConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
-use aptos_id_generator::U32IdGenerator;
-use aptos_infallible::{Mutex, RwLock};
-use aptos_mempool_notifications::MempoolNotifier;
-use aptos_network::{
+use velor_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
+use velor_id_generator::U32IdGenerator;
+use velor_infallible::{Mutex, RwLock};
+use velor_mempool_notifications::MempoolNotifier;
+use velor_network::{
     application::{
         interface::{NetworkClient, NetworkServiceEvents},
         storage::PeersAndMetadata,
@@ -44,14 +44,14 @@ use aptos_network::{
     },
     ProtocolId,
 };
-use aptos_storage_interface::mock::MockDbReaderWriter;
-use aptos_types::{
+use velor_storage_interface::mock::MockDbReaderWriter;
+use velor_types::{
     account_address::AccountAddress,
     mempool_status::MempoolStatusCode,
     on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
     transaction::{ReplayProtector, SignedTransaction},
 };
-use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use velor_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use futures::{channel::oneshot, SinkExt};
 use maplit::btreemap;
 use std::{collections::HashMap, hash::Hash, sync::Arc};
@@ -590,9 +590,9 @@ fn setup_network(
     InboundNetworkHandle,
     OutboundMessageReceiver,
 ) {
-    let (reqs_inbound_sender, reqs_inbound_receiver) = aptos_channel();
-    let (reqs_outbound_sender, reqs_outbound_receiver) = aptos_channel();
-    let (connection_outbound_sender, _connection_outbound_receiver) = aptos_channel();
+    let (reqs_inbound_sender, reqs_inbound_receiver) = velor_channel();
+    let (reqs_outbound_sender, reqs_outbound_receiver) = velor_channel();
+    let (connection_outbound_sender, _connection_outbound_receiver) = velor_channel();
 
     // Create the network sender and events
     let network_sender = NetworkSender::new(
@@ -612,11 +612,11 @@ fn setup_network(
     )
 }
 
-/// A generic FIFO Aptos channel
-fn aptos_channel<K: Eq + Hash + Clone, T>(
-) -> (aptos_channel::Sender<K, T>, aptos_channel::Receiver<K, T>) {
+/// A generic FIFO Velor channel
+fn velor_channel<K: Eq + Hash + Clone, T>(
+) -> (velor_channel::Sender<K, T>, velor_channel::Receiver<K, T>) {
     static MAX_QUEUE_SIZE: usize = 8;
-    aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None)
+    velor_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None)
 }
 
 /// Creates a full [`SharedMempool`] and mocks all of the database information.
@@ -635,13 +635,13 @@ fn setup_mempool(
     let (ac_endpoint_sender, ac_endpoint_receiver) = mpsc_channel();
     let (quorum_store_sender, quorum_store_receiver) = mpsc_channel();
     let (mempool_notifier, mempool_listener) =
-        aptos_mempool_notifications::new_mempool_notifier_listener_pair(100);
+        velor_mempool_notifications::new_mempool_notifier_listener_pair(100);
 
     let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
     let vm_validator = Arc::new(RwLock::new(MockVMValidator));
     let db_ro = Arc::new(MockDbReaderWriter);
 
-    let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+    let (reconfig_sender, reconfig_events) = velor_channel::new(QueueStyle::LIFO, 1, None);
     let reconfig_event_subscriber = ReconfigNotificationListener {
         notification_receiver: reconfig_events,
     };

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -7,15 +7,15 @@ use crate::{
     tests::mock::MockMonitoringServer,
     PeerMonitorState, PeerMonitoringServiceClient, PeerState,
 };
-use aptos_config::{
+use velor_config::{
     config::{
         LatencyMonitoringConfig, NetworkMonitoringConfig, NodeConfig, NodeMonitoringConfig,
         PeerMonitoringServiceConfig, PeerRole,
     },
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
-use aptos_peer_monitoring_service_types::{
+use velor_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
+use velor_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::{
         ConnectionMetadata, LatencyPingResponse, NetworkInformationResponse,
@@ -23,8 +23,8 @@ use aptos_peer_monitoring_service_types::{
     },
     PeerMonitoringServiceMessage,
 };
-use aptos_time_service::{MockTimeService, TimeService, TimeServiceTrait};
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use velor_time_service::{MockTimeService, TimeService, TimeServiceTrait};
+use velor_types::{network_address::NetworkAddress, PeerId};
 use maplit::btreemap;
 use rand::{rngs::OsRng, Rng};
 use std::{
@@ -321,7 +321,7 @@ pub fn create_random_network_info_response() -> NetworkInformationResponse {
 /// Creates a new network info response with random values
 pub fn create_random_node_info_response() -> NodeInformationResponse {
     // Create the random values
-    let build_information = aptos_build_info::get_build_information();
+    let build_information = velor_build_info::get_build_information();
     let highest_synced_epoch = get_random_u64();
     let highest_synced_version = get_random_u64();
     let ledger_timestamp_usecs = get_random_u64();

@@ -1,5 +1,5 @@
 module poc::create_snapshot {
-    use aptos_framework::aggregator_v2;
+    use velor_framework::aggregator_v2;
 
     public entry fun main(_owner: &signer) {
         let _snap = aggregator_v2::create_snapshot<u64>(999u64);

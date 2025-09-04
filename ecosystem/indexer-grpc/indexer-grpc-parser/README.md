@@ -1,4 +1,4 @@
-# All processors are migrated to [processor repo](https://github.com/aptos-labs/aptos-indexer-processors)
+# All processors are migrated to [processor repo](https://github.com/velor-chain/velor-indexer-processors)
 
 # Indexer GRPC Parser
 
@@ -8,7 +8,7 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
 
 ## Tutorial
 ### Prerequisite
-* A running PostgreSQL instance, with a valid database. More tutorial can be found [here](https://github.com/aptos-labs/aptos-core/tree/main/crates/indexer#postgres)
+* A running PostgreSQL instance, with a valid database. More tutorial can be found [here](https://github.com/velor-chain/velor-core/tree/main/crates/indexer#postgres)
 
 * A config YAML file
   * For exmaple, `config.yaml`
@@ -46,4 +46,4 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
 
 
 ### Use a custom parser
-* Check our [indexer processors](https://github.com/aptos-labs/aptos-indexer-processors)! 
+* Check our [indexer processors](https://github.com/velor-chain/velor-indexer-processors)! 

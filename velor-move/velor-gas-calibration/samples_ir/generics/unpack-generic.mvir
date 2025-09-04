@@ -1,0 +1,360 @@
+module 0xcafe.UnpackGeneric {
+    struct S1<T> has drop { x1: T }
+    struct S2<T> has drop { x1: T, x2: T, x3: T, x4: T, x5: T, x6: T, x7: T, x8: T }
+    struct S3<T> has drop { x1: T, x2: T, x3: T, x4: T, x5: T, x6: T, x7: T, x8: T, x9: T, x10: T, x11: T, x12: T, x13: T, x14: T, x15: T, x16: T, x17: T, x18: T, x19: T, x20: T, x21: T, x22: T, x23: T, x24: T, x25: T, x26: T, x27: T, x28: T, x29: T, x30: T, x31: T, x32: T}
+    struct S4<T> has drop { x1: T, x2: T, x3: T, x4: T, x5: T, x6: T, x7: T, x8: T, x9: T, x10: T, x11: T, x12: T, x13: T, x14: T, x15: T, x16: T, x17: T, x18: T, x19: T, x20: T, x21: T, x22: T, x23: T, x24: T, x25: T, x26: T, x27: T, x28: T, x29: T, x30: T, x31: T, x32: T, x33: T, x34: T, x35: T, x36: T, x37: T, x38: T, x39: T, x40: T, x41: T, x42: T, x43: T, x44: T, x45: T, x46: T, x47: T, x48: T, x49: T, x50: T, x51: T, x52: T, x53: T, x54: T, x55: T, x56: T, x57: T, x58: T, x59: T, x60: T, x61: T, x62: T, x63: T, x64: T }
+
+    public calibrate_unpack_s1_impl(n: u64) {
+        let i: u64;
+        let t: Self.S1<u64>;
+        let x1: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        t = S1<u64>{x1: 0};
+        S1<u64>{x1} = move(t);
+
+        t = S1<u64>{x1: 0};
+        S1<u64>{x1} = move(t);
+
+        t = S1<u64>{x1: 0};
+        S1<u64>{x1} = move(t);
+
+        t = S1<u64>{x1: 0};
+        S1<u64>{x1} = move(t);
+
+        t = S1<u64>{x1: 0};
+        S1<u64>{x1} = move(t);
+
+        t = S1<u64>{x1: 0};
+        S1<u64>{x1} = move(t);
+
+        t = S1<u64>{x1: 0};
+        S1<u64>{x1} = move(t);
+
+        t = S1<u64>{x1: 0};
+        S1<u64>{x1} = move(t);
+
+        t = S1<u64>{x1: 0};
+        S1<u64>{x1} = move(t);
+
+        t = S1<u64>{x1: 0};
+        S1<u64>{x1} = move(t);                
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_unpack_s1_x100() {
+    label b0:
+        Self.calibrate_unpack_s1_impl(10);
+        return;       
+    }
+
+    public entry calibrate_unpack_s1_x500() {
+    label b0:
+        Self.calibrate_unpack_s1_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_unpack_s1_x1000() {
+    label b0:
+        Self.calibrate_unpack_s1_impl(100);
+        return;       
+    } 
+
+    public calibrate_unpack_s2_impl(n: u64) {
+        let i: u64;
+        let t: Self.S2<u64>;
+        let x1: u64;
+        let x2: u64;
+        let x3: u64;
+        let x4: u64;
+        let x5: u64;
+        let x6: u64;
+        let x7: u64;
+        let x8: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        t = S2<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0};
+        S2<u64>{x1,x2,x3,x4,x5,x6,x7,x8} = move(t);
+
+        t = S2<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0};
+        S2<u64>{x1,x2,x3,x4,x5,x6,x7,x8} = move(t);
+
+        t = S2<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0};
+        S2<u64>{x1,x2,x3,x4,x5,x6,x7,x8} = move(t);
+
+        t = S2<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0};
+        S2<u64>{x1,x2,x3,x4,x5,x6,x7,x8} = move(t);
+
+        t = S2<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0};
+        S2<u64>{x1,x2,x3,x4,x5,x6,x7,x8} = move(t);
+
+        t = S2<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0};
+        S2<u64>{x1,x2,x3,x4,x5,x6,x7,x8} = move(t);
+
+        t = S2<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0};
+        S2<u64>{x1,x2,x3,x4,x5,x6,x7,x8} = move(t);
+
+        t = S2<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0};
+        S2<u64>{x1,x2,x3,x4,x5,x6,x7,x8} = move(t);
+
+        t = S2<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0};
+        S2<u64>{x1,x2,x3,x4,x5,x6,x7,x8} = move(t);
+
+        t = S2<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0};
+        S2<u64>{x1,x2,x3,x4,x5,x6,x7,x8} = move(t);                                
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_unpack_s2_x100() {
+    label b0:
+        Self.calibrate_unpack_s2_impl(10);
+        return;       
+    }
+
+    public entry calibrate_unpack_s2_x500() {
+    label b0:
+        Self.calibrate_unpack_s2_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_unpack_s2_x1000() {
+    label b0:
+        Self.calibrate_unpack_s2_impl(100);
+        return;       
+    } 
+
+    public calibrate_unpack_s3_impl(n: u64) {
+        let i: u64;
+        let t: Self.S3<u64>;
+        let x1: u64;
+        let x2: u64;
+        let x3: u64;
+        let x4: u64;
+        let x5: u64;
+        let x6: u64;
+        let x7: u64;
+        let x8: u64;
+        let x9: u64;
+        let x10: u64;
+        let x11: u64;
+        let x12: u64;
+        let x13: u64;
+        let x14: u64;
+        let x15: u64;
+        let x16: u64;
+        let x17: u64;
+        let x18: u64;
+        let x19: u64;
+        let x20: u64;
+        let x21: u64;
+        let x22: u64;
+        let x23: u64;
+        let x24: u64;
+        let x25: u64;
+        let x26: u64;
+        let x27: u64;
+        let x28: u64;
+        let x29: u64;
+        let x30: u64;
+        let x31: u64;
+        let x32: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        t = S3<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0};
+        S3<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32} = move(t);
+
+        t = S3<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0};
+        S3<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32} = move(t);
+        
+        t = S3<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0};
+        S3<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32} = move(t);
+
+        t = S3<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0};
+        S3<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32} = move(t);
+
+        t = S3<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0};
+        S3<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32} = move(t);
+
+        t = S3<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0};
+        S3<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32} = move(t);
+        
+        t = S3<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0};
+        S3<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32} = move(t);
+
+        t = S3<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0};
+        S3<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32} = move(t);                
+
+        t = S3<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0};
+        S3<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32} = move(t);
+
+        t = S3<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0};
+        S3<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32} = move(t);                        
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_unpack_s3_x100() {
+    label b0:
+        Self.calibrate_unpack_s3_impl(10);
+        return;       
+    }
+
+    public entry calibrate_unpack_s3_x500() {
+    label b0:
+        Self.calibrate_unpack_s3_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_unpack_s3_x1000() {
+    label b0:
+        Self.calibrate_unpack_s3_impl(100);
+        return;       
+    }   
+
+    public calibrate_unpack_s4_impl(n: u64) {
+        let i: u64;
+        let t: Self.S4<u64>;
+        let x1: u64;
+        let x2: u64;
+        let x3: u64;
+        let x4: u64;
+        let x5: u64;
+        let x6: u64;
+        let x7: u64;
+        let x8: u64;
+        let x9: u64;
+        let x10: u64;
+        let x11: u64;
+        let x12: u64;
+        let x13: u64;
+        let x14: u64;
+        let x15: u64;
+        let x16: u64;
+        let x17: u64;
+        let x18: u64;
+        let x19: u64;
+        let x20: u64;
+        let x21: u64;
+        let x22: u64;
+        let x23: u64;
+        let x24: u64;
+        let x25: u64;
+        let x26: u64;
+        let x27: u64;
+        let x28: u64;
+        let x29: u64;
+        let x30: u64;
+        let x31: u64;
+        let x32: u64;
+        let x33: u64;
+        let x34: u64;
+        let x35: u64;
+        let x36: u64;
+        let x37: u64;
+        let x38: u64;
+        let x39: u64;
+        let x40: u64;
+        let x41: u64;
+        let x42: u64;
+        let x43: u64;
+        let x44: u64;
+        let x45: u64;
+        let x46: u64;
+        let x47: u64;
+        let x48: u64;
+        let x49: u64;
+        let x50: u64;
+        let x51: u64;
+        let x52: u64;
+        let x53: u64;
+        let x54: u64;
+        let x55: u64;
+        let x56: u64;
+        let x57: u64;
+        let x58: u64;
+        let x59: u64;
+        let x60: u64;
+        let x61: u64;
+        let x62: u64;
+        let x63: u64;
+        let x64: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        t = S4<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0, x33: 0, x34: 0, x35: 0, x36: 0, x37: 0, x38: 0, x39: 0, x40: 0, x41: 0, x42: 0, x43: 0, x44: 0, x45: 0, x46: 0, x47: 0, x48: 0, x49: 0, x50: 0, x51: 0, x52: 0, x53: 0, x54: 0, x55: 0, x56: 0, x57: 0, x58: 0, x59: 0, x60: 0, x61: 0, x62: 0, x63: 0, x64: 0};
+        S4<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32,x33,x34,x35,x36,x37,x38,x39,x40,x41,x42,x43,x44,x45,x46,x47,x48,x49,x50,x51,x52,x53,x54,x55,x56,x57,x58,x59,x60,x61,x62,x63,x64} = move(t);
+
+        t = S4<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0, x33: 0, x34: 0, x35: 0, x36: 0, x37: 0, x38: 0, x39: 0, x40: 0, x41: 0, x42: 0, x43: 0, x44: 0, x45: 0, x46: 0, x47: 0, x48: 0, x49: 0, x50: 0, x51: 0, x52: 0, x53: 0, x54: 0, x55: 0, x56: 0, x57: 0, x58: 0, x59: 0, x60: 0, x61: 0, x62: 0, x63: 0, x64: 0};
+        S4<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32,x33,x34,x35,x36,x37,x38,x39,x40,x41,x42,x43,x44,x45,x46,x47,x48,x49,x50,x51,x52,x53,x54,x55,x56,x57,x58,x59,x60,x61,x62,x63,x64} = move(t);
+
+        t = S4<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0, x33: 0, x34: 0, x35: 0, x36: 0, x37: 0, x38: 0, x39: 0, x40: 0, x41: 0, x42: 0, x43: 0, x44: 0, x45: 0, x46: 0, x47: 0, x48: 0, x49: 0, x50: 0, x51: 0, x52: 0, x53: 0, x54: 0, x55: 0, x56: 0, x57: 0, x58: 0, x59: 0, x60: 0, x61: 0, x62: 0, x63: 0, x64: 0};
+        S4<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32,x33,x34,x35,x36,x37,x38,x39,x40,x41,x42,x43,x44,x45,x46,x47,x48,x49,x50,x51,x52,x53,x54,x55,x56,x57,x58,x59,x60,x61,x62,x63,x64} = move(t);
+
+        t = S4<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0, x33: 0, x34: 0, x35: 0, x36: 0, x37: 0, x38: 0, x39: 0, x40: 0, x41: 0, x42: 0, x43: 0, x44: 0, x45: 0, x46: 0, x47: 0, x48: 0, x49: 0, x50: 0, x51: 0, x52: 0, x53: 0, x54: 0, x55: 0, x56: 0, x57: 0, x58: 0, x59: 0, x60: 0, x61: 0, x62: 0, x63: 0, x64: 0};
+        S4<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32,x33,x34,x35,x36,x37,x38,x39,x40,x41,x42,x43,x44,x45,x46,x47,x48,x49,x50,x51,x52,x53,x54,x55,x56,x57,x58,x59,x60,x61,x62,x63,x64} = move(t);
+
+        t = S4<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0, x33: 0, x34: 0, x35: 0, x36: 0, x37: 0, x38: 0, x39: 0, x40: 0, x41: 0, x42: 0, x43: 0, x44: 0, x45: 0, x46: 0, x47: 0, x48: 0, x49: 0, x50: 0, x51: 0, x52: 0, x53: 0, x54: 0, x55: 0, x56: 0, x57: 0, x58: 0, x59: 0, x60: 0, x61: 0, x62: 0, x63: 0, x64: 0};
+        S4<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32,x33,x34,x35,x36,x37,x38,x39,x40,x41,x42,x43,x44,x45,x46,x47,x48,x49,x50,x51,x52,x53,x54,x55,x56,x57,x58,x59,x60,x61,x62,x63,x64} = move(t);
+
+        t = S4<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0, x33: 0, x34: 0, x35: 0, x36: 0, x37: 0, x38: 0, x39: 0, x40: 0, x41: 0, x42: 0, x43: 0, x44: 0, x45: 0, x46: 0, x47: 0, x48: 0, x49: 0, x50: 0, x51: 0, x52: 0, x53: 0, x54: 0, x55: 0, x56: 0, x57: 0, x58: 0, x59: 0, x60: 0, x61: 0, x62: 0, x63: 0, x64: 0};
+        S4<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32,x33,x34,x35,x36,x37,x38,x39,x40,x41,x42,x43,x44,x45,x46,x47,x48,x49,x50,x51,x52,x53,x54,x55,x56,x57,x58,x59,x60,x61,x62,x63,x64} = move(t);
+
+        t = S4<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0, x33: 0, x34: 0, x35: 0, x36: 0, x37: 0, x38: 0, x39: 0, x40: 0, x41: 0, x42: 0, x43: 0, x44: 0, x45: 0, x46: 0, x47: 0, x48: 0, x49: 0, x50: 0, x51: 0, x52: 0, x53: 0, x54: 0, x55: 0, x56: 0, x57: 0, x58: 0, x59: 0, x60: 0, x61: 0, x62: 0, x63: 0, x64: 0};
+        S4<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32,x33,x34,x35,x36,x37,x38,x39,x40,x41,x42,x43,x44,x45,x46,x47,x48,x49,x50,x51,x52,x53,x54,x55,x56,x57,x58,x59,x60,x61,x62,x63,x64} = move(t);
+
+        t = S4<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0, x33: 0, x34: 0, x35: 0, x36: 0, x37: 0, x38: 0, x39: 0, x40: 0, x41: 0, x42: 0, x43: 0, x44: 0, x45: 0, x46: 0, x47: 0, x48: 0, x49: 0, x50: 0, x51: 0, x52: 0, x53: 0, x54: 0, x55: 0, x56: 0, x57: 0, x58: 0, x59: 0, x60: 0, x61: 0, x62: 0, x63: 0, x64: 0};
+        S4<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32,x33,x34,x35,x36,x37,x38,x39,x40,x41,x42,x43,x44,x45,x46,x47,x48,x49,x50,x51,x52,x53,x54,x55,x56,x57,x58,x59,x60,x61,x62,x63,x64} = move(t); 
+
+        t = S4<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0, x33: 0, x34: 0, x35: 0, x36: 0, x37: 0, x38: 0, x39: 0, x40: 0, x41: 0, x42: 0, x43: 0, x44: 0, x45: 0, x46: 0, x47: 0, x48: 0, x49: 0, x50: 0, x51: 0, x52: 0, x53: 0, x54: 0, x55: 0, x56: 0, x57: 0, x58: 0, x59: 0, x60: 0, x61: 0, x62: 0, x63: 0, x64: 0};
+        S4<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32,x33,x34,x35,x36,x37,x38,x39,x40,x41,x42,x43,x44,x45,x46,x47,x48,x49,x50,x51,x52,x53,x54,x55,x56,x57,x58,x59,x60,x61,x62,x63,x64} = move(t);
+
+        t = S4<u64>{x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0, x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0, x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0, x32: 0, x33: 0, x34: 0, x35: 0, x36: 0, x37: 0, x38: 0, x39: 0, x40: 0, x41: 0, x42: 0, x43: 0, x44: 0, x45: 0, x46: 0, x47: 0, x48: 0, x49: 0, x50: 0, x51: 0, x52: 0, x53: 0, x54: 0, x55: 0, x56: 0, x57: 0, x58: 0, x59: 0, x60: 0, x61: 0, x62: 0, x63: 0, x64: 0};
+        S4<u64>{x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31,x32,x33,x34,x35,x36,x37,x38,x39,x40,x41,x42,x43,x44,x45,x46,x47,x48,x49,x50,x51,x52,x53,x54,x55,x56,x57,x58,x59,x60,x61,x62,x63,x64} = move(t);                               
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_unpack_s4_x100() {
+    label b0:
+        Self.calibrate_unpack_s4_impl(10);
+        return;       
+    }
+
+    public entry calibrate_unpack_s4_x500() {
+    label b0:
+        Self.calibrate_unpack_s4_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_unpack_s4_x1000() {
+    label b0:
+        Self.calibrate_unpack_s4_impl(100);
+        return;       
+    }               
+
+}

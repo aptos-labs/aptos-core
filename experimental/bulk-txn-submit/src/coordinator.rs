@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -7,19 +7,19 @@ use crate::{
     workloads::SignedTransactionBuilder,
 };
 use anyhow::{bail, Result};
-use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
-use aptos_logger::{error, info, sample, sample::SampleRate, warn};
-use aptos_sdk::{
+use velor_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
+use velor_logger::{error, info, sample, sample::SampleRate, warn};
+use velor_sdk::{
     move_types::account_address::AccountAddress,
     rest_client::{
-        aptos_api_types::{AptosError, AptosErrorCode, TransactionOnChainData},
-        error::{AptosErrorResponse, RestError},
+        velor_api_types::{VelorError, VelorErrorCode, TransactionOnChainData},
+        error::{VelorErrorResponse, RestError},
         Client,
     },
-    transaction_builder::{aptos_stdlib, TransactionFactory},
+    transaction_builder::{velor_stdlib, TransactionFactory},
     types::LocalAccount,
 };
-use aptos_transaction_emitter_lib::{
+use velor_transaction_emitter_lib::{
     emitter::{
         account_minter::{bulk_create_accounts, prompt_yes, BulkAccountCreationConfig},
         get_account_seq_num, get_needed_balance_per_account,
@@ -30,7 +30,7 @@ use aptos_transaction_emitter_lib::{
     },
     Cluster, ClusterArgs,
 };
-use aptos_transaction_generator_lib::ReliableTransactionSubmitter;
+use velor_transaction_generator_lib::ReliableTransactionSubmitter;
 use clap::Parser;
 use futures::{future::join_all, StreamExt};
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
@@ -241,7 +241,7 @@ pub async fn execute_return_worker_funds(
             if balance > txn_factory_ref.get_max_gas_amount() * txn_factory_ref.get_gas_unit_price()
             {
                 let txn = account.sign_with_transaction_builder(txn_factory_ref.payload(
-                    aptos_stdlib::aptos_coin_transfer(
+                    velor_stdlib::velor_coin_transfer(
                         coin_source_account.address(),
                         balance
                             - txn_factory_ref.get_max_gas_amount()
@@ -653,10 +653,10 @@ async fn submit_work_txns<T, B: SignedTransactionBuilder<T>>(
                                         warn!("Rollback txn status: {:?}", res.into_inner())
                                     );
                                 },
-                                Err(RestError::Api(AptosErrorResponse {
+                                Err(RestError::Api(VelorErrorResponse {
                                     error:
-                                        AptosError {
-                                            error_code: AptosErrorCode::TransactionNotFound,
+                                        VelorError {
+                                            error_code: VelorErrorCode::TransactionNotFound,
                                             ..
                                         },
                                     ..

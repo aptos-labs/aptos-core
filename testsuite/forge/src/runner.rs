@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,12 +8,12 @@ use crate::{
     observer::junit::JunitTestObserver,
     result::{TestResult, TestSummary},
     success_criteria::SuccessCriteriaErrors,
-    AdminContext, AdminTest, AptosContext, AptosTest, CoreContext, Factory, NetworkContext,
+    AdminContext, AdminTest, VelorContext, VelorTest, CoreContext, Factory, NetworkContext,
     NetworkContextSynchronizer, NetworkTest, ShouldFail, Test, TestReport, Version,
     NAMESPACE_CLEANUP_DURATION_BUFFER_SECS,
 };
 use anyhow::{format_err, Error, Result};
-use aptos_config::config::NodeConfig;
+use velor_config::config::NodeConfig;
 use clap::{Parser, ValueEnum};
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use std::{
@@ -31,7 +31,7 @@ const KUBERNETES_SERVICE_HOST: &str = "KUBERNETES_SERVICE_HOST";
 pub const FORGE_RUNNER_MODE: &str = "FORGE_RUNNER_MODE";
 
 #[derive(Debug, Parser)]
-#[clap(about = "Forged in Fire", styles = aptos_cli_common::aptos_cli_style())]
+#[clap(about = "Forged in Fire", styles = velor_cli_common::velor_cli_style())]
 pub struct Options {
     /// The FILTER string is tested against the name of all tests, and only those tests whose names
     /// contain the filter are run.
@@ -139,7 +139,7 @@ pub struct NodeResourceOverride {
 // Workaround way to implement all_tests, for:
 // error[E0658]: cannot cast `dyn interface::admin::AdminTest` to `dyn interface::test::Test`, trait upcasting coercion is experimental
 pub enum AnyTestRef<'a> {
-    Aptos(&'a dyn AptosTest),
+    Velor(&'a dyn VelorTest),
     Admin(&'a dyn AdminTest),
     Network(&'a dyn NetworkTest),
 }
@@ -147,7 +147,7 @@ pub enum AnyTestRef<'a> {
 impl Test for AnyTestRef<'_> {
     fn name(&self) -> &'static str {
         match self {
-            AnyTestRef::Aptos(t) => t.name(),
+            AnyTestRef::Velor(t) => t.name(),
             AnyTestRef::Admin(t) => t.name(),
             AnyTestRef::Network(t) => t.name(),
         }
@@ -155,7 +155,7 @@ impl Test for AnyTestRef<'_> {
 
     fn ignored(&self) -> bool {
         match self {
-            AnyTestRef::Aptos(t) => t.ignored(),
+            AnyTestRef::Velor(t) => t.ignored(),
             AnyTestRef::Admin(t) => t.ignored(),
             AnyTestRef::Network(t) => t.ignored(),
         }
@@ -163,7 +163,7 @@ impl Test for AnyTestRef<'_> {
 
     fn should_fail(&self) -> ShouldFail {
         match self {
-            AnyTestRef::Aptos(t) => t.should_fail(),
+            AnyTestRef::Velor(t) => t.should_fail(),
             AnyTestRef::Admin(t) => t.should_fail(),
             AnyTestRef::Network(t) => t.should_fail(),
         }
@@ -292,14 +292,14 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 self.tests.existing_db_tag.clone(),
             ))?;
 
-            // Run AptosTests
-            for test in self.filter_tests(&self.tests.aptos_tests) {
-                let mut aptos_ctx = AptosContext::new(
+            // Run VelorTests
+            for test in self.filter_tests(&self.tests.velor_tests) {
+                let mut velor_ctx = VelorContext::new(
                     CoreContext::from_rng(&mut rng),
-                    swarm.chain_info().into_aptos_public_info(),
+                    swarm.chain_info().into_velor_public_info(),
                     &mut report,
                 );
-                let result = process_test_result(runtime.block_on(test.run(&mut aptos_ctx)));
+                let result = process_test_result(runtime.block_on(test.run(&mut velor_ctx)));
                 report.report_text(result.to_string());
                 summary.handle_result(test.details(), result)?;
             }

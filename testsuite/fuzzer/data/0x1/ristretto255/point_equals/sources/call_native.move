@@ -1,5 +1,5 @@
 module poc::point_equals {
-    use aptos_std::ristretto255::{Self};
+    use velor_std::ristretto255::{Self};
 
     public entry fun main(_owner: &signer) {
         let point1 = ristretto255::point_identity();

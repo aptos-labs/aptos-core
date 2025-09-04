@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -14,12 +14,12 @@ use crate::{
     ApiTags,
 };
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{
-    AccountData, Address, AptosErrorCode, AsConverter, AssetType, LedgerInfo, MoveModuleBytecode,
+use velor_api_types::{
+    AccountData, Address, VelorErrorCode, AsConverter, AssetType, LedgerInfo, MoveModuleBytecode,
     MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
 };
-use aptos_sdk::types::{get_paired_fa_metadata_address, get_paired_fa_primary_store_address};
-use aptos_types::{
+use velor_sdk::types::{get_paired_fa_metadata_address, get_paired_fa_primary_store_address};
+use velor_types::{
     account_config::{
         AccountResource, CoinStoreResourceUntyped, ConcurrentFungibleBalanceResource,
         FungibleStoreResource, ObjectGroupResource,
@@ -81,7 +81,7 @@ impl AccountsApi {
     /// Retrieves all account resources for a given account and a specific ledger version.  If the
     /// ledger version is not specified in the request, the latest ledger version is used.
     ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// The Velor nodes prune account state history, via a configurable time window.
     /// If the requested ledger version has been pruned, the server responds with a 410.
     #[oai(
         path = "/accounts/:address/resources",
@@ -102,7 +102,7 @@ impl AccountsApi {
         ///
         /// This cursor cannot be derived manually client-side. Instead, you must
         /// call this endpoint once without this query parameter specified, and
-        /// then use the cursor returned in the X-Aptos-Cursor header in the
+        /// then use the cursor returned in the X-Velor-Cursor header in the
         /// response.
         start: Query<Option<StateKeyWrapper>>,
         /// Max number of account resources to retrieve
@@ -134,7 +134,7 @@ impl AccountsApi {
     /// for a given account, asset type and a specific ledger version.  If the
     /// ledger version is not specified in the request, the latest ledger version is used.
     ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// The Velor nodes prune account state history, via a configurable time window.
     /// If the requested ledger version has been pruned, the server responds with a 410.
     #[oai(
         path = "/accounts/:address/balance/:asset_type",
@@ -170,7 +170,7 @@ impl AccountsApi {
     /// Retrieves all account modules' bytecode for a given account at a specific ledger version.
     /// If the ledger version is not specified in the request, the latest ledger version is used.
     ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// The Velor nodes prune account state history, via a configurable time window.
     /// If the requested ledger version has been pruned, the server responds with a 410.
     #[oai(
         path = "/accounts/:address/modules",
@@ -191,7 +191,7 @@ impl AccountsApi {
         ///
         /// This cursor cannot be derived manually client-side. Instead, you must
         /// call this endpoint once without this query parameter specified, and
-        /// then use the cursor returned in the X-Aptos-Cursor header in the
+        /// then use the cursor returned in the X-Velor-Cursor header in the
         /// response.
         start: Query<Option<StateKeyWrapper>>,
         /// Max number of account modules to retrieve
@@ -272,7 +272,7 @@ impl Account {
                 .map_err(|err| {
                     BasicErrorWith404::internal_with_code(
                         err,
-                        AptosErrorCode::InternalError,
+                        VelorErrorCode::InternalError,
                         &self.latest_ledger_info,
                     )
                 })?;
@@ -281,13 +281,13 @@ impl Account {
             let stateless_account_enabled = self
                 .context
                 .feature_enabled(
-                    aptos_types::on_chain_config::FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
+                    velor_types::on_chain_config::FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
                 )
                 .context("Failed to check if stateless account is enabled")
                 .map_err(|_| {
                     BasicErrorWith404::internal_with_code(
                         "Failed to check if stateless account is enabled",
-                        AptosErrorCode::InternalError,
+                        VelorErrorCode::InternalError,
                         &self.latest_ledger_info,
                     )
                 })?;
@@ -329,7 +329,7 @@ impl Account {
                         .map_err(|err| {
                             BasicErrorWith404::internal_with_code(
                                 err,
-                                AptosErrorCode::InternalError,
+                                VelorErrorCode::InternalError,
                                 &self.latest_ledger_info,
                             )
                         })?;
@@ -339,7 +339,7 @@ impl Account {
                         |err| {
                             BasicErrorWith404::internal_with_code(
                                 err,
-                                AptosErrorCode::InternalError,
+                                VelorErrorCode::InternalError,
                                 &self.latest_ledger_info,
                             )
                         },
@@ -353,7 +353,7 @@ impl Account {
                         .map_err(|err| {
                             BasicErrorWith404::internal_with_code(
                                 err,
-                                AptosErrorCode::InternalError,
+                                VelorErrorCode::InternalError,
                                 &self.latest_ledger_info,
                             )
                         })?
@@ -383,7 +383,7 @@ impl Account {
                         .map_err(|err| {
                             BasicErrorWith404::internal_with_code(
                                 err,
-                                AptosErrorCode::InternalError,
+                                VelorErrorCode::InternalError,
                                 &self.latest_ledger_info,
                             )
                         })?;
@@ -401,7 +401,7 @@ impl Account {
                             .map_err(|err| {
                                 BasicErrorWith404::internal_with_code(
                                     err,
-                                    AptosErrorCode::InternalError,
+                                    VelorErrorCode::InternalError,
                                     &self.latest_ledger_info,
                                 )
                             })?;
@@ -430,7 +430,7 @@ impl Account {
             StateKey::resource_typed::<AccountResource>(self.address.inner()).map_err(|e| {
                 BasicErrorWith404::internal_with_code(
                     e,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &self.latest_ledger_info,
                 )
             })?;
@@ -466,7 +466,7 @@ impl Account {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &self.latest_ledger_info,
                 )
             })?;
@@ -485,7 +485,7 @@ impl Account {
                     .map_err(|err| {
                         BasicErrorWith404::internal_with_code(
                             err,
-                            AptosErrorCode::InternalError,
+                            VelorErrorCode::InternalError,
                             &self.latest_ledger_info,
                         )
                     })?;
@@ -536,7 +536,7 @@ impl Account {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &self.latest_ledger_info,
                 )
             })?;
@@ -553,7 +553,7 @@ impl Account {
                             .map_err(|err| {
                                 BasicErrorWith404::internal_with_code(
                                     err,
-                                    AptosErrorCode::InternalError,
+                                    VelorErrorCode::InternalError,
                                     &self.latest_ledger_info,
                                 )
                             })?,
@@ -598,7 +598,7 @@ impl Account {
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code(
                     err,
-                    AptosErrorCode::InvalidInput,
+                    VelorErrorCode::InvalidInput,
                     &self.latest_ledger_info,
                 )
             })?;
@@ -624,7 +624,7 @@ impl Account {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &self.latest_ledger_info,
                 )
             })?;
@@ -637,7 +637,7 @@ impl Account {
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code(
                     err,
-                    AptosErrorCode::InvalidInput,
+                    VelorErrorCode::InvalidInput,
                     &self.latest_ledger_info,
                 )
             })?;
@@ -670,7 +670,7 @@ impl Account {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &ledger_info,
                 )
             })?
@@ -690,7 +690,7 @@ impl Account {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &ledger_info,
                 )
             })

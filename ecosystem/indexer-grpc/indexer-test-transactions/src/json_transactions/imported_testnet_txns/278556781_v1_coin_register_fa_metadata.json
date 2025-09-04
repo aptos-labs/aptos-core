@@ -51,7 +51,7 @@
             "name": "PackageRegistry"
           },
           "typeStr": "0x1::code::PackageRegistry",
-          "data": "{\"packages\":[{\"deps\":[{\"account\":\"0x1\",\"package_name\":\"AptosFramework\"},{\"account\":\"0x1\",\"package_name\":\"AptosStdlib\"},{\"account\":\"0x1\",\"package_name\":\"MoveStdlib\"}],\"extension\":{\"vec\":[]},\"manifest\":\"0x1f8b08000000000002ff45ccc10ac2300c06e07b9ea2f46e371fc083089ebd8f1d429b49d94c4a335410dfdd46d0412e49beff1f0ac619af3402e38ddcc1f94b9555f824993ddca96a16b6731ffab0f70003a654499574848d7ec533e244461215e2441cb3a9635945cfb5d53fa4ce4dbedc221117cb84d0b5997ecf0ecdeefebb776ff800a7a0c71ca2000000\",\"modules\":[{\"extension\":{\"vec\":[]},\"name\":\"proton_cbdy\",\"source\":\"0x1f8b08000000000002ff8d91cd6ac3300cc7ef7e0aaf87d14220eb6117b514b6bd4019bb1baf5682596c15c961b092775fea644d330adbffa42fff2459650977b00b44512915c8b50dea3d53a2f8423e021cb36d0ebda34f4af792c4ed215d15e9539713ad609f7400e2eb88bc51395ab551fbe89319e04bc1e89041df0f55ab917a963d261253b10df849fc01106cb435badc1de04cf1b6f15fb89d9aef9697e779b84c2f66b1f7c5fef5cd3c4d5adcca3f67fd4a3dceddca36825368b5b998ffdd81b1f69290671b0c435fd1fe80041fd30d40a1872f05b0ce318a18aa7ed8855e3f8c5a8f8d3ad5a9b2dcf6e7cfd7ff06703a927209020000\",\"source_map\":\"0x\"}],\"name\":\"PRT_KFBCCC\",\"source_digest\":\"97264F03A30C9BEAD3D400FD160ED76864344A505A283CFF0C5D632506222F40\",\"upgrade_number\":\"0\",\"upgrade_policy\":{\"policy\":1}}]}"
+          "data": "{\"packages\":[{\"deps\":[{\"account\":\"0x1\",\"package_name\":\"VelorFramework\"},{\"account\":\"0x1\",\"package_name\":\"VelorStdlib\"},{\"account\":\"0x1\",\"package_name\":\"MoveStdlib\"}],\"extension\":{\"vec\":[]},\"manifest\":\"0x1f8b08000000000002ff45ccc10ac2300c06e07b9ea2f46e371fc083089ebd8f1d429b49d94c4a335410dfdd46d0412e49beff1f0ac619af3402e38ddcc1f94b9555f824993ddca96a16b6731ffab0f70003a654499574848d7ec533e244461215e2441cb3a9635945cfb5d53fa4ce4dbedc221117cb84d0b5997ecf0ecdeefebb776ff800a7a0c71ca2000000\",\"modules\":[{\"extension\":{\"vec\":[]},\"name\":\"proton_cbdy\",\"source\":\"0x1f8b08000000000002ff8d91cd6ac3300cc7ef7e0aaf87d14220eb6117b514b6bd4019bb1baf5682596c15c961b092775fea644d330adbffa42fff2459650977b00b44512915c8b50dea3d53a2f8423e021cb36d0ebda34f4af792c4ed215d15e9539713ad609f7400e2eb88bc51395ab551fbe89319e04bc1e89041df0f55ab917a963d261253b10df849fc01106cb435badc1de04cf1b6f15fb89d9aef9697e779b84c2f66b1f7c5fef5cd3c4d5adcca3f67fd4a3dceddca36825368b5b998ffdd81b1f69290671b0c435fd1fe80041fd30d40a1872f05b0ce318a18aa7ed8855e3f8c5a8f8d3ad5a9b2dcf6e7cfd7ff06703a927209020000\",\"source_map\":\"0x\"}],\"name\":\"PRT_KFBCCC\",\"source_digest\":\"97264F03A30C9BEAD3D400FD160ED76864344A505A283CFF0C5D632506222F40\",\"upgrade_number\":\"0\",\"upgrade_policy\":{\"policy\":1}}]}"
         }
       },
       {
@@ -75,7 +75,7 @@
             ]
           },
           "typeStr": "0x1::coin::CoinInfo<0x589dabf3b43ef5c331ea3c0f9b6b005860c1f0ef94a5948d133e051b20c22862::proton_cbdy::PRT_KFBCCC>",
-          "data": "{\"decimals\":10,\"name\":\"Aptos\",\"supply\":{\"vec\":[]},\"symbol\":\"APT\"}"
+          "data": "{\"decimals\":10,\"name\":\"Velor\",\"supply\":{\"vec\":[]},\"symbol\":\"APT\"}"
         }
       },
       {
@@ -92,13 +92,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"10041540182\"},\"deposit_events\":{\"counter\":\"14\",\"guid\":{\"id\":{\"addr\":\"0x589dabf3b43ef5c331ea3c0f9b6b005860c1f0ef94a5948d133e051b20c22862\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"7\",\"guid\":{\"id\":{\"addr\":\"0x589dabf3b43ef5c331ea3c0f9b6b005860c1f0ef94a5948d133e051b20c22862\",\"creation_num\":\"3\"}}}}"
         }
       },

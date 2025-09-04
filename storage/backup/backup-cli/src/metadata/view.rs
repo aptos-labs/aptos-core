@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -11,8 +11,8 @@ use crate::{
     storage::FileHandle,
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_infallible::duration_since_epoch;
-use aptos_types::transaction::Version;
+use velor_infallible::duration_since_epoch;
+use velor_types::transaction::Version;
 use itertools::Itertools;
 use std::{fmt, str::FromStr};
 

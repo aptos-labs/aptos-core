@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,8 +8,8 @@ use crate::{
         MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
     },
 };
-use aptos_config::config::{NodeConfig, OverrideNodeConfig};
-use aptos_forge::{NodeExt, Swarm, SwarmExt};
+use velor_config::config::{NodeConfig, OverrideNodeConfig};
+use velor_forge::{NodeExt, Swarm, SwarmExt};
 use std::{
     sync::Arc,
     time::{Duration, Instant},
@@ -20,7 +20,7 @@ use std::{
 #[tokio::test]
 async fn test_txn_broadcast() {
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, conf, _| {
             conf.api.failpoints_enabled = true;
         }))

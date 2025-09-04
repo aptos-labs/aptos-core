@@ -1,7 +1,7 @@
 module poc::multi_scalar_mul_internal {
     use std::vector;
-    use aptos_std::crypto_algebra::{Element, one, from_u64, scalar_mul, multi_scalar_mul, add, eq, zero};
-    use aptos_std::bls12381_algebra::{G1, Fr};
+    use velor_std::crypto_algebra::{Element, one, from_u64, scalar_mul, multi_scalar_mul, add, eq, zero};
+    use velor_std::bls12381_algebra::{G1, Fr};
 
     public entry fun main(_owner: &signer) {
         let p = one<G1>();

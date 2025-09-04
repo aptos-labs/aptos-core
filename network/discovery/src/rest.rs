@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{validator_set::extract_validator_set_updates, DiscoveryError};
-use aptos_config::{config::PeerSet, network_id::NetworkContext};
-use aptos_logger::info;
-use aptos_time_service::{Interval, TimeService, TimeServiceTrait};
-use aptos_types::{account_address::AccountAddress, on_chain_config::ValidatorSet};
+use velor_config::{config::PeerSet, network_id::NetworkContext};
+use velor_logger::info;
+use velor_time_service::{Interval, TimeService, TimeServiceTrait};
+use velor_types::{account_address::AccountAddress, on_chain_config::ValidatorSet};
 use futures::{executor::block_on, Stream};
 use std::{
     pin::Pin,
@@ -17,7 +17,7 @@ use std::{
 /// set nodes.  Useful for when genesis is significantly far behind in time
 pub struct RestStream {
     network_context: NetworkContext,
-    rest_client: aptos_rest_client::Client,
+    rest_client: velor_rest_client::Client,
     interval: Pin<Box<Interval>>,
 }
 
@@ -30,7 +30,7 @@ impl RestStream {
     ) -> Self {
         RestStream {
             network_context,
-            rest_client: aptos_rest_client::Client::new(rest_url),
+            rest_client: velor_rest_client::Client::new(rest_url),
             interval: Box::pin(time_service.interval(interval_duration)),
         }
     }

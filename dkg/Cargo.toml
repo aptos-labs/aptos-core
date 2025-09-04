@@ -1,6 +1,6 @@
 [package]
-name = "aptos-dkg-runtime"
-description = "Aptos DKG runtime"
+name = "velor-dkg-runtime"
+description = "Velor DKG runtime"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,24 +14,24 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-bounded-executor = { workspace = true }
-aptos-channels = { workspace = true }
-aptos-config = { workspace = true }
-aptos-consensus-types = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-crypto-derive = { workspace = true }
-aptos-enum-conversion-derive = { workspace = true }
-aptos-event-notifications = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-network = { workspace = true }
-aptos-reliable-broadcast = { workspace = true }
-aptos-runtimes = { workspace = true }
-aptos-safety-rules = { workspace = true }
-aptos-time-service = { workspace = true }
-aptos-types = { workspace = true }
-aptos-validator-transaction-pool = { workspace = true }
+velor-bounded-executor = { workspace = true }
+velor-channels = { workspace = true }
+velor-config = { workspace = true }
+velor-consensus-types = { workspace = true }
+velor-crypto = { workspace = true }
+velor-crypto-derive = { workspace = true }
+velor-enum-conversion-derive = { workspace = true }
+velor-event-notifications = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-network = { workspace = true }
+velor-reliable-broadcast = { workspace = true }
+velor-runtimes = { workspace = true }
+velor-safety-rules = { workspace = true }
+velor-time-service = { workspace = true }
+velor-types = { workspace = true }
+velor-validator-transaction-pool = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
@@ -47,7 +47,7 @@ tokio = { workspace = true }
 tokio-retry = { workspace = true }
 
 [dev-dependencies]
-aptos-types = { workspace = true, features = ["testing"] }
+velor-types = { workspace = true, features = ["testing"] }
 
 [features]
 smoke-test = []

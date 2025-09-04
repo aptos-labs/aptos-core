@@ -1,5 +1,5 @@
 [package]
-name = "aptos-state-sync-driver"
+name = "velor-state-sync-driver"
 description = "The driver for state sync"
 version = "0.1.0"
 
@@ -14,23 +14,23 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-config = { workspace = true }
-aptos-consensus-notifications = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-data-client = { workspace = true }
-aptos-data-streaming-service = { workspace = true }
-aptos-event-notifications = { workspace = true }
-aptos-executor-types = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-mempool-notifications = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-runtimes = { workspace = true }
-aptos-schemadb = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-storage-service-notifications = { workspace = true }
-aptos-time-service = { workspace = true }
-aptos-types = { workspace = true }
+velor-config = { workspace = true }
+velor-consensus-notifications = { workspace = true }
+velor-crypto = { workspace = true }
+velor-data-client = { workspace = true }
+velor-data-streaming-service = { workspace = true }
+velor-event-notifications = { workspace = true }
+velor-executor-types = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-mempool-notifications = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-runtimes = { workspace = true }
+velor-schemadb = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-storage-service-notifications = { workspace = true }
+velor-time-service = { workspace = true }
+velor-types = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 futures = { workspace = true }
@@ -42,19 +42,19 @@ tokio-stream = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-aptos-channels = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-db = { workspace = true }
-aptos-executor = { workspace = true }
-aptos-executor-test-helpers = { workspace = true }
-aptos-genesis = { workspace = true, features = ["testing"] }
-aptos-network = { workspace = true }
-aptos-storage-service-client = { workspace = true }
-aptos-storage-service-types = { workspace = true }
-aptos-temppath = { workspace = true }
-aptos-time-service = { workspace = true, features = ["async", "testing"] }
-aptos-vm = { workspace = true }
-aptos-vm-genesis = { workspace = true }
+velor-channels = { workspace = true }
+velor-crypto = { workspace = true }
+velor-db = { workspace = true }
+velor-executor = { workspace = true }
+velor-executor-test-helpers = { workspace = true }
+velor-genesis = { workspace = true, features = ["testing"] }
+velor-network = { workspace = true }
+velor-storage-service-client = { workspace = true }
+velor-storage-service-types = { workspace = true }
+velor-temppath = { workspace = true }
+velor-time-service = { workspace = true, features = ["async", "testing"] }
+velor-vm = { workspace = true }
+velor-vm-genesis = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 claims = { workspace = true }

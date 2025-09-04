@@ -1,4 +1,4 @@
-# Aptos Indexer
+# Velor Indexer
 
 > Tails the blockchain's transactions and pushes them into a postgres DB
 
@@ -31,11 +31,11 @@ When developing your own, ensure each `TransactionProcessor` is idempotent, and 
       `DATABASE_URL=postgres://postgres@localhost:5432/indexer_v2 diesel database reset`
 
 ### Installing fullnode
-Please follow standard fullnode installation guide on aptos.dev (https://aptos.dev/nodes/full-node/fullnode-source-code-or-docker)
+Please follow standard fullnode installation guide on velor.dev (https://velor.dev/nodes/full-node/fullnode-source-code-or-docker)
 
 ### Running indexer
 ```bash
-cargo run -p aptos-node --features "indexer" --release -- -f <some_path>/fullnode.yaml
+cargo run -p velor-node --features "indexer" --release -- -f <some_path>/fullnode.yaml
 ```
    * Example fullnode.yaml modification
       ```
@@ -78,7 +78,7 @@ Username: postgres
 > - Diesel uses the `DATABASE_URL` env var to connect to the database, or the `--database-url` argument.
 > - Diesel CLI can be installed via cargo, e.g., `cargo install diesel_cli --no-default-features --features postgres`.
 > - `diesel migration run` sets up the database and runs all available migrations.
-> - Aptos tests use the `INDEXER_DATABASE_URL` env var. It needs to be set for the relevant tests to run.
+> - Velor tests use the `INDEXER_DATABASE_URL` env var. It needs to be set for the relevant tests to run.
 > - Postgres can be [installed and run via brew](https://wiki.postgresql.org/wiki/Homebrew).
 
 ## Adding new tables / Updating tables with Diesel
@@ -112,6 +112,6 @@ pg_ctl: could not start server
 then run `brew services restart postgresql`
 6. Alias for starting testnet (put this in `~/.zshrc`)
 ```bash
-alias testnet="cd ~/Desktop/aptos-core; CARGO_NET_GIT_FETCH_WITH_CLI=true cargo run -p aptos-node -- --test"
+alias testnet="cd ~/Desktop/velor-core; CARGO_NET_GIT_FETCH_WITH_CLI=true cargo run -p velor-node -- --test"
 ```
 Then run `source ~/.zshrc`, and start testnet by running `testnet` in your terminal

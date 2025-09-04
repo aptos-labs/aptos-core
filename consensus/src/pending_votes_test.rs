@@ -1,12 +1,12 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pending_votes::TwoChainTimeoutVotes;
-use aptos_bitvec::BitVec;
-use aptos_consensus_types::{
+use velor_bitvec::BitVec;
+use velor_consensus_types::{
     quorum_cert::QuorumCert, round_timeout::RoundTimeoutReason, timeout_2chain::TwoChainTimeout,
 };
-use aptos_types::validator_verifier::{
+use velor_types::validator_verifier::{
     random_validator_verifier, random_validator_verifier_with_voting_power,
 };
 use itertools::Itertools;

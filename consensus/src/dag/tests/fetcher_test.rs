@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::dag_test::MockStorage;
@@ -9,7 +9,7 @@ use crate::dag::{
     types::{DagSnapshotBitmask, FetchResponse, RemoteFetchRequest},
     RpcHandler,
 };
-use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
+use velor_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
 use claims::assert_ok_eq;
 use std::sync::Arc;
 

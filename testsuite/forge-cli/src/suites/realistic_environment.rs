@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,7 +10,7 @@ use crate::{
     suites::ungrouped::{optimize_for_maximum_throughput, optimize_state_sync_for_throughput},
     TestCommand,
 };
-use aptos_forge::{
+use velor_forge::{
     args::TransactionTypeArg,
     prometheus_metrics::LatencyBreakdownSlice,
     success_criteria::{
@@ -19,10 +19,10 @@ use aptos_forge::{
     },
     EmitJobMode, EmitJobRequest, ForgeConfig, NetworkTest, NodeResourceOverride,
 };
-use aptos_sdk::types::on_chain_config::{
+use velor_sdk::types::on_chain_config::{
     BlockGasLimitType, OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType,
 };
-use aptos_testcases::{
+use velor_testcases::{
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
     multi_region_network_test::MultiRegionNetworkEmulationTest,
     performance_test::PerformanceBenchmark,
@@ -250,7 +250,7 @@ pub(crate) fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 1000 })
-                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
+                .gas_price(5 * velor_global_constants::GAS_UNIT_PRICE),
         )
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
@@ -392,7 +392,7 @@ pub(crate) fn realistic_env_max_load_test(
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 100 })
-                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .gas_price(5 * velor_global_constants::GAS_UNIT_PRICE)
                 .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_success_criteria(success_criteria)

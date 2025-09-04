@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,8 +9,8 @@
 //!
 //! [handshake]: crate::noise::handshake
 
-use aptos_crypto::{noise, x25519};
-use aptos_logger::prelude::*;
+use velor_crypto::{noise, x25519};
+use velor_logger::prelude::*;
 use futures::{
     io::{AsyncRead, AsyncWrite},
     ready,
@@ -526,9 +526,9 @@ mod test {
         noise::{AntiReplayTimestamps, HandshakeAuthMode, NoiseUpgrader},
         testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
     };
-    use aptos_config::network_id::NetworkContext;
-    use aptos_crypto::{test_utils::TEST_SEED, traits::Uniform as _, x25519};
-    use aptos_memsocket::MemorySocket;
+    use velor_config::network_id::NetworkContext;
+    use velor_crypto::{test_utils::TEST_SEED, traits::Uniform as _, x25519};
+    use velor_memsocket::MemorySocket;
     use futures::{
         executor::block_on,
         future::join,
@@ -546,12 +546,12 @@ mod test {
 
         let client_private = x25519::PrivateKey::generate(&mut rng);
         let client_public = client_private.public_key();
-        let client_peer_id = aptos_types::account_address::from_identity_public_key(client_public);
+        let client_peer_id = velor_types::account_address::from_identity_public_key(client_public);
         let client_network_context = NetworkContext::mock_with_peer_id(client_peer_id);
 
         let server_private = x25519::PrivateKey::generate(&mut rng);
         let server_public = server_private.public_key();
-        let server_peer_id = aptos_types::account_address::from_identity_public_key(server_public);
+        let server_peer_id = velor_types::account_address::from_identity_public_key(server_public);
         let server_network_context = NetworkContext::mock_with_peer_id(server_peer_id);
 
         let client = NoiseUpgrader::new(

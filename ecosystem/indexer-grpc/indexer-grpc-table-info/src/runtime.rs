@@ -1,20 +1,20 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     backup_restore::gcs::GcsBackupRestoreOperator,
     internal_indexer_db_service::InternalIndexerDBService, table_info_service::TableInfoService,
 };
-use aptos_api::context::Context;
-use aptos_config::config::{NodeConfig, TableInfoServiceMode};
-use aptos_db_indexer::{
+use velor_api::context::Context;
+use velor_config::config::{NodeConfig, TableInfoServiceMode};
+use velor_db_indexer::{
     db_indexer::{DBIndexer, InternalIndexerDB},
     db_ops::open_db,
     db_v2::IndexerAsyncV2,
 };
-use aptos_mempool::MempoolClientSender;
-use aptos_storage_interface::DbReaderWriter;
-use aptos_types::{chain_id::ChainId, transaction::Version};
+use velor_mempool::MempoolClientSender;
+use velor_storage_interface::DbReaderWriter;
+use velor_types::{chain_id::ChainId, transaction::Version};
 use std::{sync::Arc, time::Instant};
 use tokio::{runtime::Runtime, sync::watch::Receiver as WatchReceiver};
 
@@ -29,7 +29,7 @@ pub fn bootstrap_internal_indexer_db(
     if !config.indexer_db_config.is_internal_indexer_db_enabled() || internal_indexer_db.is_none() {
         return None;
     }
-    let runtime = aptos_runtimes::spawn_named_runtime("index-db".to_string(), None);
+    let runtime = velor_runtimes::spawn_named_runtime("index-db".to_string(), None);
     // Set up db config and open up the db initially to read metadata
     let mut indexer_service = InternalIndexerDBService::new(
         db_rw.reader,
@@ -62,7 +62,7 @@ pub fn bootstrap(
         return None;
     }
 
-    let runtime = aptos_runtimes::spawn_named_runtime("table-info".to_string(), None);
+    let runtime = velor_runtimes::spawn_named_runtime("table-info".to_string(), None);
 
     // Set up db config and open up the db initially to read metadata
     let node_config = config.clone();

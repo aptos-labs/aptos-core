@@ -78,7 +78,7 @@ pub fn run_model_builder_in_compiler_mode(
     known_attributes: &BTreeSet<String>,
     language_version: LanguageVersion,
     warn_of_deprecation_use: bool,
-    warn_of_deprecation_use_in_aptos_libs: bool,
+    warn_of_deprecation_use_in_velor_libs: bool,
     compile_test_code: bool,
     compile_verify_code: bool,
 ) -> anyhow::Result<GlobalEnv> {
@@ -100,7 +100,7 @@ pub fn run_model_builder_in_compiler_mode(
         },
         Flags::model_compilation()
             .set_warn_of_deprecation_use(warn_of_deprecation_use)
-            .set_warn_of_deprecation_use_in_aptos_libs(warn_of_deprecation_use_in_aptos_libs)
+            .set_warn_of_deprecation_use_in_velor_libs(warn_of_deprecation_use_in_velor_libs)
             .set_skip_attribute_checks(skip_attribute_checks)
             .set_verify(compile_verify_code)
             .set_keep_testing_functions(compile_test_code)

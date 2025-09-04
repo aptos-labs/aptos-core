@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -19,14 +19,14 @@ pub(crate) fn ensure_slice_len_eq(data: &[u8], len: usize) -> Result<()> {
     Ok(())
 }
 
-/// Copied from aptos-schemdadb to define pub struct instead of pub(crate)
+/// Copied from velor-schemdadb to define pub struct instead of pub(crate)
 #[macro_export]
 macro_rules! define_schema {
     ($schema_type:ident, $key_type:ty, $value_type:ty, $cf_name:expr) => {
         #[derive(Debug)]
         pub struct $schema_type;
 
-        impl aptos_schemadb::schema::Schema for $schema_type {
+        impl velor_schemadb::schema::Schema for $schema_type {
             type Key = $key_type;
             type Value = $value_type;
 

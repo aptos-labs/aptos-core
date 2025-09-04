@@ -1,0 +1,4 @@
+processed 4 tasks
+task 1 lines 4-11:  publish --private-key Alice [module 0xbbb75fa0541df726acb791a1cf919b11ccbb31d2d0546a9df77359202aa82e69::keys {]
+task 2 lines 13-20:  publish --private-key Alice [module 0xbbb75fa0541df726acb791a1cf919b11ccbb31d2d0546a9df77359202aa82e69::values {]
+task 3 lines 22-101:  publish --private-key Alice [module 0xbbb75fa0541df726acb791a1cf919b11ccbb31d2d0546a9df77359202aa82e69::distribute {]

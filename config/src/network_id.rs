@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 use crate::config::{PeerRole, RoleType};
-use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::PeerId;
+use velor_short_hex_str::AsShortHexStr;
+use velor_types::PeerId;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 use strum_macros::EnumIter;

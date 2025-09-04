@@ -135,7 +135,7 @@ env:
 # at the call site, and don't need to wrap each step in an if statement?
 jobs:
   forge:
-    runs-on: runs-on,cpu=4,ram=16,family=m7a+m7i-flex,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co
+    runs-on: runs-on,cpu=4,ram=16,family=m7a+m7i-flex,image=velor-ubuntu-x64,run-id=${{ github.run_id }},spot=co
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
     steps:
       - uses: actions/checkout@v4
@@ -162,16 +162,16 @@ jobs:
           auth_duration=$(( $FORGE_RUNNER_DURATION_SECS > 5400 ? $FORGE_RUNNER_DURATION_SECS + 30 * 60 : 5400 ))
           echo "auth_duration=${auth_duration}" >> $GITHUB_OUTPUT
 
-      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+      - uses: velor-chain/velor-core/.github/actions/docker-setup@main
         if: ${{ !inputs.SKIP_JOB }}
         id: docker-setup
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-          # action/docker-setup logs in to GCP under project "aptos-ci", but this workflow
-          # runs kubectl under project "aptos-forge-gcp-0", to which the service account
-          # of "aptos-ci" has delegated access. The exported environment variables will
-          # still refer to "aptos-ci", which confuses the gcloud CLI, so we need to keep
+          # action/docker-setup logs in to GCP under project "velor-ci", but this workflow
+          # runs kubectl under project "velor-forge-gcp-0", to which the service account
+          # of "velor-ci" has delegated access. The exported environment variables will
+          # still refer to "velor-ci", which confuses the gcloud CLI, so we need to keep
           # them out of the environment. That's ok, because gcloud will take configuration
           # from the file-system anyway.
           EXPORT_GCP_PROJECT_VARIABLES: "false"
@@ -190,7 +190,7 @@ jobs:
       - name: "Setup GCloud project"
         if: ${{ !inputs.SKIP_JOB }}
         shell: bash
-        run: gcloud config set project aptos-forge-gcp-0
+        run: gcloud config set project velor-forge-gcp-0
 
       - name: Check for Forge images
         if: ${{ !inputs.SKIP_JOB }}
@@ -201,7 +201,7 @@ jobs:
             local image_name=$2
             local output_prefix=$3
             if [[ -n "$tag" ]]; then
-              if docker manifest inspect us-docker.pkg.dev/aptos-registry/docker/${image_name}:${tag} &> /dev/null; then
+              if docker manifest inspect us-docker.pkg.dev/velor-registry/docker/${image_name}:${tag} &> /dev/null; then
                 echo "${output_prefix}_EXISTS=true" >> $GITHUB_OUTPUT
                 echo "${output_prefix}_TAG=$tag" >> $GITHUB_OUTPUT
                 echo "✅ $image_name image found for tag: $tag" >> $GITHUB_STEP_SUMMARY
@@ -276,6 +276,6 @@ jobs:
       #   with:
       #     # Configured in the nextest.toml file
       #     junit-paths: ${{ env.FORGE_JUNIT_XML_PATH }}
-      #     org-slug: aptoslabs
+      #     org-slug: velorlabs
       #     token: ${{ secrets.TRUNK_API_TOKEN }}
       #   continue-on-error: true

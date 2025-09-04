@@ -14,7 +14,7 @@ repos:
       - id: check-added-large-files
         args:
           - --maxkb=2000
-  - repo: https://github.com/aptos-labs/pre-commit-hooks
+  - repo: https://github.com/velor-chain/pre-commit-hooks
     rev: a30f0d816e5062a67d87c8de753cfe499672b959 # Fix the revision to the v1.5.5 release commit. See: https://github.com/Lucas-C/pre-commit-hooks/releases/tag/v1.5.5
     hooks:
       - id: insert-license

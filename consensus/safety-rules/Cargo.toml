@@ -1,6 +1,6 @@
 [package]
-name = "aptos-safety-rules"
-description = "Aptos safety rules"
+name = "velor-safety-rules"
+description = "Velor safety rules"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,17 +13,17 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-config = { workspace = true }
-aptos-consensus-types = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-global-constants = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-secure-net = { workspace = true }
-aptos-secure-storage = { workspace = true }
-aptos-types = { workspace = true }
-aptos-vault-client = { workspace = true }
+velor-config = { workspace = true }
+velor-consensus-types = { workspace = true }
+velor-crypto = { workspace = true }
+velor-global-constants = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-secure-net = { workspace = true }
+velor-secure-storage = { workspace = true }
+velor-types = { workspace = true }
+velor-vault-client = { workspace = true }
 hex = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
@@ -33,10 +33,10 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-aptos-config = { workspace = true, features = ["fuzzing"] }
-aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
-aptos-proptest-helpers = { workspace = true }
-aptos-secure-storage = { workspace = true, features = ["testing"] }
+velor-config = { workspace = true, features = ["fuzzing"] }
+velor-consensus-types = { workspace = true, features = ["fuzzing"] }
+velor-proptest-helpers = { workspace = true }
+velor-secure-storage = { workspace = true, features = ["testing"] }
 claims = { workspace = true }
 criterion = { workspace = true }
 proptest = { workspace = true }
@@ -50,5 +50,5 @@ required-features = ["testing"]
 
 [features]
 default = []
-fuzzing = ["aptos-consensus-types/fuzzing", "aptos-config/fuzzing", "proptest"]
-testing = ["aptos-secure-storage/testing"]
+fuzzing = ["velor-consensus-types/fuzzing", "velor-config/fuzzing", "proptest"]
+testing = ["velor-secure-storage/testing"]

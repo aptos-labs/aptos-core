@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::proposer_election::ProposerElection;
 use crate::counters::PROPOSER_ELECTION_DURATION;
-use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::Mutex;
-use aptos_logger::prelude::info;
+use velor_consensus_types::common::{Author, Round};
+use velor_infallible::Mutex;
+use velor_logger::prelude::info;
 use std::collections::BTreeMap;
 
 // Wrapper around ProposerElection.

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,7 +7,7 @@ use crate::{
     remote_service::{self, RemoteService},
     safety_rules_manager,
 };
-use aptos_config::config::{SafetyRulesConfig, SafetyRulesService};
+use velor_config::config::{SafetyRulesConfig, SafetyRulesService};
 use std::net::SocketAddr;
 
 pub struct Process {

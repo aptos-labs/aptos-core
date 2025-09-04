@@ -1,0 +1,17 @@
+---
+server_config:
+  api_path_base: ""
+metrics_server_config:
+  listen_port: 9105
+bypasser_configs: []
+checker_configs:
+  - type: "RedisRatelimit"
+    database_address: "127.0.0.1"
+    max_requests_per_day: 3
+    ratelimit_key_provider_config:
+      type: "Ip"
+funder_config:
+  type: "FakeFunder"
+handler_config:
+  use_helpful_errors: true
+  return_rejections_early: false

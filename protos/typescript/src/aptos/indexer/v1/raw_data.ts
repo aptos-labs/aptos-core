@@ -581,7 +581,7 @@ export type RawDataService = typeof RawDataService;
 export const RawDataService = {
   /** Get transactions batch without any filtering from starting version and end if transaction count is present. */
   getTransactions: {
-    path: "/aptos.indexer.v1.RawData/GetTransactions",
+    path: "/velor.indexer.v1.RawData/GetTransactions",
     requestStream: false,
     responseStream: true,
     requestSerialize: (value: GetTransactionsRequest) => Buffer.from(GetTransactionsRequest.encode(value).finish()),
@@ -609,7 +609,7 @@ export interface RawDataClient extends Client {
   ): ClientReadableStream<TransactionsResponse>;
 }
 
-export const RawDataClient = makeGenericClientConstructor(RawDataService, "aptos.indexer.v1.RawData") as unknown as {
+export const RawDataClient = makeGenericClientConstructor(RawDataService, "velor.indexer.v1.RawData") as unknown as {
   new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): RawDataClient;
   service: typeof RawDataService;
   serviceName: string;

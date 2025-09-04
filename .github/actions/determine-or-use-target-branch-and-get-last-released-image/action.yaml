@@ -3,9 +3,9 @@ description: |
   Determine the branch to fetch the latest docker image tag from, or use a target branch directly.
   - If base-branch is set, determine the target branch to fetch the latest docker image tag from
     - Determine the IMAGE_TAG based on the latest release R and check for images built on branch R - 1:
-      - For commits on the aptos-release-v1.19 branch, the IMAGE_TAG should be the latest commit built on aptos-release-v1.18
-      - For commits on the main branch, the IMAGE_TAG should be the latest commit on the max release aptos-release-v<X.X> branch
-      - For commits on other branches, the IMAGE_TAG should be the latest commit on the branch's last release aptos-release-v<X.X> branch
+      - For commits on the velor-release-v1.19 branch, the IMAGE_TAG should be the latest commit built on velor-release-v1.18
+      - For commits on the main branch, the IMAGE_TAG should be the latest commit on the max release velor-release-v<X.X> branch
+      - For commits on other branches, the IMAGE_TAG should be the latest commit on the branch's last release velor-release-v<X.X> branch
   - If branch is set, use it directly
 
 inputs:

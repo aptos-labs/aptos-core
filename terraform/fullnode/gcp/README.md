@@ -1,4 +1,4 @@
-Aptos Fullnodes GCP Deployment
+Velor Fullnodes GCP Deployment
 ==============================
 
 This directory contains Terraform configs to deploy a public fullnode on Google Cloud.
@@ -18,11 +18,11 @@ These instructions assume that you have a functioning GCP project.  If you do no
          $ gcloud auth login --update-adc
 
 
-2. Clone the aptos-core repo and go to the terraform gcp folder.
+2. Clone the velor-core repo and go to the terraform gcp folder.
 
-         $ git clone https://github.com/aptos-labs/aptos-core.git
+         $ git clone https://github.com/velor-chain/velor-core.git
 
-         $ cd aptos-core/terraform/fullnode/gcp
+         $ cd velor-core/terraform/fullnode/gcp
 
 3. Create a working directory for your configuration.  Copy the files you will change so it does not interfere with the cloned repo:
 
@@ -51,44 +51,44 @@ These instructions assume that you have a functioning GCP project.  If you do no
 
         $ terraform workspace new $WORKSPACE
 
-8. Copy `terraform.tfvars` to `~/$WORKSPACE/terraform.tfvars` and edit to set your region, zone and project name.  If you are having trouble connecting to the devnet and need to add upstream seed peers, uncomment the "fullnode_helm_values" JSON stanza.  For more detail on upstream seed peers, see the documention: https://aptos.dev/tutorials/run-a-fullnode/#add-upstream-seed-peers
+8. Copy `terraform.tfvars` to `~/$WORKSPACE/terraform.tfvars` and edit to set your region, zone and project name.  If you are having trouble connecting to the devnet and need to add upstream seed peers, uncomment the "fullnode_helm_values" JSON stanza.  For more detail on upstream seed peers, see the documention: https://velor.dev/tutorials/run-a-fullnode/#add-upstream-seed-peers
 
        $ cp terraform.tfvars ~/$WORKSPACE/terraform.tfvars
        $ vi ~/$WORKSPACE/terraform.tfvars
 
-9. Apply the configuration.  Note that you should be in the aptos-core/terraform/fullnode/gcp folder when you run this command.  It will use the  config files that you modified in the ~/$WORKSPACE folder plus the cloned terraform files.
+9. Apply the configuration.  Note that you should be in the velor-core/terraform/fullnode/gcp folder when you run this command.  It will use the  config files that you modified in the ~/$WORKSPACE folder plus the cloned terraform files.
 
        $ terraform apply -var-file ~/$WORKSPACE/terraform.tfvars
 
 10. Configure your Kubernetes client:
 
-        $ gcloud container clusters get-credentials aptos-$WORKSPACE --zone <region_zone_name> --project <project_name>
+        $ gcloud container clusters get-credentials velor-$WORKSPACE --zone <region_zone_name> --project <project_name>
         # for example:
-        $ gcloud container clusters get-credentials aptos-$WORKSPACE --zone us-central1-a --project aptos-fullnode
+        $ gcloud container clusters get-credentials velor-$WORKSPACE --zone us-central1-a --project velor-fullnode
 
 11. Check that your fullnode pods are now running (this may take a few minutes):
 
-        $ kubectl get pods -n aptos
+        $ kubectl get pods -n velor
 
 12. Get your fullnode IP:
 
-        $ kubectl get svc -o custom-columns=IP:status.loadBalancer.ingress -n aptos
+        $ kubectl get svc -o custom-columns=IP:status.loadBalancer.ingress -n velor
 
 13. Check REST API, make sure the ledge version is increasing.
 
         $ curl http://<IP>
 
-14. To verify the correctness of your FullNode, as outlined in the documentation (https://aptos.dev/tutorials/run-a-fullnode/#verify-the-correctness-of-your-fullnode), you will need to set up a port-forwarding mechanism directly to the aptos pod in one ssh terminal and test it in another ssh terminal
+14. To verify the correctness of your FullNode, as outlined in the documentation (https://velor.dev/tutorials/run-a-fullnode/#verify-the-correctness-of-your-fullnode), you will need to set up a port-forwarding mechanism directly to the velor pod in one ssh terminal and test it in another ssh terminal
 
-   * Set up the port-forwarding to the aptos-fullnode pod.  Use `kubectl get pods -n aptos` to get the name of the pod
+   * Set up the port-forwarding to the velor-fullnode pod.  Use `kubectl get pods -n velor` to get the name of the pod
 
-         $ kubectl port-forward -n aptos <pod-name> 9101:9101
+         $ kubectl port-forward -n velor <pod-name> 9101:9101
 
    * Open a new ssh terminal.  Execute the following curl calls to verify the correctness
 
-         $ curl -v http://0:9101/metrics 2> /dev/null | grep "aptos_state_sync_version{type=\"synced\"}"
+         $ curl -v http://0:9101/metrics 2> /dev/null | grep "velor_state_sync_version{type=\"synced\"}"
 
-         $ curl -v http://0:9101/metrics 2> /dev/null | grep "aptos_connections{direction=\"outbound\""
+         $ curl -v http://0:9101/metrics 2> /dev/null | grep "velor_connections{direction=\"outbound\""
 
    * Exit port-forwarding when you are done by entering control-c in the terminal
 

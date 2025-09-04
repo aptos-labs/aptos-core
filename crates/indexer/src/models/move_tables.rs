@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{
@@ -6,7 +6,7 @@ use crate::{
     schema::{current_table_items, table_items, table_metadatas},
     util::{hash_str, standardize_address},
 };
-use aptos_api_types::{DeleteTableItem, WriteTableItem};
+use velor_api_types::{DeleteTableItem, WriteTableItem};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 

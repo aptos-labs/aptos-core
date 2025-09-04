@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,7 +6,7 @@ use crate::testutils::{
     test_framework::TestFramework,
     test_node::{NodeId, NodeType, TestNode},
 };
-use aptos_config::{
+use velor_config::{
     config::NodeConfig,
     network_id::{NetworkId, PeerNetworkId},
 };

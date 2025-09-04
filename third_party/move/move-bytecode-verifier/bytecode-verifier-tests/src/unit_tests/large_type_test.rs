@@ -23,7 +23,7 @@ fn get_nested_vec_type(len: usize) -> SignatureToken {
 
 #[test]
 fn test_large_types() {
-    // See also: github.com/aptos-labs/aptos-core/security/advisories/GHSA-37qw-jfpw-8899
+    // See also: github.com/velor-chain/velor-core/security/advisories/GHSA-37qw-jfpw-8899
     let mut m = empty_module();
 
     m.signatures.push(Signature(

@@ -3,7 +3,7 @@ resource "random_id" "backup-bucket" {
 }
 
 resource "aws_s3_bucket" "backup" {
-  bucket = "aptos-${local.workspace_name}-backup-${random_id.backup-bucket.hex}"
+  bucket = "velor-${local.workspace_name}-backup-${random_id.backup-bucket.hex}"
 }
 
 resource "aws_s3_bucket_public_access_block" "backup" {
@@ -35,7 +35,7 @@ data "aws_iam_policy_document" "backup-assume-role" {
       test     = "StringEquals"
       variable = "${local.oidc_provider}:sub"
       # NOTE: assumes the deployment defaults: that namespace is default and helm release is pfn*
-      values = [for i in range(var.num_fullnodes) : "system:serviceaccount:default:pfn${i}-aptos-fullnode"]
+      values = [for i in range(var.num_fullnodes) : "system:serviceaccount:default:pfn${i}-velor-fullnode"]
     }
 
     condition {
@@ -79,7 +79,7 @@ data "aws_iam_policy_document" "backup" {
 }
 
 resource "aws_iam_role" "backup" {
-  name               = "aptos-${local.workspace_name}-backup"
+  name               = "velor-${local.workspace_name}-backup"
   path               = var.iam_path
   assume_role_policy = data.aws_iam_policy_document.backup-assume-role.json
 }

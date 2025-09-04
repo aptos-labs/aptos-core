@@ -1,6 +1,6 @@
 [package]
-name = "aptos-testcases"
-description = "Aptos compatibility tests"
+name = "velor-testcases"
+description = "Velor compatibility tests"
 version = "0.0.0"
 
 # Workspace inherited keys
@@ -14,18 +14,18 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos = { workspace = true, features = ["fuzzing"] }
-aptos-config = { workspace = true }
-aptos-forge = { workspace = true }
-aptos-global-constants = { workspace = true }
-aptos-keygen = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-release-builder = { workspace = true }
-aptos-rest-client = { workspace = true }
-aptos-runtimes = { workspace = true }
-aptos-sdk = { workspace = true }
-aptos-temppath = { workspace = true }
-aptos-types = { workspace = true }
+velor = { workspace = true, features = ["fuzzing"] }
+velor-config = { workspace = true }
+velor-forge = { workspace = true }
+velor-global-constants = { workspace = true }
+velor-keygen = { workspace = true }
+velor-logger = { workspace = true }
+velor-release-builder = { workspace = true }
+velor-rest-client = { workspace = true }
+velor-runtimes = { workspace = true }
+velor-sdk = { workspace = true }
+velor-temppath = { workspace = true }
+velor-types = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 csv = { workspace = true }

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This Checker is only valuable in certain contexts. For example, this is
@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 // TODO: When we have it, switch to using a crate that unifies metric names.
 // As it is now, this metric name could change and we'd never catch it here
 // at compile time.
-const METRIC: &str = "aptos_consensus_timeout_count";
+const METRIC: &str = "velor_consensus_timeout_count";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

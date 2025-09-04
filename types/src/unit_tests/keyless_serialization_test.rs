@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
     },
     transaction::authenticator::EphemeralPublicKey,
 };
-use aptos_crypto::{
+use velor_crypto::{
     ed25519::Ed25519PrivateKey,
     poseidon_bn254,
     traits::{PrivateKey, Uniform},

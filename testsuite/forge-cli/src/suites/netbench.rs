@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::multi_region::wrap_with_two_region_env;
 use crate::{suites::ungrouped::Delay, KILOBYTE, MEGABYTE};
-use aptos_config::config::NetbenchConfig;
-use aptos_forge::ForgeConfig;
+use velor_config::config::NetbenchConfig;
+use velor_forge::ForgeConfig;
 use std::{num::NonZeroUsize, sync::Arc};
 
 /// Attempts to match the test name to a network benchmark test

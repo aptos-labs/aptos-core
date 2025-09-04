@@ -8,7 +8,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰─────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:19:5
@@ -18,7 +18,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰───────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:27:5
@@ -28,7 +28,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰───────────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:34:5
@@ -38,7 +38,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰─────────────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:36:5
@@ -48,7 +48,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰─────────────────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:44:5
@@ -58,7 +58,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰────────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:52:5
@@ -68,7 +68,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰────────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:61:5
@@ -78,7 +78,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰────────────────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:70:5
@@ -88,7 +88,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰─────────────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:72:5
@@ -98,7 +98,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰───────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:80:5
@@ -108,7 +108,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰─────────────────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:87:5
@@ -118,7 +118,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰─────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:88:5
@@ -128,7 +128,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰─────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:98:5
@@ -138,7 +138,7 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │ ╰───────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
     ┌─ tests/model_ast_lints/almost_swapped.move:111:5
@@ -148,4 +148,4 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
     │ ╰───────────^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+    = For more information, see https://velor.dev/en/build/smart-contracts/linter#almost_swapped.

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -8,15 +8,15 @@ use crate::{
     PeerMonitoringServiceNetworkEvents, PeerMonitoringServiceServer, MAX_DISTANCE_FROM_VALIDATORS,
     PEER_MONITORING_SERVER_VERSION,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::{
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::{
     config::{BaseConfig, NodeConfig, PeerMonitoringServiceConfig, PeerRole, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_crypto::HashValue;
-use aptos_logger::Level;
-use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::{
+use velor_crypto::HashValue;
+use velor_logger::Level;
+use velor_netcore::transport::ConnectionOrigin;
+use velor_network::{
     application::{
         interface::NetworkServiceEvents, metadata::ConnectionState, storage::PeersAndMetadata,
     },
@@ -29,7 +29,7 @@ use aptos_network::{
     },
     transport::{ConnectionId, ConnectionMetadata},
 };
-use aptos_peer_monitoring_service_types::{
+use velor_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::{
         NetworkInformationResponse, NodeInformationResponse, PeerMonitoringServiceResponse,
@@ -37,9 +37,9 @@ use aptos_peer_monitoring_service_types::{
     },
     PeerMonitoringMetadata, PeerMonitoringServiceError, PeerMonitoringServiceMessage,
 };
-use aptos_storage_interface::{DbReader, LedgerSummary, Order};
-use aptos_time_service::{MockTimeService, TimeService};
-use aptos_types::{
+use velor_storage_interface::{DbReader, LedgerSummary, Order};
+use velor_time_service::{MockTimeService, TimeService};
+use velor_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
@@ -423,12 +423,12 @@ async fn verify_network_information(
 /// metadata expected by the peer monitoring service.
 fn transform_connection_metadata(
     expected_peers: BTreeMap<PeerNetworkId, ConnectionMetadata>,
-) -> BTreeMap<PeerNetworkId, aptos_peer_monitoring_service_types::response::ConnectionMetadata> {
+) -> BTreeMap<PeerNetworkId, velor_peer_monitoring_service_types::response::ConnectionMetadata> {
     expected_peers
         .into_iter()
         .map(|(peer_id, metadata)| {
             let connection_metadata =
-                aptos_peer_monitoring_service_types::response::ConnectionMetadata::new(
+                velor_peer_monitoring_service_types::response::ConnectionMetadata::new(
                     metadata.addr,
                     metadata.remote_peer_id,
                     metadata.role,
@@ -455,7 +455,7 @@ async fn verify_node_information(
     // Verify the response is correct
     let expected_response =
         PeerMonitoringServiceResponse::NodeInformation(NodeInformationResponse {
-            build_information: aptos_build_info::get_build_information(),
+            build_information: velor_build_info::get_build_information(),
             highest_synced_epoch,
             highest_synced_version,
             ledger_timestamp_usecs,
@@ -469,7 +469,7 @@ async fn verify_node_information(
 /// mock client requests to a peer monitoring service server.
 struct MockClient {
     peer_manager_notifiers:
-        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
+        HashMap<NetworkId, velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
 }
 
 impl MockClient {
@@ -500,7 +500,7 @@ impl MockClient {
         let mut network_and_events = HashMap::new();
         let mut peer_manager_notifiers = HashMap::new();
         for network_id in network_ids {
-            let queue_cfg = aptos_channel::Config::new(
+            let queue_cfg = velor_channel::Config::new(
                 peer_monitoring_config.max_network_channel_size as usize,
             )
             .queue_style(QueueStyle::FIFO)
@@ -586,9 +586,9 @@ impl MockClient {
     }
 }
 
-/// Initializes the Aptos logger for tests
+/// Initializes the Velor logger for tests
 pub fn initialize_logger() {
-    aptos_logger::Logger::builder()
+    velor_logger::Logger::builder()
         .is_async(false)
         .level(Level::Debug)
         .build();
@@ -616,7 +616,7 @@ pub fn create_mock_db_reader() -> MockDatabaseReader {
 // mock test crate to be shared across the codebase.
 mod database_mock {
     use super::*;
-    use aptos_storage_interface::Result;
+    use velor_storage_interface::Result;
 
     mock! {
         pub DatabaseReader {}

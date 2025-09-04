@@ -3,9 +3,9 @@ name = "pack_token_v1"
 version = "0.0.0"
 
 [dependencies]
-MoveStdlib = { local = "../../../../../aptos-move/framework/move-stdlib" }
-AptosFramework = { local = "../../../../../aptos-move/framework/aptos-framework" }
-AptosToken = { local = "../../../../../aptos-move/framework/aptos-token" }
+MoveStdlib = { local = "../../../../../velor-move/framework/move-stdlib" }
+VelorFramework = { local = "../../../../../velor-move/framework/velor-framework" }
+VelorToken = { local = "../../../../../velor-move/framework/velor-token" }
 
 [addresses]
 addr = "_"

@@ -1,13 +1,13 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::{
     state::{LedgerState, State},
     state_summary::{LedgerStateSummary, StateSummary},
 };
-use aptos_crypto::HashValue;
-use aptos_scratchpad::SparseMerkleTree;
-use aptos_types::{state_store::state_storage_usage::StateStorageUsage, transaction::Version};
+use velor_crypto::HashValue;
+use velor_scratchpad::SparseMerkleTree;
+use velor_types::{state_store::state_storage_usage::StateStorageUsage, transaction::Version};
 use derive_more::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Deref)]

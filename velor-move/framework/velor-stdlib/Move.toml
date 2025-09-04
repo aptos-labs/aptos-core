@@ -1,0 +1,12 @@
+[package]
+name = "VelorStdlib"
+version = "1.0.0"
+
+[addresses]
+std = "0x1"
+velor_std = "0x1"
+velor_framework = "0x1"
+Extensions = "0x1" # For Prover to instantiate `{{Ext}}` in prelude.
+
+[dependencies]
+MoveStdlib = { local = "../move-stdlib" }

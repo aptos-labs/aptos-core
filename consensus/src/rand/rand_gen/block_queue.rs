@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     pipeline::buffer_manager::OrderedBlocks,
 };
-use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
-use aptos_reliable_broadcast::DropGuard;
-use aptos_types::randomness::{FullRandMetadata, Randomness};
+use velor_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
+use velor_reliable_broadcast::DropGuard;
+use velor_types::randomness::{FullRandMetadata, Randomness};
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
@@ -161,7 +161,7 @@ mod tests {
         block_queue::{BlockQueue, QueueItem},
         test_utils::create_ordered_blocks,
     };
-    use aptos_types::randomness::Randomness;
+    use velor_types::randomness::Randomness;
     use std::collections::HashSet;
 
     #[test]

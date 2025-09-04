@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context_with_orderless_flags;
-use aptos_api_test_context::{current_function_name, TestContext};
+use velor_api_test_context::{current_function_name, TestContext};
 use rstest::rstest;
 use serde_json::json;
 use std::path::PathBuf;
@@ -50,7 +50,7 @@ async fn test_gen_resource_group(
     let named_addresses_clone = named_addresses.clone();
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-            .join("../aptos-move/move-examples/resource_groups/primary");
+            .join("../velor-move/move-examples/resource_groups/primary");
         TestContext::build_package(path, named_addresses_clone)
     });
     context.publish_package(&mut admin0, txn).await;
@@ -58,7 +58,7 @@ async fn test_gen_resource_group(
     let named_addresses_clone = named_addresses.clone();
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-            .join("../aptos-move/move-examples/resource_groups/secondary");
+            .join("../velor-move/move-examples/resource_groups/secondary");
         TestContext::build_package(path, named_addresses_clone)
     });
     context.publish_package(&mut admin1, txn).await;

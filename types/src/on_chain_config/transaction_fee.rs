@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
@@ -9,5 +9,5 @@ pub struct TransactionFeeBurnCap;
 
 impl OnChainConfig for TransactionFeeBurnCap {
     const MODULE_IDENTIFIER: &'static str = "transaction_fee";
-    const TYPE_IDENTIFIER: &'static str = "AptosCoinCapabilities";
+    const TYPE_IDENTIFIER: &'static str = "VelorCoinCapabilities";
 }

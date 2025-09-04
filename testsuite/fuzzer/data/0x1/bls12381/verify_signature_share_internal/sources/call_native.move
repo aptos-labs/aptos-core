@@ -1,5 +1,5 @@
 module poc::verify_signature_share_internal {
-    use aptos_std::bls12381::{Self};
+    use velor_std::bls12381::{Self};
     use std::option::{Self};
 
     public entry fun main(_owner: &signer) {

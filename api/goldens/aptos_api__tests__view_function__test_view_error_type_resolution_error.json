@@ -1,1 +1,1 @@
-{"message":"Struct 0x1::aptos_coin::NewCoin does not exist","error_code":"invalid_input","vm_error_code":2021}
+{"message":"Struct 0x1::velor_coin::NewCoin does not exist","error_code":"invalid_input","vm_error_code":2021}

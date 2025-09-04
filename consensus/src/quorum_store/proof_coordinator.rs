@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -13,16 +13,16 @@ use crate::{
         utils::Timeouts,
     },
 };
-use aptos_consensus_types::{
+use velor_consensus_types::{
     payload::TDataInfo,
     proof_of_store::{
         BatchInfo, ProofCache, ProofOfStore, SignedBatchInfo, SignedBatchInfoError,
         SignedBatchInfoMsg,
     },
 };
-use aptos_logger::prelude::*;
-use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::{
+use velor_logger::prelude::*;
+use velor_short_hex_str::AsShortHexStr;
+use velor_types::{
     ledger_info::SignatureAggregator, validator_verifier::ValidatorVerifier, PeerId,
 };
 use std::{

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,7 +6,7 @@ use crate::{
     SwarmNetworkBandwidth, SwarmNetworkDelay, SwarmNetworkLoss, SwarmNetworkPartition, KUBECTL_BIN,
 };
 use anyhow::bail;
-use aptos_sdk::{move_types::account_address::AccountAddress, types::PeerId};
+use velor_sdk::{move_types::account_address::AccountAddress, types::PeerId};
 use log::info;
 use std::process::{Command, Stdio};
 use tempfile::TempDir;

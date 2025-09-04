@@ -811,7 +811,7 @@ pub enum StatusCode {
     // is a signal to BlockSTM, which it might do something about (i.e. fallback to
     // sequential execution).
     // Note: This status is created both from third_party (move) and block executor
-    // (aptos-move in the adapter). In the later case, it can now also represent more
+    // (velor-move in the adapter). In the later case, it can now also represent more
     // general invariant violations beyond delayed fields, due to the convenience of
     // handling such issues with asserts (e.g. by falling back to sequential execution).
     // TODO: can be audited and broken down into specific types, once implementation

@@ -1,10 +1,10 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 mod new_layer_impl;
 
 use crate::{iterator::DescendantIterator, node::NodeStrongRef, Key, KeyHash, MapLayer, Value};
-use aptos_drop_helper::ArcAsyncDrop;
+use velor_drop_helper::ArcAsyncDrop;
 use std::marker::PhantomData;
 
 pub(crate) type DefaultHashBuilder = core::hash::BuildHasherDefault<ahash::AHasher>;

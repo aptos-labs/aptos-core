@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::QuorumStoreError;
-use aptos_consensus_types::{common::Payload, payload_pull_params::PayloadPullParameters};
+use velor_consensus_types::{common::Payload, payload_pull_params::PayloadPullParameters};
 #[cfg(test)]
-use aptos_types::transaction::SignedTransaction;
+use velor_types::transaction::SignedTransaction;
 #[cfg(test)]
 use std::time::Duration;
 #[cfg(test)]
@@ -40,7 +40,7 @@ impl UserPayloadClient for DummyClient {
         &self,
         mut params: PayloadPullParameters,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
-        use aptos_consensus_types::utils::PayloadTxnsSize;
+        use velor_consensus_types::utils::PayloadTxnsSize;
 
         let timer = Instant::now();
         let mut nxt_txn_idx = 0;

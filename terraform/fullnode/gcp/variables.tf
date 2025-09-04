@@ -23,7 +23,7 @@ variable "node_locations" {
 }
 
 variable "manage_via_tf" {
-  description = "Whether to manage the aptos-node k8s workload via Terraform. If set to false, the helm_release resource will still be created and updated when values change, but it may not be updated on every apply"
+  description = "Whether to manage the velor-node k8s workload via Terraform. If set to false, the helm_release resource will still be created and updated when values change, but it may not be updated on every apply"
   type        = bool
   default     = true
 }
@@ -167,7 +167,7 @@ variable "gke_autoscaling_max_node_count" {
 ### Naming overrides
 
 variable "helm_release_name_override" {
-  description = "If set, overrides the name of the aptos-node helm chart"
+  description = "If set, overrides the name of the velor-node helm chart"
   type        = string
   default     = ""
 }
@@ -251,7 +251,7 @@ variable "fullnode_helm_values_list" {
 variable "k8s_namespace" {
   description = "Kubernetes namespace that the fullnode will be deployed into"
   type        = string
-  default     = "aptos"
+  default     = "velor"
 }
 
 variable "k8s_api_sources" {
@@ -279,13 +279,13 @@ variable "era" {
 }
 
 variable "chain_id" {
-  description = "Aptos chain ID"
+  description = "Velor chain ID"
   type        = string
   default     = "DEVNET"
 }
 
 variable "chain_name" {
-  description = "Aptos chain name"
+  description = "Velor chain name"
   type        = string
   default     = "devnet"
 }

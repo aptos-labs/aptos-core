@@ -1,0 +1,45 @@
+[package]
+name = "velor-faucet-core"
+description = "Core functionality of the Velor faucet"
+version = "2.0.1"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-config = { workspace = true }
+velor-faucet-metrics-server = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core  = { workspace = true }
+velor-sdk = { workspace = true }
+async-trait = { workspace = true }
+captcha = { version = "0.0.9" }
+clap = { workspace = true }
+deadpool-redis = { version = "0.11.1", features = ["rt_tokio_1"], default-features = false }
+enum_dispatch = { workspace = true }
+firebase-token = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+ipnet = { workspace = true }
+iprange = "0.6.7"
+lru = { workspace = true }
+once_cell = { workspace = true }
+poem = { workspace = true }
+poem-openapi = { workspace = true }
+rand = { workspace = true }
+redis = { workspace = true, features = ["aio", "tokio-comp", "connection-manager"] }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tokio = { workspace = true }
+
+[features]
+integration-tests = []

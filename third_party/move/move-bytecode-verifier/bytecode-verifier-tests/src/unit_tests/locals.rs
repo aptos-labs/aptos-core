@@ -11,7 +11,7 @@ use move_core_types::{identifier::Identifier, vm_status::StatusCode};
 
 #[test]
 fn test_locals() {
-    // See also: github.com/aptos-labs/aptos-core/security/advisories/GHSA-jjqw-f9pc-525j
+    // See also: github.com/velor-chain/velor-core/security/advisories/GHSA-jjqw-f9pc-525j
     let mut m = empty_module();
 
     const MAX_BASIC_BLOCKS: u16 = 1024;

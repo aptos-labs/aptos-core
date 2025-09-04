@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(dead_code)]
 
-use aptos_types::keyless::{AnyKeylessPublicKey, EphemeralCertificate};
+use velor_types::keyless::{AnyKeylessPublicKey, EphemeralCertificate};
 use arbitrary::Arbitrary;
 use fuzzer::UserAccount;
 use serde::{Deserialize, Serialize};
@@ -121,8 +121,8 @@ pub struct TransactionState {
 }
 
 pub(crate) mod miscellaneous {
-    use aptos_crypto::{ed25519::ed25519_keys::Ed25519PrivateKey, PrivateKey, Uniform};
-    use aptos_types::{
+    use velor_crypto::{ed25519::ed25519_keys::Ed25519PrivateKey, PrivateKey, Uniform};
+    use velor_types::{
         jwks::rsa::INSECURE_TEST_RSA_KEY_PAIR,
         keyless::{Configuration, OpenIdSig, Pepper},
         transaction::authenticator::EphemeralPublicKey,
@@ -208,8 +208,8 @@ pub(crate) mod miscellaneous {
                 azp: "407408718192.apps.googleusercontent.com".to_string(),
                 aud: "407408718192.apps.googleusercontent.com".to_string(),
                 sub: "113990307082899718775".to_string(),
-                hd: "aptoslabs.com".to_string(),
-                email: "michael@aptoslabs.com".to_string(),
+                hd: "velorlabs.com".to_string(),
+                email: "michael@velorlabs.com".to_string(),
                 email_verified: true,
                 at_hash: "bxIESuI59IoZb5alCASqBg".to_string(),
                 name: "Michael Straka".to_string(),

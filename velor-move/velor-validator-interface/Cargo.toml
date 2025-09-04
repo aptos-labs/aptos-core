@@ -1,0 +1,29 @@
+[package]
+name = "velor-validator-interface"
+description = "Defines interfaces between the velor nodes and local move infrastructure"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-api-types = { workspace = true }
+velor-config = { workspace = true }
+velor-db = { workspace = true }
+velor-framework = { workspace = true }
+velor-rest-client = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-types = { workspace = true }
+async-recursion = { workspace = true }
+async-trait = { workspace = true }
+bcs = { workspace = true }
+lru = { workspace = true }
+move-core-types = { workspace = true }
+tokio = { workspace = true }

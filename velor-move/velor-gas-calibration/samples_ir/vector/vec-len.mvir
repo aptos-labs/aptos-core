@@ -1,0 +1,178 @@
+module 0xcafe.VecLen {
+
+    public calibrate_veclen_0_impl(n: u64) {
+        let i: u64;
+        let v: vector<u64>;
+    label entry:
+        i = 0;
+        v = vec_pack_0<u64>();
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        _, _, _, _, _, _, _, _, _, _ = (vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v));
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_veclen_0_x100() {
+    label b0:
+        Self.calibrate_veclen_0_impl(10);
+        return;       
+    }
+
+    public entry calibrate_veclen_0_x500() {
+    label b0:
+        Self.calibrate_veclen_0_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_veclen_0_x1000() {
+    label b0:
+        Self.calibrate_veclen_0_impl(100);
+        return;       
+    }   
+
+    public calibrate_veclen_1_impl(n: u64) {
+        let i: u64;
+        let v: vector<u64>;
+    label entry:
+        i = 0;
+        v = vec_pack_1<u64>(42);
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        _, _, _, _, _, _, _, _, _, _ = (vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v));
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }     
+
+    public entry calibrate_veclen_1_x100() {
+    label b0:
+        Self.calibrate_veclen_1_impl(10);
+        return;       
+    }
+
+    public entry calibrate_veclen_1_x500() {
+    label b0:
+        Self.calibrate_veclen_1_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_veclen_1_x1000() {
+    label b0:
+        Self.calibrate_veclen_1_impl(100);
+        return;       
+    }    
+    
+    public calibrate_veclen_2_impl(n: u64) {
+        let i: u64;
+        let v: vector<u64>;
+    label entry:
+        i = 0;
+        v = vec_pack_2<u64>(42, 43);
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+         _, _, _, _, _, _, _, _, _, _ = (vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v));
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }      
+
+    public entry calibrate_veclen_2_x100() {
+    label b0:
+        Self.calibrate_veclen_2_impl(10);
+        return;       
+    }
+
+    public entry calibrate_veclen_2_x500() {
+    label b0:
+        Self.calibrate_veclen_2_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_veclen_2_x1000() {
+    label b0:
+        Self.calibrate_veclen_2_impl(100);
+        return;       
+    }
+
+    public calibrate_veclen_8_impl(n: u64) {
+        let i: u64;
+        let v: vector<u64>;
+    label entry:
+        i = 0;
+        v = vec_pack_8<u64>(40, 41, 42, 43, 44, 45, 46, 47);
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        _, _, _, _, _, _, _, _, _, _ = (vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v));
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }      
+
+    public entry calibrate_veclen_8_x100() {
+    label b0:
+        Self.calibrate_veclen_8_impl(10);
+        return;       
+    }
+
+    public entry calibrate_veclen_8_x500() {
+    label b0:
+        Self.calibrate_veclen_8_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_veclen_8_x1000() {
+    label b0:
+        Self.calibrate_veclen_8_impl(100);
+        return;       
+    }
+
+    public calibrate_veclen_32_impl(n: u64) {
+        let i: u64;
+        let v: vector<u64>;
+    label entry:
+        i = 0;
+        v = vec_pack_32<u64>(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31);
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        _, _, _, _, _, _, _, _, _, _ = (vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v), vec_len<u64>(&v));
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }      
+
+    public entry calibrate_veclen_32_x100() {
+    label b0:
+        Self.calibrate_veclen_32_impl(10);
+        return;       
+    }
+
+    public entry calibrate_veclen_32_x500() {
+    label b0:
+        Self.calibrate_veclen_32_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_veclen_32_x1000() {
+    label b0:
+        Self.calibrate_veclen_32_impl(100);
+        return;       
+    }    
+                               
+}

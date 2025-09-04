@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::circuit_constants::MAX_EXTRA_FIELD_BYTES;
@@ -12,7 +12,7 @@ use crate::{
     transaction::authenticator::EphemeralPublicKey,
 };
 use anyhow::bail;
-use aptos_crypto::{poseidon_bn254, poseidon_bn254::pad_and_hash_string, CryptoMaterialError};
+use velor_crypto::{poseidon_bn254, poseidon_bn254::pad_and_hash_string, CryptoMaterialError};
 use ark_bn254::{Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -22,7 +22,7 @@ use quick_cache::sync::Cache;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_big_array::BigArray;
 
-// TODO(keyless): Some of this stuff, if not all, belongs to the aptos-crypto crate
+// TODO(keyless): Some of this stuff, if not all, belongs to the velor-crypto crate
 
 pub const G1_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 32;
 pub const G2_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 64;

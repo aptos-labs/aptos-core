@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -15,17 +15,17 @@ use crate::{
     test_utils::{mock_execution_client::MockExecutionClient, MockStorage},
     util::time_service::ClockTimeService,
 };
-use aptos_bounded_executor::BoundedExecutor;
-use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::{
+use velor_bounded_executor::BoundedExecutor;
+use velor_channels::{self, velor_channel, message_queues::QueueStyle};
+use velor_config::{
     config::{NodeConfig, WaypointConfig},
     generator::{self, ValidatorSwarm},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_consensus_types::common::{Author, Round};
-use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
-use aptos_mempool::mocks::MockSharedMempool;
-use aptos_network::{
+use velor_consensus_types::common::{Author, Round};
+use velor_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
+use velor_mempool::mocks::MockSharedMempool;
+use velor_network::{
     application::interface::{NetworkClient, NetworkServiceEvents},
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
@@ -36,7 +36,7 @@ use aptos_network::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
-use aptos_types::{
+use velor_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
         ConsensusConfigV1, InMemoryOnChainConfig, OnChainConfig, OnChainConfigPayload,
@@ -48,7 +48,7 @@ use aptos_types::{
     validator_info::ValidatorInfo,
     waypoint::Waypoint,
 };
-use aptos_validator_transaction_pool::VTxnPoolState;
+use velor_validator_transaction_pool::VTxnPoolState;
 use futures::{channel::mpsc, StreamExt};
 use maplit::hashmap;
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
@@ -79,14 +79,14 @@ impl SMRNode {
     ) -> Self {
         // Create a runtime for the twin
         let thread_name = format!("twin-{}", twin_id.id);
-        let runtime = aptos_runtimes::spawn_named_runtime(thread_name, None);
+        let runtime = velor_runtimes::spawn_named_runtime(thread_name, None);
         let _entered_runtime = runtime.enter();
 
         // Setup the network and SMR node
-        let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-        let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-        let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-        let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
+        let (network_reqs_tx, network_reqs_rx) = velor_channel::new(QueueStyle::FIFO, 8, None);
+        let (connection_reqs_tx, _) = velor_channel::new(QueueStyle::FIFO, 8, None);
+        let (consensus_tx, consensus_rx) = velor_channel::new(QueueStyle::FIFO, 8, None);
+        let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = velor_channels::new_test(8);
         let network_sender = network::NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
@@ -114,7 +114,7 @@ impl SMRNode {
             ordered_blocks_tx,
             Arc::clone(&storage),
         ));
-        let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+        let (reconfig_sender, reconfig_events) = velor_channel::new(QueueStyle::LIFO, 1, None);
         let reconfig_listener = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
         };
@@ -141,9 +141,9 @@ impl SMRNode {
         let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 
         let (timeout_sender, timeout_receiver) =
-            aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
+            velor_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
         let (self_sender, self_receiver) =
-            aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
+            velor_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
 
         let quorum_store_storage = Arc::new(MockQuorumStoreDB::new());
         let bounded_executor = BoundedExecutor::new(2, playground.handle());
@@ -160,7 +160,7 @@ impl SMRNode {
             quorum_store_storage,
             reconfig_listener,
             bounded_executor,
-            aptos_time_service::TimeService::real(),
+            velor_time_service::TimeService::real(),
             vtxn_pool,
             Arc::new(InMemRandDb::new()),
             None,

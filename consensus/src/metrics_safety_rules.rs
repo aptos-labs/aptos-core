@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,7 +6,7 @@ use crate::{
     monitor, persistent_liveness_storage::PersistentLivenessStorage,
     pipeline::signing_phase::CommitSignerProvider,
 };
-use aptos_consensus_types::{
+use velor_consensus_types::{
     block_data::BlockData,
     order_vote::OrderVote,
     order_vote_proposal::OrderVoteProposal,
@@ -14,11 +14,11 @@ use aptos_consensus_types::{
     vote::Vote,
     vote_proposal::VoteProposal,
 };
-use aptos_crypto::bls12381;
-use aptos_infallible::Mutex;
-use aptos_logger::prelude::info;
-use aptos_safety_rules::{ConsensusState, Error, TSafetyRules};
-use aptos_types::{
+use velor_crypto::bls12381;
+use velor_infallible::Mutex;
+use velor_logger::prelude::info;
+use velor_safety_rules::{ConsensusState, Error, TSafetyRules};
+use velor_types::{
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
@@ -164,7 +164,7 @@ impl CommitSignerProvider for Mutex<MetricsSafetyRules> {
 #[cfg(test)]
 mod tests {
     use crate::{metrics_safety_rules::MetricsSafetyRules, test_utils::EmptyStorage};
-    use aptos_consensus_types::{
+    use velor_consensus_types::{
         block_data::BlockData,
         order_vote::OrderVote,
         order_vote_proposal::OrderVoteProposal,
@@ -172,9 +172,9 @@ mod tests {
         vote::Vote,
         vote_proposal::VoteProposal,
     };
-    use aptos_crypto::bls12381;
-    use aptos_safety_rules::{ConsensusState, Error, TSafetyRules};
-    use aptos_types::{
+    use velor_crypto::bls12381;
+    use velor_safety_rules::{ConsensusState, Error, TSafetyRules};
+    use velor_types::{
         epoch_change::EpochChangeProof,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     };
@@ -261,7 +261,7 @@ mod tests {
 
     #[test]
     fn test_perform_initialize_ok() {
-        ::aptos_logger::Logger::init_for_testing();
+        ::velor_logger::Logger::init_for_testing();
         let (_, mock_storage) = EmptyStorage::start_for_testing();
         let mock_safety_rules = MockSafetyRules::new(0, 10, Ok(()));
         let mut metric_safety_rules =
@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn test_perform_initialize_error() {
-        ::aptos_logger::Logger::init_for_testing();
+        ::velor_logger::Logger::init_for_testing();
         let (_, mock_storage) = EmptyStorage::start_for_testing();
         let mock_safety_rules = MockSafetyRules::new(
             0,

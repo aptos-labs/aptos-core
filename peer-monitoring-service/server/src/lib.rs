@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -9,14 +9,14 @@ use crate::{
     network::PeerMonitoringServiceNetworkEvents,
     storage::StorageReaderInterface,
 };
-use aptos_bounded_executor::BoundedExecutor;
-use aptos_config::{
+use velor_bounded_executor::BoundedExecutor;
+use velor_config::{
     config::{BaseConfig, NodeConfig},
     network_id::NetworkId,
 };
-use aptos_logger::prelude::*;
-use aptos_network::application::storage::PeersAndMetadata;
-use aptos_peer_monitoring_service_types::{
+use velor_logger::prelude::*;
+use velor_network::application::storage::PeersAndMetadata;
+use velor_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::{
         ConnectionMetadata, LatencyPingResponse, NetworkInformationResponse,
@@ -24,7 +24,7 @@ use aptos_peer_monitoring_service_types::{
     },
     PeerMonitoringServiceError, Result, MAX_DISTANCE_FROM_VALIDATORS,
 };
-use aptos_time_service::{TimeService, TimeServiceTrait};
+use velor_time_service::{TimeService, TimeServiceTrait};
 use error::Error;
 use futures::stream::StreamExt;
 use std::{cmp::min, sync::Arc, time::Instant};
@@ -258,7 +258,7 @@ impl<T: StorageReaderInterface> Handler<T> {
 
     fn get_node_information(&self) -> Result<PeerMonitoringServiceResponse, Error> {
         // Get the node information
-        let build_information = aptos_build_info::get_build_information();
+        let build_information = velor_build_info::get_build_information();
         let current_time: Instant = self.time_service.now();
         let uptime = current_time.duration_since(self.start_time);
         let (highest_synced_epoch, highest_synced_version) =

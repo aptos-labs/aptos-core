@@ -66,7 +66,7 @@
             "name": "Metadata"
           },
           "typeStr": "0x1::fungible_asset::Metadata",
-          "data": "{\"decimals\":8,\"icon_uri\":\"\",\"name\":\"Aptos Coin\",\"project_uri\":\"\",\"symbol\":\"APT\"}"
+          "data": "{\"decimals\":8,\"icon_uri\":\"\",\"name\":\"Velor Coin\",\"project_uri\":\"\",\"symbol\":\"APT\"}"
         }
       },
       {
@@ -139,13 +139,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>"
         }
       },
       {
@@ -218,13 +218,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"1117884340\"},\"deposit_events\":{\"counter\":\"8\",\"guid\":{\"id\":{\"addr\":\"0xc5855db74d8b2a3b0cc62b5afa75f2d0bce471b47a5f90082336d00ae4289dd8\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xc5855db74d8b2a3b0cc62b5afa75f2d0bce471b47a5f90082336d00ae4289dd8\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -409,8 +409,8 @@
               "type": "MOVE_TYPES_STRUCT",
               "struct": {
                 "address": "0x1",
-                "module": "aptos_coin",
-                "name": "AptosCoin"
+                "module": "velor_coin",
+                "name": "VelorCoin"
               }
             }
           ],

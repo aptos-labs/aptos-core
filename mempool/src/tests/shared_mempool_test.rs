@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,10 +9,10 @@ use crate::{
     tests::common::{batch_add_signed_txn, TestTransaction},
     QuorumStoreRequest,
 };
-use aptos_config::config::MempoolConfig;
-use aptos_consensus_types::common::RejectedTransactionSummary;
-use aptos_mempool_notifications::MempoolNotificationSender;
-use aptos_types::{
+use velor_config::config::MempoolConfig;
+use velor_consensus_types::common::RejectedTransactionSummary;
+use velor_mempool_notifications::MempoolNotificationSender;
+use velor_types::{
     transaction::{ReplayProtector, Transaction},
     vm_status::DiscardedVMStatus,
 };

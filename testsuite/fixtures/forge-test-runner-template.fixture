@@ -14,7 +14,7 @@ spec:
   serviceAccountName: forge
   containers:
     - name: main
-      image: 123.dkr.ecr.banana-east-1.amazonaws.com/aptos/forge:forge_asdf
+      image: 123.dkr.ecr.banana-east-1.amazonaws.com/velor/forge:forge_asdf
       imagePullPolicy: Always
       command:
         - /bin/bash
@@ -77,7 +77,7 @@ spec:
   nodeSelector: eks.amazonaws.com/nodegroup: validators
   tolerations:
     - effect: NoExecute
-      key: aptos.org/nodepool
+      key: velor.org/nodepool
       value: validators
   volumes:
     - name: multiregion-kubeconfig

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::dag_test;
@@ -11,11 +11,11 @@ use crate::{
     pipeline::{buffer_manager::OrderedBlocks, execution_client::DummyExecutionClient},
     test_utils::{consensus_runtime, MockPayloadManager, MockStorage},
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_consensus_types::common::Author;
-use aptos_logger::debug;
-use aptos_network::{
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::network_id::{NetworkId, PeerNetworkId};
+use velor_consensus_types::common::Author;
+use velor_logger::debug;
+use velor_network::{
     application::interface::NetworkClient,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
@@ -25,8 +25,8 @@ use aptos_network::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
-use aptos_time_service::TimeService;
-use aptos_types::{
+use velor_time_service::TimeService;
+use velor_types::{
     epoch_state::EpochState,
     ledger_info::generate_ledger_info_with_sig,
     validator_signer::ValidatorSigner,
@@ -45,9 +45,9 @@ use tokio::task::JoinHandle;
 struct DagBootstrapUnit {
     nh_task_handle: JoinHandle<SyncOutcome>,
     df_task_handle: JoinHandle<()>,
-    dag_rpc_tx: aptos_channel::Sender<Author, IncomingDAGRequest>,
+    dag_rpc_tx: velor_channel::Sender<Author, IncomingDAGRequest>,
     network_events: Box<
-        Select<NetworkEvents<ConsensusMsg>, aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>>,
+        Select<NetworkEvents<ConsensusMsg>, velor_channels::UnboundedReceiver<Event<ConsensusMsg>>>,
     >,
 }
 
@@ -62,7 +62,7 @@ impl DagBootstrapUnit {
         network_events: Box<
             Select<
                 NetworkEvents<ConsensusMsg>,
-                aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
+                velor_channels::UnboundedReceiver<Event<ConsensusMsg>>,
             >,
         >,
         all_signers: Vec<ValidatorSigner>,
@@ -137,13 +137,13 @@ fn create_network(
 ) -> (
     NetworkSender,
     Box<
-        Select<NetworkEvents<ConsensusMsg>, aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>>,
+        Select<NetworkEvents<ConsensusMsg>, velor_channels::UnboundedReceiver<Event<ConsensusMsg>>>,
     >,
 ) {
-    let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-    let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-    let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-    let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
+    let (network_reqs_tx, network_reqs_rx) = velor_channel::new(QueueStyle::FIFO, 8, None);
+    let (connection_reqs_tx, _) = velor_channel::new(QueueStyle::FIFO, 8, None);
+    let (consensus_tx, consensus_rx) = velor_channel::new(QueueStyle::FIFO, 8, None);
+    let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = velor_channels::new_test(8);
     let network_sender = network::NetworkSender::new(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
@@ -157,7 +157,7 @@ fn create_network(
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
     let network_events = NetworkEvents::new(consensus_rx, None, true);
 
-    let (self_sender, self_receiver) = aptos_channels::new_unbounded_test();
+    let (self_sender, self_receiver) = velor_channels::new_unbounded_test();
     let network = NetworkSender::new(author, consensus_network_client, self_sender, validators);
 
     let twin_id = TwinId { id, author };
@@ -202,7 +202,7 @@ fn bootstrap_nodes(
                 signer.clone(),
                 storage,
                 network,
-                aptos_time_service::TimeService::real(),
+                velor_time_service::TimeService::real(),
                 network_events,
                 signers.clone(),
             )

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,14 +6,14 @@ use crate::{
     metadata_storage::database_schema::{MetadataKey, MetadataSchema, MetadataValue},
 };
 use anyhow::{anyhow, Result};
-use aptos_logger::prelude::*;
-use aptos_schemadb::{
+use velor_logger::prelude::*;
+use velor_schemadb::{
     batch::SchemaBatch,
     define_schema,
     schema::{KeyCodec, ValueCodec},
     ColumnFamilyName, Options, DB,
 };
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use velor_types::ledger_info::LedgerInfoWithSignatures;
 use serde::{Deserialize, Serialize};
 use std::{path::Path, sync::Arc, time::Instant};
 

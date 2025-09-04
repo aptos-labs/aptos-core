@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::dag_store::DagStore;
@@ -14,10 +14,10 @@ use crate::dag::{
     types::NodeMetadata,
     CertifiedNode,
 };
-use aptos_consensus_types::common::Round;
-use aptos_infallible::Mutex;
-use aptos_logger::debug;
-use aptos_types::epoch_state::EpochState;
+use velor_consensus_types::common::Round;
+use velor_infallible::Mutex;
+use velor_logger::debug;
+use velor_types::epoch_state::EpochState;
 use std::sync::Arc;
 
 pub trait TOrderRule: Send + Sync {

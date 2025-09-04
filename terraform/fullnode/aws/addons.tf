@@ -25,7 +25,7 @@ resource "helm_release" "aws-load-balancer-controller" {
         create = false
         name   = kubernetes_service_account.k8s-aws-integrations.metadata[0].name
       }
-      clusterName = data.aws_eks_cluster.aptos.name
+      clusterName = data.aws_eks_cluster.velor.name
       region      = var.region
       vpcId       = module.eks.vpc_id
     })

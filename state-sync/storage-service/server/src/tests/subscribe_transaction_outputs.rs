@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::{mock, mock::MockClient, utils};
-use aptos_config::{
+use velor_config::{
     config::StorageServiceConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_types::{epoch_change::EpochChangeProof, PeerId};
+use velor_types::{epoch_change::EpochChangeProof, PeerId};
 use claims::assert_none;
 
 #[tokio::test(flavor = "multi_thread")]

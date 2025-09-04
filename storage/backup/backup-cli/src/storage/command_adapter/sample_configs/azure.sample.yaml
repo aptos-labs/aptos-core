@@ -1,6 +1,6 @@
 env_vars:
   - key: "ACCOUNT"
-    value: "aptos-backup"
+    value: "velor-backup"
   - key: "CONTAINER"
     value: "backup-1"
   - key: "SUB_DIR"

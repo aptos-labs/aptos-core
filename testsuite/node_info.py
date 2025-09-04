@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# extract some useful parts from aptos node config yaml
+# extract some useful parts from velor node config yaml
 #
 # 'api' get the host:port of the API server
 # 'inspect' get the host:port of the inspection service endpoint

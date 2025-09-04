@@ -5,7 +5,7 @@
 0x1::type_info                                   2098           ok
 0x1::from_bcs                                    2140           ok
 0x1::any                                         2017           ok
-0x1::aptos_hash                                  2063           ok
+0x1::velor_hash                                  2063           ok
 0x1::table                                       1960           ok
 0x1::table_with_length                           1253           ok
 0x1::big_vector                                 61928           ok

@@ -1,30 +1,30 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
     utils::{create_test_accounts, execute_transactions},
 };
-use aptos_cached_packages::aptos_stdlib;
-use aptos_config::config::{
+use velor_cached_packages::velor_stdlib;
+use velor_config::config::{
     BatchTransactionFilterConfig, BlockTransactionFilterConfig, NodeConfig, TransactionFilterConfig,
 };
-use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
-use aptos_forge::{LocalSwarm, NodeExt, Swarm};
-use aptos_keygen::KeyGen;
-use aptos_sdk::{
+use velor_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
+use velor_forge::{LocalSwarm, NodeExt, Swarm};
+use velor_keygen::KeyGen;
+use velor_sdk::{
     crypto::{PrivateKey, SigningKey},
     types::{
         transaction::{authenticator::AuthenticationKey, SignedTransaction},
         LocalAccount,
     },
 };
-use aptos_transaction_filters::{
+use velor_transaction_filters::{
     batch_transaction_filter::{BatchTransactionFilter, BatchTransactionMatcher},
     block_transaction_filter::{BlockTransactionFilter, BlockTransactionMatcher},
     transaction_filter::{TransactionFilter, TransactionMatcher},
 };
-use aptos_types::on_chain_config::{
+use velor_types::on_chain_config::{
     ConsensusAlgorithmConfig, OnChainConsensusConfig, ValidatorTxnConfig, DEFAULT_WINDOW_SIZE,
 };
 use move_core_types::account_address::AccountAddress;
@@ -38,7 +38,7 @@ async fn test_consensus_block_filter() {
     // Create a new swarm with an inline consensus filter that denies transactions
     // from the sender, and disable quorum store (to ensure the filter is applied).
     let mut swarm = SwarmBuilder::new_local(3)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(move |_, config, _| {
             filter_inline_transactions(config, sender_address);
         }))
@@ -59,8 +59,8 @@ async fn test_consensus_block_filter() {
     let transaction = create_transaction_from_sender(private_key, sender_address, &mut swarm).await;
 
     // Submit the transaction and wait for it to be processed
-    let aptos_public_info = swarm.aptos_public_info();
-    let response = aptos_public_info
+    let velor_public_info = swarm.velor_public_info();
+    let response = velor_public_info
         .client()
         .submit_and_wait(&transaction)
         .await;
@@ -82,7 +82,7 @@ async fn test_mempool_transaction_filter() {
 
     // Create a new swarm with a mempool filter that denies transactions from the sender
     let mut swarm = SwarmBuilder::new_local(3)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(move |_, config, _| {
             filter_mempool_transactions(config, sender_address);
         }))
@@ -96,8 +96,8 @@ async fn test_mempool_transaction_filter() {
     let transaction = create_transaction_from_sender(private_key, sender_address, &mut swarm).await;
 
     // Submit the transaction and wait for it to be processed
-    let aptos_public_info = swarm.aptos_public_info();
-    let response = aptos_public_info
+    let velor_public_info = swarm.velor_public_info();
+    let response = velor_public_info
         .client()
         .submit_and_wait(&transaction)
         .await;
@@ -119,7 +119,7 @@ async fn test_quorum_store_batch_filter() {
 
     // Create a new swarm with a quorum store filter that denies transactions from the sender
     let mut swarm = SwarmBuilder::new_local(3)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(move |_, config, _| {
             filter_quorum_store_transactions(config, sender_address);
         }))
@@ -133,8 +133,8 @@ async fn test_quorum_store_batch_filter() {
     let transaction = create_transaction_from_sender(private_key, sender_address, &mut swarm).await;
 
     // Submit the transaction and wait for it to be processed
-    let aptos_public_info = swarm.aptos_public_info();
-    let response = aptos_public_info
+    let velor_public_info = swarm.velor_public_info();
+    let response = velor_public_info
         .client()
         .submit_and_wait(&transaction)
         .await;
@@ -155,12 +155,12 @@ async fn create_account_with_funds(
     sender_address: AccountAddress,
     swarm: &mut LocalSwarm,
 ) {
-    let mut aptos_public_info = swarm.aptos_public_info();
-    aptos_public_info
+    let mut velor_public_info = swarm.velor_public_info();
+    velor_public_info
         .create_user_account(public_key)
         .await
         .unwrap();
-    aptos_public_info
+    velor_public_info
         .mint(sender_address, 10_000_000)
         .await
         .unwrap();
@@ -184,8 +184,8 @@ async fn create_signed_transaction_from_sender(
     swarm: &mut LocalSwarm,
 ) -> SignedTransaction {
     // Fetch the sequence number for the sender address
-    let aptos_public_info = swarm.aptos_public_info();
-    let sequence_number = aptos_public_info
+    let velor_public_info = swarm.velor_public_info();
+    let sequence_number = velor_public_info
         .client()
         .get_account(sender_address)
         .await
@@ -194,9 +194,9 @@ async fn create_signed_transaction_from_sender(
         .sequence_number;
 
     // Create the unsigned transaction
-    let unsigned_txn = aptos_public_info
+    let unsigned_txn = velor_public_info
         .transaction_factory()
-        .payload(aptos_stdlib::aptos_coin_transfer(receiver.address(), 100))
+        .payload(velor_stdlib::velor_coin_transfer(receiver.address(), 100))
         .sender(sender_address)
         .sequence_number(sequence_number)
         .max_gas_amount(1_000_000)
@@ -219,8 +219,8 @@ async fn create_transaction_from_sender(
     create_account_with_funds(&private_key.public_key(), sender_address, swarm).await;
 
     // Create a receiver account and mint some coins to it
-    let mut aptos_public_info = swarm.aptos_public_info();
-    let receiver = aptos_public_info.random_account();
+    let mut velor_public_info = swarm.velor_public_info();
+    let receiver = velor_public_info.random_account();
     create_account_with_funds(receiver.public_key(), receiver.address(), swarm).await;
 
     // Create a signed transaction

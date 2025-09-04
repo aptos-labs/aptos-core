@@ -5,7 +5,7 @@ chain:
   name: testnet
   # -- Internal: Bump this number to wipe the underlying storage
   era: 1
-  # -- Aptos Chain ID
+  # -- Velor Chain ID
   chain_id: 4
   # -- If true, genesis will create a resources account that can mint coins.
   is_test: true
@@ -13,13 +13,13 @@ chain:
   root_key: "0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956"
   # -- Allow new validators to join after genesis
   allow_new_validators: false
-  # -- Minimum stake. Defaults to 1M APTOS coins with 8 decimals
+  # -- Minimum stake. Defaults to 1M VELOR coins with 8 decimals
   min_stake: 100000000000000
-  # -- Mininum voting threshold. Defaults to 1M APTOS coins with 8 decimals
+  # -- Mininum voting threshold. Defaults to 1M VELOR coins with 8 decimals
   min_voting_threshold: 100000000000000
-  # -- Required stake to be a proposer. 1M APTOS coins with 8 decimals
+  # -- Required stake to be a proposer. 1M VELOR coins with 8 decimals
   required_proposer_stake: 100000000000000
-  # -- Maximum stake. Defaults to 1B APTOS coins with 8 decimals
+  # -- Maximum stake. Defaults to 1B VELOR coins with 8 decimals
   max_stake: 100000000000000000
   # -- Length of each epoch in seconds. Defaults to 2 hours
   epoch_duration_secs: 7200
@@ -44,43 +44,43 @@ imageTag: testnet
 genesis:
   image:
     # -- Image repo to use for tools image for running genesis
-    repo: aptoslabs/tools
+    repo: velorlabs/tools
     # -- Image tag to use for tools image. If set, overrides `imageTag`
     tag:
     # -- Image pull policy to use for tools image
     pullPolicy: IfNotPresent
   # -- Number of validators to include in genesis
   numValidators: 1
-  # -- If `enable_onchain_discovery` is false, use this kubernetes service name prefix. It should be the fullname for the aptos-node helm release
-  username_prefix: aptos-node
+  # -- If `enable_onchain_discovery` is false, use this kubernetes service name prefix. It should be the fullname for the velor-node helm release
+  username_prefix: velor-node
   # -- If set, the base domain name of the fullnode and validator endpoints
   domain:
   validator:
-    # -- Use External DNS as created by aptos-node helm chart for validator host in genesis
+    # -- Use External DNS as created by velor-node helm chart for validator host in genesis
     enable_onchain_discovery: false
     # -- If `enable_onchain_discovery` is false, use this host suffix for internal kubernetes service name
     internal_host_suffix: validator-lb
-    # -- Stake amount for each validator in this testnet. Defaults to 1M APTOS coins with 8 decimals
+    # -- Stake amount for each validator in this testnet. Defaults to 1M VELOR coins with 8 decimals
     stake_amount: "100000000000000"
     # -- Number of validators to give larger stake in genesis to.
     num_validators_with_larger_stake: 0
-    # -- Stake amount for nodes we are giving larger state to. Defaults to 10M APTOS coins with 8 decimals
+    # -- Stake amount for nodes we are giving larger state to. Defaults to 10M VELOR coins with 8 decimals
     larger_stake_amount: "1000000000000000"
     # -- Random seed to generate validator keys in order to make the key generation deterministic
     key_seed:
   fullnode:
-    # -- Use External DNS as created by aptos-node helm chart for fullnode host in genesis
+    # -- Use External DNS as created by velor-node helm chart for fullnode host in genesis
     enable_onchain_discovery: true
     # -- If `enable_onchain_discovery` is false, use this host suffix for internal kubernetes service name
     internal_host_suffix: fullnode-lb
-  # -- The local path for move modules in the docker image. Defaults to the aptos-framework in the aptoslabs/tools docker image
-  moveModulesDir: /aptos-framework/move/modules
+  # -- The local path for move modules in the docker image. Defaults to the velor-framework in the velorlabs/tools docker image
+  moveModulesDir: /velor-framework/move/modules
   # -- Options for multicluster mode. This is *experimental only*
   multicluster:
     enabled: false
     # comma separated list of cluster names
     domain_suffixes: ""
-  genesis_blob_upload_url: "https://us-west1-aptos-forge-gcp-0.cloudfunctions.net/signed-url"
+  genesis_blob_upload_url: "https://us-west1-velor-forge-gcp-0.cloudfunctions.net/signed-url"
   cluster_name: "unknown"
 
 serviceAccount:

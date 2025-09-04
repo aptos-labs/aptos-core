@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{pipeline_health::TPipelineHealth, TChainHealth};
-use aptos_config::config::DagPayloadConfig;
-use aptos_consensus_types::common::Round;
-use aptos_types::epoch_state::EpochState;
+use velor_config::config::DagPayloadConfig;
+use velor_consensus_types::common::Round;
+use velor_types::epoch_state::EpochState;
 use std::{sync::Arc, time::Duration};
 
 #[derive(Clone)]

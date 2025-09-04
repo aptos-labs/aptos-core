@@ -1,10 +1,10 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{ensure, Result};
-use aptos_executor_types::LedgerUpdateOutput;
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_types::{
+use velor_executor_types::LedgerUpdateOutput;
+use velor_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use velor_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     proof::{accumulator::InMemoryTransactionAccumulator, TransactionInfoListWithProof},

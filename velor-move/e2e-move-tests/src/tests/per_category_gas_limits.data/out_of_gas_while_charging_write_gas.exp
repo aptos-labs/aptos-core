@@ -1,0 +1,115 @@
+Ok(
+    [
+        TransactionOutput {
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: {
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(083a28a47e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(201304972f9242cbc3528a1e286323471ab891baa37e0053b85651693a79854a000d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000beef0000),
+                            StateKey {
+                                inner: TableItem { handle: 18c2d68313e9af7887d2b62a1d0f3b60b8e24511e45d370d3422851db20503f4, key: 0a },
+                                hash: OnceCell(Uninit),
+                            }: CreationWithMetadata(00, metadata:V0 { deposit: 50000, creation_time_usecs: 0 }),
+                            StateKey {
+                                inner: TableItem { handle: 18c2d68313e9af7887d2b62a1d0f3b60b8e24511e45d370d3422851db20503f4, key: 0b },
+                                hash: OnceCell(Uninit),
+                            }: CreationWithMetadata(010b, metadata:V0 { deposit: 50000, creation_time_usecs: 0 }),
+                            StateKey {
+                                inner: TableItem { handle: 18c2d68313e9af7887d2b62a1d0f3b60b8e24511e45d370d3422851db20503f4, key: 0c },
+                                hash: OnceCell(Uninit),
+                            }: CreationWithMetadata(020c0c, metadata:V0 { deposit: 50000, creation_time_usecs: 0 }),
+                            StateKey {
+                                inner: TableItem { handle: 18c2d68313e9af7887d2b62a1d0f3b60b8e24511e45d370d3422851db20503f4, key: 0d },
+                                hash: OnceCell(Uninit),
+                            }: CreationWithMetadata(030d0d0d, metadata:V0 { deposit: 50000, creation_time_usecs: 0 }),
+                            StateKey {
+                                inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
+                                hash: OnceCell(Uninit),
+                            }: Modification(079b5705000000000100000000000000),
+                        },
+                    },
+                ),
+            ),
+            events: [
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "7b8e0100000000000500000000000000a286010000000000340f0300000000000000000000000000" },
+            ],
+            gas_used: 102011,
+            status: Keep(
+                Success,
+            ),
+        },
+    ],
+)
+Ok(
+    [
+        TransactionOutput {
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: {
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(486180a37e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(201304972f9242cbc3528a1e286323471ab891baa37e0053b85651693a79854a000e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000beef0000),
+                            StateKey {
+                                inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
+                                hash: OnceCell(Uninit),
+                            }: Modification(47c2af04000000000100000000000000),
+                        },
+                    },
+                ),
+            ),
+            events: [
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "b0ad0100000000000500000000000000acad01000000000000000000000000000000000000000000" },
+            ],
+            gas_used: 110000,
+            status: Keep(
+                OutOfGas,
+            ),
+        },
+    ],
+)
+Ok(
+    [
+        TransactionOutput {
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: {
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(8888d8a27e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
+                            StateKey {
+                                inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
+                                hash: OnceCell(Uninit),
+                            }: Modification(201304972f9242cbc3528a1e286323471ab891baa37e0053b85651693a79854a000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000beef0000),
+                            StateKey {
+                                inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
+                                hash: OnceCell(Uninit),
+                            }: Modification(87e90704000000000100000000000000),
+                        },
+                    },
+                ),
+            ),
+            events: [
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "b0ad0100000000000500000000000000acad01000000000000000000000000000000000000000000" },
+            ],
+            gas_used: 110000,
+            status: Keep(
+                OutOfGas,
+            ),
+        },
+    ],
+)

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,9 +6,9 @@ use crate::{
     connection_manager::ConnectionManager,
     metrics::{COUNTER, TIMER},
 };
-use aptos_indexer_grpc_utils::file_store_operator_v2::file_store_reader::FileStoreReader;
-use aptos_protos::indexer::v1::{GetTransactionsRequest, ProcessedRange, TransactionsResponse};
-use aptos_transaction_filter::BooleanTransactionFilter;
+use velor_indexer_grpc_utils::file_store_operator_v2::file_store_reader::FileStoreReader;
+use velor_protos::indexer::v1::{GetTransactionsRequest, ProcessedRange, TransactionsResponse};
+use velor_transaction_filter::BooleanTransactionFilter;
 use futures::executor::block_on;
 use std::{
     sync::Arc,

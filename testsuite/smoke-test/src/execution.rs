@@ -1,15 +1,15 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptos_cli::validator::generate_blob, smoke_test_environment::SwarmBuilder,
+    velor_cli::validator::generate_blob, smoke_test_environment::SwarmBuilder,
     utils::get_current_version,
 };
-use aptos::test::CliTestFramework;
-use aptos_forge::{NodeExt, Swarm, SwarmExt};
-use aptos_rest_client::Client;
-use aptos_types::on_chain_config::{
+use velor::test::CliTestFramework;
+use velor_forge::{NodeExt, Swarm, SwarmExt};
+use velor_rest_client::Client;
+use velor_types::on_chain_config::{
     BlockGasLimitType, ExecutionConfigV4, OnChainExecutionConfig, TransactionDeduperType,
     TransactionShufflerType,
 };
@@ -24,7 +24,7 @@ async fn fallback_test() {
             config.api.failpoints_enabled = true;
             config.execution.discard_failed_blocks = true;
         }))
-        .with_aptos()
+        .with_velor()
         .build()
         .await;
 
@@ -37,7 +37,7 @@ async fn fallback_test() {
 
     client
         .set_failpoint(
-            "aptos_vm::vm_wrapper::execute_transaction".to_string(),
+            "velor_vm::vm_wrapper::execute_transaction".to_string(),
             "100%return".to_string(),
         )
         .await
@@ -53,7 +53,7 @@ async fn fallback_test() {
 
     client
         .set_failpoint(
-            "aptos_vm::vm_wrapper::execute_transaction".to_string(),
+            "velor_vm::vm_wrapper::execute_transaction".to_string(),
             "0%return".to_string(),
         )
         .await
@@ -78,13 +78,13 @@ async fn update_execution_config(
     let update_execution_config_script = format!(
         r#"
     script {{
-        use aptos_framework::aptos_governance;
-        use aptos_framework::execution_config;
+        use velor_framework::velor_governance;
+        use velor_framework::execution_config;
         fun main(core_resources: &signer) {{
-            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let framework_signer = velor_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
             let config_bytes = {};
             execution_config::set_for_next_epoch(&framework_signer, config_bytes);
-            aptos_governance::force_end_epoch(&framework_signer);
+            velor_governance::force_end_epoch(&framework_signer);
         }}
     }}
     "#,
@@ -114,7 +114,7 @@ async fn get_last_non_reconfig_block_ending_txn_name(rest_client: &Client) -> Op
 #[tokio::test]
 async fn block_epilogue_upgrade_test() {
     let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(2)
-        .with_aptos()
+        .with_velor()
         // Start with V1
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.execution_config = OnChainExecutionConfig::V4(ExecutionConfigV4 {

@@ -1,5 +1,5 @@
 apiVersion: v2
-name: aptos-monitoring
+name: velor-monitoring
 version: 0.2.0
 
 dependencies:

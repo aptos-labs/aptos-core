@@ -15,12 +15,12 @@ runs:
 
     # Check the VM features
     - name: Check VM features
-      run: cargo test --profile ci --locked --features check-vm-features -p aptos-node
+      run: cargo test --profile ci --locked --features check-vm-features -p velor-node
       shell: bash
 
     # Run the rust doc tests
     - name: Run rust doc tests
-      run: cargo test --profile ci --locked --doc --workspace --exclude aptos-node-checker
+      run: cargo test --profile ci --locked --doc --workspace --exclude velor-node-checker
       shell: bash
 
     # Run a postgres database
@@ -37,8 +37,8 @@ runs:
           --locked \
           --workspace \
           --exclude smoke-test \
-          --exclude aptos-testcases \
-          --exclude aptos-keyless-circuit \
+          --exclude velor-testcases \
+          --exclude velor-keyless-circuit \
           --retries 3 \
           --no-fail-fast \
           --message-format libtest-json > nextest_output.json || python3 .github/actions/rust-unit-tests/nextest_summary.py nextest_output.json "$GITHUB_STEP_SUMMARY" -f
@@ -62,6 +62,6 @@ runs:
       with:
         # Configured in the nextest.toml file
         junit-paths: target/nextest/ci/junit.xml
-        org-slug: aptoslabs
+        org-slug: velorlabs
         token: ${{ inputs.TRUNK_API_TOKEN }}
       continue-on-error: true

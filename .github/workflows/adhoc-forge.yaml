@@ -26,7 +26,7 @@ on:
         required: false
         type: string
         default: land_blocking
-        description: Test suite to run. See https://github.com/aptos-labs/aptos-core/blob/main/testsuite/forge-cli/src/main.rs
+        description: Test suite to run. See https://github.com/velor-chain/velor-core/blob/main/testsuite/forge-cli/src/main.rs
       FORGE_CLUSTER_NAME:
         required: false
         type: string
@@ -34,7 +34,7 @@ on:
       FORGE_INDEXER_DEPLOYER_PROFILE:
         required: false
         type: string
-        description: If set enables an indexer stack with your test, spinning up with the provided profile from https://github.com/aptos-labs/internal-ops/blob/main/infra/cli/commands/forge/profiles.ts
+        description: If set enables an indexer stack with your test, spinning up with the provided profile from https://github.com/velor-chain/internal-ops/blob/main/infra/cli/commands/forge/profiles.ts
       FORGE_NUM_VALIDATORS:
         required: false
         type: string
@@ -82,7 +82,7 @@ jobs:
       forgeRetainDebugLogs: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}
       forgeIndexerDeployerProfile: ${{ inputs.FORGE_INDEXER_DEPLOYER_PROFILE }}
   adhoc-forge-test:
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-forge.yaml@main
     needs: [determine-forge-run-metadata]
     secrets: inherit
     with:

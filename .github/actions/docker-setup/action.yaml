@@ -69,7 +69,7 @@ runs:
         fi
         echo "AWS args were supplied and are vaild, we will log into ECR"
 
-    - uses: aptos-labs/aptos-core/.github/actions/buildx-setup@main
+    - uses: velor-chain/velor-core/.github/actions/buildx-setup@main
 
     - uses: imjasonh/setup-crane@00c9e93efa4e1138c9a7a5c594acd6c75a2fbf0c # pin@v0.3
       with:

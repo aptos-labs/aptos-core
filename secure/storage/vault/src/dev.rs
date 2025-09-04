@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,10 +9,10 @@ use std::{
     process::{Child, Command, Stdio},
 };
 
-static APTOS_VAULT: Lazy<Option<VaultRunner>> = Lazy::new(|| match VaultRunner::run() {
+static VELOR_VAULT: Lazy<Option<VaultRunner>> = Lazy::new(|| match VaultRunner::run() {
     Err(err) => {
         assert!(
-            std::env::var("APTOS_REQUIRE_VAULT_TESTS").is_err(),
+            std::env::var("VELOR_REQUIRE_VAULT_TESTS").is_err(),
             "Vault is not running: {}",
             err
         );
@@ -25,7 +25,7 @@ static APTOS_VAULT: Lazy<Option<VaultRunner>> = Lazy::new(|| match VaultRunner::
 /// This will return the vault host, if vault was started successfully. If vault is expected to be
 /// available, an assertion will cause this to fail.
 pub fn test_host_safe() -> Option<String> {
-    APTOS_VAULT.as_ref().map(|v| v.host().to_string())
+    VELOR_VAULT.as_ref().map(|v| v.host().to_string())
 }
 
 /// This will return the vault host or panic.
@@ -135,7 +135,7 @@ fn run_vault() {
     let vr = VaultRunner::run();
     if let Err(err) = vr {
         assert!(
-            std::env::var("APTOS_REQUIRE_VAULT_TESTS").is_err(),
+            std::env::var("VELOR_REQUIRE_VAULT_TESTS").is_err(),
             "Vault is not running: {}",
             err
         );

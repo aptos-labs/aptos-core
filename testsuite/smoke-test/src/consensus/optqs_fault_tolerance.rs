@@ -1,11 +1,11 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     consensus::helpers::generate_traffic_and_assert_committed, smoke_test_environment::SwarmBuilder,
 };
-use aptos_forge::{wait_for_all_nodes_to_catchup, NodeExt, SwarmExt};
-use aptos_rest_client::Client;
+use velor_forge::{wait_for_all_nodes_to_catchup, NodeExt, SwarmExt};
+use velor_rest_client::Client;
 use std::{sync::Arc, time::Duration};
 
 const MAX_WAIT_SECS: u64 = 60;
@@ -15,7 +15,7 @@ const MAX_WAIT_SECS: u64 = 60;
 #[tokio::test]
 async fn test_remote_batch_read_from_block_voters() {
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, conf, _| {
             conf.api.failpoints_enabled = true;
             conf.consensus.quorum_store.enable_opt_quorum_store = true;

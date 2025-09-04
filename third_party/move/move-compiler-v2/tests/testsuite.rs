@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -610,7 +610,7 @@ fn run_test(path: &Path, config: TestConfig) -> anyhow::Result<()> {
     };
     options.named_address_mapping = vec![
         "std=0x1".to_string(),
-        "aptos_std=0x1".to_string(),
+        "velor_std=0x1".to_string(),
         "M=0x1".to_string(),
         "A=0x42".to_string(),
         "B=0x42".to_string(),

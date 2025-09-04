@@ -28,7 +28,7 @@ import subprocess
 TESTNET_SNAPSHOT_NAME = "testnet-archive"
 MAINNET_SNAPSHOT_NAME = "mainnet-archive"
 
-PROJECT = "aptos-devinfra-0"
+PROJECT = "velor-devinfra-0"
 REGION = "us-central1"
 CLUSTER_NAME = "devinfra-usce1-0"
 NAMESPACE = "replay-verify"
@@ -566,7 +566,7 @@ def create_replay_verify_pvcs_from_snapshot(
             "deletionPolicy": "Retain",
             "driver": "pd.csi.storage.gke.io",
             "source": {
-                "snapshotHandle": f"projects/aptos-devinfra-0/global/snapshots/{snapshot_name}"
+                "snapshotHandle": f"projects/velor-devinfra-0/global/snapshots/{snapshot_name}"
             },
             "volumeSnapshotRef": {
                 "kind": "VolumeSnapshot",
@@ -711,7 +711,7 @@ if __name__ == "__main__":
     # check input arg network
     args = parse_args()
     network = args.network
-    source_project_id = "aptos-platform-compute-0"
+    source_project_id = "velor-platform-compute-0"
     region = REGION
     project_id = PROJECT
     target_namespace = NAMESPACE

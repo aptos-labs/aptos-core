@@ -1,0 +1,6 @@
+[package]
+name = "aggregator_v2_test"
+version = "0.0.0"
+
+[dependencies]
+VelorFramework = { local = "../../../../../framework/velor-framework" }

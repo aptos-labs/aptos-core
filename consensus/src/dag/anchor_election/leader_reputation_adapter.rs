@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -13,12 +13,12 @@ use crate::{
         proposer_election::ProposerElection,
     },
 };
-use aptos_bitvec::BitVec;
-use aptos_collections::BoundedVecDeque;
-use aptos_consensus_types::common::{Author, Round};
-use aptos_crypto::HashValue;
-use aptos_infallible::Mutex;
-use aptos_types::account_config::NewBlockEvent;
+use velor_bitvec::BitVec;
+use velor_collections::BoundedVecDeque;
+use velor_consensus_types::common::{Author, Round};
+use velor_crypto::HashValue;
+use velor_infallible::Mutex;
+use velor_types::account_config::NewBlockEvent;
 use move_core_types::account_address::AccountAddress;
 use std::{collections::HashMap, sync::Arc};
 

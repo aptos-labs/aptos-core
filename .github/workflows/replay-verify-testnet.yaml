@@ -1,4 +1,4 @@
-# This defines a workflow to replay transactions on the given chain with the latest aptos node software.
+# This defines a workflow to replay transactions on the given chain with the latest velor node software.
 # In order to trigger it go to the Actions Tab of the Repo, click "replay-verify" and then "Run Workflow".
 #
 # On PR, a single test case will run. On workflow_dispatch, you may specify the CHAIN_NAME to verify.
@@ -48,9 +48,9 @@ jobs:
   determine-test-metadata:
     runs-on: ubuntu-latest-32-core # consider  moving this to a smaller machine since the compute runs on GKE
     steps:
-      # checkout the repo first, so check-aptos-core can use it and cancel the workflow if necessary
+      # checkout the repo first, so check-velor-core can use it and cancel the workflow if necessary
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/check-aptos-core
+      - uses: ./.github/actions/check-velor-core
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 

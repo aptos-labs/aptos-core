@@ -1,8 +1,8 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::connection_manager::ConnectionManager;
-use aptos_protos::{indexer::v1::GetTransactionsRequest, transaction::v1::Transaction};
+use velor_protos::{indexer::v1::GetTransactionsRequest, transaction::v1::Transaction};
 use std::sync::Arc;
 use tracing::trace;
 

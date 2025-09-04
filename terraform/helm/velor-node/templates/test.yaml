@@ -1,0 +1,22 @@
+
+{{- if .Values.loadTestGenesis }}
+{{- range $i, $e := until (int .Values.numValidators) }}
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "velor-validator.fullname" $ }}-{{$i}}-genesis-e{{ $.Values.chain.era }}
+  labels:
+    {{- include "velor-validator.labels" $ | nindent 4 }}
+data:
+  waypoint.txt: |-
+{{ $.Files.Get "files/test-data/waypoint.txt" | b64enc | indent 4 }}
+  validator-identity.yaml: |-
+{{ $.Files.Get "files/test-data/validator-identity.yaml" | b64enc | indent 4 }}
+  validator-full-node-identity.yaml: |-
+{{ $.Files.Get "files/test-data/validator-full-node-identity.yaml" | b64enc | indent 4 }}
+  genesis.blob: {{ $.Files.Get "files/test-data/genesis.blob" | b64enc }}
+
+{{- end }}
+{{- end }}

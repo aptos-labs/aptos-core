@@ -1,0 +1,55 @@
+[package]
+name = "velor-transactional-test-harness"
+description = "Transactional testing framework for Move"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-api-types = { workspace = true }
+velor-block-executor = { workspace = true }
+velor-cached-packages = { workspace = true }
+velor-crypto = { workspace = true }
+velor-framework = { workspace = true }
+velor-gas-schedule = { workspace = true }
+velor-resource-viewer = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-transaction-simulation = { workspace = true }
+velor-types = { workspace = true, features = ["fuzzing"] }
+velor-vm = { workspace = true }
+velor-vm-environment = { workspace = true }
+velor-vm-genesis = { workspace = true }
+velor-vm-types = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }
+codespan-reporting = { workspace = true }
+hex = { workspace = true }
+move-binary-format = { workspace = true, features = ["fuzzing"] }
+move-bytecode-verifier = { workspace = true }
+move-command-line-common = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-core-types = { workspace = true, features = ["fuzzing"] }
+move-model = { workspace = true }
+move-symbol-pool = { workspace = true }
+move-transactional-test-runner = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
+once_cell = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+
+[dev-dependencies]
+velor-types = { workspace = true, features = ["fuzzing"] }
+datatest-stable = { workspace = true }
+
+[[test]]
+name = "tests"
+harness = false

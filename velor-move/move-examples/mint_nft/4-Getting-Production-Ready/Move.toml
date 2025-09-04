@@ -1,0 +1,12 @@
+[package]
+name = "Examples"
+version = "0.0.0"
+
+[dependencies]
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-framework", rev = "mainnet" }
+VelorToken = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-token", rev = "mainnet" }
+
+[addresses]
+velor_framework = "0x1"
+# replace the admin_addr with the actual admin address we created using CLI
+admin_addr = "0xbeef"

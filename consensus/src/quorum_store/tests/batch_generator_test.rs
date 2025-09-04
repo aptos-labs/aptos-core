@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -11,13 +11,13 @@ use crate::{
         create_vec_signed_transactions_with_gas,
     },
 };
-use aptos_config::config::QuorumStoreConfig;
-use aptos_consensus_types::{
+use velor_config::config::QuorumStoreConfig;
+use velor_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
     proof_of_store::SignedBatchInfo,
 };
-use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
-use aptos_types::{quorum_store::BatchId, transaction::SignedTransaction};
+use velor_mempool::{QuorumStoreRequest, QuorumStoreResponse};
+use velor_types::{quorum_store::BatchId, transaction::SignedTransaction};
 use futures::{
     channel::mpsc::{channel, Receiver},
     StreamExt,

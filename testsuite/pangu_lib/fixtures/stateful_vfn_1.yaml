@@ -23,10 +23,10 @@ spec:
     spec:
       containers:
       - command:
-        - /usr/local/bin/aptos-node
+        - /usr/local/bin/velor-node
         - -f
-        - /opt/aptos/etc/vfn.yaml
-        image: aptoslabs/validator:devnet@sha256:f0c62463b0e86acc9ad081c54be2d1823f143f780c73828b876caebc978c8947
+        - /opt/velor/etc/vfn.yaml
+        image: velorlabs/validator:devnet@sha256:f0c62463b0e86acc9ad081c54be2d1823f143f780c73828b876caebc978c8947
         name: test_username-vfn
         ports:
         - containerPort: 6180
@@ -34,24 +34,24 @@ spec:
         - containerPort: 6181
         - containerPort: 9101
         volumeMounts:
-        - mountPath: /opt/aptos/etc
-          name: aptos-config
-        - mountPath: /opt/aptos/genesis
+        - mountPath: /opt/velor/etc
+          name: velor-config
+        - mountPath: /opt/velor/genesis
           name: genesis-config
-        - mountPath: /opt/aptos/identites
-          name: aptos-secret
-        - mountPath: /opt/aptos/data
-          name: aptos-data
+        - mountPath: /opt/velor/identites
+          name: velor-secret
+        - mountPath: /opt/velor/data
+          name: velor-data
       volumes:
       - configMap:
           name: test_username-vfn-configmap
-        name: aptos-config
+        name: velor-config
       - configMap:
           name: genesis-artifiact-configmap-pangu
         name: genesis-config
-      - name: aptos-secret
+      - name: velor-secret
         secret:
           secretName: identity-secrets-test_username
-      - name: aptos-data
+      - name: velor-data
         persistentVolumeClaim:
           claimName: test_username-vfn-pvc

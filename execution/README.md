@@ -1,13 +1,13 @@
 ---
 id: executor
 title: Executor
-custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/executor/README.md
+custom_edit_url: https://github.com/velor-chain/velor-core/edit/main/executor/README.md
 ---
 
 
 ## Overview
 
-The Aptos Blockchain is a replicated state machine. Each validator is a replica
+The Velor Blockchain is a replicated state machine. Each validator is a replica
 of the system. Starting from genesis state S<sub>0</sub>, each transaction
 T<sub>i</sub> updates previous state S<sub>i-1</sub> to S<sub>i</sub>. Each
 S<sub>i</sub> is a mapping from accounts (represented by 32-byte addresses) to
@@ -104,12 +104,12 @@ and `B`.
 ## Configs
 
 The executors cares about these config items. One needs to specify `genesis_file_location`
-in the Aptos Node config file for it to work, but can leave other entries
+in the Velor Node config file for it to work, but can leave other entries
 default by not specifying them.
 
 ```yaml
 execution:
-    # see https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/test_data/public_full_node.yaml
+    # see https://github.com/velor-chain/velor-core/blob/main/config/src/config/test_data/public_full_node.yaml
     # for explanation
     genesis_file_location: ""
     # Determines how many threads the Parallel Executor spawns for transaction execution.

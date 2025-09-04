@@ -1,6 +1,6 @@
 [package]
-name = "aptos-vault-client"
-description = "Aptos's Restful Vault Client"
+name = "velor-vault-client"
+description = "Velor's Restful Vault Client"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,8 +13,8 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-crypto = { workspace = true }
-aptos-types = { workspace = true, optional = true }
+velor-crypto = { workspace = true }
+velor-types = { workspace = true, optional = true }
 base64 = { workspace = true }
 chrono = { workspace = true }
 native-tls = { workspace = true }
@@ -26,9 +26,9 @@ thiserror = { workspace = true }
 ureq = { workspace = true }
 
 [dev-dependencies]
-aptos-proptest-helpers = { workspace = true }
-aptos-types = { workspace = true, features = ["fuzzing"] }
+velor-proptest-helpers = { workspace = true }
+velor-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 
 [features]
-fuzzing = ["proptest", "aptos-types", "aptos-types/fuzzing"]
+fuzzing = ["proptest", "velor-types", "velor-types/fuzzing"]

@@ -1,5 +1,5 @@
 module poc::validate_pubkey_internal {
-    use aptos_std::bls12381;
+    use velor_std::bls12381;
     use std::option::{Self, Option};
 
     public entry fun main(_owner: &signer) {

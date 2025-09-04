@@ -1,7 +1,7 @@
 
 Diagnostics:
 warning: unknown attribute
-  ┌─ tests/checking/attributes/aptos_stdlib_attributes2.move:4:7
+  ┌─ tests/checking/attributes/velor_stdlib_attributes2.move:4:7
   │
 4 │     #[testonly]
   │       ^^^^^^^^ Attribute name 'testonly' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "module_lock", "native_interface", "persistent", "test", "test_only", "verify_only"}'.

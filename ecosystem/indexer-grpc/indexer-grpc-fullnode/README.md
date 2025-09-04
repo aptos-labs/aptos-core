@@ -1,4 +1,4 @@
-# Aptos Indexer GRPC on Fullnode
+# Velor Indexer GRPC on Fullnode
 
 This opens a GRPC endpoint on the indexer. A client (e.g. worker) connects to the endpoint and makes a request. The GRPC endpoint would maintain a stream and sends transactions back to the client on a batch basis. Note that transactions within a batch may be out of order. 
 
@@ -22,8 +22,8 @@ Follow instructions on how to run a fullnode against an existing network.
       processor_task_count: 10
       processor_batch_size: 100
       output_batch_size: 100```
-* Run fullnode `cargo run -p aptos-node --release -- -f ./fullnode.yaml`
+* Run fullnode `cargo run -p velor-node --release -- -f ./fullnode.yaml`
 
 ### 2) Test with GCURL
 * Install grpcurl (https://github.com/fullstorydev/grpcurl#installation)
-* From the aptos-core (base folder), test with grpcurl: `grpcurl  -max-msg-sz 10000000 -d '{ "starting_version": 0 }' -import-path crates/aptos-protos/proto -proto aptos/internal/fullnode/v1/fullnode_data.proto  -plaintext 127.0.0.1:50051 aptos.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode`
+* From the velor-core (base folder), test with grpcurl: `grpcurl  -max-msg-sz 10000000 -d '{ "starting_version": 0 }' -import-path crates/velor-protos/proto -proto velor/internal/fullnode/v1/fullnode_data.proto  -plaintext 127.0.0.1:50051 velor.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode`

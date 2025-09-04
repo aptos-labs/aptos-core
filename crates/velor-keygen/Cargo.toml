@@ -1,0 +1,19 @@
+[package]
+name = "velor-keygen"
+description = "Command line utility to generate Ed25519 key pairs for testing"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+velor-crypto = { workspace = true }
+velor-types = { workspace = true }
+rand = { workspace = true }
+

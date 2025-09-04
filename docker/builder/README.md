@@ -1,6 +1,6 @@
 # Docker Images Builder
 
-This directory contains [Docker](https://www.docker.com/) configuration for building Aptos docker images. This builder requires the use of Buildkit which is available by default in most recent Docker installations.
+This directory contains [Docker](https://www.docker.com/) configuration for building Velor docker images. This builder requires the use of Buildkit which is available by default in most recent Docker installations.
 
 To build these images run this from the repository root:
 
@@ -17,9 +17,9 @@ For using the images, look in the [docker/compose](../docker/compose/) directory
 
 The builder can produce the following Docker images. To build a particular image, run `./docker/builder/docker-bake-rust-all.sh [image-name]`. Also, refer to the `group` definitions in the [docker-bake-rust-all.hcl](docker-bake-rust-all.hcl) file for more information.
 
-1. `validator-testing` : Image containing the `aptos-node`, `aptos-debugger` binaries and other linux tools useful for debugging and testing. This image is used in Forge tests.
-2. `validator` : Image containing the `aptos-node` and `aptos-debugger` binaries. This image is usually used for distribution.
-3. `tools`: Image containing all the aptos tools binaries including `aptos-debugger`, `aptos`, `aptos-transaction-emitter`, `aptos-openapi-spec-generator` and `aptos-fn-check-client`. Also, includes the Aptos Move framework for use with genesis generation.
+1. `validator-testing` : Image containing the `velor-node`, `velor-debugger` binaries and other linux tools useful for debugging and testing. This image is used in Forge tests.
+2. `validator` : Image containing the `velor-node` and `velor-debugger` binaries. This image is usually used for distribution.
+3. `tools`: Image containing all the velor tools binaries including `velor-debugger`, `velor`, `velor-transaction-emitter`, `velor-openapi-spec-generator` and `velor-fn-check-client`. Also, includes the Velor Move framework for use with genesis generation.
 4. `forge`: Image containing the `forge` binary that orchestrates and runs Forge tests.
 5. `node-checker`: Image containing the `node-checker` binary that checks the health of a node.
 6. `faucet`: Image containing the `faucet` binary that provides a faucet service for minting coins.
@@ -30,10 +30,10 @@ The builder can produce the following Docker images. To build a particular image
 
 At a high level, the builder works as follows. By default, the builder builds all images.
 
-1. One of `aptos-node-builder`, `indexer-builder`, or `tools-builder` targets are invoked depending on what image is being built.
-2. The target image is built by copying the output of either the `aptos-node-builder` or `tools-builder` target into the target image.
+1. One of `velor-node-builder`, `indexer-builder`, or `tools-builder` targets are invoked depending on what image is being built.
+2. The target image is built by copying the output of either the `velor-node-builder` or `tools-builder` target into the target image.
 
-The `aptos-node-builder` is separate from the other builder targets because it allows to build different `aptos-node` binary variants with different features and profiles.
+The `velor-node-builder` is separate from the other builder targets because it allows to build different `velor-node` binary variants with different features and profiles.
 
 Using a builder step allows us to cache the build artifacts and reuse them across different images. Our binaries have a lot of common dependencies, so this is a significant time saver. Furthermore, most `RUN` instructions use a cache mount that allows us to cache the output of the command leading to significant build time improvements.
 
@@ -45,7 +45,7 @@ Using a builder step allows us to cache the build artifacts and reuse them acros
 
 1. Modify the `cargo build` step in `build-tools.sh` to include the new binary.
 2. Create a new Dockerfile by cloning an existing target Dockerfile (e.g. `validator.Dockerfile`). When you use a `RUN` instruction, try to use a mount cache as they can improve build times by caching the output of the command.
-3. Add the following `FROM` statements to the new Dockerfile depending on whether you need to copy from the `aptos-node-builder`, `indexer-builder`, `tools-builder`. This ensures that your image references the required builder images to copy the binaries from. These image references are injected as build contexts at build time. This is defined in the `contexts` field in `_common` target in [docker-bake-rust-all.hcl](docker-bake-rust-all.hcl).
+3. Add the following `FROM` statements to the new Dockerfile depending on whether you need to copy from the `velor-node-builder`, `indexer-builder`, `tools-builder`. This ensures that your image references the required builder images to copy the binaries from. These image references are injected as build contexts at build time. This is defined in the `contexts` field in `_common` target in [docker-bake-rust-all.hcl](docker-bake-rust-all.hcl).
 
 ```
 FROM node-builder
@@ -53,9 +53,9 @@ FROM node-builder
 FROM tools-builder
 ```
 
-4. In your new Dockerfile, use the COPY command to copy the output of the `aptos-node-builder`, `indexer-builder`, `tools-builder` target into the image. For example, to copy the `aptos-node` binary into the `validator` image, use the following command:
+4. In your new Dockerfile, use the COPY command to copy the output of the `velor-node-builder`, `indexer-builder`, `tools-builder` target into the image. For example, to copy the `velor-node` binary into the `validator` image, use the following command:
    ```
-   COPY --link --from=node-builder /aptos/dist/aptos-node /usr/local/bin/
+   COPY --link --from=node-builder /velor/dist/velor-node /usr/local/bin/
    ```
 5. Add a new target definition in [docker-bake-rust-all.hcl](docker-bake-rust-all.hcl) file by copying another target (e.g. `validator`). The target definition should have the following fields:
 
@@ -70,7 +70,7 @@ FROM tools-builder
 
 ## Image tagging strategy
 
-The `aptos-node-builder`, `indexer-builder`, `tools-builder` targets build the `aptos-node` binary and the remaining rust binaries, respectively, and is the most expensive. Its output is used by all the other targets that follow.
+The `velor-node-builder`, `indexer-builder`, `tools-builder` targets build the `velor-node` binary and the remaining rust binaries, respectively, and is the most expensive. Its output is used by all the other targets that follow.
 
 The `*-builder` itself takes in a few build arguments. Most are build metadata, such as `GIT_SHA` and `GIT_BRANCH`, but others change the build entirely, such as cargo flags `PROFILE` and `FEATURES`. Arguments like these necessitate a different cache to prevent clobbering. The general strategy is to use image tags and cache keys that use these variables. An example image tag might be:
 

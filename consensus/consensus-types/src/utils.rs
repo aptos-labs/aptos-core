@@ -1,8 +1,8 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::ensure;
-use aptos_logger::warn;
+use velor_logger::warn;
 use core::fmt;
 use serde::Serialize;
 use std::cmp::{max, Ordering};

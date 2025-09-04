@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_logger::warn;
-use aptos_sdk::types::chain_id::ChainId;
+use velor_logger::warn;
+use velor_sdk::types::chain_id::ChainId;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::{atomic::AtomicI64, Arc};
@@ -23,11 +23,11 @@ struct ProcessorStatus {
 
 fn indexer_status_url(chain_id: ChainId) -> &'static str {
     if chain_id.is_mainnet() {
-        "https://indexer.mainnet.aptoslabs.com/api/rest/get_latest_processor_status"
+        "https://indexer.mainnet.velorlabs.com/api/rest/get_latest_processor_status"
     } else if chain_id.is_testnet() {
-        "https://indexer-testnet.staging.gcp.aptosdev.com/api/rest/get_latest_processor_status"
+        "https://indexer-testnet.staging.gcp.velordev.com/api/rest/get_latest_processor_status"
     } else {
-        "https://indexer-devnet.staging.gcp.aptosdev.com/api/rest/get_latest_processor_status"
+        "https://indexer-devnet.staging.gcp.velordev.com/api/rest/get_latest_processor_status"
     }
 }
 

@@ -7,8 +7,8 @@ import * as url from "url";
 
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 
-const owner = "aptos-labs";
-const repo = "aptos-core";
+const owner = "velor-chain";
+const repo = "velor-core";
 
 export async function pruneGithubWorkflowRuns() {
   const githubToken = process.env.GITHUB_TOKEN;

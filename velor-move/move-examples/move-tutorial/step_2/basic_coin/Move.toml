@@ -1,0 +1,8 @@
+[package]
+name = "basic_coin"
+version = "0.0.0"
+
+[dependencies.VelorStdlib]
+git = 'https://github.com/velor-chain/velor-framework.git'
+rev = 'main'
+subdir = 'velor-stdlib'

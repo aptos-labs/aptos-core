@@ -1,8 +1,8 @@
 # Config to import transactions onchain.
 mainnet:
   # Transaction Stream endpoint addresss.
-  transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
-  # (Optional) The key to use with developers.aptoslabs.com
+  transaction_stream_endpoint: https://grpc.mainnet.velorlabs.com:443
+  # (Optional) The key to use with developers.velorlabs.com
   api_key: YOUR_KEY_HERE
   # A map from versions to dump and their output names.
   versions_to_import: {
@@ -11,7 +11,7 @@ mainnet:
   }
 
 # testnet:
-#   transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
+#   transaction_stream_endpoint: https://grpc.testnet.velorlabs.com:443
 #   api_key: YOUR_KEY_HERE
 #   versions_to_import: {
 #   }

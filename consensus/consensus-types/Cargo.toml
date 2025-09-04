@@ -1,6 +1,6 @@
 [package]
-name = "aptos-consensus-types"
-description = "Aptos consensus types"
+name = "velor-consensus-types"
+description = "Velor consensus types"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,14 +14,14 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-bitvec = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-crypto-derive = { workspace = true }
-aptos-executor-types = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-short-hex-str = { workspace = true }
-aptos-types = { workspace = true }
+velor-bitvec = { workspace = true }
+velor-crypto = { workspace = true }
+velor-crypto-derive = { workspace = true }
+velor-executor-types = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-short-hex-str = { workspace = true }
+velor-types = { workspace = true }
 bcs = { workspace = true }
 derivative = { workspace = true }
 fail = { workspace = true }
@@ -37,11 +37,11 @@ serde = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
-aptos-types = { workspace = true, features = ["fuzzing"] }
+velor-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 serde_json = { workspace = true }
 
 [features]
 default = []
 failpoints = ["fail/failpoints"]
-fuzzing = ["proptest", "aptos-types/fuzzing", "aptos-crypto/fuzzing"]
+fuzzing = ["proptest", "velor-types/fuzzing", "velor-crypto/fuzzing"]

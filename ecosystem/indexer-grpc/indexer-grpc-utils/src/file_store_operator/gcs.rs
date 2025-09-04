@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -7,7 +7,7 @@ use crate::{
     file_store_operator::{FileStoreOperator, METADATA_FILE_NAME},
 };
 use anyhow::bail;
-use aptos_protos::transaction::v1::Transaction;
+use velor_protos::transaction::v1::Transaction;
 use cloud_storage::{Bucket, Object};
 use std::{env, path::PathBuf};
 

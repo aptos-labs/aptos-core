@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::proposer_election::ProposerElection;
 use crate::liveness::unequivocal_proposer_election::UnequivocalProposerElection;
-use aptos_consensus_types::{
+use velor_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::{Author, Payload, Round},
 };
-use aptos_types::validator_signer::ValidatorSigner;
+use velor_types::validator_signer::ValidatorSigner;
 use std::{collections::HashMap, sync::Arc};
 
 struct MockProposerElection {

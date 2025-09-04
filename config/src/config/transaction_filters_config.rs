@@ -1,7 +1,7 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_transaction_filters::{
+use velor_transaction_filters::{
     batch_transaction_filter::BatchTransactionFilter,
     block_transaction_filter::BlockTransactionFilter, transaction_filter::TransactionFilter,
 };

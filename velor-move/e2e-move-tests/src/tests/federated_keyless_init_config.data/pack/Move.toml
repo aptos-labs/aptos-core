@@ -1,0 +1,6 @@
+[package]
+name = 'FederatedKeylessInitConfig'
+version = "0.0.0"
+
+[dependencies]
+VelorFramework = { local = "../../../../../framework/velor-framework" }

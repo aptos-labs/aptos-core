@@ -1,0 +1,38 @@
+[package]
+name = "velor-move-debugger"
+version = "0.1.0"
+description = "A tool to replay transactions on chain and to execute transactions locally."
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-block-executor = { workspace = true }
+velor-consensus = { workspace = true }
+velor-crypto = { workspace = true }
+velor-gas-profiling = { workspace = true }
+velor-logger = { workspace = true }
+velor-rest-client = { workspace = true }
+velor-types = { workspace = true }
+velor-validator-interface = { workspace = true }
+velor-vm = { workspace = true }
+velor-vm-environment = { workspace = true }
+velor-vm-logging = { workspace = true }
+velor-vm-types = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }
+itertools = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
+
+[[bin]]
+name = "remote-gas-profiler"

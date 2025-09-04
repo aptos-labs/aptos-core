@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     block_storage::block_store::sync_manager::TargetBlockRetrieval,
     counters::BLOCK_RETRIEVAL_LOCAL_FULFILL_COUNT,
 };
-use aptos_consensus_types::{block::Block, common::Round};
-use aptos_crypto::HashValue;
-use aptos_logger::info;
+use velor_consensus_types::{block::Block, common::Round};
+use velor_crypto::HashValue;
+use velor_logger::info;
 use futures_channel::oneshot;
 use std::collections::{BTreeMap, HashMap};
 

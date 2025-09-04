@@ -1,10 +1,10 @@
 [package]
 name = "move-decompiler"
 version = "0.1.0"
-authors = ["Aptos Labs"]
+authors = ["Velor Labs"]
 description = "Move Decompiler"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptosfoundation.org/"
+repository = "https://github.com/velor-chain/velor-core"
+homepage = "https://velorfoundation.org/"
 license = "Apache-2.0"
 publish = false
 edition = "2021"

@@ -1,6 +1,6 @@
 [package]
-name = "aptos-executor-benchmark"
-description = "Aptos executor benchmark"
+name = "velor-executor-benchmark"
+description = "Velor executor benchmark"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,34 +14,34 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-aggregator = { workspace = true }
-aptos-block-executor = { workspace = true }
-aptos-block-partitioner = { workspace = true }
-aptos-config = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-db = { workspace = true }
-aptos-executor = { workspace = true }
-aptos-executor-service = { workspace = true }
-aptos-executor-types = { workspace = true }
-aptos-experimental-ptx-executor = { workspace = true }
-aptos-experimental-runtimes = { workspace = true }
-aptos-genesis = { workspace = true, features = ["testing"] }
-aptos-infallible = { workspace = true }
-aptos-jellyfish-merkle = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-mvhashmap = { workspace = true }
-aptos-node-resource-metrics = { workspace = true }
-aptos-push-metrics =  { workspace = true }
-aptos-sdk = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-transaction-generator-lib = { workspace = true }
-aptos-transaction-workloads-lib = { workspace = true }
-aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
-aptos-vm-environment = { workspace = true }
-aptos-vm-logging = { workspace = true }
-aptos-vm-types = { workspace = true }
+velor-aggregator = { workspace = true }
+velor-block-executor = { workspace = true }
+velor-block-partitioner = { workspace = true }
+velor-config = { workspace = true }
+velor-crypto = { workspace = true }
+velor-db = { workspace = true }
+velor-executor = { workspace = true }
+velor-executor-service = { workspace = true }
+velor-executor-types = { workspace = true }
+velor-experimental-ptx-executor = { workspace = true }
+velor-experimental-runtimes = { workspace = true }
+velor-genesis = { workspace = true, features = ["testing"] }
+velor-infallible = { workspace = true }
+velor-jellyfish-merkle = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-mvhashmap = { workspace = true }
+velor-node-resource-metrics = { workspace = true }
+velor-push-metrics =  { workspace = true }
+velor-sdk = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-transaction-generator-lib = { workspace = true }
+velor-transaction-workloads-lib = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true }
+velor-vm-environment = { workspace = true }
+velor-vm-logging = { workspace = true }
+velor-vm-types = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
@@ -63,12 +63,12 @@ tokio = { workspace = true }
 toml = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-aptos-profiler = { workspace = true }
+velor-profiler = { workspace = true }
 jemallocator = { workspace = true }
 
 [dev-dependencies]
-aptos-temppath = { workspace = true }
+velor-temppath = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-types/fuzzing"]
+fuzzing = ["velor-config/fuzzing", "velor-crypto/fuzzing", "velor-types/fuzzing"]

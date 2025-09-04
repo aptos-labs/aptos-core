@@ -1,19 +1,19 @@
 
 Diagnostics:
 warning: unknown attribute
-  ┌─ tests/checking/attributes/aptos_stdlib_attributes.move:4:7
+  ┌─ tests/checking/attributes/velor_stdlib_attributes.move:4:7
   │
 4 │     #[a, a(x = 0)]
   │       ^ Attribute name 'a' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "module_lock", "native_interface", "persistent", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
-  ┌─ tests/checking/attributes/aptos_stdlib_attributes.move:4:10
+  ┌─ tests/checking/attributes/velor_stdlib_attributes.move:4:10
   │
 4 │     #[a, a(x = 0)]
   │          ^ Attribute name 'a' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "module_lock", "native_interface", "persistent", "test", "test_only", "verify_only"}'.
 
 error: duplicate declaration, item, or annotation
-  ┌─ tests/checking/attributes/aptos_stdlib_attributes.move:4:10
+  ┌─ tests/checking/attributes/velor_stdlib_attributes.move:4:10
   │
 4 │     #[a, a(x = 0)]
   │       -  ^^^^^^^^ Duplicate attribute 'a' attached to the same item
@@ -21,19 +21,19 @@ error: duplicate declaration, item, or annotation
   │       Attribute previously given here
 
 warning: unknown attribute
-  ┌─ tests/checking/attributes/aptos_stdlib_attributes.move:7:7
+  ┌─ tests/checking/attributes/velor_stdlib_attributes.move:7:7
   │
 7 │     #[testonly]
   │       ^^^^^^^^ Attribute name 'testonly' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "module_lock", "native_interface", "persistent", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
-  ┌─ tests/checking/attributes/aptos_stdlib_attributes.move:8:7
+  ┌─ tests/checking/attributes/velor_stdlib_attributes.move:8:7
   │
 8 │     #[b(a, a = 0, a(x = 1))]
   │       ^ Attribute name 'b' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "module_lock", "native_interface", "persistent", "test", "test_only", "verify_only"}'.
 
 error: duplicate declaration, item, or annotation
-  ┌─ tests/checking/attributes/aptos_stdlib_attributes.move:8:12
+  ┌─ tests/checking/attributes/velor_stdlib_attributes.move:8:12
   │
 8 │     #[b(a, a = 0, a(x = 1))]
   │         -  ^^^^^ Duplicate attribute 'a' attached to the same item
@@ -41,7 +41,7 @@ error: duplicate declaration, item, or annotation
   │         Attribute previously given here
 
 error: duplicate declaration, item, or annotation
-  ┌─ tests/checking/attributes/aptos_stdlib_attributes.move:8:19
+  ┌─ tests/checking/attributes/velor_stdlib_attributes.move:8:19
   │
 8 │     #[b(a, a = 0, a(x = 1))]
   │         -         ^^^^^^^^ Duplicate attribute 'a' attached to the same item

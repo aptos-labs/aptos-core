@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Integration tests for validator_network.
 use crate::dummy::{setup_network, DummyMsg};
-use aptos_network::{application::interface::NetworkClientInterface, protocols::network::Event};
+use velor_network::{application::interface::NetworkClientInterface, protocols::network::Event};
 use futures::{future::join, StreamExt};
 use std::time::Duration;
 
@@ -15,7 +15,7 @@ fn test_network_builder() {
 
 #[test]
 fn test_direct_send() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let tn = setup_network();
     let dialer_peer = tn.dialer_peer;
     let mut dialer_events = tn.dialer_events;
@@ -60,7 +60,7 @@ fn test_direct_send() {
 
 #[test]
 fn test_rpc() {
-    ::aptos_logger::Logger::init_for_testing();
+    ::velor_logger::Logger::init_for_testing();
     let tn = setup_network();
     let dialer_peer = tn.dialer_peer;
     let mut dialer_events = tn.dialer_events;

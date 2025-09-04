@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::errors::FilterError;
@@ -196,6 +196,6 @@ mod test {
         let res = outer.is_valid();
         assert!(res.is_err());
         let error = res.unwrap_err();
-        assert_eq!(error.to_string(), "Filter Error: This is a test error!\nTrace Path:\naptos_transaction_filter::traits::test::InnerStruct:   {\"a\":\"test\"}\ncore::option::Option<aptos_transaction_filter::traits::test::InnerStruct>:   {\"a\":\"test\"}\naptos_transaction_filter::traits::test::OuterStruct:   {\"inner\":{\"a\":\"test\"}}");
+        assert_eq!(error.to_string(), "Filter Error: This is a test error!\nTrace Path:\nvelor_transaction_filter::traits::test::InnerStruct:   {\"a\":\"test\"}\ncore::option::Option<velor_transaction_filter::traits::test::InnerStruct>:   {\"a\":\"test\"}\nvelor_transaction_filter::traits::test::OuterStruct:   {\"inner\":{\"a\":\"test\"}}");
     }
 }

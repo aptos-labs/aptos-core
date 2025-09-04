@@ -1,5 +1,5 @@
 module poc::native_stack_trace {
-   use aptos_std::debug;
+   use velor_std::debug;
 
    public entry fun main(_owner: &signer) {
       debug::print_stack_trace();

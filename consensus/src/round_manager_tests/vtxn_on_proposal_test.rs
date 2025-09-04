@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 
@@ -7,12 +7,12 @@ use crate::{
     round_manager::round_manager_tests::NodeSetup,
     test_utils::{consensus_runtime, create_vec_signed_transactions, timed_block_on},
 };
-use aptos_config::config::ConsensusConfig;
-use aptos_consensus_types::{
+use velor_config::config::ConsensusConfig;
+use velor_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Payload,
 };
-use aptos_types::{
+use velor_types::{
     dkg::{real_dkg::RealDKG, DKGSessionMetadata, DKGTrait, DKGTranscript},
     jwks::QuorumCertifiedUpdate,
     on_chain_config::{

@@ -1,0 +1,63 @@
+[package]
+name = "velor-release-builder"
+description = "Tooling for building the governance proposal script used for the network"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor = { workspace = true, features = [ "no-upload-proposal" ] }
+velor-build-info = { workspace = true }
+velor-crypto = { workspace = true }
+velor-framework = { workspace = true }
+velor-gas-profiling = { workspace = true }
+velor-gas-schedule = { workspace = true }
+velor-gas-schedule-updator = { workspace = true }
+velor-genesis = { workspace = true }
+velor-infallible = { workspace = true }
+velor-keygen = { workspace = true }
+velor-language-e2e-tests = { workspace = true }
+velor-move-debugger = { workspace = true }
+velor-rest-client = { workspace = true }
+velor-temppath = { workspace = true }
+velor-transaction-simulation = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true }
+velor-vm-environment = { workspace = true }
+velor-vm-logging = { workspace = true }
+velor-vm-types = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }
+futures = { workspace = true }
+git2 = { workspace = true }
+handlebars = { workspace = true }
+hex = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
+move-core-types = { workspace = true }
+move-model = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
+once_cell = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+sha3 = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
+walkdir = { workspace = true }
+
+[[bin]]
+name = "velor-release-builder"
+path = "src/main.rs"

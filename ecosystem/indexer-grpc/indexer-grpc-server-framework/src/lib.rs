@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{Context, Result};
 #[cfg(target_os = "linux")]
-use aptos_system_utils::profiling::start_cpu_profiling;
+use velor_system_utils::profiling::start_cpu_profiling;
 use backtrace::Backtrace;
 use clap::Parser;
 use figment::{
@@ -161,7 +161,7 @@ fn handle_panic(panic_info: &PanicHookInfo<'_>) {
     let crash_info = toml::to_string_pretty(&info).unwrap();
     error!("{}", crash_info);
     // TODO / HACK ALARM: Write crash info synchronously via eprintln! to ensure it is written before the process exits which error! doesn't guarantee.
-    // This is a workaround until https://github.com/aptos-labs/aptos-core/issues/2038 is resolved.
+    // This is a workaround until https://github.com/velor-chain/velor-core/issues/2038 is resolved.
     eprintln!("{}", crash_info);
     // Kill the process
     process::exit(12);
@@ -202,7 +202,7 @@ where
 
     let metrics_endpoint = warp::path("metrics").map(|| {
         // Metrics encoding.
-        let metrics = aptos_metrics_core::gather();
+        let metrics = velor_metrics_core::gather();
         let mut encode_buffer = vec![];
         let encoder = TextEncoder::new();
         // If metrics encoding fails, we want to panic and crash the process.

@@ -32,9 +32,9 @@ jobs:
   determine-test-metadata:
     runs-on: ubuntu-latest
     steps:
-      # checkout the repo first, so check-aptos-core can use it and cancel the workflow if necessary
+      # checkout the repo first, so check-velor-core can use it and cancel the workflow if necessary
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/check-aptos-core
+      - uses: ./.github/actions/check-velor-core
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 

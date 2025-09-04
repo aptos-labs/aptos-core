@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
@@ -9,10 +9,10 @@ use crate::consensus_observer::{
     network::observer_message::OrderedBlock,
     observer::{execution_pool::ObservedOrderedBlock, payload_store::BlockPayloadStore},
 };
-use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
-use aptos_crypto::HashValue;
-use aptos_logger::{error, info, warn};
-use aptos_types::block_info::Round;
+use velor_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
+use velor_crypto::HashValue;
+use velor_logger::{error, info, warn};
+use velor_types::block_info::Round;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     sync::Arc,
@@ -318,15 +318,15 @@ mod test {
         network::observer_message::{BlockPayload, BlockTransactionPayload},
         observer::payload_store::BlockPayloadStore,
     };
-    use aptos_consensus_types::{
+    use velor_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
         pipelined_block::{OrderedBlockWindow, PipelinedBlock},
         quorum_cert::QuorumCert,
     };
-    use aptos_crypto::HashValue;
-    use aptos_infallible::Mutex;
-    use aptos_types::{
+    use velor_crypto::HashValue;
+    use velor_infallible::Mutex;
+    use velor_types::{
         aggregate_signature::AggregateSignature,
         block_info::BlockInfo,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},

@@ -1,5 +1,5 @@
 [package]
-name = "aptos-num-variants"
+name = "velor-num-variants"
 description = "Utility to add a constant value to enum variants"
 version = "0.1.0"
 

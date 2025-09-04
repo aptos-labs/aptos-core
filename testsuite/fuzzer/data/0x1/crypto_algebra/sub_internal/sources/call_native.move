@@ -1,6 +1,6 @@
 module poc::sub_internal {
-    use aptos_std::crypto_algebra::{Self, Element};
-    use aptos_std::bls12381_algebra::{Fr};
+    use velor_std::crypto_algebra::{Self, Element};
+    use velor_std::bls12381_algebra::{Fr};
 
     public entry fun main(_owner: &signer) {
         let fr_element1: Element<Fr> = crypto_algebra::from_u64<Fr>(5u64);

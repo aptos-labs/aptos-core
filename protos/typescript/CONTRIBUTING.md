@@ -1,4 +1,4 @@
-# Aptos Protos
+# Velor Protos
 
 ## Changelog
 To update the changelog do the following:
@@ -17,8 +17,8 @@ To release a new version of the package do the following.
 1. Check out the latest commit on main.
 1. Get the auth token from our password manager. Search for "npmjs". It should look like similar to this: `npm_cccaCVg0bWaaR741D5Gdsd12T4JpQre444aaaa`.
 1. Run `pnpm publish --dry-run`. From here, make some sanity checks:
-  a. Look closely at the output of the command. Pay close attention to what is packaged. Make sure we're not including some files that were included accidentally. For example `.aptos`. Add those to .npmignore if needed.
+  a. Look closely at the output of the command. Pay close attention to what is packaged. Make sure we're not including some files that were included accidentally. For example `.velor`. Add those to .npmignore if needed.
   b. Compare the summary with the public npm package summary on npmjs. The number of files and sizes should not vary too much.
 1. Run `pnpm build`
 1. Run `NODE_AUTH_TOKEN=<token> pnpm publish --non-interactive`.
-1. Double check that the release worked by visitng npmjs: https://www.npmjs.com/package/aptos-protos.
+1. Double check that the release worked by visitng npmjs: https://www.npmjs.com/package/velor-protos.

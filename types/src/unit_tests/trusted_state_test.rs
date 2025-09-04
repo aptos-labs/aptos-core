@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -15,7 +15,7 @@ use crate::{
     validator_verifier::{random_validator_verifier, ValidatorConsensusInfo, ValidatorVerifier},
     waypoint::Waypoint,
 };
-use aptos_crypto::hash::{CryptoHash, CryptoHasher, HashValue};
+use velor_crypto::hash::{CryptoHash, CryptoHasher, HashValue};
 use bcs::test_helpers::assert_canonical_encode_decode;
 use proptest::{
     collection::{size_range, vec, SizeRange},

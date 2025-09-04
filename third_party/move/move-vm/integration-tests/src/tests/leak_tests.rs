@@ -13,7 +13,7 @@ use move_vm_test_utils::InMemoryStorage;
 fn leak_with_abort() {
     let mut locals = vec![U128, MutableReference(Box::new(U128))];
     // Make locals bigger so each leak is bigger
-    // 128 is limit for aptos
+    // 128 is limit for velor
     for _ in 0..100 {
         locals.push(U128);
     }

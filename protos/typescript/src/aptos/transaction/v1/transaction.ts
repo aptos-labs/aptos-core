@@ -171,7 +171,7 @@ export function moveAbilityToJSON(object: MoveAbility): string {
 }
 
 /**
- * A block on Aptos holds transactions in chronological order (ordered by a transactions monotonically increasing `version` field)
+ * A block on Velor holds transactions in chronological order (ordered by a transactions monotonically increasing `version` field)
  * All blocks start with a `BlockMetadataTransaction`, and are followed by zero or more transactions.
  * The next `BlockMetadataTransaction` denotes the end of the current block, and the start of the next one.
  *

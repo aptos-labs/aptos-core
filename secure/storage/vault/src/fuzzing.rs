@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,7 +8,7 @@ use crate::{
     ReadSecretListResponse, ReadSecretMetadata, ReadSecretResponse, RenewTokenAuth,
     RenewTokenResponse, SealStatusResponse, Signature, SignatureResponse,
 };
-use aptos_types::proptest_types::arb_json_value;
+use velor_types::proptest_types::arb_json_value;
 use proptest::prelude::*;
 use serde_json::Value;
 use ureq::Response;

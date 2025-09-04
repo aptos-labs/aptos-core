@@ -1,15 +1,15 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{config::SecureBackend, keys::ConfigKey};
 use anyhow::anyhow;
-use aptos_crypto::{
+use velor_crypto::{
     bls12381,
     ed25519::Ed25519PrivateKey,
     x25519::{self, PRIVATE_KEY_SIZE},
     ValidCryptoMaterial,
 };
-use aptos_types::{
+use velor_types::{
     account_address::{from_identity_public_key, AccountAddress, AccountAddress as PeerId},
     dkg::{real_dkg::maybe_dk_from_bls_sk, DKGTrait, DefaultDKG},
 };

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction::{
@@ -6,7 +6,7 @@ use crate::transaction::{
     signature_verified_transaction::SignatureVerifiedTransaction,
     AuxiliaryInfo, AuxiliaryInfoTrait, Transaction,
 };
-use aptos_crypto::HashValue;
+use velor_crypto::HashValue;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,

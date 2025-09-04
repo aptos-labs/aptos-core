@@ -1,0 +1,124 @@
+[package]
+name = "velor"
+description = "Velor tool for management of nodes and interacting with the blockchain"
+version = "7.7.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-api-types = { workspace = true }
+velor-backup-cli = { workspace = true }
+velor-bitvec = { workspace = true }
+velor-build-info = { workspace = true }
+velor-cached-packages = { workspace = true }
+velor-cli-common = { workspace = true }
+velor-config = { workspace = true }
+velor-crypto = { workspace = true }
+velor-faucet-core = { workspace = true }
+velor-framework = { workspace = true }
+velor-gas-profiling = { workspace = true }
+velor-gas-schedule = { workspace = true }
+velor-genesis = { workspace = true }
+velor-github-client = { workspace = true }
+velor-global-constants = { workspace = true }
+velor-indexer-grpc-server-framework = { workspace = true }
+velor-indexer-processor-sdk = { workspace = true }
+velor-keygen = { workspace = true }
+velor-ledger = { workspace = true }
+velor-localnet = { workspace = true }
+velor-logger = { workspace = true }
+velor-move-debugger = { workspace = true }
+velor-network-checker = { workspace = true }
+velor-node = { workspace = true }
+velor-rest-client = { workspace = true }
+velor-sdk = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-telemetry = { workspace = true }
+velor-temppath = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true, features = ["testing"] }
+velor-vm-environment = { workspace = true }
+velor-vm-genesis = { workspace = true }
+velor-vm-logging = { workspace = true }
+velor-vm-types = { workspace = true }
+velor-workspace-server = { workspace = true }
+async-trait = { workspace = true }
+backoff = { workspace = true }
+base64 = { workspace = true }
+bcs = { workspace = true }
+bollard = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true, features = ["env", "unstable-styles", "wrap_help"] }
+clap_complete = { workspace = true }
+colored = { workspace = true }
+dashmap = { workspace = true }
+diesel = { workspace = true, features = ["postgres_backend"] }
+diesel-async = { workspace = true }
+dirs = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+indoc = { workspace = true }
+itertools = { workspace = true }
+legacy-move-compiler = { workspace = true }
+maplit = { workspace = true }
+move-asm = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-source-map = { workspace = true }
+move-cli = { workspace = true }
+move-command-line-common = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-core-types = { workspace = true }
+move-coverage = { workspace = true }
+move-decompiler = { workspace = true }
+move-disassembler = { workspace = true }
+move-ir-types = { workspace = true }
+move-linter = { workspace = true }
+move-model = { workspace = true }
+move-package = { workspace = true }
+move-prover-boogie-backend = { workspace = true }
+move-symbol-pool = { workspace = true }
+move-unit-test = { workspace = true, features = ["debugging"] }
+move-vm-runtime = { workspace = true, features = ["testing"] }
+open = { workspace = true }
+pathsearch = { workspace = true }
+poem = { workspace = true }
+processor = { workspace = true }
+rand = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+self_update = { git = "https://github.com/banool/self_update.git", rev = "8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b", features = [
+    "archive-zip",
+    "compression-zip-deflate",
+] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+set_env = { workspace = true }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+url = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { workspace = true }
+
+[features]
+default = []
+fuzzing = []
+no-upload-proposal = []
+indexer = ["velor-node/indexer"]
+cli-framework-test-move = []
+
+[build-dependencies]
+shadow-rs = { workspace = true }

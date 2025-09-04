@@ -1,0 +1,10 @@
+[package]
+name = 'knight'
+version = '1.0.0'
+
+[addresses]
+knight = "_"
+
+[dependencies]
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-framework", rev = "mainnet" }
+VelorTokenObjects = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-token-objects", rev = "mainnet" }

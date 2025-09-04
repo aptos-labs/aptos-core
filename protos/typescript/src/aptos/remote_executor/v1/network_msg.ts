@@ -202,7 +202,7 @@ export const Empty = {
 export type NetworkMessageServiceService = typeof NetworkMessageServiceService;
 export const NetworkMessageServiceService = {
   simpleMsgExchange: {
-    path: "/aptos.remote_executor.v1.NetworkMessageService/SimpleMsgExchange",
+    path: "/velor.remote_executor.v1.NetworkMessageService/SimpleMsgExchange",
     requestStream: false,
     responseStream: false,
     requestSerialize: (value: NetworkMessage) => Buffer.from(NetworkMessage.encode(value).finish()),
@@ -236,7 +236,7 @@ export interface NetworkMessageServiceClient extends Client {
 
 export const NetworkMessageServiceClient = makeGenericClientConstructor(
   NetworkMessageServiceService,
-  "aptos.remote_executor.v1.NetworkMessageService",
+  "velor.remote_executor.v1.NetworkMessageService",
 ) as unknown as {
   new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): NetworkMessageServiceClient;
   service: typeof NetworkMessageServiceService;

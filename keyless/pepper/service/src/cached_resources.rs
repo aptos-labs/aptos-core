@@ -1,11 +1,11 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     groth16_vk::OnChainGroth16VerificationKey, keyless_config::OnChainKeylessConfiguration, utils,
 };
-use aptos_infallible::RwLock;
-use aptos_logger::{info, warn};
+use velor_infallible::RwLock;
+use velor_logger::{info, warn};
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};

@@ -1,14 +1,14 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     connectivity_manager::{DiscoveredPeer, DiscoveredPeerSet},
     logging::NetworkSchema,
 };
-use aptos_config::network_id::NetworkContext;
-use aptos_infallible::RwLock;
-use aptos_logger::error;
-use aptos_types::PeerId;
+use velor_config::network_id::NetworkContext;
+use velor_infallible::RwLock;
+use velor_logger::error;
+use velor_types::PeerId;
 use maplit::hashset;
 use ordered_float::OrderedFloat;
 use rand_latest::prelude::*;
@@ -224,11 +224,11 @@ fn get_unselected_peer_ids(
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_config::{
+    use velor_config::{
         config::{PeerRole, RoleType},
         network_id::NetworkId,
     };
-    use aptos_types::account_address::AccountAddress;
+    use velor_types::account_address::AccountAddress;
     use rand::Rng;
     use std::collections::{BinaryHeap, HashMap};
 

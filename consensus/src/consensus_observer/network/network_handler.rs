@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
@@ -10,13 +10,13 @@ use crate::consensus_observer::{
         },
     },
 };
-use aptos_channels::{
-    aptos_channel,
-    aptos_channel::{Receiver, Sender},
+use velor_channels::{
+    velor_channel,
+    velor_channel::{Receiver, Sender},
     message_queues::QueueStyle,
 };
-use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
-use aptos_logger::{error, info, warn};
+use velor_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
+use velor_logger::{error, info, warn};
 use futures::StreamExt;
 
 /// A simple struct that holds a message to be sent to the consensus observer
@@ -91,14 +91,14 @@ impl ConsensusObserverNetworkHandler {
         Receiver<(), ConsensusPublisherNetworkMessage>,
     ) {
         // Create a channel for sending consensus observer messages
-        let (observer_message_sender, observer_message_receiver) = aptos_channel::new(
+        let (observer_message_sender, observer_message_receiver) = velor_channel::new(
             QueueStyle::FIFO,
             consensus_observer_config.max_network_channel_size as usize,
             None,
         );
 
         // Create a channel for sending consensus publisher messages
-        let (publisher_message_sender, publisher_message_receiver) = aptos_channel::new(
+        let (publisher_message_sender, publisher_message_receiver) = velor_channel::new(
             QueueStyle::FIFO,
             consensus_observer_config.max_network_channel_size as usize,
             None,
@@ -245,13 +245,13 @@ mod test {
             ConsensusObserverDirectSend, ConsensusObserverMessage, ConsensusObserverRequest,
         },
     };
-    use aptos_channels::{aptos_channel, aptos_channel::Receiver, message_queues::QueueStyle};
-    use aptos_config::{
+    use velor_channels::{velor_channel, velor_channel::Receiver, message_queues::QueueStyle};
+    use velor_config::{
         config::ConsensusObserverConfig,
         network_id::{NetworkId, PeerNetworkId},
     };
-    use aptos_crypto::HashValue;
-    use aptos_network::{
+    use velor_crypto::HashValue;
+    use velor_network::{
         application::{
             interface::{NetworkClient, NetworkServiceEvents},
             storage::PeersAndMetadata,
@@ -268,7 +268,7 @@ mod test {
         },
         transport::ConnectionMetadata,
     };
-    use aptos_types::{
+    use velor_types::{
         aggregate_signature::AggregateSignature,
         block_info::BlockInfo,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -571,10 +571,10 @@ mod test {
         wait_and_verify_no_message(&mut publisher_message_receiver).await;
     }
 
-    /// Creates and returns a single Aptos channel
-    fn create_aptos_channel<K: Eq + Hash + Clone, T>(
-    ) -> (aptos_channel::Sender<K, T>, aptos_channel::Receiver<K, T>) {
-        aptos_channel::new(QueueStyle::FIFO, 10, None)
+    /// Creates and returns a single Velor channel
+    fn create_velor_channel<K: Eq + Hash + Clone, T>(
+    ) -> (velor_channel::Sender<K, T>, velor_channel::Receiver<K, T>) {
+        velor_channel::new(QueueStyle::FIFO, 10, None)
     }
 
     /// Creates a network sender and events for testing (using the specified network IDs)
@@ -583,8 +583,8 @@ mod test {
     ) -> (
         HashMap<NetworkId, NetworkSender<ConsensusObserverMessage>>,
         NetworkServiceEvents<ConsensusObserverMessage>,
-        HashMap<NetworkId, aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>>,
-        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
+        HashMap<NetworkId, velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>>,
+        HashMap<NetworkId, velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
     ) {
         let mut network_senders = HashMap::new();
         let mut network_and_events = HashMap::new();
@@ -593,10 +593,10 @@ mod test {
 
         for network_id in network_ids {
             // Create the peer manager and connection channels
-            let (inbound_request_sender, inbound_request_receiver) = create_aptos_channel();
-            let (outbound_request_sender, outbound_request_receiver) = create_aptos_channel();
+            let (inbound_request_sender, inbound_request_receiver) = create_velor_channel();
+            let (outbound_request_sender, outbound_request_receiver) = create_velor_channel();
             let (connection_outbound_sender, _connection_outbound_receiver) =
-                create_aptos_channel();
+                create_velor_channel();
 
             // Create the network sender and events
             let network_sender = NetworkSender::new(
@@ -710,11 +710,11 @@ mod test {
     /// it to the appropriate receiver (observer or publisher).
     async fn wait_for_handler_processing(
         expected_peer_network_id: PeerNetworkId,
-        observer_message_receiver: &mut aptos_channel::Receiver<
+        observer_message_receiver: &mut velor_channel::Receiver<
             (),
             ConsensusObserverNetworkMessage,
         >,
-        publisher_message_receiver: &mut aptos_channel::Receiver<
+        publisher_message_receiver: &mut velor_channel::Receiver<
             (),
             ConsensusPublisherNetworkMessage,
         >,
@@ -758,11 +758,11 @@ mod test {
         expected_peer_network_id: PeerNetworkId,
         outbound_request_receivers: &mut HashMap<
             NetworkId,
-            aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+            velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
         >,
         inbound_request_senders: &mut HashMap<
             NetworkId,
-            aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
+            velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
         >,
         expected_direct_send_protocol: Option<ProtocolId>,
         expected_rpc_protocol: Option<ProtocolId>,

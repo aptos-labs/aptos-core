@@ -116,7 +116,7 @@ CREATE INDEX bmt_insat_index ON block_metadata_transactions (inserted_at);
  "expiration_timestamp_secs":"1649713172",
  "payload":{
  "type":"entry_function_payload",
- "function":"0x1::aptos_coin::mint",
+ "function":"0x1::velor_coin::mint",
  "type_arguments":[
  
  ],

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -6,9 +6,9 @@
 //! TODO(aldenhu): doc
 
 use crate::{metrics::TIMER, sorter::PtxSorterClient};
-use aptos_logger::trace;
-use aptos_metrics_core::TimerHelper;
-use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
+use velor_logger::trace;
+use velor_metrics_core::TimerHelper;
+use velor_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
 use rayon::Scope;
 use std::sync::mpsc::{channel, Sender};
 

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,7 +7,7 @@ use crate::{
     data_stream::{DataStreamId, DataStreamListener},
     error::Error,
 };
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
+use velor_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use async_trait::async_trait;
 use futures::{
     channel::{mpsc, oneshot},
@@ -21,7 +21,7 @@ use std::{
 
 pub type Epoch = u64;
 
-/// The streaming client used by state sync to fetch data from the Aptos network
+/// The streaming client used by state sync to fetch data from the Velor network
 /// to synchronize local state.
 ///
 /// Notes:

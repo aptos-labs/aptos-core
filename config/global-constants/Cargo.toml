@@ -1,6 +1,6 @@
 [package]
-name = "aptos-global-constants"
-description = "Aptos's global constant crate: the source of truth for constant definitions that span multiple crates"
+name = "velor-global-constants"
+description = "Velor's global constant crate: the source of truth for constant definitions that span multiple crates"
 version = "0.1.0"
 
 # Workspace inherited keys

@@ -1,15 +1,15 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     fullnode_data_service::FullnodeDataService, localnet_data_service::LocalnetDataService,
     ServiceContext,
 };
-use aptos_api::context::Context;
-use aptos_config::config::NodeConfig;
-use aptos_logger::info;
-use aptos_mempool::MempoolClientSender;
-use aptos_protos::{
+use velor_api::context::Context;
+use velor_config::config::NodeConfig;
+use velor_logger::info;
+use velor_mempool::MempoolClientSender;
+use velor_protos::{
     indexer::v1::{
         raw_data_server::RawDataServer, FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,
     },
@@ -17,8 +17,8 @@ use aptos_protos::{
     transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
-use aptos_storage_interface::DbReader;
-use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
+use velor_storage_interface::DbReader;
+use velor_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
 use futures::channel::oneshot;
 use std::sync::Arc;
 use tokio::{net::TcpListener, runtime::Runtime};
@@ -45,7 +45,7 @@ pub fn bootstrap(
         return None;
     }
 
-    let runtime = aptos_runtimes::spawn_named_runtime("indexer-grpc".to_string(), None);
+    let runtime = velor_runtimes::spawn_named_runtime("indexer-grpc".to_string(), None);
 
     let node_config = config.clone();
 

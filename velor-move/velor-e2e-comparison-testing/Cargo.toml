@@ -1,0 +1,36 @@
+[package]
+name = "velor-comparison-testing"
+version = "0.1.0"
+authors = ["Velor Labs <opensource@velorlabs.com>"]
+description = "A tool to perform comparison testing on the compiler"
+repository = "https://github.com/velor-chain/velor-core"
+homepage = "https://velorlabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+default-run = "velor-comparison-testing"
+
+[dependencies]
+anyhow = { workspace = true }
+velor-block-executor = { workspace = true }
+velor-framework = { workspace = true }
+velor-language-e2e-tests = { workspace = true }
+velor-rest-client = { workspace = true }
+velor-transaction-simulation = { workspace = true }
+velor-types = { workspace = true }
+velor-validator-interface = { workspace = true }
+velor-vm = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }
+futures = { workspace = true }
+itertools = { workspace = true }
+legacy-move-compiler = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-model = { workspace = true }
+move-package = { workspace = true }
+rocksdb = { workspace = true }
+serde = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }

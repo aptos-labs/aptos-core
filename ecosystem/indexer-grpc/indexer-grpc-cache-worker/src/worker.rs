@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{ERROR_COUNT, WAIT_FOR_FILE_STORE_COUNTER};
 use anyhow::{bail, Context, Result};
-use aptos_indexer_grpc_utils::{
+use velor_indexer_grpc_utils::{
     cache_operator::CacheOperator,
     compression_util::{FileStoreMetadata, StorageFormat},
     config::IndexerGrpcFileStoreConfig,
@@ -12,8 +12,8 @@ use aptos_indexer_grpc_utils::{
     file_store_operator::FileStoreOperator,
     types::RedisUrl,
 };
-use aptos_moving_average::MovingAverage;
-use aptos_protos::internal::fullnode::v1::{
+use velor_moving_average::MovingAverage;
+use velor_protos::internal::fullnode::v1::{
     stream_status::StatusType, transactions_from_node_response::Response,
     GetTransactionsFromNodeRequest, TransactionsFromNodeResponse,
 };

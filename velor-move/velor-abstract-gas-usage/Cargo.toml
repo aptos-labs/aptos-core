@@ -1,0 +1,13 @@
+[package]
+name = "velor-abstract-gas-usage"
+version = "0.1.0"
+edition = "2021"
+license = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-gas-algebra = { workspace = true }
+velor-gas-meter = { workspace = true }
+velor-gas-schedule = { workspace = true }
+velor-vm-types = { workspace = true }
+move-binary-format = { workspace = true }

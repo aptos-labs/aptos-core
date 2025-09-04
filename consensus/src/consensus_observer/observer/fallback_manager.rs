@@ -1,15 +1,15 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::common::{
     error::Error,
     logging::{LogEntry, LogSchema},
 };
-use aptos_config::config::ConsensusObserverConfig;
-use aptos_logger::warn;
-use aptos_storage_interface::DbReader;
-use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
+use velor_config::config::ConsensusObserverConfig;
+use velor_logger::warn;
+use velor_storage_interface::DbReader;
+use velor_time_service::{TimeService, TimeServiceTrait};
+use velor_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use std::{
     sync::Arc,
     time::{Duration, Instant},
@@ -167,9 +167,9 @@ impl ObserverFallbackManager {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_crypto::HashValue;
-    use aptos_storage_interface::Result;
-    use aptos_types::{
+    use velor_crypto::HashValue;
+    use velor_storage_interface::Result;
+    use velor_types::{
         aggregate_signature::AggregateSignature, block_info::BlockInfo, ledger_info::LedgerInfo,
         transaction::Version,
     };

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,13 +9,13 @@ use crate::{
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
-use aptos_bitvec::BitVec;
-use aptos_crypto::{
+use velor_bitvec::BitVec;
+use velor_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
 };
-use aptos_crypto_derive::CryptoHasher;
-use aptos_types::{
+use velor_crypto_derive::CryptoHasher;
+use velor_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -427,7 +427,7 @@ impl BlockData {
 
 #[test]
 fn test_reconfiguration_suffix() {
-    use aptos_types::{
+    use velor_types::{
         account_address::AccountAddress, epoch_state::EpochState, on_chain_config::ValidatorSet,
     };
 

@@ -1,7 +1,7 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics_core::{
+use velor_metrics_core::{
     exponential_buckets, histogram_opts, register_histogram_vec, register_int_counter_vec,
     register_int_gauge, register_int_gauge_vec, HistogramTimer, HistogramVec, IntCounterVec,
     IntGauge, IntGaugeVec,
@@ -100,7 +100,7 @@ const CHUNK_SIZE_BUCKETS: &[f64] = &[
 /// Counter for state sync bootstrapper errors
 pub static BOOTSTRAPPER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_state_sync_bootstrapper_errors",
+        "velor_state_sync_bootstrapper_errors",
         "Counters related to state sync bootstrapper errors",
         &["error_label"]
     )
@@ -110,7 +110,7 @@ pub static BOOTSTRAPPER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Gauge indicating whether consensus is currently executing
 pub static CONSENSUS_EXECUTING_GAUGE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_state_sync_consensus_executing_gauge",
+        "velor_state_sync_consensus_executing_gauge",
         "Gauge indicating whether consensus is currently executing"
     )
     .unwrap()
@@ -119,7 +119,7 @@ pub static CONSENSUS_EXECUTING_GAUGE: Lazy<IntGauge> = Lazy::new(|| {
 /// Gauge for state sync continuous syncer fallback mode
 pub static CONTINUOUS_SYNCER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_state_sync_continuous_syncer_errors",
+        "velor_state_sync_continuous_syncer_errors",
         "Counters related to state sync continuous syncer errors",
         &["error_label"]
     )
@@ -129,7 +129,7 @@ pub static CONTINUOUS_SYNCER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counters related to the state sync driver
 pub static DRIVER_COUNTERS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_state_sync_driver_counters",
+        "velor_state_sync_driver_counters",
         "Counters related to the state sync driver",
         &["label"]
     )
@@ -139,7 +139,7 @@ pub static DRIVER_COUNTERS: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter for tracking data notification latencies
 pub static DATA_NOTIFICATION_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "aptos_state_sync_data_notification_latencies",
+        "velor_state_sync_data_notification_latencies",
         "Counters related to the data notification latencies",
         &["label"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
@@ -150,7 +150,7 @@ pub static DATA_NOTIFICATION_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
 /// Gauge for state sync bootstrapper fallback mode
 pub static DRIVER_FALLBACK_MODE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "aptos_state_sync_driver_fallback_mode",
+        "velor_state_sync_driver_fallback_mode",
         "Gauges related to the driver fallback mode",
         &["label"]
     )
@@ -160,7 +160,7 @@ pub static DRIVER_FALLBACK_MODE: Lazy<IntGaugeVec> = Lazy::new(|| {
 /// Counters related to the currently executing component in the main driver loop
 pub static EXECUTING_COMPONENT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_state_sync_executing_component_counters",
+        "velor_state_sync_executing_component_counters",
         "Counters related to the currently executing component",
         &["label"]
     )
@@ -170,7 +170,7 @@ pub static EXECUTING_COMPONENT: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter for tracking sizes of data chunks sent to the storage synchronizer
 pub static STORAGE_SYNCHRONIZER_CHUNK_SIZES: Lazy<HistogramVec> = Lazy::new(|| {
     let histogram_opts = histogram_opts!(
-        "aptos_state_sync_storage_synchronizer_chunk_sizes",
+        "velor_state_sync_storage_synchronizer_chunk_sizes",
         "Counter for tracking sizes of data chunks sent to the storage synchronizer",
         CHUNK_SIZE_BUCKETS.to_vec()
     );
@@ -180,7 +180,7 @@ pub static STORAGE_SYNCHRONIZER_CHUNK_SIZES: Lazy<HistogramVec> = Lazy::new(|| {
 /// Counter for storage synchronizer errors
 pub static STORAGE_SYNCHRONIZER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_state_sync_storage_synchronizer_errors",
+        "velor_state_sync_storage_synchronizer_errors",
         "Counters related to storage synchronizer errors",
         &["error_label"]
     )
@@ -190,7 +190,7 @@ pub static STORAGE_SYNCHRONIZER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Gauges related to the storage synchronizer
 pub static STORAGE_SYNCHRONIZER_GAUGES: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "aptos_state_sync_storage_synchronizer_gauges",
+        "velor_state_sync_storage_synchronizer_gauges",
         "Gauges related to the storage synchronizer",
         &["label"]
     )
@@ -200,7 +200,7 @@ pub static STORAGE_SYNCHRONIZER_GAUGES: Lazy<IntGaugeVec> = Lazy::new(|| {
 /// Counter for tracking storage synchronizer latencies
 pub static STORAGE_SYNCHRONIZER_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "aptos_state_sync_storage_synchronizer_latencies",
+        "velor_state_sync_storage_synchronizer_latencies",
         "Counters related to the storage synchronizer latencies",
         &["label"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
@@ -211,7 +211,7 @@ pub static STORAGE_SYNCHRONIZER_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
 /// Gauges for the storage synchronizer operations
 pub static STORAGE_SYNCHRONIZER_OPERATIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "aptos_state_sync_version",
+        "velor_state_sync_version",
         "The versions processed by the storage synchronizer operations",
         &["type"]
     )
@@ -222,7 +222,7 @@ pub static STORAGE_SYNCHRONIZER_OPERATIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
 pub static STORAGE_SYNCHRONIZER_PIPELINE_CHANNEL_BACKPRESSURE: Lazy<IntGaugeVec> =
     Lazy::new(|| {
         register_int_gauge_vec!(
-            "aptos_state_sync_storage_synchronizer_pipeline_channel_backpressure",
+            "velor_state_sync_storage_synchronizer_pipeline_channel_backpressure",
             "Gauges for tracking the storage synchronizer pipeline channel backpressure",
             &["channel"]
         )

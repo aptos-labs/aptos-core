@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::HashValue;
-use aptos_logger::Schema;
+use velor_crypto::HashValue;
+use velor_logger::Schema;
 use serde::Serialize;
 
 #[derive(Schema)]

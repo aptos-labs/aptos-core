@@ -1,0 +1,14 @@
+[package]
+name = "DrandLottery"
+version = "0.0.1"
+
+[dependencies]
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-framework", rev = "mainnet" }
+#VelorStdlib = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-stdlib", rev = "mainnet" }
+
+
+[addresses]
+std = "0x1"
+velor_std = "0x1"
+velor_framework = "0x1"
+drand = "_"

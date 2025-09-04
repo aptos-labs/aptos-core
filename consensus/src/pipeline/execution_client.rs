@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -27,20 +27,20 @@ use crate::{
     transaction_shuffler::create_transaction_shuffler,
 };
 use anyhow::{anyhow, Result};
-use aptos_bounded_executor::BoundedExecutor;
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{ConsensusConfig, ConsensusObserverConfig};
-use aptos_consensus_types::{
+use velor_bounded_executor::BoundedExecutor;
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::config::{ConsensusConfig, ConsensusObserverConfig};
+use velor_consensus_types::{
     common::{Author, Round},
     pipelined_block::PipelinedBlock,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
-use aptos_crypto::bls12381::PrivateKey;
-use aptos_executor_types::ExecutorResult;
-use aptos_infallible::RwLock;
-use aptos_logger::prelude::*;
-use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
-use aptos_types::{
+use velor_crypto::bls12381::PrivateKey;
+use velor_executor_types::ExecutorResult;
+use velor_infallible::RwLock;
+use velor_logger::prelude::*;
+use velor_network::{application::interface::NetworkClient, protocols::network::Event};
+use velor_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
@@ -69,7 +69,7 @@ pub trait TExecutionClient: Send + Sync {
         onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
-        rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        rand_msg_rx: velor_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
     );
 
@@ -113,7 +113,7 @@ pub trait TExecutionClient: Send + Sync {
 struct BufferManagerHandle {
     pub execute_tx: Option<UnboundedSender<OrderedBlocks>>,
     pub commit_tx:
-        Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>>,
+        Option<velor_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>>,
     pub reset_tx_to_buffer_manager: Option<UnboundedSender<ResetRequest>>,
     pub reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
 }
@@ -131,7 +131,7 @@ impl BufferManagerHandle {
     pub fn init(
         &mut self,
         execute_tx: UnboundedSender<OrderedBlocks>,
-        commit_tx: aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>,
+        commit_tx: velor_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>,
         reset_tx_to_buffer_manager: UnboundedSender<ResetRequest>,
         reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
     ) {
@@ -159,7 +159,7 @@ pub struct ExecutionProxyClient {
     consensus_config: ConsensusConfig,
     execution_proxy: Arc<ExecutionProxy>,
     author: Author,
-    self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
+    self_sender: velor_channels::UnboundedSender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     bounded_executor: BoundedExecutor,
     // channels to buffer manager
@@ -174,7 +174,7 @@ impl ExecutionProxyClient {
         consensus_config: ConsensusConfig,
         execution_proxy: Arc<ExecutionProxy>,
         author: Author,
-        self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
+        self_sender: velor_channels::UnboundedSender<Event<ConsensusMsg>>,
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         bounded_executor: BoundedExecutor,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
@@ -203,7 +203,7 @@ impl ExecutionProxyClient {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         onchain_consensus_config: &OnChainConsensusConfig,
-        rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        rand_msg_rx: velor_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
         buffer_manager_back_pressure_enabled: bool,
         consensus_observer_config: ConsensusObserverConfig,
@@ -219,7 +219,7 @@ impl ExecutionProxyClient {
         let (reset_buffer_manager_tx, reset_buffer_manager_rx) = unbounded::<ResetRequest>();
 
         let (commit_msg_tx, commit_msg_rx) =
-            aptos_channel::new::<AccountAddress, (AccountAddress, IncomingCommitRequest)>(
+            velor_channel::new::<AccountAddress, (AccountAddress, IncomingCommitRequest)>(
                 QueueStyle::FIFO,
                 100,
                 Some(&counters::BUFFER_MANAGER_MSGS),
@@ -316,7 +316,7 @@ impl TExecutionClient for ExecutionProxyClient {
         onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
-        rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        rand_msg_rx: velor_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
@@ -335,7 +335,7 @@ impl TExecutionClient for ExecutionProxyClient {
 
         let transaction_shuffler =
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
-        let block_executor_onchain_config: aptos_types::block_executor::config::BlockExecutorConfigFromOnchain =
+        let block_executor_onchain_config: velor_types::block_executor::config::BlockExecutorConfigFromOnchain =
             onchain_execution_config.block_executor_onchain_config();
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
@@ -537,7 +537,7 @@ impl TExecutionClient for DummyExecutionClient {
         _onchain_randomness_config: &OnChainRandomnessConfig,
         _rand_config: Option<RandConfig>,
         _fast_rand_config: Option<RandConfig>,
-        _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        _rand_msg_rx: velor_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
     ) {
     }

@@ -1,6 +1,6 @@
 module poc::deserialize_internal {
-   use aptos_std::crypto_algebra::{Self};
-   use aptos_std::bls12381_algebra::{Fr, FormatFrLsb};
+   use velor_std::crypto_algebra::{Self};
+   use velor_std::bls12381_algebra::{Fr, FormatFrLsb};
 
    public entry fun main(_owner: &signer) {
       let element_fr = crypto_algebra::from_u64<Fr>(42);

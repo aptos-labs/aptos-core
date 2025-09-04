@@ -78,7 +78,7 @@ spec:
   nodeSelector: {VALIDATOR_NODE_SELECTOR}
   tolerations:
     - effect: NoExecute
-      key: aptos.org/nodepool
+      key: velor.org/nodepool
       value: validators
   volumes:
     - name: multiregion-kubeconfig

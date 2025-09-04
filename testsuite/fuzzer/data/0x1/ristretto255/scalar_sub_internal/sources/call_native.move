@@ -1,5 +1,5 @@
 module poc::scalar_sub_internal {
-    use aptos_std::ristretto255::{Self, Scalar};
+    use velor_std::ristretto255::{Self, Scalar};
 
     public entry fun main(_owner: &signer) {
         let scalar1: Scalar = ristretto255::new_scalar_from_u64(5u64);

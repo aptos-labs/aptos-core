@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,17 +6,17 @@ use crate::{
     optimistic_fetch::OptimisticFetchRequest, storage::StorageReaderInterface,
     subscription::SubscriptionStreamRequests,
 };
-use aptos_config::network_id::PeerNetworkId;
-use aptos_metrics_core::HistogramVec;
-use aptos_storage_service_types::{
+use velor_config::network_id::PeerNetworkId;
+use velor_metrics_core::HistogramVec;
+use velor_storage_service_types::{
     requests::{DataRequest, EpochEndingLedgerInfoRequest, StorageServiceRequest},
     responses::{
         DataResponse, NewTransactionDataWithProofResponse, StorageServerSummary,
         StorageServiceResponse,
     },
 };
-use aptos_time_service::TimeService;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use velor_time_service::TimeService;
+use velor_types::ledger_info::LedgerInfoWithSignatures;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use mini_moka::sync::Cache;
@@ -34,7 +34,7 @@ pub fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     peer_network_id: &PeerNetworkId,
     storage: T,
     time_service: TimeService,
-) -> aptos_storage_service_types::Result<LedgerInfoWithSignatures, Error> {
+) -> velor_storage_service_types::Result<LedgerInfoWithSignatures, Error> {
     // Create a new storage request for the epoch ending ledger info
     let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
         start_epoch: epoch,
@@ -98,7 +98,7 @@ pub fn notify_peer_of_new_data<T: StorageReaderInterface>(
     missing_data_request: StorageServiceRequest,
     target_ledger_info: LedgerInfoWithSignatures,
     response_sender: ResponseSender,
-) -> aptos_storage_service_types::Result<DataResponse, Error> {
+) -> velor_storage_service_types::Result<DataResponse, Error> {
     // Handle the storage service request to fetch the missing data
     let use_compression = missing_data_request.use_compression;
     let handler = Handler::new(

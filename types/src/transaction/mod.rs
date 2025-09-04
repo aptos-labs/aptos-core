@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -20,7 +20,7 @@ use crate::{
     write_set::{HotStateOp, WriteSet},
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
-use aptos_crypto::{
+use velor_crypto::{
     ed25519::*,
     hash::CryptoHash,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
@@ -28,7 +28,7 @@ use aptos_crypto::{
     traits::{signing_message, SigningKey},
     CryptoMaterialError, HashValue,
 };
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rand::Rng;
@@ -197,7 +197,7 @@ pub struct RawTransaction {
     /// in the future to indicate that a transaction does not expire.
     expiration_timestamp_secs: u64,
 
-    /// Chain ID of the Aptos network this transaction is intended for.
+    /// Chain ID of the Velor network this transaction is intended for.
     chain_id: ChainId,
 }
 
@@ -2841,7 +2841,7 @@ impl AccountOrderedTransactionsWithProof {
     }
 }
 
-/// `Transaction` will be the transaction type used internally in the aptos node to represent the
+/// `Transaction` will be the transaction type used internally in the velor node to represent the
 /// transaction to be processed and persisted.
 ///
 /// We suppress the clippy warning here as we would expect most of the transaction to be user
@@ -2856,7 +2856,7 @@ pub enum Transaction {
     ///       transaction types we had in our codebase.
     UserTransaction(SignedTransaction),
 
-    /// Transaction that applies a WriteSet to the current storage, it's applied manually via aptos-db-bootstrapper.
+    /// Transaction that applies a WriteSet to the current storage, it's applied manually via velor-db-bootstrapper.
     GenesisTransaction(WriteSetPayload),
 
     /// Transaction to update the block metadata resource at the beginning of a block,

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use self::real_dkg::RealDKG;
@@ -10,8 +10,8 @@ use crate::{
     },
 };
 use anyhow::{Context, Result};
-use aptos_crypto::Uniform;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_crypto::Uniform;
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
     account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::TypeTag,
     move_resource::MoveStructType,

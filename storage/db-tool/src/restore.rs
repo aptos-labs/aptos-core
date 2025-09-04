@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_backup_cli::{
+use velor_backup_cli::{
     backup_types::{
         epoch_ending::restore::{EpochEndingRestoreController, EpochEndingRestoreOpt},
         state_snapshot::restore::{StateSnapshotRestoreController, StateSnapshotRestoreOpt},
@@ -12,7 +12,7 @@ use aptos_backup_cli::{
     storage::DBToolStorageOpt,
     utils::GlobalRestoreOpt,
 };
-use aptos_executor_types::VerifyExecutionMode;
+use velor_executor_types::VerifyExecutionMode;
 use clap::{Parser, Subcommand};
 
 /// Restore the database using either a one-time or continuous backup.

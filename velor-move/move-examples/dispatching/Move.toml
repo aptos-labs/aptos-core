@@ -1,0 +1,13 @@
+[package]
+name = "dispatching"
+version = "0.0.0"
+
+
+[addresses]
+dispatching = "_"
+
+#[dev-addresses]
+#dispatching = "0xd119"
+
+[dependencies]
+VelorFramework = { local = "../../framework/velor-framework" }

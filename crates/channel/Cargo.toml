@@ -1,5 +1,5 @@
 [package]
-name = "aptos-channels"
+name = "velor-channels"
 description = "An implementation of a channel with configurable QoS"
 version = "0.1.0"
 
@@ -14,10 +14,10 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-metrics-core = { workspace = true }
+velor-infallible = { workspace = true }
+velor-metrics-core = { workspace = true }
 futures = { workspace = true }
 
 [dev-dependencies]
-aptos-types = { workspace = true }
+velor-types = { workspace = true }
 tokio = { workspace = true }

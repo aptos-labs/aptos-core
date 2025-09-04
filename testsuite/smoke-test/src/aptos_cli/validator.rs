@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
     utils::{create_and_fund_account, MAX_CATCH_UP_WAIT_SECS},
 };
-use aptos::{
+use velor::{
     account::create::DEFAULT_FUNDED_COINS,
     common::types::TransactionSummary,
     node::analyze::{
@@ -14,15 +14,15 @@ use aptos::{
     },
     test::{CliTestFramework, ValidatorPerformance},
 };
-use aptos_bitvec::BitVec;
-use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, ValidCryptoMaterialStringExt};
-use aptos_forge::{reconfig, wait_for_all_nodes_to_catchup, LocalSwarm, NodeExt, Swarm, SwarmExt};
-use aptos_genesis::config::HostAndPort;
-use aptos_keygen::KeyGen;
-use aptos_logger::info;
-use aptos_rest_client::{Client, State};
-use aptos_types::{
+use velor_bitvec::BitVec;
+use velor_cached_packages::velor_stdlib;
+use velor_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, ValidCryptoMaterialStringExt};
+use velor_forge::{reconfig, wait_for_all_nodes_to_catchup, LocalSwarm, NodeExt, Swarm, SwarmExt};
+use velor_genesis::config::HostAndPort;
+use velor_keygen::KeyGen;
+use velor_logger::info;
+use velor_rest_client::{Client, State};
+use velor_types::{
     account_config::CORE_CODE_ADDRESS,
     network_address::DnsName,
     on_chain_config::{
@@ -43,7 +43,7 @@ use std::{
 #[tokio::test]
 async fn test_analyze_validators() {
     let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, conf, _| {
             conf.indexer_db_config.enable_event = true;
         }))
@@ -79,7 +79,7 @@ async fn test_analyze_validators() {
 #[tokio::test]
 async fn test_show_validator_set() {
     let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .build_with_cli(1)
         .await;
     let validator_set = cli.show_validator_set().await.unwrap();
@@ -241,7 +241,7 @@ async fn test_onchain_config_change() {
             });
             genesis_config.consensus_config = new_consensus_config;
         }))
-        .with_aptos()
+        .with_velor()
         .build_with_cli(0)
         .await;
 
@@ -293,10 +293,10 @@ async fn test_onchain_config_change() {
     let update_consensus_config_script = format!(
         r#"
     script {{
-        use aptos_framework::aptos_governance;
-        use aptos_framework::consensus_config;
+        use velor_framework::velor_governance;
+        use velor_framework::consensus_config;
         fun main(core_resources: &signer) {{
-            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let framework_signer = velor_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
             let config_bytes = {};
             consensus_config::set(&framework_signer, config_bytes);
         }}
@@ -370,7 +370,7 @@ async fn test_onchain_config_change() {
 // This test is ignored because it is very long running
 async fn test_onchain_shuffling_change() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(2)
-        .with_aptos()
+        .with_velor()
         .build_with_cli(0)
         .await;
 
@@ -407,10 +407,10 @@ async fn test_onchain_shuffling_change() {
     let update_execution_config_script = format!(
         r#"
     script {{
-        use aptos_framework::aptos_governance;
-        use aptos_framework::execution_config;
+        use velor_framework::velor_governance;
+        use velor_framework::execution_config;
         fun main(core_resources: &signer) {{
-            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let framework_signer = velor_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
             let config_bytes = {};
             execution_config::set(&framework_signer, config_bytes);
         }}
@@ -445,10 +445,10 @@ async fn test_onchain_shuffling_change() {
 
 async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
     swarm
-        .aptos_public_info()
+        .velor_public_info()
         .sync_root_account_sequence_number()
         .await;
-    let transaction_factory = swarm.aptos_public_info().transaction_factory();
+    let transaction_factory = swarm.velor_public_info().transaction_factory();
 
     let clients = swarm.get_all_nodes_clients_with_names();
 
@@ -461,7 +461,7 @@ async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
 
         for _ in 0..5 {
             let txn = account.sign_with_transaction_builder(
-                transaction_factory.payload(aptos_stdlib::aptos_coin_transfer(dst.address(), 10)),
+                transaction_factory.payload(velor_stdlib::velor_coin_transfer(dst.address(), 10)),
             );
             txns.push(txn);
         }
@@ -499,11 +499,11 @@ async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
     let mut block_txns = vec![];
     for txn in committed_order {
         match txn.transaction {
-            aptos_types::transaction::Transaction::UserTransaction(txn) => {
+            velor_types::transaction::Transaction::UserTransaction(txn) => {
                 info!("from {}, seq_num {}", txn.sender(), txn.sequence_number());
                 block_txns.push(txn);
             },
-            aptos_types::transaction::Transaction::BlockMetadata(b) => {
+            velor_types::transaction::Transaction::BlockMetadata(b) => {
                 info!("block metadata {}", b.round());
 
                 let senders = accounts.iter().map(|a| a.address()).collect::<HashSet<_>>();
@@ -955,7 +955,7 @@ async fn test_nodes_rewards() {
 #[tokio::test]
 async fn test_register_and_update_validator() {
     let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .build_with_cli(0)
         .await;
     let transaction_factory = swarm.chain_info().transaction_factory();
@@ -1051,7 +1051,7 @@ async fn test_register_and_update_validator() {
 #[tokio::test]
 async fn test_join_and_leave_validator() {
     let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_i, conf, _| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
@@ -1216,7 +1216,7 @@ async fn test_join_and_leave_validator() {
 #[tokio::test]
 async fn test_owner_create_and_delegate_flow() {
     let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_i, conf, _| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;

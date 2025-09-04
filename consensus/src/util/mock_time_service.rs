@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::util::time_service::{ScheduledTask, TimeService};
-use aptos_infallible::Mutex;
-use aptos_logger::prelude::*;
+use velor_infallible::Mutex;
+use velor_logger::prelude::*;
 use async_trait::async_trait;
 use futures::future::AbortHandle;
 use std::{sync::Arc, time::Duration};

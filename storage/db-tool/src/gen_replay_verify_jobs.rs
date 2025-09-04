@@ -1,7 +1,7 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_backup_cli::{
+use velor_backup_cli::{
     metadata::{
         cache::{sync_and_load, MetadataCacheOpt},
         StateSnapshotBackupMeta,
@@ -9,7 +9,7 @@ use aptos_backup_cli::{
     storage::DBToolStorageOpt,
     utils::ConcurrentDownloadsOpt,
 };
-use aptos_types::transaction::Version;
+use velor_types::transaction::Version;
 use clap::Parser;
 use itertools::Itertools;
 use std::{

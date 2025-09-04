@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -36,9 +36,9 @@ use crate::{
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
-    AptosCoinType,
+    VelorCoinType,
 };
-use aptos_crypto::{
+use velor_crypto::{
     bls12381::{self, bls12381_keys},
     ed25519::{self, Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
@@ -775,8 +775,8 @@ pub struct CoinStoreResourceGen {
 }
 
 impl CoinStoreResourceGen {
-    pub fn materialize(self) -> CoinStoreResource<AptosCoinType> {
-        CoinStoreResource::<AptosCoinType>::new(
+    pub fn materialize(self) -> CoinStoreResource<VelorCoinType> {
+        CoinStoreResource::<VelorCoinType>::new(
             self.coin,
             false,
             EventHandle::random(0),
@@ -808,7 +808,7 @@ impl AccountStateGen {
                 bcs::to_bytes(&account_resource).unwrap(),
             ),
             (
-                StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(address).unwrap(),
+                StateKey::resource_typed::<CoinStoreResource<VelorCoinType>>(address).unwrap(),
                 bcs::to_bytes(&balance_resource).unwrap(),
             ),
         ]

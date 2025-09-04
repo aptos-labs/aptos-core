@@ -1,18 +1,18 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
+    smoke_test_environment::{new_local_swarm_with_velor, SwarmBuilder},
     state_sync_utils,
     utils::{
         create_test_accounts, execute_transactions, execute_transactions_and_wait,
         wait_for_all_nodes, MAX_CATCH_UP_WAIT_SECS,
     },
 };
-use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
-use aptos_forge::{LocalSwarm, NodeExt};
-use aptos_types::on_chain_config::{
+use velor_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
+use velor_forge::{LocalSwarm, NodeExt};
+use velor_types::on_chain_config::{
     ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
     ProposerElectionType,
 };
@@ -33,7 +33,7 @@ async fn test_fullnode_fast_sync_no_epoch_changes() {
 #[tokio::test]
 async fn test_fullnode_output_sync_epoch_changes() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_velor(1).await;
 
     // Create a fullnode config that uses transaction outputs to sync
     let mut vfn_config = NodeConfig::get_default_vfn_config();
@@ -43,7 +43,7 @@ async fn test_fullnode_output_sync_epoch_changes() {
         .state_sync
         .state_sync_driver
         .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
-    vfn_config.state_sync.aptos_data_client.use_compression = true;
+    vfn_config.state_sync.velor_data_client.use_compression = true;
 
     // Create the fullnode and test its ability to sync
     let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
@@ -53,7 +53,7 @@ async fn test_fullnode_output_sync_epoch_changes() {
 #[tokio::test]
 async fn test_fullnode_output_sync_no_compression() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_velor(1).await;
 
     // Create a fullnode config that uses transaction outputs to sync (without compression)
     let mut vfn_config = NodeConfig::get_default_vfn_config();
@@ -63,7 +63,7 @@ async fn test_fullnode_output_sync_no_compression() {
         .state_sync
         .state_sync_driver
         .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
-    vfn_config.state_sync.aptos_data_client.use_compression = false;
+    vfn_config.state_sync.velor_data_client.use_compression = false;
 
     // Create the fullnode and test its ability to sync
     let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
@@ -73,7 +73,7 @@ async fn test_fullnode_output_sync_no_compression() {
 #[tokio::test]
 async fn test_fullnode_output_sync_exponential_backoff() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_velor(1).await;
 
     // Create a fullnode config that uses transaction outputs to sync with a small timeout
     let mut vfn_config = NodeConfig::get_default_vfn_config();
@@ -83,7 +83,7 @@ async fn test_fullnode_output_sync_exponential_backoff() {
         .state_sync
         .state_sync_driver
         .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
-    vfn_config.state_sync.aptos_data_client.response_timeout_ms = 1;
+    vfn_config.state_sync.velor_data_client.response_timeout_ms = 1;
 
     // Create the fullnode and test its ability to sync
     let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
@@ -94,7 +94,7 @@ async fn test_fullnode_output_sync_exponential_backoff() {
 async fn test_fullnode_intelligent_sync_epoch_changes() {
     // Create a validator swarm of 1 validator node with a small network limit
     let mut swarm = SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.storage_service.max_network_chunk_bytes = 5 * 1024;
         }))
@@ -111,9 +111,9 @@ async fn test_fullnode_intelligent_sync_epoch_changes() {
         .continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs;
     vfn_config
         .state_sync
-        .aptos_data_client
+        .velor_data_client
         .max_num_output_reductions = 1;
-    vfn_config.state_sync.aptos_data_client.response_timeout_ms = 1;
+    vfn_config.state_sync.velor_data_client.response_timeout_ms = 1;
 
     // Create the fullnode and test its ability to sync
     let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
@@ -124,7 +124,7 @@ async fn test_fullnode_intelligent_sync_epoch_changes() {
 async fn test_fullnode_fast_and_intelligent_sync_epoch_changes() {
     // Create a validator swarm of 1 validator node with a small network limit
     let mut swarm = SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.storage_service.max_network_chunk_bytes = 500 * 1024;
         }))
@@ -141,9 +141,9 @@ async fn test_fullnode_fast_and_intelligent_sync_epoch_changes() {
         .continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs;
     vfn_config
         .state_sync
-        .aptos_data_client
+        .velor_data_client
         .max_num_output_reductions = 2;
-    vfn_config.state_sync.aptos_data_client.response_timeout_ms = 1;
+    vfn_config.state_sync.velor_data_client.response_timeout_ms = 1;
 
     // Create the fullnode and test its ability to sync
     let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
@@ -153,7 +153,7 @@ async fn test_fullnode_fast_and_intelligent_sync_epoch_changes() {
 #[tokio::test]
 async fn test_fullnode_execution_sync_epoch_changes() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_velor(1).await;
 
     // Create a fullnode config that uses transactions to sync
     let mut vfn_config = NodeConfig::get_default_vfn_config();
@@ -163,7 +163,7 @@ async fn test_fullnode_execution_sync_epoch_changes() {
         .state_sync
         .state_sync_driver
         .continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactions;
-    vfn_config.state_sync.aptos_data_client.use_compression = true;
+    vfn_config.state_sync.velor_data_client.use_compression = true;
 
     // Create the fullnode and test its ability to sync
     let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
@@ -173,7 +173,7 @@ async fn test_fullnode_execution_sync_epoch_changes() {
 #[tokio::test]
 async fn test_fullnode_output_sync_no_epoch_changes() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_velor(1).await;
 
     // Create a fullnode config that uses transaction outputs to sync
     let mut vfn_config = NodeConfig::get_default_vfn_config();
@@ -190,7 +190,7 @@ async fn test_fullnode_output_sync_no_epoch_changes() {
 #[tokio::test]
 async fn test_fullnode_execution_sync_no_epoch_changes() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_velor(1).await;
 
     // Create a fullnode config that uses transactions to sync
     let mut vfn_config = NodeConfig::get_default_vfn_config();
@@ -207,7 +207,7 @@ async fn test_fullnode_execution_sync_no_epoch_changes() {
 #[tokio::test]
 async fn test_single_validator_reboot() {
     // Create a swarm of 1 validator
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_velor(1).await;
 
     // Execute multiple transactions
     let validator = swarm.validators_mut().next().unwrap();
@@ -246,7 +246,7 @@ async fn test_single_validator_reboot() {
 async fn test_validator_output_sync_epoch_changes() {
     // Create a swarm of 4 validators using output syncing
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::ApplyTransactionOutputsFromGenesis;
@@ -289,7 +289,7 @@ async fn test_validator_fast_sync_and_participate_no_epoch_changes() {
 async fn test_validator_output_sync_small_network_limit() {
     // Create a swarm of 4 validators using output syncing and an aggressive network limit
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::ApplyTransactionOutputsFromGenesis;
@@ -310,7 +310,7 @@ async fn test_validator_output_sync_unrealistic_network_limit() {
     // Create a swarm of 4 validators using output syncing and an unrealistic network limit.
     // This forces all chunks to be of size 1.
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::ApplyTransactionOutputsFromGenesis;
@@ -329,13 +329,13 @@ async fn test_validator_output_sync_unrealistic_network_limit() {
 async fn test_validator_fast_sync_no_compression() {
     // Create a swarm of 4 validators using fast syncing and no compression
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
             config.state_sync.state_sync_driver.continuous_syncing_mode =
                 ContinuousSyncingMode::ApplyTransactionOutputs;
-            config.state_sync.aptos_data_client.use_compression = false;
+            config.state_sync.velor_data_client.use_compression = false;
         }))
         .build()
         .await;
@@ -349,7 +349,7 @@ async fn test_validator_fast_sync_no_compression() {
 async fn test_validator_fast_sync_small_network_limit() {
     // Create a swarm of 4 validators using fast sync and an aggressive network limit
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
@@ -370,7 +370,7 @@ async fn test_validator_fast_sync_unrealistic_network_limit() {
     // Create a swarm of 4 validators using fast sync and an unrealistic network limit.
     // This forces all chunks to be of size 1.
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
@@ -401,7 +401,7 @@ async fn test_validator_fast_sync_exponential_backoff_no_epoch_changes() {
 async fn test_validator_execution_sync_epoch_changes() {
     // Create a swarm of 4 validators using transaction syncing
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::ExecuteTransactionsFromGenesis;
@@ -419,7 +419,7 @@ async fn test_validator_execution_sync_epoch_changes() {
 async fn test_validator_intelligent_sync_epoch_changes() {
     // Create a swarm of 4 validators using transaction or output syncing
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::ExecuteOrApplyFromGenesis;
@@ -428,9 +428,9 @@ async fn test_validator_intelligent_sync_epoch_changes() {
             config.state_sync.storage_service.max_network_chunk_bytes = 10 * 1024;
             config
                 .state_sync
-                .aptos_data_client
+                .velor_data_client
                 .max_num_output_reductions = 1;
-            config.state_sync.aptos_data_client.response_timeout_ms = 1;
+            config.state_sync.velor_data_client.response_timeout_ms = 1;
         }))
         .build()
         .await;
@@ -444,7 +444,7 @@ async fn test_validator_intelligent_sync_epoch_changes() {
 async fn test_validator_execution_sync_small_network_limits() {
     // Create a swarm of 4 validators using transaction syncing and an aggressive network limit
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::ExecuteTransactionsFromGenesis;
@@ -465,7 +465,7 @@ async fn test_validator_execution_sync_unrealistic_network_limits() {
     // Create a swarm of 4 validators using transaction syncing and an unrealistic network limit.
     // This forces all chunks to be of size 1.
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::ExecuteTransactionsFromGenesis;
@@ -484,13 +484,13 @@ async fn test_validator_execution_sync_unrealistic_network_limits() {
 async fn test_validator_output_sync_exponential_backoff() {
     // Create a swarm of 4 validators using output syncing and a small response timeout
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::ApplyTransactionOutputsFromGenesis;
             config.state_sync.state_sync_driver.continuous_syncing_mode =
                 ContinuousSyncingMode::ApplyTransactionOutputs;
-            config.state_sync.aptos_data_client.response_timeout_ms = 1;
+            config.state_sync.velor_data_client.response_timeout_ms = 1;
         }))
         .build()
         .await;
@@ -503,13 +503,13 @@ async fn test_validator_output_sync_exponential_backoff() {
 async fn test_validator_execution_sync_no_compression() {
     // Create a swarm of 4 validators using transaction syncing and no compression
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::ExecuteTransactionsFromGenesis;
             config.state_sync.state_sync_driver.continuous_syncing_mode =
                 ContinuousSyncingMode::ExecuteTransactions;
-            config.state_sync.aptos_data_client.use_compression = false;
+            config.state_sync.velor_data_client.use_compression = false;
         }))
         .build()
         .await;
@@ -523,7 +523,7 @@ async fn test_validator_execution_sync_no_compression() {
 async fn test_all_validators_fast_and_output_sync() {
     // Create a swarm of 4 validators with fast and output syncing
     let swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
@@ -542,7 +542,7 @@ async fn test_all_validators_fast_and_output_sync() {
 async fn test_all_validators_fast_and_execution_sync() {
     // Create a swarm of 4 validators with fast and execution syncing
     let swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
@@ -563,14 +563,14 @@ async fn test_all_validators_fast_and_execution_sync() {
 async fn test_validator_sync_exponential_backoff(epoch_changes: bool) {
     // Create a swarm of 4 validators using fast sync and a small response timeout
     let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
             config.state_sync.state_sync_driver.continuous_syncing_mode =
                 ContinuousSyncingMode::ApplyTransactionOutputs;
-            config.state_sync.aptos_data_client.use_compression = false;
-            config.state_sync.aptos_data_client.response_timeout_ms = 1;
+            config.state_sync.velor_data_client.use_compression = false;
+            config.state_sync.velor_data_client.response_timeout_ms = 1;
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.epoch_duration_secs = 10_000; // Prevent epoch changes from occurring unnecessarily
@@ -644,7 +644,7 @@ async fn test_validator_sync_and_participate(fast_sync: bool, epoch_changes: boo
     // Create a swarm of 4 validators
     let num_validators = 4;
     let mut swarm = SwarmBuilder::new_local(num_validators)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(move |_, config, _| {
             if fast_sync {
                 // Set the bootstrapping mode to fast syncing

@@ -1,7 +1,7 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_api_types::mime_types::{BCS, JSON};
+use velor_api_types::mime_types::{BCS, JSON};
 use poem::{web::Accept, FromRequest, Request, RequestBody, Result};
 
 /// Accept types from input headers

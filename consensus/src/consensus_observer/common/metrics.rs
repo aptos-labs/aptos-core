@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::unwrap_used)]
 
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_metrics_core::{
+use velor_config::network_id::{NetworkId, PeerNetworkId};
+use velor_metrics_core::{
     exponential_buckets, register_histogram_vec, register_int_counter, register_int_counter_vec,
     register_int_gauge_vec, HistogramVec, IntCounter, IntCounterVec, IntGaugeVec,
 };

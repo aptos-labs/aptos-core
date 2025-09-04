@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
-use aptos_config::keys::ConfigKey;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
-use aptos_sdk::types::chain_id::ChainId;
-use aptos_transaction_generator_lib::AccountType;
+use velor_config::keys::ConfigKey;
+use velor_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
+use velor_sdk::types::chain_id::ChainId;
+use velor_transaction_generator_lib::AccountType;
 use clap::{ArgGroup, Parser};
 use serde::{Deserialize, Serialize};
 use std::{

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,15 +6,15 @@ use crate::{
     namespaced::NAMESPACE_SEPARATOR, CryptoStorage, Error, GetResponse, KVStorage,
     PublicKeyResponse,
 };
-use aptos_crypto::{
+use velor_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     hash::CryptoHash,
 };
-use aptos_infallible::RwLock;
-use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_vault_client::Client;
+use velor_infallible::RwLock;
+use velor_time_service::{TimeService, TimeServiceTrait};
+use velor_vault_client::Client;
 #[cfg(any(test, feature = "testing"))]
-use aptos_vault_client::ReadResponse;
+use velor_vault_client::ReadResponse;
 use chrono::DateTime;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -77,7 +77,7 @@ impl VaultStorage {
                     let next_renewal = now + (ttl as u64) / 2;
                     self.next_renewal.store(next_renewal, Ordering::Relaxed);
                 } else if let Err(e) = result {
-                    aptos_logger::error!("Unable to renew lease: {}", e.to_string());
+                    velor_logger::error!("Unable to renew lease: {}", e.to_string());
                 }
             }
         }
@@ -103,7 +103,7 @@ impl VaultStorage {
         let keys = match self.client().list_keys() {
             Ok(keys) => keys,
             // No keys were found, so there's no need to reset.
-            Err(aptos_vault_client::Error::NotFound(_, _)) => return Ok(()),
+            Err(velor_vault_client::Error::NotFound(_, _)) => return Ok(()),
             Err(e) => return Err(e.into()),
         };
         for key in keys {
@@ -278,7 +278,7 @@ impl CryptoStorage for VaultStorage {
         message: &T,
     ) -> Result<Ed25519Signature, Error> {
         let name = self.crypto_name(name);
-        let mut bytes = <T::Hasher as aptos_crypto::hash::CryptoHasher>::seed().to_vec();
+        let mut bytes = <T::Hasher as velor_crypto::hash::CryptoHasher>::seed().to_vec();
         bcs::serialize_into(&mut bytes, &message).map_err(|e| {
             Error::InternalError(format!(
                 "Serialization of signable material should not fail, yet returned Error:{}",
@@ -296,7 +296,7 @@ impl CryptoStorage for VaultStorage {
     ) -> Result<Ed25519Signature, Error> {
         let name = self.crypto_name(name);
         let vers = self.key_version(&name, &version)?;
-        let mut bytes = <T::Hasher as aptos_crypto::hash::CryptoHasher>::seed().to_vec();
+        let mut bytes = <T::Hasher as velor_crypto::hash::CryptoHasher>::seed().to_vec();
         bcs::serialize_into(&mut bytes, &message).map_err(|e| {
             Error::InternalError(format!(
                 "Serialization of signable material should not fail, yet returned Error:{}",
@@ -311,9 +311,9 @@ impl CryptoStorage for VaultStorage {
 pub mod policy {
     use super::*;
     use crate::{Capability, Identity, Policy};
-    use aptos_vault_client as vault;
+    use velor_vault_client as vault;
 
-    const APTOS_DEFAULT: &str = "aptos_default";
+    const VELOR_DEFAULT: &str = "velor_default";
 
     /// VaultStorage utilizes Vault for maintaining encrypted, authenticated data. This
     /// version currently matches the behavior of OnDiskStorage and InMemoryStorage. In the future,
@@ -340,7 +340,7 @@ pub mod policy {
         fn reset_policies(&self) -> Result<(), Error> {
             let policies = match self.client().list_policies() {
                 Ok(policies) => policies,
-                Err(aptos_vault_client::Error::NotFound(_, _)) => return Ok(()),
+                Err(velor_vault_client::Error::NotFound(_, _)) => return Ok(()),
                 Err(e) => return Err(e.into()),
             };
 
@@ -357,7 +357,7 @@ pub mod policy {
 
         /// Creates a token but uses the namespace for policies
         pub fn create_token(&self, mut policies: Vec<&str>) -> Result<String, Error> {
-            policies.push(APTOS_DEFAULT);
+            policies.push(VELOR_DEFAULT);
             let result = if let Some(ns) = &self.namespace {
                 let policies: Vec<_> = policies.iter().map(|p| format!("{}/{}", ns, p)).collect();
                 self.client()
@@ -420,7 +420,7 @@ pub mod policy {
                 match &perm.id {
                     Identity::User(id) => self.set_policy(id, engine, name, &perm.capabilities)?,
                     Identity::Anyone => {
-                        self.set_policy(APTOS_DEFAULT, engine, name, &perm.capabilities)?
+                        self.set_policy(VELOR_DEFAULT, engine, name, &perm.capabilities)?
                     },
                     Identity::NoOne => (),
                 };

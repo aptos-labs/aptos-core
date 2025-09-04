@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{counters::DKG_STAGE_SECONDS, types::DKGTranscriptRequest, DKGMessage};
 use anyhow::{anyhow, ensure, Context};
-use aptos_consensus_types::common::Author;
-use aptos_infallible::{duration_since_epoch, Mutex};
-use aptos_logger::info;
-use aptos_reliable_broadcast::BroadcastStatus;
-use aptos_types::{
+use velor_consensus_types::common::Author;
+use velor_infallible::{duration_since_epoch, Mutex};
+use velor_logger::info;
+use velor_reliable_broadcast::BroadcastStatus;
+use velor_types::{
     dkg::{DKGTrait, DKGTranscript},
     epoch_state::EpochState,
     validator_verifier::VerifyError,

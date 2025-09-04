@@ -1,10 +1,10 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::publish_util::Package;
 use crate::publishing::prebuild_packages::PrebuiltPackagesBundle;
-use aptos_framework::natives::code::PackageMetadata;
-use aptos_sdk::{
+use velor_framework::natives::code::PackageMetadata;
+use velor_sdk::{
     move_types::{
         account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     },

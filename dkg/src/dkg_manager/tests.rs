@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,12 +8,12 @@ use crate::{
     types::DKGTranscriptRequest,
     DKGMessage,
 };
-use aptos_crypto::{
+use velor_crypto::{
     bls12381::{PrivateKey, PublicKey},
     Uniform,
 };
-use aptos_infallible::RwLock;
-use aptos_types::{
+use velor_infallible::RwLock;
+use velor_types::{
     dkg::{
         dummy_dkg::DummyDKG, DKGSessionMetadata, DKGStartEvent, DKGTrait, DKGTranscript,
         DKGTranscriptMetadata,
@@ -25,7 +25,7 @@ use aptos_types::{
         ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct, ValidatorVerifier,
     },
 };
-use aptos_validator_transaction_pool::{TransactionFilter, VTxnPoolState};
+use velor_validator_transaction_pool::{TransactionFilter, VTxnPoolState};
 use move_core_types::account_address::AccountAddress;
 use std::{
     sync::Arc,

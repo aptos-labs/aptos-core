@@ -1,6 +1,6 @@
 [package]
-name = "aptos-network-builder"
-description = "Aptos network builder for constructing a network"
+name = "velor-network-builder"
+description = "Velor network builder for constructing a network"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,16 +13,16 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-channels = { workspace = true }
-aptos-config = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-event-notifications = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-netcore = { workspace = true }
-aptos-network = { workspace = true }
-aptos-network-discovery = { workspace = true }
-aptos-time-service = { workspace = true }
-aptos-types = { workspace = true }
+velor-channels = { workspace = true }
+velor-config = { workspace = true }
+velor-crypto = { workspace = true }
+velor-event-notifications = { workspace = true }
+velor-logger = { workspace = true }
+velor-netcore = { workspace = true }
+velor-network = { workspace = true }
+velor-network-discovery = { workspace = true }
+velor-time-service = { workspace = true }
+velor-types = { workspace = true }
 bcs = { workspace = true }
 futures = { workspace = true }
 maplit = { workspace = true }

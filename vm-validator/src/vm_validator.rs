@@ -1,26 +1,26 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_logger::info;
-use aptos_storage_interface::{
+use velor_logger::info;
+use velor_storage_interface::{
     state_store::state_view::{
         cached_state_view::CachedDbStateView,
         db_state_view::{DbStateView, LatestDbStateCheckpointView},
     },
     DbReader,
 };
-use aptos_types::{
+use velor_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
     state_store::{state_key::StateKey, MoveResourceExt, StateView},
     transaction::{SignedTransaction, VMValidatorResult},
-    vm::modules::AptosModuleExtension,
+    vm::modules::VelorModuleExtension,
 };
-use aptos_vm::AptosVM;
-use aptos_vm_environment::environment::AptosEnvironment;
-use aptos_vm_logging::log_schema::AdapterLogSchema;
+use velor_vm::VelorVM;
+use velor_vm_environment::environment::VelorEnvironment;
+use velor_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
 use move_binary_format::{
     errors::{Location, PartialVMError, VMResult},
@@ -40,7 +40,7 @@ use std::sync::{Arc, Mutex};
 mod vm_validator_test;
 
 pub trait TransactionValidation: Send + Sync + Clone {
-    type ValidationInstance: aptos_vm::VMValidator;
+    type ValidationInstance: velor_vm::VMValidator;
 
     /// Validate a txn from client
     fn validate_transaction(&self, _txn: SignedTransaction) -> Result<VMValidatorResult>;
@@ -59,11 +59,11 @@ struct ValidationState<S> {
     /// The raw snapshot of the state used for validation.
     state_view: S,
     /// Stores configs needed for execution.
-    environment: AptosEnvironment,
+    environment: VelorEnvironment,
     /// Versioned cache for deserialized and verified Move modules. The versioning allows to detect
     /// when the version of the code is no longer up-to-date (a newer version has been committed to
     /// the state view) and update the cache accordingly.
-    module_cache: UnsyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, usize>,
+    module_cache: UnsyncModuleCache<ModuleId, CompiledModule, Module, VelorModuleExtension, usize>,
 }
 
 impl<S: StateView> ValidationState<S> {
@@ -74,7 +74,7 @@ impl<S: StateView> ValidationState<S> {
             AdapterLogSchema::new(state_view.id(), 0),
             "Validation environment and module cache created"
         );
-        let environment = AptosEnvironment::new(&state_view);
+        let environment = VelorEnvironment::new(&state_view);
         Self {
             state_view,
             environment,
@@ -92,7 +92,7 @@ impl<S: StateView> ValidationState<S> {
     /// state view snapshot.
     fn reset_all(&mut self, state_view: S) {
         self.state_view = state_view;
-        self.environment = AptosEnvironment::new(&self.state_view);
+        self.environment = VelorEnvironment::new(&self.state_view);
         self.module_cache = UnsyncModuleCache::empty();
     }
 }
@@ -105,7 +105,7 @@ impl<S> WithRuntimeEnvironment for ValidationState<S> {
 
 impl<S: StateView> ModuleCache for ValidationState<S> {
     type Deserialized = CompiledModule;
-    type Extension = AptosModuleExtension;
+    type Extension = VelorModuleExtension;
     type Key = ModuleId;
     type Verified = Module;
     type Version = usize;
@@ -184,7 +184,7 @@ impl<S: StateView> ModuleCache for ValidationState<S> {
                 .environment
                 .runtime_environment()
                 .deserialize_into_compiled_module(state_value.bytes())?;
-            let extension = Arc::new(AptosModuleExtension::new(state_value));
+            let extension = Arc::new(VelorModuleExtension::new(state_value));
 
             let new_version = version + 1;
             let new_module_code = self.module_cache.insert_deserialized_module(
@@ -204,7 +204,7 @@ impl<S: StateView> ModuleCache for ValidationState<S> {
 
 impl<S: StateView> ModuleCodeBuilder for ValidationState<S> {
     type Deserialized = CompiledModule;
-    type Extension = AptosModuleExtension;
+    type Extension = VelorModuleExtension;
     type Key = ModuleId;
     type Verified = Module;
 
@@ -223,7 +223,7 @@ impl<S: StateView> ModuleCodeBuilder for ValidationState<S> {
         let compiled_module = self
             .runtime_environment()
             .deserialize_into_compiled_module(state_value.bytes())?;
-        let extension = Arc::new(AptosModuleExtension::new(state_value));
+        let extension = Arc::new(VelorModuleExtension::new(state_value));
         let module = ModuleCode::from_deserialized(compiled_module, extension);
         Ok(Some(module))
     }
@@ -313,7 +313,7 @@ impl PooledVMValidator {
 }
 
 impl TransactionValidation for PooledVMValidator {
-    type ValidationInstance = AptosVM;
+    type ValidationInstance = VelorVM;
 
     fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
         let vm_validator = self.get_next_vm();
@@ -326,8 +326,8 @@ impl TransactionValidation for PooledVMValidator {
 
         let vm_validator_locked = vm_validator.lock().unwrap();
 
-        use aptos_vm::VMValidator;
-        let vm = AptosVM::new(
+        use velor_vm::VMValidator;
+        let vm = VelorVM::new(
             &vm_validator_locked.state.environment,
             &vm_validator_locked.state.state_view,
         );
@@ -355,7 +355,7 @@ impl TransactionValidation for PooledVMValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aptos_types::state_store::{state_value::StateValue, MockStateView};
+    use velor_types::state_store::{state_value::StateValue, MockStateView};
     use move_binary_format::file_format::empty_module_with_dependencies_and_friends;
     use move_core_types::ident_str;
     use move_vm_runtime::ModuleStorage;

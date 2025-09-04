@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::rand::rand_gen::types::{AugData, AugDataId, CertifiedAugData, TAugmentedData};
-use aptos_schemadb::{
+use velor_schemadb::{
     define_schema,
     schema::{KeyCodec, Schema, ValueCodec},
     ColumnFamilyName,

@@ -1,0 +1,46 @@
+base:
+  role: "validator"
+  data_dir: "/opt/velor/data"
+  waypoint:
+    from_file: "/opt/velor/genesis/waypoint.txt"
+
+consensus:
+  safety_rules:
+    service:
+      type: "local"
+    backend:
+      type: "on_disk_storage"
+      path: secure-data.json
+      namespace: ~
+    initial_safety_rules_config:
+      from_file:
+        waypoint:
+          from_file: /opt/velor/genesis/waypoint.txt
+        identity_blob_path: /opt/velor/genesis/validator-identity.yaml
+
+execution:
+  genesis_file_location: "/opt/velor/genesis/genesis.blob"
+
+storage:
+  rocksdb_configs:
+    enable_storage_sharding: true
+
+validator_network:
+  discovery_method: "onchain"
+  mutual_authentication: true
+  identity:
+    type: "from_file"
+    path: /opt/velor/genesis/validator-identity.yaml
+
+full_node_networks:
+- network_id:
+    private: "vfn"
+  listen_address: "/ip4/0.0.0.0/tcp/6181"
+  identity:
+    type: "from_config"
+    key: "b0f405a3e75516763c43a2ae1d70423699f34cd68fa9f8c6bb2d67aa87d0af69"
+    peer_id: "00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237"
+
+api:
+  enabled: true
+  address: "0.0.0.0:8080"

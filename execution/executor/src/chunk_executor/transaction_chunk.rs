@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,20 +6,20 @@ use crate::{
     workflow::do_get_execution_output::DoGetExecutionOutput,
 };
 use anyhow::Result;
-use aptos_executor_types::execution_output::ExecutionOutput;
-use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::state_store::{
+use velor_executor_types::execution_output::ExecutionOutput;
+use velor_experimental_runtimes::thread_manager::optimal_min_len;
+use velor_metrics_core::TimerHelper;
+use velor_storage_interface::state_store::{
     state::LedgerState, state_view::cached_state_view::CachedStateView,
 };
-use aptos_types::{
+use velor_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     transaction::{AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version},
 };
-use aptos_vm::VMBlockExecutor;
+use velor_vm::VMBlockExecutor;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::Arc;

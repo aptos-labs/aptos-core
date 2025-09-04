@@ -6,7 +6,7 @@ on:
       branch:
         description: "Release branch to run the workflow against"
         required: true
-        default: "aptos-release-v1."
+        default: "velor-release-v1."
       override-version:
         description: "Optional version to override the calculated version"
         required: false
@@ -25,7 +25,7 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
 
-      - name: Determine next version and update aptos-node/Cargo.toml
+      - name: Determine next version and update velor-node/Cargo.toml
         uses: actions/github-script@v6
         id: determine-version
         with:
@@ -35,7 +35,7 @@ jobs:
 
             // Read Cargo.toml
             const fs = require("fs");
-            const cargoFilePath = "aptos-node/Cargo.toml";
+            const cargoFilePath = "velor-node/Cargo.toml";
             const cargoContent = fs.readFileSync(cargoFilePath, "utf8");
 
             // Extract and update the version
@@ -58,9 +58,9 @@ jobs:
               newVersion = overrideVersion;
             } else {
               // Match everything after 'v' in the branch name
-              const match = branch.match(/aptos-release-v(.*)/);
+              const match = branch.match(/velor-release-v(.*)/);
               if (!match) {
-                throw new Error(`Branch name does not match expected pattern 'aptos-release-v*'. Got: ${branch}`);
+                throw new Error(`Branch name does not match expected pattern 'velor-release-v*'. Got: ${branch}`);
               }
               const versionSuffix = match[1]; // Extract everything after 'v'
               console.log(`Version suffix extracted from branch: ${versionSuffix}`);           
@@ -90,7 +90,7 @@ jobs:
 
       - name: Update Cargo.lock
         run: |
-          cargo update -p aptos-node
+          cargo update -p velor-node
 
       - name: Create Pull Request
         id: create-pr
@@ -100,9 +100,9 @@ jobs:
           branch: update-version-${{ github.run_id }}
           base: ${{ github.event.inputs.branch }}
           title: "[${{ steps.determine-version.outputs.releaseBranch }}] Bump version to ${{ steps.determine-version.outputs.newVersion }}"
-          body: "This PR bumps the aptos-node version to ${{ steps.determine-version.outputs.newVersion }} in ${{ steps.determine-version.outputs.releaseBranch }}."
+          body: "This PR bumps the velor-node version to ${{ steps.determine-version.outputs.newVersion }} in ${{ steps.determine-version.outputs.releaseBranch }}."
           commit-message: "[${{ steps.determine-version.outputs.releaseBranch }}] Bump version to ${{ steps.determine-version.outputs.newVersion }}"
-          add-paths: "aptos-node/Cargo.toml, Cargo.lock"
+          add-paths: "velor-node/Cargo.toml, Cargo.lock"
       - name: Log PR URL
         if: ${{ steps.create-pr.outputs.pull-request-number }}
         run: |

@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{CacheConfig, IndexerGrpcManagerConfig, ServiceConfig};
-use aptos_config::utils::get_available_port;
-use aptos_indexer_grpc_server_framework::RunnableConfig;
-use aptos_indexer_grpc_utils::{
+use velor_config::utils::get_available_port;
+use velor_indexer_grpc_server_framework::RunnableConfig;
+use velor_indexer_grpc_utils::{
     config::IndexerGrpcFileStoreConfig,
     file_store_operator_v2::common::{FileStoreMetadata, METADATA_FILE_NAME},
 };

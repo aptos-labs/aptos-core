@@ -1,21 +1,21 @@
-name: "Bump aptos-node cargo version"
+name: "Bump velor-node cargo version"
 description: |
-  Bumps the aptos-node cargo version against the aptos-core branch name.
+  Bumps the velor-node cargo version against the velor-core branch name.
 inputs:
   release_tag:
     description: "The release tag which includes the version to bump"
     required: true
-  aptos_node_cargo_toml:
-    description: "The path to the aptos-node Cargo.toml file"
+  velor_node_cargo_toml:
+    description: "The path to the velor-node Cargo.toml file"
     required: true
 
 runs:
   using: composite
   steps:
-    - name: Bump aptos-node-version
+    - name: Bump velor-node-version
       shell: bash
       run: |
-        python3 ${{ github.action_path }}/bump_aptos_node_version.py
+        python3 ${{ github.action_path }}/bump_velor_node_version.py
       env:
         RELEASE_TAG: ${{ inputs.release_tag }}
-        APTOS_NODE_CARGO_TOML: ${{ inputs.aptos_node_cargo_toml }}
+        VELOR_NODE_CARGO_TOML: ${{ inputs.velor_node_cargo_toml }}

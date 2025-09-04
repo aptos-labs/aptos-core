@@ -6,4 +6,4 @@ bug: compiler internal error: file format generator: Inferred and Store AssignKi
 2 │   fun equality<T>(x: T, y: T): bool {
   │       ^^^^^^^^
   │
-  = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+  = please consider reporting this issue (see https://velor.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)

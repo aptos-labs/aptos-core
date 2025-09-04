@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,29 +6,29 @@ use crate::{
     metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
+use velor_block_executor::txn_provider::default::DefaultTxnProvider;
 #[cfg(feature = "consensus-only-perf-test")]
-use aptos_block_executor::txn_provider::TxnProvider;
-use aptos_crypto::HashValue;
-use aptos_executor_service::{
+use velor_block_executor::txn_provider::TxnProvider;
+use velor_crypto::HashValue;
+use velor_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
     remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
 };
-use aptos_executor_types::{
+use velor_executor_types::{
     execution_output::ExecutionOutput,
     planned::Planned,
     should_forward_to_subscription_service,
     transactions_with_output::{TransactionsToKeep, TransactionsWithOutput},
 };
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_logger::prelude::*;
-use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::state_store::{
+use velor_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use velor_logger::prelude::*;
+use velor_metrics_core::TimerHelper;
+use velor_storage_interface::state_store::{
     state::LedgerState, state_view::cached_state_view::CachedStateView,
 };
 #[cfg(feature = "consensus-only-perf-test")]
-use aptos_types::transaction::ExecutionStatus;
-use aptos_types::{
+use velor_types::transaction::ExecutionStatus;
+use velor_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
@@ -48,7 +48,7 @@ use aptos_types::{
     },
     write_set::{HotStateOp, TransactionWrite, WriteSet},
 };
-use aptos_vm::VMBlockExecutor;
+use velor_vm::VMBlockExecutor;
 use itertools::Itertools;
 use std::sync::Arc;
 
@@ -153,7 +153,7 @@ impl DoGetExecutionOutput {
         // there could be zero or more block epilogue transactions, and we need to handle all of
         // them.
         //
-        // TODO(HotState): it might be better to do this in AptosVM::execute_single_transaction,
+        // TODO(HotState): it might be better to do this in VelorVM::execute_single_transaction,
         // but we need to figure out how to properly construct `VMOutput` from block end info.
         for (transaction, output) in transactions.iter().zip_eq(transaction_outputs.iter_mut()) {
             if let Transaction::BlockEpilogue(payload) = transaction {
@@ -305,7 +305,7 @@ impl DoGetExecutionOutput {
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>> {
-        use aptos_types::{
+        use velor_types::{
             state_store::{StateViewId, TStateView},
             transaction::TransactionAuxiliaryData,
             write_set::WriteSet,
@@ -544,14 +544,14 @@ impl TStateView for WriteSetStateView<'_> {
     fn get_state_value(
         &self,
         state_key: &Self::Key,
-    ) -> aptos_types::state_store::StateViewResult<Option<StateValue>> {
+    ) -> velor_types::state_store::StateViewResult<Option<StateValue>> {
         Ok(self
             .write_set
             .get_write_op(state_key)
             .and_then(|write_op| write_op.as_state_value()))
     }
 
-    fn get_usage(&self) -> aptos_types::state_store::StateViewResult<StateStorageUsage> {
+    fn get_usage(&self) -> velor_types::state_store::StateViewResult<StateStorageUsage> {
         unreachable!("Not supposed to be called on WriteSetStateView.")
     }
 }
@@ -559,10 +559,10 @@ impl TStateView for WriteSetStateView<'_> {
 #[cfg(test)]
 mod tests {
     use super::Parser;
-    use aptos_storage_interface::state_store::{
+    use velor_storage_interface::state_store::{
         state::LedgerState, state_view::cached_state_view::CachedStateView,
     };
-    use aptos_types::{
+    use velor_types::{
         contract_event::ContractEvent,
         transaction::{
             AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, Transaction,

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
@@ -35,17 +35,17 @@ use crate::{
     payload_manager::TPayloadManager,
     pipeline::{buffer_manager::OrderedBlocks, execution_client::TExecutionClient},
 };
-use aptos_bounded_executor::BoundedExecutor;
-use aptos_channels::{
-    aptos_channel::{self, Receiver},
+use velor_bounded_executor::BoundedExecutor;
+use velor_channels::{
+    velor_channel::{self, Receiver},
     message_queues::QueueStyle,
 };
-use aptos_config::config::DagConsensusConfig;
-use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::{debug, info};
-use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
-use aptos_types::{
+use velor_config::config::DagConsensusConfig;
+use velor_consensus_types::common::{Author, Round};
+use velor_infallible::{Mutex, RwLock};
+use velor_logger::{debug, info};
+use velor_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
+use velor_types::{
     epoch_state::EpochState,
     on_chain_config::{
         AnchorElectionMode, DagConsensusConfigV1,
@@ -329,7 +329,7 @@ pub struct DagBootstrapper {
     rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage, DAGRpcResult>>,
     dag_network_sender: Arc<dyn TDAGNetworkSender>,
     proof_notifier: Arc<dyn ProofNotifier>,
-    time_service: aptos_time_service::TimeService,
+    time_service: velor_time_service::TimeService,
     payload_manager: Arc<dyn TPayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
     ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
@@ -354,7 +354,7 @@ impl DagBootstrapper {
         rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage, DAGRpcResult>>,
         dag_network_sender: Arc<dyn TDAGNetworkSender>,
         proof_notifier: Arc<dyn ProofNotifier>,
-        time_service: aptos_time_service::TimeService,
+        time_service: velor_time_service::TimeService,
         payload_manager: Arc<dyn TPayloadManager>,
         payload_client: Arc<dyn PayloadClient>,
         ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
@@ -737,14 +737,14 @@ pub(super) fn bootstrap_dag_for_test(
     rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage, DAGRpcResult>>,
     dag_network_sender: Arc<dyn TDAGNetworkSender>,
     proof_notifier: Arc<dyn ProofNotifier>,
-    time_service: aptos_time_service::TimeService,
+    time_service: velor_time_service::TimeService,
     payload_manager: Arc<dyn TPayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
     execution_client: Arc<dyn TExecutionClient>,
 ) -> (
     JoinHandle<SyncOutcome>,
     JoinHandle<()>,
-    aptos_channel::Sender<Author, IncomingDAGRequest>,
+    velor_channel::Sender<Author, IncomingDAGRequest>,
     UnboundedReceiver<OrderedBlocks>,
 ) {
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
@@ -773,7 +773,7 @@ pub(super) fn bootstrap_dag_for_test(
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();
 
-    let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
+    let (dag_rpc_tx, dag_rpc_rx) = velor_channel::new(QueueStyle::FIFO, 64, None);
 
     let dh_handle = tokio::spawn(async move {
         let mut dag_rpc_rx = dag_rpc_rx;

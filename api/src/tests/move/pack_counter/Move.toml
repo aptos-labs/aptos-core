@@ -3,7 +3,7 @@ name = "pack_counter"
 version = "0.0.0"
 
 [dependencies]
-AptosFramework = { local = "../../../../../aptos-move/framework/aptos-framework" }
+VelorFramework = { local = "../../../../../velor-move/framework/velor-framework" }
 
 [addresses]
 addr = "_"

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,8 +8,8 @@ use crate::{
     },
     test_utils::create_vec_signed_transactions,
 };
-use aptos_temppath::TempPath;
-use aptos_types::{account_address::AccountAddress, quorum_store::BatchId};
+use velor_temppath::TempPath;
+use velor_types::{account_address::AccountAddress, quorum_store::BatchId};
 use claims::assert_ok;
 
 #[test]

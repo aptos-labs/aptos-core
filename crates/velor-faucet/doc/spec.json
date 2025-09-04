@@ -1,0 +1,369 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Velor Tap",
+    "description": "todo",
+    "version": "0.1.0",
+    "contact": {
+      "name": "Velor Labs",
+      "url": "https://github.com/velor-chain"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    }
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Captcha",
+      "description": "Captcha API"
+    },
+    {
+      "name": "Fund",
+      "description": "API for funding accounts."
+    },
+    {
+      "name": "General",
+      "description": "General information"
+    }
+  ],
+  "paths": {
+    "/spec": {
+      "get": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Show OpenAPI explorer",
+        "description": "Provides a UI that you can use to explore the API. You can also\nretrieve the API directly at `/spec.yaml` and `/spec.json`.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "spec"
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Check API health",
+        "description": "Basic endpoint that always returns Ok for health.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "root"
+      }
+    },
+    "/request_captcha": {
+      "get": {
+        "tags": [
+          "Captcha"
+        ],
+        "summary": "Initiate captcha flow",
+        "description": "With this endpoint you can initiate a captcha flow. The response will\ncontain an image (the captcha to solve) in the body and a code in the\nheader that you must include in the call to `/fund`. This endpoint is\nonly relevant if the CaptchaChecker is enabled.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "CAPTCHA_KEY": {
+                "description": "Captcha key",
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint32"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VelorTapError"
+                }
+              }
+            },
+            "headers": {
+              "CAPTCHA_KEY": {
+                "description": "Captcha key",
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint32"
+                }
+              },
+              "RETRY-AFTER": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "request_captcha"
+      }
+    },
+    "/fund": {
+      "post": {
+        "tags": [
+          "Fund"
+        ],
+        "summary": "Funds an account",
+        "description": "With this endpoint a user can create and fund an account. Depending on\nthe configured funding backend, this may do different things under the\nhood (e.g. minting vs transferring) and have different funding semantics\n(e.g. whether it will fund an account if it already exists).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VelorTapError"
+                }
+              }
+            },
+            "headers": {
+              "RETRY-AFTER": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "fund"
+      }
+    },
+    "/is_eligible": {
+      "post": {
+        "tags": [
+          "Fund"
+        ],
+        "summary": "Check whether a given requester is eligible to be funded",
+        "description": "This function runs only the various eligibility checks that we perform\nin `fund` without actually funding the account or writing anything to\nstorage. If the request is valid it returns an empty 200. If it is invalid\nit returns a 400 or 403 with an explanation in the response body.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VelorTapError"
+                }
+              }
+            },
+            "headers": {
+              "RETRY-AFTER": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "is_eligible"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "VelorTapError": {
+        "type": "object",
+        "description": "This is the generic struct we use for all API errors, it contains a string\nmessage and a service specific error code.",
+        "required": [
+          "message",
+          "error_code",
+          "rejection_reasons",
+          "txn_hashes"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "A message describing the error"
+          },
+          "error_code": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VelorTapErrorCode"
+              },
+              {
+                "description": "A code describing the error for programmatic use."
+              }
+            ]
+          },
+          "rejection_reasons": {
+            "type": "array",
+            "description": "If we're returning a 403 because we're rejecting the mint request, this\ncontains additional reasons why.",
+            "items": {
+              "$ref": "#/components/schemas/RejectionReason"
+            }
+          },
+          "txn_hashes": {
+            "type": "array",
+            "description": "Submitted transaction hashes, if it got to that point.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "VelorTapErrorCode": {
+        "type": "string",
+        "description": "These codes provide more granular error information beyond just the HTTP\nstatus code of the response.",
+        "enum": [
+          "YeahNahYeahYeahYeahNahYeahNah",
+          "InvalidRequest",
+          "AccountDoesNotExist",
+          "Rejected",
+          "SourceIpMissing",
+          "TransactionFailed",
+          "EndpointNotEnabled",
+          "VelorApiError",
+          "BypasserError",
+          "CheckerError",
+          "StorageError",
+          "FunderAccountProblem",
+          "TransactionTimedOut",
+          "SerializationError",
+          "ServerOverloaded",
+          "WebFrameworkError"
+        ]
+      },
+      "FundRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "uint64",
+            "description": "If not set, the default is the preconfigured max funding amount. If set,\nwe will use this amount instead assuming it is < than the maximum,\notherwise we'll just use the maximum."
+          },
+          "auth_key": {
+            "type": "string",
+            "description": "Either this or `address` / `pub_key` must be provided."
+          },
+          "address": {
+            "type": "string",
+            "description": "Either this or `auth_key` / `pub_key` must be provided."
+          },
+          "pub_key": {
+            "type": "string",
+            "description": "Either this or `auth_key` / `address` must be provided."
+          }
+        }
+      },
+      "FundResponse": {
+        "type": "object",
+        "required": [
+          "txn_hashes"
+        ],
+        "properties": {
+          "txn_hashes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RejectionReason": {
+        "type": "object",
+        "required": [
+          "reason",
+          "code"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "code": {
+            "$ref": "#/components/schemas/RejectionReasonCode"
+          }
+        }
+      },
+      "RejectionReasonCode": {
+        "type": "string",
+        "enum": [
+          "Hehe",
+          "AccountAlreadyExists",
+          "IpUsageLimitExhausted",
+          "IpInBlocklist",
+          "RequestFromVpn",
+          "RequestFromCloud",
+          "MagicHeaderIncorrect",
+          "CaptchaInvalid",
+          "AuthTokenInvalid"
+        ]
+      }
+    }
+  }
+}

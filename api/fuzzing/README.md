@@ -5,10 +5,10 @@ This project uses [RESTler](https://github.com/microsoft/restler-fuzzer) (from M
 ## Quick start
 To get started with fuzzing, first make sure you have an API running locally:
 ```
-cargo run -p aptos -- node run-local-testnet --faucet-port 8081 --force-restart --assume-yes
+cargo run -p velor -- node run-local-testnet --faucet-port 8081 --force-restart --assume-yes
 ```
 
-And ensure that you have Docker running on your system. Then, run the following commands from the root of `aptos-core`:
+And ensure that you have Docker running on your system. Then, run the following commands from the root of `velor-core`:
 ```
 api/fuzzing/fuzz_api.py -d compile
 api/fuzzing/fuzz_api.py -d test --suite lean

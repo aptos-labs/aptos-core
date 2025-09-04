@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
@@ -13,8 +13,8 @@ use crate::{
     },
     network_id::NetworkId,
 };
-use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
-use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
+use velor_crypto::{x25519, ValidCryptoMaterialStringExt};
+use velor_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
 use maplit::hashset;
 use serde_yaml::Value;
 use std::{collections::HashMap, str::FromStr};
@@ -32,7 +32,7 @@ const IDENTITY_KEY_FILE: &str = "ephemeral_identity_key";
 const MAINNET_SEED_PEERS: [(&str, &str, &str); 1] = [(
     "568fdb6acf26aae2a84419108ff13baa3ebf133844ef18e23a9f47b5af16b698",
     "0x003cc2ed36e7d486539ac2c411b48d962f1ef17d884c3a7109cad43f16bd5008",
-    "/dns/node1.cloud-b.mainnet.aptoslabs.com/tcp/6182/noise-ik/0x003cc2ed36e7d486539ac2c411b48d962f1ef17d884c3a7109cad43f16bd5008/handshake/0",
+    "/dns/node1.cloud-b.mainnet.velorlabs.com/tcp/6182/noise-ik/0x003cc2ed36e7d486539ac2c411b48d962f1ef17d884c3a7109cad43f16bd5008/handshake/0",
 )];
 
 // Testnet seed peers. Each seed peer entry is a tuple
@@ -41,22 +41,22 @@ const TESTNET_SEED_PEERS: [(&str, &str, &str); 4] = [
     (
         "31e55012a7d439dcd16fee0509cd5855c1fbdc62057ba7fac3f7c88f5453dd8e",
         "0x87bb19b02580b7e2a91a8e9342ec77ffd8f3ad967f54e77b22aaf558c5c11755",
-        "/dns/seed0.testnet.aptoslabs.com/tcp/6182/noise-ik/0x87bb19b02580b7e2a91a8e9342ec77ffd8f3ad967f54e77b22aaf558c5c11755/handshake/0",
+        "/dns/seed0.testnet.velorlabs.com/tcp/6182/noise-ik/0x87bb19b02580b7e2a91a8e9342ec77ffd8f3ad967f54e77b22aaf558c5c11755/handshake/0",
     ),
     (
         "116176e2af223a8b7f8db80dc52f7a423b4d7f8c0553a1747e92ef58849aff4f",
         "0xc2f24389f31c9c18d2ceb69d153ad9299e0ea7bbd66f457e0a28ef41c77c2b64",
-        "/dns/seed1.testnet.aptoslabs.com/tcp/6182/noise-ik/0xc2f24389f31c9c18d2ceb69d153ad9299e0ea7bbd66f457e0a28ef41c77c2b64/handshake/0",
+        "/dns/seed1.testnet.velorlabs.com/tcp/6182/noise-ik/0xc2f24389f31c9c18d2ceb69d153ad9299e0ea7bbd66f457e0a28ef41c77c2b64/handshake/0",
     ),
     (
         "12000330d7cd8a748f46c25e6ce5d236a27e13d0b510d4516ac84ecc5fddd002",
         "0x171c661e5b785283978a74eafc52a906e68c73ae78119737b92f93507c753933",
-        "/dns/seed2.testnet.aptoslabs.com/tcp/6182/noise-ik/0x171c661e5b785283978a74eafc52a906e68c73ae78119737b92f93507c753933/handshake/0",
+        "/dns/seed2.testnet.velorlabs.com/tcp/6182/noise-ik/0x171c661e5b785283978a74eafc52a906e68c73ae78119737b92f93507c753933/handshake/0",
     ),
     (
         "03c04549114877c55f45649aba48ac0a4ff086ab7bdce3b8cc8d3d9947bc0d99",
         "0xafc38bf177bd825326a1c314748612137d2b35dae6472932806806a32c23174a",
-        "/dns/seed3.testnet.aptoslabs.com/tcp/6182/noise-ik/0xafc38bf177bd825326a1c314748612137d2b35dae6472932806806a32c23174a/handshake/0",
+        "/dns/seed3.testnet.velorlabs.com/tcp/6182/noise-ik/0xafc38bf177bd825326a1c314748612137d2b35dae6472932806806a32c23174a/handshake/0",
     ),
 ];
 
@@ -328,8 +328,8 @@ mod tests {
         },
         network_id::NetworkId,
     };
-    use aptos_crypto::{Uniform, ValidCryptoMaterial};
-    use aptos_types::{account_address::AccountAddress, waypoint::Waypoint};
+    use velor_crypto::{Uniform, ValidCryptoMaterial};
+    use velor_types::{account_address::AccountAddress, waypoint::Waypoint};
     use rand::rngs::OsRng;
     use std::{io::Write, path::PathBuf};
     use tempfile::{tempdir, NamedTempFile};
@@ -499,7 +499,7 @@ mod tests {
                   seeds:
                       bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a:
                           addresses:
-                              - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/handshake/0"
+                              - "/dns4/pfn0.node.devnet.velorlabs.com/tcp/6182/noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/handshake/0"
                           role: "Upstream"
             "#,
         )

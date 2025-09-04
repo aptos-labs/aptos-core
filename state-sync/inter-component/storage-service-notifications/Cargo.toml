@@ -1,5 +1,5 @@
 [package]
-name = "aptos-storage-service-notifications"
+name = "velor-storage-service-notifications"
 description = "The notification interface between state sync and the storage service"
 version = "0.1.0"
 
@@ -13,13 +13,13 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-channels = { workspace = true }
+velor-channels = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-aptos-crypto = { workspace = true }
+velor-crypto = { workspace = true }
 claims = { workspace = true }
 tokio = { workspace = true }

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
@@ -13,7 +13,7 @@ use crate::{
     schema::user_transactions,
     util::{parse_timestamp, parse_timestamp_secs, standardize_address, u64_to_bigdecimal},
 };
-use aptos_api_types::{TransactionPayload, UserTransaction as APIUserTransaction};
+use velor_api_types::{TransactionPayload, UserTransaction as APIUserTransaction};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

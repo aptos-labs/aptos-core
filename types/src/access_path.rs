@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -43,7 +43,7 @@ use crate::{
     state_store::state_key::{inner::StateKeyInner, StateKey},
 };
 use anyhow::{Error, Result};
-use aptos_crypto::hash::HashValue;
+use velor_crypto::hash::HashValue;
 use move_core_types::language_storage::{ModuleId, StructTag};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;

@@ -202,7 +202,7 @@ def list_eks_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
         cluster_result: AwsListClusterResult = json.loads(cluster_json.decode())
         clusters: Dict[str, ForgeCluster] = {}
         for cluster_name in cluster_result["clusters"]:
-            if cluster_name.startswith("aptos-forge-"):
+            if cluster_name.startswith("velor-forge-"):
                 clusters[cluster_name] = ForgeCluster(
                     cloud=Cloud.AWS,
                     name=cluster_name,
@@ -221,7 +221,7 @@ def list_gke_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
         clusters: Dict[str, ForgeCluster] = {}
         for cluster_config in cluster_result:
             cluster_name = cluster_config["name"]
-            if cluster_name.startswith("aptos-forge-"):
+            if cluster_name.startswith("velor-forge-"):
                 clusters[cluster_name] = ForgeCluster(
                     cloud=Cloud.GCP,
                     name=cluster_name,

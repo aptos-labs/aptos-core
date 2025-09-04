@@ -1,0 +1,22 @@
+[package]
+name = "velor-drop-helper"
+description = "Velor Drop Helper"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+velor-infallible = { workspace = true }
+velor-metrics-core = { workspace = true }
+once_cell = { workspace = true }
+threadpool = { workspace = true }
+
+[dev-dependencies]
+rayon = { workspace = true }

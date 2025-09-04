@@ -7,7 +7,7 @@ manageImages: true
 chain:
   # -- Bump this number to wipe the underlying storage
   era: 1
-  # -- Name of the testnet to connect to. There must be a corresponding entry in .Values.aptos_chains
+  # -- Name of the testnet to connect to. There must be a corresponding entry in .Values.velor_chains
   name: devnet
   # -- The value of the `chain_name` label. If empty, defaults to `.Values.chain.name`
   label:
@@ -17,19 +17,19 @@ chain:
   genesisSecret:
 
 # -- For each supported chain, specify the URLs from which to download the genesis.blob and waypoint.txt
-aptos_chains:
+velor_chains:
   devnet:
-    waypoint_txt_url: https://devnet.aptoslabs.com/waypoint.txt
-    genesis_blob_url: https://devnet.aptoslabs.com/genesis.blob
+    waypoint_txt_url: https://devnet.velorlabs.com/waypoint.txt
+    genesis_blob_url: https://devnet.velorlabs.com/genesis.blob
   testnet:
-    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis_waypoint.txt
-    genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis.blob
+    waypoint_txt_url: https://raw.githubusercontent.com/velor-chain/velor-networks/main/testnet/genesis_waypoint.txt
+    genesis_blob_url: https://raw.githubusercontent.com/velor-chain/velor-networks/main/testnet/genesis.blob
   mainnet:
-    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt
-    genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/genesis.blob
+    waypoint_txt_url: https://raw.githubusercontent.com/velor-chain/velor-networks/main/mainnet/waypoint.txt
+    genesis_blob_url: https://raw.githubusercontent.com/velor-chain/velor-networks/main/mainnet/genesis.blob
 
 fullnode:
-  # -- Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
+  # -- Fullnode configuration. See NodeConfig https://github.com/velor-chain/velor-core/blob/main/config/src/config/mod.rs
   config:
     full_node_networks:
       # The first item in the array `full_node_networks` must always refer to the public fullnode network
@@ -43,7 +43,7 @@ rust_log: info
 
 image:
   # -- Image repo to use for fullnode images. Fullnodes and validators use the same image
-  repo: aptoslabs/validator
+  repo: velorlabs/validator
   # -- Image tag to use for fullnode images. If set, overrides `imageTag`
   tag:
   # -- Image pull policy to use for fullnode images
@@ -70,7 +70,7 @@ storage:
   snapshotRefForRestore:
 
 service:
-  # -- The Kubernetes ServiceType to use for the fullnode. Change this to LoadBalancer expose the REST API, aptosnet endpoint externally
+  # -- The Kubernetes ServiceType to use for the fullnode. Change this to LoadBalancer expose the REST API, velornet endpoint externally
   type: ClusterIP
   # -- Whether to expose the node REST API
   exposeApi: true
@@ -111,7 +111,7 @@ metrics:
 backup:
   image:
     # -- Image repo to use for backup images
-    repo: aptoslabs/tools
+    repo: velorlabs/tools
     # -- Image tag to use for backup images
     tag:
     # -- Image pull policy to use for backup images
@@ -182,7 +182,7 @@ backup_compaction:
 restore:
   image:
     # -- Image repo to use for restore images
-    repo: aptoslabs/tools
+    repo: velorlabs/tools
     # -- Image tag to use for restore images
     tag:
     # -- Image pull policy to use for restore images

@@ -5,8 +5,8 @@ updates:
     schedule:
       interval: "daily"
     reviewers:
-      - "aptos-labs/security"
-      - "aptos-labs/prod-eng"
+      - "velor-chain/security"
+      - "velor-chain/prod-eng"
     labels:
       - "CICD:run-e2e-tests"
       - "dependencies"

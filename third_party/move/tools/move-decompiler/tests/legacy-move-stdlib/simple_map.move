@@ -4,7 +4,7 @@
 /// 3) A Key can be found within O(N) time
 /// 4) The keys are unsorted.
 /// 5) Adds and removals take O(N) time
-module aptos_std::simple_map {
+module velor_std::simple_map {
     use std::error;
     use std::option;
     use std::vector;

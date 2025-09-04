@@ -6,5 +6,5 @@ error: failed to parse manifest
 4 |
 5 | [dependencies]
 6 | a = { local = "../a", address = "0x123" }
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ redundant field "address" -- only needed for "aptos" dependencies
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ redundant field "address" -- only needed for "velor" dependencies
   |

@@ -1,0 +1,11 @@
+[package]
+name = "test_package"
+version = "0.0.0"
+upgrade_policy = "compatible"
+
+[dependencies]
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-framework", rev = "mainnet" }
+
+[addresses]
+# change it to `source_addr = "_" when calling `create-resource-account-and-publish-package` from the cli
+source_addr = "0xcafe"

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
     monitor,
@@ -11,15 +11,15 @@ use crate::{
         utils::{MempoolProxy, TimeExpirations},
     },
 };
-use aptos_config::config::QuorumStoreConfig;
-use aptos_consensus_types::{
+use velor_config::config::QuorumStoreConfig;
+use velor_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
     proof_of_store::BatchInfo,
 };
-use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_logger::prelude::*;
-use aptos_mempool::QuorumStoreRequest;
-use aptos_types::{quorum_store::BatchId, transaction::SignedTransaction, PeerId};
+use velor_experimental_runtimes::thread_manager::optimal_min_len;
+use velor_logger::prelude::*;
+use velor_mempool::QuorumStoreRequest;
+use velor_types::{quorum_store::BatchId, transaction::SignedTransaction, PeerId};
 use futures_channel::mpsc::Sender;
 use rayon::prelude::*;
 use std::{
@@ -92,7 +92,7 @@ impl BatchGenerator {
             id.increment();
             id
         } else {
-            BatchId::new(aptos_infallible::duration_since_epoch().as_micros() as u64)
+            BatchId::new(velor_infallible::duration_since_epoch().as_micros() as u64)
         };
         debug!("Initialized with batch_id of {}", batch_id);
         let mut incremented_batch_id = batch_id;
@@ -363,7 +363,7 @@ impl BatchGenerator {
         counters::BATCH_CREATION_DURATION.observe_duration(self.last_end_batch_time.elapsed());
 
         let bucket_compute_start = Instant::now();
-        let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
+        let expiry_time = velor_infallible::duration_since_epoch().as_micros() as u64
             + self.config.batch_expiry_gap_when_init_usecs;
         let batches = self.bucket_into_batches(&mut pulled_txns, expiry_time);
         self.last_end_batch_time = Instant::now();
@@ -378,7 +378,7 @@ impl BatchGenerator {
         batch_id: BatchId,
         txns: Vec<SignedTransaction>,
     ) {
-        let expiry_time_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64
+        let expiry_time_usecs = velor_infallible::duration_since_epoch().as_micros() as u64
             + self.config.remote_batch_expiry_gap_when_init_usecs;
         self.insert_batch(author, batch_id, txns, expiry_time_usecs);
     }

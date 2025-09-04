@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -18,18 +18,18 @@ use crate::{
     },
     utils::OutputFallbackHandler,
 };
-use aptos_config::config::ContinuousSyncingMode;
-use aptos_consensus_notifications::{
+use velor_config::config::ContinuousSyncingMode;
+use velor_consensus_notifications::{
     ConsensusSyncDurationNotification, ConsensusSyncTargetNotification,
 };
-use aptos_data_streaming_service::{
+use velor_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     streaming_client::{NotificationAndFeedback, NotificationFeedback},
 };
-use aptos_infallible::Mutex;
-use aptos_storage_service_types::Epoch;
-use aptos_time_service::TimeService;
-use aptos_types::transaction::{
+use velor_infallible::Mutex;
+use velor_storage_service_types::Epoch;
+use velor_time_service::TimeService;
+use velor_types::transaction::{
     TransactionOutputListWithProof, TransactionOutputListWithProofV2, Version,
 };
 use claims::assert_matches;
@@ -796,7 +796,7 @@ fn create_continuous_syncer(
     OutputFallbackHandler,
 ) {
     // Initialize the logger for tests
-    aptos_logger::Logger::init_for_testing();
+    velor_logger::Logger::init_for_testing();
 
     // Create the mock storage synchronizer
     let mock_storage_synchronizer = create_ready_storage_synchronizer(expect_reset_executor);

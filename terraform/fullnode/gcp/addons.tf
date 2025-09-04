@@ -11,7 +11,7 @@ resource "google_project_iam_member" "k8s-gcp-integrations-dns" {
 resource "google_service_account_iam_binding" "k8s-gcp-integrations" {
   service_account_id = google_service_account.k8s-gcp-integrations.name
   role               = "roles/iam.workloadIdentityUser"
-  members            = ["serviceAccount:${google_container_cluster.aptos.workload_identity_config[0].workload_pool}[kube-system/k8s-gcp-integrations]"]
+  members            = ["serviceAccount:${google_container_cluster.velor.workload_identity_config[0].workload_pool}[kube-system/k8s-gcp-integrations]"]
 }
 
 resource "kubernetes_service_account" "k8s-gcp-integrations" {
@@ -57,7 +57,7 @@ resource "helm_release" "external-dns" {
       extraArgs = [
         "--google-project=${local.zone_project}",
         "--txt-owner-id=${terraform.workspace}",
-        "--txt-prefix=aptos",
+        "--txt-prefix=velor",
       ]
     })
   ]
@@ -81,7 +81,7 @@ resource "helm_release" "pfn-addons" {
       ingress = {
         class                           = "gce"
         backend_http2                   = var.backend_http2
-        gce_managed_certificate         = var.create_google_managed_ssl_certificate ? "aptos-${local.workspace_name}-ingress" : null
+        gce_managed_certificate         = var.create_google_managed_ssl_certificate ? "velor-${local.workspace_name}-ingress" : null
         gce_managed_certificate_domains = var.create_google_managed_ssl_certificate ? join(",", distinct(concat([local.domain], var.tls_sans))) : ""
         # loadBalancerSourceRanges = var.client_sources_ipv4 # not supported yet
       }

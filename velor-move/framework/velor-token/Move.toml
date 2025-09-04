@@ -1,0 +1,12 @@
+[package]
+name = "VelorToken"
+version = "1.0.0"
+
+[addresses]
+std = "0x1"
+velor_framework = "0x1"
+velor_token = "0x3"
+
+[dependencies]
+MoveStdlib = { local = "../move-stdlib" }
+VelorFramework = { local = "../velor-framework"}

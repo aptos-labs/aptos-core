@@ -1,4 +1,4 @@
-// See also: github.com/aptos-labs/aptos-core/security/advisories/GHSA-7v29-m9hj-jxjf
+// See also: github.com/velor-chain/velor-core/security/advisories/GHSA-7v29-m9hj-jxjf
 //# publish
 module 0x42::pwn {
     struct R1 has key {f:u8}

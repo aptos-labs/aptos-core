@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{models::transactions::Transaction, schema::move_resources, util::standardize_address};
 use anyhow::{Context, Result};
-use aptos_api_types::{DeleteResource, MoveStructTag as APIMoveStructTag, WriteResource};
+use velor_api_types::{DeleteResource, MoveStructTag as APIMoveStructTag, WriteResource};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 #[derive(

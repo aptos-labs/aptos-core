@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_consensus_types::{common::Round, safety_data::SafetyData};
-use aptos_types::waypoint::Waypoint;
+use velor_consensus_types::{common::Round, safety_data::SafetyData};
+use velor_types::waypoint::Waypoint;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 

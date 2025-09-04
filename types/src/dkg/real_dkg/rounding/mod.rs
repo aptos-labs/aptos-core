@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, ensure};
-use aptos_dkg::pvss::WeightedConfig;
+use velor_dkg::pvss::WeightedConfig;
 use fixed::types::U64F64;
 use once_cell::sync::Lazy;
 use std::{

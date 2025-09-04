@@ -1,6 +1,6 @@
 [package]
-name = "aptos-indexer-grpc-manager"
-description = "Aptos Indexer gRPC Manager"
+name = "velor-indexer-grpc-manager"
+description = "Velor Indexer gRPC Manager"
 version = "1.0.0"
 
 # Workspace inherited keys
@@ -14,10 +14,10 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-indexer-grpc-server-framework = { workspace = true }
-aptos-indexer-grpc-utils = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-protos = { workspace = true }
+velor-indexer-grpc-server-framework = { workspace = true }
+velor-indexer-grpc-utils = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-protos = { workspace = true }
 async-trait = { workspace = true }
 build_html = { workspace = true }
 clap = { workspace = true }
@@ -35,7 +35,7 @@ tracing = { workspace = true }
 warp = { workspace = true }
 
 [dev-dependencies]
-aptos-config = { workspace = true }
+velor-config = { workspace = true }
 serde_json = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pipeline::{CommitBlockMessage, LedgerUpdateMessage};
-use aptos_executor::block_executor::BlockExecutor;
-use aptos_executor_types::BlockExecutorTrait;
-use aptos_infallible::Mutex;
-use aptos_vm::VMBlockExecutor;
+use velor_executor::block_executor::BlockExecutor;
+use velor_executor_types::BlockExecutorTrait;
+use velor_infallible::Mutex;
+use velor_vm::VMBlockExecutor;
 use move_core_types::language_storage::StructTag;
 use std::{
     collections::BTreeMap,

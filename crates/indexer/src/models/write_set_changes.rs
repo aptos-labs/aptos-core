@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
 use super::{
@@ -10,7 +10,7 @@ use super::{
 use crate::{
     models::transactions::Transaction, schema::write_set_changes, util::standardize_address,
 };
-use aptos_api_types::WriteSetChange as APIWriteSetChange;
+use velor_api_types::WriteSetChange as APIWriteSetChange;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 

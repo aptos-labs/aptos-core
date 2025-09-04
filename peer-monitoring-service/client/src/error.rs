@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_network::protocols::network::RpcError;
-use aptos_peer_monitoring_service_types::{
+use velor_network::protocols::network::RpcError;
+use velor_peer_monitoring_service_types::{
     response::UnexpectedResponseError, PeerMonitoringServiceError,
 };
 use thiserror::Error;
@@ -15,7 +15,7 @@ pub enum Error {
     #[error("Error from remote monitoring service: {0}")]
     PeerMonitoringServiceError(#[from] PeerMonitoringServiceError),
 
-    #[error("Aptos network rpc error: {0}")]
+    #[error("Velor network rpc error: {0}")]
     RpcError(#[from] RpcError),
 
     #[error("Unexpected error encountered: {0}")]
@@ -34,8 +34,8 @@ impl Error {
     }
 }
 
-impl From<aptos_network::application::error::Error> for Error {
-    fn from(error: aptos_network::application::error::Error) -> Self {
+impl From<velor_network::application::error::Error> for Error {
+    fn from(error: velor_network::application::error::Error) -> Self {
         Error::NetworkError(error.to_string())
     }
 }

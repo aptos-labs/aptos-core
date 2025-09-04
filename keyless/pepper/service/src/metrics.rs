@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_inspection_service::utils::get_encoded_metrics;
-use aptos_metrics_core::{exponential_buckets, register_histogram_vec, HistogramVec, TextEncoder};
+use velor_inspection_service::utils::get_encoded_metrics;
+use velor_metrics_core::{exponential_buckets, register_histogram_vec, HistogramVec, TextEncoder};
 use hyper::{header::CONTENT_TYPE, Body, Method, StatusCode};
 use once_cell::sync::Lazy;
 use std::convert::Infallible;

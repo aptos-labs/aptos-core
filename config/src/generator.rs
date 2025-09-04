@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -68,7 +68,7 @@ pub fn validator_swarm_for_testing(nodes: usize) -> ValidatorSwarm {
 /// with a fully formatted `NetworkAddress` containing its network identity pubkey
 /// and handshake protocol version.
 pub fn build_seed_for_network(seed_config: &NetworkConfig, seed_role: PeerRole) -> PeerSet {
-    let seed_pubkey = aptos_crypto::PrivateKey::public_key(&seed_config.identity_key());
+    let seed_pubkey = velor_crypto::PrivateKey::public_key(&seed_config.identity_key());
     let seed_addr = seed_config
         .listen_address
         .clone()

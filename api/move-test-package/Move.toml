@@ -6,4 +6,4 @@ version = "0.0.0"
 # test user address to be installed dynamically on build
 
 [dependencies]
-AptosFramework = { local = "../../aptos-move/framework/aptos-framework" }
+VelorFramework = { local = "../../velor-move/framework/velor-framework" }

@@ -1,0 +1,6 @@
+[package]
+name = "Pack1"
+version = "0.0.0"
+
+[dependencies]
+Pack2 = { velor = "http://localhost:8080", address = "default" }

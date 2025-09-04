@@ -1,23 +1,23 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
 use anyhow::{anyhow, ensure, Context, Result};
-use aptos_config::{
+use velor_config::{
     config::{NodeConfig, SECURE_STORAGE_FILENAME},
     keys::ConfigKey,
 };
-use aptos_db::{
+use velor_db::{
     common::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME},
     fast_sync_storage_wrapper::SECONDARY_DB_DIR,
 };
-use aptos_logger::{debug, info};
-use aptos_sdk::{
+use velor_logger::{debug, info};
+use velor_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{account_address::AccountAddress, PeerId},
 };
-use aptos_state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
+use velor_state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
 use std::{
     env,
     fs::{self, OpenOptions},

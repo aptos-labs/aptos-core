@@ -1,0 +1,7 @@
+[package]
+name = "TooLargeTest"
+version = "0.0.0"
+
+[dependencies]
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-framework", rev = "mainnet" }
+MoveStdlib = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "move-stdlib", rev = "mainnet" }

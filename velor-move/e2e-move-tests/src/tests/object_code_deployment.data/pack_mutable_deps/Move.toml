@@ -1,0 +1,8 @@
+[package]
+name = "test_mutable_deps"
+version = "0.0.0"
+upgrade_policy = "compatible"
+
+[dependencies]
+VelorFramework = { local = "../../../../../framework/velor-framework" }
+test_package = { local = "../pack_upgrade_compat" }

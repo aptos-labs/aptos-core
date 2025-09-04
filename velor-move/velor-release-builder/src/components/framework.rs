@@ -1,0 +1,146 @@
+// Copyright © Velor Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::{velor_core_path, components::get_execution_hash};
+use anyhow::Result;
+use velor_crypto::HashValue;
+use velor_framework::{BuildOptions, BuiltPackage, ReleasePackage};
+use velor_temppath::TempPath;
+use velor_types::account_address::AccountAddress;
+use git2::Repository;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
+pub struct FrameworkReleaseConfig {
+    /// Move bytecode version the framework release would be compiled to.
+    pub bytecode_version: u32,
+    /// Compile the framework release at a given git commit hash.
+    /// If set to None, we will use the velor framework under current repo.
+    pub git_hash: Option<String>,
+}
+
+pub fn generate_upgrade_proposals(
+    config: &FrameworkReleaseConfig,
+    is_testnet: bool,
+    next_execution_hash: Option<HashValue>,
+    is_multi_step: bool,
+) -> Result<Vec<(String, String)>> {
+    assert!(
+        is_multi_step || next_execution_hash.is_none(),
+        "only multi-step proposals can have a next execution hash"
+    );
+
+    const VELOR_GIT_PATH: &str = "https://github.com/velor-chain/velor-core.git";
+
+    // NOTE: This is skipping 0x7 (velor-experimental package) which is only meant to be released
+    // to devnet (or local testnet) via the genesis process and never released/upgraded in testnet
+    // or mainnet.
+    let mut package_path_list = [
+        ("0x1", "velor-move/framework/move-stdlib"),
+        ("0x1", "velor-move/framework/velor-stdlib"),
+        ("0x1", "velor-move/framework/velor-framework"),
+        ("0x3", "velor-move/framework/velor-token"),
+        ("0x4", "velor-move/framework/velor-token-objects"),
+    ];
+
+    let mut result: Vec<(String, String)> = vec![];
+
+    let temp_root_path = TempPath::new();
+    temp_root_path.create_as_dir()?;
+
+    let commit_info = if let Some(revision) = &config.git_hash {
+        // If a commit hash is set, clone the repo from github and checkout to desired hash to a local temp directory.
+        let repository = Repository::clone(VELOR_GIT_PATH, temp_root_path.path())?;
+        let (commit, _) = repository.revparse_ext(revision.as_str())?;
+        let commit_info = commit
+            .describe(&git2::DescribeOptions::default())?
+            .format(None)?;
+        repository.checkout_tree(&commit, None)?;
+        commit_info
+    } else {
+        velor_build_info::get_git_hash()
+    };
+
+    // For generating multi-step proposal files, we need to generate them in the reverse order since
+    // we need the hash of the next script.
+    // We will reverse the order back when writing the files into a directory.
+    if is_multi_step {
+        package_path_list.reverse();
+    }
+
+    for (publish_addr, relative_package_path) in package_path_list.iter() {
+        let account = AccountAddress::from_hex_literal(publish_addr)?;
+        let temp_script_path = TempPath::new();
+        temp_script_path.create_as_file()?;
+        let mut move_script_path = temp_script_path.path().to_path_buf();
+        move_script_path.set_extension("move");
+
+        let mut package_path = if config.git_hash.is_some() {
+            temp_root_path.path().to_path_buf()
+        } else {
+            velor_core_path()
+        };
+
+        package_path.push(relative_package_path);
+
+        let script_name = package_path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+
+        // If this file is the first framework file being generated (if `result.is_empty()` is true),
+        // its `next_execution_hash` should be the `next_execution_hash` value being passed in.
+        // If the `result` vector is not empty, the current file's `next_execution_hash` should be the
+        // hash of the latest framework file being generated (the hash of result.last()).
+        // For example, let's say we are going to generate these files:
+        // 0-move-stdlib.move	2-velor-framework.move	4-gas-schedule.move	6-features.move
+        // 1-velor-stdlib.move	3-velor-token.move	5-version.move		7-consensus-config.move
+        // The first framework file being generated is 3-velor-token.move. It's using the next_execution_hash being passed in (so in this case, the hash of 4-gas-schedule.move being passed in mod.rs).
+        // The second framework file being generated would be 2-velor-framework.move, and it's using the hash of 3-velor-token.move (which would be result.last()).
+
+        let options = BuildOptions {
+            with_srcs: true,
+            with_abis: false,
+            with_source_maps: false,
+            with_error_map: true,
+            skip_fetch_latest_git_deps: false,
+            bytecode_version: Some(config.bytecode_version),
+            ..BuildOptions::default()
+        };
+        let package = BuiltPackage::build(package_path, options)?;
+        let release = ReleasePackage::new(package)?;
+
+        if is_multi_step {
+            // If we're generating a multi-step proposal
+            let next_execution_hash_bytes = if result.is_empty() {
+                next_execution_hash
+            } else {
+                get_execution_hash(&result)
+            };
+            release.generate_script_proposal_multi_step(
+                account,
+                move_script_path.clone(),
+                next_execution_hash_bytes,
+            )?;
+        } else if is_testnet {
+            // If we're generating a single-step proposal on testnet
+            release.generate_script_proposal_testnet(account, move_script_path.clone())?;
+        } else {
+            // If we're generating a single-step proposal on mainnet
+            release.generate_script_proposal(account, move_script_path.clone())?;
+        }
+
+        let mut script = format!(
+            "// Framework commit hash: {}\n// Builder commit hash: {}\n",
+            commit_info,
+            velor_build_info::get_git_hash()
+        );
+
+        script.push_str(&std::fs::read_to_string(move_script_path.as_path())?);
+
+        result.push((script_name, script));
+    }
+    Ok(result)
+}

@@ -1,17 +1,17 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{ensure, format_err, Context, Result};
-use aptos_config::config::{
+use velor_config::config::{
     RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
-use aptos_db::AptosDB;
-use aptos_executor::db_bootstrapper::calculate_genesis;
-use aptos_storage_interface::DbReaderWriter;
-use aptos_types::{transaction::Transaction, waypoint::Waypoint};
-use aptos_vm::aptos_vm::AptosVMBlockExecutor;
+use velor_db::VelorDB;
+use velor_executor::db_bootstrapper::calculate_genesis;
+use velor_storage_interface::DbReaderWriter;
+use velor_types::{transaction::Transaction, waypoint::Waypoint};
+use velor_vm::velor_vm::VelorVMBlockExecutor;
 use clap::Parser;
 use std::{
     fs::File,
@@ -21,7 +21,7 @@ use std::{
 
 #[derive(Parser)]
 #[clap(
-    name = "aptos-db-bootstrapper",
+    name = "velor-db-bootstrapper",
     about = "Calculate, verify and commit the genesis to local DB without a consensus among validators."
 )]
 pub struct Command {
@@ -49,7 +49,7 @@ impl Command {
 
         // Opening the DB exclusively, it's not allowed to run this tool alongside a running node which
         // operates on the same DB.
-        let db = AptosDB::open(
+        let db = VelorDB::open(
             StorageDirPaths::from_path(&self.db_dir),
             false,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
@@ -77,7 +77,7 @@ impl Command {
         }
 
         let committer =
-            calculate_genesis::<AptosVMBlockExecutor>(&db, ledger_summary, &genesis_txn)
+            calculate_genesis::<VelorVMBlockExecutor>(&db, ledger_summary, &genesis_txn)
                 .with_context(|| format_err!("Failed to calculate genesis."))?;
         println!(
             "Successfully calculated genesis. Got waypoint: {}",

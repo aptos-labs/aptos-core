@@ -1,0 +1,6 @@
+[package]
+name = "any_tests"
+version = "0.0.0"
+
+[dependencies]
+VelorStdlib = { local = "../../../../../framework/velor-stdlib" }

@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context_with_orderless_flags;
-use aptos_api_test_context::{current_function_name, TestContext};
-use aptos_types::{
+use velor_api_test_context::{current_function_name, TestContext};
+use velor_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, MultisigTransactionPayload},
 };
@@ -398,7 +398,7 @@ async fn test_multisig_transaction_with_payload_hash(
         .execute_multisig_transaction_with_payload(
             owner_account,
             multisig_account,
-            "0x1::aptos_account::transfer",
+            "0x1::velor_account::transfer",
             &[],
             &[&owner_account.address().to_hex_literal(), "1000"],
             202,
@@ -447,7 +447,7 @@ async fn test_multisig_transaction_with_payload_hash_and_failing_execution(
         .execute_multisig_transaction_with_payload(
             owner_account,
             multisig_account,
-            "0x1::aptos_account::transfer",
+            "0x1::velor_account::transfer",
             &[],
             &[&owner_account.address().to_hex_literal(), "2000"],
             202,
@@ -493,7 +493,7 @@ async fn test_multisig_transaction_with_payload_not_matching_hash(
         .execute_multisig_transaction_with_payload(
             owner_account,
             multisig_account,
-            "0x1::aptos_account::transfer",
+            "0x1::velor_account::transfer",
             &[],
             &[&owner_account.address().to_hex_literal(), "1000"],
             400,
@@ -532,7 +532,7 @@ async fn test_multisig_transaction_with_matching_payload(
         .execute_multisig_transaction_with_payload(
             owner_account,
             multisig_account,
-            "0x1::aptos_account::transfer",
+            "0x1::velor_account::transfer",
             &[],
             &[&owner_account.address().to_hex_literal(), "1000"],
             202,
@@ -575,7 +575,7 @@ async fn test_multisig_transaction_with_mismatching_payload(
         .execute_multisig_transaction_with_payload(
             owner_account,
             multisig_account,
-            "0x1::aptos_account::transfer",
+            "0x1::velor_account::transfer",
             &[],
             &[&owner_account.address().to_hex_literal(), "2000"],
             400,
@@ -589,7 +589,7 @@ async fn test_multisig_transaction_with_mismatching_payload(
         .execute_multisig_transaction_with_payload(
             owner_account,
             multisig_account,
-            "0x1::aptos_account::transfer",
+            "0x1::velor_account::transfer",
             &[],
             &[&owner_account.address().to_hex_literal(), "1000"],
             202,
@@ -636,7 +636,7 @@ async fn test_multisig_transaction_simulation(
         .simulate_multisig_transaction(
             owner_account_1,
             multisig_account,
-            "0x1::aptos_account::transfer",
+            "0x1::velor_account::transfer",
             &[],
             &[&owner_account_1.address().to_hex_literal(), "1000"],
             200,
@@ -698,7 +698,7 @@ async fn test_multisig_transaction_simulation_2_of_3(
         .simulate_multisig_transaction(
             owner_account_1,
             multisig_account,
-            "0x1::aptos_account::transfer",
+            "0x1::velor_account::transfer",
             &[],
             &[&owner_account_1.address().to_hex_literal(), "1000"],
             200,
@@ -756,7 +756,7 @@ async fn test_multisig_transaction_simulation_fail(
         .simulate_multisig_transaction(
             owner_account_1,
             multisig_account,
-            "0x1::aptos_account::transfer",
+            "0x1::velor_account::transfer",
             &[],
             &[&owner_account_1.address().to_hex_literal(), "2000"],
             200,
@@ -815,7 +815,7 @@ async fn test_multisig_transaction_simulation_fail_2_of_3_insufficient_approvals
         .simulate_multisig_transaction(
             owner_account_1,
             multisig_account,
-            "0x1::aptos_account::transfer",
+            "0x1::velor_account::transfer",
             &[],
             &[&owner_account_1.address().to_hex_literal(), "1000"],
             200,
@@ -868,7 +868,7 @@ async fn test_simulate_multisig_transaction_should_charge_gas_against_sender(
         .simulate_multisig_transaction(
             owner_account,
             multisig_account,
-            "0x1::aptos_account::transfer",
+            "0x1::velor_account::transfer",
             &[],
             &[&owner_account.address().to_hex_literal(), "10"],
             200,
@@ -927,7 +927,7 @@ async fn assert_signature_threshold(
 fn construct_multisig_txn_transfer_payload(recipient: AccountAddress, amount: u64) -> Vec<u8> {
     bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
         EntryFunction::new(
-            ModuleId::new(CORE_CODE_ADDRESS, ident_str!("aptos_account").to_owned()),
+            ModuleId::new(CORE_CODE_ADDRESS, ident_str!("velor_account").to_owned()),
             ident_str!("transfer").to_owned(),
             vec![],
             serialize_values(&vec![MoveValue::Address(recipient), MoveValue::U64(amount)]),

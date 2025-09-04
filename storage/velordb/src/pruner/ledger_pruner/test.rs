@@ -1,0 +1,300 @@
+// Copyright © Velor Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::{
+    schema::version_data::VersionDataSchema, VelorDB, LedgerPrunerManager, LedgerStore,
+    PrunerManager, TransactionStore,
+};
+use velor_accumulator::HashReader;
+use velor_config::config::LedgerPrunerConfig;
+use velor_schemadb::SchemaBatch;
+use velor_storage_interface::DbReader;
+use velor_temppath::TempPath;
+use velor_types::{
+    account_address::AccountAddress,
+    block_metadata::BlockMetadata,
+    proof::position::Position,
+    state_merkle_pruner::state_storage_usage::StateStorageUsage,
+    transaction::{SignedTransaction, Transaction, TransactionInfo, Version},
+    write_set::WriteSet,
+};
+use proptest::{collection::vec, prelude::*, proptest};
+use std::sync::Arc;
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    fn test_txn_store_pruner(txns in vec(
+        prop_oneof![
+            any::<BlockMetadata>().prop_map(Transaction::BlockMetadata),
+            any::<SignedTransaction>().prop_map(Transaction::UserTransaction),
+        ], 1..100,),
+        txn_infos in vec(any::<TransactionInfo>(),100,),
+        step_size in 1usize..20,
+    ) {
+        verify_txn_store_pruner(txns, txn_infos, step_size)
+    }
+
+     #[test]
+    fn test_write_set_pruner(
+        write_set in vec(any::<WriteSet>(), 100),
+        ) {
+            verify_write_set_pruner(write_set);
+        }
+}
+
+fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
+    let tmp_dir = TempPath::new();
+    let velor_db = VelorDB::new_for_test(&tmp_dir);
+    let transaction_store = &velor_db.transaction_store;
+    let num_write_sets = write_sets.len();
+
+    let pruner = LedgerPrunerManager::new(Arc::clone(&velor_db.ledger_db), LedgerPrunerConfig {
+        enable: true,
+        prune_window: 0,
+        batch_size: 1,
+        user_pruning_window_offset: 0,
+    });
+
+    // write sets
+    let mut batch = SchemaBatch::new();
+    for (ver, ws) in write_sets.iter().enumerate() {
+        transaction_store
+            .put_write_set(ver as Version, ws, &mut batch)
+            .unwrap();
+    }
+    velor_db
+        .ledger_db
+        .write_set_db()
+        .write_schemas(batch)
+        .unwrap();
+    // start pruning write sets in batches of size 2 and verify transactions have been pruned from DB
+    for i in (0..=num_write_sets).step_by(2) {
+        pruner
+            .wake_and_wait_pruner(i as u64 /* latest_version */)
+            .unwrap();
+        // ensure that all transaction up to i * 2 has been pruned
+        for j in 0..i {
+            assert!(transaction_store.get_write_set(j as u64).is_err());
+        }
+        // ensure all other are valid in DB
+        for j in i..num_write_sets {
+            let write_set_from_db = transaction_store.get_write_set(j as u64).unwrap();
+            assert_eq!(write_set_from_db, *write_sets.get(j).unwrap());
+        }
+    }
+}
+
+fn verify_txn_store_pruner(
+    txns: Vec<Transaction>,
+    txn_infos: Vec<TransactionInfo>,
+    step_size: usize,
+) {
+    let tmp_dir = TempPath::new();
+    let velor_db = VelorDB::new_for_test(&tmp_dir);
+    let transaction_store = &velor_db.transaction_store;
+    let ledger_store = LedgerStore::new(Arc::clone(&velor_db.ledger_db));
+    let num_transaction = txns.len();
+
+    let ledger_version = num_transaction as Version - 1;
+    put_txn_in_store(
+        &velor_db,
+        transaction_store,
+        &ledger_store,
+        &txn_infos,
+        &txns,
+    );
+
+    let mut batch = SchemaBatch::new();
+    for i in 0..=num_transaction as u64 {
+        let usage = StateStorageUsage::zero();
+        batch.put::<VersionDataSchema>(&i, &usage.into()).unwrap();
+    }
+    velor_db
+        .ledger_db
+        .metadata_db()
+        .write_schemas(batch)
+        .unwrap();
+
+    // start pruning transactions batches of size step_size and verify transactions have been pruned
+    // from DB
+    for i in (0..=num_transaction).step_by(step_size) {
+        // Initialize a pruner in every iteration to test the min_readable_version initialization
+        // logic.
+        let pruner =
+            LedgerPrunerManager::new(Arc::clone(&velor_db.ledger_db), LedgerPrunerConfig {
+                enable: true,
+                prune_window: 0,
+                batch_size: 1,
+                user_pruning_window_offset: 0,
+            });
+        pruner
+            .wake_and_wait_pruner(i as u64 /* latest_version */)
+            .unwrap();
+        // ensure that all transaction up to i * 2 has been pruned
+        for j in 0..i {
+            verify_txn_not_in_store(transaction_store, &txns, j as u64, ledger_version);
+            // Ensure that transaction accumulator is pruned in DB. This can be done by trying to
+            // read transaction proof.
+            // Note: we only prune versions which are odd numbers because the even versions will be
+            // pruned in the iteration of even_version + 1. So if the end version, i - 1, is an even
+            // version, it will not be pruned.
+            if j != i - 1 || j % 2 == 1 {
+                assert!(ledger_store
+                    .get_transaction_proof(j as u64, ledger_version)
+                    .is_err());
+            }
+            assert!(velor_db.state_store.get_usage(Some(j as u64)).is_err());
+        }
+        // ensure all other are valid in DB
+        for j in i..num_transaction {
+            verify_txn_in_store(
+                transaction_store,
+                &ledger_store,
+                &txns,
+                j as u64,
+                ledger_version,
+            );
+            velor_db.get_accumulator_summary(j as Version).unwrap();
+            assert!(velor_db.state_store.get_usage(Some(j as u64)).is_ok());
+        }
+        verify_transaction_accumulator_pruned(&ledger_store, i as u64);
+    }
+}
+
+fn verify_txn_not_in_store(
+    transaction_store: &TransactionStore,
+    txns: &[Transaction],
+    index: u64,
+    ledger_version: u64,
+) {
+    // Ensure that all transaction from transaction schema store has been pruned
+    assert!(transaction_store.get_transaction(index).is_err());
+    // Ensure that transaction by account store has been pruned
+    if let Some(txn) = txns.get(index as usize).unwrap().try_as_signed_user_txn() {
+        if let ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
+            assert!(transaction_store
+                .get_account_ordered_transaction_version(txn.sender(), seq_num, ledger_version)
+                .unwrap()
+                .is_none()
+            );
+        }
+    }
+}
+
+fn verify_txn_in_store(
+    transaction_store: &TransactionStore,
+    ledger_store: &LedgerStore,
+    txns: &[Transaction],
+    index: u64,
+    ledger_version: u64,
+) {
+    verify_transaction_in_transaction_store(
+        transaction_store,
+        txns.get(index as usize).unwrap(),
+        index,
+    );
+    if let Some(txn) = txns.get(index as usize).unwrap().try_as_signed_user_txn() {
+        if let ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
+            verify_transaction_in_account_txn_by_version_index(
+                transaction_store,
+                index,
+                txn.sender(),
+                txn.sequence_number(),
+                ledger_version,
+            );
+        }
+    }
+    // Ensure that transaction accumulator is in DB. This can be done by trying
+    // to read transaction proof
+    assert!(ledger_store
+        .get_transaction_proof(index, ledger_version)
+        .is_ok());
+}
+
+// Ensure that transaction accumulator has been pruned as well. The idea to verify is get the
+// inorder position of the left child of the accumulator root and ensure that all lower index
+// position from the DB should be deleted. We need to make several conversion between inorder and
+// postorder transaction because the DB stores the indices in postorder, while the APIs for the
+// accumulator deals with inorder.
+fn verify_transaction_accumulator_pruned(ledger_store: &LedgerStore, least_readable_version: u64) {
+    let least_readable_position = if least_readable_version > 0 {
+        Position::root_from_leaf_index(least_readable_version).left_child()
+    } else {
+        Position::root_from_leaf_index(least_readable_version)
+    };
+    let least_readable_position_postorder = least_readable_position.to_postorder_index();
+    for i in 0..least_readable_position_postorder {
+        assert!(ledger_store
+            .get(Position::from_postorder_index(i).unwrap())
+            .is_err())
+    }
+}
+
+fn put_txn_in_store(
+    velor_db: &VelorDB,
+    transaction_store: &TransactionStore,
+    ledger_store: &LedgerStore,
+    txn_infos: &[TransactionInfo],
+    txns: &[Transaction],
+) {
+    let mut transaction_batch = SchemaBatch::new();
+    for i in 0..txns.len() {
+        transaction_store
+            .put_transaction(
+                i as u64,
+                txns.get(i).unwrap(),
+                /*skip_index=*/ false,
+                &transaction_batch,
+            )
+            .unwrap();
+    }
+    velor_db
+        .ledger_db
+        .transaction_db()
+        .write_schemas(transaction_batch)
+        .unwrap();
+    let mut transaction_info_batch = SchemaBatch::new();
+    let mut transaction_accumulator_batch = SchemaBatch::new();
+    ledger_store
+        .put_transaction_infos(
+            0,
+            txn_infos,
+            &transaction_info_batch,
+            &transaction_accumulator_batch,
+        )
+        .unwrap();
+    velor_db
+        .ledger_db
+        .transaction_info_db()
+        .write_schemas(transaction_info_batch)
+        .unwrap();
+    velor_db
+        .ledger_db
+        .transaction_accumulator_db()
+        .write_schemas(transaction_accumulator_batch)
+        .unwrap();
+}
+
+fn verify_transaction_in_transaction_store(
+    transaction_store: &TransactionStore,
+    expected_value: &Transaction,
+    version: Version,
+) {
+    let txn = transaction_store.get_transaction(version).unwrap();
+    assert_eq!(txn, *expected_value)
+}
+
+fn verify_transaction_in_account_txn_by_version_index(
+    transaction_store: &TransactionStore,
+    expected_value: Version,
+    address: AccountAddress,
+    sequence_number: u64,
+    ledger_version: Version,
+) {
+    let transaction = transaction_store
+        .get_account_ordered_transaction_version(address, sequence_number, ledger_version)
+        .unwrap()
+        .unwrap();
+    assert_eq!(transaction, expected_value)
+}

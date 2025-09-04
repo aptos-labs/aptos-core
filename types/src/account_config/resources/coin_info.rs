@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::aggregator::{AggregatorV1Resource, OptionalAggregatorV1Resource};
@@ -68,7 +68,7 @@ impl<C: CoinType> CoinInfoResource<C> {
             integer: None,
         };
         Self {
-            name: "AptosCoin".to_string().into_bytes(),
+            name: "VelorCoin".to_string().into_bytes(),
             symbol: "APT".to_string().into_bytes(),
             decimals: 8,
             supply: Some(aggregator),

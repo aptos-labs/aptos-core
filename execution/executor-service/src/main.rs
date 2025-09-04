@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_executor_service::process_executor_service::ProcessExecutorService;
-use aptos_logger::info;
+use velor_executor_service::process_executor_service::ProcessExecutorService;
+use velor_logger::info;
 use clap::Parser;
 use std::net::SocketAddr;
 
@@ -26,7 +26,7 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    aptos_logger::Logger::new().init();
+    velor_logger::Logger::new().init();
 
     let (tx, rx) = crossbeam_channel::unbounded();
     ctrlc::set_handler(move || {

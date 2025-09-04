@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction::{
@@ -110,7 +110,7 @@ mod tests {
             TransactionExecutable, TransactionExtraConfig, TransactionPayloadInner,
         },
     };
-    use aptos_crypto::{
+    use velor_crypto::{
         ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
         HashValue, PrivateKey, SigningKey, Uniform,
     };

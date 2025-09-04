@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //^ This file stores the details associated with a sample ZK proof. The constants are outputted by
@@ -17,7 +17,7 @@ use crate::{
     },
     transaction::authenticator::EphemeralPublicKey,
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use velor_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use ark_bn254::Bn254;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use once_cell::sync::Lazy;
@@ -99,8 +99,8 @@ pub fn sample_jwt_payload_json_overrides(
             "azp":"407408718192.apps.googleusercontent.com",
             "aud":"407408718192.apps.googleusercontent.com",
             "sub":"{}",
-            "hd":"aptoslabs.com",
-            "email":"michael@aptoslabs.com",
+            "hd":"velorlabs.com",
+            "email":"michael@velorlabs.com",
             "email_verified":true,
             "at_hash":"bxIESuI59IoZb5alCASqBg",
             "name":"Michael Straka",
@@ -179,7 +179,7 @@ pub(crate) static SAMPLE_PK: Lazy<KeylessPublicKey> = Lazy::new(|| {
 ///  - uid_key set to `sub`
 ///  - no override aud
 ///  - the extra field enabled
-/// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
+/// https://github.com/velor-chain/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
         G1Bytes::new_from_vec(hex::decode("3304cc0defd488d770af0439480ec24c8473b30dbcbfad9fdf99ca62256bd908").unwrap()).unwrap(),
@@ -192,7 +192,7 @@ pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
 ///  - uid_key set to `sub`
 ///  - no override aud
 ///  - no extra field
-/// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
+/// https://github.com/velor-chain/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF_NO_EXTRA_FIELD: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
         G1Bytes::new_from_vec(hex::decode("bdfda383c9131ab44dd3d8efe65c59842b28e17467e2d07c4020742407c580a7").unwrap()).unwrap(),
@@ -201,7 +201,7 @@ pub(crate) static SAMPLE_PROOF_NO_EXTRA_FIELD: Lazy<Groth16Proof> = Lazy::new(||
     )
 });
 
-/// A new Groth16 VK to test the VK rotation.  Using https://raw.githubusercontent.com/aptos-labs/devnet-groth16-keys/refs/heads/master/verification_key.json
+/// A new Groth16 VK to test the VK rotation.  Using https://raw.githubusercontent.com/velor-chain/devnet-groth16-keys/refs/heads/master/verification_key.json
 pub(crate) static SAMPLE_UPGRADED_VK: Lazy<PreparedVerifyingKey<Bn254>> = Lazy::new(|| {
     let alpha_g1 = g1_projective_str_to_affine(
         "20491192805390485299153009773594534940189261866228447918068658471970481763042",

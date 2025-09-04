@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
 
-package aptos.util.timestamp;
+package velor.util.timestamp;
 
 message Timestamp {
   // Represents seconds of UTC time since Unix epoch

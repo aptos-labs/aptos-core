@@ -1,0 +1,2482 @@
+{
+  "resource_version": 10000,
+  "metadata": {
+    "version": 3,
+    "sources": [
+      {
+        "name": "indexer-v2",
+        "kind": "postgres",
+        "tables": [
+          {
+            "table": {
+              "name": "address_version_from_move_resources",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "address_version_from_move_resources",
+              "custom_root_fields": {}
+            },
+            "array_relationships": [
+              {
+                "name": "coin_activities",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "transaction_version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "coin_activities",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "delegated_staking_activities",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "transaction_version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "delegated_staking_activities",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "token_activities",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "transaction_version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "token_activities",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "token_activities_v2",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "transaction_version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "token_activities_v2",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "address",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "coin_activities",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "coin_activities",
+              "custom_root_fields": {}
+            },
+            "object_relationships": [
+              {
+                "name": "coin_info",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "coin_type": "coin_type"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "coin_infos",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              }
+            ],
+            "array_relationships": [
+              {
+                "name": "velor_names",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "owner_address": "registered_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_velor_names",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "activity_type",
+                    "amount",
+                    "block_height",
+                    "coin_type",
+                    "entry_function_id_str",
+                    "event_account_address",
+                    "event_creation_number",
+                    "event_index",
+                    "event_sequence_number",
+                    "is_gas_fee",
+                    "is_transaction_success",
+                    "owner_address",
+                    "storage_refund_amount",
+                    "transaction_timestamp",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "coin_balances",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "coin_balances",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "amount",
+                    "coin_type",
+                    "coin_type_hash",
+                    "owner_address",
+                    "transaction_timestamp",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "coin_infos",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "coin_infos",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "coin_type",
+                    "coin_type_hash",
+                    "creator_address",
+                    "decimals",
+                    "name",
+                    "supply_aggregator_table_handle",
+                    "supply_aggregator_table_key",
+                    "symbol",
+                    "transaction_created_timestamp",
+                    "transaction_version_created"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "collection_datas",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "collection_datas",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "collection_data_id_hash",
+                    "collection_name",
+                    "creator_address",
+                    "description",
+                    "description_mutable",
+                    "maximum",
+                    "maximum_mutable",
+                    "metadata_uri",
+                    "supply",
+                    "table_handle",
+                    "transaction_timestamp",
+                    "transaction_version",
+                    "uri_mutable"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_ans_lookup",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "current_ans_lookup",
+              "custom_root_fields": {}
+            },
+            "array_relationships": [
+              {
+                "name": "all_token_ownerships",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_name": "name"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_token_ownerships",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "domain",
+                    "expiration_timestamp",
+                    "is_deleted",
+                    "last_transaction_version",
+                    "registered_address",
+                    "subdomain",
+                    "token_name"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_coin_balances",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "current_coin_balances",
+              "custom_root_fields": {}
+            },
+            "object_relationships": [
+              {
+                "name": "coin_info",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "coin_type_hash": "coin_type_hash"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "coin_infos",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "amount",
+                    "coin_type",
+                    "coin_type_hash",
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
+                    "owner_address"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_collection_datas",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "current_collection_datas",
+              "custom_root_fields": {
+                "select": "current_collection_datas"
+              }
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "collection_data_id_hash",
+                    "collection_name",
+                    "creator_address",
+                    "description",
+                    "description_mutable",
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
+                    "maximum",
+                    "maximum_mutable",
+                    "metadata_uri",
+                    "supply",
+                    "table_handle",
+                    "uri_mutable"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_token_datas",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "current_token_datas",
+              "custom_root_fields": {}
+            },
+            "object_relationships": [
+              {
+                "name": "current_collection_data",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "collection_data_id_hash": "collection_data_id_hash"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_collection_datas",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "collection_data_id_hash",
+                    "collection_name",
+                    "creator_address",
+                    "default_properties",
+                    "description",
+                    "description_mutable",
+                    "largest_property_version",
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
+                    "maximum",
+                    "maximum_mutable",
+                    "metadata_uri",
+                    "name",
+                    "payee_address",
+                    "properties_mutable",
+                    "royalty_mutable",
+                    "royalty_points_denominator",
+                    "royalty_points_numerator",
+                    "supply",
+                    "token_data_id_hash",
+                    "uri_mutable"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_token_ownerships",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "current_token_ownerships",
+              "custom_root_fields": {}
+            },
+            "object_relationships": [
+              {
+                "name": "velor_name",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "name": "token_name"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_velor_names",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "current_collection_data",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "collection_data_id_hash": "collection_data_id_hash"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_collection_datas",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "current_token_data",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_data_id_hash": "token_data_id_hash"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_token_datas",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "amount",
+                    "collection_data_id_hash",
+                    "collection_name",
+                    "creator_address",
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
+                    "name",
+                    "owner_address",
+                    "property_version",
+                    "table_type",
+                    "token_data_id_hash",
+                    "token_properties"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "move_resources",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "move_resources",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "address",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "token_activities",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "token_activities",
+              "custom_root_fields": {}
+            },
+            "object_relationships": [
+              {
+                "name": "current_token_data",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_data_id_hash": "token_data_id_hash"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_token_datas",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              }
+            ],
+            "array_relationships": [
+              {
+                "name": "velor_names_owner",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "event_account_address": "registered_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_velor_names",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "velor_names_to",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "to_address": "registered_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_velor_names",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "coin_amount",
+                    "coin_type",
+                    "collection_data_id_hash",
+                    "collection_name",
+                    "creator_address",
+                    "event_account_address",
+                    "event_creation_number",
+                    "event_index",
+                    "event_sequence_number",
+                    "from_address",
+                    "name",
+                    "property_version",
+                    "to_address",
+                    "token_amount",
+                    "token_data_id_hash",
+                    "transaction_timestamp",
+                    "transaction_version",
+                    "transfer_type"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "token_datas",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "token_datas",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "collection_data_id_hash",
+                    "collection_name",
+                    "creator_address",
+                    "default_properties",
+                    "description",
+                    "description_mutable",
+                    "largest_property_version",
+                    "maximum",
+                    "maximum_mutable",
+                    "metadata_uri",
+                    "name",
+                    "payee_address",
+                    "properties_mutable",
+                    "royalty_mutable",
+                    "royalty_points_denominator",
+                    "royalty_points_numerator",
+                    "supply",
+                    "token_data_id_hash",
+                    "transaction_timestamp",
+                    "transaction_version",
+                    "uri_mutable"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "token_ownerships",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "token_ownerships",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "amount",
+                    "collection_data_id_hash",
+                    "collection_name",
+                    "creator_address",
+                    "name",
+                    "owner_address",
+                    "property_version",
+                    "table_handle",
+                    "table_type",
+                    "token_data_id_hash",
+                    "transaction_timestamp",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "tokens",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "tokens",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "collection_data_id_hash",
+                    "collection_name",
+                    "creator_address",
+                    "name",
+                    "property_version",
+                    "token_data_id_hash",
+                    "token_properties",
+                    "transaction_timestamp",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "parsed_asset_uris",
+              "schema": "nft_metadata_crawler"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "animation_optimizer_retry_count",
+                    "asset_uri",
+                    "cdn_animation_uri",
+                    "cdn_image_uri",
+                    "cdn_json_uri",
+                    "image_optimizer_retry_count",
+                    "json_parser_retry_count",
+                    "raw_animation_uri",
+                    "raw_image_uri"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "ledger_infos",
+              "schema": "processor_metadata"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "ledger_infos",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "chain_id"
+                  ],
+                  "filter": {}
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "processor_status",
+              "schema": "processor_metadata"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "processor_status",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "last_success_version",
+                    "processor",
+                    "last_transaction_timestamp",
+                    "last_updated"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "account_transactions",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "user_transaction",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "user_transactions",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "array_relationships": [
+              {
+                "name": "coin_activities",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "transaction_version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "coin_activities",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "delegated_staking_activities",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "transaction_version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "delegated_staking_activities",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "fungible_asset_activities",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "transaction_version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "fungible_asset_activities",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "token_activities",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "transaction_version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "token_activities",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "token_activities_v2",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "transaction_version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "token_activities_v2",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "account_address",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "address_events_summary",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "block_metadata",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "min_block_height": "block_height"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "block_metadata_transactions",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "min_block_height",
+                    "num_distinct_versions",
+                    "account_address"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "address_version_from_events",
+              "schema": "public"
+            },
+            "array_relationships": [
+              {
+                "name": "coin_activities",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "transaction_version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "coin_activities",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "delegated_staking_activities",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "transaction_version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "delegated_staking_activities",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "token_activities",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "transaction_version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "token_activities",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "token_activities_v2",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "transaction_version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "token_activities_v2",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "account_address",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "auth_key_account_addresses",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "auth_key",
+                    "account_address",
+                    "last_transaction_version",
+                    "is_auth_key_used"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "block_metadata_transactions",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "block_height",
+                    "epoch",
+                    "failed_proposer_indices",
+                    "id",
+                    "previous_block_votes_bitvec",
+                    "proposer",
+                    "round",
+                    "timestamp",
+                    "version"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "coin_supply",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "coin_type",
+                    "coin_type_hash",
+                    "supply",
+                    "transaction_epoch",
+                    "transaction_timestamp",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_ans_lookup_v2",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "domain",
+                    "expiration_timestamp",
+                    "is_deleted",
+                    "last_transaction_version",
+                    "registered_address",
+                    "subdomain",
+                    "token_name",
+                    "token_standard"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_velor_names",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "is_domain_owner",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "domain_with_suffix": "token_name",
+                      "owner_address": "owner_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_velor_names",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "domain",
+                    "domain_expiration_timestamp",
+                    "domain_with_suffix",
+                    "expiration_timestamp",
+                    "is_active",
+                    "is_primary",
+                    "last_transaction_version",
+                    "owner_address",
+                    "registered_address",
+                    "subdomain",
+                    "subdomain_expiration_policy",
+                    "token_name",
+                    "token_standard"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_collection_ownership_v2_view",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "current_collection",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "collection_id": "collection_id"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_collections_v2",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "distinct_tokens",
+                    "last_transaction_version",
+                    "collection_id",
+                    "collection_name",
+                    "creator_address",
+                    "owner_address",
+                    "collection_uri",
+                    "single_token_uri"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_collections_v2",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "cdn_asset_uris",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "uri": "asset_uri"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "parsed_asset_uris",
+                      "schema": "nft_metadata_crawler"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "collection_id",
+                    "collection_name",
+                    "collection_properties",
+                    "creator_address",
+                    "current_supply",
+                    "description",
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
+                    "max_supply",
+                    "mutable_description",
+                    "mutable_uri",
+                    "table_handle_v1",
+                    "token_standard",
+                    "total_minted_v2",
+                    "uri"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_delegated_staking_pool_balances",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "active_table_handle",
+                    "inactive_table_handle",
+                    "last_transaction_version",
+                    "operator_commission_percentage",
+                    "staking_pool_address",
+                    "total_coins",
+                    "total_shares"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_delegated_voter",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "delegation_pool_address",
+                    "delegator_address",
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
+                    "pending_voter",
+                    "table_handle",
+                    "voter"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_delegator_balances",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "current_pool_balance",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "pool_address": "staking_pool_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_delegated_staking_pool_balances",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "staking_pool_metadata",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "pool_address": "staking_pool_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_staking_pool_voter",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "delegator_address",
+                    "last_transaction_version",
+                    "parent_table_handle",
+                    "pool_address",
+                    "pool_type",
+                    "shares",
+                    "table_handle"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_fungible_asset_balances",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "metadata",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "asset_type": "asset_type"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "fungible_asset_metadata",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "amount",
+                    "amount_v1",
+                    "amount_v2",
+                    "asset_type",
+                    "asset_type_v1",
+                    "asset_type_v2",
+                    "is_frozen",
+                    "is_primary",
+                    "last_transaction_timestamp",
+                    "last_transaction_timestamp_v1",
+                    "last_transaction_timestamp_v2",
+                    "last_transaction_version",
+                    "last_transaction_version_v1",
+                    "last_transaction_version_v2",
+                    "owner_address",
+                    "storage_id",
+                    "token_standard"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_objects",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "allow_ungated_transfer",
+                    "is_deleted",
+                    "last_guid_creation_num",
+                    "last_transaction_version",
+                    "object_address",
+                    "owner_address",
+                    "state_key_hash"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_staking_pool_voter",
+              "schema": "public"
+            },
+            "array_relationships": [
+              {
+                "name": "operator_velor_name",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "operator_address": "registered_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_velor_names",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "last_transaction_version",
+                    "operator_address",
+                    "staking_pool_address",
+                    "voter_address"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_table_items",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "decoded_key",
+                    "decoded_value",
+                    "is_deleted",
+                    "key",
+                    "key_hash",
+                    "last_transaction_version",
+                    "table_handle"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_token_datas_v2",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "velor_name",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_name": "token_name"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_velor_names",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "cdn_asset_uris",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_uri": "asset_uri"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "parsed_asset_uris",
+                      "schema": "nft_metadata_crawler"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "current_collection",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "collection_id": "collection_id"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_collections_v2",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "current_royalty_v1",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_data_id": "token_data_id"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_token_royalty_v1",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "array_relationships": [
+              {
+                "name": "current_token_ownerships",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_data_id": "token_data_id"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_token_ownerships_v2",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "collection_id",
+                    "decimals",
+                    "description",
+                    "is_deleted_v2",
+                    "is_fungible_v2",
+                    "largest_property_version_v1",
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
+                    "maximum",
+                    "supply",
+                    "token_data_id",
+                    "token_name",
+                    "token_properties",
+                    "token_standard",
+                    "token_uri"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_token_ownerships_v2",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "current_token_data",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_data_id": "token_data_id"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_token_datas_v2",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "array_relationships": [
+              {
+                "name": "composed_nfts",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_data_id": "owner_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_token_ownerships_v2",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "amount",
+                    "is_fungible_v2",
+                    "is_soulbound_v2",
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
+                    "non_transferrable_by_owner",
+                    "owner_address",
+                    "property_version_v1",
+                    "storage_id",
+                    "table_type_v1",
+                    "token_data_id",
+                    "token_properties_mutated_v1",
+                    "token_standard"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_token_pending_claims",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "current_collection_data",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "collection_data_id_hash": "collection_data_id_hash"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_collection_datas",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "current_collection_v2",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "collection_id": "collection_id"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_collections_v2",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "current_token_data",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_data_id_hash": "token_data_id_hash"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_token_datas",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "current_token_data_v2",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_data_id": "token_data_id"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_token_datas_v2",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "token",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "last_transaction_version": "transaction_version",
+                      "property_version": "property_version",
+                      "token_data_id_hash": "token_data_id_hash"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "tokens",
+                      "schema": "legacy_migration_v1"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "amount",
+                    "collection_data_id_hash",
+                    "collection_id",
+                    "collection_name",
+                    "creator_address",
+                    "from_address",
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
+                    "name",
+                    "property_version",
+                    "table_handle",
+                    "to_address",
+                    "token_data_id",
+                    "token_data_id_hash"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_token_royalty_v1",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
+                    "payee_address",
+                    "royalty_points_denominator",
+                    "royalty_points_numerator",
+                    "token_data_id"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "delegated_staking_activities",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "amount",
+                    "delegator_address",
+                    "event_index",
+                    "event_type",
+                    "pool_address",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "delegated_staking_pool_balances",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "active_table_handle",
+                    "inactive_table_handle",
+                    "operator_commission_percentage",
+                    "staking_pool_address",
+                    "total_coins",
+                    "total_shares",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "delegated_staking_pools",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "current_staking_pool",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "staking_pool_address": "staking_pool_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_staking_pool_voter",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "first_transaction_version",
+                    "staking_pool_address"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "delegator_distinct_pool",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "current_pool_balance",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "pool_address": "staking_pool_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_delegated_staking_pool_balances",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "staking_pool_metadata",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "pool_address": "staking_pool_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_staking_pool_voter",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "delegator_address",
+                    "pool_address"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "events",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "account_address",
+                    "creation_number",
+                    "data",
+                    "event_index",
+                    "sequence_number",
+                    "transaction_block_height",
+                    "transaction_version",
+                    "type",
+                    "indexed_type"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "fungible_asset_activities",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "metadata",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "asset_type": "asset_type"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "fungible_asset_metadata",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "array_relationships": [
+              {
+                "name": "owner_velor_names",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "owner_address": "registered_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_velor_names",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "amount",
+                    "asset_type",
+                    "block_height",
+                    "entry_function_id_str",
+                    "event_index",
+                    "gas_fee_payer_address",
+                    "is_frozen",
+                    "is_gas_fee",
+                    "is_transaction_success",
+                    "owner_address",
+                    "storage_id",
+                    "storage_refund_amount",
+                    "token_standard",
+                    "transaction_timestamp",
+                    "transaction_version",
+                    "type"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "fungible_asset_metadata",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "asset_type",
+                    "creator_address",
+                    "decimals",
+                    "icon_uri",
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
+                    "maximum_v2",
+                    "name",
+                    "project_uri",
+                    "supply_aggregator_table_handle_v1",
+                    "supply_aggregator_table_key_v1",
+                    "supply_v2",
+                    "symbol",
+                    "token_standard"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "indexer_status",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "db",
+                    "is_indexer_up"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "num_active_delegator_per_pool",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "num_active_delegator",
+                    "pool_address"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "public_key_auth_keys",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "public_key",
+                    "public_key_type",
+                    "auth_key",
+                    "account_public_key",
+                    "last_transaction_version",
+                    "is_public_key_used",
+                    "signature_type"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "proposal_votes",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "num_votes",
+                    "proposal_id",
+                    "should_pass",
+                    "staking_pool_address",
+                    "transaction_timestamp",
+                    "transaction_version",
+                    "voter_address"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "signatures",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "is_sender_primary",
+                    "multi_agent_index",
+                    "multi_sig_index",
+                    "public_key",
+                    "public_key_indices",
+                    "signature",
+                    "signer",
+                    "threshold",
+                    "transaction_block_height",
+                    "transaction_version",
+                    "type"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "table_items",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "decoded_key",
+                    "decoded_value",
+                    "key",
+                    "table_handle",
+                    "transaction_version",
+                    "write_set_change_index"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "table_metadatas",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "handle",
+                    "key_type",
+                    "value_type"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "token_activities_v2",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "current_token_data",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_data_id": "token_data_id"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_token_datas_v2",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "array_relationships": [
+              {
+                "name": "velor_names_from",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "from_address": "registered_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_velor_names",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "velor_names_to",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "to_address": "registered_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_velor_names",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "after_value",
+                    "before_value",
+                    "entry_function_id_str",
+                    "event_account_address",
+                    "event_index",
+                    "from_address",
+                    "is_fungible_v2",
+                    "property_version_v1",
+                    "to_address",
+                    "token_amount",
+                    "token_data_id",
+                    "token_standard",
+                    "transaction_timestamp",
+                    "transaction_version",
+                    "type"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "token_datas_v2",
+              "schema": "public"
+            }
+          },
+          {
+            "table": {
+              "name": "user_transactions",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "block_height",
+                    "entry_function_id_str",
+                    "entry_function_contract_address",
+                    "entry_function_module_name",
+                    "entry_function_function_name",
+                    "epoch",
+                    "expiration_timestamp_secs",
+                    "gas_unit_price",
+                    "max_gas_amount",
+                    "parent_signature_type",
+                    "sender",
+                    "sequence_number",
+                    "timestamp",
+                    "version"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          }
+        ],
+        "configuration": {
+          "connection_info": {
+            "database_url": {
+              "from_env": "INDEXER_V2_POSTGRES_URL"
+            },
+            "isolation_level": "read-committed",
+            "pool_settings": {
+              "connection_lifetime": 600,
+              "max_connections": 100
+            },
+            "use_prepared_statements": false
+          }
+        }
+      }
+    ],
+    "query_collections": [
+      {
+        "name": "allowed-queries",
+        "definition": {
+          "queries": [
+            {
+              "name": "Latest Processor Status",
+              "query": "query LatestProcessorStatus {\n  processor_status {\n    processor\n    last_updated\n    last_success_version\n    last_transaction_timestamp\n  }\n}"
+            }
+          ]
+        }
+      }
+    ],
+    "allowlist": [
+      {
+        "collection": "allowed-queries",
+        "scope": {
+          "global": true
+        }
+      }
+    ],
+    "rest_endpoints": [
+      {
+        "comment": "",
+        "definition": {
+          "query": {
+            "collection_name": "allowed-queries",
+            "query_name": "Latest Processor Status"
+          }
+        },
+        "methods": [
+          "GET"
+        ],
+        "name": "Latest Processor Status",
+        "url": "get_latest_processor_status"
+      }
+    ],
+    "api_limits": {
+      "depth_limit": {
+        "global": 5,
+        "per_role": {}
+      },
+      "disabled": false,
+      "time_limit": {
+        "global": 10,
+        "per_role": {}
+      }
+    },
+    "metrics_config": {
+      "analyze_query_variables": true,
+      "analyze_response_body": true
+    }
+  }
+}

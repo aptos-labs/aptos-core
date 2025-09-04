@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     transcript_aggregation::TranscriptAggregationState, types::DKGTranscriptRequest, DKGMessage,
 };
-use aptos_channels::aptos_channel::Sender;
-use aptos_logger::info;
-use aptos_reliable_broadcast::ReliableBroadcast;
-use aptos_types::{dkg::DKGTrait, epoch_state::EpochState};
+use velor_channels::velor_channel::Sender;
+use velor_logger::info;
+use velor_reliable_broadcast::ReliableBroadcast;
+use velor_types::{dkg::DKGTrait, epoch_state::EpochState};
 use futures::future::AbortHandle;
 use futures_util::future::Abortable;
 use move_core_types::account_address::AccountAddress;

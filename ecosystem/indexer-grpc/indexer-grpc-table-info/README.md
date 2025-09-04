@@ -1,4 +1,4 @@
-# Aptos Indexer GRPC Table Info on Fullnode
+# Velor Indexer GRPC Table Info on Fullnode
 
 This indexes and parses table info mapping on fullnode.
 
@@ -44,4 +44,4 @@ Follow instructions on how to run a fullnode against an existing network.
             your-bucket-name
 ```
 
-* Run fullnode `cargo run -p aptos-node --release -- -f ./fullnode.yaml`
+* Run fullnode `cargo run -p velor-node --release -- -f ./fullnode.yaml`

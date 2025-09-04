@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     common::{new_cpu_set, pin_cpu_set},
     thread_manager::ThreadManager,
 };
-use aptos_runtimes::spawn_rayon_thread_pool_with_start_hook;
+use velor_runtimes::spawn_rayon_thread_pool_with_start_hook;
 use libc::CPU_SET;
 use rayon::ThreadPool;
 

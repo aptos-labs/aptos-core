@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "aptos-monitoring.fullname" . }}-grafana
+  name: {{ include "velor-monitoring.fullname" . }}-grafana
   labels:
-    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+    {{- include "velor-monitoring.labels" . | nindent 4 }}
 data:
   prometheus.yml: |-
     apiVersion: 1
@@ -18,10 +18,10 @@ data:
     apiVersion: 1
     providers:
     - name: 'default'
-      folder: 'aptos'
+      folder: 'velor'
       type: file
       options:
-        path: /etc/grafana/dashboards/aptos
+        path: /etc/grafana/dashboards/velor
   grafana.ini: |-
 {{ (tpl (.Files.Get "files/grafana.ini") .) | indent 4 }}
 
@@ -30,9 +30,9 @@ data:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  name: {{ include "velor-monitoring.fullname" . }}-prometheus
   labels:
-    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+    {{- include "velor-monitoring.labels" . | nindent 4 }}
 spec:
   accessModes:
   - ReadWriteOnce
@@ -46,9 +46,9 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "aptos-monitoring.fullname" . }}
+  name: {{ include "velor-monitoring.fullname" . }}
   labels:
-    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+    {{- include "velor-monitoring.labels" . | nindent 4 }}
 data:
 {{ (tpl (.Files.Glob "files/rules/*.yml").AsConfig .) | indent 2 }}
   prometheus.yml: |-
@@ -62,9 +62,9 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "aptos-monitoring.fullname" . }}-dashboards
+  name: {{ include "velor-monitoring.fullname" . }}-dashboards
   labels:
-    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+    {{- include "velor-monitoring.labels" . | nindent 4 }}
 binaryData:
 {{ (.Files.Glob "files/dashboards/*.json.gz").AsSecrets | indent 2 }}
 
@@ -73,20 +73,20 @@ binaryData:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  name: {{ include "velor-monitoring.fullname" . }}-prometheus
   annotations:
 {{- toYaml .Values.monitoring.serviceAccount.annotations | nindent 4 }}
   labels:
-    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+    {{- include "velor-monitoring.labels" . | nindent 4 }}
 
 ---
 
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  name: {{ include "velor-monitoring.fullname" . }}-prometheus
   labels:
-    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+    {{- include "velor-monitoring.labels" . | nindent 4 }}
 rules:
 - apiGroups: [""]
   resources:
@@ -109,16 +109,16 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  name: {{ include "velor-monitoring.fullname" . }}-prometheus
   labels:
-    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+    {{- include "velor-monitoring.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  name: {{ include "velor-monitoring.fullname" . }}-prometheus
 subjects:
 - kind: ServiceAccount
-  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  name: {{ include "velor-monitoring.fullname" . }}-prometheus
   namespace: {{ .Release.Namespace }}
 
 ---
@@ -126,9 +126,9 @@ subjects:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "aptos-monitoring.fullname" . }}
+  name: {{ include "velor-monitoring.fullname" . }}
   labels:
-    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+    {{- include "velor-monitoring.labels" . | nindent 4 }}
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
     {{- if .Values.service.domain }}
@@ -136,7 +136,7 @@ metadata:
     {{- end }}
 spec:
   selector:
-    {{- include "aptos-monitoring.selectorLabels" . | nindent 4 }}
+    {{- include "velor-monitoring.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: monitoring
   ports:
   - name: grafana-http
@@ -153,12 +153,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  name: {{ include "velor-monitoring.fullname" . }}-prometheus
   labels:
-    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+    {{- include "velor-monitoring.labels" . | nindent 4 }}
 spec:
   selector:
-    {{- include "aptos-monitoring.selectorLabels" . | nindent 4 }}
+    {{- include "velor-monitoring.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: monitoring
   ports:
   - name: prometheus-http
@@ -170,22 +170,22 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "aptos-monitoring.fullname" . }}
+  name: {{ include "velor-monitoring.fullname" . }}
   labels:
-    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+    {{- include "velor-monitoring.labels" . | nindent 4 }}
     app.kubernetes.io/name: monitoring
 spec:
-  serviceName: {{ include "aptos-monitoring.fullname" . }}
+  serviceName: {{ include "velor-monitoring.fullname" . }}
   replicas: 1
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      {{- include "aptos-monitoring.selectorLabels" . | nindent 6 }}
+      {{- include "velor-monitoring.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/name: monitoring
   template:
     metadata:
       labels:
-        {{- include "aptos-monitoring.selectorLabels" . | nindent 8 }}
+        {{- include "velor-monitoring.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: monitoring
       annotations:
         checksum/prometheus.yml: {{ tpl (.Files.Get "files/prometheus.yml") . | sha256sum }}
@@ -279,7 +279,7 @@ spec:
           value: {{ quote $v }}
         {{- end }}
         command: ["/bin/sh", "-c"]
-        args: ["cp /dashboards/* /etc/grafana/dashboards/aptos && gunzip -f /etc/grafana/dashboards/aptos/*.json.gz && exec /run.sh"]
+        args: ["cp /dashboards/* /etc/grafana/dashboards/velor && gunzip -f /etc/grafana/dashboards/velor/*.json.gz && exec /run.sh"]
         resources:
           {{- toYaml .grafana.resources | nindent 10 }}
         ports:
@@ -301,7 +301,7 @@ spec:
         - name: grafana-dashboards-archive
           mountPath: /dashboards
         - name: grafana-dashboards
-          mountPath: /etc/grafana/dashboards/aptos
+          mountPath: /etc/grafana/dashboards/velor
         - name: grafana-data
           mountPath: /var/lib/grafana
         securityContext:
@@ -333,13 +333,13 @@ spec:
       volumes:
       - name: grafana-config
         configMap:
-          name: {{ include "aptos-monitoring.fullname" . }}-grafana
+          name: {{ include "velor-monitoring.fullname" . }}-grafana
           items:
           - key: grafana.ini
             path: grafana.ini
       - name: grafana-provisioning
         configMap:
-          name: {{ include "aptos-monitoring.fullname" . }}-grafana
+          name: {{ include "velor-monitoring.fullname" . }}-grafana
           items:
           - key: prometheus.yml
             path: datasources/prometheus.yml
@@ -347,22 +347,22 @@ spec:
             path: dashboards/dashboards.yml
       - name: grafana-dashboards-archive
         configMap:
-          name: {{ include "aptos-monitoring.fullname" . }}-dashboards
+          name: {{ include "velor-monitoring.fullname" . }}-dashboards
       - name: grafana-dashboards
         emptyDir: {}
       - name: monitoring-config
         configMap:
-          name: {{ include "aptos-monitoring.fullname" . }}
+          name: {{ include "velor-monitoring.fullname" . }}
       - name: prometheus-data
         persistentVolumeClaim:
-          claimName: {{ include "aptos-monitoring.fullname" . }}-prometheus
+          claimName: {{ include "velor-monitoring.fullname" . }}-prometheus
       - name: pushgateway-data
         emptyDir: {}
       - name: alertmanager-data
         emptyDir: {}
       - name: grafana-data
         emptyDir: {}
-      serviceAccountName: {{ include "aptos-monitoring.fullname" . }}-prometheus
+      serviceAccountName: {{ include "velor-monitoring.fullname" . }}-prometheus
       {{- if .Values.imagePullSecret }}
       imagePullSecrets:
       - name: {{.Values.imagePullSecret}}

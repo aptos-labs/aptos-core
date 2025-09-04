@@ -1,9 +1,9 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::PepperServiceError, process_common, tests::utils};
-use aptos_crypto::ed25519::Ed25519PublicKey;
-use aptos_types::{
+use velor_crypto::ed25519::Ed25519PublicKey;
+use velor_types::{
     keyless::{
         circuit_testcases::{
             sample_jwt_payload_json_overrides, SAMPLE_EXP_DATE, SAMPLE_JWT_EXTRA_FIELD,

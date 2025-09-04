@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::{mock::MockClient, utils};
-use aptos_storage_service_types::{
+use velor_storage_service_types::{
     requests::DataRequest,
     responses::{DataResponse, ServerProtocolVersion, StorageServiceResponse},
 };

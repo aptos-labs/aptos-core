@@ -39,11 +39,11 @@ permissions:
 jobs:
   copy-images:
     # Run on a machine with more local storage for large docker images
-    runs-on: runs-on,cpu=16,family=m6id,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=16,family=m6id,disk=large,image=velor-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+      - uses: velor-chain/velor-core/.github/actions/docker-setup@main
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}

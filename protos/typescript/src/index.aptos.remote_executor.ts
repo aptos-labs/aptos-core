@@ -1,3 +1,3 @@
 /* eslint-disable */
 
-export * as v1 from "./index.aptos.remote_executor.v1";
+export * as v1 from "./index.velor.remote_executor.v1";

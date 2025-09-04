@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -8,14 +8,14 @@ use crate::{
     metrics::TIMER,
     state_view::OverlayedStateView,
 };
-use aptos_logger::trace;
-use aptos_metrics_core::TimerHelper;
-use aptos_types::{
+use velor_logger::trace;
+use velor_metrics_core::TimerHelper;
+use velor_types::{
     state_store::{state_key::StateKey, StateView},
     transaction::TransactionOutput,
     write_set::TransactionWrite,
 };
-use aptos_vm_types::output::VMOutput;
+use velor_vm_types::output::VMOutput;
 use once_cell::sync::Lazy;
 use rayon::Scope;
 use std::{

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,10 +10,10 @@ use crate::{
     network_id::NetworkId,
     utils,
 };
-use aptos_crypto::{x25519, Uniform};
-use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
-use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::{
+use velor_crypto::{x25519, Uniform};
+use velor_secure_storage::{CryptoStorage, KVStorage, Storage};
+use velor_short_hex_str::AsShortHexStr;
+use velor_types::{
     account_address::from_identity_public_key, network_address::NetworkAddress,
     transaction::authenticator::AuthenticationKey, PeerId,
 };
@@ -33,7 +33,7 @@ use std::{
 // TODO: We could possibly move these constants somewhere else, but since they are defaults for the
 //   configurations of the system, we'll leave it here for now.
 /// Current supported protocol negotiation handshake version. See
-/// [`aptos_network::protocols::wire::v1`](../../network/protocols/wire/handshake/v1/index.html).
+/// [`velor_network::protocols::wire::v1`](../../network/protocols/wire/handshake/v1/index.html).
 pub const HANDSHAKE_VERSION: u8 = 0;
 pub const NETWORK_CHANNEL_SIZE: usize = 1024;
 pub const PING_INTERVAL_MS: u64 = 10_000;
@@ -305,7 +305,7 @@ impl NetworkConfig {
     }
 
     fn verify_address(peer_id: &PeerId, addr: &NetworkAddress) -> Result<(), Error> {
-        if !addr.is_aptosnet_addr() {
+        if !addr.is_velornet_addr() {
             return Err(Error::InvariantViolation(format!(
                 "Unexpected seed peer address format: peer_id: {}, addr: '{}'",
                 peer_id.short_str(),
@@ -329,7 +329,7 @@ impl NetworkConfig {
                 Self::verify_address(peer_id, addr)?;
             }
 
-            // Require there to be a pubkey somewhere, either in the address (assumed by `is_aptosnet_addr`)
+            // Require there to be a pubkey somewhere, either in the address (assumed by `is_velornet_addr`)
             if seed.keys.is_empty() && seed.addresses.is_empty() {
                 return Err(Error::InvariantViolation(format!(
                     "Seed peer {} has no pubkeys",

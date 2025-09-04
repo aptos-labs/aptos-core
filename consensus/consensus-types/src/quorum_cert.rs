@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{vote_data::VoteData, wrapped_ledger_info::WrappedLedgerInfo};
 use anyhow::{ensure, Context};
-use aptos_bitvec::BitVec;
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::{
+use velor_bitvec::BitVec;
+use velor_crypto::{hash::CryptoHash, HashValue};
+use velor_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},

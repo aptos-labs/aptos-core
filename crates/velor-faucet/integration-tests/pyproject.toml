@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "velor-faucet-e2e-tests"
+version = "0.1.0"
+description = "Velor Faucet E2E tests"
+authors = ["Velor Labs <opensource@velorlabs.com>"]
+license = "Apache-2.0"
+
+[tool.poetry.dependencies]
+python = ">=3.7 <4"
+requests = "^2.31.0"
+
+[tool.poetry.dev-dependencies]
+black = "^22.6.0"
+isort = "^5.10.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

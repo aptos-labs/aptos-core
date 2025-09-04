@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,8 +8,8 @@ use crate::{
     counters,
     peer_manager::{conn_notifs_channel, ConnectionRequestSender},
 };
-use aptos_config::{config::PeerSet, network_id::NetworkContext};
-use aptos_time_service::TimeService;
+use velor_config::{config::PeerSet, network_id::NetworkContext};
+use velor_time_service::TimeService;
 use std::{sync::Arc, time::Duration};
 use tokio::runtime::Handle;
 use tokio_retry::strategy::ExponentialBackoff;
@@ -18,7 +18,7 @@ pub type ConnectivityManagerService = ConnectivityManager<ExponentialBackoff>;
 
 pub struct ConnectivityManagerBuilder {
     connectivity_manager: Option<ConnectivityManagerService>,
-    conn_mgr_reqs_tx: aptos_channels::Sender<ConnectivityRequest>,
+    conn_mgr_reqs_tx: velor_channels::Sender<ConnectivityRequest>,
 }
 
 impl ConnectivityManagerBuilder {
@@ -37,7 +37,7 @@ impl ConnectivityManagerBuilder {
         mutual_authentication: bool,
         enable_latency_aware_dialing: bool,
     ) -> Self {
-        let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new(
+        let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = velor_channels::new(
             channel_size,
             &counters::PENDING_CONNECTIVITY_MANAGER_REQUESTS,
         );
@@ -62,7 +62,7 @@ impl ConnectivityManagerBuilder {
         }
     }
 
-    pub fn conn_mgr_reqs_tx(&self) -> aptos_channels::Sender<ConnectivityRequest> {
+    pub fn conn_mgr_reqs_tx(&self) -> velor_channels::Sender<ConnectivityRequest> {
         self.conn_mgr_reqs_tx.clone()
     }
 

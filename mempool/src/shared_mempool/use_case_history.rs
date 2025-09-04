@@ -1,9 +1,9 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::info;
-use aptos_mempool_notifications::CommittedTransaction;
-use aptos_types::transaction::use_case::UseCaseKey;
+use velor_logger::info;
+use velor_mempool_notifications::CommittedTransaction;
+use velor_types::transaction::use_case::UseCaseKey;
 use std::{
     cmp::Ordering,
     collections::{BinaryHeap, HashMap, VecDeque},
@@ -119,7 +119,7 @@ impl PartialOrd for UseCaseByCount {
 
 #[test]
 fn test_use_case_history() {
-    use aptos_types::{account_address::AccountAddress, transaction::ReplayProtector};
+    use velor_types::{account_address::AccountAddress, transaction::ReplayProtector};
     let ct = |use_case: UseCaseKey| -> CommittedTransaction {
         CommittedTransaction {
             sender: AccountAddress::ONE,

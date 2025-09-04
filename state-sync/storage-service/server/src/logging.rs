@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::Error;
-use aptos_config::network_id::PeerNetworkId;
-use aptos_logger::Schema;
-use aptos_storage_service_types::requests::StorageServiceRequest;
+use velor_config::network_id::PeerNetworkId;
+use velor_logger::Schema;
+use velor_storage_service_types::requests::StorageServiceRequest;
 use serde::Serialize;
 
 #[derive(Schema)]

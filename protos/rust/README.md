@@ -1,11 +1,11 @@
-# Aptos Protos
+# Velor Protos
 
-This repository contains the protobuf definitions for Aptos.
+This repository contains the protobuf definitions for Velor.
 
 ## Usage
 Import generated structs like this:
 ```rust
-use aptos_protos::transaction::v1::Transaction;
+use velor_protos::transaction::v1::Transaction;
 ```
 
 Then use them like this:

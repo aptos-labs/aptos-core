@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,7 +6,7 @@ use crate::{
     metrics::{FILE_STORE_UPLOADED_BYTES, FILE_STORE_VERSION, TIMER},
 };
 use anyhow::Result;
-use aptos_indexer_grpc_utils::{
+use velor_indexer_grpc_utils::{
     compression_util::{FileEntry, StorageFormat},
     config::IndexerGrpcFileStoreConfig,
     file_store_operator_v2::{
@@ -15,7 +15,7 @@ use aptos_indexer_grpc_utils::{
         file_store_reader::FileStoreReader,
     },
 };
-use aptos_protos::transaction::v1::Transaction;
+use velor_protos::transaction::v1::Transaction;
 use std::{path::PathBuf, sync::Arc, time::Duration};
 use tokio::{
     sync::{mpsc::channel, oneshot::Sender},

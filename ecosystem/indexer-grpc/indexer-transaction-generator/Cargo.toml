@@ -1,5 +1,5 @@
 [package]
-name = "aptos-indexer-transaction-generator"
+name = "velor-indexer-transaction-generator"
 description = "Indexer integration testing framework."
 version = "1.0.0"
 
@@ -15,11 +15,11 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 # used for localnode.
-aptos = { workspace = true }
-aptos-config = { workspace = true }
-aptos-faucet-core = { workspace = true }
-aptos-indexer-grpc-utils = { workspace = true }
-aptos-protos ={ workspace = true }
+velor = { workspace = true }
+velor-config = { workspace = true }
+velor-faucet-core = { workspace = true }
+velor-indexer-grpc-utils = { workspace = true }
+velor-protos ={ workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 rand = { workspace = true }

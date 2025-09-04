@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
@@ -16,7 +16,7 @@ impl serde::Serialize for GetTransactionsFromNodeRequest {
         if self.transactions_count.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.internal.fullnode.v1.GetTransactionsFromNodeRequest", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.internal.fullnode.v1.GetTransactionsFromNodeRequest", len)?;
         if let Some(v) = self.starting_version.as_ref() {
             struct_ser.serialize_field("startingVersion", ToString::to_string(&v).as_str())?;
         }
@@ -78,7 +78,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsFromNodeRequest {
             type Value = GetTransactionsFromNodeRequest;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.internal.fullnode.v1.GetTransactionsFromNodeRequest")
+                formatter.write_str("struct velor.internal.fullnode.v1.GetTransactionsFromNodeRequest")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<GetTransactionsFromNodeRequest, V::Error>
@@ -113,7 +113,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsFromNodeRequest {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.internal.fullnode.v1.GetTransactionsFromNodeRequest", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.internal.fullnode.v1.GetTransactionsFromNodeRequest", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for PingFullnodeRequest {
@@ -124,7 +124,7 @@ impl serde::Serialize for PingFullnodeRequest {
     {
         use serde::ser::SerializeStruct;
         let len = 0;
-        let struct_ser = serializer.serialize_struct("aptos.internal.fullnode.v1.PingFullnodeRequest", len)?;
+        let struct_ser = serializer.serialize_struct("velor.internal.fullnode.v1.PingFullnodeRequest", len)?;
         struct_ser.end()
     }
 }
@@ -170,7 +170,7 @@ impl<'de> serde::Deserialize<'de> for PingFullnodeRequest {
             type Value = PingFullnodeRequest;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.internal.fullnode.v1.PingFullnodeRequest")
+                formatter.write_str("struct velor.internal.fullnode.v1.PingFullnodeRequest")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<PingFullnodeRequest, V::Error>
@@ -184,7 +184,7 @@ impl<'de> serde::Deserialize<'de> for PingFullnodeRequest {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.internal.fullnode.v1.PingFullnodeRequest", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.internal.fullnode.v1.PingFullnodeRequest", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for PingFullnodeResponse {
@@ -198,7 +198,7 @@ impl serde::Serialize for PingFullnodeResponse {
         if self.info.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.internal.fullnode.v1.PingFullnodeResponse", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.internal.fullnode.v1.PingFullnodeResponse", len)?;
         if let Some(v) = self.info.as_ref() {
             struct_ser.serialize_field("info", v)?;
         }
@@ -252,7 +252,7 @@ impl<'de> serde::Deserialize<'de> for PingFullnodeResponse {
             type Value = PingFullnodeResponse;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.internal.fullnode.v1.PingFullnodeResponse")
+                formatter.write_str("struct velor.internal.fullnode.v1.PingFullnodeResponse")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<PingFullnodeResponse, V::Error>
@@ -275,7 +275,7 @@ impl<'de> serde::Deserialize<'de> for PingFullnodeResponse {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.internal.fullnode.v1.PingFullnodeResponse", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.internal.fullnode.v1.PingFullnodeResponse", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for StreamStatus {
@@ -295,7 +295,7 @@ impl serde::Serialize for StreamStatus {
         if self.end_version.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.internal.fullnode.v1.StreamStatus", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.internal.fullnode.v1.StreamStatus", len)?;
         if self.r#type != 0 {
             let v = stream_status::StatusType::from_i32(self.r#type)
                 .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
@@ -365,7 +365,7 @@ impl<'de> serde::Deserialize<'de> for StreamStatus {
             type Value = StreamStatus;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.internal.fullnode.v1.StreamStatus")
+                formatter.write_str("struct velor.internal.fullnode.v1.StreamStatus")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<StreamStatus, V::Error>
@@ -408,7 +408,7 @@ impl<'de> serde::Deserialize<'de> for StreamStatus {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.internal.fullnode.v1.StreamStatus", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.internal.fullnode.v1.StreamStatus", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for stream_status::StatusType {
@@ -501,7 +501,7 @@ impl serde::Serialize for TransactionsFromNodeResponse {
         if self.response.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.internal.fullnode.v1.TransactionsFromNodeResponse", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.internal.fullnode.v1.TransactionsFromNodeResponse", len)?;
         if self.chain_id != 0 {
             struct_ser.serialize_field("chainId", &self.chain_id)?;
         }
@@ -572,7 +572,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsFromNodeResponse {
             type Value = TransactionsFromNodeResponse;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.internal.fullnode.v1.TransactionsFromNodeResponse")
+                formatter.write_str("struct velor.internal.fullnode.v1.TransactionsFromNodeResponse")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<TransactionsFromNodeResponse, V::Error>
@@ -613,7 +613,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsFromNodeResponse {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.internal.fullnode.v1.TransactionsFromNodeResponse", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.internal.fullnode.v1.TransactionsFromNodeResponse", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for TransactionsOutput {
@@ -627,7 +627,7 @@ impl serde::Serialize for TransactionsOutput {
         if !self.transactions.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.internal.fullnode.v1.TransactionsOutput", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.internal.fullnode.v1.TransactionsOutput", len)?;
         if !self.transactions.is_empty() {
             struct_ser.serialize_field("transactions", &self.transactions)?;
         }
@@ -681,7 +681,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
             type Value = TransactionsOutput;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.internal.fullnode.v1.TransactionsOutput")
+                formatter.write_str("struct velor.internal.fullnode.v1.TransactionsOutput")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<TransactionsOutput, V::Error>
@@ -704,6 +704,6 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.internal.fullnode.v1.TransactionsOutput", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.internal.fullnode.v1.TransactionsOutput", FIELDS, GeneratedVisitor)
     }
 }

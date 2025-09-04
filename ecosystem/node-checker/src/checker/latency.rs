@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use tokio::time::{Duration, Instant};
 
 const LINK: &str =
-    "https://aptos.dev/nodes/node-health-checker/node-health-checker-faq#how-does-the-latency-evaluator-work";
+    "https://velor.dev/nodes/node-health-checker/node-health-checker-faq#how-does-the-latency-evaluator-work";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -34,7 +34,7 @@ pub struct LatencyCheckerConfig {
     /// If the average latency exceeds this value, it will fail the evaluation.
     /// This value is not the same as regular latency , e.g. with the ping tool.
     /// Instead, this measures the total RTT for an API call to the node. See
-    /// https://aptos.dev/nodes/node-health-checker/node-health-checker-faq#how-does-the-latency-evaluator-work
+    /// https://velor.dev/nodes/node-health-checker/node-health-checker-faq#how-does-the-latency-evaluator-work
     /// for more information.
     pub max_api_latency_ms: u64,
 }

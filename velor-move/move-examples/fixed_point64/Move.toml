@@ -1,0 +1,16 @@
+[package]
+name = "fixed_point64"
+version = "1.0.0"
+authors = []
+
+[addresses]
+fixed_point64 = "0xdeadbeef"
+
+[dev-addresses]
+
+[dependencies.VelorFramework]
+git = "https://github.com/velor-chain/velor-framework.git"
+rev = "mainnet"
+subdir = "velor-framework"
+
+[dev-dependencies]

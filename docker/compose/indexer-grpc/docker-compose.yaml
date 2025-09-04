@@ -38,27 +38,27 @@ services:
       - redis
 
   indexer-grpc-cache-worker:
-    image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-main}"
+    image: "${INDEXER_GRPC_IMAGE_REPO:-velorlabs/indexer-grpc}:${IMAGE_TAG:-main}"
     networks:
       shared:
         ipv4_address: 172.16.1.13
     restart: unless-stopped
     volumes:
-      - type: volume # XXX: needed now before refactor https://github.com/aptos-labs/aptos-core/pull/8139
+      - type: volume # XXX: needed now before refactor https://github.com/velor-chain/velor-core/pull/8139
         source: indexer-grpc-file-store
-        target: /opt/aptos/file-store
+        target: /opt/velor/file-store
       - type: bind
         source: ./cache-worker-config.yaml
-        target: /opt/aptos/cache-worker-config.yaml
+        target: /opt/velor/cache-worker-config.yaml
     command:
-      - '/usr/local/bin/aptos-indexer-grpc-cache-worker'
+      - '/usr/local/bin/velor-indexer-grpc-cache-worker'
       - '--config-path'
-      - '/opt/aptos/cache-worker-config.yaml'
+      - '/opt/velor/cache-worker-config.yaml'
     depends_on:
       - redis
 
   indexer-grpc-file-store:
-    image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-main}"
+    image: "${INDEXER_GRPC_IMAGE_REPO:-velorlabs/indexer-grpc}:${IMAGE_TAG:-main}"
     networks:
       shared:
         ipv4_address: 172.16.1.14
@@ -66,40 +66,40 @@ services:
     volumes:
       - type: volume
         source: indexer-grpc-file-store
-        target: /opt/aptos/file-store
+        target: /opt/velor/file-store
       - type: bind
         source: ./file-store-config.yaml
-        target: /opt/aptos/file-store-config.yaml
+        target: /opt/velor/file-store-config.yaml
     command:
-      - '/usr/local/bin/aptos-indexer-grpc-file-store'
+      - '/usr/local/bin/velor-indexer-grpc-file-store'
       - '--config-path'
-      - '/opt/aptos/file-store-config.yaml'
+      - '/opt/velor/file-store-config.yaml'
     depends_on:
       - redis
 
   indexer-grpc-data-service:
-    image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-main}"
+    image: "${INDEXER_GRPC_IMAGE_REPO:-velorlabs/indexer-grpc}:${IMAGE_TAG:-main}"
     networks:
       shared:
         ipv4_address: 172.16.1.15
     restart: unless-stopped
     volumes:
-      - type: volume # XXX: needed now before refactor https://github.com/aptos-labs/aptos-core/pull/8139
+      - type: volume # XXX: needed now before refactor https://github.com/velor-chain/velor-core/pull/8139
         source: indexer-grpc-file-store
-        target: /opt/aptos/file-store
+        target: /opt/velor/file-store
       - type: bind
         source: ./data-service-config.yaml
-        target: /opt/aptos/data-service-config.yaml
+        target: /opt/velor/data-service-config.yaml
       - type: bind
         source: ./data-service-grpc-server.key
-        target: /opt/aptos/certs/data-service-grpc-server.key
+        target: /opt/velor/certs/data-service-grpc-server.key
       - type: bind
         source: ./data-service-grpc-server.crt
-        target: /opt/aptos/certs/data-service-grpc-server.crt
+        target: /opt/velor/certs/data-service-grpc-server.crt
     command:
-      - '/usr/local/bin/aptos-indexer-grpc-data-service'
+      - '/usr/local/bin/velor-indexer-grpc-data-service'
       - '--config-path'
-      - '/opt/aptos/data-service-config.yaml'
+      - '/opt/velor/data-service-config.yaml'
     ports:
       - "50052:50052" # GRPC non-secure
       - "50053:50053" # GRPC secure
@@ -113,7 +113,7 @@ services:
 networks:
   shared:
     external: true
-    name: "aptos-docker-compose-shared"
+    name: "velor-docker-compose-shared"
 
 volumes:
   indexer-grpc-file-store:

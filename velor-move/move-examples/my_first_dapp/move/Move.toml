@@ -1,0 +1,9 @@
+[package]
+name = 'my_todo_list'
+version = '1.0.0'
+[dependencies.VelorFramework]
+git = 'https://github.com/velor-chain/velor-framework.git'
+rev = 'main'
+subdir = 'velor-framework'
+[addresses]
+todolist_addr='_'

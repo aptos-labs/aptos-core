@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -12,17 +12,17 @@ use crate::{
     },
     Error, PeerMonitoringServiceClient,
 };
-use aptos_config::{
+use velor_config::{
     config::{NodeConfig, PeerMonitoringServiceConfig},
     network_id::PeerNetworkId,
 };
-use aptos_id_generator::{IdGenerator, U64IdGenerator};
-use aptos_infallible::RwLock;
-use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
-use aptos_peer_monitoring_service_types::{
+use velor_id_generator::{IdGenerator, U64IdGenerator};
+use velor_infallible::RwLock;
+use velor_network::application::{interface::NetworkClient, metadata::PeerMetadata};
+use velor_peer_monitoring_service_types::{
     response::PeerMonitoringServiceResponse, PeerMonitoringMetadata, PeerMonitoringServiceMessage,
 };
-use aptos_time_service::{TimeService, TimeServiceTrait};
+use velor_time_service::{TimeService, TimeServiceTrait};
 use rand::{rngs::OsRng, Rng};
 use std::{
     collections::HashMap,

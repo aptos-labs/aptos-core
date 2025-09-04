@@ -1,0 +1,33 @@
+{
+    "type_args": [
+        "0x1::account::Account",
+        "0x1::chain_id::ChainId"
+    ],
+    "args": [
+        {
+            "type": "u8",
+            "value": 123
+        },
+        {
+            "type": "hex",
+            "value": "0x1234"
+        },
+        {
+            "type": "string",
+            "value": "hello, world! ♥"
+        },
+        {
+            "type": "u8",
+            "value": [
+                122,
+                123,
+                124,
+                125
+            ]
+        },
+        {
+            "type": "address",
+            "value": "0xace"
+        }
+    ]
+}

@@ -1,6 +1,6 @@
 ## Implementation of: https://github.com/marketplace/actions/lychee-broken-link-checker
 
-name: Aptos GitHub Links Checker
+name: Velor GitHub Links Checker
 
 on:
   repository_dispatch:
@@ -32,4 +32,4 @@ jobs:
           title: Link Checker Report
           content-filepath: ./lychee/out.md
           labels: report, automated issue
-          assignees: clay-aptos
+          assignees: clay-velor

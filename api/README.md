@@ -1,6 +1,6 @@
-# Aptos Node API
+# Velor Node API
 
-This module provides a REST API for client applications to query the Aptos blockchain.
+This module provides a REST API for client applications to query the Velor blockchain.
 
 See spec source:
 - [YAML in doc/spec.yaml](doc/spec.yaml).
@@ -13,15 +13,15 @@ With our API setup, the spec files (`api/doc/spec.yaml` / `api/doc/spec.json`) a
 ![API + spec + TS SDK generation diagram](doc/api_spec_ts_sdk_diagram.png)
 
 This process updates the docs at:
-- https://fullnode.devnet.aptoslabs.com/v1/spec#/ (and testnet / mainnet, based on the API rollout schedule)
+- https://fullnode.devnet.velorlabs.com/v1/spec#/ (and testnet / mainnet, based on the API rollout schedule)
 
-All commands here are relative to the root of `aptos-core`.
+All commands here are relative to the root of `velor-core`.
 
 1. Make your changes to the API code, i.e. the code in `api/src/`.
-2. Regenerate the API spec `.yaml` and `.json` files by running these commands from the root of `aptos-core`:
+2. Regenerate the API spec `.yaml` and `.json` files by running these commands from the root of `velor-core`:
 ```
-cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/spec.yaml
-cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/spec.json
+cargo run -p velor-openapi-spec-generator -- -f yaml -o api/doc/spec.yaml
+cargo run -p velor-openapi-spec-generator -- -f json -o api/doc/spec.json
 ```
 
 ### Sanity checks

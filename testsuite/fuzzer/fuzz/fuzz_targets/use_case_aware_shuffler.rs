@@ -1,9 +1,9 @@
 #![no_main]
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_consensus::transaction_shuffler_fuzzing::use_case_aware::{Config, UseCaseAwareShuffler};
-use aptos_types::transaction::use_case::{UseCaseAwareTransaction, UseCaseKey};
+use velor_consensus::transaction_shuffler_fuzzing::use_case_aware::{Config, UseCaseAwareShuffler};
+use velor_types::transaction::use_case::{UseCaseAwareTransaction, UseCaseKey};
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use move_core_types::account_address::AccountAddress;

@@ -19,7 +19,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
         num_of_validators: int = 10
         workspace: Optional[str] = "test_workspace"
         kubernetes: Kubernetes = SpyKubernetes()
-        aptos_cli_path: str = "test_aptos_cli"
+        velor_cli_path: str = "test_velor_cli"
         dry_run: bool = False
         namespace: str = "test_namespace"
 
@@ -52,7 +52,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                 RunResult(0, b"output"),
             ),
             FakeCommand(
-                f"{aptos_cli_path} genesis generate-genesis --local-repository-dir {workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace} --output-dir {workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}",
+                f"{velor_cli_path} genesis generate-genesis --local-repository-dir {workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace} --output-dir {workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}",
                 RunResult(0, b"output"),
             ),
         ]
@@ -67,7 +67,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                 layout_path=layout_path,
                 workspace=workspace,
                 framework_path=framework_path,
-                aptos_cli_path=aptos_cli_path,
+                velor_cli_path=velor_cli_path,
                 dry_run=dry_run,
                 name=namespace,
             ),
@@ -90,7 +90,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
         num_of_validators: int = 10
         workspace: Optional[str] = "test_workspace"
         kubernetes: Kubernetes = SpyKubernetes()
-        aptos_cli_path: str = "test_aptos_cli"
+        velor_cli_path: str = "test_velor_cli"
         dry_run: bool = True
         namespace: str = "test_namespace"
 
@@ -125,7 +125,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                 RunResult(0, b"output"),
             ),
             FakeCommand(
-                f"{aptos_cli_path} genesis generate-genesis --local-repository-dir {workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace} --output-dir {workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}",
+                f"{velor_cli_path} genesis generate-genesis --local-repository-dir {workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace} --output-dir {workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}",
                 RunResult(0, b"output"),
             ),
         ]
@@ -140,7 +140,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                 layout_path=layout_path,
                 workspace=workspace,
                 framework_path=framework_path,
-                aptos_cli_path=aptos_cli_path,
+                velor_cli_path=velor_cli_path,
                 dry_run=dry_run,
                 name=namespace,
             ),
@@ -174,7 +174,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                 layout_path="",
                 workspace=None,
                 framework_path="",
-                aptos_cli_path="",
+                velor_cli_path="",
                 dry_run=False,
                 name="default",
             ),
@@ -203,7 +203,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                 layout_path="",
                 workspace="/tmp",
                 framework_path="",
-                aptos_cli_path="",
+                velor_cli_path="",
                 dry_run=False,
                 name="default",
             ),
@@ -306,7 +306,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                 layout_path=layout_path,
                 workspace="/path/to/workspace",
                 framework_path="",
-                aptos_cli_path="",
+                velor_cli_path="",
                 dry_run=False,
                 name="default",
             ),
@@ -403,7 +403,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
         # Load up the variables
         framework_path: str = "test_frm_path"
         workspace: str = "test_workspace"
-        aptos_cli_path: str = "test_aptos"
+        velor_cli_path: str = "test_velor"
         username: str = "blueprint1-node-1"
         user_dir: str = f"{workspace}/{username}"
         validator_host: str = f"{username}-validator:6180"
@@ -416,11 +416,11 @@ class testnet_tests_create_testnet(unittest.TestCase):
         # Create the expected commands
         expected_commands = [
             FakeCommand(
-                f"{aptos_cli_path} genesis generate-keys --output-dir {user_dir}",
+                f"{velor_cli_path} genesis generate-keys --output-dir {user_dir}",
                 RunResult(0, b"output"),
             ),
             FakeCommand(
-                f"{aptos_cli_path} genesis set-validator-configuration --owner-public-identity-file {workspace}/blueprint1-node-1/public-keys.yaml --local-repository-dir {workspace} --username {username} --validator-host {validator_host} --full-node-host {fullnode_host} --stake-amount {cur_stake_amount}",
+                f"{velor_cli_path} genesis set-validator-configuration --owner-public-identity-file {workspace}/blueprint1-node-1/public-keys.yaml --local-repository-dir {workspace} --username {username} --validator-host {validator_host} --full-node-host {fullnode_host} --stake-amount {cur_stake_amount}",
                 RunResult(0, b"output"),
             ),
             FakeCommand(
@@ -428,7 +428,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                 RunResult(0, b"output"),
             ),
             FakeCommand(
-                f"{aptos_cli_path} genesis generate-genesis --local-repository-dir {workspace} --output-dir {workspace}",
+                f"{velor_cli_path} genesis generate-genesis --local-repository-dir {workspace} --output-dir {workspace}",
                 RunResult(0, b"output"),
             ),
         ]
@@ -476,7 +476,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                     layout_path="layout_path",
                     workspace=workspace,
                     framework_path=framework_path,
-                    aptos_cli_path=aptos_cli_path,
+                    velor_cli_path=velor_cli_path,
                     dry_run=True,
                     name="default",
                 ),
@@ -499,7 +499,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
         fullnode_host: str = "test_ful_host"
         cur_stake_amount: int = -1
         workspace: str = "test_workspace"
-        aptos_cli_path: str = "test_aptos"
+        velor_cli_path: str = "test_velor"
         vfn_config_path: str = ""
         create_vfns: bool = False
 
@@ -509,7 +509,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
             FakeCommand(
                 " ".join(
                     [
-                        aptos_cli_path,
+                        velor_cli_path,
                         "genesis",
                         "generate-keys",
                         "--output-dir",
@@ -521,7 +521,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
             FakeCommand(
                 " ".join(
                     [
-                        aptos_cli_path,
+                        velor_cli_path,
                         "genesis",
                         "set-validator-configuration",
                         "--owner-public-identity-file",
@@ -573,7 +573,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                     layout_path="",
                     workspace=workspace,
                     framework_path="",
-                    aptos_cli_path=aptos_cli_path,
+                    velor_cli_path=velor_cli_path,
                     dry_run=True,
                     name="default",
                 ),
@@ -661,7 +661,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                     layout_path="layout_path",
                     workspace=workspace,
                     framework_path="framework_path",
-                    aptos_cli_path="aptos_cli_path",
+                    velor_cli_path="velor_cli_path",
                     dry_run=dry_run,
                     name=namespace,
                 ),
@@ -736,7 +736,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                     layout_path="layout_path",
                     workspace=workspace,
                     framework_path="framework_path",
-                    aptos_cli_path="aptos_cli_path",
+                    velor_cli_path="velor_cli_path",
                     dry_run=dry_run,
                     name=namespace,
                 ),
@@ -789,7 +789,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                     layout_path="layout_path",
                     workspace=workspace,
                     framework_path="framework_path",
-                    aptos_cli_path="aptos_cli_path",
+                    velor_cli_path="velor_cli_path",
                     dry_run=dry_run,
                     name=namespace,
                 ),
@@ -869,7 +869,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
                     layout_path="layout_path",
                     workspace=workspace,
                     framework_path="framework_path",
-                    aptos_cli_path="aptos_cli_path",
+                    velor_cli_path="velor_cli_path",
                     dry_run=dry_run,
                     name=namespace,
                 ),

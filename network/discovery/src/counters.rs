@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics_core::{
+use velor_metrics_core::{
     op_counters::DurationHistogram, register_histogram, register_int_counter_vec,
     register_int_gauge_vec, IntCounterVec, IntGaugeVec,
 };
@@ -21,7 +21,7 @@ pub static EVENT_PROCESSING_LOOP_BUSY_DURATION_S: Lazy<DurationHistogram> = Lazy
 
 pub static DISCOVERY_COUNTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_simple_onchain_discovery_counts",
+        "velor_simple_onchain_discovery_counts",
         "Histogram of busy time of spent in event processing loop",
         &["role_type", "network_id", "peer_id", "metric"]
     )
@@ -30,7 +30,7 @@ pub static DISCOVERY_COUNTS: Lazy<IntCounterVec> = Lazy::new(|| {
 
 pub static NETWORK_KEY_MISMATCH: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "aptos_network_key_mismatch",
+        "velor_network_key_mismatch",
         "Gauge of whether the network key mismatches onchain state",
         &["role_type", "network_id", "peer_id"]
     )

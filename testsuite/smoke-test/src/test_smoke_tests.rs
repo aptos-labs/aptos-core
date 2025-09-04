@@ -1,25 +1,25 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
     utils::{MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS},
 };
-use aptos_config::config::{NodeConfig, OverrideNodeConfig};
-use aptos_forge::{NodeExt, Swarm};
+use velor_config::config::{NodeConfig, OverrideNodeConfig};
+use velor_forge::{NodeExt, Swarm};
 use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
 
 /// Bring up a swarm normally, then run get_bin, and bring up a VFN.
-/// Previously get_bin triggered a rebuild of aptos-node, which caused issues that were only seen
+/// Previously get_bin triggered a rebuild of velor-node, which caused issues that were only seen
 /// during parallel execution of tests.
 /// This test should make regressions obvious.
 #[tokio::test]
-async fn test_aptos_node_after_get_bin() {
+async fn test_velor_node_after_get_bin() {
     let mut swarm = SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, conf, _| {
             conf.api.failpoints_enabled = true;
         }))
@@ -28,8 +28,8 @@ async fn test_aptos_node_after_get_bin() {
     let version = swarm.versions().max().unwrap();
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
-    // Before #5308 this re-compiled aptos-node and caused a panic on the vfn.
-    let _aptos_cli = crate::workspace_builder::get_bin("aptos");
+    // Before #5308 this re-compiled velor-node and caused a panic on the vfn.
+    let _velor_cli = crate::workspace_builder::get_bin("velor");
 
     let validator = validator_peer_ids[0];
     let _vfn = swarm

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -12,16 +12,16 @@ use std::{fmt::Display, path::PathBuf};
 
 /// Represents a standard library.
 pub enum StdLib {
-    AptosTokenObjects,
-    AptosToken,
-    AptosFramework,
-    AptosStdlib,
+    VelorTokenObjects,
+    VelorToken,
+    VelorFramework,
+    VelorStdlib,
     MoveStdlib,
 }
 
 impl StdLib {
     /// The well-known git URL for the standard library.
-    const STD_GIT_URL: &'static str = "https://github.com/aptos-labs/aptos-framework.git";
+    const STD_GIT_URL: &'static str = "https://github.com/velor-chain/velor-framework.git";
 
     /// Returns the dependency for the standard library with the given version.
     pub fn dependency(&self, version: &StdVersion) -> Dependency {
@@ -56,10 +56,10 @@ impl StdLib {
     /// Returns the name of the standard library.
     pub fn as_str(&self) -> &'static str {
         match self {
-            StdLib::AptosToken => "AptosToken",
-            StdLib::AptosTokenObjects => "AptosTokenObjects",
-            StdLib::AptosFramework => "AptosFramework",
-            StdLib::AptosStdlib => "AptosStdlib",
+            StdLib::VelorToken => "VelorToken",
+            StdLib::VelorTokenObjects => "VelorTokenObjects",
+            StdLib::VelorFramework => "VelorFramework",
+            StdLib::VelorStdlib => "VelorStdlib",
             StdLib::MoveStdlib => "MoveStdlib",
         }
     }
@@ -67,10 +67,10 @@ impl StdLib {
     /// Returns the standard library from the given package name, or `None` if the package name is not a standard library.
     pub fn from_package_name(package_name: Symbol) -> Option<StdLib> {
         match package_name.as_str() {
-            "AptosToken" => Some(StdLib::AptosToken),
-            "AptosTokenObjects" => Some(StdLib::AptosTokenObjects),
-            "AptosFramework" => Some(StdLib::AptosFramework),
-            "AptosStdlib" => Some(StdLib::AptosStdlib),
+            "VelorToken" => Some(StdLib::VelorToken),
+            "VelorTokenObjects" => Some(StdLib::VelorTokenObjects),
+            "VelorFramework" => Some(StdLib::VelorFramework),
+            "VelorStdlib" => Some(StdLib::VelorStdlib),
             "MoveStdlib" => Some(StdLib::MoveStdlib),
             _ => None,
         }
@@ -79,10 +79,10 @@ impl StdLib {
     /// Returns the subdirectory of the standard library in the git repository.
     fn sub_dir(&self) -> &'static str {
         match self {
-            StdLib::AptosToken => "aptos-token",
-            StdLib::AptosTokenObjects => "aptos-token-objects",
-            StdLib::AptosFramework => "aptos-framework",
-            StdLib::AptosStdlib => "aptos-stdlib",
+            StdLib::VelorToken => "velor-token",
+            StdLib::VelorTokenObjects => "velor-token-objects",
+            StdLib::VelorFramework => "velor-framework",
+            StdLib::VelorStdlib => "velor-stdlib",
             StdLib::MoveStdlib => "move-stdlib",
         }
     }

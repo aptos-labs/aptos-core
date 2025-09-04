@@ -1,6 +1,6 @@
 [package]
-name = "aptos-storage-service-client"
-description = "The Aptos storage service (client-side)"
+name = "velor-storage-service-client"
+description = "The Velor storage service (client-side)"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,7 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-config = { workspace = true }
-aptos-network = { workspace = true }
-aptos-storage-service-types = { workspace = true }
+velor-config = { workspace = true }
+velor-network = { workspace = true }
+velor-storage-service-types = { workspace = true }
 thiserror = { workspace = true }

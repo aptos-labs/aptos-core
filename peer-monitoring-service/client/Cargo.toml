@@ -1,6 +1,6 @@
 [package]
-name = "aptos-peer-monitoring-service-client"
-description = "The Aptos peer monitoring service (client-side)"
+name = "velor-peer-monitoring-service-client"
+description = "The Velor peer monitoring service (client-side)"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,16 +13,16 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-channels = { workspace = true }
-aptos-config = { workspace = true }
-aptos-id-generator = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-network = { workspace = true }
-aptos-peer-monitoring-service-types = { workspace = true }
-aptos-time-service = { workspace = true }
-aptos-types = { workspace = true }
+velor-channels = { workspace = true }
+velor-config = { workspace = true }
+velor-id-generator = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-network = { workspace = true }
+velor-peer-monitoring-service-types = { workspace = true }
+velor-time-service = { workspace = true }
+velor-types = { workspace = true }
 enum_dispatch = { workspace = true }
 futures = { workspace = true }
 once_cell = { workspace = true }
@@ -33,11 +33,11 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
-aptos-build-info = { workspace = true }
-aptos-config = { workspace = true }
-aptos-netcore = { workspace = true }
-aptos-network = { workspace = true, features = ["fuzzing"] }
-aptos-peer-monitoring-service-server = { workspace = true }
+velor-build-info = { workspace = true }
+velor-config = { workspace = true }
+velor-netcore = { workspace = true }
+velor-network = { workspace = true, features = ["fuzzing"] }
+velor-peer-monitoring-service-server = { workspace = true }
 bcs = { workspace = true }
 maplit = { workspace = true }
 tokio-stream = { workspace = true }

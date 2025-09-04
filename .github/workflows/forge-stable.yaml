@@ -4,7 +4,7 @@ name: Continuous Forge Tests - Stable
 # We have various Forge Stable tests here, that test out different situations and workloads.
 #
 #
-# Dashboard showing historical results: https://grafana.aptoslabs.com/d/bdnt45ggsg000f/forge-stable-performance?orgId=1
+# Dashboard showing historical results: https://grafana.velorlabs.com/d/bdnt45ggsg000f/forge-stable-performance?orgId=1
 
 # Tests are named based on how they are set up, some of the common flavors are:
 # * "realistic-env" - tests with "realistic-env" in their name try to have network and hardware environemnt
@@ -45,7 +45,7 @@ permissions:
   pull-requests: write
   contents: read
   id-token: write
-  actions: write #required for workflow cancellation via check-aptos-core
+  actions: write #required for workflow cancellation via check-velor-core
 
 on:
   # Allow triggering manually
@@ -230,12 +230,12 @@ jobs:
           # Hashing the branch name
           echo "BRANCH_HASH=$(echo -n "${{ steps.determine-test-branch.outputs.BRANCH }}" | sha256sum | cut -c1-10)" >> $GITHUB_OUTPUT
 
-      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
+      - uses: velor-chain/velor-core/.github/actions/check-velor-core@main
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
       # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
-      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+      - uses: velor-chain/velor-core/.github/actions/docker-setup@main
         id: docker-setup
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -246,13 +246,13 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - uses: aptos-labs/aptos-core/.github/actions/get-latest-docker-image-tag@main
+      - uses: velor-chain/velor-core/.github/actions/get-latest-docker-image-tag@main
         id: get-docker-image-tag
         with:
           branch: ${{ steps.determine-test-branch.outputs.BRANCH }}
           variants: ${{ needs.generate-matrix.outputs.imageVariants }}
 
-      - uses: aptos-labs/aptos-core/.github/actions/determine-or-use-target-branch-and-get-last-released-image@main
+      - uses: velor-chain/velor-core/.github/actions/determine-or-use-target-branch-and-get-last-released-image@main
         id: get-last-released-image-tag-for-compat-test
         with:
           base-branch: ${{ steps.determine-test-branch.outputs.BRANCH }}
@@ -278,7 +278,7 @@ jobs:
       fail-fast: false
       max-parallel: ${{ inputs.JOB_PARALLELISM && fromJson(inputs.JOB_PARALLELISM) || 1 }}
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ ((matrix.FORGE_TEST_SUITE == 'compat' && needs.determine-test-metadata.outputs.IMAGE_TAG_FOR_COMPAT_TEST) || needs.determine-test-metadata.outputs.IMAGE_TAG) }}

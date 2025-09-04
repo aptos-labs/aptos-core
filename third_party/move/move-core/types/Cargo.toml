@@ -23,8 +23,8 @@ once_cell = { workspace = true }
 primitive-types = { workspace = true, features = ["impl-serde"] }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
-# Cannot use workspace version as aptos-core currently cannot be upgraded
-# to newer rand. See https://github.com/aptos-labs/aptos-core/issues/13031
+# Cannot use workspace version as velor-core currently cannot be upgraded
+# to newer rand. See https://github.com/velor-chain/velor-core/issues/13031
 rand = { version = "0.8.5" }
 ref-cast = { workspace = true }
 serde = { workspace = true }

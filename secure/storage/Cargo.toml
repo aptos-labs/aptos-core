@@ -1,6 +1,6 @@
 [package]
-name = "aptos-secure-storage"
-description = "Aptos's Persistent, Secure Storage"
+name = "velor-secure-storage"
+description = "Velor's Persistent, Secure Storage"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,12 +13,12 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-crypto = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-temppath = { workspace = true }
-aptos-time-service = { workspace = true }
-aptos-vault-client = { workspace = true }
+velor-crypto = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-temppath = { workspace = true }
+velor-time-service = { workspace = true }
+velor-vault-client = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
 chrono = { workspace = true }
@@ -29,10 +29,10 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-aptos-crypto = { workspace = true, features = ["fuzzing"] }
-aptos-crypto-derive = { workspace = true }
+velor-crypto = { workspace = true, features = ["fuzzing"] }
+velor-crypto-derive = { workspace = true }
 rand = { workspace = true }
 
 [features]
-fuzzing = ["aptos-crypto/fuzzing"]
+fuzzing = ["velor-crypto/fuzzing"]
 testing = []

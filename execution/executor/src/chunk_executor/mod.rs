@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -16,21 +16,21 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_executor_types::{
+use velor_executor_types::{
     ChunkCommitNotification, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::prelude::*;
-use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
-use aptos_storage_interface::{
+use velor_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use velor_infallible::{Mutex, RwLock};
+use velor_logger::prelude::*;
+use velor_metrics_core::{IntGaugeVecHelper, TimerHelper};
+use velor_storage_interface::{
     state_store::{
         state::State, state_summary::ProvableStateSummary,
         state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter,
 };
-use aptos_types::{
+use velor_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
         transaction_slice_metadata::TransactionSliceMetadata,
@@ -47,7 +47,7 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use aptos_vm::VMBlockExecutor;
+use velor_vm::VMBlockExecutor;
 use chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger};
 use chunk_result_verifier::{ChunkResultVerifier, ReplayChunkVerifier, StateSyncChunkVerifier};
 use fail::fail_point;

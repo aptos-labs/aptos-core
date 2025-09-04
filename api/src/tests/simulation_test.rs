@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::new_test_context_with_orderless_flags;
-use aptos_api_test_context::{current_function_name, pretty, TestContext};
-use aptos_crypto::ed25519::Ed25519Signature;
-use aptos_types::{
+use velor_api_test_context::{current_function_name, pretty, TestContext};
+use velor_crypto::ed25519::Ed25519Signature;
+use velor_types::{
     account_address::AccountAddress,
     transaction::{
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
@@ -16,7 +16,7 @@ use rstest::rstest;
 use serde_json::json;
 use std::path::PathBuf;
 
-async fn simulate_aptos_transfer(
+async fn simulate_velor_transfer(
     context: &mut TestContext,
     use_valid_signature: bool,
     transfer_amount: u64,
@@ -47,7 +47,7 @@ async fn simulate_aptos_transfer(
             "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
             "payload": {
                 "type": "entry_function_payload",
-                "function": "0x1::aptos_account::transfer",
+                "function": "0x1::velor_account::transfer",
                 "type_arguments": [],
                 "arguments": [
                     bob.address().to_standard_string(), transfer_amount.to_string(),
@@ -77,7 +77,7 @@ async fn simulate_aptos_transfer(
         if assert_gas_used {
             assert!(
                 resp.headers()
-                    .get("X-Aptos-Gas-Used")
+                    .get("X-Velor-Gas-Used")
                     .unwrap()
                     .to_str()
                     .unwrap()
@@ -92,7 +92,7 @@ async fn simulate_aptos_transfer(
     }
 }
 
-async fn simulate_aptos_transfer_bcs(
+async fn simulate_velor_transfer_bcs(
     context: &mut TestContext,
     use_valid_signature: bool,
     transfer_amount: u64,
@@ -159,7 +159,7 @@ async fn test_simulate_transaction_with_valid_signature(
         use_txn_payload_v2_format,
         use_orderless_transactions,
     );
-    let resp = simulate_aptos_transfer(&mut context, true, SMALL_TRANSFER_AMOUNT, 400, false).await;
+    let resp = simulate_velor_transfer(&mut context, true, SMALL_TRANSFER_AMOUNT, 400, false).await;
     context.check_golden_output(resp);
 }
 
@@ -181,7 +181,7 @@ async fn test_simulate_transaction_with_valid_signature_bcs(
         use_orderless_transactions,
     );
     let resp =
-        simulate_aptos_transfer_bcs(&mut context, true, SMALL_TRANSFER_AMOUNT, 400, false).await;
+        simulate_velor_transfer_bcs(&mut context, true, SMALL_TRANSFER_AMOUNT, 400, false).await;
     context.check_golden_output(resp);
 }
 
@@ -203,10 +203,10 @@ async fn test_simulate_transaction_with_not_valid_signature(
         use_orderless_transactions,
     );
     let resp =
-        simulate_aptos_transfer_bcs(&mut context, false, SMALL_TRANSFER_AMOUNT, 200, true).await;
+        simulate_velor_transfer_bcs(&mut context, false, SMALL_TRANSFER_AMOUNT, 200, true).await;
     assert!(resp[0]["success"].as_bool().is_some_and(|v| v));
 
-    let resp = simulate_aptos_transfer(&mut context, false, SMALL_TRANSFER_AMOUNT, 200, true).await;
+    let resp = simulate_velor_transfer(&mut context, false, SMALL_TRANSFER_AMOUNT, 200, true).await;
     assert!(resp[0]["success"].as_bool().is_some_and(|v| v));
 }
 
@@ -228,10 +228,10 @@ async fn test_simulate_transaction_with_insufficient_balance(
         use_orderless_transactions,
     );
     let resp =
-        simulate_aptos_transfer_bcs(&mut context, false, LARGE_TRANSFER_AMOUNT, 200, true).await;
+        simulate_velor_transfer_bcs(&mut context, false, LARGE_TRANSFER_AMOUNT, 200, true).await;
     assert!(!resp[0]["success"].as_bool().is_some_and(|v| v));
 
-    let resp = simulate_aptos_transfer(&mut context, false, LARGE_TRANSFER_AMOUNT, 200, true).await;
+    let resp = simulate_velor_transfer(&mut context, false, LARGE_TRANSFER_AMOUNT, 200, true).await;
     assert!(!resp[0]["success"].as_bool().is_some_and(|v| v));
 }
 
@@ -248,7 +248,7 @@ async fn test_bcs_simulate_fee_payer_transaction_without_gas_fee_check_with_aa_d
         false,
     );
     context
-        .disable_feature(aptos_types::on_chain_config::FeatureFlag::ACCOUNT_ABSTRACTION as u64)
+        .disable_feature(velor_types::on_chain_config::FeatureFlag::ACCOUNT_ABSTRACTION as u64)
         .await;
     bcs_simulate_fee_payer_transaction_without_gas_fee_check(&mut context).await;
 }
@@ -264,7 +264,7 @@ async fn test_bcs_simulate_fee_payer_transaction_without_gas_fee_check(
         false,
     );
     context
-        .disable_feature(aptos_types::on_chain_config::FeatureFlag::ACCOUNT_ABSTRACTION as u64)
+        .disable_feature(velor_types::on_chain_config::FeatureFlag::ACCOUNT_ABSTRACTION as u64)
         .await;
     bcs_simulate_fee_payer_transaction_without_gas_fee_check(&mut context).await;
 }
@@ -552,7 +552,7 @@ async fn test_bcs_simulate_automated_account_creation(
     if !context.use_orderless_transactions
         && !context
             .is_feature_enabled(
-                aptos_types::on_chain_config::FeatureFlag::ORDERLESS_TRANSACTIONS as u64,
+                velor_types::on_chain_config::FeatureFlag::ORDERLESS_TRANSACTIONS as u64,
             )
             .await
     {

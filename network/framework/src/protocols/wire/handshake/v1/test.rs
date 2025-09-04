@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -148,14 +148,14 @@ fn ignore_unknown_protocols() {
     ]);
     let all_known_hs = HandshakeMsg::from_supported(all_known_protos);
 
-    let some_unknown_protos = ProtocolIdSet(aptos_bitvec::BitVec::from_iter([
+    let some_unknown_protos = ProtocolIdSet(velor_bitvec::BitVec::from_iter([
         ProtocolId::MempoolDirectSend as u8,
         66,
         234,
     ]));
     let some_unknown_hs = HandshakeMsg::from_supported(some_unknown_protos.clone());
 
-    let all_unknown_protos = ProtocolIdSet(aptos_bitvec::BitVec::from_iter([42, 99, 123]));
+    let all_unknown_protos = ProtocolIdSet(velor_bitvec::BitVec::from_iter([42, 99, 123]));
     let all_unknown_hs = HandshakeMsg::from_supported(all_unknown_protos.clone());
 
     // Case 1: the other set contains some unknown protocols, but we can still

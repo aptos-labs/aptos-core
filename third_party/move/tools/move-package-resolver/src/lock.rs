@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
@@ -93,7 +93,7 @@ impl PackageLock {
         let res = match self.on_chain.entry(node_identity.to_string()) {
             btree_map::Entry::Occupied(entry) => *entry.get(),
             btree_map::Entry::Vacant(entry) => {
-                let client = aptos_rest_client::Client::new(fullnode_url.clone());
+                let client = velor_rest_client::Client::new(fullnode_url.clone());
                 let version = client.get_ledger_information().await?.into_inner().version;
 
                 entry.insert(version);

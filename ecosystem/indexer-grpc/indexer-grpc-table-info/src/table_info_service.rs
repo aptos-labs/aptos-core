@@ -1,19 +1,19 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     backup_restore::gcs::GcsBackupRestoreOperator, snapshot_folder_name, snapshot_folder_prefix,
 };
 use anyhow::{anyhow, Context, Error};
-use aptos_api::context::Context as ApiContext;
-use aptos_api_types::TransactionOnChainData;
-use aptos_db_indexer::db_v2::IndexerAsyncV2;
-use aptos_indexer_grpc_fullnode::stream_coordinator::{
+use velor_api::context::Context as ApiContext;
+use velor_api_types::TransactionOnChainData;
+use velor_db_indexer::db_v2::IndexerAsyncV2;
+use velor_indexer_grpc_fullnode::stream_coordinator::{
     IndexerStreamCoordinator, TransactionBatchInfo,
 };
-use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
-use aptos_logger::{debug, error, info, sample, sample::SampleRate};
-use aptos_types::write_set::WriteSet;
+use velor_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
+use velor_logger::{debug, error, info, sample, sample::SampleRate};
+use velor_types::write_set::WriteSet;
 use itertools::Itertools;
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 
@@ -66,7 +66,7 @@ impl TableInfoService {
                 let context = self.context.clone();
                 let _task = tokio::spawn(async move {
                     loop {
-                        aptos_logger::info!("[Table Info] Checking for snapshots to backup.");
+                        velor_logger::info!("[Table Info] Checking for snapshots to backup.");
                         Self::backup_snapshot_if_present(
                             context.clone(),
                             backup_restore_operator.clone(),
@@ -106,7 +106,7 @@ impl TableInfoService {
                 .await;
                 let previous_epoch = epoch - 1;
                 if backup_is_enabled {
-                    aptos_logger::info!(
+                    velor_logger::info!(
                         epoch = previous_epoch,
                         "[Table Info] Snapshot taken at the end of the epoch"
                     );
@@ -126,7 +126,7 @@ impl TableInfoService {
                         // We're at the start of the epoch.
                         // We need to snapshot the database.
                         if backup_is_enabled {
-                            aptos_logger::info!(
+                            velor_logger::info!(
                                 epoch = current_epoch,
                                 "[Table Info] Snapshot taken at the start of the epoch"
                             );
@@ -437,16 +437,16 @@ impl TableInfoService {
         // If nothing to backup, return.
         if epochs_to_backup.is_empty() {
             // No snapshot to backup.
-            aptos_logger::info!("[Table Info] No snapshot to backup. Skipping the backup.");
+            velor_logger::info!("[Table Info] No snapshot to backup. Skipping the backup.");
             return;
         }
-        aptos_logger::info!(
+        velor_logger::info!(
             epochs_to_backup = format!("{:?}", epochs_to_backup),
             "[Table Info] Found snapshots to backup."
         );
         // Sort the epochs to backup.
         epochs_to_backup.sort();
-        aptos_logger::info!(
+        velor_logger::info!(
             epochs_to_backup = format!("{:?}", epochs_to_backup),
             "[Table Info] Sorted snapshots to backup."
         );
@@ -504,7 +504,7 @@ async fn backup_the_snapshot_and_cleanup(
     epoch: u64,
 ) {
     let snapshot_folder_name = snapshot_folder_name(context.chain_id().id() as u64, epoch);
-    aptos_logger::info!(
+    velor_logger::info!(
         epoch = epoch,
         snapshot_folder_name = snapshot_folder_name,
         "[Table Info] Backing up the snapshot and cleaning up the old snapshot."
@@ -521,7 +521,7 @@ async fn backup_the_snapshot_and_cleanup(
             );
         }
     } else {
-        aptos_logger::warn!(
+        velor_logger::warn!(
             epoch = epoch,
             snapshot_folder_name = snapshot_folder_name,
             "[Table Info] No backup metadata found. Skipping the backup."
@@ -536,7 +536,7 @@ async fn backup_the_snapshot_and_cleanup(
         .join(snapshot_folder_name.clone());
     // If the backup is for old epoch, clean up and return.
     if let Some(metadata) = backup_metadata {
-        aptos_logger::info!(
+        velor_logger::info!(
             epoch = epoch,
             metadata_epoch = metadata.epoch,
             snapshot_folder_name = snapshot_folder_name,
@@ -544,7 +544,7 @@ async fn backup_the_snapshot_and_cleanup(
             "[Table Info] Checking the metadata before backup."
         );
         if metadata.epoch >= epoch {
-            aptos_logger::info!(
+            velor_logger::info!(
                 epoch = epoch,
                 snapshot_folder_name = snapshot_folder_name,
                 "[Table Info] Snapshot already backed up. Skipping the backup."
@@ -554,13 +554,13 @@ async fn backup_the_snapshot_and_cleanup(
             return;
         }
     } else {
-        aptos_logger::warn!(
+        velor_logger::warn!(
             epoch = epoch,
             snapshot_folder_name = snapshot_folder_name,
             "[Table Info] No backup metadata found."
         );
     }
-    aptos_logger::info!(
+    velor_logger::info!(
         epoch = epoch,
         snapshot_folder_name = snapshot_folder_name,
         snapshot_dir = snapshot_dir.to_str(),
@@ -626,7 +626,7 @@ fn transactions_in_epochs(
     };
 
     // Log the split of the transactions.
-    aptos_logger::info!(
+    velor_logger::info!(
         split_off_index = split_off_index,
         last_version = last_version,
         first_version = first_version,

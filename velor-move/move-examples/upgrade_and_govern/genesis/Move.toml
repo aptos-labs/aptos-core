@@ -1,0 +1,12 @@
+# :!:>manifest
+[package]
+name = 'UpgradeAndGovern'
+version = '1.0.0'
+
+[addresses]
+upgrade_and_govern = '_'
+
+[dependencies.VelorFramework]
+git = "https://github.com/velor-chain/velor-framework.git"
+subdir = "velor-framework"
+rev = "mainnet"

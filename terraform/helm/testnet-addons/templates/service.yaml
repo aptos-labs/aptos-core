@@ -1,4 +1,4 @@
-# aggregate service to serve all REST API from all aptos-node haproxies
+# aggregate service to serve all REST API from all velor-node haproxies
 apiVersion: v1
 kind: Service
 metadata:
@@ -15,7 +15,7 @@ metadata:
     {{- end }}
 spec:
   selector:
-    app.kubernetes.io/part-of: aptos-node
+    app.kubernetes.io/part-of: velor-node
     app.kubernetes.io/name: haproxy
   ports:
   - port: 80

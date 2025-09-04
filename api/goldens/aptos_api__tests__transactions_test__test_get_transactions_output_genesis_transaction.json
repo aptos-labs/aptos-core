@@ -435,7 +435,7 @@
             "address": "0x1",
             "name": "coin",
             "friends": [
-              "0x1::aptos_coin",
+              "0x1::velor_coin",
               "0x1::genesis"
             ],
             "exposed_functions": [
@@ -1841,7 +1841,7 @@
                 "generic_type_params": [],
                 "params": [
                   "&0x1::stake::OwnerCapability",
-                  "0x1::coin::Coin<0x1::aptos_coin::AptosCoin>"
+                  "0x1::coin::Coin<0x1::velor_coin::VelorCoin>"
                 ],
                 "return": []
               },
@@ -2206,13 +2206,13 @@
                 "return": []
               },
               {
-                "name": "store_aptos_coin_mint_cap",
+                "name": "store_velor_coin_mint_cap",
                 "visibility": "friend",
                 "is_entry": false,
                 "generic_type_params": [],
                 "params": [
                   "&signer",
-                  "0x1::coin::MintCapability<0x1::aptos_coin::AptosCoin>"
+                  "0x1::coin::MintCapability<0x1::velor_coin::VelorCoin>"
                 ],
                 "return": []
               },
@@ -2283,7 +2283,7 @@
                   "u64"
                 ],
                 "return": [
-                  "0x1::coin::Coin<0x1::aptos_coin::AptosCoin>"
+                  "0x1::coin::Coin<0x1::velor_coin::VelorCoin>"
                 ]
               }
             ],
@@ -2308,7 +2308,7 @@
                 ]
               },
               {
-                "name": "AptosCoinCapabilities",
+                "name": "VelorCoinCapabilities",
                 "is_native": false,
                 "abilities": [
                   "key"
@@ -2317,7 +2317,7 @@
                 "fields": [
                   {
                     "name": "mint_cap",
-                    "type": "0x1::coin::MintCapability<0x1::aptos_coin::AptosCoin>"
+                    "type": "0x1::coin::MintCapability<0x1::velor_coin::VelorCoin>"
                   }
                 ]
               },
@@ -2517,19 +2517,19 @@
                 "fields": [
                   {
                     "name": "active",
-                    "type": "0x1::coin::Coin<0x1::aptos_coin::AptosCoin>"
+                    "type": "0x1::coin::Coin<0x1::velor_coin::VelorCoin>"
                   },
                   {
                     "name": "inactive",
-                    "type": "0x1::coin::Coin<0x1::aptos_coin::AptosCoin>"
+                    "type": "0x1::coin::Coin<0x1::velor_coin::VelorCoin>"
                   },
                   {
                     "name": "pending_active",
-                    "type": "0x1::coin::Coin<0x1::aptos_coin::AptosCoin>"
+                    "type": "0x1::coin::Coin<0x1::velor_coin::VelorCoin>"
                   },
                   {
                     "name": "pending_inactive",
-                    "type": "0x1::coin::Coin<0x1::aptos_coin::AptosCoin>"
+                    "type": "0x1::coin::Coin<0x1::velor_coin::VelorCoin>"
                   },
                   {
                     "name": "locked_until_secs",
@@ -4273,7 +4273,7 @@
             "address": "0x1",
             "name": "account",
             "friends": [
-              "0x1::aptos_account",
+              "0x1::velor_account",
               "0x1::coin",
               "0x1::genesis",
               "0x1::resource_account",
@@ -6312,7 +6312,7 @@
           "bytecode": "0xa11ceb0b050000000d0100100210320342830104c5011605db01e00107bb03a80408e307200683087710fa088d020a870b1a0ca10bc0030de10e060fe70e020001000200030004000500060007000800090800000a0400000b0800000c0800010e05010001031207010000011405010001011f0401000101270501000105280700000d000100000f02010000100301000011000100001304050000150006000016070100041b000400031c0a0b0100031d0a0c0100071e0e0f010006200001000121000101000116121301000122140101000623000100022409090001111701010003250119010003260f19010005291b1c00012a1d1e0100012b1f010100022c090900080909090a0d0c110d110e111111120913091511161101060c0003060c060c0b04010800020c050105010b050103020b060108000b0401080003060c050304070a0801030b0501030b04010800010301060b0501090001010106090001080102070a090003010900010b070108000108000203060b04010900010b0701090002050b0701090005070a080103070a080106080103010b04010800010b0401090005060a0801060801030b05010303010b05010900030b060108000b080108000b04010800010a0201080905060c080908090201030b060109000b080109000b04010900010b0801090003050b07010800060b040108000767656e657369730a6170746f735f636f696e04636f696e056572726f72066f7074696f6e067369676e657206737472696e671073797374656d5f61646472657373657306766563746f72094170746f73436f696e1744656c6567617465644d696e744361706162696c6974790b44656c65676174696f6e730c4d696e7443617053746f726515636c61696d5f6d696e745f6361706162696c6974790e4d696e744361706162696c6974791b636f6e6669677572655f6163636f756e74735f666f725f746573741864656c65676174655f6d696e745f6361706162696c6974791064657374726f795f6d696e745f636170064f7074696f6e0f66696e645f64656c65676174696f6e0e4275726e4361706162696c6974790a696e697469616c697a65046d696e740b64756d6d795f6669656c6402746f05696e6e6572086d696e745f6361700a616464726573735f6f660769735f736f6d6506626f72726f770b737761705f72656d6f766504436f696e166173736572745f6170746f735f6672616d65776f726b087265676973746572076465706f736974146173736572745f636f72655f7265736f7572636510696e76616c69645f617267756d656e74046e6f6e6504736f6d6510467265657a654361706162696c69747906537472696e67047574663825696e697469616c697a655f776974685f706172616c6c656c697a61626c655f737570706c791264657374726f795f667265657a655f636170096e6f745f666f756e6400000000000000000000000000000000000000000000000000000000000000010308020000000000000003080300000000000000030801000000000000000520000000000000000000000000000000000000000000000000000000000a550c18052000000000000000000000000000000000000000000000000000000000000000010a020b0a4170746f7320436f696e0a020403415054126170746f733a3a6d657461646174615f7630f80103010000000000000010454e4f5f4341504142494c4954494553254163636f756e7420646f6573206e6f742068617665206d696e74206361706162696c69747902000000000000001245414c52454144595f44454c454741544544444d696e74206361706162696c6974792068617320616c7265616479206265656e2064656c65676174656420746f20746869732073706563696669656420616464726573730300000000000000154544454c45474154494f4e5f4e4f545f464f554e443943616e6e6f742066696e642064656c65676174696f6e206f66206d696e74206361706162696c69747920746f2074686973206163636f756e7400020117010102011805020201190a08010302011a0b0401080000010402020308220a00110711040c030e033800030b0b00010701270e033801140c0207032a020f000c010b010b02380213010107032b031001140c040b000b0412032d03020103000010150b00110b0a01380306ffffffffffffffff0e0238040c030a0111070b0338050a010b0212032d030b01400d000000000000000012022d02020201040102152d0e00110f07032a020f000c040600000000000000000c060a060a042e410d23030f05280a040a060c030c020b022e0b03420d0c050b051002140a012203230b040107001110270b06060100000000000000160c0605080b040b011201440d02030300010316090b00110b07042c0313030c010b013806020400000102182807032b0210000c010600000000000000000c030a01410d0c0538070c040a030a0523031005260a010a03420d0c020b021002140a0021031b05210b01010b0338080c0405260b03060100000000000000160c03050b0b0402050300001a160a00110b0a00070511140706111431080838090c030c020c010b000a0312032d030b02380a0b010b0302060104010320150b0011070c030a032903030907021117270b032b0310010c050b020b0538040c040b010b04380502020003000100000000",
           "abi": {
             "address": "0x1",
-            "name": "aptos_coin",
+            "name": "velor_coin",
             "friends": [
               "0x1::genesis"
             ],
@@ -6335,7 +6335,7 @@
                 "params": [
                   "&signer",
                   "&signer",
-                  "0x1::coin::MintCapability<0x1::aptos_coin::AptosCoin>"
+                  "0x1::coin::MintCapability<0x1::velor_coin::VelorCoin>"
                 ],
                 "return": []
               },
@@ -6369,8 +6369,8 @@
                   "&signer"
                 ],
                 "return": [
-                  "0x1::coin::BurnCapability<0x1::aptos_coin::AptosCoin>",
-                  "0x1::coin::MintCapability<0x1::aptos_coin::AptosCoin>"
+                  "0x1::coin::BurnCapability<0x1::velor_coin::VelorCoin>",
+                  "0x1::coin::MintCapability<0x1::velor_coin::VelorCoin>"
                 ]
               },
               {
@@ -6388,7 +6388,7 @@
             ],
             "structs": [
               {
-                "name": "AptosCoin",
+                "name": "VelorCoin",
                 "is_native": false,
                 "abilities": [
                   "key"
@@ -6425,7 +6425,7 @@
                 "fields": [
                   {
                     "name": "inner",
-                    "type": "vector<0x1::aptos_coin::DelegatedMintCapability>"
+                    "type": "vector<0x1::velor_coin::DelegatedMintCapability>"
                   }
                 ]
               },
@@ -6439,7 +6439,7 @@
                 "fields": [
                   {
                     "name": "mint_cap",
-                    "type": "0x1::coin::MintCapability<0x1::aptos_coin::AptosCoin>"
+                    "type": "0x1::coin::MintCapability<0x1::velor_coin::VelorCoin>"
                   }
                 ]
               }
@@ -6456,7 +6456,7 @@
           "bytecode": "0xa11ceb0b0500000007010004030416041a02051c0d07293f0868200c88011900000001000200000000030001000004020101000105020001000303010a02010301060900010900000a6170746f735f6861736803626373096b656363616b323536087369705f68617368137369705f686173685f66726f6d5f76616c756508746f5f6279746573000000000000000000000000000000000000000000000000000000000000000100010200010102000201000000060b0038000c010b0111010200",
           "abi": {
             "address": "0x1",
-            "name": "aptos_hash",
+            "name": "velor_hash",
             "friends": [],
             "exposed_functions": [
               {
@@ -8151,7 +8151,7 @@
           "bytecode": "0xa11ceb0b0500000009010008020804030c20042c0405301207427408b601200cd6012d0f830204000200030004000502080800000600010000070201000106000300030905010100010a0006000307020101000304050401050003060c0503010c01080001060c01010767656e65736973107265736f757263655f6163636f756e740d6170746f735f6163636f756e74076163636f756e740a6170746f735f636f696e04636f696e0e6372656174655f6163636f756e74087472616e73666572094170746f73436f696e087265676973746572096578697374735f617400000000000000000000000000000000000000000000000000000000000000010001040003060b0011020c010e0138000201010400010c0a01110420030505070a0111000b000b010b023801020000000100",
           "abi": {
             "address": "0x1",
-            "name": "aptos_account",
+            "name": "velor_account",
             "friends": [
               "0x1::genesis",
               "0x1::resource_account"
@@ -8835,7 +8835,7 @@
             "address": "0x1",
             "name": "reconfiguration",
             "friends": [
-              "0x1::aptos_governance",
+              "0x1::velor_governance",
               "0x1::block",
               "0x1::consensus_config",
               "0x1::gas_schedule",
@@ -8965,20 +8965,20 @@
                 "return": []
               },
               {
-                "name": "store_aptos_coin_burn_cap",
+                "name": "store_velor_coin_burn_cap",
                 "visibility": "friend",
                 "is_entry": false,
                 "generic_type_params": [],
                 "params": [
                   "&signer",
-                  "0x1::coin::BurnCapability<0x1::aptos_coin::AptosCoin>"
+                  "0x1::coin::BurnCapability<0x1::velor_coin::VelorCoin>"
                 ],
                 "return": []
               }
             ],
             "structs": [
               {
-                "name": "AptosCoinCapabilities",
+                "name": "VelorCoinCapabilities",
                 "is_native": false,
                 "abilities": [
                   "key"
@@ -8987,7 +8987,7 @@
                 "fields": [
                   {
                     "name": "burn_cap",
-                    "type": "0x1::coin::BurnCapability<0x1::aptos_coin::AptosCoin>"
+                    "type": "0x1::coin::BurnCapability<0x1::velor_coin::VelorCoin>"
                   }
                 ]
               }
@@ -9004,7 +9004,7 @@
           "bytecode": "0xa11ceb0b050000000c0100240224540378b70204af033e05ed039a03078707a60b08ad122006cd12a20110ef13f7060ae61a6d0cd31be7070dba23120000000100020003000400050006000700080009000a000b000c000d000e000f001000110012080000130600001408000015080000160800001707000018060000190600001a08000a1e0702000000000d1f070006230600012b06000539040106010f41040203010001074707010000024c08000c570b00001b000100001c000100001d020100002003040000210105000022010000002406070000250100000026080000002709010000280a01000029000100002a0b0700002c0c0100002d090100002e0d01000a42101102040411431300010404440000001145131401040a46150102040409480a08000b49080800104a0100000b4b080000034d01180100074e01190100074f1a11010007501a1b010007511c190100061d011200111d1d00010405521f0101060d531421000d542200000a5501240204040a50102702040401562807000c58012a000c592b11000b5a082c000b5b0800000e5c0a0100115d0a010104015e0a2e01060f5f013202030408280101001160131101040a613435020404112a131c01040e620a01000f6339110203000f463a010203001164130001040665011200112e3b010104100f11121312140f19171a051b051c051d051f12201e2323142324262b122c1e2c2f2c302d31230f2f12300f311223261426202f3331343135123712203001030005060c050a020a020a02020a020a02010b0902080a0a02010402080b05010c010504060c04030301060c02030503060c05080c04060c050301030708000a020302030a0202060b090209000901060900010101080b020503010a0203070b09020900090109000901110305050a020b0902080a0a02070b0d010801030b0f010407080306080203030b0902080a0a020503040b0f0104010810010b0f0104010b0f01090001060b0f0109000106090001090008050509000a0204030b0f01040b0902080a0a0201080102070b0d010900090003080a080a0b0902080a0a0201080a0106080a02080a0a02010b0902090009010206080406080c0205080c010609010106080c060811030301030301081101060811040303030304030403060c010b0d01090001080601080702080501010b0e020900090103070b0902030a020603070b0902030a0202070b090209000901060900020900090101070b090205080c0207080307080208080b07080303030805050307080802060b0e0209000901090003070b0e0209000901090009010506090005030301106170746f735f676f7665726e616e6365076163636f756e740a6170746f735f636f696e04636f696e056572726f72056576656e7413676f7665726e616e63655f70726f706f73616c066f7074696f6e0f7265636f6e66696775726174696f6e067369676e65720a73696d706c655f6d6170057374616b650e7374616b696e675f636f6e66696706737472696e671073797374656d5f616464726573736573057461626c650974696d657374616d7006766f74696e6717417070726f766564457865637574696f6e4861736865731343726561746550726f706f73616c4576656e7410476f7665726e616e6365436f6e66696710476f7665726e616e63654576656e747317476f7665726e616e6365526573706f6e7362696c697479095265636f72644b657911557064617465436f6e6669674576656e7409566f74654576656e740d566f74696e675265636f726473186164645f617070726f7665645f7363726970745f686173681f6164645f617070726f7665645f7363726970745f686173685f7363726970740f6372656174655f70726f706f73616c0953696d706c654d617006537472696e67186372656174655f70726f706f73616c5f6d65746164617461186765745f6d696e5f766f74696e675f7468726573686f6c641b6765745f72657175697265645f70726f706f7365725f7374616b6512476f7665726e616e636550726f706f73616c0a6765745f7369676e6572186765745f766f74696e675f6475726174696f6e5f73656373106765745f766f74696e675f706f7765720a696e697469616c697a650b7265636f6e6669677572651472656d6f76655f617070726f7665645f68617368077265736f6c7665105369676e65724361706162696c6974791073746f72655f7369676e65725f636170187570646174655f676f7665726e616e63655f636f6e66696704766f7465066861736865730870726f706f7365720a7374616b655f706f6f6c0b70726f706f73616c5f69640e657865637574696f6e5f686173681170726f706f73616c5f6d65746164617461146d696e5f766f74696e675f7468726573686f6c641772657175697265645f70726f706f7365725f7374616b6514766f74696e675f6475726174696f6e5f73656373166372656174655f70726f706f73616c5f6576656e74730b4576656e7448616e646c65147570646174655f636f6e6669675f6576656e74730b766f74655f6576656e74730b7369676e65725f6361707305766f746572096e756d5f766f7465730b73686f756c645f7061737305766f746573055461626c650c636f6e7461696e735f6b6579126765745f70726f706f73616c5f737461746510696e76616c69645f617267756d656e74126765745f657865637574696f6e5f6861736803616464064f7074696f6e0a616464726573735f6f66136765745f64656c6567617465645f766f7465720b6e6f775f7365636f6e64730f6765745f6c6f636b75705f73656373094170746f73436f696e06737570706c79046e6f6e650769735f736f6d6506626f72726f7704736f6d650a656d69745f6576656e740475746638066c656e677468066372656174651d6372656174655f7369676e65725f776974685f6361706162696c6974790d5374616b696e67436f6e666967036765741e6765745f616c6c6f775f76616c696461746f725f7365745f6368616e6765096765745f7374616b651e6765745f63757272656e745f65706f63685f766f74696e675f706f776572166173736572745f6170746f735f6672616d65776f726b087265676973746572106e65775f6576656e745f68616e646c65036e65770b69735f7265736f6c7665640672656d6f7665216173736572745f6672616d65776f726b5f72657365727665645f6164647265737308636f6e7461696e731c6765745f70726f706f73616c5f65787069726174696f6e5f73656373156372656174655f656d7074795f70726f706f73616c000000000000000000000000000000000000000000000000000000000000000103080400000000000000030801000000000000000308030000000000000003080a0000000000000003080900000000000000030802000000000000000308050000000000000003080600000000000000030808000000000000000a020e0d6d657461646174615f686173680a0212116d657461646174615f6c6f636174696f6e05200000000000000000000000000000000000000000000000000000000000000001126170746f733a3a6d657461646174615f7630e2060901000000000000001c45494e53554646494349454e545f50524f504f5345525f5354414b454c54686520737065636966696564207374616b6520706f6f6c20646f6573206e6f7420686176652073756666696369656e74207374616b6520746f2063726561746520612070726f706f73616c020000000000000014454e4f545f44454c4547415445445f564f5445524454686973206163636f756e74206973206e6f74207468652064657369676e6174656420766f746572206f662074686520737065636966696564207374616b6520706f6f6c03000000000000001a45494e53554646494349454e545f5354414b455f4c4f434b55506054686520737065636966696564207374616b6520706f6f6c20646f6573206e6f742068617665206c6f6e6720656e6f7567682072656d61696e696e67206c6f636b757020746f2063726561746520612070726f706f73616c206f7220766f746504000000000000000e45414c52454144595f564f5445444b54686520737065636966696564207374616b6520706f6f6c2068617320616c7265616479206265656e207573656420746f20766f7465206f6e207468652073616d652070726f706f73616c050000000000000010454e4f5f564f54494e475f504f5745523a54686520737065636966696564207374616b6520706f6f6c206d7573742062652070617274206f66207468652076616c696461746f722073657406000000000000001c4550524f504f53414c5f4e4f545f5245534f4c5641424c455f5945543e50726f706f73616c206973206e6f7420726561647920746f206265207265736f6c7665642e2057616974696e67206f6e2074696d65206f7220766f74657308000000000000001a4550524f504f53414c5f4e4f545f5245534f4c5645445f594554265468652070726f706f73616c20686173206e6f74206265656e207265736f6c7665642079657409000000000000001b454d455441444154415f4c4f434154494f4e5f544f4f5f4c4f4e47314d65746164617461206c6f636174696f6e2063616e6e6f74206265206c6f6e676572207468616e203235362063686172730a0000000000000017454d455441444154415f484153485f544f4f5f4c4f4e472d4d6574616461746120686173682063616e6e6f74206265206c6f6e676572207468616e203235362063686172730002012f0b0902030a02010205300531053203330a02340b0902080a0a02020203350436033703030203380b0d0108013a0b0d0108063b0b0d0108070402013c0b090205080c0502023105320306020335043603370307020532033d0531053e033f01080201400b0e0208050100010001000e23070b2a000c010a0110000e0038000309050c0b010102070b0a0038010c030b0307012103190b01010707111227070b0a0038020c020b010f000b000b02380302010104010001030b00110002020104020203166a0b0011150c120a0111160a1221030b0705111227070b2b020c0e0a0111080c130b130a0e10011426031c0b0e01070111122711170c0b0b0b0a0e100214160c0f0a0111180a0f26032e0b0e0107021112270b030b0411030c1138040c1538050c0c0e153806033a05450e153807140c140b1432020000000000000000000000000000001a32010000000000000000000000000000001638080c0c0a12070b111e0a020b0e1003140b0f0b0c0a1138090c10070b2a030c0d0b0d0f040c0a0b100c050b120c060b010c070b020c080b110c090b0a0b060b070b050b080b091201380a020300000020240a0011210c020e02112206000100000000000025030b07041112270a0111210c030e0311220600010000000000002503160703111227380b0c040d04070a11210b00380c0d04070911210b01380c0b040204010001020105070b2b021003140205010001020105070b2b02100114020600000104250b070b2b040c020b0210050e01380d0c030b0311250207010001020105070b2b021002140208000000291a11260c010e0111270c040b04030805150b0011280c060c05010c030b030b05160b06160c0205180b0011290c020b0202090000002d240a00112a0a00380e0a000c070b030c040b010c050b020c060b070b050b060b0412022d020a000a00380f0a0038100a00381112032d030a00381212082d080b00381312002d00020a01000001040b00112a112e020b01000100331e070b0a00381403070708111227070b2a000f000c030a030e000c020c010b012e0b0238000315051b0b030e0038150101051d0b0301020c0100020004120a070b0a0038160c020b00110b0b020b011106020d0100010436170a001132070b2904200307050c0b00381712042d04050e0b0001070b2a040f050c030b030b010b023818020e0100020203371c0b00112a070b2a020c050a030a050f02150a010a050f03150a020b050f0115070b2a030c040b040f060b010b020b0312063819020f01040300030838580b0011150c090a0111160a0921030b0705111227070b2a080c0b0a010a0212050c080a0b10070a08381a20031d0b0b0107001112270b0b0f070b0808381b0a0111080c0a0a0a06000000000000000024032c0706111227070b0a02381c0c060a0111180b06260338070211122711360c040e04070b0a020a0a0a03381d070b2a030c050b050f080a020b090b010b0a0b031207381e070b0a0238010c070b07070121035505570b0211000200000201020202000300040003010800030200",
           "abi": {
             "address": "0x1",
-            "name": "aptos_governance",
+            "name": "velor_governance",
             "friends": [],
             "exposed_functions": [
               {
@@ -9221,15 +9221,15 @@
                 "fields": [
                   {
                     "name": "create_proposal_events",
-                    "type": "0x1::event::EventHandle<0x1::aptos_governance::CreateProposalEvent>"
+                    "type": "0x1::event::EventHandle<0x1::velor_governance::CreateProposalEvent>"
                   },
                   {
                     "name": "update_config_events",
-                    "type": "0x1::event::EventHandle<0x1::aptos_governance::UpdateConfigEvent>"
+                    "type": "0x1::event::EventHandle<0x1::velor_governance::UpdateConfigEvent>"
                   },
                   {
                     "name": "vote_events",
-                    "type": "0x1::event::EventHandle<0x1::aptos_governance::VoteEvent>"
+                    "type": "0x1::event::EventHandle<0x1::velor_governance::VoteEvent>"
                   }
                 ]
               },
@@ -9331,7 +9331,7 @@
                 "fields": [
                   {
                     "name": "votes",
-                    "type": "0x1::table::Table<0x1::aptos_governance::RecordKey, bool>"
+                    "type": "0x1::table::Table<0x1::velor_governance::RecordKey, bool>"
                   }
                 ]
               }
@@ -9491,7 +9491,7 @@
             "friends": [],
             "exposed_functions": [
               {
-                "name": "assert_aptos_framework",
+                "name": "assert_velor_framework",
                 "visibility": "public",
                 "is_entry": false,
                 "generic_type_params": [],
@@ -9541,7 +9541,7 @@
                 "return": []
               },
               {
-                "name": "is_aptos_framework_address",
+                "name": "is_velor_framework_address",
                 "visibility": "public",
                 "is_entry": false,
                 "generic_type_params": [],
@@ -9922,7 +9922,7 @@
             "address": "0x1",
             "name": "governance_proposal",
             "friends": [
-              "0x1::aptos_governance"
+              "0x1::velor_governance"
             ],
             "exposed_functions": [
               {
@@ -10211,10 +10211,10 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>",
+          "type": "0x1::coin::CoinInfo<0x1::velor_coin::VelorCoin>",
           "data": {
             "decimals": 8,
-            "name": "Aptos Coin",
+            "name": "Velor Coin",
             "supply": {
               "vec": [
                 {
@@ -10326,7 +10326,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::stake::AptosCoinCapabilities",
+          "type": "0x1::stake::VelorCoinCapabilities",
           "data": {
             "mint_cap": {
               "dummy_field": false
@@ -10972,279 +10972,279 @@
                 "val": "1"
               },
               {
-                "key": "aptos_framework.account.create_address.base",
+                "key": "velor_framework.account.create_address.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.account.create_signer.base",
+                "key": "velor_framework.account.create_signer.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.bls12381.base",
+                "key": "velor_framework.bls12381.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.bls12381.per_pubkey_deserialize",
+                "key": "velor_framework.bls12381.per_pubkey_deserialize",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.bls12381.per_pubkey_aggregate",
+                "key": "velor_framework.bls12381.per_pubkey_aggregate",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.bls12381.per_pubkey_subgroup_check",
+                "key": "velor_framework.bls12381.per_pubkey_subgroup_check",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.bls12381.per_sig_deserialize",
+                "key": "velor_framework.bls12381.per_sig_deserialize",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.bls12381.per_sig_aggregate",
+                "key": "velor_framework.bls12381.per_sig_aggregate",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.bls12381.per_sig_subgroup_check",
+                "key": "velor_framework.bls12381.per_sig_subgroup_check",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.bls12381.per_sig_verify",
+                "key": "velor_framework.bls12381.per_sig_verify",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.bls12381.per_pop_verify",
+                "key": "velor_framework.bls12381.per_pop_verify",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.bls12381.per_pairing",
+                "key": "velor_framework.bls12381.per_pairing",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.bls12381.per_msg_hashing",
+                "key": "velor_framework.bls12381.per_msg_hashing",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.bls12381.per_byte_hashing",
+                "key": "velor_framework.bls12381.per_byte_hashing",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.signature.base",
+                "key": "velor_framework.signature.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.signature.per_pubkey_deserialize",
+                "key": "velor_framework.signature.per_pubkey_deserialize",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.signature.per_pubkey_small_order_check",
+                "key": "velor_framework.signature.per_pubkey_small_order_check",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.signature.per_sig_deserialize",
+                "key": "velor_framework.signature.per_sig_deserialize",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.signature.per_sig_strict_verify",
+                "key": "velor_framework.signature.per_sig_strict_verify",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.signature.per_msg_hashing_base",
+                "key": "velor_framework.signature.per_msg_hashing_base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.signature.per_msg_byte_hashing",
+                "key": "velor_framework.signature.per_msg_byte_hashing",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.secp256k1.base",
+                "key": "velor_framework.secp256k1.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.secp256k1.ecdsa_recover",
+                "key": "velor_framework.secp256k1.ecdsa_recover",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.basepoint_mul",
+                "key": "velor_framework.ristretto255.basepoint_mul",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.basepoint_double_mul",
+                "key": "velor_framework.ristretto255.basepoint_double_mul",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.point_add",
+                "key": "velor_framework.ristretto255.point_add",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.point_compress",
+                "key": "velor_framework.ristretto255.point_compress",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.point_decompress",
+                "key": "velor_framework.ristretto255.point_decompress",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.point_equals",
+                "key": "velor_framework.ristretto255.point_equals",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.point_from_64_uniform_bytes",
+                "key": "velor_framework.ristretto255.point_from_64_uniform_bytes",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.point_identity",
+                "key": "velor_framework.ristretto255.point_identity",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.point_mul",
+                "key": "velor_framework.ristretto255.point_mul",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.point_neg",
+                "key": "velor_framework.ristretto255.point_neg",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.point_sub",
+                "key": "velor_framework.ristretto255.point_sub",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.point_parse_arg",
+                "key": "velor_framework.ristretto255.point_parse_arg",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.scalar_sha512_per_byte",
+                "key": "velor_framework.ristretto255.scalar_sha512_per_byte",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.scalar_sha512_per_hash",
+                "key": "velor_framework.ristretto255.scalar_sha512_per_hash",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.scalar_add",
+                "key": "velor_framework.ristretto255.scalar_add",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.scalar_reduced_from_32_bytes",
+                "key": "velor_framework.ristretto255.scalar_reduced_from_32_bytes",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.scalar_uniform_from_64_bytes",
+                "key": "velor_framework.ristretto255.scalar_uniform_from_64_bytes",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.scalar_from_u128",
+                "key": "velor_framework.ristretto255.scalar_from_u128",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.scalar_from_u64",
+                "key": "velor_framework.ristretto255.scalar_from_u64",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.scalar_invert",
+                "key": "velor_framework.ristretto255.scalar_invert",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.scalar_is_canonical",
+                "key": "velor_framework.ristretto255.scalar_is_canonical",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.scalar_mul",
+                "key": "velor_framework.ristretto255.scalar_mul",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.scalar_neg",
+                "key": "velor_framework.ristretto255.scalar_neg",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.scalar_sub",
+                "key": "velor_framework.ristretto255.scalar_sub",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.ristretto255.scalar_parse_arg",
+                "key": "velor_framework.ristretto255.scalar_parse_arg",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.hash.sip_hash.base",
+                "key": "velor_framework.hash.sip_hash.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.hash.sip_hash.per_byte",
+                "key": "velor_framework.hash.sip_hash.per_byte",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.hash.keccak256.base",
+                "key": "velor_framework.hash.keccak256.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.hash.keccak256.per_byte",
+                "key": "velor_framework.hash.keccak256.per_byte",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.type_info.type_of.base",
+                "key": "velor_framework.type_info.type_of.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.type_info.type_of.per_abstract_memory_unit",
+                "key": "velor_framework.type_info.type_of.per_abstract_memory_unit",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.type_info.type_name.base",
+                "key": "velor_framework.type_info.type_name.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.type_info.type_name.per_abstract_memory_unit",
+                "key": "velor_framework.type_info.type_name.per_abstract_memory_unit",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.util.from_bytes.base",
+                "key": "velor_framework.util.from_bytes.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.util.from_bytes.per_byte",
+                "key": "velor_framework.util.from_bytes.per_byte",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.transaction_context.get_script_hash.base",
+                "key": "velor_framework.transaction_context.get_script_hash.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.code.request_publish.base",
+                "key": "velor_framework.code.request_publish.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.code.request_publish.per_byte",
+                "key": "velor_framework.code.request_publish.per_byte",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.event.write_to_event_store.base",
+                "key": "velor_framework.event.write_to_event_store.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.event.write_to_event_store.per_abstract_memory_unit",
+                "key": "velor_framework.event.write_to_event_store.per_abstract_memory_unit",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.state_storage.get_usage.base",
+                "key": "velor_framework.state_storage.get_usage.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.aggregator.add.base",
+                "key": "velor_framework.aggregator.add.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.aggregator.read.base",
+                "key": "velor_framework.aggregator.read.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.aggregator.sub.base",
+                "key": "velor_framework.aggregator.sub.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.aggregator.destroy.base",
+                "key": "velor_framework.aggregator.destroy.base",
                 "val": "1"
               },
               {
-                "key": "aptos_framework.aggregator_factory.new_aggregator.base",
+                "key": "velor_framework.aggregator_factory.new_aggregator.base",
                 "val": "1"
               },
               {
@@ -11420,7 +11420,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::transaction_fee::AptosCoinCapabilities",
+          "type": "0x1::transaction_fee::VelorCoinCapabilities",
           "data": {
             "burn_cap": {
               "dummy_field": false
@@ -11433,7 +11433,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::aptos_governance::VotingRecords",
+          "type": "0x1::velor_governance::VotingRecords",
           "data": {
             "votes": {
               "handle": "0xdc3189011da6e60643ef48030b4f8fc315beddc236c6c523db96778af7b47056"
@@ -11446,7 +11446,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::aptos_governance::GovernanceConfig",
+          "type": "0x1::velor_governance::GovernanceConfig",
           "data": {
             "min_voting_threshold": "0",
             "required_proposer_stake": "0",
@@ -11459,7 +11459,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::aptos_governance::GovernanceEvents",
+          "type": "0x1::velor_governance::GovernanceEvents",
           "data": {
             "create_proposal_events": {
               "counter": "0",
@@ -11496,7 +11496,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::aptos_governance::ApprovedExecutionHashes",
+          "type": "0x1::velor_governance::ApprovedExecutionHashes",
           "data": {
             "hashes": {
               "data": []
@@ -11509,7 +11509,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::aptos_governance::GovernanceResponsbility",
+          "type": "0x1::velor_governance::GovernanceResponsbility",
           "data": {
             "signer_caps": {
               "data": [
@@ -13673,7 +13673,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "type": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": {
             "coin": {
               "value": "18446744073709551615"
@@ -13757,7 +13757,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::aptos_coin::Delegations",
+          "type": "0x1::velor_coin::Delegations",
           "data": {
             "inner": []
           }
@@ -13768,7 +13768,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::aptos_coin::MintCapStore",
+          "type": "0x1::velor_coin::MintCapStore",
           "data": {
             "mint_cap": {
               "dummy_field": false
@@ -13781,7 +13781,7 @@
         "address": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "type": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -14443,7 +14443,7 @@
                 "address": "0x1",
                 "name": "coin",
                 "friends": [
-                  "0x1::aptos_coin",
+                  "0x1::velor_coin",
                   "0x1::genesis"
                 ],
                 "exposed_functions": [
@@ -15841,7 +15841,7 @@
                     "generic_type_params": [],
                     "params": [
                       "&0x1::stake::OwnerCapability",
-                      "0x1::coin::Coin<0x1::aptos_coin::AptosCoin>"
+                      "0x1::coin::Coin<0x1::velor_coin::VelorCoin>"
                     ],
                     "return": []
                   },
@@ -16206,13 +16206,13 @@
                     "return": []
                   },
                   {
-                    "name": "store_aptos_coin_mint_cap",
+                    "name": "store_velor_coin_mint_cap",
                     "visibility": "friend",
                     "is_entry": false,
                     "generic_type_params": [],
                     "params": [
                       "&signer",
-                      "0x1::coin::MintCapability<0x1::aptos_coin::AptosCoin>"
+                      "0x1::coin::MintCapability<0x1::velor_coin::VelorCoin>"
                     ],
                     "return": []
                   },
@@ -16283,7 +16283,7 @@
                       "u64"
                     ],
                     "return": [
-                      "0x1::coin::Coin<0x1::aptos_coin::AptosCoin>"
+                      "0x1::coin::Coin<0x1::velor_coin::VelorCoin>"
                     ]
                   }
                 ],
@@ -16308,7 +16308,7 @@
                     ]
                   },
                   {
-                    "name": "AptosCoinCapabilities",
+                    "name": "VelorCoinCapabilities",
                     "is_native": false,
                     "abilities": [
                       "key"
@@ -16317,7 +16317,7 @@
                     "fields": [
                       {
                         "name": "mint_cap",
-                        "type": "0x1::coin::MintCapability<0x1::aptos_coin::AptosCoin>"
+                        "type": "0x1::coin::MintCapability<0x1::velor_coin::VelorCoin>"
                       }
                     ]
                   },
@@ -16517,19 +16517,19 @@
                     "fields": [
                       {
                         "name": "active",
-                        "type": "0x1::coin::Coin<0x1::aptos_coin::AptosCoin>"
+                        "type": "0x1::coin::Coin<0x1::velor_coin::VelorCoin>"
                       },
                       {
                         "name": "inactive",
-                        "type": "0x1::coin::Coin<0x1::aptos_coin::AptosCoin>"
+                        "type": "0x1::coin::Coin<0x1::velor_coin::VelorCoin>"
                       },
                       {
                         "name": "pending_active",
-                        "type": "0x1::coin::Coin<0x1::aptos_coin::AptosCoin>"
+                        "type": "0x1::coin::Coin<0x1::velor_coin::VelorCoin>"
                       },
                       {
                         "name": "pending_inactive",
-                        "type": "0x1::coin::Coin<0x1::aptos_coin::AptosCoin>"
+                        "type": "0x1::coin::Coin<0x1::velor_coin::VelorCoin>"
                       },
                       {
                         "name": "locked_until_secs",
@@ -18266,7 +18266,7 @@
                 "address": "0x1",
                 "name": "account",
                 "friends": [
-                  "0x1::aptos_account",
+                  "0x1::velor_account",
                   "0x1::coin",
                   "0x1::genesis",
                   "0x1::resource_account",
@@ -20293,7 +20293,7 @@
               "bytecode": "0xa11ceb0b050000000d0100100210320342830104c5011605db01e00107bb03a80408e307200683087710fa088d020a870b1a0ca10bc0030de10e060fe70e020001000200030004000500060007000800090800000a0400000b0800000c0800010e05010001031207010000011405010001011f0401000101270501000105280700000d000100000f02010000100301000011000100001304050000150006000016070100041b000400031c0a0b0100031d0a0c0100071e0e0f010006200001000121000101000116121301000122140101000623000100022409090001111701010003250119010003260f19010005291b1c00012a1d1e0100012b1f010100022c090900080909090a0d0c110d110e111111120913091511161101060c0003060c060c0b04010800020c050105010b050103020b060108000b0401080003060c050304070a0801030b0501030b04010800010301060b0501090001010106090001080102070a090003010900010b070108000108000203060b04010900010b0701090002050b0701090005070a080103070a080106080103010b04010800010b0401090005060a0801060801030b05010303010b05010900030b060108000b080108000b04010800010a0201080905060c080908090201030b060109000b080109000b04010900010b0801090003050b07010800060b040108000767656e657369730a6170746f735f636f696e04636f696e056572726f72066f7074696f6e067369676e657206737472696e671073797374656d5f61646472657373657306766563746f72094170746f73436f696e1744656c6567617465644d696e744361706162696c6974790b44656c65676174696f6e730c4d696e7443617053746f726515636c61696d5f6d696e745f6361706162696c6974790e4d696e744361706162696c6974791b636f6e6669677572655f6163636f756e74735f666f725f746573741864656c65676174655f6d696e745f6361706162696c6974791064657374726f795f6d696e745f636170064f7074696f6e0f66696e645f64656c65676174696f6e0e4275726e4361706162696c6974790a696e697469616c697a65046d696e740b64756d6d795f6669656c6402746f05696e6e6572086d696e745f6361700a616464726573735f6f660769735f736f6d6506626f72726f770b737761705f72656d6f766504436f696e166173736572745f6170746f735f6672616d65776f726b087265676973746572076465706f736974146173736572745f636f72655f7265736f7572636510696e76616c69645f617267756d656e74046e6f6e6504736f6d6510467265657a654361706162696c69747906537472696e67047574663825696e697469616c697a655f776974685f706172616c6c656c697a61626c655f737570706c791264657374726f795f667265657a655f636170096e6f745f666f756e6400000000000000000000000000000000000000000000000000000000000000010308020000000000000003080300000000000000030801000000000000000520000000000000000000000000000000000000000000000000000000000a550c18052000000000000000000000000000000000000000000000000000000000000000010a020b0a4170746f7320436f696e0a020403415054126170746f733a3a6d657461646174615f7630f80103010000000000000010454e4f5f4341504142494c4954494553254163636f756e7420646f6573206e6f742068617665206d696e74206361706162696c69747902000000000000001245414c52454144595f44454c454741544544444d696e74206361706162696c6974792068617320616c7265616479206265656e2064656c65676174656420746f20746869732073706563696669656420616464726573730300000000000000154544454c45474154494f4e5f4e4f545f464f554e443943616e6e6f742066696e642064656c65676174696f6e206f66206d696e74206361706162696c69747920746f2074686973206163636f756e7400020117010102011805020201190a08010302011a0b0401080000010402020308220a00110711040c030e033800030b0b00010701270e033801140c0207032a020f000c010b010b02380213010107032b031001140c040b000b0412032d03020103000010150b00110b0a01380306ffffffffffffffff0e0238040c030a0111070b0338050a010b0212032d030b01400d000000000000000012022d02020201040102152d0e00110f07032a020f000c040600000000000000000c060a060a042e410d23030f05280a040a060c030c020b022e0b03420d0c050b051002140a012203230b040107001110270b06060100000000000000160c0605080b040b011201440d02030300010316090b00110b07042c0313030c010b013806020400000102182807032b0210000c010600000000000000000c030a01410d0c0538070c040a030a0523031005260a010a03420d0c020b021002140a0021031b05210b01010b0338080c0405260b03060100000000000000160c03050b0b0402050300001a160a00110b0a00070511140706111431080838090c030c020c010b000a0312032d030b02380a0b010b0302060104010320150b0011070c030a032903030907021117270b032b0310010c050b020b0538040c040b010b04380502020003000100000000",
               "abi": {
                 "address": "0x1",
-                "name": "aptos_coin",
+                "name": "velor_coin",
                 "friends": [
                   "0x1::genesis"
                 ],
@@ -20316,7 +20316,7 @@
                     "params": [
                       "&signer",
                       "&signer",
-                      "0x1::coin::MintCapability<0x1::aptos_coin::AptosCoin>"
+                      "0x1::coin::MintCapability<0x1::velor_coin::VelorCoin>"
                     ],
                     "return": []
                   },
@@ -20350,8 +20350,8 @@
                       "&signer"
                     ],
                     "return": [
-                      "0x1::coin::BurnCapability<0x1::aptos_coin::AptosCoin>",
-                      "0x1::coin::MintCapability<0x1::aptos_coin::AptosCoin>"
+                      "0x1::coin::BurnCapability<0x1::velor_coin::VelorCoin>",
+                      "0x1::coin::MintCapability<0x1::velor_coin::VelorCoin>"
                     ]
                   },
                   {
@@ -20369,7 +20369,7 @@
                 ],
                 "structs": [
                   {
-                    "name": "AptosCoin",
+                    "name": "VelorCoin",
                     "is_native": false,
                     "abilities": [
                       "key"
@@ -20406,7 +20406,7 @@
                     "fields": [
                       {
                         "name": "inner",
-                        "type": "vector<0x1::aptos_coin::DelegatedMintCapability>"
+                        "type": "vector<0x1::velor_coin::DelegatedMintCapability>"
                       }
                     ]
                   },
@@ -20420,7 +20420,7 @@
                     "fields": [
                       {
                         "name": "mint_cap",
-                        "type": "0x1::coin::MintCapability<0x1::aptos_coin::AptosCoin>"
+                        "type": "0x1::coin::MintCapability<0x1::velor_coin::VelorCoin>"
                       }
                     ]
                   }
@@ -20436,7 +20436,7 @@
               "bytecode": "0xa11ceb0b0500000007010004030416041a02051c0d07293f0868200c88011900000001000200000000030001000004020101000105020001000303010a02010301060900010900000a6170746f735f6861736803626373096b656363616b323536087369705f68617368137369705f686173685f66726f6d5f76616c756508746f5f6279746573000000000000000000000000000000000000000000000000000000000000000100010200010102000201000000060b0038000c010b0111010200",
               "abi": {
                 "address": "0x1",
-                "name": "aptos_hash",
+                "name": "velor_hash",
                 "friends": [],
                 "exposed_functions": [
                   {
@@ -22121,7 +22121,7 @@
               "bytecode": "0xa11ceb0b0500000009010008020804030c20042c0405301207427408b601200cd6012d0f830204000200030004000502080800000600010000070201000106000300030905010100010a0006000307020101000304050401050003060c0503010c01080001060c01010767656e65736973107265736f757263655f6163636f756e740d6170746f735f6163636f756e74076163636f756e740a6170746f735f636f696e04636f696e0e6372656174655f6163636f756e74087472616e73666572094170746f73436f696e087265676973746572096578697374735f617400000000000000000000000000000000000000000000000000000000000000010001040003060b0011020c010e0138000201010400010c0a01110420030505070a0111000b000b010b023801020000000100",
               "abi": {
                 "address": "0x1",
-                "name": "aptos_account",
+                "name": "velor_account",
                 "friends": [
                   "0x1::genesis",
                   "0x1::resource_account"
@@ -22800,7 +22800,7 @@
                 "address": "0x1",
                 "name": "reconfiguration",
                 "friends": [
-                  "0x1::aptos_governance",
+                  "0x1::velor_governance",
                   "0x1::block",
                   "0x1::consensus_config",
                   "0x1::gas_schedule",
@@ -22929,20 +22929,20 @@
                     "return": []
                   },
                   {
-                    "name": "store_aptos_coin_burn_cap",
+                    "name": "store_velor_coin_burn_cap",
                     "visibility": "friend",
                     "is_entry": false,
                     "generic_type_params": [],
                     "params": [
                       "&signer",
-                      "0x1::coin::BurnCapability<0x1::aptos_coin::AptosCoin>"
+                      "0x1::coin::BurnCapability<0x1::velor_coin::VelorCoin>"
                     ],
                     "return": []
                   }
                 ],
                 "structs": [
                   {
-                    "name": "AptosCoinCapabilities",
+                    "name": "VelorCoinCapabilities",
                     "is_native": false,
                     "abilities": [
                       "key"
@@ -22951,7 +22951,7 @@
                     "fields": [
                       {
                         "name": "burn_cap",
-                        "type": "0x1::coin::BurnCapability<0x1::aptos_coin::AptosCoin>"
+                        "type": "0x1::coin::BurnCapability<0x1::velor_coin::VelorCoin>"
                       }
                     ]
                   }
@@ -22967,7 +22967,7 @@
               "bytecode": "0xa11ceb0b050000000c0100240224540378b70204af033e05ed039a03078707a60b08ad122006cd12a20110ef13f7060ae61a6d0cd31be7070dba23120000000100020003000400050006000700080009000a000b000c000d000e000f001000110012080000130600001408000015080000160800001707000018060000190600001a08000a1e0702000000000d1f070006230600012b06000539040106010f41040203010001074707010000024c08000c570b00001b000100001c000100001d020100002003040000210105000022010000002406070000250100000026080000002709010000280a01000029000100002a0b0700002c0c0100002d090100002e0d01000a42101102040411431300010404440000001145131401040a46150102040409480a08000b49080800104a0100000b4b080000034d01180100074e01190100074f1a11010007501a1b010007511c190100061d011200111d1d00010405521f0101060d531421000d542200000a5501240204040a50102702040401562807000c58012a000c592b11000b5a082c000b5b0800000e5c0a0100115d0a010104015e0a2e01060f5f013202030408280101001160131101040a613435020404112a131c01040e620a01000f6339110203000f463a010203001164130001040665011200112e3b010104100f11121312140f19171a051b051c051d051f12201e2323142324262b122c1e2c2f2c302d31230f2f12300f311223261426202f3331343135123712203001030005060c050a020a020a02020a020a02010b0902080a0a02010402080b05010c010504060c04030301060c02030503060c05080c04060c050301030708000a020302030a0202060b090209000901060900010101080b020503010a0203070b09020900090109000901110305050a020b0902080a0a02070b0d010801030b0f010407080306080203030b0902080a0a020503040b0f0104010810010b0f0104010b0f01090001060b0f0109000106090001090008050509000a0204030b0f01040b0902080a0a0201080102070b0d010900090003080a080a0b0902080a0a0201080a0106080a02080a0a02010b0902090009010206080406080c0205080c010609010106080c060811030301030301081101060811040303030304030403060c010b0d01090001080601080702080501010b0e020900090103070b0902030a020603070b0902030a0202070b090209000901060900020900090101070b090205080c0207080307080208080b07080303030805050307080802060b0e0209000901090003070b0e0209000901090009010506090005030301106170746f735f676f7665726e616e6365076163636f756e740a6170746f735f636f696e04636f696e056572726f72056576656e7413676f7665726e616e63655f70726f706f73616c066f7074696f6e0f7265636f6e66696775726174696f6e067369676e65720a73696d706c655f6d6170057374616b650e7374616b696e675f636f6e66696706737472696e671073797374656d5f616464726573736573057461626c650974696d657374616d7006766f74696e6717417070726f766564457865637574696f6e4861736865731343726561746550726f706f73616c4576656e7410476f7665726e616e6365436f6e66696710476f7665726e616e63654576656e747317476f7665726e616e6365526573706f6e7362696c697479095265636f72644b657911557064617465436f6e6669674576656e7409566f74654576656e740d566f74696e675265636f726473186164645f617070726f7665645f7363726970745f686173681f6164645f617070726f7665645f7363726970745f686173685f7363726970740f6372656174655f70726f706f73616c0953696d706c654d617006537472696e67186372656174655f70726f706f73616c5f6d65746164617461186765745f6d696e5f766f74696e675f7468726573686f6c641b6765745f72657175697265645f70726f706f7365725f7374616b6512476f7665726e616e636550726f706f73616c0a6765745f7369676e6572186765745f766f74696e675f6475726174696f6e5f73656373106765745f766f74696e675f706f7765720a696e697469616c697a650b7265636f6e6669677572651472656d6f76655f617070726f7665645f68617368077265736f6c7665105369676e65724361706162696c6974791073746f72655f7369676e65725f636170187570646174655f676f7665726e616e63655f636f6e66696704766f7465066861736865730870726f706f7365720a7374616b655f706f6f6c0b70726f706f73616c5f69640e657865637574696f6e5f686173681170726f706f73616c5f6d65746164617461146d696e5f766f74696e675f7468726573686f6c641772657175697265645f70726f706f7365725f7374616b6514766f74696e675f6475726174696f6e5f73656373166372656174655f70726f706f73616c5f6576656e74730b4576656e7448616e646c65147570646174655f636f6e6669675f6576656e74730b766f74655f6576656e74730b7369676e65725f6361707305766f746572096e756d5f766f7465730b73686f756c645f7061737305766f746573055461626c650c636f6e7461696e735f6b6579126765745f70726f706f73616c5f737461746510696e76616c69645f617267756d656e74126765745f657865637574696f6e5f6861736803616464064f7074696f6e0a616464726573735f6f66136765745f64656c6567617465645f766f7465720b6e6f775f7365636f6e64730f6765745f6c6f636b75705f73656373094170746f73436f696e06737570706c79046e6f6e650769735f736f6d6506626f72726f7704736f6d650a656d69745f6576656e740475746638066c656e677468066372656174651d6372656174655f7369676e65725f776974685f6361706162696c6974790d5374616b696e67436f6e666967036765741e6765745f616c6c6f775f76616c696461746f725f7365745f6368616e6765096765745f7374616b651e6765745f63757272656e745f65706f63685f766f74696e675f706f776572166173736572745f6170746f735f6672616d65776f726b087265676973746572106e65775f6576656e745f68616e646c65036e65770b69735f7265736f6c7665640672656d6f7665216173736572745f6672616d65776f726b5f72657365727665645f6164647265737308636f6e7461696e731c6765745f70726f706f73616c5f65787069726174696f6e5f73656373156372656174655f656d7074795f70726f706f73616c000000000000000000000000000000000000000000000000000000000000000103080400000000000000030801000000000000000308030000000000000003080a0000000000000003080900000000000000030802000000000000000308050000000000000003080600000000000000030808000000000000000a020e0d6d657461646174615f686173680a0212116d657461646174615f6c6f636174696f6e05200000000000000000000000000000000000000000000000000000000000000001126170746f733a3a6d657461646174615f7630e2060901000000000000001c45494e53554646494349454e545f50524f504f5345525f5354414b454c54686520737065636966696564207374616b6520706f6f6c20646f6573206e6f7420686176652073756666696369656e74207374616b6520746f2063726561746520612070726f706f73616c020000000000000014454e4f545f44454c4547415445445f564f5445524454686973206163636f756e74206973206e6f74207468652064657369676e6174656420766f746572206f662074686520737065636966696564207374616b6520706f6f6c03000000000000001a45494e53554646494349454e545f5354414b455f4c4f434b55506054686520737065636966696564207374616b6520706f6f6c20646f6573206e6f742068617665206c6f6e6720656e6f7567682072656d61696e696e67206c6f636b757020746f2063726561746520612070726f706f73616c206f7220766f746504000000000000000e45414c52454144595f564f5445444b54686520737065636966696564207374616b6520706f6f6c2068617320616c7265616479206265656e207573656420746f20766f7465206f6e207468652073616d652070726f706f73616c050000000000000010454e4f5f564f54494e475f504f5745523a54686520737065636966696564207374616b6520706f6f6c206d7573742062652070617274206f66207468652076616c696461746f722073657406000000000000001c4550524f504f53414c5f4e4f545f5245534f4c5641424c455f5945543e50726f706f73616c206973206e6f7420726561647920746f206265207265736f6c7665642e2057616974696e67206f6e2074696d65206f7220766f74657308000000000000001a4550524f504f53414c5f4e4f545f5245534f4c5645445f594554265468652070726f706f73616c20686173206e6f74206265656e207265736f6c7665642079657409000000000000001b454d455441444154415f4c4f434154494f4e5f544f4f5f4c4f4e47314d65746164617461206c6f636174696f6e2063616e6e6f74206265206c6f6e676572207468616e203235362063686172730a0000000000000017454d455441444154415f484153485f544f4f5f4c4f4e472d4d6574616461746120686173682063616e6e6f74206265206c6f6e676572207468616e203235362063686172730002012f0b0902030a02010205300531053203330a02340b0902080a0a02020203350436033703030203380b0d0108013a0b0d0108063b0b0d0108070402013c0b090205080c0502023105320306020335043603370307020532033d0531053e033f01080201400b0e0208050100010001000e23070b2a000c010a0110000e0038000309050c0b010102070b0a0038010c030b0307012103190b01010707111227070b0a0038020c020b010f000b000b02380302010104010001030b00110002020104020203166a0b0011150c120a0111160a1221030b0705111227070b2b020c0e0a0111080c130b130a0e10011426031c0b0e01070111122711170c0b0b0b0a0e100214160c0f0a0111180a0f26032e0b0e0107021112270b030b0411030c1138040c1538050c0c0e153806033a05450e153807140c140b1432020000000000000000000000000000001a32010000000000000000000000000000001638080c0c0a12070b111e0a020b0e1003140b0f0b0c0a1138090c10070b2a030c0d0b0d0f040c0a0b100c050b120c060b010c070b020c080b110c090b0a0b060b070b050b080b091201380a020300000020240a0011210c020e02112206000100000000000025030b07041112270a0111210c030e0311220600010000000000002503160703111227380b0c040d04070a11210b00380c0d04070911210b01380c0b040204010001020105070b2b021003140205010001020105070b2b02100114020600000104250b070b2b040c020b0210050e01380d0c030b0311250207010001020105070b2b021002140208000000291a11260c010e0111270c040b04030805150b0011280c060c05010c030b030b05160b06160c0205180b0011290c020b0202090000002d240a00112a0a00380e0a000c070b030c040b010c050b020c060b070b050b060b0412022d020a000a00380f0a0038100a00381112032d030a00381212082d080b00381312002d00020a01000001040b00112a112e020b01000100331e070b0a00381403070708111227070b2a000f000c030a030e000c020c010b012e0b0238000315051b0b030e0038150101051d0b0301020c0100020004120a070b0a0038160c020b00110b0b020b011106020d0100010436170a001132070b2904200307050c0b00381712042d04050e0b0001070b2a040f050c030b030b010b023818020e0100020203371c0b00112a070b2a020c050a030a050f02150a010a050f03150a020b050f0115070b2a030c040b040f060b010b020b0312063819020f01040300030838580b0011150c090a0111160a0921030b0705111227070b2a080c0b0a010a0212050c080a0b10070a08381a20031d0b0b0107001112270b0b0f070b0808381b0a0111080c0a0a0a06000000000000000024032c0706111227070b0a02381c0c060a0111180b06260338070211122711360c040e04070b0a020a0a0a03381d070b2a030c050b050f080a020b090b010b0a0b031207381e070b0a0238010c070b07070121035505570b0211000200000201020202000300040003010800030200",
               "abi": {
                 "address": "0x1",
-                "name": "aptos_governance",
+                "name": "velor_governance",
                 "friends": [],
                 "exposed_functions": [
                   {
@@ -23184,15 +23184,15 @@
                     "fields": [
                       {
                         "name": "create_proposal_events",
-                        "type": "0x1::event::EventHandle<0x1::aptos_governance::CreateProposalEvent>"
+                        "type": "0x1::event::EventHandle<0x1::velor_governance::CreateProposalEvent>"
                       },
                       {
                         "name": "update_config_events",
-                        "type": "0x1::event::EventHandle<0x1::aptos_governance::UpdateConfigEvent>"
+                        "type": "0x1::event::EventHandle<0x1::velor_governance::UpdateConfigEvent>"
                       },
                       {
                         "name": "vote_events",
-                        "type": "0x1::event::EventHandle<0x1::aptos_governance::VoteEvent>"
+                        "type": "0x1::event::EventHandle<0x1::velor_governance::VoteEvent>"
                       }
                     ]
                   },
@@ -23294,7 +23294,7 @@
                     "fields": [
                       {
                         "name": "votes",
-                        "type": "0x1::table::Table<0x1::aptos_governance::RecordKey, bool>"
+                        "type": "0x1::table::Table<0x1::velor_governance::RecordKey, bool>"
                       }
                     ]
                   }
@@ -23451,7 +23451,7 @@
                 "friends": [],
                 "exposed_functions": [
                   {
-                    "name": "assert_aptos_framework",
+                    "name": "assert_velor_framework",
                     "visibility": "public",
                     "is_entry": false,
                     "generic_type_params": [],
@@ -23501,7 +23501,7 @@
                     "return": []
                   },
                   {
-                    "name": "is_aptos_framework_address",
+                    "name": "is_velor_framework_address",
                     "visibility": "public",
                     "is_entry": false,
                     "generic_type_params": [],
@@ -23879,7 +23879,7 @@
                 "address": "0x1",
                 "name": "governance_proposal",
                 "friends": [
-                  "0x1::aptos_governance"
+                  "0x1::velor_governance"
                 ],
                 "exposed_functions": [
                   {
@@ -24301,7 +24301,7 @@
                         "extension": {
                           "vec": []
                         },
-                        "name": "aptos_hash",
+                        "name": "velor_hash",
                         "source": "0x1f8b08000000000002ff7d536b6f9b3014fd9e5f719749136c79f00c84b495baed43d769d9b456d3a4aa4a8d6d8a55c0081b9a68ea7f9f0d79f7612161dfcbb9f79cc3f5783c862fd5aa94fcbe4265ca30a448a45444bdb1ca0ce13bc5183d0c1d7f1281a01452294b118dc70f6d7c2429ca37fb54e69946b5c86f0520429864bc18c0d5c5b9a34b002a883eb8dda1a2801ac432146714580177429228d2fdef4630e792824c91dc019800040daa182a24f064cd2d022655aaed3aff79ad301404ca556db1c77eb46536e7c5106f143f177cc5ca0b15881457ad60587189241d2e7905c6f9efbf26c448500209ca59b6d22c4a416bc22b258de790d405d69a05e08a2a1c817805971415c35f29cb58595238af7324042f5a33bea282d10c2e47f09956859054d9a01ec7b29d5ece49ad8c418aa958b4d6745bcd17fef540ad5a28ad3a136331ebb5a10249d65028eb3853da141f10ac6c3146bc924a2734144b5e9dd4e19919413df1d6c017108ba4e2f9a241594d4f7ef086fed1bb33a389e0c3f6d8d558f3d12ba312da4e700a8a561449be68cf4663ae5be975c8ca6ce34f5d5afda8ee05f34eccd6d54dfa15a5dd20aabffda2d4dd6176dce79a0ac98afb83f2ef6f540979dbee0f8a2f74dc308f24b3a2aca5d6dcb5b9d926f58afbb2ebd01f1cc5f702b77beee88abc966f945cf6fdc49e241e0e12db9b22ec2553dfb6c81427214edcd0b3dc1011d70b6337c6045bf6d4f6d51784da0e49a6c48e2de788cbb28f7de27813cb0e2749e0b82e9e3a010d48ec108c03cbc516f52d2b9ef82e46a1e3046e1cc40922a1e5f924f49117586f68614a8535db861ed565a0603038e9c6b7131845192dee656a7ce8cc34f73d3ef05955fb78008c7955f1c70d7000cc9c3d43b6134d97a582a87bf95a85b5ebaf9750c8dd9cb5fdf6c75a2f75bd6925df19470d4f5bf800ece3efb5390c3e81bd6bf8345b5f88a7de7f96dba073a2050000",
                         "source_map": "0x"
                       },
@@ -24402,7 +24402,7 @@
                         "source_map": "0x"
                       }
                     ],
-                    "name": "AptosStdlib",
+                    "name": "VelorStdlib",
                     "source_digest": "A323A700050AC7AD4B32C9EA85EFE11E54569E63EBA4B9D78DFB19A5385E3573",
                     "upgrade_number": "0",
                     "upgrade_policy": {
@@ -24413,7 +24413,7 @@
                     "deps": [
                       {
                         "account": "0x1",
-                        "package_name": "AptosStdlib"
+                        "package_name": "VelorStdlib"
                       },
                       {
                         "account": "0x1",
@@ -24493,7 +24493,7 @@
                         "extension": {
                           "vec": []
                         },
-                        "name": "aptos_coin",
+                        "name": "velor_coin",
                         "source": "0x1f8b08000000000002ffbd586d6fdb3610fe9e5fc176402a779eddace9cb94a4589a6443803629d6ecc3300c022dd1321149f4482aae1bf8bfef8ed40b454b4e8775f587c4968e77c7bbe79e3b723a9d929b0557241749993192b0392f982294e4bce039cd082d1292b282491e9333c10bf3e02dcd6811b3c9de14d6c3523ee72c21732972b2d07aa9c2e934e57a51ce26b1c8a7b9b8633fc082b4a42933bfa65a32f84679316d9e27222e735668aab928a6bad442729aed558ed1a5162a9a4b9ab39590b761681fc4e8d1fd1e814fa918513a0943a5252fd2a3ee4326a590de33c553d897f7f08ec57a4b522cd1a930bcffc8b2f9985c9b9f9ba3bd466acb3d74ac917f5bcae28c2ee98c675cafc7e43d2f74fb7b7334ac46ad95667944934432a598aa4cce256790862d714c94e2b51426e7348e4559689208c86a213459d03b86c9d5246e3c30d2b12894261757d7d1d9e987d3b797ef2e6f2e2f3e86a47c79484ec8c151a3f27d77316804bc6492d1644d668c1500a28ca5540322b4201ad1a5962cb618a976e25a3c7df7dbc5e9f91fd1f9c5bb8b5f4f6f2ece6b9b3fb636cf6881ce0338935a3d648088b9bf95c624b51b770d55062eafafa2abeb9be897ebdfaf1a5bcfab980178ca5893538cac813beeee96adc93dd97424aa1c7e04b0b056c848e007dd8ac0add04bf671a3f9cdd8086fda5c9db71bd3e21602194350318cb375bd69214dfdc5b480509338a33cb7eff5823571071c29cfecc475fdbcce4f57c6ec4299fdb4fbd022ece4cc71f7064c42643554319376a1327ec4a59450c8640918854a7412a6fafcc0e73d11e405a80d89adc7e3019fb783084821a2c8d610a32c83d82425b201a92a03e101c4a68159f86766bc35092158afd6b96539cb781cd8121b917959382b02bfe4c8be65915148826e99bb991e06c1c8d9b15fec4072f04feac833ea3b31aab08b9f8c6912ccc01104df188882b1cfcc7eaf213902b85b7a6af715ad80aea325951834784067198b54b95c66aeb34163063f9e17e3ce4b4bc26158eaf9eb60f6d80619953c1eed16fc70e34bbc1e93e95300518cfd4891a7d3ce5b80123302b980dd085979ed8ab9f1414a34be347e9382b144353c8208b1dfc159172fe40e22956009aa89ed992b9e65588692dd41b92600bbd842aa9574ed1ae63504d9c63d99b48c017d31d2c24feeb8cb34f74d1ac9c6dd974d68c2209c621db5690fdaafa3a346da4148830abf90ae77165165c96c977a01ada8f789da2267132150d913d3c62ef25ba541f5c7cc7367b06ceb68d45b1c2e5e30f877c991bfbac1fe1aa5e956e6602aa1244dfe71843a76a5de043f0fabec26bdd96693d2a34172c4e6d19bda3974180d0a4d925349217f3d1d762be3d893704f101d51ca9839e9ac523998256821739e969245b568044e44e844cb3743991b3bb1000d8df91e812feec85f9b92eb91c9b4463748756c9c6903c39f621b06dad1a6cdb34f2c2e35ab3c01baa385a2b1d34c5b2048967210922e6377c3e2c1d1525cdd0d304083647ff0faf0f0e5abc3c367af9ebf7af6d38b17072f0f5e74697abf0ef0d8255e1faa4ba178c78a4d13c4d586381273dfe7b1f5d30d69cd955dc9dd54f9d05a771ab9ef4e1f707cc8977a1d8c1a457d3c893d13d655e5832581df0a063f560b26d936009a2915b20c99ab126a0ad54c7ed09a565592a8197c4df4504f0e8690859536d87cd26872cb8cc01026d7a6c830124e3559d99e22a91536435ffb8ae6760dcccb759d3cc49a88b1ca96d10a50eb497725e1e6d716d9a32e046d8c3c7674d57b738339f285219c1b8050ca2209fcb3cd68dc3b22a0d70d724ec8fe4c80a25594666246b35de627f5aa9e2a33ec0c743b546c36ba4e3bfe82d2a99335ee98f8b60875cf7a786431fd0367029b5f2432f3b3d2027fb3c49e5b3c1a2619689103f0adad343dae5a143448ae80ec9e571c7c766afb6172ef5043b0df02d44dab73aa4194e4a5261da444f0e4d8310c9ddc23b6892199ae560eba9eb58f560b0e290b38396ea8286345aa1781637ee476ac5a11bcc6db1450572fb4deb90bc7843b9b720baf5a3d018e797402411dd7d5c40b33b24554a6e6b626d83ebe8f3c9db8254ebeafaf100c38dbafb577cb522da2198d6fbb0e0e9d55ef710cf9666c6cf0ea1eb193ada9c812743b147b8531006c5309c3a8de9e4fcfdde0eca0dd9cae672c82eb12f609c28ff726511bd760070b3bc9abc150df7e71152991434138caa13bf7deab78c5c21374e369ada9826247d1b7a8ae5d680a4964e6f01a906a4597a00ec705af66924ffe78476f81e2004dcbb57b2565ef4e399c60b0695b22746ec2dc86ddd37776b59dadbd6e779ee63869cd3c3c1b554584a8f4e1d29908e0a6c3de7f1ec324f0e6218eedc9657763ff9521f11150a293b81e82f434545551a3b110050b46bda40bbabe1eb9f2397189f5e4c484d4d76fefbeba1e9ab2f3d5e167065df8b6f374f36fc8d7d871b3ffdd9fc892119e11ff1abe95a6692aed6d6434a7b8fff5d1c0f28af0ba9768edf9eeffbc4ddb76b273e1b5fd7ad0ad911bb0a19bc0fafe64b3f70f32c99a0054190000",
                         "source_map": "0x"
                       },
@@ -24501,7 +24501,7 @@
                         "extension": {
                           "vec": []
                         },
-                        "name": "aptos_account",
+                        "name": "velor_account",
                         "source": "0x1f8b08000000000002ffb554db6ed430107def57b8455a395204494579c852c4e53310b21c67b2b59ad82bdb11bba0fd777c898d4397087af1c32a9b393373e6cc7146d94d0320ba3752935ed111be4b75df34e105654c4ec2a09f17c89e499f0306c87605e15f30c945d37c72cf5fece30a9ef9b08ff78a83e81e4276204073bd5d0529d072520c48a2e8e16f9eefc47ae833d59ca1a81653400d97028d60ee64a75f3f7b5f5f703fb583ed0ac2a823ea2711faa671319dcc1db987638368d759317431efd19d010cd27c2740a1db48dc4a7fbe42b14d79618d0a765c1b50efd33e3fe04d2837634f7fe1681415ba0785c36e1a34a795c8c844b44474f484d0f4ee6dce9af7f832918583e5603d6ab091458ef23c979358440a9ffe9c2672caa709f41cab48a6c8e77af5d580b602d9e1c00af8b13ad0ba767826d5fca22ebee512f8e16d0e490af8e406c5f95d66fc974fe3ee88365dd384d0761108a6f7e15ec991b44ccf368f4b6e656bf9c4a01d569259657cb8aa9e72daaabdca9ce19a31aae4f022ed18bda96ad76ed10fb7931284d17d89462e8c7b2a9c9fd73e415c70c3adf63f80f45211bfc78d133f77f9d23d41795b264c42648f377e7bc5839bd1c15e6abe9652ce484718d76eb6126d12fbac60324a482cdd2a4b74535519866a0dca5ce250b2a503150c721fdb1cabc8ad4b2b51b556ddefeebfebfbacdf1dea7fe8503fbac5b517eb3a7741545d1b258f24da21f9e2cc7e02320a8e93f24b2793706fec6ffc9e9d2e7e01309455742c070000",
                         "source_map": "0x"
                       },
@@ -24581,7 +24581,7 @@
                         "extension": {
                           "vec": []
                         },
-                        "name": "aptos_governance",
+                        "name": "velor_governance",
                         "source": "0x1f8b08000000000002ffed3d7b73dbc6f1fffb5320eefc14d261684a8e33f9519626aacd389e3896c79693c9743a08441c45d420c0e22159cde8bb7777ef817b82a4e4244d1b4feb48c0dddededebe770f7ef8e0c1bde84174b26ecafa7979c9aa2229e62caad8ba62352b9a3a6a962c2a8bcfe7cb242ba28b6e48b9a05734332a58735556efc7d10f65931517d1babc625594d5d13cc9e76d9e342c8dce931afe2e0b9c866bcedbaa821522b62ee7cb4febe8529f2aa0afab725dd6f87b85ef5905e3ce93f97b1c5837c97b185196f9387a5144499a664d5616a3680183b3266aca685eb64533c2c510583701a0e4e5fc7dbb06c4595ae3d07316254d94b3a46ea2045fc30a49ad2191e0acb4ad125c640c3011ec8b06df5e6629e34317659e975788dd02fe3bc521fbe3e8b5d80592a388e615037a4489821b9d5f239d729c661dc474ca47c772ec383ad3c8e2a5062eaab6b54c2e1961b6ca8a6cd5ae3a8af20915fb679b552c1d47a78b8538e479b95a97051d3ee25bb7e7f5bcca804000ef29a1f35a6033bbc4036c4aa2700598747b22bc81525152a4ddd32cad9174d101718aa4089e2c32464712da6656993c01ec94b22abb042e5a54e58ab6e5638659325f6a0f70095cb32cf26b3ce616d910b6225765385c61c83e24f3060696407d71ca0fefadcab4cde1c8f070e24595ac1872fb74ca1f6842f1cbbd08fec00ab07e3a9db2aa2aab43f359b946b2580febeca260f6c8baa9606bd3e92f6f59be18456fe9d751d4368baf6e0eefa9b11c09be1e9e879a40a7f32dd03f673787bee175b65ae72c5e25eb6e117af47db2f6cf6892f39ca9c167f89b8b8a4ea03989a0061ef7f9345927e7599e35d723210d3127407c9535cb78ae5e3b4868a0e76556f4bcee0e45c98ec2a2932fc9c87d0b556c5e168bec42887ecf48e2b90defe108630eaf6fe075ddb0550c2a0db470cdea9ea1fc0112633a25e5f1b49f2e4db66280c76add33864b9d38d7870f1f92cea9d76c9e2d32901d4db4d212145f51365ccfd4ed6291cd33d4097c0caa605bdb1150a000e8d9d98b576fdf7df3cd8ba72f66afcee2d76f4e5f9fbe9dbd89df9e9d7c379b46ed975f4447d1fea186056800c151a80c705dd401a07c817bc8c6908d90c6c387b1befaabd3b3f8d9ece5ecf9c9d9ec59fcc3e9d9ec8d5cf5e070d7bd93c16045d95e2c41a9ae408fa25a1256c6470769d282f42032c42f4f9f7ef7eeb5c4ebd116782dc16c25392c97a2ba6385a3f0883670d8de233979f96676f2ec2722c733b9ec175b2cbb6a613aa8d7755235f2042e933c4b9306765ab3c6243d2ef0e2d5f3f8f5e98f1dd91f77ebbc5626831399ef871b6a108a32bf44a3f563929181c05d01634b9ad6fa5a9caf4e5ec678de6f666f4f5ffe70f2d797b3f8a7d9995cf74b737fea889094b8389151ae1a5d9b7bf1c00776d2a07fd541ff9e3509102441c6e0e6118c135f81380898b75982453c78fc6504c6b83236f2fdecece4d9c9d909f2c4c9d98bd357f1d9e929fcf2eab95ce9ff3d2bc11e96b75ae5db93b7df3a2bec4f0cb50087b34a9af952b83fc455ac00378303cb0a61c1e1a498f0454a70a2d679364769c8c8d7fa1ed4314953f1a95224eb75096c849e1c82ab91e6630d4b45731092b359fcf6ddd3a7b3d9b38e61f7352c1527ad244992064ce9790b08bc67d7b50ed725f177b39fa6d1259b03133f69bf3a06d8e7f725a0589ee2fd431f0c2260ef7c3c9bfb1aaa6f611477d72c4399018141a684f2aba3b648e910bdae397885804953812f4490c18f68e78d66f5deb01a1cbc9adb586272a083f05d680237c66087eb69e7113c11e6c8b5e2c7239a7ad36de4a96e316b2356e8d018a15640971a25f8392b408dd7e42ea24f888eda3ae581c3b5a1b2e68003405c30705bd5823406a6db810cf7dc0274e0587a0800ce72cc19376e96b0e76599a7c05afb075f8dd418e939c7d2a38e4919120776a304141937c4359bd7da10413281d91bf034aaf43bc6cf645eaec13f4a013a108a18433b215c2a46bd3b8de4b1a897527dc559ea2e85c4e2eb507cc0bd763dcaa9b9436c19149f2131a8ca033f09d92529a9e52977199fa88d8ea27358e1d846f09d58886377b5cc0021f681cd5b5299188dac1b526cace60a83d04bd6188b7186e9a4616caa2bf89f3c39b226d7eba4c62804bc2c588809f1b31703a27c98339c828c98fd0bf468b602ed05b251d67cc5155b51f8a113e544603493e0be9538dbe4e19bd1a50d0f4e531cae8c917b5f47172038959493ac00ff070218923a74a67d72d72f1402ac8ba21589c6146c00ca5a98f1c4131e1e778cc9055ab8bfdef9ef6804974b7b36729077124692fa609b461183a34202c1f9ea4126e52708e1d4a0852fc64572f845518abf47106f21a5f847311fd907dd7a78664b5ba2b38e8c1437728f499906d91f8c47e206e48796a8b3eda8e2db1db9e8bb120b7c80586810031868e63607150c323c2555b2e53ef544166747d876a54c8ec10e0e4ff66cfbb7361c646bb9b5c40c12ec5098d30b614ec18112e653db71d6d410078f4db743787064daa32e04271f2c892e20ed52c873e133d7ed39b871d1a22d3819e2ce6d18a86dd8b165b4c7478d6c674380f63186023b75f307346a088e11d1b40e3a399ae9b4626b08a1e13f55d3211963eab302b52d070dac5d0c85cb867fb24534f8847dc8eaa67e1258fc78f0b50d60a821447c0333e3a6b4171a85f6f38be9a3e9891caed17a9cb5c130ba191eaae56fb4cde4e08f6980c159dd5bb510369490c7ba8a2ff2f21c354edbecb0d3b106ef503bd30e61c074a00d1a591c31d23012686bccffa200e718a2cc7f49fe6d30ae409ee589e90ed131098a4c029ad2229d4fb298895850ad81d010b6b5b56830f9b03f943eb9e56680549015461bb3869c256275cee609e65bb2e6d35a21005c4bf94695d1bc5c7150285799dadd2e12f59b29a1e1366265e1db274b7c39ccb85d803cb1ea899ba83bf6ccdf418884c76f0a9f6f9723533c3d14354704e8d90dbad90d51e1859988863c3095652dd8157f089e43d01f732868eec4efa48597705db60d0b187e5c186ee7d5f5c0db8aaa6668e29c3d3a1522af0d480c76851ef2f1cd75a47fefd1d4b6a36f62e08446446ebf0f23e3ed31d7417357df81e322f3733c9d85da4ff7880b1e4663acad96b4c207c7fa0b8ed132ee1c9dff509de5f11538f7f6cadfc7d06f685e1d2a6146a8c7be72d43c86b5634d07e4d8470358c7f7b80f8cef50008cef711f98c0b901a4c01b8b645c576ca0133fb05e3a89ea18c6025cd5f8749721b5e4fdf0e5c73ebd682a3637503075c07696642b6bd2c7ecc6a09b6e8ee93c69f27bc19ad8076830e4e9d4a0c068fb338e661bf61d0751f723e8231c21082ae257c2d0b7640f868143fb75a91858d489119dea934a0ec90afacf5d00fe73e7cc7e0de622595929094820caae0199534348f44aa47ac9bae81934a800c8d85bcfbfc8a2ca48ad48168be7e0209125937d842e951a105759d340cb56b773cc082fda1ce6713c65002f0e0824b1baa663b21ca8812789e3c6a77d79896d52354eb560c3303fa4dbda2d54a08a3704fea04af92e29f8c22771b918c8519ac6e426ee9301b7b353e4f294e5ec027324948fa9061d7986d1d191b3d428a21e88e9342ba8181827d545bb021c07bef2eb50b79646318e7a5db8d9f0b6ec709e1379ddf3128a08c9aa0bcbb636bebb195e0a9769ff3095fcb0235d9952d78a4e2097b086ae36411d1f6d6f4a4dc310a4784fb97d68d8899dce006bdc407428736fd140251b7a589595a97938a21f2ca642ee51a41a15c02d87f3a9b10b23059b74e8616d8c853eac336e4960ae01eab32d1da46d4e87cb00afea731ba9f3fff1910f9fdb1c8e5efb0f1f8dd4eac0eda2d2ae2957a94fc67e7aa962e8911356ca570347738d4c2d65a10325deab84fac1a204dbe0a09054814ed64c011887aecc0499b3152f7782227f3cf93f693a9ab201f4b1048c6d58fc99e82f8cb0cfa5d6d7c4542c2a22698a641999b814aa2125b5af81d4a03b96158b9cf6f13065e2a76850b1ab04e3424cff6675dd022b8373070683fa1289b817b0c8823163611c7ede5600355960cf099f0305aba2e6f59721d4b65a734db124a04983db22cfdeb3fc5af5e92560e1fe81cd8bab359a3e6c6a405ae8cb0ab288bc15e58bc21245b3950b53be67c0e87cfe51c43b86f8af4f54e3d0b12d5f7484717784a4f58d6880f7b3a1901610cb823766c0c0f4a81c91d5715daed8602f88979317ed76a1107f20c171c5dd07edd08005d4432efb2cda270ebd2cb334aac046a4483e12cb7a6c8aead67ba76d19783e8c0e70a59e3cab562151a199d3ee69aa20c7b81a6f6d4365bef5f6c3d9ab59991ad3bb09c2eb8916471efcfb94633fc503d0a44ef2ebc95f3782f426d88231a43f81676ecb577d74e3488d7b468197e8cdf6738ce9debaefface7fc309f4c69ee8e6ff204a8c6640f2b3b6af9fb961d33b802949ee062a8e9f8f6c33b02b8ebb79f6e10266a0e6a839e88194a0eba7877393c8b58477bfcf4e43eee4b01b8bdccd5b9f15752bfa27781fa634c6690907c41f767127b5f3686ddbf6d6518f54822e3ec13528b7d14de79062ec6838d2fa6c7eb9b78d2c7885ed6683bff889c829632b56025ecb60cfdcd49852cf230db3e1969ea2d1a239d4362a56c4821a699d4d0b8ec05f6999758ac60d0ed5e39a15f3bc4de1a818d9cb187d9c4beab7944fb2423c13018c664ca94e271a55f291751743c853d7491b0288be4486015796f39e24d15c3bd0fb79708f437de113d02130d1c2fb0a6160fc98a67c9e789e15c2ddfc20eea578d992d366db580f0beccbb26a3e9f67d5bcc5a6a1852623bcc5d450736387b18c758fa349af9c1a9db5be885a5ea4b96328d719f1f1162199747090669e11144c79eb7d8e5ba38be3f00f16b4492ae01178776bba0e7d4e1b5bad9beba0ebd6ef0c06bd079dd1cc379ad5fb3dfc2cad1a18f4aeb4c2a2897bd7b0b4a323253c07d346eee442698d4b61da06e9eb7a517e49e35d0f0121a39777122d0ce2ecb58e823dd8760c07748b656b66ccd3b9e44f0efc8bdd7852ec9d671702267e1ed86edb66af4cc3762b4c6d47f6244dbd2da32a1d9e68296abd66ab3c5f6c74a5f612d1be9a6775e376ada29e367a56e9561f6f3ad5f30e7a7b2af56e49b0dea5bb79083069d4b298df68ca32ca41d9b168c0c61763d1370ae6e1a24a52560f9d4af03604dcfd5890d51554d1f5eb53310148bd9a86ee0790cea00ba422a7c27d53ed18c511e1c944ab366f3228e2f30ce5d89012a3bc2f1c3ff4b4067bd606c64b1112ece9bc658b4ec51a4831795308a6bfdd5dbbe445117543e677d117d2146faf337a1c9a9eeb3b43c7fe98652a7383e6cb3b6dd06e5f232b143a61ddc25818ba61f11b7e70a6d2d06fc562971af9cb8b24cba52bb9b62e4b697307f8bbb8974686087d76cabb16a55a9552b0d73e89168ce408f028d4b7399cca1ed25dc2e150b3a6ceb5da710aacee748615a3961ee3d4022609b9876f4a0db0f73f740f12c1430aa353c086efec31161ee2f7a3780b0be773922555213f2bf5c62d28bba5c71cbc2d370cfb39aef20fb4a56e6f0184741e6ea7bd2d0436686d1d0c3fc20d000eeda482c647df94157d8f417678315002a5ded1c56b9f10de725fa333ed60cda10e4397ecd52531d1ebeee134057f106ad6fa48dd9e9dfc194d6bfa3d6b36f02946348546c583a2e1c4bea9440926c06a0d0574b4db1eb7a7ee3a6c9d101ee1f8941ab670582e09d6b86275c51522cb26062a17176859cdabdedc0085270cf63ce30743cb050fcff7954d063ca5318ae29195fd18392996a1c05884cabc6f45a7845b4af99175dff6f09c4a2dca785015fa5c257208aeba0d283ed680f70a32fbba7026b34efc6321e6d2029a71b97864252aae65454d26896a869d2c0d96dbe64b46698ecc6908d132ce43ca536595bd38e7366e82792a4adc472ff8782b610dd88519506965bea1cfec2cd567ce41758a226279cd7cf94b7e84b2024e49ac30870ffd61972670b21b9eb6b222268d38d351d268f2615f6f2af57d28461157dcdd34854fd8d52ebfe1f93ac32ecec6763e859658a9f8b04c8c0b37846cbae97018b8464199fbce22c8b2651085b1711962cff2330eedfb78fe2f6768372a0cd7c4d305d553ef37da90c21d4ac30d97cf3c0e88fcb649ce8a8b6639d8c38f9ab8eb83697d7284d7d47be283f0adf8a1b730d2b72ef9e4bbac69dc9177c211adc7c2d3f7ed21d460538ca10a6df4159881f7bafa70e4b69cdd16aebcc23e743b3f243cf95ce7b2bffc0d028d26c656bebf9bdfb4e19b3dd487d93e02502be46952d6fd6bd039078f4618aff092167f76f0088292a2ec1e3dfae2f1f0effe2c1261c795624f93ba5d2feccaaaf61b858afb4a6264bed9ad58186af30b4650e1ba22984a48828badef3964de937b841fd5a6e067b98bcd01379d2fa66e213b8d3cadb3b47cb96e2161877da79cf9ac32b3d135d1db0fd1616bf9df4e9d548ddca1c3e1fcfefd9e07fab6b0daac93cb87807a0da2345185371384a4b21f823a0302b0002fc22edd9da2b9d5aa2ed4feb624f30cea2f1d99b90251773ba7db237596e2f71464bc0f6c7b253c29c814602e905206b009edfb2a62554a1e1465e7d2689d7bf26a080fd1f0450c7e444c62bf3f813ff4d76412eaeabb65a2ca473ee7125134b963caca1c6b9d05a68555e4ef04f9bdd9669b1a1b729f77897ae5b61ff83c1437689d50cb802daf136beb3287a5739b9988941f713a52f925e0e81e874a596fdfb9725884996b37f63d506e9fef9800d71cfcf6a7f3c9d669653aa351f4c88c9f7f5f3b0b29e9d897c98ab3452cfbf563790f36becc923f2df39f96f9bfcc326fb60677339abdb6647bdd7cbbfcfae4a3ebd8c9a63cfde40fa084f73fa612e62d08fb9a0ae64f0e4c0dfc97bf81fb07b20cb8607d88d2b9400950c2658a7e144003c6f96293be86dc5bcc9bf662b395f20e9a58ec20f4e2e08fa786c58ed44f07baacfdcaeab15f05fa74a2ae059ea9864cfa762e0f049a65854e7fc1d31e634b03aacdfa90142f7b14e8ada6fff12587a7e5d28cbe565734b1d149c4ea3f05eb7f4fb028917e10299ee0c7548b1ac8b5282a60c2acb74bfa8e52294a05b5a7417c1ba007c380841fdc41c2b57ca1fe6d299d6f76f8a244cf955e2d28d80b47057b01b1d95c6170b29dfa8bd037b2378cea3e771d06a47d0a5a7ce95a5decd25b87345713cf9f1c4cf05c308d5191fe13ce2612bc2726975f6e1102297eef5c550f1f389fc1ba1b3825c27784d345007704a402014b2d745fa9b23edc323604522f00779f7eea56747d65f032c12a415282fe46c1e20fe9b95e3eee3e24e5a64838140eca5011a18fba79047097ee639bb224fbda3a5f87bff7d34fd74e4fd6a465953720caba4cbfe1c7f3505854ed4aeab513278bc3dd265876808da22d79f64e00bdcc7b27883a175bf6429c98d183e07294b38c9d9c18e0cd593ceb117e10a5a12a25905e57605bf0bf75c7628d9f08173c90aca8158097d1e95fa0702e95888fb19d97cd927a6be517053873e2bf31011c44df8bc47f0fa32583cead90beaa7561c32453d7183ee8bc1bbe3ddcf6e03108dd9e2240efabfd892d9c8185b46487066e3fbcd2fe6d57ea72223adee11df52fc347a670cc55791dcb81facd643539344932953e493ebb6544d1ebeedfe2bb571b5d8a2dbee8711bc3b4d7637935dbe0bae560490eba7c32b91ea15def792dcb01fcffd1c456001fe3eb1b3231d3fbb1aa234262129e16fc38d511a1be1f9ee9ffc8d611ec36988057650f1e9c6e1d7a3e065979742b5e8cdb22699b6559c1f14266905f32c155060e3f45b2cdef766c69b01107b923fba8493adb702adedcfb3726d3794ba96a0000",
                         "source_map": "0x"
                       },
@@ -24682,7 +24682,7 @@
                         "source_map": "0x"
                       }
                     ],
-                    "name": "AptosFramework",
+                    "name": "VelorFramework",
                     "source_digest": "09C9ACBC0EB783802AD9881AA2758F7FE88523B528194473DCA1F5330C33F8F9",
                     "upgrade_number": "0",
                     "upgrade_policy": {
@@ -24698,10 +24698,10 @@
             "address": "0x1",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>",
+              "type": "0x1::coin::CoinInfo<0x1::velor_coin::VelorCoin>",
               "data": {
                 "decimals": 8,
-                "name": "Aptos Coin",
+                "name": "Velor Coin",
                 "supply": {
                   "vec": [
                     {
@@ -24813,7 +24813,7 @@
             "address": "0x1",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::stake::AptosCoinCapabilities",
+              "type": "0x1::stake::VelorCoinCapabilities",
               "data": {
                 "mint_cap": {
                   "dummy_field": false
@@ -25459,279 +25459,279 @@
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.account.create_address.base",
+                    "key": "velor_framework.account.create_address.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.account.create_signer.base",
+                    "key": "velor_framework.account.create_signer.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.bls12381.base",
+                    "key": "velor_framework.bls12381.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.bls12381.per_pubkey_deserialize",
+                    "key": "velor_framework.bls12381.per_pubkey_deserialize",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.bls12381.per_pubkey_aggregate",
+                    "key": "velor_framework.bls12381.per_pubkey_aggregate",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.bls12381.per_pubkey_subgroup_check",
+                    "key": "velor_framework.bls12381.per_pubkey_subgroup_check",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.bls12381.per_sig_deserialize",
+                    "key": "velor_framework.bls12381.per_sig_deserialize",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.bls12381.per_sig_aggregate",
+                    "key": "velor_framework.bls12381.per_sig_aggregate",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.bls12381.per_sig_subgroup_check",
+                    "key": "velor_framework.bls12381.per_sig_subgroup_check",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.bls12381.per_sig_verify",
+                    "key": "velor_framework.bls12381.per_sig_verify",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.bls12381.per_pop_verify",
+                    "key": "velor_framework.bls12381.per_pop_verify",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.bls12381.per_pairing",
+                    "key": "velor_framework.bls12381.per_pairing",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.bls12381.per_msg_hashing",
+                    "key": "velor_framework.bls12381.per_msg_hashing",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.bls12381.per_byte_hashing",
+                    "key": "velor_framework.bls12381.per_byte_hashing",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.signature.base",
+                    "key": "velor_framework.signature.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.signature.per_pubkey_deserialize",
+                    "key": "velor_framework.signature.per_pubkey_deserialize",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.signature.per_pubkey_small_order_check",
+                    "key": "velor_framework.signature.per_pubkey_small_order_check",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.signature.per_sig_deserialize",
+                    "key": "velor_framework.signature.per_sig_deserialize",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.signature.per_sig_strict_verify",
+                    "key": "velor_framework.signature.per_sig_strict_verify",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.signature.per_msg_hashing_base",
+                    "key": "velor_framework.signature.per_msg_hashing_base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.signature.per_msg_byte_hashing",
+                    "key": "velor_framework.signature.per_msg_byte_hashing",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.secp256k1.base",
+                    "key": "velor_framework.secp256k1.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.secp256k1.ecdsa_recover",
+                    "key": "velor_framework.secp256k1.ecdsa_recover",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.basepoint_mul",
+                    "key": "velor_framework.ristretto255.basepoint_mul",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.basepoint_double_mul",
+                    "key": "velor_framework.ristretto255.basepoint_double_mul",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.point_add",
+                    "key": "velor_framework.ristretto255.point_add",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.point_compress",
+                    "key": "velor_framework.ristretto255.point_compress",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.point_decompress",
+                    "key": "velor_framework.ristretto255.point_decompress",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.point_equals",
+                    "key": "velor_framework.ristretto255.point_equals",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.point_from_64_uniform_bytes",
+                    "key": "velor_framework.ristretto255.point_from_64_uniform_bytes",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.point_identity",
+                    "key": "velor_framework.ristretto255.point_identity",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.point_mul",
+                    "key": "velor_framework.ristretto255.point_mul",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.point_neg",
+                    "key": "velor_framework.ristretto255.point_neg",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.point_sub",
+                    "key": "velor_framework.ristretto255.point_sub",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.point_parse_arg",
+                    "key": "velor_framework.ristretto255.point_parse_arg",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.scalar_sha512_per_byte",
+                    "key": "velor_framework.ristretto255.scalar_sha512_per_byte",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.scalar_sha512_per_hash",
+                    "key": "velor_framework.ristretto255.scalar_sha512_per_hash",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.scalar_add",
+                    "key": "velor_framework.ristretto255.scalar_add",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.scalar_reduced_from_32_bytes",
+                    "key": "velor_framework.ristretto255.scalar_reduced_from_32_bytes",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.scalar_uniform_from_64_bytes",
+                    "key": "velor_framework.ristretto255.scalar_uniform_from_64_bytes",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.scalar_from_u128",
+                    "key": "velor_framework.ristretto255.scalar_from_u128",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.scalar_from_u64",
+                    "key": "velor_framework.ristretto255.scalar_from_u64",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.scalar_invert",
+                    "key": "velor_framework.ristretto255.scalar_invert",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.scalar_is_canonical",
+                    "key": "velor_framework.ristretto255.scalar_is_canonical",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.scalar_mul",
+                    "key": "velor_framework.ristretto255.scalar_mul",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.scalar_neg",
+                    "key": "velor_framework.ristretto255.scalar_neg",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.scalar_sub",
+                    "key": "velor_framework.ristretto255.scalar_sub",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.ristretto255.scalar_parse_arg",
+                    "key": "velor_framework.ristretto255.scalar_parse_arg",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.hash.sip_hash.base",
+                    "key": "velor_framework.hash.sip_hash.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.hash.sip_hash.per_byte",
+                    "key": "velor_framework.hash.sip_hash.per_byte",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.hash.keccak256.base",
+                    "key": "velor_framework.hash.keccak256.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.hash.keccak256.per_byte",
+                    "key": "velor_framework.hash.keccak256.per_byte",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.type_info.type_of.base",
+                    "key": "velor_framework.type_info.type_of.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.type_info.type_of.per_abstract_memory_unit",
+                    "key": "velor_framework.type_info.type_of.per_abstract_memory_unit",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.type_info.type_name.base",
+                    "key": "velor_framework.type_info.type_name.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.type_info.type_name.per_abstract_memory_unit",
+                    "key": "velor_framework.type_info.type_name.per_abstract_memory_unit",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.util.from_bytes.base",
+                    "key": "velor_framework.util.from_bytes.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.util.from_bytes.per_byte",
+                    "key": "velor_framework.util.from_bytes.per_byte",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.transaction_context.get_script_hash.base",
+                    "key": "velor_framework.transaction_context.get_script_hash.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.code.request_publish.base",
+                    "key": "velor_framework.code.request_publish.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.code.request_publish.per_byte",
+                    "key": "velor_framework.code.request_publish.per_byte",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.event.write_to_event_store.base",
+                    "key": "velor_framework.event.write_to_event_store.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.event.write_to_event_store.per_abstract_memory_unit",
+                    "key": "velor_framework.event.write_to_event_store.per_abstract_memory_unit",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.state_storage.get_usage.base",
+                    "key": "velor_framework.state_storage.get_usage.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.aggregator.add.base",
+                    "key": "velor_framework.aggregator.add.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.aggregator.read.base",
+                    "key": "velor_framework.aggregator.read.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.aggregator.sub.base",
+                    "key": "velor_framework.aggregator.sub.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.aggregator.destroy.base",
+                    "key": "velor_framework.aggregator.destroy.base",
                     "val": "1"
                   },
                   {
-                    "key": "aptos_framework.aggregator_factory.new_aggregator.base",
+                    "key": "velor_framework.aggregator_factory.new_aggregator.base",
                     "val": "1"
                   },
                   {
@@ -25918,7 +25918,7 @@
             "address": "0x1",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::transaction_fee::AptosCoinCapabilities",
+              "type": "0x1::transaction_fee::VelorCoinCapabilities",
               "data": {
                 "burn_cap": {
                   "dummy_field": false
@@ -25931,7 +25931,7 @@
             "address": "0x1",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::aptos_governance::VotingRecords",
+              "type": "0x1::velor_governance::VotingRecords",
               "data": {
                 "votes": {
                   "handle": "0xdc3189011da6e60643ef48030b4f8fc315beddc236c6c523db96778af7b47056"
@@ -25944,7 +25944,7 @@
             "address": "0x1",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::aptos_governance::GovernanceConfig",
+              "type": "0x1::velor_governance::GovernanceConfig",
               "data": {
                 "min_voting_threshold": "0",
                 "required_proposer_stake": "0",
@@ -25957,7 +25957,7 @@
             "address": "0x1",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::aptos_governance::GovernanceEvents",
+              "type": "0x1::velor_governance::GovernanceEvents",
               "data": {
                 "create_proposal_events": {
                   "counter": "0",
@@ -25994,7 +25994,7 @@
             "address": "0x1",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::aptos_governance::ApprovedExecutionHashes",
+              "type": "0x1::velor_governance::ApprovedExecutionHashes",
               "data": {
                 "hashes": {
                   "data": []
@@ -26007,7 +26007,7 @@
             "address": "0x1",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::aptos_governance::GovernanceResponsbility",
+              "type": "0x1::velor_governance::GovernanceResponsbility",
               "data": {
                 "signer_caps": {
                   "data": [
@@ -27837,11 +27837,11 @@
                     "deps": [
                       {
                         "account": "0x1",
-                        "package_name": "AptosFramework"
+                        "package_name": "VelorFramework"
                       },
                       {
                         "account": "0x1",
-                        "package_name": "AptosStdlib"
+                        "package_name": "VelorStdlib"
                       },
                       {
                         "account": "0x1",
@@ -27886,7 +27886,7 @@
                         "source_map": "0x"
                       }
                     ],
-                    "name": "AptosToken",
+                    "name": "VelorToken",
                     "source_digest": "9758186DC2F67FC4499BFF45D0EDEDA75B42CA42B61B069A0F46D7091B529A5A",
                     "upgrade_number": "0",
                     "upgrade_policy": {
@@ -28230,7 +28230,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+              "type": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
               "data": {
                 "coin": {
                   "value": "18446744073709551615"
@@ -28314,7 +28314,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::aptos_coin::Delegations",
+              "type": "0x1::velor_coin::Delegations",
               "data": {
                 "inner": []
               }
@@ -28325,7 +28325,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::aptos_coin::MintCapStore",
+              "type": "0x1::velor_coin::MintCapStore",
               "data": {
                 "mint_cap": {
                   "dummy_field": false
@@ -28338,7 +28338,7 @@
             "address": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+              "type": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
               "data": {
                 "coin": {
                   "value": "0"

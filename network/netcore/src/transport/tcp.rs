@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! TCP Transport
 use crate::transport::Transport;
-use aptos_proxy::Proxy;
-use aptos_types::{
+use velor_proxy::Proxy;
+use velor_types::{
     network_address::{parse_dns_tcp, parse_ip_tcp, parse_tcp, IpFilter, NetworkAddress},
     PeerId,
 };
@@ -150,7 +150,7 @@ impl Transport for TcpTransport {
         let proxy = Proxy::new();
 
         let proxy_addr = {
-            use aptos_types::network_address::Protocol::*;
+            use velor_types::network_address::Protocol::*;
 
             let addr = match protos.first() {
                 Some(Ip4(ip)) => proxy.https(&ip.to_string()),
@@ -411,7 +411,7 @@ impl AsyncWrite for TcpSocket {
 mod test {
     use super::*;
     use crate::transport::{ConnectionOrigin, Transport, TransportExt};
-    use aptos_types::PeerId;
+    use velor_types::PeerId;
     use futures::{
         future::{join, FutureExt},
         io::{AsyncReadExt, AsyncWriteExt},

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) Aptos Foundation
+# Copyright (c) Velor Foundation
 # Copyright (c) The Move Contributors
 # SPDX-License-Identifier: Apache-2.0
 
@@ -15,7 +15,7 @@ MOVE_PR_NEXTEST_PROFILE="${MOVE_PR_NEXTEST_PROFILE:-smoke-test}"
 
 BASE=$(git rev-parse --show-toplevel)
 
-# This is currently setup for the aptos-core environment. If move is at a different
+# This is currently setup for the velor-core environment. If move is at a different
 # location, this need to be changed.
 MOVE_BASE=$BASE/third_party/move
 
@@ -34,7 +34,7 @@ Usage:
 Flags:
     -h   Print this help
     -t   Run tests
-    -i   In addition to -t, run integration tests (Aptos framework and e2e tests)
+    -i   In addition to -t, run integration tests (Velor framework and e2e tests)
     -c   Run xclippy and fmt +nightly
     -g   Run the git checks script (whitespace check). This works
          only for committed clients.
@@ -103,7 +103,7 @@ MOVE_CRATES="\
 
 # This is a list of crates for integration testing.
 MOVE_CRATES_INTEGRATION_TEST="\
-  -p aptos-transactional-test-harness \
+  -p velor-transactional-test-harness \
   -p bytecode-verifier-tests \
   -p bytecode-verifier-transactional-tests \
   -p move-cli \
@@ -114,16 +114,16 @@ MOVE_CRATES_INTEGRATION_TEST="\
   -p move-transactional-test-runner \
   -p move-unit-test \
   -p move-vm-transactional-tests \
-  -p aptos-move-stdlib\
+  -p velor-move-stdlib\
   -p move-abigen\
   -p move-docgen\
   -p move-stdlib\
   -p move-table-extension\
   -p move-vm-integration-tests\
-  -p aptos-move-examples\
+  -p velor-move-examples\
   -p e2e-move-tests\
-  -p aptos-framework\
-  -p aptos-api\
+  -p velor-framework\
+  -p velor-api\
 "
 
 if [ ! -z "$CHECK" ]; then
@@ -153,7 +153,7 @@ if [ ! -z "$GEN_ARTIFACTS" ]; then
     # Add hoc treatment
     (
         cd $BASE
-        cargo build $CARGO_OP_PARAMS -p aptos-cached-packages
+        cargo build $CARGO_OP_PARAMS -p velor-cached-packages
     )
 fi
 

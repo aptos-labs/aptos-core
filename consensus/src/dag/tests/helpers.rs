@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,14 +8,14 @@ use crate::{
     },
     payload_manager::TPayloadManager,
 };
-use aptos_bitvec::BitVec;
-use aptos_config::config::BlockTransactionFilterConfig;
-use aptos_consensus_types::{
+use velor_bitvec::BitVec;
+use velor_config::config::BlockTransactionFilterConfig;
+use velor_consensus_types::{
     block::Block,
     common::{Author, Payload, Round},
 };
-use aptos_executor_types::ExecutorResult;
-use aptos_types::{aggregate_signature::AggregateSignature, transaction::SignedTransaction};
+use velor_executor_types::ExecutorResult;
+use velor_types::{aggregate_signature::AggregateSignature, transaction::SignedTransaction};
 use async_trait::async_trait;
 
 pub(super) const TEST_DAG_WINDOW: u64 = 5;

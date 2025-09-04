@@ -22,14 +22,14 @@ concurrency:
 
 jobs:
   prover-inconsistency-test:
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=velor-ubuntu-x64,run-id=${{ github.run_id }}
     timeout-minutes: ${{ github.event_name == 'pull_request' && 10 || 480}}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/move-prover-setup
-      - run: MVP_TEST_DISALLOW_TIMEOUT_OVERWRITE=1 MVP_TEST_VC_TIMEOUT=1200 cargo test -p aptos-move-examples --release -- --include-ignored prover
-      - run: MVP_TEST_DISALLOW_TIMEOUT_OVERWRITE=1 MVP_TEST_VC_TIMEOUT=7200 cargo test -p aptos-framework --release -- --include-ignored prover
-      - run: MVP_TEST_DISALLOW_TIMEOUT_OVERWRITE=1 MVP_TEST_VC_TIMEOUT=1200 MVP_TEST_INCONSISTENCY=1 cargo test -p aptos-move-examples --release -- --include-ignored prover
-      - run: MVP_TEST_DISALLOW_TIMEOUT_OVERWRITE=1 MVP_TEST_VC_TIMEOUT=7200 MVP_TEST_INCONSISTENCY=1 cargo test -p aptos-framework --release -- --include-ignored prover
+      - run: MVP_TEST_DISALLOW_TIMEOUT_OVERWRITE=1 MVP_TEST_VC_TIMEOUT=1200 cargo test -p velor-move-examples --release -- --include-ignored prover
+      - run: MVP_TEST_DISALLOW_TIMEOUT_OVERWRITE=1 MVP_TEST_VC_TIMEOUT=7200 cargo test -p velor-framework --release -- --include-ignored prover
+      - run: MVP_TEST_DISALLOW_TIMEOUT_OVERWRITE=1 MVP_TEST_VC_TIMEOUT=1200 MVP_TEST_INCONSISTENCY=1 cargo test -p velor-move-examples --release -- --include-ignored prover
+      - run: MVP_TEST_DISALLOW_TIMEOUT_OVERWRITE=1 MVP_TEST_VC_TIMEOUT=7200 MVP_TEST_INCONSISTENCY=1 cargo test -p velor-framework --release -- --include-ignored prover

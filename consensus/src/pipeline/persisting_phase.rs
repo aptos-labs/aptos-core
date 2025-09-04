@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{network::NetworkSender, pipeline::pipeline_phase::StatelessPipeline};
-use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
-use aptos_executor_types::ExecutorResult;
-use aptos_types::{epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures};
+use velor_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
+use velor_executor_types::ExecutorResult;
+use velor_types::{epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures};
 use async_trait::async_trait;
 use std::{
     fmt::{Debug, Display, Formatter},

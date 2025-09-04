@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,10 +9,10 @@ use crate::{
     quorum_cert::QuorumCert,
 };
 use anyhow::{bail, ensure, format_err, Result};
-use aptos_bitvec::BitVec;
-use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
-use aptos_infallible::duration_since_epoch;
-use aptos_types::{
+use velor_bitvec::BitVec;
+use velor_crypto::{bls12381, hash::CryptoHash, HashValue};
+use velor_infallible::duration_since_epoch;
+use velor_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,

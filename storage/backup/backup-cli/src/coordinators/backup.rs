@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -20,10 +20,10 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_db::backup::backup_handler::DbState;
-use aptos_infallible::duration_since_epoch;
-use aptos_logger::prelude::*;
-use aptos_types::transaction::Version;
+use velor_db::backup::backup_handler::DbState;
+use velor_infallible::duration_since_epoch;
+use velor_logger::prelude::*;
+use velor_types::transaction::Version;
 use clap::Parser;
 use futures::{stream, Future, StreamExt};
 use std::{
@@ -520,7 +520,7 @@ fn get_next_snapshot(last_in_backup: Option<u64>, db_state: DbState, interval: u
 #[cfg(test)]
 mod tests {
     use crate::coordinators::backup::{get_batch_range, get_next_snapshot};
-    use aptos_db::backup::backup_handler::DbState;
+    use velor_db::backup::backup_handler::DbState;
 
     #[test]
     fn test_get_batch_range() {

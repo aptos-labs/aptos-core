@@ -1,0 +1,129 @@
+[package]
+name = "velor-crypto"
+description = "Velor crypto"
+version = "0.0.3"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aes-gcm = { workspace = true }
+anyhow = { workspace = true }
+velor-crypto-derive = { workspace = true }
+arbitrary = { workspace = true, features = ["derive"], optional = true }
+ark-bn254 = { workspace = true }
+ark-ec = { workspace = true }
+ark-ff = { workspace = true }
+ark-groth16 = { workspace = true }
+ark-std = { workspace = true }
+base64 = { workspace = true }
+bcs = { workspace = true }
+blst = { workspace = true }
+bulletproofs = { workspace = true }
+bytes = { workspace = true }
+curve25519-dalek = { workspace = true }
+curve25519-dalek-ng = { workspace = true }
+digest = { workspace = true }
+ed25519-dalek = { workspace = true }
+ff = { workspace = true }
+hex = { workspace = true }
+hkdf = { workspace = true }
+libsecp256k1 = { workspace = true }
+merlin = { workspace = true }
+more-asserts = { workspace = true }
+neptune = { workspace = true }
+num-bigint = { workspace = true }
+num-integer = { workspace = true }
+once_cell = { workspace = true }
+p256 = { workspace = true }
+poseidon-ark = { workspace = true }
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+ring = { workspace = true }
+serde = { workspace = true }
+serde-name = { workspace = true }
+serde_bytes = { workspace = true }
+sha2 = { workspace = true }
+sha2_0_10_6 = { workspace = true }
+sha3 = { workspace = true }
+signature = { workspace = true }
+static_assertions = { workspace = true }
+thiserror = { workspace = true }
+tiny-keccak = { workspace = true }
+typenum = { workspace = true }
+x25519-dalek = { workspace = true }
+
+[dev-dependencies]
+arbitrary = { workspace = true, features = ["derive"] }
+ark-bls12-381 = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-serialize = { workspace = true }
+ark-std = { workspace = true }
+bitvec = { workspace = true }
+blake2 = { workspace = true }
+blake2-rfc = { workspace = true }
+byteorder = { workspace = true }
+criterion = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+serde_json = { workspace = true }
+trybuild = { workspace = true }
+
+[features]
+default = []
+assert-private-keys-not-cloneable = []
+cloneable-private-keys = []
+fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys", "arbitrary"]
+testing = []
+
+[[bench]]
+name = "ark_bls12_381"
+harness = false
+
+[[bench]]
+name = "ark_bn254"
+harness = false
+
+[[bench]]
+name = "bls12381"
+harness = false
+
+[[bench]]
+name = "bulletproofs"
+harness = false
+
+[[bench]]
+name = "bulletproofs_batch_verify"
+harness = false
+
+[[bench]]
+name = "ed25519"
+harness = false
+
+[[bench]]
+name = "hash"
+harness = false
+
+[[bench]]
+name = "noise"
+harness = false
+
+[[bench]]
+name = "ristretto255"
+harness = false
+
+[[bench]]
+name = "secp256k1"
+harness = false
+
+[[bench]]
+name = "poseidon_bn254"
+harness = false

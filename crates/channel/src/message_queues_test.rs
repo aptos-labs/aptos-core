@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::message_queues::{PerKeyQueue, QueueStyle};
-use aptos_infallible::NonZeroUsize;
-use aptos_types::account_address::AccountAddress;
+use velor_infallible::NonZeroUsize;
+use velor_types::account_address::AccountAddress;
 
 /// This represents a proposal message from a validator
 #[derive(Debug, PartialEq, Eq)]

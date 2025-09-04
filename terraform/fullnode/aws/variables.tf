@@ -49,7 +49,7 @@ variable "num_fullnodes" {
 }
 
 variable "image_tag" {
-  description = "Docker image tag for aptos components. Overrides ecr_repo method."
+  description = "Docker image tag for velor components. Overrides ecr_repo method."
   type        = string
   default     = ""
 }
@@ -67,13 +67,13 @@ variable "era" {
 }
 
 variable "chain_id" {
-  description = "Aptos chain ID"
+  description = "Velor chain ID"
   type        = string
   default     = "DEVNET"
 }
 
 variable "chain_name" {
-  description = "Aptos chain name"
+  description = "Velor chain name"
   type        = string
   default     = "devnet"
 }
@@ -202,7 +202,7 @@ variable "enable_kube_state_metrics" {
 }
 
 variable "manage_via_tf" {
-  description = "Whether to manage the aptos-node k8s workload via Terraform. If set to false, the helm_release resource will still be created and updated when values change, but it may not be updated on every apply"
+  description = "Whether to manage the velor-node k8s workload via Terraform. If set to false, the helm_release resource will still be created and updated when values change, but it may not be updated on every apply"
   type        = bool
   default     = true
 }

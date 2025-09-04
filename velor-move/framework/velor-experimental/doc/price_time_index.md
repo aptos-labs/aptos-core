@@ -1,0 +1,908 @@
+
+<a id="0x7_price_time_index"></a>
+
+# Module `0x7::price_time_index`
+
+ActiveOrderBook: This is the main order book that keeps track of active orders and their states. The active order
+book is backed by a BigOrderedMap, which is a data structure that allows for efficient insertion, deletion, and matching of the order
+The orders are matched based on time-price priority.
+
+This is internal module, which cannot be used directly, use OrderBook instead.
+
+
+-  [Struct `PriceTime`](#0x7_price_time_index_PriceTime)
+-  [Struct `OrderData`](#0x7_price_time_index_OrderData)
+-  [Enum `PriceTimeIndex`](#0x7_price_time_index_PriceTimeIndex)
+-  [Constants](#@Constants_0)
+-  [Function `new_price_time_idx`](#0x7_price_time_index_new_price_time_idx)
+-  [Function `best_bid_price`](#0x7_price_time_index_best_bid_price)
+-  [Function `best_ask_price`](#0x7_price_time_index_best_ask_price)
+-  [Function `get_mid_price`](#0x7_price_time_index_get_mid_price)
+-  [Function `get_slippage_price`](#0x7_price_time_index_get_slippage_price)
+-  [Function `get_impact_bid_price`](#0x7_price_time_index_get_impact_bid_price)
+-  [Function `get_impact_ask_price`](#0x7_price_time_index_get_impact_ask_price)
+-  [Function `get_tie_breaker`](#0x7_price_time_index_get_tie_breaker)
+-  [Function `cancel_active_order`](#0x7_price_time_index_cancel_active_order)
+-  [Function `is_active_order`](#0x7_price_time_index_is_active_order)
+-  [Function `is_taker_order`](#0x7_price_time_index_is_taker_order)
+-  [Function `single_match_with_current_active_order`](#0x7_price_time_index_single_match_with_current_active_order)
+-  [Function `get_single_match_for_buy_order`](#0x7_price_time_index_get_single_match_for_buy_order)
+-  [Function `get_single_match_for_sell_order`](#0x7_price_time_index_get_single_match_for_sell_order)
+-  [Function `modify_order_data`](#0x7_price_time_index_modify_order_data)
+-  [Function `get_single_match_result`](#0x7_price_time_index_get_single_match_result)
+-  [Function `increase_order_size`](#0x7_price_time_index_increase_order_size)
+-  [Function `decrease_order_size`](#0x7_price_time_index_decrease_order_size)
+-  [Function `place_maker_order`](#0x7_price_time_index_place_maker_order)
+
+
+<pre><code><b>use</b> <a href="../../velor-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
+<b>use</b> <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
+<b>use</b> <a href="single_order_types.md#0x7_single_order_types">0x7::single_order_types</a>;
+</code></pre>
+
+
+
+<a id="0x7_price_time_index_PriceTime"></a>
+
+## Struct `PriceTime`
+
+
+
+<pre><code><b>struct</b> <a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>price: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>tie_breaker: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x7_price_time_index_OrderData"></a>
+
+## Struct `OrderData`
+
+
+
+<pre><code><b>struct</b> <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>size: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x7_price_time_index_PriceTimeIndex"></a>
+
+## Enum `PriceTimeIndex`
+
+OrderBook tracking active (i.e. unconditional, immediately executable) limit orders.
+
+- invariant - all buys are smaller than sells, at all times.
+- tie_breaker in sells is U128_MAX-value, to make sure largest value in the book
+that is taken first, is the one inserted first, amongst those with same bid price.
+
+
+<pre><code>enum <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a> <b>has</b> store
+</code></pre>
+
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>buys: <a href="../../velor-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="price_time_index.md#0x7_price_time_index_PriceTime">price_time_index::PriceTime</a>, <a href="price_time_index.md#0x7_price_time_index_OrderData">price_time_index::OrderData</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>sells: <a href="../../velor-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="price_time_index.md#0x7_price_time_index_PriceTime">price_time_index::PriceTime</a>, <a href="price_time_index.md#0x7_price_time_index_OrderData">price_time_index::OrderData</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+
+</details>
+
+<a id="@Constants_0"></a>
+
+## Constants
+
+
+<a id="0x7_price_time_index_EINTERNAL_INVARIANT_BROKEN"></a>
+
+There is a code bug that breaks internal invariant
+
+
+<pre><code><b>const</b> <a href="price_time_index.md#0x7_price_time_index_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x7_price_time_index_EINVALID_MAKER_ORDER"></a>
+
+
+
+<pre><code><b>const</b> <a href="price_time_index.md#0x7_price_time_index_EINVALID_MAKER_ORDER">EINVALID_MAKER_ORDER</a>: u64 = 1;
+</code></pre>
+
+
+
+<a id="0x7_price_time_index_U64_MAX"></a>
+
+========= Active OrderBook ===========
+
+
+<pre><code><b>const</b> <a href="price_time_index.md#0x7_price_time_index_U64_MAX">U64_MAX</a>: u64 = 18446744073709551615;
+</code></pre>
+
+
+
+<a id="0x7_price_time_index_new_price_time_idx"></a>
+
+## Function `new_price_time_idx`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_new_price_time_idx">new_price_time_idx</a>(): <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_new_price_time_idx">new_price_time_idx</a>(): <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a> {
+    // potentially add max value <b>to</b> both sides (that will be skipped),
+    // so that max_key never changes, and doesn't create conflict.
+    PriceTimeIndex::V1 {
+        buys: new_default_big_ordered_map(),
+        sells: new_default_big_ordered_map()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_best_bid_price"></a>
+
+## Function `best_bid_price`
+
+Picks the best (i.e. highest) bid (i.e. buy) price from the active order book.
+aborts if there are no buys
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_best_bid_price">best_bid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>): <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_best_bid_price">best_bid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>): Option&lt;u64&gt; {
+    <b>if</b> (self.buys.is_empty()) {
+        <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    } <b>else</b> {
+        <b>let</b> (back_key, _back_value) = self.buys.borrow_back();
+        <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(back_key.price)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_best_ask_price"></a>
+
+## Function `best_ask_price`
+
+Picks the best (i.e. lowest) ask (i.e. sell) price from the active order book.
+aborts if there are no sells
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_best_ask_price">best_ask_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>): <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_best_ask_price">best_ask_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>): Option&lt;u64&gt; {
+    <b>if</b> (self.sells.is_empty()) {
+        <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    } <b>else</b> {
+        <b>let</b> (front_key, _front_value) = self.sells.borrow_front();
+        <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(front_key.price)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_get_mid_price"></a>
+
+## Function `get_mid_price`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_mid_price">get_mid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>): <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_mid_price">get_mid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>): Option&lt;u64&gt; {
+    <b>let</b> best_bid = self.<a href="price_time_index.md#0x7_price_time_index_best_bid_price">best_bid_price</a>();
+    <b>let</b> best_ask = self.<a href="price_time_index.md#0x7_price_time_index_best_ask_price">best_ask_price</a>();
+    <b>if</b> (best_bid.is_none() || best_ask.is_none()) {
+        <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    } <b>else</b> {
+        <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
+            (best_bid.destroy_some() + best_ask.destroy_some()) / 2
+        )
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_get_slippage_price"></a>
+
+## Function `get_slippage_price`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_slippage_price">get_slippage_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, is_bid: bool, slippage_pct: u64): <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_slippage_price">get_slippage_price</a>(
+    self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>, is_bid: bool, slippage_pct: u64
+): Option&lt;u64&gt; {
+    <b>let</b> mid_price = self.<a href="price_time_index.md#0x7_price_time_index_get_mid_price">get_mid_price</a>();
+    <b>if</b> (mid_price.is_none()) {
+        <b>return</b> <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    };
+    <b>let</b> mid_price = mid_price.destroy_some();
+    <b>let</b> slippage = mul_div(
+        mid_price, slippage_pct, get_slippage_pct_precision() * 100
+    );
+    <b>if</b> (is_bid) {
+        <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(mid_price + slippage)
+    } <b>else</b> {
+        <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(mid_price - slippage)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_get_impact_bid_price"></a>
+
+## Function `get_impact_bid_price`
+
+
+
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_impact_bid_price">get_impact_bid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, impact_size: u64): <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_impact_bid_price">get_impact_bid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>, impact_size: u64): Option&lt;u64&gt; {
+    <b>let</b> total_value = (0 <b>as</b> u128);
+    <b>let</b> total_size = 0;
+    <b>let</b> orders = &self.buys;
+    <b>if</b> (orders.is_empty()) {
+        <b>return</b> <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    };
+    <b>let</b> (front_key, front_value) = orders.borrow_back();
+    <b>while</b> (total_size &lt; impact_size) {
+        <b>let</b> matched_size =
+            <b>if</b> (total_size + front_value.size &gt; impact_size) {
+                impact_size - total_size
+            } <b>else</b> {
+                front_value.size
+            };
+        total_value +=(matched_size <b>as</b> u128) * (front_key.price <b>as</b> u128);
+        total_size += matched_size;
+        <b>let</b> next_key = orders.prev_key(&front_key);
+        <b>if</b> (next_key.is_none()) {
+            // TODO maybe we should <b>return</b> none <b>if</b> there is not enough depth?
+            <b>break</b>;
+        };
+        front_key = next_key.destroy_some();
+        front_value = orders.borrow(&front_key);
+    };
+    <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>((total_value / (total_size <b>as</b> u128)) <b>as</b> u64)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_get_impact_ask_price"></a>
+
+## Function `get_impact_ask_price`
+
+
+
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_impact_ask_price">get_impact_ask_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, impact_size: u64): <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_impact_ask_price">get_impact_ask_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>, impact_size: u64): Option&lt;u64&gt; {
+    <b>let</b> total_value = 0 <b>as</b> u128;
+    <b>let</b> total_size = 0;
+    <b>let</b> orders = &self.sells;
+    <b>if</b> (orders.is_empty()) {
+        <b>return</b> <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    };
+    <b>let</b> (front_key, front_value) = orders.borrow_front();
+    <b>while</b> (total_size &lt; impact_size) {
+        <b>let</b> matched_size =
+            <b>if</b> (total_size + front_value.size &gt; impact_size) {
+                impact_size - total_size
+            } <b>else</b> {
+                front_value.size
+            };
+        total_value +=(matched_size <b>as</b> u128) * (front_key.price <b>as</b> u128);
+        total_size += matched_size;
+        <b>let</b> next_key = orders.next_key(&front_key);
+        <b>if</b> (next_key.is_none()) {
+            <b>break</b>;
+        };
+        front_key = next_key.destroy_some();
+        front_value = orders.borrow(&front_key);
+    };
+    <a href="../../velor-framework/../velor-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>((total_value / (total_size <b>as</b> u128)) <b>as</b> u64)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_get_tie_breaker"></a>
+
+## Function `get_tie_breaker`
+
+
+
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_bid: bool): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_tie_breaker">get_tie_breaker</a>(
+    unique_priority_idx: UniqueIdxType, is_bid: bool
+): UniqueIdxType {
+    <b>if</b> (is_bid) {
+        unique_priority_idx
+    } <b>else</b> {
+        unique_priority_idx.descending_idx()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_cancel_active_order"></a>
+
+## Function `cancel_active_order`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_cancel_active_order">cancel_active_order</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_bid: bool): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_cancel_active_order">cancel_active_order</a>(
+    self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>,
+    price: u64,
+    unique_priority_idx: UniqueIdxType,
+    is_bid: bool
+): u64 {
+    <b>let</b> tie_breaker = <a href="price_time_index.md#0x7_price_time_index_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
+    <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a> { price, tie_breaker };
+    <b>let</b> value =
+        <b>if</b> (is_bid) {
+            self.buys.remove(&key)
+        } <b>else</b> {
+            self.sells.remove(&key)
+        };
+    value.size
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_is_active_order"></a>
+
+## Function `is_active_order`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_is_active_order">is_active_order</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_bid: bool): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_is_active_order">is_active_order</a>(
+    self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>,
+    price: u64,
+    unique_priority_idx: UniqueIdxType,
+    is_bid: bool
+): bool {
+    <b>let</b> tie_breaker = <a href="price_time_index.md#0x7_price_time_index_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
+    <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a> { price: price, tie_breaker };
+    <b>if</b> (is_bid) {
+        self.buys.contains(&key)
+    } <b>else</b> {
+        self.sells.contains(&key)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_is_taker_order"></a>
+
+## Function `is_taker_order`
+
+Check if the order is a taker order - i.e. if it can be immediately matched with the order book fully or partially.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_is_taker_order">is_taker_order</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, is_bid: bool): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_is_taker_order">is_taker_order</a>(
+    self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>, price: u64, is_bid: bool
+): bool {
+    <b>if</b> (is_bid) {
+        <b>let</b> best_ask_price = self.<a href="price_time_index.md#0x7_price_time_index_best_ask_price">best_ask_price</a>();
+        best_ask_price.is_some() && price &gt;= best_ask_price.destroy_some()
+    } <b>else</b> {
+        <b>let</b> best_bid_price = self.<a href="price_time_index.md#0x7_price_time_index_best_bid_price">best_bid_price</a>();
+        best_bid_price.is_some() && price &lt;= best_bid_price.destroy_some()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_single_match_with_current_active_order"></a>
+
+## Function `single_match_with_current_active_order`
+
+
+
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_single_match_with_current_active_order">single_match_with_current_active_order</a>(remaining_size: u64, cur_key: <a href="price_time_index.md#0x7_price_time_index_PriceTime">price_time_index::PriceTime</a>, cur_value: <a href="price_time_index.md#0x7_price_time_index_OrderData">price_time_index::OrderData</a>, orders: &<b>mut</b> <a href="../../velor-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="price_time_index.md#0x7_price_time_index_PriceTime">price_time_index::PriceTime</a>, <a href="price_time_index.md#0x7_price_time_index_OrderData">price_time_index::OrderData</a>&gt;): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_single_match_with_current_active_order">single_match_with_current_active_order</a>(
+    remaining_size: u64,
+    cur_key: <a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a>,
+    cur_value: <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a>,
+    orders: &<b>mut</b> BigOrderedMap&lt;<a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a>, <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a>&gt;
+): ActiveMatchedOrder {
+    <b>let</b> is_cur_match_fully_consumed = cur_value.size &lt;= remaining_size;
+
+    <b>let</b> matched_size_for_this_order =
+        <b>if</b> (is_cur_match_fully_consumed) {
+            cur_value.size
+        } <b>else</b> {
+            remaining_size
+        };
+
+    <b>let</b> result =
+        new_active_matched_order(
+            cur_value.order_id,
+            matched_size_for_this_order, // Matched size on the maker order
+            cur_value.size - matched_size_for_this_order, // Remaining size on the maker order
+            cur_value.order_book_type
+        );
+
+    <b>if</b> (is_cur_match_fully_consumed) {
+        orders.remove(&cur_key);
+    } <b>else</b> {
+        <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
+            orders, &cur_key, |order_data| {
+                order_data.size -= matched_size_for_this_order;
+            }
+        );
+    };
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_get_single_match_for_buy_order"></a>
+
+## Function `get_single_match_for_buy_order`
+
+
+
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, size: u64): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(
+    self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>, price: u64, size: u64
+): ActiveMatchedOrder {
+    <b>let</b> (smallest_key, smallest_value) = self.sells.borrow_front();
+    <b>assert</b>!(price &gt;= smallest_key.price, <a href="price_time_index.md#0x7_price_time_index_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>);
+    <a href="price_time_index.md#0x7_price_time_index_single_match_with_current_active_order">single_match_with_current_active_order</a>(
+        size,
+        smallest_key,
+        *smallest_value,
+        &<b>mut</b> self.sells
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_get_single_match_for_sell_order"></a>
+
+## Function `get_single_match_for_sell_order`
+
+
+
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, size: u64): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(
+    self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>, price: u64, size: u64
+): ActiveMatchedOrder {
+    <b>let</b> (largest_key, largest_value) = self.buys.borrow_back();
+    <b>assert</b>!(price &lt;= largest_key.price, <a href="price_time_index.md#0x7_price_time_index_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>);
+    <a href="price_time_index.md#0x7_price_time_index_single_match_with_current_active_order">single_match_with_current_active_order</a>(
+        size,
+        largest_key,
+        *largest_value,
+        &<b>mut</b> self.buys
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_modify_order_data"></a>
+
+## Function `modify_order_data`
+
+
+
+<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(orders: &<b>mut</b> <a href="../../velor-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="price_time_index.md#0x7_price_time_index_PriceTime">price_time_index::PriceTime</a>, <a href="price_time_index.md#0x7_price_time_index_OrderData">price_time_index::OrderData</a>&gt;, key: &<a href="price_time_index.md#0x7_price_time_index_PriceTime">price_time_index::PriceTime</a>, modify_fn: |&<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_OrderData">price_time_index::OrderData</a>|)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
+    orders: &<b>mut</b> BigOrderedMap&lt;<a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a>, <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a>&gt;, key: &<a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a>, modify_fn: |&<b>mut</b>  <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a>|
+) {
+    <b>let</b> order = *orders.borrow(key);
+    modify_fn(&<b>mut</b> order);
+    orders.upsert(*key, order);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_get_single_match_result"></a>
+
+## Function `get_single_match_result`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_result">get_single_match_result</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, size: u64, is_bid: bool): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_result">get_single_match_result</a>(
+    self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>,
+    price: u64,
+    size: u64,
+    is_bid: bool
+): ActiveMatchedOrder {
+    <b>if</b> (is_bid) {
+        self.<a href="price_time_index.md#0x7_price_time_index_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(price, size)
+    } <b>else</b> {
+        self.<a href="price_time_index.md#0x7_price_time_index_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(price, size)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_increase_order_size"></a>
+
+## Function `increase_order_size`
+
+Increase the size of the order in the orderbook without altering its position in the price-time priority.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_increase_order_size">increase_order_size</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size_delta: u64, is_bid: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_increase_order_size">increase_order_size</a>(
+    self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>,
+    price: u64,
+    unique_priority_idx: UniqueIdxType,
+    size_delta: u64,
+    is_bid: bool
+) {
+    <b>let</b> tie_breaker = <a href="price_time_index.md#0x7_price_time_index_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
+    <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a> { price, tie_breaker };
+    <b>if</b> (is_bid) {
+        <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
+            &<b>mut</b> self.buys, &key, |order_data| {
+                order_data.size += size_delta;
+            }
+        );
+    } <b>else</b> {
+        <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
+            &<b>mut</b> self.sells, &key, |order_data| {
+                order_data.size += size_delta;
+            }
+        );
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_decrease_order_size"></a>
+
+## Function `decrease_order_size`
+
+Decrease the size of the order in the order book without altering its position in the price-time priority.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_decrease_order_size">decrease_order_size</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size_delta: u64, is_bid: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_decrease_order_size">decrease_order_size</a>(
+    self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>,
+    price: u64,
+    unique_priority_idx: UniqueIdxType,
+    size_delta: u64,
+    is_bid: bool
+) {
+    <b>let</b> tie_breaker = <a href="price_time_index.md#0x7_price_time_index_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
+    <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a> { price, tie_breaker };
+    <b>if</b> (is_bid) {
+        <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
+            &<b>mut</b> self.buys, &key, |order_data| {
+                order_data.size -= size_delta;
+            }
+        );
+    } <b>else</b> {
+        <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
+            &<b>mut</b> self.sells, &key, |order_data| {
+                order_data.size -= size_delta;
+            }
+        );
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_price_time_index_place_maker_order"></a>
+
+## Function `place_maker_order`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_place_maker_order">place_maker_order</a>(self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size: u64, is_bid: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_place_maker_order">place_maker_order</a>(
+    self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>,
+    order_id: OrderIdType,
+    order_book_type: OrderBookType,
+    price: u64,
+    unique_priority_idx: UniqueIdxType,
+    size: u64,
+    is_bid: bool
+) {
+    <b>let</b> tie_breaker = <a href="price_time_index.md#0x7_price_time_index_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
+    <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a> { price, tie_breaker };
+    <b>let</b> value = <a href="price_time_index.md#0x7_price_time_index_OrderData">OrderData</a> { order_id, order_book_type, size };
+    // Assert that this is not a taker order
+    <b>assert</b>!(!self.<a href="price_time_index.md#0x7_price_time_index_is_taker_order">is_taker_order</a>(price, is_bid), <a href="price_time_index.md#0x7_price_time_index_EINVALID_MAKER_ORDER">EINVALID_MAKER_ORDER</a>);
+    <b>if</b> (is_bid) {
+        self.buys.add(key, value);
+    } <b>else</b> {
+        self.sells.add(key, value);
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+
+[move-book]: https://velor.dev/move/book/SUMMARY

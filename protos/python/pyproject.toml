@@ -1,14 +1,14 @@
 [tool.poetry]
-name = "aptos-protos"
+name = "velor-protos"
 version = "1.1.2"
-description = "Code generated from protobuf definitions for the Aptos tech stack"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Code generated from protobuf definitions for the Velor tech stack"
+authors = ["Velor Labs <opensource@velorlabs.com>"]
 license = "Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://github.com/aptos-labs/aptos-core/tree/main/protos/python"
-keywords = ["web3", "aptos", "blockchain", "indexer"]
-packages = [{include = "aptos_protos"}]
+repository = "https://github.com/velor-chain/velor-core"
+homepage = "https://github.com/velor-chain/velor-core/tree/main/protos/python"
+keywords = ["web3", "velor", "blockchain", "indexer"]
+packages = [{include = "velor_protos"}]
 
 [tool.poe.tasks]
 generate = "./generate.sh"

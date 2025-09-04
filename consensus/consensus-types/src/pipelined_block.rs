@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,13 +12,13 @@ use crate::{
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use anyhow::Error;
-use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
-use aptos_executor_types::{
+use velor_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
+use velor_executor_types::{
     state_compute_result::StateComputeResult, ExecutorError, ExecutorResult,
 };
-use aptos_infallible::Mutex;
-use aptos_logger::{error, info, warn};
-use aptos_types::{
+use velor_infallible::Mutex;
+use velor_logger::{error, info, warn};
+use velor_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,

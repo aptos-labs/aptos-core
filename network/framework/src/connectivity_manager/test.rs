@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,15 +7,15 @@ use crate::{
     peer_manager::{conn_notifs_channel, ConnectionNotification, ConnectionRequest},
     transport::ConnectionMetadata,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::{
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::{
     config::{Peer, PeerRole, PeerSet, HANDSHAKE_VERSION},
     network_id::NetworkId,
 };
-use aptos_crypto::{test_utils::TEST_SEED, x25519, Uniform};
-use aptos_logger::info;
-use aptos_time_service::{MockTimeService, TimeService};
-use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress};
+use velor_crypto::{test_utils::TEST_SEED, x25519, Uniform};
+use velor_logger::info;
+use velor_time_service::{MockTimeService, TimeService};
+use velor_types::{account_address::AccountAddress, network_address::NetworkAddress};
 use futures::{executor::block_on, future, SinkExt};
 use maplit::{hashmap, hashset};
 use rand::{rngs::StdRng, SeedableRng};
@@ -77,9 +77,9 @@ struct TestHarness {
     network_context: NetworkContext,
     peers_and_metadata: Arc<PeersAndMetadata>,
     mock_time: MockTimeService,
-    connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
+    connection_reqs_rx: velor_channel::Receiver<PeerId, ConnectionRequest>,
     connection_notifs_tx: conn_notifs_channel::Sender,
-    conn_mgr_reqs_tx: aptos_channels::Sender<ConnectivityRequest>,
+    conn_mgr_reqs_tx: velor_channels::Sender<ConnectivityRequest>,
 }
 
 impl TestHarness {
@@ -87,9 +87,9 @@ impl TestHarness {
         let network_context = NetworkContext::mock();
         let time_service = TimeService::mock();
         let (connection_reqs_tx, connection_reqs_rx) =
-            aptos_channel::new(QueueStyle::FIFO, 1, None);
+            velor_channel::new(QueueStyle::FIFO, 1, None);
         let (connection_notifs_tx, connection_notifs_rx) = conn_notifs_channel::new();
-        let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(0);
+        let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = velor_channels::new_test(0);
         let peers_and_metadata = PeersAndMetadata::new(&[network_context.network_id()]);
 
         let conn_mgr = ConnectivityManager::new(

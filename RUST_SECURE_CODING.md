@@ -1,6 +1,6 @@
-# Secure Coding for Aptos Core
+# Secure Coding for Velor Core
 
-These Rust Secure Coding Guidelines are essential for anyone contributing to Aptos, reflecting our security-first approach. As Aptos is built with a primary focus on security, these guidelines, derived and adapted from ANSSI's Secure Rust Guidelines, are integral to maintaining the high standards of safety and robustness in aptos-core. Aptos contributors are encouraged to thoroughly understand and apply these principles in their work.
+These Rust Secure Coding Guidelines are essential for anyone contributing to Velor, reflecting our security-first approach. As Velor is built with a primary focus on security, these guidelines, derived and adapted from ANSSI's Secure Rust Guidelines, are integral to maintaining the high standards of safety and robustness in velor-core. Velor contributors are encouraged to thoroughly understand and apply these principles in their work.
 
 ## Development Environment
 
@@ -10,7 +10,7 @@ Utilize Rustup for managing Rust toolchains. However, keep in mind that, from a 
 
 ### Stable Toolchain
 
-Aptos Core leverages Rust stable toolchain to limit potential compiler, runtime, or tooling bugs, or potential supply chain attacks in nightly releases.
+Velor Core leverages Rust stable toolchain to limit potential compiler, runtime, or tooling bugs, or potential supply chain attacks in nightly releases.
 
 ### Cargo
 
@@ -21,9 +21,9 @@ Utilize Cargo for project management without overriding variables like `debug-as
 
 ### Linters and Formatters
 
-Regularly use tools like Clippy and Rustfmt for identifying potential issues and maintaining code style. Aptos **enforces** Clippy during automated testing with additional rules, so ensure to run it locally to prevent CI/CD failures.
+Regularly use tools like Clippy and Rustfmt for identifying potential issues and maintaining code style. Velor **enforces** Clippy during automated testing with additional rules, so ensure to run it locally to prevent CI/CD failures.
 
-Clippy with Aptos-specific configuration can be run locally via `cargo xclippy` or using rust-analyser in your preferred IDE following these [instructions](https://rust-analyzer.github.io/manual.html#clippy). Aptos uses directives in files and a per-directory configuration to turn on or off checks.
+Clippy with Velor-specific configuration can be run locally via `cargo xclippy` or using rust-analyser in your preferred IDE following these [instructions](https://rust-analyzer.github.io/manual.html#clippy). Velor uses directives in files and a per-directory configuration to turn on or off checks.
 
 ### Rustfix
 
@@ -39,7 +39,7 @@ Document safety invariants and security considerations in code, especially for p
 
 Assess and monitor the quality and maintenance of crates that are being introduced to the codebase, employing tools like `cargo-outdated` and `cargo-audit` for version management and vulnerability checking.
 
-- Aptos utilizes **[Dependabot](https://github.com/dependabot)** to continuously monitor libraries. Our policy requires mandatory updates for critical and high-vulnerabilities, or upon impact evaluation given the context for medium and lower.
+- Velor utilizes **[Dependabot](https://github.com/dependabot)** to continuously monitor libraries. Our policy requires mandatory updates for critical and high-vulnerabilities, or upon impact evaluation given the context for medium and lower.
 - We recommend leveraging [deps.dev](https://deps.dev) to evaluate new third party crates. This site provides an OpenSSF scorecard containing essential information. As a guideline, libraries with a score of 7 or higher are typically safe to import. However, those scoring **below 7** must be flagged during the PR and require a specific justification.
 
 ### Minimize Use of Feature Flags
@@ -105,7 +105,7 @@ In the majority of scenarios, manual implementation is unnecessary. In Rust, nea
 ### Comparison Traits
 
 Ensure the implementation of standard comparison traits respects documented invariants.
-In the context of implementing standard comparison traits (like Eq, PartialEq, Ord, PartialOrd in Rust), respecting documented invariants means that the implementation of these traits should adhere to the properties and expectations defined by those invariants. For instance, if an invariant states that an object's identity is determined by certain fields, comparisons (equality, greater than, less than, etc.) must only consider those fields and ignore others. This ensures consistency, predictability, and correctness in how objects are compared, sorted, or considered equal within the Aptos Core.
+In the context of implementing standard comparison traits (like Eq, PartialEq, Ord, PartialOrd in Rust), respecting documented invariants means that the implementation of these traits should adhere to the properties and expectations defined by those invariants. For instance, if an invariant states that an object's identity is determined by certain fields, comparisons (equality, greater than, less than, etc.) must only consider those fields and ignore others. This ensures consistency, predictability, and correctness in how objects are compared, sorted, or considered equal within the Velor Core.
 
 The ANSSI resource extensively covers the matter [References](#references).
 
@@ -120,7 +120,7 @@ By utilizing these primitives, Rust programs can manage shared resources among m
 
 ### Data Structures with Deterministic Internal Order
 
-Certain data structures, like HashMap and HashSet, do not guarantee a deterministic order for the elements stored within them. This lack of order can lead to problems in operations that require processing elements in a consistent sequence across multiple executions. In the Aptos blockchain, deterministic data structures help in achieving consensus, maintaining the integrity of the ledger, and ensuring that computations can be reliably reproduced across different nodes.
+Certain data structures, like HashMap and HashSet, do not guarantee a deterministic order for the elements stored within them. This lack of order can lead to problems in operations that require processing elements in a consistent sequence across multiple executions. In the Velor blockchain, deterministic data structures help in achieving consensus, maintaining the integrity of the ledger, and ensuring that computations can be reliably reproduced across different nodes.
 
 Below is a list of deterministic data structures available in Rust. Please note, this list may not be exhaustive:
 
@@ -134,7 +134,7 @@ Below is a list of deterministic data structures available in Rust. Please note,
 
 ### No Custom Cryptographic Algorithm
 
-Use exclusively the cryptographic primitives exposed by the `aptos-crypto` crate.
+Use exclusively the cryptographic primitives exposed by the `velor-crypto` crate.
 
 ### Cryptographic Material Management
 
@@ -156,11 +156,11 @@ Most memory leaks result in general product reliability problems. If an attacker
 
 ### Fuzzing
 
-Aptos contains harnesses for fuzzing crash-prone code like deserializers, using [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) through [`cargo fuzz`](https://rust-fuzz.github.io/book/cargo-fuzz.html). For more examples, see the `testsuite/fuzzer` directory where find detailed README.md.
+Velor contains harnesses for fuzzing crash-prone code like deserializers, using [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) through [`cargo fuzz`](https://rust-fuzz.github.io/book/cargo-fuzz.html). For more examples, see the `testsuite/fuzzer` directory where find detailed README.md.
 
 ## Conclusion
 
-These guidelines are a crucial element for anyone contributing to Aptos, reflecting our commitment to a security-first approach. By adhering to these guidelines, Aptos contributors play a vital role in maintaining the security and robustness of the Aptos network. As we work towards automating the enforcement of these standards, following these practices will help maintain and improve the overall integrity and resilience of the Aptos ecosystem. This ongoing effort ensures that Aptos continues to set a high bar for security and reliability.
+These guidelines are a crucial element for anyone contributing to Velor, reflecting our commitment to a security-first approach. By adhering to these guidelines, Velor contributors play a vital role in maintaining the security and robustness of the Velor network. As we work towards automating the enforcement of these standards, following these practices will help maintain and improve the overall integrity and resilience of the Velor ecosystem. This ongoing effort ensures that Velor continues to set a high bar for security and reliability.
 
 ## References
 

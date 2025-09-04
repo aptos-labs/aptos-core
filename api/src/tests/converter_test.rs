@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context;
-use aptos_api_test_context::current_function_name;
-use aptos_api_types::{new_vm_utf8_string, AsConverter, HexEncodedBytes, MoveConverter, MoveType};
-use aptos_types::state_store::StateView;
+use velor_api_test_context::current_function_name;
+use velor_api_types::{new_vm_utf8_string, AsConverter, HexEncodedBytes, MoveConverter, MoveType};
+use velor_types::state_store::StateView;
 use move_core_types::{
     account_address::AccountAddress,
     value::{MoveStruct, MoveValue as VmMoveValue},

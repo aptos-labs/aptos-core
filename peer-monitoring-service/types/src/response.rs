@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::{config::PeerRole, network_id::PeerNetworkId};
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use velor_config::{config::PeerRole, network_id::PeerNetworkId};
+use velor_types::{network_address::NetworkAddress, PeerId};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt, fmt::Display, time::Duration};
 use thiserror::Error;

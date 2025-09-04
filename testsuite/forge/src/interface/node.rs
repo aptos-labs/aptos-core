@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Result, Version};
 use anyhow::anyhow;
-use aptos_config::{config::NodeConfig, network_id::NetworkId};
-use aptos_inspection_service::inspection_client::InspectionClient;
-use aptos_rest_client::{AptosBaseUrl, Client as RestClient};
-use aptos_sdk::types::PeerId;
+use velor_config::{config::NodeConfig, network_id::NetworkId};
+use velor_inspection_service::inspection_client::InspectionClient;
+use velor_rest_client::{VelorBaseUrl, Client as RestClient};
+use velor_sdk::types::PeerId;
 use std::{
     collections::HashMap,
     time::{Duration, Instant},
@@ -155,7 +155,7 @@ pub trait NodeExt: Node {
 
     /// Return REST API client of this Node
     fn rest_client_with_timeout(&self, timeout: Duration) -> RestClient {
-        RestClient::builder(AptosBaseUrl::Custom(self.rest_api_endpoint()))
+        RestClient::builder(VelorBaseUrl::Custom(self.rest_api_endpoint()))
             .timeout(timeout)
             .build()
     }
@@ -219,7 +219,7 @@ pub trait NodeExt: Node {
         if let Some(direction) = direction {
             map.insert("direction".to_string(), direction.to_string());
         }
-        self.get_metric_with_fields_i64("aptos_connections", map)
+        self.get_metric_with_fields_i64("velor_connections", map)
             .await
     }
 

@@ -1,5 +1,5 @@
 module poc::write_module_event_to_store {
-    use aptos_framework::event;
+    use velor_framework::event;
 
     #[event]
     struct MyEvent has drop, store {

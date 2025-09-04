@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::arc_with_non_send_sync)]
 
-use aptos_crypto::{
+use velor_crypto::{
     traits::{CryptoMaterialError, ValidCryptoMaterialStringExt},
     x25519,
 };
@@ -28,7 +28,7 @@ const MAX_DNS_NAME_SIZE: usize = 255;
 
 /// ## Overview
 ///
-/// Aptos `NetworkAddress` is a compact, efficient, self-describing and
+/// Velor `NetworkAddress` is a compact, efficient, self-describing and
 /// future-proof network address represented as a stack of protocols. Essentially
 /// libp2p's [multiaddr] but using [`bcs`] to describe the binary format.
 ///
@@ -43,7 +43,7 @@ const MAX_DNS_NAME_SIZE: usize = 255;
 /// 3. Perform a Noise IK handshake and assume the peer's static pubkey is
 ///    `<x25519-pubkey>`. After this step, we will have a secure, authenticated
 ///    connection with the peer.
-/// 4. Perform a AptosNet version negotiation handshake (version 1).
+/// 4. Perform a VelorNet version negotiation handshake (version 1).
 ///
 /// ## Self-describing, Upgradable
 ///
@@ -65,7 +65,7 @@ const MAX_DNS_NAME_SIZE: usize = 255;
 ///
 /// ## Transport
 ///
-/// In addition, `NetworkAddress` is integrated with the AptosNet concept of a
+/// In addition, `NetworkAddress` is integrated with the VelorNet concept of a
 /// [`Transport`], which takes a `NetworkAddress` when dialing and peels off
 /// [`Protocol`]s to establish a connection and perform initial handshakes.
 /// Similarly, the [`Transport`] takes `NetworkAddress` to listen on, which tells
@@ -91,7 +91,7 @@ const MAX_DNS_NAME_SIZE: usize = 255;
 /// //               \  '-- uvarint number of protocols
 /// //                '-- length of encoded network address
 ///
-/// use aptos_types::network_address::NetworkAddress;
+/// use velor_types::network_address::NetworkAddress;
 /// use bcs;
 /// use std::{str::FromStr, convert::TryFrom};
 ///
@@ -325,8 +325,8 @@ impl NetworkAddress {
     /// ### Example
     ///
     /// ```rust
-    /// use aptos_crypto::{traits::ValidCryptoMaterialStringExt, x25519};
-    /// use aptos_types::network_address::NetworkAddress;
+    /// use velor_crypto::{traits::ValidCryptoMaterialStringExt, x25519};
+    /// use velor_types::network_address::NetworkAddress;
     /// use std::str::FromStr;
     ///
     /// let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
@@ -348,10 +348,10 @@ impl NetworkAddress {
             .push(Protocol::Handshake(handshake_version))
     }
 
-    /// Check that a `NetworkAddress` looks like a typical AptosNet address with
+    /// Check that a `NetworkAddress` looks like a typical VelorNet address with
     /// associated protocols.
     ///
-    /// "typical" AptosNet addresses begin with a transport protocol:
+    /// "typical" VelorNet addresses begin with a transport protocol:
     ///
     /// `"/ip4/<addr>/tcp/<port>"` or
     /// `"/ip6/<addr>/tcp/<port>"` or
@@ -367,15 +367,15 @@ impl NetworkAddress {
     /// ### Example
     ///
     /// ```rust
-    /// use aptos_types::network_address::NetworkAddress;
+    /// use velor_types::network_address::NetworkAddress;
     /// use std::str::FromStr;
     ///
     /// let addr_str = "/ip4/1.2.3.4/tcp/6180/noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/handshake/0";
     /// let addr = NetworkAddress::from_str(addr_str).unwrap();
-    /// assert!(addr.is_aptosnet_addr());
+    /// assert!(addr.is_velornet_addr());
     /// ```
-    pub fn is_aptosnet_addr(&self) -> bool {
-        parse_aptosnet_protos(self.as_slice()).is_some()
+    pub fn is_velornet_addr(&self) -> bool {
+        parse_velornet_protos(self.as_slice()).is_some()
     }
 
     /// Retrieves the IP address from the network address
@@ -567,7 +567,7 @@ impl<'de> Deserialize<'de> for NetworkAddress {
 }
 
 #[cfg(any(test, feature = "fuzzing"))]
-pub fn arb_aptosnet_addr() -> impl Strategy<Value = NetworkAddress> {
+pub fn arb_velornet_addr() -> impl Strategy<Value = NetworkAddress> {
     let arb_transport_protos = prop_oneof![
         any::<u16>().prop_map(|port| vec![Protocol::Memory(port)]),
         any::<(Ipv4Addr, u16)>()
@@ -581,12 +581,12 @@ pub fn arb_aptosnet_addr() -> impl Strategy<Value = NetworkAddress> {
         any::<(DnsName, u16)>()
             .prop_map(|(name, port)| vec![Protocol::Dns6(name), Protocol::Tcp(port)]),
     ];
-    let arb_aptosnet_protos = any::<(x25519::PublicKey, u8)>()
+    let arb_velornet_protos = any::<(x25519::PublicKey, u8)>()
         .prop_map(|(pubkey, hs)| vec![Protocol::NoiseIK(pubkey), Protocol::Handshake(hs)]);
 
-    (arb_transport_protos, arb_aptosnet_protos).prop_map(
-        |(mut transport_protos, mut aptosnet_protos)| {
-            transport_protos.append(&mut aptosnet_protos);
+    (arb_transport_protos, arb_velornet_protos).prop_map(
+        |(mut transport_protos, mut velornet_protos)| {
+            transport_protos.append(&mut velornet_protos);
             NetworkAddress::from_protocols(transport_protos).unwrap()
         },
     )
@@ -857,10 +857,10 @@ pub fn parse_handshake(protos: &[Protocol]) -> Option<u8> {
     }
 }
 
-/// parse canonical aptosnet protocols
+/// parse canonical velornet protocols
 ///
-/// See: [`NetworkAddress::is_aptosnet_addr`]
-fn parse_aptosnet_protos(protos: &[Protocol]) -> Option<&[Protocol]> {
+/// See: [`NetworkAddress::is_velornet_addr`]
+fn parse_velornet_protos(protos: &[Protocol]) -> Option<&[Protocol]> {
     // parse base transport layer
     // ---
     // parse_ip_tcp
@@ -1106,7 +1106,7 @@ mod test {
 
     proptest! {
         #[test]
-        fn test_network_address_canonical_serialization(addr in arb_aptosnet_addr()) {
+        fn test_network_address_canonical_serialization(addr in arb_velornet_addr()) {
             if addr.to_string().is_ascii() {
                 assert_canonical_encode_decode(addr);
             } else {
@@ -1116,7 +1116,7 @@ mod test {
         }
 
         #[test]
-        fn test_network_address_display_roundtrip(addr in arb_aptosnet_addr()) {
+        fn test_network_address_display_roundtrip(addr in arb_velornet_addr()) {
             let addr_str = addr.to_string();
             let addr_parsed = NetworkAddress::from_str(&addr_str);
             if addr_str.is_ascii() {
@@ -1130,8 +1130,8 @@ mod test {
         }
 
         #[test]
-        fn test_is_aptosnet_addr(addr in arb_aptosnet_addr()) {
-            assert!(addr.is_aptosnet_addr(), "addr.is_aptosnet_addr() = false; addr: '{}'", addr);
+        fn test_is_velornet_addr(addr in arb_velornet_addr()) {
+            assert!(addr.is_velornet_addr(), "addr.is_velornet_addr() = false; addr: '{}'", addr);
         }
     }
 }

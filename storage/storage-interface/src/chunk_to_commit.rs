@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::{
@@ -8,7 +8,7 @@ use crate::state_store::{
     state_view::cached_state_view::ShardedStateCache,
     state_with_summary::{LedgerStateWithSummary, StateWithSummary},
 };
-use aptos_types::transaction::{
+use velor_types::transaction::{
     PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionOutput, Version,
 };
 

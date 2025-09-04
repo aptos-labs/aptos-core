@@ -1,0 +1,9 @@
+[package]
+name = "RingDeque"
+version = "0.0.0"
+
+[dependencies]
+VelorFramework = { local = "../../framework/velor-framework" }
+
+[addresses]
+ring_deque = "_"

@@ -4,12 +4,12 @@ module addr::token_objects {
     use std::string::{Self, String};
     use std::signer;
 
-    use aptos_framework::object::{Self, Object};
-    use aptos_token_objects::collection;
-    use aptos_token_objects::token;
-    use aptos_token_objects::property_map;
-    use aptos_framework::event;
-    use aptos_std::string_utils::{to_string};
+    use velor_framework::object::{Self, Object};
+    use velor_token_objects::collection;
+    use velor_token_objects::token;
+    use velor_token_objects::property_map;
+    use velor_framework::event;
+    use velor_std::string_utils::{to_string};
 
     /// The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;
@@ -36,7 +36,7 @@ module addr::token_objects {
     const RANK_SILVER: vector<u8> = b"Silver";
     const RANK_BRONZE: vector<u8> = b"Bronze";
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = velor_framework::object::ObjectGroup)]
     /// The ambassador token
     struct AmbassadorToken has key {
         /// Used to mutate the token uri
@@ -49,7 +49,7 @@ module addr::token_objects {
         base_uri: String,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = velor_framework::object::ObjectGroup)]
     /// The ambassador level
     struct AmbassadorLevel has key {
         ambassador_level: u64,

@@ -1,0 +1,47 @@
+[package]
+name = "velor-vm-profiling"
+version = "0.1.0"
+authors = ["Velor Labs <opensource@velorlabs.com>"]
+repository = "https://github.com/velor-chain/velor-core"
+homepage = "https://velorlabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+default-run = "main"
+
+[dependencies]
+anyhow = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }
+glob = { workspace = true }
+once_cell = { workspace = true }
+smallvec = { workspace = true }
+
+velor-block-executor = { workspace = true }
+velor-cached-packages = { workspace = true }
+velor-gas-schedule = { workspace = true }
+velor-move-stdlib = { workspace = true }
+velor-native-interface = { workspace = true }
+velor-table-natives = { workspace = true }
+velor-transaction-simulation = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true }
+
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-ir-compiler = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-test-utils = { workspace = true }
+move-vm-types = { workspace = true }
+
+[[bin]]
+name = "main"
+path  = "src/main.rs"
+
+[[bin]]
+name = "run-move"
+path = "src/bins/run_move.rs"
+
+[[bin]]
+name = "run-velor-p2p"
+path = "src/bins/run_velor_p2p.rs"

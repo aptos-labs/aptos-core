@@ -1,23 +1,23 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::{
+use velor_config::{
     config::NodeConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_logger::{
+use velor_logger::{
     debug, info,
     prelude::{sample, SampleRate},
     warn,
 };
-use aptos_metrics_core::{register_int_counter_vec, IntCounter, IntCounterVec};
-use aptos_network::{
+use velor_metrics_core::{register_int_counter_vec, IntCounter, IntCounterVec};
+use velor_network::{
     application::interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
     peer_manager::ConnectionNotification,
     protocols::{network::Event, rpc::error::RpcError, wire::handshake::v1::ProtocolId},
 };
-use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::{account_address::AccountAddress, PeerId};
+use velor_time_service::{TimeService, TimeServiceTrait};
+use velor_types::{account_address::AccountAddress, PeerId};
 use bytes::Bytes;
 use futures::{
     channel::oneshot::Sender,
@@ -53,7 +53,7 @@ pub struct NetbenchDataReply {
 /// Counter for pending network events to the network benchmark service (server-side)
 pub static PENDING_NETBENCH_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_netbench_pending_network_events",
+        "velor_netbench_pending_network_events",
         "Counters for pending network events for benchmarking",
         &["state"]
     )
@@ -566,9 +566,9 @@ pub struct SendRecord {
     pub bytes_sent: usize,
 }
 
-pub static APTOS_NETWORK_BENCHMARK_DIRECT_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static VELOR_NETWORK_BENCHMARK_DIRECT_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_network_benchmark_direct_messages",
+        "velor_network_benchmark_direct_messages",
         "Number of net benchmark direct messages",
         &["state"]
     )
@@ -576,14 +576,14 @@ pub static APTOS_NETWORK_BENCHMARK_DIRECT_MESSAGES: Lazy<IntCounterVec> = Lazy::
 });
 
 fn direct_messages(state_label: &'static str) {
-    APTOS_NETWORK_BENCHMARK_DIRECT_MESSAGES
+    VELOR_NETWORK_BENCHMARK_DIRECT_MESSAGES
         .with_label_values(&[state_label])
         .inc();
 }
 
-pub static APTOS_NETWORK_BENCHMARK_DIRECT_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static VELOR_NETWORK_BENCHMARK_DIRECT_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_network_benchmark_direct_bytes",
+        "velor_network_benchmark_direct_bytes",
         "Number of net benchmark direct bytes",
         &["state"]
     )
@@ -591,14 +591,14 @@ pub static APTOS_NETWORK_BENCHMARK_DIRECT_BYTES: Lazy<IntCounterVec> = Lazy::new
 });
 
 fn direct_bytes(state_label: &'static str, byte_count: u64) {
-    APTOS_NETWORK_BENCHMARK_DIRECT_BYTES
+    VELOR_NETWORK_BENCHMARK_DIRECT_BYTES
         .with_label_values(&[state_label])
         .inc_by(byte_count);
 }
 
-pub static APTOS_NETWORK_BENCHMARK_DIRECT_MICROS: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static VELOR_NETWORK_BENCHMARK_DIRECT_MICROS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_network_benchmark_direct_micros",
+        "velor_network_benchmark_direct_micros",
         "Number of net benchmark direct micros",
         &["state"]
     )
@@ -606,14 +606,14 @@ pub static APTOS_NETWORK_BENCHMARK_DIRECT_MICROS: Lazy<IntCounterVec> = Lazy::ne
 });
 
 fn direct_micros(state_label: &'static str, micros: u64) {
-    APTOS_NETWORK_BENCHMARK_DIRECT_MICROS
+    VELOR_NETWORK_BENCHMARK_DIRECT_MICROS
         .with_label_values(&[state_label])
         .inc_by(micros);
 }
 
-pub static APTOS_NETWORK_BENCHMARK_RPC_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static VELOR_NETWORK_BENCHMARK_RPC_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_network_benchmark_rpc_messages",
+        "velor_network_benchmark_rpc_messages",
         "Number of net benchmark RPC messages",
         &["state"]
     )
@@ -621,14 +621,14 @@ pub static APTOS_NETWORK_BENCHMARK_RPC_MESSAGES: Lazy<IntCounterVec> = Lazy::new
 });
 
 fn rpc_messages(state_label: &'static str) {
-    APTOS_NETWORK_BENCHMARK_RPC_MESSAGES
+    VELOR_NETWORK_BENCHMARK_RPC_MESSAGES
         .with_label_values(&[state_label])
         .inc();
 }
 
-pub static APTOS_NETWORK_BENCHMARK_RPC_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static VELOR_NETWORK_BENCHMARK_RPC_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_network_benchmark_rpc_bytes",
+        "velor_network_benchmark_rpc_bytes",
         "Number of net benchmark RPC bytes transferred",
         &["state"]
     )
@@ -636,12 +636,12 @@ pub static APTOS_NETWORK_BENCHMARK_RPC_BYTES: Lazy<IntCounterVec> = Lazy::new(||
 });
 
 pub fn rpc_bytes(state_label: &'static str) -> IntCounter {
-    APTOS_NETWORK_BENCHMARK_RPC_BYTES.with_label_values(&[state_label])
+    VELOR_NETWORK_BENCHMARK_RPC_BYTES.with_label_values(&[state_label])
 }
 
-pub static APTOS_NETWORK_BENCHMARK_RPC_MICROS: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static VELOR_NETWORK_BENCHMARK_RPC_MICROS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_network_benchmark_rpc_micros",
+        "velor_network_benchmark_rpc_micros",
         "Number of net benchmark RPC microseconds used (hint: divide by _messages)",
         &["state"]
     )
@@ -649,5 +649,5 @@ pub static APTOS_NETWORK_BENCHMARK_RPC_MICROS: Lazy<IntCounterVec> = Lazy::new(|
 });
 
 pub fn rpc_micros(state_label: &'static str) -> IntCounter {
-    APTOS_NETWORK_BENCHMARK_RPC_MICROS.with_label_values(&[state_label])
+    VELOR_NETWORK_BENCHMARK_RPC_MICROS.with_label_values(&[state_label])
 }

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,8 +9,8 @@ use crate::{
     ledger_info::SignatureWithStatus, on_chain_config::ValidatorSet,
 };
 use anyhow::{ensure, Result};
-use aptos_bitvec::BitVec;
-use aptos_crypto::{
+use velor_bitvec::BitVec;
+use velor_crypto::{
     bls12381,
     bls12381::{bls12381_keys, PublicKey},
     hash::CryptoHash,
@@ -679,7 +679,7 @@ pub fn random_validator_verifier_with_voting_power(
 mod tests {
     use super::*;
     use crate::{aggregate_signature::PartialSignatures, validator_signer::ValidatorSigner};
-    use aptos_crypto::test_utils::{TestAptosCrypto, TEST_SEED};
+    use velor_crypto::test_utils::{TestVelorCrypto, TEST_SEED};
     use proptest::{collection::vec, prelude::*};
     use std::collections::BTreeMap;
 
@@ -691,7 +691,7 @@ mod tests {
         let (validator_signers, validator_verifier) = random_validator_verifier(total, None, false);
         let mut author_to_signature_map = BTreeMap::new();
 
-        let dummy_struct = TestAptosCrypto("Hello, World".to_string());
+        let dummy_struct = TestVelorCrypto("Hello, World".to_string());
         for (i, validator) in validator_signers.iter().enumerate() {
             if i < minority {
                 assert_eq!(
@@ -753,7 +753,7 @@ mod tests {
     #[test]
     fn test_validator() {
         let validator_signer = ValidatorSigner::random(TEST_SEED);
-        let dummy_struct = TestAptosCrypto("Hello, World".to_string());
+        let dummy_struct = TestVelorCrypto("Hello, World".to_string());
         let signature = validator_signer.sign(&dummy_struct).unwrap();
         let validator =
             ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key());
@@ -780,7 +780,7 @@ mod tests {
     #[test]
     fn test_invalid_multi_signatures() {
         let validator_signer = ValidatorSigner::random(TEST_SEED);
-        let dummy_struct = TestAptosCrypto("Hello, World".to_string());
+        let dummy_struct = TestVelorCrypto("Hello, World".to_string());
         let validator =
             ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key());
 
@@ -807,7 +807,7 @@ mod tests {
     #[test]
     fn test_verify_empty_signature() {
         let validator_signer = ValidatorSigner::random(TEST_SEED);
-        let dummy_struct = TestAptosCrypto("Hello, World".to_string());
+        let dummy_struct = TestVelorCrypto("Hello, World".to_string());
         let validator =
             ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key());
 
@@ -823,7 +823,7 @@ mod tests {
     #[test]
     fn test_insufficient_voting_power() {
         let validator_signer = ValidatorSigner::random(TEST_SEED);
-        let dummy_struct = TestAptosCrypto("Hello, World".to_string());
+        let dummy_struct = TestVelorCrypto("Hello, World".to_string());
         let validator =
             ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key());
 
@@ -847,7 +847,7 @@ mod tests {
         let validator_signers: Vec<ValidatorSigner> = (0..NUM_SIGNERS)
             .map(|i| ValidatorSigner::random([i; 32]))
             .collect();
-        let dummy_struct = TestAptosCrypto("Hello, World".to_string());
+        let dummy_struct = TestVelorCrypto("Hello, World".to_string());
 
         // Create a map from authors to public keys with equal voting power.
         let mut validator_infos = vec![];
@@ -960,7 +960,7 @@ mod tests {
         let validator_signers: Vec<ValidatorSigner> = (0..NUM_SIGNERS)
             .map(|i| ValidatorSigner::random([i; 32]))
             .collect();
-        let dummy_struct = TestAptosCrypto("Hello, World".to_string());
+        let dummy_struct = TestVelorCrypto("Hello, World".to_string());
 
         // Create a map from authors to public keys with increasing weights (0, 1, 2, 3) and
         // a map of author to signature.

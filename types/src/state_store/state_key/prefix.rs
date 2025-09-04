@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::state_key::{inner::StateKeyTag, StateKey};
@@ -47,7 +47,7 @@ mod tests {
     use crate::{
         account_config::{AccountResource, CoinStoreResource},
         state_store::state_key::{inner::StateKeyTag, prefix::StateKeyPrefix, StateKey},
-        AptosCoinType,
+        VelorCoinType,
     };
     use move_core_types::account_address::AccountAddress;
 
@@ -56,7 +56,7 @@ mod tests {
         let address1 = AccountAddress::new([12u8; AccountAddress::LENGTH]);
         let address2 = AccountAddress::new([22u8; AccountAddress::LENGTH]);
         let key1 = StateKey::resource_typed::<AccountResource>(&address1).unwrap();
-        let key2 = StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(&address2).unwrap();
+        let key2 = StateKey::resource_typed::<CoinStoreResource<VelorCoinType>>(&address2).unwrap();
 
         let account1_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());
         let account2_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address2.to_vec());

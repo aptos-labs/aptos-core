@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -16,7 +16,7 @@
 //! - An address space that doesn't match the size expected is rejected e.g. too big for IPv4
 //! - Address space that's larger than the current supported requests is rejected
 
-use aptos_types::network_address::NetworkAddress;
+use velor_types::network_address::NetworkAddress;
 use futures::io::{AsyncRead, AsyncReadExt};
 use std::{
     convert::TryInto,
@@ -135,7 +135,7 @@ pub async fn read_header<T: AsyncRead + std::marker::Unpin>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_memsocket::MemorySocket;
+    use velor_memsocket::MemorySocket;
     use futures::{executor::block_on, future::join, io::AsyncWriteExt};
     use std::net::ToSocketAddrs;
 

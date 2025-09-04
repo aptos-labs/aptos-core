@@ -12,7 +12,7 @@ on:
         type: string
         required: true
       GIT_REF:
-        description: "The aptos-core git ref (GIT_REF or commit hash) to switch to before running the fullnode."
+        description: "The velor-core git ref (GIT_REF or commit hash) to switch to before running the fullnode."
         type: string
         required: true
       NETWORK:
@@ -39,7 +39,7 @@ on:
         type: string
         required: true
       GIT_REF:
-        description: "The aptos-core GIT_REF (or ref) to switch to before running the fullnode."
+        description: "The velor-core GIT_REF (or ref) to switch to before running the fullnode."
         type: string
         required: true
       NETWORK:
@@ -57,7 +57,7 @@ on:
 
 jobs:
   fullnode-sync:
-    runs-on: runs-on,family=c5ad.8xlarge,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=false
+    runs-on: runs-on,family=c5ad.8xlarge,image=velor-ubuntu-x64,run-id=${{ github.run_id }},spot=false
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 300 }} # the default run is 300 minutes (5 hours). Specified here because workflow_dispatch uses string rather than number
     steps:
       - uses: actions/checkout@v4

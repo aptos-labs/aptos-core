@@ -11,7 +11,7 @@ permissions:
   id-token: write
 jobs:
   cargo-metadata:
-    runs-on: runs-on,cpu=4,ram=16,family=m7a+m7i-flex,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co
+    runs-on: runs-on,cpu=4,ram=16,family=m7a+m7i-flex,image=velor-ubuntu-x64,run-id=${{ github.run_id }},spot=co
     steps:
       - uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
@@ -23,4 +23,4 @@ jobs:
       - shell: bash
         run: |
           set -ex
-          cargo metadata --all-features | gcloud storage cp - gs://aptos-core-cargo-metadata-public/metadata-${{ github.sha }}.json
+          cargo metadata --all-features | gcloud storage cp - gs://velor-core-cargo-metadata-public/metadata-${{ github.sha }}.json

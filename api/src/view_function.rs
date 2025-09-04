@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -13,13 +13,13 @@ use crate::{
     ApiTags, Context,
 };
 use anyhow::Context as anyhowContext;
-use aptos_api_types::{
-    AptosErrorCode, AsConverter, MoveValue, ViewFunction, ViewRequest, MAX_RECURSIVE_TYPES_ALLOWED,
+use velor_api_types::{
+    VelorErrorCode, AsConverter, MoveValue, ViewFunction, ViewRequest, MAX_RECURSIVE_TYPES_ALLOWED,
     U64,
 };
-use aptos_bcs_utils::serialize_uleb128;
-use aptos_types::{state_store::StateView, transaction::ViewFunctionError, vm_status::StatusCode};
-use aptos_vm::AptosVM;
+use velor_bcs_utils::serialize_uleb128;
+use velor_types::{state_store::StateView, transaction::ViewFunctionError, vm_status::StatusCode};
+use velor_vm::VelorVM;
 use itertools::Itertools;
 use move_core_types::language_storage::TypeTag;
 use poem_openapi::{param::Query, payload::Json, ApiRequest, OpenApi};
@@ -54,7 +54,7 @@ pub enum ViewFunctionRequest {
     #[oai(content_type = "application/json")]
     Json(Json<ViewRequest>),
 
-    #[oai(content_type = "application/x.aptos.view_function+bcs")]
+    #[oai(content_type = "application/x.velor.view_function+bcs")]
     Bcs(Bcs),
 }
 
@@ -64,7 +64,7 @@ impl ViewFunctionApi {
     ///
     /// Execute the Move function with the given parameters and return its execution result.
     ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// The Velor nodes prune account state history, via a configurable time window.
     /// If the requested ledger version has been pruned, the server responds with a 410.
     #[oai(
         path = "/view",
@@ -107,7 +107,7 @@ fn view_request(
         .map_err(|err| {
             BasicErrorWith404::bad_request_with_code(
                 err,
-                AptosErrorCode::InternalError,
+                VelorErrorCode::InternalError,
                 &ledger_info,
             )
         })?;
@@ -119,7 +119,7 @@ fn view_request(
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code(
                     err,
-                    AptosErrorCode::InvalidInput,
+                    VelorErrorCode::InvalidInput,
                     &ledger_info,
                 )
             })?,
@@ -129,7 +129,7 @@ fn view_request(
                 .map_err(|err| {
                     BasicErrorWith404::bad_request_with_code(
                         err,
-                        AptosErrorCode::InvalidInput,
+                        VelorErrorCode::InvalidInput,
                         &ledger_info,
                     )
                 })?
@@ -147,11 +147,11 @@ fn view_request(
                 "Function {}::{} is not allowed",
                 view_function.module, view_function.function
             ),
-            AptosErrorCode::InvalidInput,
+            VelorErrorCode::InvalidInput,
         ));
     }
 
-    let output = AptosVM::execute_view_function(
+    let output = VelorVM::execute_view_function(
         &state_view,
         view_function.module.clone(),
         view_function.function.clone(),
@@ -165,7 +165,7 @@ fn view_request(
             convert_view_function_error(&status, &state_view, &context);
         BasicErrorWith404::bad_request_with_optional_vm_status_and_ledger_info(
             anyhow::anyhow!(err_string),
-            AptosErrorCode::InvalidInput,
+            VelorErrorCode::InvalidInput,
             vm_error_code,
             Some(&ledger_info),
         )
@@ -181,7 +181,7 @@ fn view_request(
             serialize_uleb128(&mut length, num_vals as u64).map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &ledger_info,
                 )
             })?;
@@ -204,7 +204,7 @@ fn view_request(
                 .map_err(|err| {
                     BasicErrorWith404::bad_request_with_code(
                         err,
-                        AptosErrorCode::InternalError,
+                        VelorErrorCode::InternalError,
                         &ledger_info,
                     )
                 })?;
@@ -221,7 +221,7 @@ fn view_request(
                 .map_err(|err| {
                     BasicErrorWith404::bad_request_with_code(
                         err,
-                        AptosErrorCode::InternalError,
+                        VelorErrorCode::InternalError,
                         &ledger_info,
                     )
                 })?;

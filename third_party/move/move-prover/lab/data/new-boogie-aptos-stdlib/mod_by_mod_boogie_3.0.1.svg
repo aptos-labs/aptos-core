@@ -592,7 +592,7 @@
 0.763
 </text>
 <text x="0" y="2333" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::aptos_hash
+0x1::velor_hash
 </text>
 <rect x="0" y="2348" width="38" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="48" y="2349" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">

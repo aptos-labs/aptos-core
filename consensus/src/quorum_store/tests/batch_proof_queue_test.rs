@@ -1,16 +1,16 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::{
     batch_proof_queue::BatchProofQueue, tests::batch_store_test::batch_store_for_test,
 };
-use aptos_consensus_types::{
+use velor_consensus_types::{
     common::TxnSummaryWithExpiration,
     proof_of_store::{BatchInfo, ProofOfStore},
     utils::PayloadTxnsSize,
 };
-use aptos_crypto::HashValue;
-use aptos_types::{
+use velor_crypto::HashValue;
+use velor_types::{
     aggregate_signature::AggregateSignature, quorum_store::BatchId, transaction::ReplayProtector,
     PeerId,
 };
@@ -96,7 +96,7 @@ async fn test_proof_queue_sorting() {
         2,
         2,
         true,
-        aptos_infallible::duration_since_epoch(),
+        velor_infallible::duration_since_epoch(),
     );
     let mut count_author_0 = 0;
     let mut count_author_1 = 0;
@@ -125,7 +125,7 @@ async fn test_proof_queue_sorting() {
         4,
         4,
         true,
-        aptos_infallible::duration_since_epoch(),
+        velor_infallible::duration_since_epoch(),
     );
     let mut count_author_0 = 0;
     let mut count_author_1 = 0;
@@ -153,8 +153,8 @@ async fn test_proof_calculate_remaining_txns_and_proofs() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
     let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
-    let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
-    let now_in_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
+    let now_in_secs = velor_infallible::duration_since_epoch().as_secs() as u64;
+    let now_in_usecs = velor_infallible::duration_since_epoch().as_micros() as u64;
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
     let txns = vec![
@@ -433,7 +433,7 @@ async fn test_proof_pull_proofs_with_duplicates() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
     let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
-    let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
+    let now_in_secs = velor_infallible::duration_since_epoch().as_secs() as u64;
     let now_in_usecs = now_in_secs * 1_000_000;
     let txns = vec![
         TxnSummaryWithExpiration::new(
@@ -722,7 +722,7 @@ async fn test_proof_queue_soft_limit() {
         12,
         12,
         true,
-        aptos_infallible::duration_since_epoch(),
+        velor_infallible::duration_since_epoch(),
     );
 
     assert_eq!(pulled.len(), 1);
@@ -734,7 +734,7 @@ async fn test_proof_queue_soft_limit() {
         30,
         12,
         true,
-        aptos_infallible::duration_since_epoch(),
+        velor_infallible::duration_since_epoch(),
     );
 
     assert_eq!(pulled.len(), 2);
@@ -794,7 +794,7 @@ async fn test_proof_queue_pull_full_utilization() {
     assert_eq!(remaining_txns, 30);
     assert_eq!(remaining_proofs, 3);
 
-    let now_in_secs = aptos_infallible::duration_since_epoch();
+    let now_in_secs = velor_infallible::duration_since_epoch();
     let (proof_block, txns_with_proof_size, cur_unique_txns, proof_queue_fully_utilized) =
         proof_queue.pull_proofs(
             &HashSet::new(),
@@ -810,7 +810,7 @@ async fn test_proof_queue_pull_full_utilization() {
     assert_eq!(cur_unique_txns, 10);
     assert!(!proof_queue_fully_utilized);
 
-    let now_in_secs = aptos_infallible::duration_since_epoch();
+    let now_in_secs = velor_infallible::duration_since_epoch();
     let (proof_block, txns_with_proof_size, cur_unique_txns, proof_queue_fully_utilized) =
         proof_queue.pull_proofs(
             &HashSet::new(),

@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::dkg::DKGTranscriptMetadata;
 use crate::{dkg::DKGTranscript, jwks, validator_verifier::ValidatorVerifier};
 use anyhow::Context;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};

@@ -1,0 +1,275 @@
+<!-- Copyright © Velor Foundation -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{title}}</title>
+    <style>
+        /* Add your custom CSS styles here */
+        body {
+            background-color: white;
+            color: black;
+        }
+
+        section {
+            margin-bottom: 60px;
+        }
+
+        table,
+        th,
+        td {
+            border: 1px solid black;
+        }
+
+        td {
+            padding: 2px;
+        }
+
+        table {
+            border-collapse: collapse;
+        }
+
+        h2 {
+            background: rgb(220, 220, 220);
+        }
+
+        h3 {
+            background: rgb(240, 240, 240);
+        }
+
+        .flamegraph {
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body onload="init();">
+    <header>
+        <h1>{{title}}</h1>
+    </header>
+
+    <section>
+        <h2>Flamegraphs</h2>
+        {{#if graph-exec-io}}
+        <object data="assets/exec_io.svg" type="image/svg+xml" class="flamegraph"></object>
+        {{else}}
+        (No execution & IO graph to show.)<br>
+        {{/if}}
+
+        {{#if graph-storage}}
+        <object data="assets/storage.svg" type="image/svg+xml" class="flamegraph"></object>
+        {{else}}
+        (No storage graph to show.)
+        {{/if}}
+    </section>
+
+    <section>
+        <h2>Cost Break-down</h2>
+        The Velor network charges a transaction in two parts: (1) execution and IO, and (2) storage.
+
+        <h3> Execution & IO</h3>
+        The execution & IO costs cover the transient resources used for executing the transaction
+        and are quantified in gas units, meaning that the final fee incurred will be subject to the gas unit
+        price established by the gas fee market. This allows one to benefit from low transaction fees when
+        the network is not at capacity.
+
+        <h4>Intrinsic Cost</h4>
+        {{intrinsic}} gas units
+        {{#if intrinsic-percentage}}
+        , {{intrinsic-percentage}} of the total cost for execution & IO.
+        {{/if}}
+
+        {{#if keyless}}
+        <h4>Keyless Cost</h4>
+        {{keyless}} gas units, {{keyless-percentage}} of the total cost for execution & IO.
+        {{/if}}
+
+        <h4>Dependencies</h4>
+        {{#if deps}}
+        <table>
+            <tr>
+                <th><b>Name</b></th>
+                <th style="text-align: right"><b>Size in Bytes</b></th>
+                <th style="text-align: right"><b>Cost in Gas Units</b></th>
+                <th style="text-align: right"><b>Percentage</b></th>
+            </tr>
+            {{#each deps}}
+            <tr>
+                <td>{{name}}</td>
+                <td style="text-align: right">{{size}}</td>
+                <td style="text-align: right">{{cost}}</td>
+                <td style="text-align: right">{{percentage}}</td>
+            </tr>
+            {{/each}}
+        </table>
+        {{else}}
+        (No dependencies to show. System dependencies are excluded.)
+        {{/if}}
+        <h4>Execution</h4>
+        {{#if ops}}
+        <table>
+            <tr>
+                <th><b>Operation</b></th>
+                <th style="text-align: right"><b>Number of Hits</b></th>
+                <th style="text-align: right"><b>Cost in Gas Units</b></th>
+                <th style="text-align: right"><b>Percentage</b></th>
+            </tr>
+            {{#each ops}}
+            <tr>
+                <td>{{name}}</td>
+                <td style="text-align: right">{{hits}}</td>
+                <td style="text-align: right">{{cost}}</td>
+                <td style="text-align: right">{{percentage}}</td>
+            </tr>
+            {{/each}}
+        </table>
+        {{else}}
+        (No operations to show.)
+        {{/if}}
+        <h4>State Reads</h4>
+        {{#if reads}}
+        <table>
+            <tr>
+                <td><b>Resource Name</b></td>
+                <td style="text-align: right"><b>Number of Hits</b></td>
+                <td style="text-align: right"><b>Cost in Gas Units</b></td>
+                <td style="text-align: right"><b>Percentage</b></td>
+            </tr>
+            {{#each reads}}
+            <tr>
+                <td>{{name}}</td>
+                <td style="text-align: right">{{hits}}</td>
+                <td style="text-align: right">{{cost}}</td>
+                <td style="text-align: right">{{percentage}}</td>
+            </tr>
+            {{/each}}
+        </table>
+        {{else}}
+        (No reads to show.)
+        {{/if}}
+        <h4>Ledger Writes</h4>
+        <h5>Transaction Itself</h5>
+        <table>
+            <tr>
+                <td style="text-align: right"><b>Cost in Gas Units</b></td>
+                <td style="text-align: right"><b>Percentage</b></td>
+            </tr>
+            {{#with transaction_write}}
+            <tr>
+                <td style="text-align: right">{{cost}}</td>
+                <td style="text-align: right">{{percentage}}</td>
+            </tr>
+            {{/with}}
+        </table>
+        <h5>Events</h5>
+        {{#if event_writes}}
+        <table>
+            <tr>
+                <td><b>Event Type</b></td>
+                <td style="text-align: right"><b>Number of Hits</b></td>
+                <td style="text-align: right"><b>Cost in Gas Units</b></td>
+                <td style="text-align: right"><b>Percentage</b></td>
+            </tr>
+            {{#each event_writes}}
+            <tr>
+                <td>{{name}}</td>
+                <td style="text-align: right">{{hits}}</td>
+                <td style="text-align: right">{{cost}}</td>
+                <td style="text-align: right">{{percentage}}</td>
+            </tr>
+            {{/each}}
+        </table>
+        {{else}}
+        (No writes to show.)
+        {{/if}}
+        <h5>State Write Ops</h5>
+        {{#if writes}}
+        <table>
+            <tr>
+                <td><b>Resource Name</b></td>
+                <td style="text-align: right"><b>Number of Hits</b></td>
+                <td style="text-align: right"><b>Cost in Gas Units</b></td>
+                <td style="text-align: right"><b>Percentage</b></td>
+            </tr>
+            {{#each writes}}
+            <tr>
+                <td>{{name}}</td>
+                <td style="text-align: right">{{hits}}</td>
+                <td style="text-align: right">{{cost}}</td>
+                <td style="text-align: right">{{percentage}}</td>
+            </tr>
+            {{/each}}
+        </table>
+        {{else}}
+        (No writes to show.)
+        {{/if}}
+        <h3>Storage</h3>
+        The storage fees cover the extended-term storage of states and events and are assessed at a fixed price in APT.
+
+        <h4>Transaction</h4>
+        {{storage-txn}} APT
+        {{#if storage-txn-percentage}}
+        , {{storage-txn-percentage}} of the total cost for storage.
+        {{/if}}
+        <h4>States</h4>
+        {{#if storage-writes}}
+        <table>
+            <tr>
+                <td><b>Path</b></td>
+                <td style="text-align: right"><b>Cost in APT</b></td>
+                <td style="text-align: right"><b>Percentage</b></td>
+                <td style="text-align: right"><b>Refund in APT</b></td>
+                <td style="text-align: right"><b>Percentage</b></td>
+            </tr>
+            {{#each storage-writes}}
+            <tr>
+                <td>{{name}}</td>
+                <td style="text-align: right">{{cost}}</td>
+                <td style="text-align: right">{{cost-percentage}}</td>
+                <td style="text-align: right">{{refund}}</td>
+                <td style="text-align: right">{{refund-percentage}}</td>
+            </tr>
+            {{/each}}
+        </table>
+        {{else}}
+        (No state changes to show.)
+        {{/if}}
+        <h4>Events</h4>
+        {{#if storage-events}}
+        <table>
+            <tr>
+                <td><b>Name</b></td>
+                <td style="text-align: right"><b>Cost in APT</b></td>
+                <td style="text-align: right"><b>Percentage</b></td>
+            </tr>
+            {{#each storage-events}}
+            <tr>
+                <td>{{name}}</td>
+                <td style="text-align: right">{{cost}}</td>
+                <td style="text-align: right">{{cost-percentage}}</td>
+            </tr>
+            {{/each}}
+        </table>
+        {{storage-event-discount}}
+        {{else}}
+        (No events to show.)
+        {{/if}}
+    </section>
+
+    <section>
+        <h2>Full Execution Trace</h2>
+        <div>
+            <pre style="display: inline-block; border:1px solid black; padding: 2px;"><code>{{trace}}</code></pre>
+        </div>
+    </section>
+
+    <footer>
+        <p>Generated by the Velor Gas Profiler</p>
+    </footer>
+</body>
+
+</html>

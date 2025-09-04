@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,16 +7,16 @@ use crate::{
     pending_votes::{PendingVotes, VoteReceptionResult, VoteStatus},
     util::time_service::{SendTask, TimeService},
 };
-use aptos_consensus_types::{
+use velor_consensus_types::{
     common::Round,
     round_timeout::{RoundTimeout, RoundTimeoutReason},
     sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutWithPartialSignatures,
     vote::Vote,
 };
-use aptos_crypto::HashValue;
-use aptos_logger::{prelude::*, Schema};
-use aptos_types::validator_verifier::ValidatorVerifier;
+use velor_crypto::HashValue;
+use velor_logger::{prelude::*, Schema};
+use velor_types::validator_verifier::ValidatorVerifier;
 use futures::future::AbortHandle;
 use serde::Serialize;
 use std::{fmt, sync::Arc, time::Duration};
@@ -155,7 +155,7 @@ pub struct RoundState {
     // Service for timer
     time_service: Arc<dyn TimeService>,
     // To send local timeout events to the subscriber (e.g., SMR)
-    timeout_sender: aptos_channels::Sender<Round>,
+    timeout_sender: velor_channels::Sender<Round>,
     // Votes received for the current round.
     pending_votes: PendingVotes,
     // Vote sent locally for the current round.
@@ -191,7 +191,7 @@ impl RoundState {
     pub fn new(
         time_interval: Box<dyn RoundTimeInterval>,
         time_service: Arc<dyn TimeService>,
-        timeout_sender: aptos_channels::Sender<Round>,
+        timeout_sender: velor_channels::Sender<Round>,
     ) -> Self {
         // Our counters are initialized lazily, so they're not going to appear in
         // Prometheus if some conditions never happen. Invoking get() function enforces creation.

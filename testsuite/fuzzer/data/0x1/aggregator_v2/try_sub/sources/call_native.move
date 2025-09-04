@@ -1,5 +1,5 @@
 module poc::try_sub {
-    use aptos_framework::aggregator_v2;
+    use velor_framework::aggregator_v2;
 
     public entry fun main(_owner:&signer) {
         let agg = aggregator_v2::create_unbounded_aggregator<u64>();

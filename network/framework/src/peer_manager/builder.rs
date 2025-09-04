@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -14,21 +14,21 @@ use crate::{
         network::{NetworkClientConfig, NetworkServiceConfig, ReceivedMessage},
         wire::handshake::v1::ProtocolIdSet,
     },
-    transport::{self, AptosNetTransport, Connection, APTOS_TCP_TRANSPORT},
+    transport::{self, VelorNetTransport, Connection, VELOR_TCP_TRANSPORT},
     ProtocolId,
 };
-use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::{config::HANDSHAKE_VERSION, network_id::NetworkContext};
-use aptos_crypto::x25519;
-use aptos_logger::prelude::*;
+use velor_channels::{self, velor_channel, message_queues::QueueStyle};
+use velor_config::{config::HANDSHAKE_VERSION, network_id::NetworkContext};
+use velor_crypto::x25519;
+use velor_logger::prelude::*;
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
-use aptos_netcore::transport::memory::MemoryTransport;
-use aptos_netcore::transport::{
+use velor_netcore::transport::memory::MemoryTransport;
+use velor_netcore::transport::{
     tcp::{TCPBufferCfg, TcpSocket, TcpTransport},
     Transport,
 };
-use aptos_time_service::TimeService;
-use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
+use velor_time_service::TimeService;
+use velor_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
 use std::{clone::Clone, collections::HashMap, fmt::Debug, sync::Arc};
 use tokio::runtime::Handle;
 
@@ -63,14 +63,14 @@ impl TransportContext {
 
 struct PeerManagerContext {
     // TODO(philiphayes): better support multiple listening addrs
-    pm_reqs_tx: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
-    pm_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
-    connection_reqs_tx: aptos_channel::Sender<PeerId, ConnectionRequest>,
-    connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
+    pm_reqs_tx: velor_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
+    pm_reqs_rx: velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+    connection_reqs_tx: velor_channel::Sender<PeerId, ConnectionRequest>,
+    connection_reqs_rx: velor_channel::Receiver<PeerId, ConnectionRequest>,
 
     peers_and_metadata: Arc<PeersAndMetadata>,
     upstream_handlers:
-        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
+        HashMap<ProtocolId, velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
     channel_size: usize,
@@ -83,15 +83,15 @@ struct PeerManagerContext {
 impl PeerManagerContext {
     #[allow(clippy::too_many_arguments)]
     fn new(
-        pm_reqs_tx: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
-        pm_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
-        connection_reqs_tx: aptos_channel::Sender<PeerId, ConnectionRequest>,
-        connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
+        pm_reqs_tx: velor_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
+        pm_reqs_rx: velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+        connection_reqs_tx: velor_channel::Sender<PeerId, ConnectionRequest>,
+        connection_reqs_rx: velor_channel::Receiver<PeerId, ConnectionRequest>,
 
         peers_and_metadata: Arc<PeersAndMetadata>,
         upstream_handlers: HashMap<
             ProtocolId,
-            aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
+            velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
         >,
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
@@ -122,7 +122,7 @@ impl PeerManagerContext {
     fn add_upstream_handler(
         &mut self,
         protocol_id: ProtocolId,
-        channel: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
+        channel: velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
     ) -> &mut Self {
         self.upstream_handlers.insert(protocol_id, channel);
         self
@@ -137,8 +137,8 @@ impl PeerManagerContext {
 
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 type MemoryPeerManager =
-    PeerManager<AptosNetTransport<MemoryTransport>, NoiseStream<aptos_memsocket::MemorySocket>>;
-type TcpPeerManager = PeerManager<AptosNetTransport<TcpTransport>, NoiseStream<TcpSocket>>;
+    PeerManager<VelorNetTransport<MemoryTransport>, NoiseStream<velor_memsocket::MemorySocket>>;
+type TcpPeerManager = PeerManager<VelorNetTransport<TcpTransport>, NoiseStream<TcpSocket>>;
 
 enum TransportPeerManager {
     #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
@@ -175,14 +175,14 @@ impl PeerManagerBuilder {
         tcp_buffer_cfg: TCPBufferCfg,
     ) -> Self {
         // Setup channel to send requests to peer manager.
-        let (pm_reqs_tx, pm_reqs_rx) = aptos_channel::new(
+        let (pm_reqs_tx, pm_reqs_rx) = velor_channel::new(
             QueueStyle::FIFO,
             channel_size,
             Some(&counters::PENDING_PEER_MANAGER_REQUESTS),
         );
         // Setup channel to send connection requests to peer manager.
         let (connection_reqs_tx, connection_reqs_rx) =
-            aptos_channel::new(QueueStyle::FIFO, channel_size, None);
+            velor_channel::new(QueueStyle::FIFO, channel_size, None);
 
         Self {
             network_context,
@@ -217,7 +217,7 @@ impl PeerManagerBuilder {
         self.listen_address.clone()
     }
 
-    pub fn connection_reqs_tx(&self) -> aptos_channel::Sender<PeerId, ConnectionRequest> {
+    pub fn connection_reqs_tx(&self) -> velor_channel::Sender<PeerId, ConnectionRequest> {
         self.peer_manager_context
             .as_ref()
             .expect("Cannot access connection_reqs once PeerManager has been built")
@@ -240,7 +240,7 @@ impl PeerManagerBuilder {
     /// Create the configured transport and start PeerManager.
     /// Return the actual NetworkAddress over which this peer is listening.
     pub fn build(&mut self, executor: &Handle) -> &mut Self {
-        use aptos_types::network_address::Protocol::*;
+        use velor_types::network_address::Protocol::*;
 
         let transport_context = self
             .transport_context
@@ -262,15 +262,15 @@ impl PeerManagerBuilder {
             ),
         };
 
-        let mut aptos_tcp_transport = APTOS_TCP_TRANSPORT.clone();
+        let mut velor_tcp_transport = VELOR_TCP_TRANSPORT.clone();
         let tcp_cfg = self.get_tcp_buffers_cfg();
-        aptos_tcp_transport.set_tcp_buffers(&tcp_cfg);
+        velor_tcp_transport.set_tcp_buffers(&tcp_cfg);
 
         self.peer_manager = match self.listen_address.as_slice() {
             [Ip4(_), Tcp(_)] | [Ip6(_), Tcp(_)] => {
                 Some(TransportPeerManager::Tcp(self.build_with_transport(
-                    AptosNetTransport::new(
-                        aptos_tcp_transport,
+                    VelorNetTransport::new(
+                        velor_tcp_transport,
                         self.network_context,
                         self.time_service.clone(),
                         key,
@@ -285,7 +285,7 @@ impl PeerManagerBuilder {
             },
             #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
             [Memory(_)] => Some(TransportPeerManager::Memory(self.build_with_transport(
-                AptosNetTransport::new(
+                VelorNetTransport::new(
                     MemoryTransport,
                     self.network_context,
                     self.time_service.clone(),
@@ -411,7 +411,7 @@ impl PeerManagerBuilder {
     pub fn add_service(
         &mut self,
         config: &NetworkServiceConfig,
-    ) -> aptos_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage> {
+    ) -> velor_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage> {
         // Register the direct send and rpc protocols
         self.transport_context()
             .add_protocols(&config.direct_send_protocols_and_preferences);

@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_types::{
+use velor_types::{
     account_address::AccountAddress,
     account_config::{
         primary_apt_store, AccountResource, CoinInfoResource, CoinStoreResource,
@@ -12,7 +12,7 @@ use aptos_types::{
     event::{EventHandle, EventKey},
     state_store::{state_key::StateKey, StateView},
     write_set::TOTAL_SUPPLY_STATE_KEY,
-    AptosCoinType, CoinType,
+    VelorCoinType, CoinType,
 };
 use itertools::Itertools;
 use move_core_types::{
@@ -40,15 +40,15 @@ impl CommonStructTags {
     pub fn new() -> Self {
         Self {
             account: AccountResource::struct_tag(),
-            apt_coin_store: CoinStoreResource::<AptosCoinType>::struct_tag(),
+            apt_coin_store: CoinStoreResource::<VelorCoinType>::struct_tag(),
             object_group: ObjectGroupResource::struct_tag(),
             object_core: ObjectCoreResource::struct_tag(),
             fungible_store: FungibleStoreResource::struct_tag(),
             concurrent_supply: ConcurrentSupplyResource::struct_tag(),
 
-            apt_coin_type_name: "0x1::aptos_coin::AptosCoin".to_string(),
-            apt_coin_info_resource: StateKey::resource_typed::<CoinInfoResource<AptosCoinType>>(
-                &AptosCoinType::coin_info_address(),
+            apt_coin_type_name: "0x1::velor_coin::VelorCoin".to_string(),
+            apt_coin_info_resource: StateKey::resource_typed::<CoinInfoResource<VelorCoinType>>(
+                &VelorCoinType::coin_info_address(),
             )
             .unwrap(),
         }
@@ -96,7 +96,7 @@ impl DbAccessUtil {
         StateKey::resource(address, &self.common.account).unwrap()
     }
 
-    pub fn new_state_key_aptos_coin(&self, address: &AccountAddress) -> StateKey {
+    pub fn new_state_key_velor_coin(&self, address: &AccountAddress) -> StateKey {
         StateKey::resource(address, &self.common.apt_coin_store).unwrap()
     }
 
@@ -135,7 +135,7 @@ impl DbAccessUtil {
     pub fn get_apt_coin_store(
         coin_store_key: &StateKey,
         state_view: &impl StateView,
-    ) -> Result<Option<CoinStoreResource<AptosCoinType>>> {
+    ) -> Result<Option<CoinStoreResource<VelorCoinType>>> {
         Self::get_value(coin_store_key, state_view)
     }
 
@@ -172,8 +172,8 @@ impl DbAccessUtil {
     pub fn new_apt_coin_store(
         balance: u64,
         address: AccountAddress,
-    ) -> CoinStoreResource<AptosCoinType> {
-        CoinStoreResource::<AptosCoinType>::new(
+    ) -> CoinStoreResource<VelorCoinType> {
+        CoinStoreResource::<VelorCoinType>::new(
             balance,
             false,
             EventHandle::new(EventKey::new(1, address), 0),

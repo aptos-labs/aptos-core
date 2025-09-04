@@ -1,6 +1,6 @@
 [package]
-name = "aptos-api-types"
-description = "Aptos API Types"
+name = "velor-api-types"
+description = "Velor API Types"
 version = "0.0.1"
 
 # Workspace inherited keys
@@ -14,14 +14,14 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-config = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-openapi = { workspace = true }
-aptos-resource-viewer = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
+velor-config = { workspace = true }
+velor-crypto = { workspace = true }
+velor-logger = { workspace = true }
+velor-openapi = { workspace = true }
+velor-resource-viewer = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }

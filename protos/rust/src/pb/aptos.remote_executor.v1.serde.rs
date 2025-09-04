@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
@@ -10,7 +10,7 @@ impl serde::Serialize for Empty {
     {
         use serde::ser::SerializeStruct;
         let len = 0;
-        let struct_ser = serializer.serialize_struct("aptos.remote_executor.v1.Empty", len)?;
+        let struct_ser = serializer.serialize_struct("velor.remote_executor.v1.Empty", len)?;
         struct_ser.end()
     }
 }
@@ -56,7 +56,7 @@ impl<'de> serde::Deserialize<'de> for Empty {
             type Value = Empty;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.remote_executor.v1.Empty")
+                formatter.write_str("struct velor.remote_executor.v1.Empty")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<Empty, V::Error>
@@ -70,7 +70,7 @@ impl<'de> serde::Deserialize<'de> for Empty {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.remote_executor.v1.Empty", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.remote_executor.v1.Empty", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for NetworkMessage {
@@ -87,7 +87,7 @@ impl serde::Serialize for NetworkMessage {
         if !self.message_type.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.remote_executor.v1.NetworkMessage", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.remote_executor.v1.NetworkMessage", len)?;
         if !self.message.is_empty() {
             struct_ser.serialize_field("message", pbjson::private::base64::encode(&self.message).as_str())?;
         }
@@ -148,7 +148,7 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
             type Value = NetworkMessage;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.remote_executor.v1.NetworkMessage")
+                formatter.write_str("struct velor.remote_executor.v1.NetworkMessage")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<NetworkMessage, V::Error>
@@ -181,6 +181,6 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.remote_executor.v1.NetworkMessage", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.remote_executor.v1.NetworkMessage", FIELDS, GeneratedVisitor)
     }
 }

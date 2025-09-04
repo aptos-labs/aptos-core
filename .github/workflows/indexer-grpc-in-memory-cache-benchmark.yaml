@@ -12,11 +12,11 @@ jobs:
       - name: Install grpcurl
         run: curl -sSL "https://github.com/fullstorydev/grpcurl/releases/download/v1.8.7/grpcurl_1.8.7_linux_x86_64.tar.gz" | sudo tar -xz -C /usr/local/bin
       - name: Rust setup
-        uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        uses: velor-chain/velor-core/.github/actions/rust-setup@main
         with:
             GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: build and run the benchmark
         run: |
           set -ex
-          cargo build --release --bin aptos-indexer-grpc-in-memory-cache-benchmark
+          cargo build --release --bin velor-indexer-grpc-in-memory-cache-benchmark
           ./target/release/indexer-grpc-in-memory-cache-benchmark

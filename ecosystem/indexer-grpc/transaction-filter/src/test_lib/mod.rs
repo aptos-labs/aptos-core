@@ -1,7 +1,7 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_protos::indexer::v1::TransactionsInStorage;
+use velor_protos::indexer::v1::TransactionsInStorage;
 use prost::Message;
 use std::io::Read;
 
@@ -15,7 +15,7 @@ pub fn decompress_fixture(bytes: &[u8]) -> TransactionsInStorage {
 }
 
 #[allow(dead_code)]
-pub fn load_taptos_fixture() -> TransactionsInStorage {
+pub fn load_tvelor_fixture() -> TransactionsInStorage {
     let data = include_bytes!(
         "../../fixtures/compressed_files_lz4_00008bc1d5adcf862d3967c1410001fb_705101000.pb.lz4"
     );

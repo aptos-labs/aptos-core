@@ -34,10 +34,10 @@
           "stateKeyHash": "/9ZAn6dPJmyhtLndaQfHEWU2VzDQd4q76rc2HFpUzxU=",
           "type": {
             "address": "0x4",
-            "module": "aptos_token",
-            "name": "AptosToken"
+            "module": "velor_token",
+            "name": "VelorToken"
           },
-          "typeStr": "0x4::aptos_token::AptosToken",
+          "typeStr": "0x4::velor_token::VelorToken",
           "data": "{\"burn_ref\":{\"vec\":[{\"inner\":{\"vec\":[{\"self\":\"0xa29064debdf40962abec633e081e173978994005b263bfd1b077052f693f5dd\"}]},\"self\":{\"vec\":[]}}]},\"mutator_ref\":{\"vec\":[{\"self\":\"0xa29064debdf40962abec633e081e173978994005b263bfd1b077052f693f5dd\"}]},\"property_mutator_ref\":{\"self\":\"0xa29064debdf40962abec633e081e173978994005b263bfd1b077052f693f5dd\"},\"transfer_ref\":{\"vec\":[{\"self\":\"0xa29064debdf40962abec633e081e173978994005b263bfd1b077052f693f5dd\"}]}}"
         }
       },
@@ -66,7 +66,7 @@
             "name": "Token"
           },
           "typeStr": "0x4::token::Token",
-          "data": "{\"collection\":{\"inner\":\"0x39b61bdc5088c71bc496103af399ff79be45b9974cfd234a69beb726dd720df3\"},\"description\":\"A Commemorative NFT: Wapal X Aptos Galxe Campaign.\",\"index\":\"603559\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa29064debdf40962abec633e081e173978994005b263bfd1b077052f693f5dd\",\"creation_num\":\"1125899906842625\"}}},\"name\":\"Make Every M🌐ve Count. #603558\",\"uri\":\"https://arweave.net/M0qCJ4i07oQli5hoq1MRBkvvwz6dGBTt4r6Wp3RhuLI/\"}"
+          "data": "{\"collection\":{\"inner\":\"0x39b61bdc5088c71bc496103af399ff79be45b9974cfd234a69beb726dd720df3\"},\"description\":\"A Commemorative NFT: Wapal X Velor Galxe Campaign.\",\"index\":\"603559\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa29064debdf40962abec633e081e173978994005b263bfd1b077052f693f5dd\",\"creation_num\":\"1125899906842625\"}}},\"name\":\"Make Every M🌐ve Count. #603558\",\"uri\":\"https://arweave.net/M0qCJ4i07oQli5hoq1MRBkvvwz6dGBTt4r6Wp3RhuLI/\"}"
         }
       },
       {
@@ -83,13 +83,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"41047895432\"},\"deposit_events\":{\"counter\":\"961313\",\"guid\":{\"id\":{\"addr\":\"0x305d730682a5311fbfc729a51b8eec73924b40849bff25cf9fdb4348cc0a719a\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"13\",\"guid\":{\"id\":{\"addr\":\"0x305d730682a5311fbfc729a51b8eec73924b40849bff25cf9fdb4348cc0a719a\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -114,10 +114,10 @@
           "stateKeyHash": "T9IPmgM4xvwF4DG6KTVwnE1nysscfay1e2vVlfq2qFI=",
           "type": {
             "address": "0x4",
-            "module": "aptos_token",
-            "name": "AptosCollection"
+            "module": "velor_token",
+            "name": "VelorCollection"
           },
-          "typeStr": "0x4::aptos_token::AptosCollection",
+          "typeStr": "0x4::velor_token::VelorCollection",
           "data": "{\"mutable_description\":true,\"mutable_token_description\":true,\"mutable_token_name\":true,\"mutable_token_properties\":true,\"mutable_token_uri\":true,\"mutable_uri\":true,\"mutator_ref\":{\"vec\":[{\"self\":\"0x39b61bdc5088c71bc496103af399ff79be45b9974cfd234a69beb726dd720df3\"}]},\"royalty_mutator_ref\":{\"vec\":[{\"inner\":{\"self\":\"0x39b61bdc5088c71bc496103af399ff79be45b9974cfd234a69beb726dd720df3\"}}]},\"tokens_burnable_by_creator\":true,\"tokens_freezable_by_creator\":true}"
         }
       },
@@ -132,7 +132,7 @@
             "name": "Collection"
           },
           "typeStr": "0x4::collection::Collection",
-          "data": "{\"creator\":\"0x810222769c2b5598e28203359d51211a895636b3c10232364d8a142400fe71a4\",\"description\":\"A Commemorative NFT: Wapal X Aptos Galxe Campaign.\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x39b61bdc5088c71bc496103af399ff79be45b9974cfd234a69beb726dd720df3\",\"creation_num\":\"1125899906842627\"}}},\"name\":\"Make Every M🌐ve Count.\",\"uri\":\"https://arweave.net/M0qCJ4i07oQli5hoq1MRBkvvwz6dGBTt4r6Wp3RhuLI/\"}"
+          "data": "{\"creator\":\"0x810222769c2b5598e28203359d51211a895636b3c10232364d8a142400fe71a4\",\"description\":\"A Commemorative NFT: Wapal X Velor Galxe Campaign.\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x39b61bdc5088c71bc496103af399ff79be45b9974cfd234a69beb726dd720df3\",\"creation_num\":\"1125899906842627\"}}},\"name\":\"Make Every M🌐ve Count.\",\"uri\":\"https://arweave.net/M0qCJ4i07oQli5hoq1MRBkvvwz6dGBTt4r6Wp3RhuLI/\"}"
         }
       },
       {
@@ -177,13 +177,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"9859700\"},\"deposit_events\":{\"counter\":\"28\",\"guid\":{\"id\":{\"addr\":\"0x494690aa79cb6a257f55969e2a91f63c03d2dd98501b7498389bdfad6cefa5b2\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"76\",\"guid\":{\"id\":{\"addr\":\"0x494690aa79cb6a257f55969e2a91f63c03d2dd98501b7498389bdfad6cefa5b2\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -215,13 +215,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"1697778\"},\"deposit_events\":{\"counter\":\"829384\",\"guid\":{\"id\":{\"addr\":\"0x4973fca13d1a759ed91dbeb468975d74749eb8c5aaf7d21d67c7ea8889084ec2\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"8\",\"guid\":{\"id\":{\"addr\":\"0x4973fca13d1a759ed91dbeb468975d74749eb8c5aaf7d21d67c7ea8889084ec2\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -250,7 +250,7 @@
             "name": "CandyMachine"
           },
           "typeStr": "0x6547d9f1d481fdc21cd38c730c07974f2f61adb7063e76f9d9522ab91f090dac::candymachine::CandyMachine",
-          "data": "{\"baseuri\":\"https://arweave.net/M0qCJ4i07oQli5hoq1MRBkvvwz6dGBTt4r6Wp3RhuLI/\",\"candies\":{\"bit_field\":[false],\"length\":\"1\"},\"collection_description\":\"A Commemorative NFT: Wapal X Aptos Galxe Campaign.\",\"collection_name\":\"Make Every M🌐ve Count.\",\"is_openedition\":true,\"is_sbt\":false,\"merkle_root\":\"0x\",\"minted\":\"603560\",\"paused\":false,\"presale_mint_price\":\"0\",\"presale_mint_time\":\"1706184900\",\"public_mint_limit\":\"0\",\"public_sale_mint_price\":\"0\",\"public_sale_mint_time\":\"1706184901\",\"royalty_payee_address\":\"0x4973fca13d1a759ed91dbeb468975d74749eb8c5aaf7d21d67c7ea8889084ec2\",\"royalty_points_denominator\":\"1000\",\"royalty_points_numerator\":\"40\",\"token_mutate_setting\":[false,false,false,false,false],\"total_supply\":\"100000000\",\"update_event\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x810222769c2b5598e28203359d51211a895636b3c10232364d8a142400fe71a4\",\"creation_num\":\"2\"}}}}"
+          "data": "{\"baseuri\":\"https://arweave.net/M0qCJ4i07oQli5hoq1MRBkvvwz6dGBTt4r6Wp3RhuLI/\",\"candies\":{\"bit_field\":[false],\"length\":\"1\"},\"collection_description\":\"A Commemorative NFT: Wapal X Velor Galxe Campaign.\",\"collection_name\":\"Make Every M🌐ve Count.\",\"is_openedition\":true,\"is_sbt\":false,\"merkle_root\":\"0x\",\"minted\":\"603560\",\"paused\":false,\"presale_mint_price\":\"0\",\"presale_mint_time\":\"1706184900\",\"public_mint_limit\":\"0\",\"public_sale_mint_price\":\"0\",\"public_sale_mint_time\":\"1706184901\",\"royalty_payee_address\":\"0x4973fca13d1a759ed91dbeb468975d74749eb8c5aaf7d21d67c7ea8889084ec2\",\"royalty_points_denominator\":\"1000\",\"royalty_points_numerator\":\"40\",\"token_mutate_setting\":[false,false,false,false,false],\"total_supply\":\"100000000\",\"update_event\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x810222769c2b5598e28203359d51211a895636b3c10232364d8a142400fe71a4\",\"creation_num\":\"2\"}}}}"
         }
       },
       {
@@ -274,10 +274,10 @@
           "stateKeyHash": "9fpM3tdEU2nug+APGyd6Pk4KtROLy1W1ju0lH1Y48Ck=",
           "type": {
             "address": "0x4",
-            "module": "aptos_token",
-            "name": "AptosToken"
+            "module": "velor_token",
+            "name": "VelorToken"
           },
-          "typeStr": "0x4::aptos_token::AptosToken",
+          "typeStr": "0x4::velor_token::VelorToken",
           "data": "{\"burn_ref\":{\"vec\":[{\"inner\":{\"vec\":[{\"self\":\"0xf3f53aef6048b8871a90a5ffdb29018cea3e52b10369527b7dc90461c9f25b9e\"}]},\"self\":{\"vec\":[]}}]},\"mutator_ref\":{\"vec\":[{\"self\":\"0xf3f53aef6048b8871a90a5ffdb29018cea3e52b10369527b7dc90461c9f25b9e\"}]},\"property_mutator_ref\":{\"self\":\"0xf3f53aef6048b8871a90a5ffdb29018cea3e52b10369527b7dc90461c9f25b9e\"},\"transfer_ref\":{\"vec\":[{\"self\":\"0xf3f53aef6048b8871a90a5ffdb29018cea3e52b10369527b7dc90461c9f25b9e\"}]}}"
         }
       },
@@ -306,7 +306,7 @@
             "name": "Token"
           },
           "typeStr": "0x4::token::Token",
-          "data": "{\"collection\":{\"inner\":\"0x39b61bdc5088c71bc496103af399ff79be45b9974cfd234a69beb726dd720df3\"},\"description\":\"A Commemorative NFT: Wapal X Aptos Galxe Campaign.\",\"index\":\"603560\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xf3f53aef6048b8871a90a5ffdb29018cea3e52b10369527b7dc90461c9f25b9e\",\"creation_num\":\"1125899906842625\"}}},\"name\":\"Make Every M🌐ve Count. #603559\",\"uri\":\"https://arweave.net/M0qCJ4i07oQli5hoq1MRBkvvwz6dGBTt4r6Wp3RhuLI/\"}"
+          "data": "{\"collection\":{\"inner\":\"0x39b61bdc5088c71bc496103af399ff79be45b9974cfd234a69beb726dd720df3\"},\"description\":\"A Commemorative NFT: Wapal X Velor Galxe Campaign.\",\"index\":\"603560\",\"mutation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xf3f53aef6048b8871a90a5ffdb29018cea3e52b10369527b7dc90461c9f25b9e\",\"creation_num\":\"1125899906842625\"}}},\"name\":\"Make Every M🌐ve Count. #603559\",\"uri\":\"https://arweave.net/M0qCJ4i07oQli5hoq1MRBkvvwz6dGBTt4r6Wp3RhuLI/\"}"
         }
       },
       {

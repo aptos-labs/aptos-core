@@ -1,19 +1,19 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{errors::FilterError, traits::Filterable, utils::standardize_address};
 use anyhow::anyhow;
-use aptos_protos::transaction::v1::MoveStructTag;
+use velor_protos::transaction::v1::MoveStructTag;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 
 /// Example:
 /// ```
-/// use aptos_transaction_filter::MoveStructTagFilterBuilder;
+/// use velor_transaction_filter::MoveStructTagFilterBuilder;
 ///
 /// let filter = MoveStructTagFilterBuilder::default()
 ///   .address("0x0000000000000000000000000000000000000000000000000000000000000004")
-///   .module("aptos_token")
+///   .module("velor_token")
 ///   .name("Token")
 ///   .build()
 ///   .unwrap();
@@ -45,8 +45,8 @@ impl MoveStructTagFilter {
     }
 }
 
-impl From<aptos_protos::indexer::v1::MoveStructTagFilter> for MoveStructTagFilter {
-    fn from(proto_filter: aptos_protos::indexer::v1::MoveStructTagFilter) -> Self {
+impl From<velor_protos::indexer::v1::MoveStructTagFilter> for MoveStructTagFilter {
+    fn from(proto_filter: velor_protos::indexer::v1::MoveStructTagFilter) -> Self {
         Self {
             standardized_address: OnceCell::with_value(
                 proto_filter
@@ -61,7 +61,7 @@ impl From<aptos_protos::indexer::v1::MoveStructTagFilter> for MoveStructTagFilte
     }
 }
 
-impl From<MoveStructTagFilter> for aptos_protos::indexer::v1::MoveStructTagFilter {
+impl From<MoveStructTagFilter> for velor_protos::indexer::v1::MoveStructTagFilter {
     fn from(move_struct_tag_filter: MoveStructTagFilter) -> Self {
         Self {
             address: move_struct_tag_filter.address,

@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{keyless::Claims, move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use anyhow::{anyhow, bail, ensure, Result};
-use aptos_crypto::poseidon_bn254;
+use velor_crypto::poseidon_bn254;
 use base64::URL_SAFE_NO_PAD;
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use move_core_types::value::{MoveStruct, MoveValue};
@@ -75,7 +75,7 @@ impl RSA_JWK {
         }
     }
 
-    // The private key to this JWK is found under INTERNAL_TEST_OIDC_PROVIDER_PRIVATE_KEY in aptos-keyless-prod in gcloud secrets
+    // The private key to this JWK is found under INTERNAL_TEST_OIDC_PROVIDER_PRIVATE_KEY in velor-keyless-prod in gcloud secrets
     pub fn secure_test_jwk() -> RSA_JWK {
         RSA_JWK {
             kid:"test-rsa".to_owned(),
@@ -98,7 +98,7 @@ impl RSA_JWK {
         self.kid.as_bytes().to_vec()
     }
 
-    // TODO(keyless): Move this to aptos-crypto so other services can use this
+    // TODO(keyless): Move this to velor-crypto so other services can use this
     pub fn to_poseidon_scalar(&self) -> Result<ark_bn254::Fr> {
         let mut modulus = base64::decode_config(&self.n, URL_SAFE_NO_PAD)?;
         // The circuit only supports RSA256

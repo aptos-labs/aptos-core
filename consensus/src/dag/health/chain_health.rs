@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,8 +6,8 @@ use crate::{
     dag::anchor_election::CommitHistory,
     liveness::{leader_reputation::VotingPowerRatio, proposal_generator::ChainHealthBackoffConfig},
 };
-use aptos_config::config::ChainHealthBackoffValues;
-use aptos_consensus_types::common::Round;
+use velor_config::config::ChainHealthBackoffValues;
+use velor_consensus_types::common::Round;
 use std::{sync::Arc, time::Duration};
 
 pub trait TChainHealth: Send + Sync {

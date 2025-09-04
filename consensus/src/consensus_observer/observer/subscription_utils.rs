@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
@@ -12,14 +12,14 @@ use crate::consensus_observer::{
     observer::subscription::ConsensusObserverSubscription,
     publisher::consensus_publisher::ConsensusPublisher,
 };
-use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
-use aptos_logger::{error, info, warn};
-use aptos_network::{
+use velor_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
+use velor_logger::{error, info, warn};
+use velor_network::{
     application::{interface::NetworkClient, metadata::PeerMetadata},
     ProtocolId,
 };
-use aptos_storage_interface::DbReader;
-use aptos_time_service::TimeService;
+use velor_storage_interface::DbReader;
+use velor_time_service::TimeService;
 use ordered_float::OrderedFloat;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -299,7 +299,7 @@ pub fn sort_peers_by_subscription_optimality(
 
         // If the distance is not found, use the maximum distance
         let distance =
-            distance.unwrap_or(aptos_peer_monitoring_service_types::MAX_DISTANCE_FROM_VALIDATORS);
+            distance.unwrap_or(velor_peer_monitoring_service_types::MAX_DISTANCE_FROM_VALIDATORS);
 
         // If the latency is not found, use a large latency
         let latency = latency.unwrap_or(MAX_PING_LATENCY_SECS);
@@ -358,10 +358,10 @@ fn supports_consensus_observer(peer_metadata: &PeerMetadata) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-    use aptos_config::{config::PeerRole, network_id::NetworkId};
-    use aptos_netcore::transport::ConnectionOrigin;
-    use aptos_network::{
+    use velor_channels::{velor_channel, message_queues::QueueStyle};
+    use velor_config::{config::PeerRole, network_id::NetworkId};
+    use velor_netcore::transport::ConnectionOrigin;
+    use velor_network::{
         application::storage::PeersAndMetadata,
         peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
         protocols::{
@@ -370,11 +370,11 @@ mod tests {
         },
         transport::{ConnectionId, ConnectionMetadata},
     };
-    use aptos_peer_monitoring_service_types::{
+    use velor_peer_monitoring_service_types::{
         response::NetworkInformationResponse, PeerMonitoringMetadata,
     };
-    use aptos_storage_interface::Result;
-    use aptos_types::{network_address::NetworkAddress, transaction::Version, PeerId};
+    use velor_storage_interface::Result;
+    use velor_types::{network_address::NetworkAddress, transaction::Version, PeerId};
     use bytes::Bytes;
     use futures::StreamExt;
     use mockall::mock;
@@ -980,7 +980,7 @@ mod tests {
         >,
         peer_manager_request_receivers: &mut HashMap<
             NetworkId,
-            aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+            velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
         >,
         num_subscriptions_to_create: usize,
         expected_subscription_peers: Vec<PeerNetworkId>,
@@ -1063,14 +1063,14 @@ mod tests {
     ) -> (
         Arc<PeersAndMetadata>,
         Arc<ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>>,
-        HashMap<NetworkId, aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>>,
+        HashMap<NetworkId, velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>>,
     ) {
         // Create the network senders and receivers for each network
         let mut network_senders = HashMap::new();
         let mut peer_manager_request_receivers = HashMap::new();
         for network_id in network_ids {
             // Create the request managers
-            let queue_cfg = aptos_channel::Config::new(10).queue_style(QueueStyle::FIFO);
+            let queue_cfg = velor_channel::Config::new(10).queue_style(QueueStyle::FIFO);
             let (peer_manager_request_sender, peer_manager_request_receiver) = queue_cfg.build();
             let (connected_request_sender, _) = queue_cfg.build();
 
@@ -1221,7 +1221,7 @@ mod tests {
         network_id: NetworkId,
         peer_manager_request_receivers: &mut HashMap<
             NetworkId,
-            aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+            velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
         >,
         return_successfully: bool,
     ) {

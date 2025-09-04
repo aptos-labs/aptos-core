@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,13 +9,13 @@ use crate::{
     },
 };
 use anyhow::Result;
-use aptos_consensus_types::{
+use velor_consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
 };
-use aptos_crypto::HashValue;
-use aptos_infallible::Mutex;
-use aptos_storage_interface::DbReader;
-use aptos_types::{
+use velor_crypto::HashValue;
+use velor_infallible::Mutex;
+use velor_storage_interface::DbReader;
+use velor_types::{
     aggregate_signature::AggregateSignature,
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -240,7 +240,7 @@ impl PersistentLivenessStorage for MockStorage {
         Ok(EpochChangeProof::new(vec![lis], false))
     }
 
-    fn aptos_db(&self) -> Arc<dyn DbReader> {
+    fn velor_db(&self) -> Arc<dyn DbReader> {
         unimplemented!()
     }
 
@@ -314,7 +314,7 @@ impl PersistentLivenessStorage for EmptyStorage {
         Ok(EpochChangeProof::new(vec![], false))
     }
 
-    fn aptos_db(&self) -> Arc<dyn DbReader> {
+    fn velor_db(&self) -> Arc<dyn DbReader> {
         unimplemented!()
     }
 

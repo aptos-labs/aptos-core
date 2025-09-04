@@ -1,14 +1,14 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module implements a reentrancy checker for dynamic dispatch. Two types of checks
 //! are implemented:
 //!
 //! (1) The resource lock mechanism for closure dispatch, as described in
-//!     [AIP-122](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-112.md).
+//!     [AIP-122](https://github.com/velor-foundation/AIPs/blob/main/aips/aip-112.md).
 //!     In summary, for this mechanism access to any resource is disallowed on reentrancy.
 //! (2) The module lock mechanism for native dispatch as implemented for
-//!     [AIP-73](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-73.md).
+//!     [AIP-73](https://github.com/velor-foundation/AIPs/blob/main/aips/aip-73.md).
 //!     For this mechanism reentrancy via any kind of function call is disallowed.
 //!     This entails (2), so every check failing for (1), also fails in (2). This
 //!     is by the property that resources can only be accessed inside the module

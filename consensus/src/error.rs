@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,8 +12,8 @@ pub struct DbError {
     inner: anyhow::Error,
 }
 
-impl From<aptos_storage_interface::AptosDbError> for DbError {
-    fn from(e: aptos_storage_interface::AptosDbError) -> Self {
+impl From<velor_storage_interface::VelorDbError> for DbError {
+    fn from(e: velor_storage_interface::VelorDbError) -> Self {
         DbError { inner: e.into() }
     }
 }
@@ -31,8 +31,8 @@ impl From<pipeline::errors::Error> for StateSyncError {
     }
 }
 
-impl From<aptos_executor_types::ExecutorError> for StateSyncError {
-    fn from(e: aptos_executor_types::ExecutorError) -> Self {
+impl From<velor_executor_types::ExecutorError> for StateSyncError {
+    fn from(e: velor_executor_types::ExecutorError) -> Self {
         StateSyncError { inner: e.into() }
     }
 }
@@ -59,14 +59,14 @@ pub struct VerifyError {
 }
 
 pub fn error_kind(e: &anyhow::Error) -> &'static str {
-    if e.downcast_ref::<aptos_executor_types::ExecutorError>()
+    if e.downcast_ref::<velor_executor_types::ExecutorError>()
         .is_some()
     {
         return "Execution";
     }
     if let Some(e) = e.downcast_ref::<StateSyncError>() {
         if e.inner
-            .downcast_ref::<aptos_executor_types::ExecutorError>()
+            .downcast_ref::<velor_executor_types::ExecutorError>()
             .is_some()
         {
             return "Execution";
@@ -82,7 +82,7 @@ pub fn error_kind(e: &anyhow::Error) -> &'static str {
     if e.downcast_ref::<DbError>().is_some() {
         return "ConsensusDb";
     }
-    if e.downcast_ref::<aptos_safety_rules::Error>().is_some() {
+    if e.downcast_ref::<velor_safety_rules::Error>().is_some() {
         return "SafetyRules";
     }
     if e.downcast_ref::<VerifyError>().is_some() {
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn conversion_and_downcast() {
-        let error = aptos_executor_types::ExecutorError::InternalError {
+        let error = velor_executor_types::ExecutorError::InternalError {
             error: "lalala".to_string(),
         };
         let typed_error: StateSyncError = error.into();

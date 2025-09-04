@@ -1,10 +1,10 @@
 [package]
-name = "aptos-protos"
+name = "velor-protos"
 version = "1.3.1"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-description = "Code generated from Aptos protobuf definitions"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
+authors = ["Velor Labs <opensource@velorlabs.com>"]
+description = "Code generated from Velor protobuf definitions"
+repository = "https://github.com/velor-chain/velor-core"
+homepage = "https://velorlabs.com"
 license = "Apache-2.0"
 publish = true
 edition = "2021"

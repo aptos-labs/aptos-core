@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::Error;
-use aptos_storage_interface::DbReader;
-use aptos_types::ledger_info::LedgerInfo;
+use velor_storage_interface::DbReader;
+use velor_types::ledger_info::LedgerInfo;
 use std::sync::Arc;
 
-/// The interface into local storage (e.g., the Aptos DB) used by the peer
+/// The interface into local storage (e.g., the Velor DB) used by the peer
 /// monitoring server to handle client requests and responses.
 pub trait StorageReaderInterface: Clone + Send + 'static {
     /// Returns the highest synced epoch and version

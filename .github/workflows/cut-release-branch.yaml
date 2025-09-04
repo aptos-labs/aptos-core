@@ -13,7 +13,7 @@ on:
       BRANCH_PREFIX:
         required: false
         type: string
-        default: aptos-release-v
+        default: velor-release-v
         description: The prefix to use for the branch name
       BRANCH_SUFFIX:
         required: false
@@ -45,6 +45,6 @@ jobs:
           git checkout ${{ inputs.GIT_HASH }}
           git checkout -b "$BRANCH_NAME"
 
-          perl -i -pe 's/version\s*=\s*"[^"]*"/version = "${{ inputs.NEW_VERSION }}.0"/g' aptos-node/Cargo.toml
+          perl -i -pe 's/version\s*=\s*"[^"]*"/version = "${{ inputs.NEW_VERSION }}.0"/g' velor-node/Cargo.toml
 
           git push origin "$BRANCH_NAME"

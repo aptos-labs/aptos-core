@@ -1,0 +1,39 @@
+[package]
+name = "velor-inspection-service"
+description = "The Node Inspection Service"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-build-info = { workspace = true }
+velor-config = { workspace = true }
+velor-data-client = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-network = { workspace = true }
+velor-runtimes = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-storage-service-client = { workspace = true }
+velor-telemetry = { workspace = true }
+velor-time-service = { workspace = true }
+futures = { workspace = true }
+hyper = { workspace = true }
+once_cell = { workspace = true }
+prometheus = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+velor-time-service = { workspace = true, features = ["testing"] }
+assert_approx_eq = { workspace = true }
+rusty-fork = { workspace = true }

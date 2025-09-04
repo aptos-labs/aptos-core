@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,16 +8,16 @@ use crate::{
     shared_mempool::{start_shared_mempool, types::SharedMempoolNotification},
     tests::common::TestTransaction,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::{
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::{
     config::{Identity, NodeConfig, PeerRole, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_crypto::{x25519::PrivateKey, Uniform};
-use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
-use aptos_infallible::{Mutex, MutexGuard, RwLock};
-use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::{
+use velor_crypto::{x25519::PrivateKey, Uniform};
+use velor_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
+use velor_infallible::{Mutex, MutexGuard, RwLock};
+use velor_netcore::transport::ConnectionOrigin;
+use velor_network::{
     application::{
         interface::{NetworkClient, NetworkServiceEvents},
         storage::PeersAndMetadata,
@@ -32,13 +32,13 @@ use aptos_network::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
-use aptos_storage_interface::mock::MockDbReaderWriter;
-use aptos_types::{
+use velor_storage_interface::mock::MockDbReaderWriter;
+use velor_types::{
     on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
     transaction::ReplayProtector,
     PeerId,
 };
-use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use velor_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use enum_dispatch::enum_dispatch;
 use futures::{
     channel::mpsc::{self, unbounded, UnboundedReceiver},
@@ -471,9 +471,9 @@ impl Node {
 /// Allows us to mock out the network without dealing with the details
 pub struct NodeNetworkInterface {
     /// Peer request receiver for messages
-    pub(crate) network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+    pub(crate) network_reqs_rx: velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     /// Peer notification sender for sending outgoing messages to other peers
-    pub(crate) network_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
+    pub(crate) network_notifs_tx: velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
 }
 
 impl NodeNetworkInterface {
@@ -542,10 +542,10 @@ fn setup_node_network_interface(
     // Create the network sender and events receiver
     static MAX_QUEUE_SIZE: usize = 8;
     let (network_reqs_tx, network_reqs_rx) =
-        aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
-    let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
+        velor_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
+    let (connection_reqs_tx, _) = velor_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
     let (network_notifs_tx, network_notifs_rx) =
-        aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
+        velor_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
     let network_sender = NetworkSender::new(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
@@ -577,8 +577,8 @@ fn start_node_mempool(
     let (_ac_endpoint_sender, ac_endpoint_receiver) = mpsc::channel(1_024);
     let (_quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
     let (_mempool_notifier, mempool_listener) =
-        aptos_mempool_notifications::new_mempool_notifier_listener_pair(100);
-    let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+        velor_mempool_notifications::new_mempool_notifier_listener_pair(100);
+    let (reconfig_sender, reconfig_events) = velor_channel::new(QueueStyle::LIFO, 1, None);
     let reconfig_event_subscriber = ReconfigNotificationListener {
         notification_receiver: reconfig_events,
     };
@@ -592,7 +592,7 @@ fn start_node_mempool(
         })
         .unwrap();
 
-    let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
+    let runtime = velor_runtimes::spawn_named_runtime("shared-mem".into(), None);
     start_shared_mempool(
         runtime.handle(),
         &config,

@@ -1,17 +1,17 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
-use aptos_types::{
+use velor_block_executor::txn_provider::default::DefaultTxnProvider;
+use velor_types::{
     account_address::AccountAddress,
     bytes::NumToBytes,
     state_store::{state_key::StateKey, MockStateView},
     transaction::signature_verified_transaction::into_signature_verified_block,
     write_set::WriteOp,
 };
-use aptos_vm::VMBlockExecutor;
+use velor_vm::VMBlockExecutor;
 use std::collections::BTreeMap;
 
 fn gen_address(index: u8) -> AccountAddress {

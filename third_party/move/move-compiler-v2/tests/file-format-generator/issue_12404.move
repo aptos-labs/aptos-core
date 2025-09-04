@@ -1,4 +1,4 @@
-// Example taken from https://github.com/aptos-labs/aptos-core/issues/12404#issuecomment-2004040746
+// Example taken from https://github.com/velor-chain/velor-core/issues/12404#issuecomment-2004040746
 module 0xc0ffee::m {
     fun test1(x: u64): u64 {
         x + 1

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -73,7 +73,7 @@ use std::{collections::BTreeSet, path::Path};
 
 const DEBUG: bool = false;
 const COMPILER_BUG_REPORT_MSG: &str =
-    "please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)";
+    "please consider reporting this issue (see https://velor.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)";
 
 /// Run Move compiler and print errors to stderr.
 pub fn run_move_compiler_to_stderr(
@@ -213,7 +213,7 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
         },
         options.language_version.unwrap_or_default(),
         options.warn_deprecated,
-        options.warn_of_deprecation_use_in_aptos_libs,
+        options.warn_of_deprecation_use_in_velor_libs,
         options.compile_test_code,
         options.compile_verify_code,
     )?;
@@ -379,7 +379,7 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         env_pipeline.add("model AST lints", model_ast_lints::checker);
     }
 
-    // The comparison rewriter is a new features in Aptos Move 2.2 and onwards
+    // The comparison rewriter is a new features in Velor Move 2.2 and onwards
     let rewrite_cmp = options
         .language_version
         .unwrap_or_default()

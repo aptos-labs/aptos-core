@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 /// TODO(jill): deprecate Indexer once Indexer Async V2 is ready
@@ -12,22 +12,22 @@ mod metrics;
 pub mod utils;
 
 use crate::db::INDEX_DB_NAME;
-use aptos_config::config::RocksdbConfig;
-use aptos_db_indexer_schemas::{
+use velor_config::config::RocksdbConfig;
+use velor_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue},
     schema::{
         column_families, indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema,
     },
 };
-use aptos_logger::warn;
-use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
-use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{batch::SchemaBatch, DB};
-use aptos_storage_interface::{
+use velor_logger::warn;
+use velor_resource_viewer::{AnnotatedMoveValue, VelorValueAnnotator};
+use velor_rocksdb_options::gen_rocksdb_options;
+use velor_schemadb::{batch::SchemaBatch, DB};
+use velor_storage_interface::{
     db_ensure, db_other_bail, state_store::state_view::db_state_view::DbStateViewAtVersion,
-    AptosDbError, DbReader, Result,
+    VelorDbError, DbReader, Result,
 };
-use aptos_types::{
+use velor_types::{
     access_path::Path,
     account_address::AccountAddress,
     state_store::{
@@ -87,13 +87,13 @@ impl Indexer {
     ) -> Result<()> {
         let last_version = first_version + write_sets.len() as Version;
         let state_view = db_reader.state_view_at_version(Some(last_version))?;
-        let annotator = AptosValueAnnotator::new(&state_view);
+        let annotator = VelorValueAnnotator::new(&state_view);
         self.index_with_annotator(&annotator, first_version, write_sets)
     }
 
     pub fn index_with_annotator<R: StateView>(
         &self,
-        annotator: &AptosValueAnnotator<R>,
+        annotator: &VelorValueAnnotator<R>,
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
@@ -126,12 +126,12 @@ impl Indexer {
         match table_info_parser.finish(&mut batch) {
             Ok(_) => {},
             Err(err) => {
-                aptos_logger::error!(first_version = first_version, end_version = end_version, error = ?&err);
+                velor_logger::error!(first_version = first_version, end_version = end_version, error = ?&err);
                 write_sets
                     .iter()
                     .enumerate()
                     .for_each(|(i, write_set)| {
-                        aptos_logger::error!(version = first_version as usize + i, write_set = ?write_set);
+                        velor_logger::error!(version = first_version as usize + i, write_set = ?write_set);
                     });
                 db_other_bail!("Failed to parse table info: {:?}", err);
             },
@@ -157,13 +157,13 @@ impl Indexer {
 
 struct TableInfoParser<'a, R> {
     indexer: &'a Indexer,
-    annotator: &'a AptosValueAnnotator<'a, R>,
+    annotator: &'a VelorValueAnnotator<'a, R>,
     result: HashMap<TableHandle, TableInfo>,
     pending_on: HashMap<TableHandle, Vec<Bytes>>,
 }
 
 impl<'a, R: StateView> TableInfoParser<'a, R> {
-    pub fn new(indexer: &'a Indexer, annotator: &'a AptosValueAnnotator<R>) -> Self {
+    pub fn new(indexer: &'a Indexer, annotator: &'a VelorValueAnnotator<R>) -> Self {
         Self {
             indexer,
             annotator,

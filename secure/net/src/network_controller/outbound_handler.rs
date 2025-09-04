@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -7,7 +7,7 @@ use crate::{
         inbound_handler::InboundHandler, metrics::NETWORK_HANDLER_TIMER, Message, MessageType,
     },
 };
-use aptos_logger::{info, warn};
+use velor_logger::{info, warn};
 use crossbeam_channel::{unbounded, Receiver, Select, Sender};
 use std::{
     collections::{HashMap, HashSet},

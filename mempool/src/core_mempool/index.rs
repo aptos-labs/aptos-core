@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,10 +9,10 @@ use crate::{
     logging::{LogEntry, LogSchema},
     shared_mempool::types::{MultiBucketTimelineIndexIds, TimelineIndexIdentifier},
 };
-use aptos_consensus_types::common::TransactionSummary;
-use aptos_crypto::HashValue;
-use aptos_logger::error;
-use aptos_types::{account_address::AccountAddress, transaction::ReplayProtector};
+use velor_consensus_types::common::TransactionSummary;
+use velor_crypto::HashValue;
+use velor_logger::error;
+use velor_types::{account_address::AccountAddress, transaction::ReplayProtector};
 use rand::seq::SliceRandom;
 use std::{
     cmp::Ordering,

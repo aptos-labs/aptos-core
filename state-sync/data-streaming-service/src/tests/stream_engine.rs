@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,13 +12,13 @@ use crate::{
         utils::{create_ledger_info, initialize_logger},
     },
 };
-use aptos_config::config::DataStreamingServiceConfig;
-use aptos_data_client::{
+use velor_config::config::DataStreamingServiceConfig;
+use velor_data_client::{
     global_summary::{GlobalDataSummary, OptimalChunkSizes},
     interface::ResponsePayload,
 };
-use aptos_id_generator::U64IdGenerator;
-use aptos_storage_service_types::responses::CompleteDataRange;
+use velor_id_generator::U64IdGenerator;
+use velor_storage_service_types::responses::CompleteDataRange;
 use claims::{assert_matches, assert_ok};
 use std::{cmp, sync::Arc};
 

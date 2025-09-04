@@ -1,8 +1,8 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_indexer_transaction_generator::config::IndexerCliArgs;
+use velor_indexer_transaction_generator::config::IndexerCliArgs;
 use clap::Parser;
 
 #[tokio::main]

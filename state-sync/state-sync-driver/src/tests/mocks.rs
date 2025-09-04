@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,18 +8,18 @@ use crate::{
     tests::utils::{create_empty_epoch_state, create_epoch_ending_ledger_info},
 };
 use anyhow::Result as AnyhowResult;
-use aptos_crypto::HashValue;
-use aptos_data_streaming_service::{
+use velor_crypto::HashValue;
+use velor_data_streaming_service::{
     data_notification::NotificationId,
     data_stream::{DataStreamId, DataStreamListener},
     streaming_client::{DataStreamingClient, Epoch, NotificationAndFeedback},
 };
-use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
-use aptos_storage_interface::{
+use velor_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
+use velor_storage_interface::{
     chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter, DbWriter, LedgerSummary, Order,
     Result, StateSnapshotReceiver,
 };
-use aptos_types::{
+use velor_types::{
     account_address::AccountAddress,
     contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
@@ -382,19 +382,19 @@ mock! {
             &self,
             version: Version,
             start_index: Option<u64>,
-        ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
+        ) -> AnyhowResult<DataStreamListener, velor_data_streaming_service::error::Error>;
 
         async fn get_all_epoch_ending_ledger_infos(
             &self,
             start_epoch: Epoch,
-        ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
+        ) -> AnyhowResult<DataStreamListener, velor_data_streaming_service::error::Error>;
 
         async fn get_all_transaction_outputs(
             &self,
             start_version: Version,
             end_version: Version,
             proof_version: Version,
-        ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
+        ) -> AnyhowResult<DataStreamListener, velor_data_streaming_service::error::Error>;
 
         async fn get_all_transactions(
             &self,
@@ -402,7 +402,7 @@ mock! {
             end_version: Version,
             proof_version: Version,
             include_events: bool,
-        ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
+        ) -> AnyhowResult<DataStreamListener, velor_data_streaming_service::error::Error>;
 
         async fn get_all_transactions_or_outputs(
             &self,
@@ -410,14 +410,14 @@ mock! {
             end_version: Version,
             proof_version: Version,
             include_events: bool,
-        ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
+        ) -> AnyhowResult<DataStreamListener, velor_data_streaming_service::error::Error>;
 
         async fn continuously_stream_transaction_outputs(
             &self,
             start_version: Version,
             start_epoch: Epoch,
             target: Option<LedgerInfoWithSignatures>,
-        ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
+        ) -> AnyhowResult<DataStreamListener, velor_data_streaming_service::error::Error>;
 
         async fn continuously_stream_transactions(
             &self,
@@ -425,7 +425,7 @@ mock! {
             start_epoch: Epoch,
             include_events: bool,
             target: Option<LedgerInfoWithSignatures>,
-        ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
+        ) -> AnyhowResult<DataStreamListener, velor_data_streaming_service::error::Error>;
 
         async fn continuously_stream_transactions_or_outputs(
             &self,
@@ -433,13 +433,13 @@ mock! {
             start_epoch: Epoch,
             include_events: bool,
             target: Option<LedgerInfoWithSignatures>,
-        ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
+        ) -> AnyhowResult<DataStreamListener, velor_data_streaming_service::error::Error>;
 
         async fn terminate_stream_with_feedback(
             &self,
             data_stream_id: DataStreamId,
             notification_and_feedback: Option<NotificationAndFeedback>,
-        ) -> AnyhowResult<(), aptos_data_streaming_service::error::Error>;
+        ) -> AnyhowResult<(), velor_data_streaming_service::error::Error>;
     }
     impl Clone for StreamingClient {
         fn clone(&self) -> Self;

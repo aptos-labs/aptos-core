@@ -1,4 +1,4 @@
-// Example taken from https://github.com/aptos-labs/aptos-core/issues/14243
+// Example taken from https://github.com/velor-chain/velor-core/issues/14243
 module 0xc0ffee::m {
    fun id_mut<T>(r: &mut T): &mut T {
         r

@@ -29,7 +29,7 @@
     "payload": {
       "function": "0x1::MemeCoin::transfer",
       "type_arguments": [
-        "0x1::aptos_coin::AptosCoin"
+        "0x1::velor_coin::VelorCoin"
       ],
       "arguments": [
         "0x00000000000000000000000000000000000000000000000000000000000000dd",

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
     },
     write_set::WriteOp,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use velor_crypto::{hash::CryptoHash, HashValue};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;

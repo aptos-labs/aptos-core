@@ -1,8 +1,8 @@
 {
-  "file": "/var/log/pods/forge-pr-2175_aptos-node-13-validator-0_f11cb109-8703-49ca-b121-ab314ab0be68/validator/0.log",
+  "file": "/var/log/pods/forge-pr-2175_velor-node-13-validator-0_f11cb109-8703-49ca-b121-ab314ab0be68/validator/0.log",
   "kubernetes": {
     "container_id": "docker://f1ca262722983ed4a6683196adcfab52b4b0b65e9336e9e050d6452f91de0db9",
-    "container_image": "12356.dkr.ecr.asia-central-2.amazonaws.com/aptos/validator:efea1a8000e0bcc9644e5f006cb0060424ebe6dc",
+    "container_image": "12356.dkr.ecr.asia-central-2.amazonaws.com/velor/validator:efea1a8000e0bcc9644e5f006cb0060424ebe6dc",
     "container_name": "validator",
     "namespace_labels": { "kubernetes.io/metadata.name": "forge-pr-2175" },
     "node_labels": {
@@ -34,14 +34,14 @@
       "app.kubernetes.io/instance": "validator-13",
       "app.kubernetes.io/managed-by": "helm",
       "app.kubernetes.io/name": "validator",
-      "app.kubernetes.io/part-of": "aptos-node",
-      "controller-revision-hash": "aptos-node-13-validator-666476d798",
-      "statefulset.kubernetes.io/pod-name": "aptos-node-13-validator-0"
+      "app.kubernetes.io/part-of": "velor-node",
+      "controller-revision-hash": "velor-node-13-validator-666476d798",
+      "statefulset.kubernetes.io/pod-name": "velor-node-13-validator-0"
     },
-    "pod_name": "aptos-node-13-validator-0",
+    "pod_name": "velor-node-13-validator-0",
     "namespace": "forge-pr-2175",
     "pod_node_name": "ip-192-168-127-197.us-west-2.compute.internal",
-    "pod_owner": "StatefulSet/aptos-node-13-validator",
+    "pod_owner": "StatefulSet/velor-node-13-validator",
     "pod_uid": "f11cb109-8703-49ca-b121-ab314ab0be68"
   },
   "message": "2022-07-24T03:39:54.744745Z [consensus] INFO consensus/src/round_manager.rs:314 Local state SyncInfo[certified_round: 966, ordered_round: 965, timeout round: 0, commit_info: BlockInfo: [epoch: 2, round: 963, id: 6d4833ab, executed_state_id: 81472687, version: 1380763, timestamp (us): 1658633992630447, next_epoch_state: None]], remote state SyncInfo[certified_round: 967, ordered_round: 966, timeout round: 0, commit_info: BlockInfo: [epoch: 2, round: 963, id: 6d4833ab, executed_state_id: 81472687, version: 1380763, timestamp (us): 1658633992630447, next_epoch_state: None]] {\"epoch\":2,\"event\":\"ReceiveNewCertificate\",\"remote_peer\":\"065f70c398566ebd3b806cbd11f7e86dd8e39d9616f2bb45a1bda1a0748c7c88\",\"round\":967}",

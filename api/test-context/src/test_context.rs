@@ -1,41 +1,41 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{golden_output::GoldenOutputs, pretty};
-use aptos_api::{attach_poem_to_runtime, BasicError, Context};
-use aptos_api_types::{
-    mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
-    X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
+use velor_api::{attach_poem_to_runtime, BasicError, Context};
+use velor_api_types::{
+    mime_types, HexEncodedBytes, TransactionOnChainData, X_VELOR_CHAIN_ID,
+    X_VELOR_LEDGER_TIMESTAMP, X_VELOR_LEDGER_VERSION,
 };
-use aptos_cached_packages::aptos_stdlib;
-use aptos_config::{
+use velor_cached_packages::velor_stdlib;
+use velor_config::{
     config::{
         NodeConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     },
     keys::ConfigKey,
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, SigningKey};
-use aptos_db::AptosDB;
-use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
-use aptos_executor_types::BlockExecutorTrait;
-use aptos_framework::{BuildOptions, BuiltPackage};
-use aptos_indexer_grpc_table_info::internal_indexer_db_service::MockInternalIndexerDBService;
-use aptos_mempool::mocks::MockSharedMempool;
-use aptos_mempool_notifications::MempoolNotificationSender;
-use aptos_sdk::{
+use velor_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, SigningKey};
+use velor_db::VelorDB;
+use velor_executor::{block_executor::BlockExecutor, db_bootstrapper};
+use velor_executor_types::BlockExecutorTrait;
+use velor_framework::{BuildOptions, BuiltPackage};
+use velor_indexer_grpc_table_info::internal_indexer_db_service::MockInternalIndexerDBService;
+use velor_mempool::mocks::MockSharedMempool;
+use velor_mempool_notifications::MempoolNotificationSender;
+use velor_sdk::{
     bcs,
     transaction_builder::TransactionFactory,
     types::{
-        account_config::aptos_test_root_address, get_apt_primary_store_address,
+        account_config::velor_test_root_address, get_apt_primary_store_address,
         transaction::SignedTransaction, AccountKey, LocalAccount,
     },
 };
-use aptos_storage_interface::{
+use velor_storage_interface::{
     state_store::state_view::db_state_view::DbStateView, DbReaderWriter,
 };
-use aptos_temppath::TempPath;
-use aptos_types::{
+use velor_temppath::TempPath;
+use velor_types::{
     account_address::{create_multisig_account_address, AccountAddress},
     aggregate_signature::AggregateSignature,
     block_executor::config::BlockExecutorConfigFromOnchain,
@@ -50,8 +50,8 @@ use aptos_types::{
         TransactionPayload, TransactionStatus, Version,
     },
 };
-use aptos_vm::aptos_vm::AptosVMBlockExecutor;
-use aptos_vm_validator::vm_validator::PooledVMValidator;
+use velor_vm::velor_vm::VelorVMBlockExecutor;
+use velor_vm_validator::vm_validator::PooledVMValidator;
 use bytes::Bytes;
 use hyper::{HeaderMap, Response};
 use rand::{Rng, SeedableRng};
@@ -129,14 +129,14 @@ pub fn new_test_context_inner(
 ) -> TestContext {
     // Speculative logging uses a global variable and when many instances use it together, they
     // panic, so we disable this to run tests.
-    aptos_vm_logging::disable_speculative_logging();
+    velor_vm_logging::disable_speculative_logging();
     let tmp_dir = TempPath::new();
     tmp_dir.create_as_dir().unwrap();
 
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
-    let builder = aptos_genesis::builder::Builder::new(
+    let builder = velor_genesis::builder::Builder::new(
         tmp_dir.path(),
-        aptos_cached_packages::head_release_bundle().clone(),
+        velor_cached_packages::head_release_bundle().clone(),
     )
     .unwrap()
     .with_init_genesis_config(Some(Arc::new(|genesis_config| {
@@ -149,7 +149,7 @@ pub fn new_test_context_inner(
     let validator_owner = validator_identity.account_address.unwrap();
     let (sender, recver) = channel::<(Instant, Version)>((Instant::now(), 0 as Version));
     let (db, db_rw) = if use_db_with_indexer {
-        let mut aptos_db = AptosDB::new_for_test_with_indexer(
+        let mut velor_db = VelorDB::new_for_test_with_indexer(
             &tmp_dir,
             node_config.storage.rocksdb_configs.enable_storage_sharding,
         );
@@ -157,11 +157,11 @@ pub fn new_test_context_inner(
             .indexer_db_config
             .is_internal_indexer_db_enabled()
         {
-            aptos_db.add_version_update_subscriber(sender).unwrap();
+            velor_db.add_version_update_subscriber(sender).unwrap();
         }
-        DbReaderWriter::wrap(aptos_db)
+        DbReaderWriter::wrap(velor_db)
     } else {
-        let mut aptos_db = AptosDB::open(
+        let mut velor_db = VelorDB::open(
             StorageDirPaths::from_path(&tmp_dir),
             false,                       /* readonly */
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
@@ -182,11 +182,11 @@ pub fn new_test_context_inner(
             .indexer_db_config
             .is_internal_indexer_db_enabled()
         {
-            aptos_db.add_version_update_subscriber(sender).unwrap();
+            velor_db.add_version_update_subscriber(sender).unwrap();
         }
-        DbReaderWriter::wrap(aptos_db)
+        DbReaderWriter::wrap(velor_db)
     };
-    let ret = db_bootstrapper::maybe_bootstrap::<AptosVMBlockExecutor>(
+    let ret = db_bootstrapper::maybe_bootstrap::<VelorVMBlockExecutor>(
         &db_rw,
         &genesis,
         genesis_waypoint,
@@ -226,7 +226,7 @@ pub fn new_test_context_inner(
         rng,
         root_key,
         validator_owner,
-        Box::new(BlockExecutor::<AptosVMBlockExecutor>::new(db_rw)),
+        Box::new(BlockExecutor::<VelorVMBlockExecutor>::new(db_rw)),
         mempool,
         db,
         test_name,
@@ -241,7 +241,7 @@ pub struct TestContext {
     pub context: Context,
     pub validator_owner: AccountAddress,
     pub mempool: Arc<MockSharedMempool>,
-    pub db: Arc<AptosDB>,
+    pub db: Arc<VelorDB>,
     pub rng: rand::rngs::StdRng,
     root_key: ConfigKey<Ed25519PrivateKey>,
     executor: Arc<dyn BlockExecutorTrait>,
@@ -262,7 +262,7 @@ impl TestContext {
         validator_owner: AccountAddress,
         executor: Box<dyn BlockExecutorTrait>,
         mempool: MockSharedMempool,
-        db: Arc<AptosDB>,
+        db: Arc<VelorDB>,
         test_name: String,
         api_specific_config: ApiSpecificConfig,
         use_txn_payload_v2_format: bool,
@@ -388,9 +388,9 @@ impl TestContext {
     pub async fn root_account(&self) -> LocalAccount {
         // Fetch the actual root account's sequence number in case it has been used to sign
         // transactions before.
-        let root_sequence_number = self.get_sequence_number(aptos_test_root_address()).await;
+        let root_sequence_number = self.get_sequence_number(velor_test_root_address()).await;
         LocalAccount::new(
-            aptos_test_root_address(),
+            velor_test_root_address(),
             self.root_key.private_key(),
             root_sequence_number,
         )
@@ -400,10 +400,10 @@ impl TestContext {
         // This function executes the following script as the root account:
         // script {
         //   fun main(root: &signer, feature: u64) {
-        //     let aptos_framework = aptos_framework::aptos_governance::get_signer_testnet_only(root, @0x1);
-        //     std::features::change_feature_flags_for_next_epoch(&aptos_framework, vector[feature], vector[]);
-        //     aptos_framework::aptos_governance::reconfigure(&aptos_framework);
-        //     std::features::on_new_epoch(&aptos_framework);
+        //     let velor_framework = velor_framework::velor_governance::get_signer_testnet_only(root, @0x1);
+        //     std::features::change_feature_flags_for_next_epoch(&velor_framework, vector[feature], vector[]);
+        //     velor_framework::velor_governance::reconfigure(&velor_framework);
+        //     std::features::on_new_epoch(&velor_framework);
         //   }
         // }
         let mut root = self.root_account().await;
@@ -420,10 +420,10 @@ impl TestContext {
         // This function executes the following script as the root account:
         // script {
         //   fun main(root: &signer, feature: u64) {
-        //     let aptos_framework = aptos_framework::aptos_governance::get_signer_testnet_only(root, @0x1);
-        //     std::features::change_feature_flags_for_next_epoch(&aptos_framework, vector[], vector[feature]);
-        //     aptos_framework::aptos_governance::reconfigure(&aptos_framework);
-        //     std::features::on_new_epoch(&aptos_framework);
+        //     let velor_framework = velor_framework::velor_governance::get_signer_testnet_only(root, @0x1);
+        //     std::features::change_feature_flags_for_next_epoch(&velor_framework, vector[], vector[feature]);
+        //     velor_framework::velor_governance::reconfigure(&velor_framework);
+        //     std::features::on_new_epoch(&velor_framework);
         //   }
         // }
         let mut root = self.root_account().await;
@@ -482,12 +482,12 @@ impl TestContext {
     pub async fn api_create_account(&mut self) -> LocalAccount {
         let root = &mut self.root_account().await;
         let account = self.gen_account();
-        self.api_execute_aptos_account_transfer(root, account.address(), TRANSFER_AMOUNT)
+        self.api_execute_velor_account_transfer(root, account.address(), TRANSFER_AMOUNT)
             .await;
         account
     }
 
-    pub async fn api_execute_aptos_account_transfer(
+    pub async fn api_execute_velor_account_transfer(
         &mut self,
         sender: &mut LocalAccount,
         receiver: AccountAddress,
@@ -495,7 +495,7 @@ impl TestContext {
     ) {
         self.api_execute_entry_function(
             sender,
-            "0x1::aptos_account::transfer",
+            "0x1::velor_account::transfer",
             json!([]),
             json!([receiver.to_hex_literal(), amount.to_string()]),
         )
@@ -800,11 +800,11 @@ impl TestContext {
             .into_inner()
     }
 
-    pub fn get_latest_ledger_info(&self) -> aptos_api_types::LedgerInfo {
+    pub fn get_latest_ledger_info(&self) -> velor_api_types::LedgerInfo {
         self.context.get_latest_ledger_info::<BasicError>().unwrap()
     }
 
-    pub fn get_latest_storage_ledger_info(&self) -> aptos_api_types::LedgerInfo {
+    pub fn get_latest_storage_ledger_info(&self) -> velor_api_types::LedgerInfo {
         self.context
             .get_latest_storage_ledger_info::<BasicError>()
             .unwrap()
@@ -856,7 +856,7 @@ impl TestContext {
         let code = package.extract_code();
         let metadata = package.extract_metadata().unwrap();
 
-        aptos_stdlib::code_publish_package_txn(bcs::to_bytes(&metadata).unwrap(), code)
+        velor_stdlib::code_publish_package_txn(bcs::to_bytes(&metadata).unwrap(), code)
     }
 
     pub async fn publish_package(
@@ -967,7 +967,7 @@ impl TestContext {
                 account,
                 "0x1",
                 "coin",
-                "CoinStore<0x1::aptos_coin::AptosCoin>",
+                "CoinStore<0x1::velor_coin::VelorCoin>",
             )
             .await;
         let coin = coin_balance_option.map(|x| {
@@ -1294,7 +1294,7 @@ impl TestContext {
     }
 
     // Currently we still run our tests with warp.
-    // https://github.com/aptos-labs/aptos-core/issues/2966
+    // https://github.com/velor-chain/velor-core/issues/2966
     pub fn get_routes_with_poem(
         &self,
         poem_address: SocketAddr,
@@ -1323,13 +1323,13 @@ impl TestContext {
 
         if self.expect_status_code < 300 {
             let ledger_info = self.get_latest_ledger_info();
-            assert_eq!(headers[X_APTOS_CHAIN_ID], "4");
+            assert_eq!(headers[X_VELOR_CHAIN_ID], "4");
             assert_eq!(
-                headers[X_APTOS_LEDGER_VERSION],
+                headers[X_VELOR_LEDGER_VERSION],
                 ledger_info.version().to_string()
             );
             assert_eq!(
-                headers[X_APTOS_LEDGER_TIMESTAMP],
+                headers[X_VELOR_LEDGER_TIMESTAMP],
                 ledger_info.timestamp().to_string()
             );
         }

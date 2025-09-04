@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,12 +9,12 @@ use crate::{
     NODE_METRIC_PORT, REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT,
 };
 use anyhow::{anyhow, format_err};
-use aptos_config::config::NodeConfig;
-use aptos_db::common::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
-use aptos_logger::info;
-use aptos_rest_client::Client as RestClient;
-use aptos_sdk::types::PeerId;
-use aptos_state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
+use velor_config::config::NodeConfig;
+use velor_db::common::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
+use velor_logger::info;
+use velor_rest_client::Client as RestClient;
+use velor_sdk::types::PeerId;
+use velor_state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
 use futures::try_join;
 use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
@@ -29,7 +29,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const APTOS_DATA_DIR: &str = "/opt/aptos/data";
+const VELOR_DATA_DIR: &str = "/opt/velor/data";
 
 pub struct K8sNode {
     pub(crate) name: String,
@@ -210,9 +210,9 @@ impl Node for K8sNode {
 
     async fn clear_storage(&self) -> Result<()> {
         // Remove all storage files
-        let ledger_db_path = format!("{}/db/{}", APTOS_DATA_DIR, LEDGER_DB_NAME);
-        let state_db_path = format!("{}/db/{}", APTOS_DATA_DIR, STATE_MERKLE_DB_NAME);
-        let state_sync_db_path = format!("{}/db/{}", APTOS_DATA_DIR, STATE_SYNC_DB_NAME);
+        let ledger_db_path = format!("{}/db/{}", VELOR_DATA_DIR, LEDGER_DB_NAME);
+        let state_db_path = format!("{}/db/{}", VELOR_DATA_DIR, STATE_MERKLE_DB_NAME);
+        let state_sync_db_path = format!("{}/db/{}", VELOR_DATA_DIR, STATE_SYNC_DB_NAME);
 
         let delete_storage_paths = [
             "-n",

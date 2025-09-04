@@ -28,15 +28,15 @@
 ## Which Components or Systems Does This Change Impact?
 - [ ] Validator Node
 - [ ] Full Node (API, Indexer, etc.)
-- [ ] Move/Aptos Virtual Machine
-- [ ] Aptos Framework
-- [ ] Aptos CLI/SDK
+- [ ] Move/Velor Virtual Machine
+- [ ] Velor Framework
+- [ ] Velor CLI/SDK
 - [ ] Developer Infrastructure
 - [ ] Move Compiler
 - [ ] Other (specify)
 
 ## Checklist
-- [ ] I have read and followed the [CONTRIBUTING](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) doc
+- [ ] I have read and followed the [CONTRIBUTING](https://github.com/velor-chain/velor-core/blob/main/CONTRIBUTING.md) doc
 - [ ] I have performed a self-review of my own code
 - [ ] I have commented my code, particularly in hard-to-understand areas
 - [ ] I identified and added all stakeholders and component owners affected by this change as reviewers

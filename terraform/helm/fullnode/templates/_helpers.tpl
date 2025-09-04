@@ -2,7 +2,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "aptos-fullnode.name" -}}
+{{- define "velor-fullnode.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
@@ -11,7 +11,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "aptos-fullnode.fullname" -}}
+{{- define "velor-fullnode.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -27,16 +27,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "aptos-fullnode.chart" -}}
+{{- define "velor-fullnode.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
 Common labels
 */}}
-{{- define "aptos-fullnode.labels" -}}
-helm.sh/chart: {{ include "aptos-fullnode.chart" . }}
-{{ include "aptos-fullnode.selectorLabels" . }}
+{{- define "velor-fullnode.labels" -}}
+helm.sh/chart: {{ include "velor-fullnode.chart" . }}
+{{ include "velor-fullnode.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -46,23 +46,23 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "aptos-fullnode.selectorLabels" -}}
-app.kubernetes.io/part-of: {{ include "aptos-fullnode.name" . }}
+{{- define "velor-fullnode.selectorLabels" -}}
+app.kubernetes.io/part-of: {{ include "velor-fullnode.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "aptos-fullnode.serviceAccountName" -}}
+{{- define "velor-fullnode.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create -}}
-    {{ default (include "aptos-fullnode.fullname" .) .Values.serviceAccount.name }}
+    {{ default (include "velor-fullnode.fullname" .) .Values.serviceAccount.name }}
 {{- else -}}
     {{ default "default" .Values.serviceAccount.name }}
 {{- end -}}
 {{- end -}}
 
-{{- define "aptos-fullnode.backupEnvironment" -}}
+{{- define "velor-fullnode.backupEnvironment" -}}
 # awscli writes to ~/.aws/cli/cache/
 # gsutil writes to ~/.gsutil/
 # azcopy writes to ~/.azcopy/
@@ -101,27 +101,27 @@ Create the name of the service account to use
 {{- end -}}
 
 {{- define "backup.fullname" -}}
-{{ include "aptos-fullnode.fullname" . }}
+{{ include "velor-fullnode.fullname" . }}
 {{- end -}}
 
 {{- define "backup.labels" -}}
-{{ include "aptos-fullnode.labels" . }}
+{{ include "velor-fullnode.labels" . }}
 {{- end -}}
 
 {{- define "backup.selectorLabels" -}}
-{{ include "aptos-fullnode.selectorLabels" . }}
+{{ include "velor-fullnode.selectorLabels" . }}
 {{- end -}}
 
 {{- define "backup.serviceAccount" -}}
-{{ include "aptos-fullnode.serviceAccountName" . }}
+{{ include "velor-fullnode.serviceAccountName" . }}
 {{- end -}}
 
 {{- define "backup.backupService" -}}
-{{ include "aptos-fullnode.fullname" . }}:6186
+{{ include "velor-fullnode.fullname" . }}:6186
 {{- end -}}
 
 {{- define "backup.persistentVolumeClaim" -}}
-{{ include "aptos-fullnode.fullname" . }}-e{{ .Values.chain.era }}
+{{ include "velor-fullnode.fullname" . }}-e{{ .Values.chain.era }}
 {{- end -}}
 
 {{- define "backup.pushMetricsEndpoint" -}}

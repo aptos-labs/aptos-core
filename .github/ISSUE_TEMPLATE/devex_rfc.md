@@ -6,7 +6,7 @@ labels: DevEx
 assignees: ''
 ---
 
-<!-- See an example RFC here: https://github.com/aptos-labs/aptos-core/issues/6171 -->
+<!-- See an example RFC here: https://github.com/velor-chain/velor-core/issues/6171 -->
 
 ## Context
 

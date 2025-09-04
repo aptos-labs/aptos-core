@@ -1,0 +1,91 @@
+{{- if .Values.validator.enableNetworkPolicy }}
+{{- range $i, $e := until (int .Values.numValidators) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "velor-validator.fullname" $ }}-{{$i}}-validator
+  labels:
+    {{- include "velor-validator.labels" $ | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "velor-validator.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/name: validator
+      app.kubernetes.io/instance: validator-{{$i}}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # HAproxy
+  - from:
+    - podSelector:
+        matchLabels:
+          {{- include "velor-validator.selectorLabels" $ | nindent 10 }}
+          app.kubernetes.io/name: haproxy
+          app.kubernetes.io/instance: haproxy-{{$i}}
+    ports:
+      # VelorNet from HAproxy
+    - protocol: TCP
+      port: 6180
+    - protocol: TCP
+      port: 9101
+  {{- if $.Values.service.validator.enableRestApi }}
+      # REST API from HAproxy
+    - protocol: TCP
+      port: 8080
+  {{- end }}
+  # Monitoring metrics port
+  - from:
+    - namespaceSelector: {}
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9101
+  # Node Health Checker accesses these ports
+  - from:
+    - namespaceSelector: {}
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: node-health-checker
+    ports:
+    - protocol: TCP
+      port: 9101
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 6180
+
+  # VelorNet from local full nodes
+  - from:
+    - podSelector:
+        matchLabels:
+          {{- include "velor-validator.selectorLabels" $ | nindent 10 }}
+          app.kubernetes.io/name: fullnode
+          app.kubernetes.io/instance: fullnode-{{$i}}
+    ports:
+    - protocol: TCP
+      port: 6181
+  egress:
+  # VelorNet to other validators
+  - ports:
+    - protocol: TCP
+      port: 6180
+  # DNS
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53
+  # Enable HTTPS telemetry
+  - ports:
+    - protocol: TCP
+      port: 443
+  # Logging
+  - ports:
+    - protocol: TCP
+      port: 5044
+{{- end }}
+{{- end }}

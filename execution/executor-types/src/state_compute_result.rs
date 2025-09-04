@@ -1,16 +1,16 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
     ChunkCommitNotification, LedgerUpdateOutput,
 };
-use aptos_crypto::{
+use velor_crypto::{
     hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_storage_interface::chunk_to_commit::ChunkToCommit;
-use aptos_types::{
+use velor_storage_interface::chunk_to_commit::ChunkToCommit;
+use velor_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     proof::{accumulator::InMemoryTransactionAccumulator, AccumulatorExtensionProof},

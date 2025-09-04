@@ -1,13 +1,13 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_db_indexer_schemas::schema::event_sequence_number::EventSequenceNumberSchema;
-use aptos_schemadb::DB;
-use aptos_storage_interface::{
-    state_store::state_view::db_state_view::LatestDbStateCheckpointView, AptosDbError, DbReader,
+use velor_db_indexer_schemas::schema::event_sequence_number::EventSequenceNumberSchema;
+use velor_schemadb::DB;
+use velor_storage_interface::{
+    state_store::state_view::db_state_view::LatestDbStateCheckpointView, VelorDbError, DbReader,
     Result,
 };
-use aptos_types::{
+use velor_types::{
     account_config::{
         AccountResource, Burn, BurnEvent, BurnToken, BurnTokenEvent, CancelOffer, Claim,
         CoinDeposit, CoinRegister, CoinRegisterEvent, CoinStoreResource, CoinWithdraw,
@@ -450,7 +450,7 @@ impl EventV2Translator for TokenMutationTranslator {
         } else {
             // If the token resource is not found, we skip the event translation to avoid panic
             // because the creation number cannot be decided. The token may have been burned.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "Token resource not found"
             )));
         };
@@ -491,7 +491,7 @@ impl EventV2Translator for CollectionMutationTranslator {
         } else {
             // If the token resource is not found, we skip the event translation to avoid panic
             // because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "Collection resource not found"
             )));
         };
@@ -541,7 +541,7 @@ impl EventV2Translator for MintTranslator {
         } else {
             // If the collection resource is not found, we skip the event translation to avoid panic
             // because the creation number cannot be decided. The collection may have ConcurrentSupply.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "FixedSupply or UnlimitedSupply resource not found"
             )));
         };
@@ -590,7 +590,7 @@ impl EventV2Translator for BurnTranslator {
         } else {
             // If the collection resource is not found, we skip the event translation to avoid panic
             // because the creation number cannot be decided. The collection may have ConcurrentSupply.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "FixedSupply or UnlimitedSupply resource not found"
             )));
         };
@@ -624,7 +624,7 @@ impl EventV2Translator for TokenDepositTranslator {
         } else {
             // If the token store resource is not found, we skip the event translation to avoid panic
             // because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "Token store resource not found"
             )));
         };
@@ -658,7 +658,7 @@ impl EventV2Translator for TokenWithdrawTranslator {
         } else {
             // If the token store resource is not found, we skip the event translation to avoid panic
             // because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "Token store resource not found"
             )));
         };
@@ -692,7 +692,7 @@ impl EventV2Translator for BurnTokenTranslator {
         } else {
             // If the token store resource is not found, we skip the event translation to avoid panic
             // because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "Token store resource not found"
             )));
         };
@@ -728,7 +728,7 @@ impl EventV2Translator for MutatePropertyMapTranslator {
         } else {
             // If the token store resource is not found, we skip the event translation to avoid panic
             // because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "Token store resource not found"
             )));
         };
@@ -769,7 +769,7 @@ impl EventV2Translator for MintTokenTranslator {
         } else {
             // If the collections store resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "Collections resource not found"
             )));
         };
@@ -806,7 +806,7 @@ impl EventV2Translator for CreateCollectionTranslator {
         } else {
             // If the collections resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "Collections resource not found"
             )));
         };
@@ -848,7 +848,7 @@ impl EventV2Translator for TokenDataCreationTranslator {
         } else {
             // If the collections resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "Collections resource not found"
             )));
         };
@@ -895,7 +895,7 @@ impl EventV2Translator for OfferTranslator {
         } else {
             // If the PendingClaims resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "PendingClaims resource not found"
             )));
         };
@@ -933,7 +933,7 @@ impl EventV2Translator for CancelOfferTranslator {
         } else {
             // If the PendingClaims resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "PendingClaims resource not found"
             )));
         };
@@ -971,7 +971,7 @@ impl EventV2Translator for ClaimTranslator {
         } else {
             // If the PendingClaims resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "PendingClaims resource not found"
             )));
         };
@@ -1016,7 +1016,7 @@ impl EventV2Translator for CollectionDescriptionMutateTranslator {
         } else {
             // If the TokenEventStoreV1 resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "TokenEventStoreV1 resource not found"
             )));
         };
@@ -1057,7 +1057,7 @@ impl EventV2Translator for CollectionUriMutateTranslator {
         } else {
             // If the TokenEventStoreV1 resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "TokenEventStoreV1 resource not found"
             )));
         };
@@ -1098,7 +1098,7 @@ impl EventV2Translator for CollectionMaximumMutateTranslator {
         } else {
             // If the TokenEventStoreV1 resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "TokenEventStoreV1 resource not found"
             )));
         };
@@ -1137,7 +1137,7 @@ impl EventV2Translator for UriMutationTranslator {
         } else {
             // If the TokenEventStoreV1 resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "TokenEventStoreV1 resource not found"
             )));
         };
@@ -1179,7 +1179,7 @@ impl EventV2Translator for DefaultPropertyMutateTranslator {
         } else {
             // If the TokenEventStoreV1 resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "TokenEventStoreV1 resource not found"
             )));
         };
@@ -1222,7 +1222,7 @@ impl EventV2Translator for DescriptionMutateTranslator {
         } else {
             // If the TokenEventStoreV1 resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "TokenEventStoreV1 resource not found"
             )));
         };
@@ -1262,7 +1262,7 @@ impl EventV2Translator for RoyaltyMutateTranslator {
         } else {
             // If the TokenEventStoreV1 resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "TokenEventStoreV1 resource not found"
             )));
         };
@@ -1306,7 +1306,7 @@ impl EventV2Translator for MaximumMutateTranslator {
         } else {
             // If the TokenEventStoreV1 resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "TokenEventStoreV1 resource not found"
             )));
         };
@@ -1346,7 +1346,7 @@ impl EventV2Translator for OptInTransferTranslator {
         } else {
             // If the TokenEventStoreV1 resource is not found, we skip the event translation to
             // avoid panic because the creation number cannot be decided.
-            return Err(AptosDbError::from(anyhow::format_err!(
+            return Err(VelorDbError::from(anyhow::format_err!(
                 "TokenEventStoreV1 resource not found"
             )));
         };

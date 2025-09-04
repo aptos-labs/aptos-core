@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::ensure;
-use aptos_consensus_types::{
+use velor_consensus_types::{
     common::{BatchPayload, TxnSummaryWithExpiration},
     proof_of_store::BatchInfo,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::{
+use velor_crypto::{hash::CryptoHash, HashValue};
+use velor_types::{
     ledger_info::LedgerInfoWithSignatures, quorum_store::BatchId, transaction::SignedTransaction,
     validator_verifier::ValidatorVerifier, PeerId,
 };
@@ -110,7 +110,7 @@ impl TryFrom<PersistedValue> for Batch {
 
 #[cfg(test)]
 mod tests {
-    use aptos_config::config;
+    use velor_config::config;
 
     #[test]
     fn test_batch_payload_padding() {

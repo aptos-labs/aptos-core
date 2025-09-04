@@ -28,7 +28,7 @@ import pangu_lib.util as util
 @click.option(
     "--framework-path",
     required=True,
-    help="Pass in the path to the compiled move framework (head.mrb, or framework.mrb) file. To compile it, run: $ cargo run --locked --package aptos-framework -- release",
+    help="Pass in the path to the compiled move framework (head.mrb, or framework.mrb) file. To compile it, run: $ cargo run --locked --package velor-framework -- release",
 )
 @click.option(
     "--num-of-validators",
@@ -40,9 +40,9 @@ import pangu_lib.util as util
     help="Pass the path to the folder you would like the genesis files to be generated (default is a temp folder).",
 )
 @click.option(
-    "--aptos-cli-path",
-    default="aptos",
-    help="Pass the path to the aptos CLI if it is not in your $PATH var.",
+    "--velor-cli-path",
+    default="velor",
+    help="Pass the path to the velor CLI if it is not in your $PATH var.",
 )
 @click.option(
     "--dry-run",
@@ -59,7 +59,7 @@ def create(
     layout_path: Optional[str],
     workspace: Optional[str],
     framework_path: str,
-    aptos_cli_path: str,
+    velor_cli_path: str,
     dry_run: bool,
     name: Optional[str],
 ):
@@ -71,7 +71,7 @@ def create(
         layout_path (str): path to the layout file
         workspace (str): path to the folder you would like the genesis files to be generated (default is a temp folder).
         framework_path (str): path to the compiled move framework
-        aptos_cli_path (str): path to aptos cli
+        velor_cli_path (str): path to velor cli
         dry_run (bool): whether to deploy to kubernetes, or save the deployment instructions to the workspace
         namespace (str): the namespace to create the testnet
     """
@@ -105,7 +105,7 @@ def create(
                 layout_path=layout_path,
                 workspace=workspace,
                 framework_path=framework_path,
-                aptos_cli_path=aptos_cli_path,
+                velor_cli_path=velor_cli_path,
                 dry_run=dry_run,
                 name=testnet_name,
             ),

@@ -1,5 +1,5 @@
 [package]
-name = "aptos-jwk-utils"
+name = "velor-jwk-utils"
 description = "JWK utils"
 version = "0.1.0"
 
@@ -14,7 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-types = { workspace = true }
+velor-types = { workspace = true }
 http = { workspace = true }
 move-core-types = { workspace = true }
 reqwest = { workspace = true }

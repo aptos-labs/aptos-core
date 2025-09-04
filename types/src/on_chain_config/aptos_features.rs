@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
@@ -20,7 +20,7 @@ pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
     TREAT_FRIEND_AS_PRIVATE = 2,
     SHA_512_AND_RIPEMD_160_NATIVES = 3,
-    APTOS_STD_CHAIN_ID_NATIVES = 4,
+    VELOR_STD_CHAIN_ID_NATIVES = 4,
     VM_BINARY_FORMAT_V6 = 5,
     _DEPRECATED_COLLECT_AND_DISTRIBUTE_GAS_FEES = 6,
     MULTI_ED25519_PK_VALIDATE_V2_NATIVES = 7,
@@ -39,7 +39,7 @@ pub enum FeatureFlag {
     CHARGE_INVARIANT_VIOLATION = 20,
     DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING = 21,
     GAS_PAYER_ENABLED = 22,
-    APTOS_UNIQUE_IDENTIFIERS = 23,
+    VELOR_UNIQUE_IDENTIFIERS = 23,
     BULLETPROOFS_NATIVES = 24,
     SIGNER_NATIVE_FORMAT_FIX = 25,
     MODULE_EVENT = 26,
@@ -103,7 +103,7 @@ pub enum FeatureFlag {
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
     /// covers mem::swap and vector::move_range
-    /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
+    /// AIP-105 (https://github.com/velor-foundation/AIPs/blob/main/aips/aip-105.md)
     NATIVE_MEMORY_OPERATIONS = 80,
     /// The feature was used to gate the rollout of new loader used by Move VM. It was enabled on
     /// mainnet and can no longer be disabled.
@@ -124,7 +124,7 @@ pub enum FeatureFlag {
     /// implementations. If required in the future, we can add a flag
     /// to explicitly disable the instruction cache.
     ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE = 83,
-    /// AIP-103 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-103.md)
+    /// AIP-103 (https://github.com/velor-foundation/AIPs/blob/main/aips/aip-103.md)
     PERMISSIONED_SIGNER = 84,
     ACCOUNT_ABSTRACTION = 85,
     /// Enables bytecode version v8
@@ -152,7 +152,7 @@ impl FeatureFlag {
             FeatureFlag::CODE_DEPENDENCY_CHECK,
             FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
             FeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES,
-            FeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
+            FeatureFlag::VELOR_STD_CHAIN_ID_NATIVES,
             // Feature flag V6 is used to enable metadata v1 format and needs to stay on, even
             // if we enable a higher version.
             FeatureFlag::VM_BINARY_FORMAT_V6,
@@ -172,7 +172,7 @@ impl FeatureFlag {
             FeatureFlag::STORAGE_SLOT_METADATA,
             FeatureFlag::CHARGE_INVARIANT_VIOLATION,
             FeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING,
-            FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
+            FeatureFlag::VELOR_UNIQUE_IDENTIFIERS,
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::BULLETPROOFS_NATIVES,
             FeatureFlag::SIGNER_NATIVE_FORMAT_FIX,
@@ -449,7 +449,7 @@ impl Features {
     }
 }
 
-pub fn aptos_test_feature_flags_genesis() -> ChangeSet {
+pub fn velor_test_feature_flags_genesis() -> ChangeSet {
     let features_value = bcs::to_bytes(&Features::default()).unwrap();
 
     let mut change_set = ChangeSet::new();

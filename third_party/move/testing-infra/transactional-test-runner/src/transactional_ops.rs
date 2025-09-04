@@ -82,7 +82,7 @@ impl<'a> MoveTestAdapter<'a> for MinimalAdapter<'a> {
             None => BTreeMap::new(),
         };
 
-        let mut named_address_mapping = aptos_framework::named_addresses().clone();
+        let mut named_address_mapping = velor_framework::named_addresses().clone();
 
         for (name, addr) in additional_named_address_mapping.clone() {
             if named_address_mapping.contains_key(&name) {

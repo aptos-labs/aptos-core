@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context_with_orderless_flags;
-use aptos_api_test_context::{current_function_name, TestContext};
+use velor_api_test_context::{current_function_name, TestContext};
 use rstest::rstest;
 use serde_json::{json, Value};
 
@@ -229,7 +229,7 @@ fn signing_message_request(use_orderless_transactions: bool) -> Value {
         "expiration_timestamp_secs": "9991638487317",
         "payload": {
             "type": "entry_function_payload",
-            "function": "0x1::aptos_account::create_account",
+            "function": "0x1::velor_account::create_account",
             "type_arguments": [],
             "arguments": [
                 "0x00000000000000000000000001234567", // address

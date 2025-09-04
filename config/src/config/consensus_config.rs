@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,8 +10,8 @@ use crate::config::{
     node_config_loader::NodeType, Error, NodeConfig, QuorumStoreConfig, ReliableBroadcastConfig,
     SafetyRulesConfig, BATCH_PADDING_BYTES,
 };
-use aptos_crypto::_once_cell::sync::Lazy;
-use aptos_types::chain_id::ChainId;
+use velor_crypto::_once_cell::sync::Lazy;
+use velor_types::chain_id::ChainId;
 use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;

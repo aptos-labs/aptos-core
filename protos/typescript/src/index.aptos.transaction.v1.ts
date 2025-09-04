@@ -1,3 +1,3 @@
 /* eslint-disable */
 
-export * from "./aptos/transaction/v1/transaction";
+export * from "./velor/transaction/v1/transaction";

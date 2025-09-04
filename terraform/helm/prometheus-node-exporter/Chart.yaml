@@ -1,5 +1,5 @@
 apiVersion: v2
-name: aptos-prometheus-node-exporter
+name: velor-prometheus-node-exporter
 version: 4.17.5
 
 dependencies:

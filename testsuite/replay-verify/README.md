@@ -1,6 +1,6 @@
 # Replay Verification Tools
 
-This folder contains tools for managing and provisioning archive storage used in replay verifying for the Aptos blockchain networks.
+This folder contains tools for managing and provisioning archive storage used in replay verifying for the Velor blockchain networks.
 
 ## Files
 

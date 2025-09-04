@@ -2,7 +2,7 @@ apiVersion: v2
 name: testnet-addons
 version: "0.1"
 appVersion: 0.1.0
-description: Additional components for aptos-nodes testnet
-home: https://aptoslabs.com/
+description: Additional components for velor-nodes testnet
+home: https://velorlabs.com/
 sources:
-  - https://github.com/aptos-labs/aptos-core
+  - https://github.com/velor-chain/velor-core

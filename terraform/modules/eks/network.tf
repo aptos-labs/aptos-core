@@ -3,8 +3,8 @@ resource "aws_vpc" "vpc" {
   enable_dns_hostnames = true
 
   tags = merge(local.default_tags, {
-    Name                                                  = "aptos-${local.workspace_name}"
-    "kubernetes.io/cluster/aptos-${local.workspace_name}" = "shared"
+    Name                                                  = "velor-${local.workspace_name}"
+    "kubernetes.io/cluster/velor-${local.workspace_name}" = "shared"
   })
 }
 
@@ -16,8 +16,8 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = merge(local.default_tags, {
-    Name                                                  = "aptos-${local.workspace_name}/public-${local.aws_availability_zones[count.index]}"
-    "kubernetes.io/cluster/aptos-${local.workspace_name}" = "shared"
+    Name                                                  = "velor-${local.workspace_name}/public-${local.aws_availability_zones[count.index]}"
+    "kubernetes.io/cluster/velor-${local.workspace_name}" = "shared"
     "kubernetes.io/role/elb"                              = "1"
   })
 }
@@ -26,7 +26,7 @@ resource "aws_internet_gateway" "public" {
   vpc_id = aws_vpc.vpc.id
 
   tags = merge(local.default_tags, {
-    Name = "aptos-${local.workspace_name}"
+    Name = "velor-${local.workspace_name}"
   })
 }
 
@@ -39,7 +39,7 @@ resource "aws_route_table" "public" {
   }
 
   tags = merge(local.default_tags, {
-    Name = "aptos-${local.workspace_name}/public"
+    Name = "velor-${local.workspace_name}/public"
   })
 }
 
@@ -56,8 +56,8 @@ resource "aws_subnet" "private" {
   availability_zone = local.aws_availability_zones[count.index]
 
   tags = merge(local.default_tags, {
-    Name                                                  = "aptos-${local.workspace_name}/private-${local.aws_availability_zones[count.index]}"
-    "kubernetes.io/cluster/aptos-${local.workspace_name}" = "shared"
+    Name                                                  = "velor-${local.workspace_name}/private-${local.aws_availability_zones[count.index]}"
+    "kubernetes.io/cluster/velor-${local.workspace_name}" = "shared"
     "kubernetes.io/role/internal-elb"                     = "1"
   })
 }
@@ -66,7 +66,7 @@ resource "aws_eip" "nat" {
   vpc = true
 
   tags = merge(local.default_tags, {
-    Name = "aptos-${local.workspace_name}-nat"
+    Name = "velor-${local.workspace_name}-nat"
   })
 }
 
@@ -85,7 +85,7 @@ resource "aws_route_table" "private" {
   }
 
   tags = merge(local.default_tags, {
-    Name = "aptos-${local.workspace_name}/private"
+    Name = "velor-${local.workspace_name}/private"
   })
 }
 
@@ -96,12 +96,12 @@ resource "aws_route_table_association" "private" {
 }
 
 resource "aws_security_group" "cluster" {
-  name        = "aptos-${local.workspace_name}/cluster"
+  name        = "velor-${local.workspace_name}/cluster"
   description = "k8s masters"
   vpc_id      = aws_vpc.vpc.id
 
   tags = merge(local.default_tags, {
-    "kubernetes.io/cluster/aptos-${local.workspace_name}" = "owned"
+    "kubernetes.io/cluster/velor-${local.workspace_name}" = "owned"
   })
 }
 
@@ -126,12 +126,12 @@ resource "aws_security_group_rule" "cluster-kubelet" {
 }
 
 resource "aws_security_group" "nodes" {
-  name        = "aptos-${local.workspace_name}/nodes"
+  name        = "velor-${local.workspace_name}/nodes"
   description = "k8s nodes"
   vpc_id      = aws_vpc.vpc.id
 
   tags = merge(local.default_tags, {
-    "kubernetes.io/cluster/aptos-${local.workspace_name}" = "owned"
+    "kubernetes.io/cluster/velor-${local.workspace_name}" = "owned"
   })
 }
 

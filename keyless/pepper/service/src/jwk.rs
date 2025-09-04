@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics::JWK_FETCH_SECONDS, Issuer, KeyID};
 use anyhow::{anyhow, Result};
-use aptos_keyless_pepper_common::jwt::parse;
-use aptos_logger::warn;
-use aptos_types::jwks::rsa::RSA_JWK;
+use velor_keyless_pepper_common::jwt::parse;
+use velor_logger::warn;
+use velor_types::jwks::rsa::RSA_JWK;
 use dashmap::DashMap;
 use jsonwebtoken::DecodingKey;
 use once_cell::sync::Lazy;

@@ -746,7 +746,7 @@ export const PingFullnodeResponse = {
 export type FullnodeDataService = typeof FullnodeDataService;
 export const FullnodeDataService = {
   ping: {
-    path: "/aptos.internal.fullnode.v1.FullnodeData/Ping",
+    path: "/velor.internal.fullnode.v1.FullnodeData/Ping",
     requestStream: false,
     responseStream: false,
     requestSerialize: (value: PingFullnodeRequest) => Buffer.from(PingFullnodeRequest.encode(value).finish()),
@@ -755,7 +755,7 @@ export const FullnodeDataService = {
     responseDeserialize: (value: Buffer) => PingFullnodeResponse.decode(value),
   },
   getTransactionsFromNode: {
-    path: "/aptos.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode",
+    path: "/velor.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode",
     requestStream: false,
     responseStream: true,
     requestSerialize: (value: GetTransactionsFromNodeRequest) =>
@@ -801,7 +801,7 @@ export interface FullnodeDataClient extends Client {
 
 export const FullnodeDataClient = makeGenericClientConstructor(
   FullnodeDataService,
-  "aptos.internal.fullnode.v1.FullnodeData",
+  "velor.internal.fullnode.v1.FullnodeData",
 ) as unknown as {
   new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): FullnodeDataClient;
   service: typeof FullnodeDataService;

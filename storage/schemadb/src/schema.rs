@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,7 +13,7 @@ use std::fmt::Debug;
 /// `define_schema!` allows a schema to be defined in the following syntax:
 /// ```
 /// use anyhow::Result;
-/// use aptos_schemadb::{
+/// use velor_schemadb::{
 ///     define_schema,
 ///     schema::{KeyCodec, SeekKeyCodec, ValueCodec},
 /// };
@@ -177,7 +177,7 @@ pub mod fuzzing {
     #[macro_export]
     macro_rules! test_no_panic_decoding {
         ($schema_type:ty) => {
-            use aptos_schemadb::schema::fuzzing::{arb_small_vec_u8, assert_no_panic_decoding};
+            use velor_schemadb::schema::fuzzing::{arb_small_vec_u8, assert_no_panic_decoding};
             use proptest::prelude::*;
 
             proptest! {

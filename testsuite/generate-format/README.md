@@ -1,27 +1,27 @@
 ---
 id: generate-format
 title: Generate Format
-custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/testsuite/generate-format/README.md
+custom_edit_url: https://github.com/velor-chain/velor-core/edit/main/testsuite/generate-format/README.md
 ---
 
-`generate-format` hosts the Aptos core type checker to ensure compatibility and uses 
-[`serde-reflection`](https://github.com/aptos-labs/serde-reflection) to properly track type changes over time. 
+`generate-format` hosts the Velor core type checker to ensure compatibility and uses 
+[`serde-reflection`](https://github.com/velor-chain/serde-reflection) to properly track type changes over time. 
 
 ## How to make a change
 
 When you introduce a new struct, enum, variant, or other type, ensure you make changes to the following files:
 - [x] api.rs
-- [x] aptos.rs
+- [x] velor.rs
 - [x] consensus.rs
 
 as well as
 - [x] api.yaml
-- [x] aptos.yaml
+- [x] velor.yaml
 - [x] consensus.yaml
 
 ## Example
 As an example, we will walk through a real-life example to demonstrate how to make the appropriate changes.
-Feel free to follow along here: https://github.com/aptos-labs/aptos-core/pull/10755/files
+Feel free to follow along here: https://github.com/velor-chain/velor-core/pull/10755/files
 
 Suppose you're adding a new `secp256r1_ecdsa` crypto library with new structs for the following keys and signatures:
 - `PublicKey` 
@@ -39,7 +39,7 @@ The following changes should be made to support `secp256r1_ecdsa` keys and signa
 
 In the following files
 - [x] api.rs
-- [x] aptos.rs
+- [x] velor.rs
 - [x] consensus.rs
 
 add `tracer.trace_value` for secp256r1_ecdsa
@@ -65,7 +65,7 @@ pub struct PublicKey {...}
 
 Additionally, in the following files
 - [x] api.yaml
-- [x] aptos.yaml
+- [x] velor.yaml
 - [x] consensus.yaml
 
 add the following yaml
@@ -125,12 +125,12 @@ AssertionSignature:
 
 Ensure that the changes above are synchronized across all of these files:
 - [x] api.yaml
-- [x] aptos.yaml
+- [x] velor.yaml
 - [x] consensus.yaml
 
-> Note: Because `[api|aptos|consensus].rs`, are already tracking the `AnyPublicKey` and `AnySignature` struct, no further tracers are necessary here
+> Note: Because `[api|velor|consensus].rs`, are already tracking the `AnyPublicKey` and `AnySignature` struct, no further tracers are necessary here
 
-Additionally, ensure that `enums` are tracked correctly across `[api|aptos|consensus].rs`
+Additionally, ensure that `enums` are tracked correctly across `[api|velor|consensus].rs`
 ```rust
 fn get_registry(){
     ...

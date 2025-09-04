@@ -1,0 +1,46 @@
+[package]
+name = "velor-logger"
+description = "Velor logger"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+# Do NOT add any inter-project dependencies.
+# This is to avoid ever having a circular dependency with the velor-logger crate.
+[dependencies]
+velor-infallible = { workspace = true }
+velor-log-derive = { workspace = true }
+velor-node-identity = { workspace = true, optional = true }
+backtrace = { workspace = true }
+chrono = { workspace = true }
+console-subscriber = { workspace = true, optional = true }
+erased-serde = { workspace = true }
+futures = { workspace = true }
+hostname = { workspace = true }
+once_cell = { workspace = true }
+prometheus = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+
+[features]
+default = []
+tokio-console = ["console-subscriber"]
+node-identity = ["velor-node-identity"]
+
+[package.metadata.cargo-machete]
+ignored = ["strum"]

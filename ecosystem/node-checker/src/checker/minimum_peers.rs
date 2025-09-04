@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
@@ -94,7 +94,7 @@ impl MinimumPeersChecker {
                 50,
                 format!("{} {}", explanation, additional_info),
             )
-            .links(vec!["https://aptos.dev/issues-and-workarounds/".to_string()])
+            .links(vec!["https://velor.dev/issues-and-workarounds/".to_string()])
         }
     }
 }
@@ -146,7 +146,7 @@ impl Checker for MinimumPeersChecker {
 // Helpers.
 //////////////////////////////////////////////////////////////////////////////
 
-const METRIC: &str = "aptos_connections";
+const METRIC: &str = "velor_connections";
 
 static INBOUND_LABEL: Lazy<Label> = Lazy::new(|| Label {
     key: "direction",

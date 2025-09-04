@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -18,21 +18,21 @@ use crate::{
     },
 };
 use anyhow::Result;
-use aptos_crypto::HashValue;
-use aptos_executor_types::{
+use velor_crypto::HashValue;
+use velor_executor_types::{
     state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorError, ExecutorResult,
 };
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_infallible::RwLock;
-use aptos_logger::prelude::*;
-use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
-use aptos_storage_interface::{
+use velor_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use velor_infallible::RwLock;
+use velor_logger::prelude::*;
+use velor_metrics_core::{IntGaugeVecHelper, TimerHelper};
+use velor_storage_interface::{
     state_store::{
         state_summary::ProvableStateSummary, state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter,
 };
-use aptos_types::{
+use velor_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock,
         transaction_slice_metadata::TransactionSliceMetadata,
@@ -40,7 +40,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
 };
-use aptos_vm::VMBlockExecutor;
+use velor_vm::VMBlockExecutor;
 use block_tree::BlockTree;
 use fail::fail_point;
 use std::sync::Arc;

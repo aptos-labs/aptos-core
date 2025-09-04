@@ -2,20 +2,20 @@ name: Copy images to dockerhub on release
 on:
   push:
     branches:
-      # aptos-node network-specific release branches
+      # velor-node network-specific release branches
       - devnet
       - testnet
       - mainnet
       # preview branches
       - preview
       - preview-networking
-      # aptos-indexer-grpc network-specific release branches
-      - aptos-indexer-grpc-devnet
-      - aptos-indexer-grpc-testnet
-      - aptos-indexer-grpc-mainnet
+      # velor-indexer-grpc network-specific release branches
+      - velor-indexer-grpc-devnet
+      - velor-indexer-grpc-testnet
+      - velor-indexer-grpc-mainnet
     tags:
-      - aptos-node-v*
-      - aptos-indexer-grpc-v*
+      - velor-node-v*
+      - velor-indexer-grpc-v*
 
 permissions:
   contents: read

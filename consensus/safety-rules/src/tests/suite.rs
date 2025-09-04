@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,7 +6,7 @@ use crate::{
     test_utils::{self, make_timeout_cert},
     Error, TSafetyRules,
 };
-use aptos_consensus_types::{
+use velor_consensus_types::{
     block::block_test_utils::random_payload,
     common::{Payload, Round},
     order_vote_proposal::OrderVoteProposal,
@@ -14,8 +14,8 @@ use aptos_consensus_types::{
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote_proposal::VoteProposal,
 };
-use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
-use aptos_types::{
+use velor_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
+use velor_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     epoch_state::EpochState,

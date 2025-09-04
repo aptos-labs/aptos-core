@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::TIMER;
 use anyhow::{ensure, Result};
-use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::state_store::state_update_refs::StateUpdateRefs;
-use aptos_types::transaction::{PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version};
+use velor_metrics_core::TimerHelper;
+use velor_storage_interface::state_store::state_update_refs::StateUpdateRefs;
+use velor_types::transaction::{PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version};
 use itertools::izip;
 use std::{
     fmt::{Debug, Formatter},

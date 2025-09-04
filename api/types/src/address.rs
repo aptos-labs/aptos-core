@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::account_address::AccountAddress;
+use velor_types::account_address::AccountAddress;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
@@ -20,7 +20,7 @@ impl Address {
 
     /// Represent an account address in a way that is compliant with the v1 address
     /// standard. The standard is defined as part of AIP-40, read more here:
-    /// <https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md>
+    /// <https://github.com/velor-foundation/AIPs/blob/main/aips/aip-40.md>
     ///
     /// In short, all special addresses MUST be represented in SHORT form, e.g.
     ///
@@ -102,7 +102,7 @@ impl<'de> Deserialize<'de> for Address {
 #[cfg(test)]
 mod tests {
     use crate::address::Address;
-    use aptos_types::account_address::AccountAddress;
+    use velor_types::account_address::AccountAddress;
     use serde_json::{json, Value};
 
     #[test]

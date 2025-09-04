@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     quorum_store::types::{Batch, BatchRequest},
     test_utils::create_vec_signed_transactions,
 };
-use aptos_consensus_types::common::BatchPayload;
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::{account_address::AccountAddress, quorum_store::BatchId};
+use velor_consensus_types::common::BatchPayload;
+use velor_crypto::{hash::CryptoHash, HashValue};
+use velor_types::{account_address::AccountAddress, quorum_store::BatchId};
 use claims::{assert_err, assert_ok};
 
 #[test]

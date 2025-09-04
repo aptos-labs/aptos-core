@@ -1,0 +1,107 @@
+{{ template "chart.header" . }}
+{{ template "chart.deprecationWarning" . }}
+
+{{ template "chart.badgesSection" . }}
+
+{{ template "chart.description" . }}
+
+{{ template "chart.homepageLine" . }}
+
+{{ template "chart.maintainersSection" . }}
+
+{{ template "chart.sourcesSection" . }}
+
+{{ template "chart.requirementsSection" . }}
+
+{{ template "chart.valuesSection" . }}
+
+## Resource Descriptions
+
+Below is a list of the Kubernetes resources created by this helm chart.
+
+The resources created by this helm chart will be prefixed with the helm release name. Below, they are denoted by
+the `<RELEASE_NAME>` prefix.
+
+StatefulSets:
+* `<RELEASE_NAME>-velor-node-0-validator` - The validator StatefulSet
+* `<RELEASE_NAME>-velor-node-0-fullnode-e<ERA>` - The fullnode StatefulSet
+
+Deployments:
+* `<RELEASE_NAME>-velor-node-0-validator` - The HAProxy deployment
+
+PersistentVolumeClaim:
+* `<RELEASE_NAME>-0-validator-e<ERA>` - The validator PersistentVolumeClaim
+* `fn-<RELEASE_NAME>-0-fullnode-e<ERA>-0` - The fullnode PersistentVolumeClaim. Note the difference in naming scheme between valdiator and fullnode PVC, which is due to the fact that you can spin up multiple fullnodes, but only a single validator.
+
+Services:
+* `<RELEASE_NAME>-velor-node-0-validator-lb` - Inbound load balancer service that routes to the validator
+* `<RELEASE_NAME>-velor-node-0-fullnode-lb` - Inbound load balancer service that routes to the fullnode
+
+ConfigMaps:
+* `<RELEASE_NAME>-0` - The validator and fullnode NodeConfigs
+* `<RELEASE_NAME>-0-haproxy` - The HAProxy configuration
+
+NetworkPolicies:
+* `<RELEASE_NAME>-0-validator` - The validator NetworkPolicy, which controls network access to the validator pods
+
+ServiceAccounts:
+* [optional] `<RELEASE_NAME>` - The default service account
+* `<RELEASE_NAME>-validator` - The validator service account
+* `<RELEASE_NAME>-fullnode` - The fullnode service account
+
+[optional] PodSecurityPolicy:
+* `<RELEASE_NAME>` - The default PodSecurityPolicy for validators and fullnodes
+* `<RELEASE_NAME>-haproxy` - The PodSecurityPolicy for HAProxy
+
+## Common Operations
+
+### Check Pod Status
+
+```
+$ kubectl get pods
+```
+
+You should see at least `1/1` replicas running for the validator, fullnode, and HAProxy. If there are any restarts, you should see it in this view.
+
+To see more details about a singular pod, you can describe it:
+
+```
+$ kubectl describe pod <POD_NAME>
+```
+
+### Check the Pod Logs
+
+```
+$ kubectl logs <POD_NAME>
+```
+
+### Check all services
+
+```
+$ kubectl get services
+```
+
+By default, the services are `LoadBalancer` type, which means that they will be accessible from the outside world. Depending on your kubernetes deployment/cloud, the public IP or DNS information will be displayed.
+
+### Scale Down Workloads
+
+If you want to temporarily remove some of the workloads, you can scale them down.
+```
+# scale down the validator
+kubectl scale statefulset <STS_NAME> --replicas=0
+```
+
+## Advanced Options
+
+### Testnet Mode (Multiple Validators and Fullnodes)
+
+For testing purposes, you may deploy multiple validators into the same cluster via `.Values.numValidators`. The naming convention is `<RELEASE_NAME>-velor-node-<INDEX>-validator`, where `<INDEX>` is the index of the validator. Note that for each validator, you must provide genesis ConfigMaps for each, of the name: `<RELEASE_NAME>-<INDEX>-genesis-e<ERA>`.
+You may also deploy multiple fullnodes into the cluster via `.Values.numFullnodeGroups` and `.Values.fullnode.groups`. Each validator can have multiple fullnode groups, each with multiple replicas. The total number of fullnode groups can be limited via `.Values.numFullnodeGroups`.
+
+### Era
+
+The `.Values.chain.era` is a number that is incremented every time the validator's storage is wiped. This is useful for testnets when the network is wiped.
+
+### Privileged Mode
+
+For debugging purposes, it's sometimes useful to run the validator as root (privileged mode). This is enabled by `.Values.enablePrivilegedMode`.

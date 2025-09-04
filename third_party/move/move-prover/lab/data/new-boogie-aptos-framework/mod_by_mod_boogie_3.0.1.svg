@@ -79,7 +79,7 @@
 16.645
 </text>
 <text x="0" y="309" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::aptos_governance
+0x1::velor_governance
 </text>
 <rect x="0" y="323" width="325" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="335" y="325" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -349,7 +349,7 @@
 2.759
 </text>
 <text x="0" y="1384" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::aptos_account
+0x1::velor_account
 </text>
 <rect x="0" y="1398" width="60" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="70" y="1400" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -700,7 +700,7 @@
 1.277
 </text>
 <text x="0" y="2781" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-0x1::aptos_coin
+0x1::velor_coin
 </text>
 <rect x="0" y="2796" width="22" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="31" y="2797" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">

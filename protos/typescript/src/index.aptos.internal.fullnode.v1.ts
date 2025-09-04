@@ -1,3 +1,3 @@
 /* eslint-disable */
 
-export * from "./aptos/internal/fullnode/v1/fullnode_data";
+export * from "./velor/internal/fullnode/v1/fullnode_data";

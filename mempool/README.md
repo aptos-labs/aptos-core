@@ -1,7 +1,7 @@
 ---
 id: mempool
 title: Mempool
-custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/mempool/README.md
+custom_edit_url: https://github.com/velor-chain/velor-core/edit/main/mempool/README.md
 ---
 
 Mempool is a memory-buffer that holds the transactions that are waiting to be executed.

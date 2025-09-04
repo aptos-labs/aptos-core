@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_cached_packages::aptos_stdlib::aptos_token_stdlib;
-use aptos_forge::{AptosPublicInfo, Result, Swarm};
-use aptos_indexer::{
+use velor_cached_packages::velor_stdlib::velor_token_stdlib;
+use velor_forge::{VelorPublicInfo, Result, Swarm};
+use velor_indexer::{
     database::{new_db_pool, PgDbPool, PgPoolConnection},
     models::transactions::TransactionQuery,
 };
-use aptos_sdk::types::LocalAccount;
+use velor_sdk::types::LocalAccount;
 use diesel::RunQueryDsl;
 use std::sync::Arc;
 
@@ -32,12 +32,12 @@ pub fn setup_indexer() -> anyhow::Result<PgDbPool> {
     Ok(conn_pool)
 }
 
-pub async fn execute_nft_txns(creator: LocalAccount, info: &mut AptosPublicInfo) -> Result<()> {
+pub async fn execute_nft_txns(creator: LocalAccount, info: &mut VelorPublicInfo) -> Result<()> {
     let collection_name = "collection name".to_owned().into_bytes();
     let token_name = "token name".to_owned().into_bytes();
     let collection_builder =
         info.transaction_factory()
-            .payload(aptos_token_stdlib::token_create_collection_script(
+            .payload(velor_token_stdlib::token_create_collection_script(
                 collection_name.clone(),
                 "description".to_owned().into_bytes(),
                 "uri".to_owned().into_bytes(),
@@ -50,7 +50,7 @@ pub async fn execute_nft_txns(creator: LocalAccount, info: &mut AptosPublicInfo)
 
     let token_builder =
         info.transaction_factory()
-            .payload(aptos_token_stdlib::token_create_token_script(
+            .payload(velor_token_stdlib::token_create_token_script(
                 collection_name.clone(),
                 token_name.clone(),
                 "collection description".to_owned().into_bytes(),
@@ -71,7 +71,7 @@ pub async fn execute_nft_txns(creator: LocalAccount, info: &mut AptosPublicInfo)
 
     let token_mutator =
         info.transaction_factory()
-            .payload(aptos_token_stdlib::token_mutate_token_properties(
+            .payload(velor_token_stdlib::token_mutate_token_properties(
                 creator.address(),
                 creator.address(),
                 collection_name.clone(),
@@ -91,26 +91,26 @@ pub async fn execute_nft_txns(creator: LocalAccount, info: &mut AptosPublicInfo)
 #[ignore]
 #[tokio::test]
 async fn test_old_indexer() {
-    if aptos_indexer::should_skip_pg_tests() {
+    if velor_indexer::should_skip_pg_tests() {
         return;
     }
 
     let conn_pool = setup_indexer().unwrap();
 
     let swarm = crate::smoke_test_environment::SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.storage.enable_indexer = true;
 
             config.indexer.enabled = true;
             config.indexer.postgres_uri = Some(get_database_url());
             config.indexer.processor =
-                Some(aptos_indexer::processors::default_processor::NAME.to_string());
+                Some(velor_indexer::processors::default_processor::NAME.to_string());
         }))
         .build()
         .await;
 
-    let mut info = swarm.aptos_public_info();
+    let mut info = swarm.velor_public_info();
 
     let ledger = info
         .client()

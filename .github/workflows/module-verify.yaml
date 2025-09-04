@@ -1,4 +1,4 @@
-# This defines a workflow to verify all modules that have been published on chain with the latest aptos node software.
+# This defines a workflow to verify all modules that have been published on chain with the latest velor node software.
 # In order to trigger it go to the Actions Tab of the Repo, click "module-verify" and then "Run Workflow".
 #
 # On PR, a single test case will run. On workflow_dispatch, you may specify the CHAIN_NAME to verify.
@@ -37,11 +37,11 @@ concurrency:
 jobs:
   verify-modules-testnet:
     if: ${{ github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all') }}
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-module-verify.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-module-verify.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ inputs.GIT_SHA }}
-      BUCKET: aptos-testnet-backup-2223d95b
+      BUCKET: velor-testnet-backup-2223d95b
       SUB_DIR: e1
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config
@@ -50,11 +50,11 @@ jobs:
 
   verify-modules-mainnet:
     if: ${{ github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'mainnet' || inputs.CHAIN_NAME == 'all') }}
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-module-verify.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-module-verify.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ inputs.GIT_SHA }}
-      BUCKET: aptos-mainnet-backup-backup-6addc21b
+      BUCKET: velor-mainnet-backup-backup-6addc21b
       SUB_DIR: e1
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config
@@ -63,11 +63,11 @@ jobs:
 
   test-verify-modules:
     if: ${{ github.event_name == 'pull_request' }}
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-module-verify.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-module-verify.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha }}
-      BUCKET: aptos-testnet-backup-2223d95b
+      BUCKET: velor-testnet-backup-2223d95b
       SUB_DIR: e1
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config

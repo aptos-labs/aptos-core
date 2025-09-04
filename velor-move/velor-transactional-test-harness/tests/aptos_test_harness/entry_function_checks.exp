@@ -1,0 +1,41 @@
+processed 4 tasks
+task 1 lines 4-22:  publish --private-key alice [module alice::foo {]
+warning: to be used as an entry function, all signers should precede non-signers
+   ┌─ TEMPFILE:12:41
+   │
+12 │     entry fun one_signer_later(_x: u64, _s: &signer) {}
+   │                                         ^^
+
+warning: to be used as an entry function, all signers should precede non-signers
+   ┌─ TEMPFILE:13:56
+   │
+13 │     entry fun multiple_signers_later(_x: u64, _y: u64, _s1: &signer, _z: u64, _s2: &signer) {}
+   │                                                        ^^^
+
+warning: to be used as an entry function, all signers should precede non-signers
+   ┌─ TEMPFILE:13:79
+   │
+13 │     entry fun multiple_signers_later(_x: u64, _y: u64, _s1: &signer, _z: u64, _s2: &signer) {}
+   │                                                                               ^^^
+
+
+task 2 lines 24-30:  publish --private-key alice [module alice::bar {]
+Error: extended checks failed:
+
+error: entry function cannot return values
+   ┌─ TEMPFILE1:27:15
+   │
+27 │     entry fun return_something(): u64 {
+   │               ^^^^^^^^^^^^^^^^
+
+
+task 3 lines 32-38:  publish --private-key alice [module alice::baz {]
+Error: extended checks failed:
+
+error: type `0x1::bit_vector::BitVector` is not supported as a transaction parameter type
+   ┌─ TEMPFILE2:36:40
+   │
+36 │     public entry fun invalid_txn_param(_bv: BitVector) {}
+   │                                        ^^^
+
+

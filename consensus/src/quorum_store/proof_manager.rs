@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::batch_store::BatchStore;
@@ -6,15 +6,15 @@ use crate::{
     monitor,
     quorum_store::{batch_generator::BackPressure, batch_proof_queue::BatchProofQueue, counters},
 };
-use aptos_consensus_types::{
+use velor_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
     utils::PayloadTxnsSize,
 };
-use aptos_logger::prelude::*;
-use aptos_types::PeerId;
+use velor_logger::prelude::*;
+use velor_types::PeerId;
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
 use std::{cmp::min, collections::HashSet, sync::Arc, time::Duration};

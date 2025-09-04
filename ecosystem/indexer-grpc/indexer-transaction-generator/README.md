@@ -4,28 +4,28 @@ This tool is to generate transactions for testing purposes.
 
 ## Usage
 
-Under the root folder, i.e., `aptos-core`, run the follow command. This will default to importing transactions for all networks.
+Under the root folder, i.e., `velor-core`, run the follow command. This will default to importing transactions for all networks.
 
 ```bash
-cargo run -p aptos-indexer-transaction-generator -- --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src
+cargo run -p velor-indexer-transaction-generator -- --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src
 ```
 
 You can optionally specify the mode, e.g. for script mode
 
 ```bash
-cargo run -p aptos-indexer-transaction-generator -- --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src --mode script
+cargo run -p velor-indexer-transaction-generator -- --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src --mode script
 ```
 
 Or network, e.g. mainnet
 
 ```bash
-cargo run -p aptos-indexer-transaction-generator -- --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src --network mainnet
+cargo run -p velor-indexer-transaction-generator -- --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src --network mainnet
 ```
 
 Or testnet
 
 ```bash
-cargo run -p aptos-indexer-transaction-generator -- --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src --network testnet
+cargo run -p velor-indexer-transaction-generator -- --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src --network testnet
 ```
 
 ### Config overview
@@ -44,8 +44,8 @@ Your testing folder should contain:
     ```yaml
     testnet:
       # Transaction Stream endpoint address.
-      transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
-      # (Optional) The key to use with developers.aptoslabs.com
+      transaction_stream_endpoint: https://grpc.testnet.velorlabs.com:443
+      # (Optional) The key to use with developers.velorlabs.com
       api_key: YOUR_KEY_HERE
       # A map from versions to dump and their output names.
       versions_to_import:
@@ -71,8 +71,8 @@ the actual account address will be allocated by the account manager.
 
 The accounts in `testing_accounts.yaml` will be used to run scripted transactions. 
 They are persisted in the config so each scripted transaction's generated output stays consistent between 
-`aptos-indexer-transaction-generator` runs. You can generate more testing accounts using 
-Aptos CLI by running `aptos init --profile local`. 
+`velor-indexer-transaction-generator` runs. You can generate more testing accounts using 
+Velor CLI by running `velor init --profile local`. 
 
 TODO: account manager handles address as script argument.
 

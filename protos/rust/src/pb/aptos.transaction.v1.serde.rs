@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
@@ -16,7 +16,7 @@ impl serde::Serialize for AbstractionSignature {
         if !self.signature.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.AbstractionSignature", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.AbstractionSignature", len)?;
         if !self.function_info.is_empty() {
             struct_ser.serialize_field("functionInfo", &self.function_info)?;
         }
@@ -77,7 +77,7 @@ impl<'de> serde::Deserialize<'de> for AbstractionSignature {
             type Value = AbstractionSignature;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.AbstractionSignature")
+                formatter.write_str("struct velor.transaction.v1.AbstractionSignature")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<AbstractionSignature, V::Error>
@@ -110,7 +110,7 @@ impl<'de> serde::Deserialize<'de> for AbstractionSignature {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.AbstractionSignature", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.AbstractionSignature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for AccountSignature {
@@ -127,7 +127,7 @@ impl serde::Serialize for AccountSignature {
         if self.signature.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.AccountSignature", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.AccountSignature", len)?;
         if self.r#type != 0 {
             let v = account_signature::Type::from_i32(self.r#type)
                 .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
@@ -220,7 +220,7 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
             type Value = AccountSignature;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.AccountSignature")
+                formatter.write_str("struct velor.transaction.v1.AccountSignature")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<AccountSignature, V::Error>
@@ -280,7 +280,7 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.AccountSignature", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.AccountSignature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for account_signature::Type {
@@ -382,7 +382,7 @@ impl serde::Serialize for AnyPublicKey {
         if !self.public_key.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.AnyPublicKey", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.AnyPublicKey", len)?;
         if self.r#type != 0 {
             let v = any_public_key::Type::from_i32(self.r#type)
                 .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
@@ -445,7 +445,7 @@ impl<'de> serde::Deserialize<'de> for AnyPublicKey {
             type Value = AnyPublicKey;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.AnyPublicKey")
+                formatter.write_str("struct velor.transaction.v1.AnyPublicKey")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<AnyPublicKey, V::Error>
@@ -478,7 +478,7 @@ impl<'de> serde::Deserialize<'de> for AnyPublicKey {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.AnyPublicKey", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.AnyPublicKey", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for any_public_key::Type {
@@ -583,7 +583,7 @@ impl serde::Serialize for AnySignature {
         if self.signature_variant.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.AnySignature", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.AnySignature", len)?;
         if self.r#type != 0 {
             let v = any_signature::Type::from_i32(self.r#type)
                 .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
@@ -674,7 +674,7 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
             type Value = AnySignature;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.AnySignature")
+                formatter.write_str("struct velor.transaction.v1.AnySignature")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<AnySignature, V::Error>
@@ -737,7 +737,7 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.AnySignature", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.AnySignature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for any_signature::Type {
@@ -842,7 +842,7 @@ impl serde::Serialize for Block {
         if self.chain_id != 0 {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.Block", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.Block", len)?;
         if let Some(v) = self.timestamp.as_ref() {
             struct_ser.serialize_field("timestamp", v)?;
         }
@@ -915,7 +915,7 @@ impl<'de> serde::Deserialize<'de> for Block {
             type Value = Block;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.Block")
+                formatter.write_str("struct velor.transaction.v1.Block")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<Block, V::Error>
@@ -966,7 +966,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.Block", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.Block", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for BlockEndInfo {
@@ -989,7 +989,7 @@ impl serde::Serialize for BlockEndInfo {
         if self.block_approx_output_size != 0 {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.BlockEndInfo", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.BlockEndInfo", len)?;
         if self.block_gas_limit_reached {
             struct_ser.serialize_field("blockGasLimitReached", &self.block_gas_limit_reached)?;
         }
@@ -1065,7 +1065,7 @@ impl<'de> serde::Deserialize<'de> for BlockEndInfo {
             type Value = BlockEndInfo;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.BlockEndInfo")
+                formatter.write_str("struct velor.transaction.v1.BlockEndInfo")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<BlockEndInfo, V::Error>
@@ -1116,7 +1116,7 @@ impl<'de> serde::Deserialize<'de> for BlockEndInfo {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.BlockEndInfo", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.BlockEndInfo", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for BlockEpilogueTransaction {
@@ -1130,7 +1130,7 @@ impl serde::Serialize for BlockEpilogueTransaction {
         if self.block_end_info.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.BlockEpilogueTransaction", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.BlockEpilogueTransaction", len)?;
         if let Some(v) = self.block_end_info.as_ref() {
             struct_ser.serialize_field("blockEndInfo", v)?;
         }
@@ -1185,7 +1185,7 @@ impl<'de> serde::Deserialize<'de> for BlockEpilogueTransaction {
             type Value = BlockEpilogueTransaction;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.BlockEpilogueTransaction")
+                formatter.write_str("struct velor.transaction.v1.BlockEpilogueTransaction")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<BlockEpilogueTransaction, V::Error>
@@ -1208,7 +1208,7 @@ impl<'de> serde::Deserialize<'de> for BlockEpilogueTransaction {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.BlockEpilogueTransaction", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.BlockEpilogueTransaction", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for BlockMetadataTransaction {
@@ -1237,7 +1237,7 @@ impl serde::Serialize for BlockMetadataTransaction {
         if !self.failed_proposer_indices.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.BlockMetadataTransaction", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.BlockMetadataTransaction", len)?;
         if !self.id.is_empty() {
             struct_ser.serialize_field("id", &self.id)?;
         }
@@ -1323,7 +1323,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
             type Value = BlockMetadataTransaction;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.BlockMetadataTransaction")
+                formatter.write_str("struct velor.transaction.v1.BlockMetadataTransaction")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<BlockMetadataTransaction, V::Error>
@@ -1393,7 +1393,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.BlockMetadataTransaction", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.BlockMetadataTransaction", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for DeleteModule {
@@ -1413,7 +1413,7 @@ impl serde::Serialize for DeleteModule {
         if self.module.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.DeleteModule", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.DeleteModule", len)?;
         if !self.address.is_empty() {
             struct_ser.serialize_field("address", &self.address)?;
         }
@@ -1480,7 +1480,7 @@ impl<'de> serde::Deserialize<'de> for DeleteModule {
             type Value = DeleteModule;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.DeleteModule")
+                formatter.write_str("struct velor.transaction.v1.DeleteModule")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<DeleteModule, V::Error>
@@ -1521,7 +1521,7 @@ impl<'de> serde::Deserialize<'de> for DeleteModule {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.DeleteModule", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.DeleteModule", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for DeleteResource {
@@ -1544,7 +1544,7 @@ impl serde::Serialize for DeleteResource {
         if !self.type_str.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.DeleteResource", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.DeleteResource", len)?;
         if !self.address.is_empty() {
             struct_ser.serialize_field("address", &self.address)?;
         }
@@ -1618,7 +1618,7 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
             type Value = DeleteResource;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.DeleteResource")
+                formatter.write_str("struct velor.transaction.v1.DeleteResource")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<DeleteResource, V::Error>
@@ -1667,7 +1667,7 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.DeleteResource", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.DeleteResource", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for DeleteTableData {
@@ -1684,7 +1684,7 @@ impl serde::Serialize for DeleteTableData {
         if !self.key_type.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.DeleteTableData", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.DeleteTableData", len)?;
         if !self.key.is_empty() {
             struct_ser.serialize_field("key", &self.key)?;
         }
@@ -1745,7 +1745,7 @@ impl<'de> serde::Deserialize<'de> for DeleteTableData {
             type Value = DeleteTableData;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.DeleteTableData")
+                formatter.write_str("struct velor.transaction.v1.DeleteTableData")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<DeleteTableData, V::Error>
@@ -1776,7 +1776,7 @@ impl<'de> serde::Deserialize<'de> for DeleteTableData {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.DeleteTableData", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.DeleteTableData", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for DeleteTableItem {
@@ -1799,7 +1799,7 @@ impl serde::Serialize for DeleteTableItem {
         if self.data.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.DeleteTableItem", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.DeleteTableItem", len)?;
         if !self.state_key_hash.is_empty() {
             struct_ser.serialize_field("stateKeyHash", pbjson::private::base64::encode(&self.state_key_hash).as_str())?;
         }
@@ -1872,7 +1872,7 @@ impl<'de> serde::Deserialize<'de> for DeleteTableItem {
             type Value = DeleteTableItem;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.DeleteTableItem")
+                formatter.write_str("struct velor.transaction.v1.DeleteTableItem")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<DeleteTableItem, V::Error>
@@ -1921,7 +1921,7 @@ impl<'de> serde::Deserialize<'de> for DeleteTableItem {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.DeleteTableItem", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.DeleteTableItem", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for DirectWriteSet {
@@ -1938,7 +1938,7 @@ impl serde::Serialize for DirectWriteSet {
         if !self.events.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.DirectWriteSet", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.DirectWriteSet", len)?;
         if !self.write_set_change.is_empty() {
             struct_ser.serialize_field("writeSetChange", &self.write_set_change)?;
         }
@@ -1999,7 +1999,7 @@ impl<'de> serde::Deserialize<'de> for DirectWriteSet {
             type Value = DirectWriteSet;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.DirectWriteSet")
+                formatter.write_str("struct velor.transaction.v1.DirectWriteSet")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<DirectWriteSet, V::Error>
@@ -2030,7 +2030,7 @@ impl<'de> serde::Deserialize<'de> for DirectWriteSet {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.DirectWriteSet", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.DirectWriteSet", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for Ed25519 {
@@ -2044,7 +2044,7 @@ impl serde::Serialize for Ed25519 {
         if !self.signature.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.Ed25519", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.Ed25519", len)?;
         if !self.signature.is_empty() {
             struct_ser.serialize_field("signature", pbjson::private::base64::encode(&self.signature).as_str())?;
         }
@@ -2098,7 +2098,7 @@ impl<'de> serde::Deserialize<'de> for Ed25519 {
             type Value = Ed25519;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.Ed25519")
+                formatter.write_str("struct velor.transaction.v1.Ed25519")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<Ed25519, V::Error>
@@ -2123,7 +2123,7 @@ impl<'de> serde::Deserialize<'de> for Ed25519 {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.Ed25519", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.Ed25519", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for Ed25519Signature {
@@ -2140,7 +2140,7 @@ impl serde::Serialize for Ed25519Signature {
         if !self.signature.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.Ed25519Signature", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.Ed25519Signature", len)?;
         if !self.public_key.is_empty() {
             struct_ser.serialize_field("publicKey", pbjson::private::base64::encode(&self.public_key).as_str())?;
         }
@@ -2201,7 +2201,7 @@ impl<'de> serde::Deserialize<'de> for Ed25519Signature {
             type Value = Ed25519Signature;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.Ed25519Signature")
+                formatter.write_str("struct velor.transaction.v1.Ed25519Signature")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<Ed25519Signature, V::Error>
@@ -2236,7 +2236,7 @@ impl<'de> serde::Deserialize<'de> for Ed25519Signature {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.Ed25519Signature", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.Ed25519Signature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for EntryFunctionId {
@@ -2253,7 +2253,7 @@ impl serde::Serialize for EntryFunctionId {
         if !self.name.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.EntryFunctionId", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.EntryFunctionId", len)?;
         if let Some(v) = self.module.as_ref() {
             struct_ser.serialize_field("module", v)?;
         }
@@ -2313,7 +2313,7 @@ impl<'de> serde::Deserialize<'de> for EntryFunctionId {
             type Value = EntryFunctionId;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.EntryFunctionId")
+                formatter.write_str("struct velor.transaction.v1.EntryFunctionId")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<EntryFunctionId, V::Error>
@@ -2344,7 +2344,7 @@ impl<'de> serde::Deserialize<'de> for EntryFunctionId {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.EntryFunctionId", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.EntryFunctionId", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for EntryFunctionPayload {
@@ -2367,7 +2367,7 @@ impl serde::Serialize for EntryFunctionPayload {
         if !self.entry_function_id_str.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.EntryFunctionPayload", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.EntryFunctionPayload", len)?;
         if let Some(v) = self.function.as_ref() {
             struct_ser.serialize_field("function", v)?;
         }
@@ -2441,7 +2441,7 @@ impl<'de> serde::Deserialize<'de> for EntryFunctionPayload {
             type Value = EntryFunctionPayload;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.EntryFunctionPayload")
+                formatter.write_str("struct velor.transaction.v1.EntryFunctionPayload")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<EntryFunctionPayload, V::Error>
@@ -2488,7 +2488,7 @@ impl<'de> serde::Deserialize<'de> for EntryFunctionPayload {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.EntryFunctionPayload", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.EntryFunctionPayload", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for Event {
@@ -2514,7 +2514,7 @@ impl serde::Serialize for Event {
         if !self.data.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.Event", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.Event", len)?;
         if let Some(v) = self.key.as_ref() {
             struct_ser.serialize_field("key", v)?;
         }
@@ -2594,7 +2594,7 @@ impl<'de> serde::Deserialize<'de> for Event {
             type Value = Event;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.Event")
+                formatter.write_str("struct velor.transaction.v1.Event")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<Event, V::Error>
@@ -2651,7 +2651,7 @@ impl<'de> serde::Deserialize<'de> for Event {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.Event", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.Event", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for EventKey {
@@ -2668,7 +2668,7 @@ impl serde::Serialize for EventKey {
         if !self.account_address.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.EventKey", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.EventKey", len)?;
         if self.creation_number != 0 {
             struct_ser.serialize_field("creationNumber", ToString::to_string(&self.creation_number).as_str())?;
         }
@@ -2730,7 +2730,7 @@ impl<'de> serde::Deserialize<'de> for EventKey {
             type Value = EventKey;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.EventKey")
+                formatter.write_str("struct velor.transaction.v1.EventKey")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<EventKey, V::Error>
@@ -2763,7 +2763,7 @@ impl<'de> serde::Deserialize<'de> for EventKey {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.EventKey", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.EventKey", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for EventSizeInfo {
@@ -2780,7 +2780,7 @@ impl serde::Serialize for EventSizeInfo {
         if self.total_bytes != 0 {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.EventSizeInfo", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.EventSizeInfo", len)?;
         if self.type_tag_bytes != 0 {
             struct_ser.serialize_field("typeTagBytes", &self.type_tag_bytes)?;
         }
@@ -2842,7 +2842,7 @@ impl<'de> serde::Deserialize<'de> for EventSizeInfo {
             type Value = EventSizeInfo;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.EventSizeInfo")
+                formatter.write_str("struct velor.transaction.v1.EventSizeInfo")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<EventSizeInfo, V::Error>
@@ -2877,7 +2877,7 @@ impl<'de> serde::Deserialize<'de> for EventSizeInfo {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.EventSizeInfo", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.EventSizeInfo", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for ExtraConfigV1 {
@@ -2894,7 +2894,7 @@ impl serde::Serialize for ExtraConfigV1 {
         if self.replay_protection_nonce.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ExtraConfigV1", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.ExtraConfigV1", len)?;
         if let Some(v) = self.multisig_address.as_ref() {
             struct_ser.serialize_field("multisigAddress", v)?;
         }
@@ -2956,7 +2956,7 @@ impl<'de> serde::Deserialize<'de> for ExtraConfigV1 {
             type Value = ExtraConfigV1;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ExtraConfigV1")
+                formatter.write_str("struct velor.transaction.v1.ExtraConfigV1")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<ExtraConfigV1, V::Error>
@@ -2989,7 +2989,7 @@ impl<'de> serde::Deserialize<'de> for ExtraConfigV1 {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.ExtraConfigV1", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.ExtraConfigV1", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for FeePayerSignature {
@@ -3015,7 +3015,7 @@ impl serde::Serialize for FeePayerSignature {
         if self.fee_payer_signer.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.FeePayerSignature", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.FeePayerSignature", len)?;
         if let Some(v) = self.sender.as_ref() {
             struct_ser.serialize_field("sender", v)?;
         }
@@ -3097,7 +3097,7 @@ impl<'de> serde::Deserialize<'de> for FeePayerSignature {
             type Value = FeePayerSignature;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.FeePayerSignature")
+                formatter.write_str("struct velor.transaction.v1.FeePayerSignature")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<FeePayerSignature, V::Error>
@@ -3152,7 +3152,7 @@ impl<'de> serde::Deserialize<'de> for FeePayerSignature {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.FeePayerSignature", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.FeePayerSignature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for GenesisTransaction {
@@ -3169,7 +3169,7 @@ impl serde::Serialize for GenesisTransaction {
         if !self.events.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.GenesisTransaction", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.GenesisTransaction", len)?;
         if let Some(v) = self.payload.as_ref() {
             struct_ser.serialize_field("payload", v)?;
         }
@@ -3229,7 +3229,7 @@ impl<'de> serde::Deserialize<'de> for GenesisTransaction {
             type Value = GenesisTransaction;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.GenesisTransaction")
+                formatter.write_str("struct velor.transaction.v1.GenesisTransaction")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<GenesisTransaction, V::Error>
@@ -3260,7 +3260,7 @@ impl<'de> serde::Deserialize<'de> for GenesisTransaction {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.GenesisTransaction", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.GenesisTransaction", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for IndexedSignature {
@@ -3277,7 +3277,7 @@ impl serde::Serialize for IndexedSignature {
         if self.signature.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.IndexedSignature", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.IndexedSignature", len)?;
         if self.index != 0 {
             struct_ser.serialize_field("index", &self.index)?;
         }
@@ -3337,7 +3337,7 @@ impl<'de> serde::Deserialize<'de> for IndexedSignature {
             type Value = IndexedSignature;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.IndexedSignature")
+                formatter.write_str("struct velor.transaction.v1.IndexedSignature")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<IndexedSignature, V::Error>
@@ -3370,7 +3370,7 @@ impl<'de> serde::Deserialize<'de> for IndexedSignature {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.IndexedSignature", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.IndexedSignature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for Keyless {
@@ -3384,7 +3384,7 @@ impl serde::Serialize for Keyless {
         if !self.signature.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.Keyless", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.Keyless", len)?;
         if !self.signature.is_empty() {
             struct_ser.serialize_field("signature", pbjson::private::base64::encode(&self.signature).as_str())?;
         }
@@ -3438,7 +3438,7 @@ impl<'de> serde::Deserialize<'de> for Keyless {
             type Value = Keyless;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.Keyless")
+                formatter.write_str("struct velor.transaction.v1.Keyless")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<Keyless, V::Error>
@@ -3463,7 +3463,7 @@ impl<'de> serde::Deserialize<'de> for Keyless {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.Keyless", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.Keyless", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveAbility {
@@ -3574,7 +3574,7 @@ impl serde::Serialize for MoveFunction {
         if !self.r#return.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveFunction", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MoveFunction", len)?;
         if !self.name.is_empty() {
             struct_ser.serialize_field("name", &self.name)?;
         }
@@ -3662,7 +3662,7 @@ impl<'de> serde::Deserialize<'de> for MoveFunction {
             type Value = MoveFunction;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MoveFunction")
+                formatter.write_str("struct velor.transaction.v1.MoveFunction")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveFunction, V::Error>
@@ -3725,7 +3725,7 @@ impl<'de> serde::Deserialize<'de> for MoveFunction {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MoveFunction", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MoveFunction", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for move_function::Visibility {
@@ -3818,7 +3818,7 @@ impl serde::Serialize for MoveFunctionGenericTypeParam {
         if !self.constraints.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveFunctionGenericTypeParam", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MoveFunctionGenericTypeParam", len)?;
         if !self.constraints.is_empty() {
             let v = self.constraints.iter().cloned().map(|v| {
                 MoveAbility::from_i32(v)
@@ -3876,7 +3876,7 @@ impl<'de> serde::Deserialize<'de> for MoveFunctionGenericTypeParam {
             type Value = MoveFunctionGenericTypeParam;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MoveFunctionGenericTypeParam")
+                formatter.write_str("struct velor.transaction.v1.MoveFunctionGenericTypeParam")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveFunctionGenericTypeParam, V::Error>
@@ -3899,7 +3899,7 @@ impl<'de> serde::Deserialize<'de> for MoveFunctionGenericTypeParam {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MoveFunctionGenericTypeParam", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MoveFunctionGenericTypeParam", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveModule {
@@ -3925,7 +3925,7 @@ impl serde::Serialize for MoveModule {
         if !self.structs.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveModule", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MoveModule", len)?;
         if !self.address.is_empty() {
             struct_ser.serialize_field("address", &self.address)?;
         }
@@ -4004,7 +4004,7 @@ impl<'de> serde::Deserialize<'de> for MoveModule {
             type Value = MoveModule;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MoveModule")
+                formatter.write_str("struct velor.transaction.v1.MoveModule")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveModule, V::Error>
@@ -4059,7 +4059,7 @@ impl<'de> serde::Deserialize<'de> for MoveModule {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MoveModule", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MoveModule", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveModuleBytecode {
@@ -4076,7 +4076,7 @@ impl serde::Serialize for MoveModuleBytecode {
         if self.abi.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveModuleBytecode", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MoveModuleBytecode", len)?;
         if !self.bytecode.is_empty() {
             struct_ser.serialize_field("bytecode", pbjson::private::base64::encode(&self.bytecode).as_str())?;
         }
@@ -4136,7 +4136,7 @@ impl<'de> serde::Deserialize<'de> for MoveModuleBytecode {
             type Value = MoveModuleBytecode;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MoveModuleBytecode")
+                formatter.write_str("struct velor.transaction.v1.MoveModuleBytecode")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveModuleBytecode, V::Error>
@@ -4169,7 +4169,7 @@ impl<'de> serde::Deserialize<'de> for MoveModuleBytecode {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MoveModuleBytecode", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MoveModuleBytecode", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveModuleId {
@@ -4186,7 +4186,7 @@ impl serde::Serialize for MoveModuleId {
         if !self.name.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveModuleId", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MoveModuleId", len)?;
         if !self.address.is_empty() {
             struct_ser.serialize_field("address", &self.address)?;
         }
@@ -4246,7 +4246,7 @@ impl<'de> serde::Deserialize<'de> for MoveModuleId {
             type Value = MoveModuleId;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MoveModuleId")
+                formatter.write_str("struct velor.transaction.v1.MoveModuleId")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveModuleId, V::Error>
@@ -4277,7 +4277,7 @@ impl<'de> serde::Deserialize<'de> for MoveModuleId {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MoveModuleId", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MoveModuleId", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveScriptBytecode {
@@ -4294,7 +4294,7 @@ impl serde::Serialize for MoveScriptBytecode {
         if self.abi.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveScriptBytecode", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MoveScriptBytecode", len)?;
         if !self.bytecode.is_empty() {
             struct_ser.serialize_field("bytecode", pbjson::private::base64::encode(&self.bytecode).as_str())?;
         }
@@ -4354,7 +4354,7 @@ impl<'de> serde::Deserialize<'de> for MoveScriptBytecode {
             type Value = MoveScriptBytecode;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MoveScriptBytecode")
+                formatter.write_str("struct velor.transaction.v1.MoveScriptBytecode")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveScriptBytecode, V::Error>
@@ -4387,7 +4387,7 @@ impl<'de> serde::Deserialize<'de> for MoveScriptBytecode {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MoveScriptBytecode", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MoveScriptBytecode", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveStruct {
@@ -4416,7 +4416,7 @@ impl serde::Serialize for MoveStruct {
         if !self.fields.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveStruct", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MoveStruct", len)?;
         if !self.name.is_empty() {
             struct_ser.serialize_field("name", &self.name)?;
         }
@@ -4507,7 +4507,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
             type Value = MoveStruct;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MoveStruct")
+                formatter.write_str("struct velor.transaction.v1.MoveStruct")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveStruct, V::Error>
@@ -4570,7 +4570,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MoveStruct", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MoveStruct", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveStructField {
@@ -4587,7 +4587,7 @@ impl serde::Serialize for MoveStructField {
         if self.r#type.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveStructField", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MoveStructField", len)?;
         if !self.name.is_empty() {
             struct_ser.serialize_field("name", &self.name)?;
         }
@@ -4647,7 +4647,7 @@ impl<'de> serde::Deserialize<'de> for MoveStructField {
             type Value = MoveStructField;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MoveStructField")
+                formatter.write_str("struct velor.transaction.v1.MoveStructField")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveStructField, V::Error>
@@ -4678,7 +4678,7 @@ impl<'de> serde::Deserialize<'de> for MoveStructField {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MoveStructField", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MoveStructField", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveStructGenericTypeParam {
@@ -4695,7 +4695,7 @@ impl serde::Serialize for MoveStructGenericTypeParam {
         if self.is_phantom {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveStructGenericTypeParam", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MoveStructGenericTypeParam", len)?;
         if !self.constraints.is_empty() {
             let v = self.constraints.iter().cloned().map(|v| {
                 MoveAbility::from_i32(v)
@@ -4760,7 +4760,7 @@ impl<'de> serde::Deserialize<'de> for MoveStructGenericTypeParam {
             type Value = MoveStructGenericTypeParam;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MoveStructGenericTypeParam")
+                formatter.write_str("struct velor.transaction.v1.MoveStructGenericTypeParam")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveStructGenericTypeParam, V::Error>
@@ -4791,7 +4791,7 @@ impl<'de> serde::Deserialize<'de> for MoveStructGenericTypeParam {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MoveStructGenericTypeParam", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MoveStructGenericTypeParam", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveStructTag {
@@ -4814,7 +4814,7 @@ impl serde::Serialize for MoveStructTag {
         if !self.generic_type_params.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveStructTag", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MoveStructTag", len)?;
         if !self.address.is_empty() {
             struct_ser.serialize_field("address", &self.address)?;
         }
@@ -4887,7 +4887,7 @@ impl<'de> serde::Deserialize<'de> for MoveStructTag {
             type Value = MoveStructTag;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MoveStructTag")
+                formatter.write_str("struct velor.transaction.v1.MoveStructTag")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveStructTag, V::Error>
@@ -4934,7 +4934,7 @@ impl<'de> serde::Deserialize<'de> for MoveStructTag {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MoveStructTag", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MoveStructTag", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveType {
@@ -4951,7 +4951,7 @@ impl serde::Serialize for MoveType {
         if self.content.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveType", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MoveType", len)?;
         if self.r#type != 0 {
             let v = MoveTypes::from_i32(self.r#type)
                 .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
@@ -5042,7 +5042,7 @@ impl<'de> serde::Deserialize<'de> for MoveType {
             type Value = MoveType;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MoveType")
+                formatter.write_str("struct velor.transaction.v1.MoveType")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveType, V::Error>
@@ -5100,7 +5100,7 @@ impl<'de> serde::Deserialize<'de> for MoveType {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MoveType", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MoveType", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for move_type::ReferenceType {
@@ -5117,7 +5117,7 @@ impl serde::Serialize for move_type::ReferenceType {
         if self.to.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveType.ReferenceType", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MoveType.ReferenceType", len)?;
         if self.mutable {
             struct_ser.serialize_field("mutable", &self.mutable)?;
         }
@@ -5177,7 +5177,7 @@ impl<'de> serde::Deserialize<'de> for move_type::ReferenceType {
             type Value = move_type::ReferenceType;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MoveType.ReferenceType")
+                formatter.write_str("struct velor.transaction.v1.MoveType.ReferenceType")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<move_type::ReferenceType, V::Error>
@@ -5208,7 +5208,7 @@ impl<'de> serde::Deserialize<'de> for move_type::ReferenceType {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MoveType.ReferenceType", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MoveType.ReferenceType", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveTypes {
@@ -5340,7 +5340,7 @@ impl serde::Serialize for MultiAgentSignature {
         if !self.secondary_signers.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MultiAgentSignature", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MultiAgentSignature", len)?;
         if let Some(v) = self.sender.as_ref() {
             struct_ser.serialize_field("sender", v)?;
         }
@@ -5408,7 +5408,7 @@ impl<'de> serde::Deserialize<'de> for MultiAgentSignature {
             type Value = MultiAgentSignature;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MultiAgentSignature")
+                formatter.write_str("struct velor.transaction.v1.MultiAgentSignature")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MultiAgentSignature, V::Error>
@@ -5447,7 +5447,7 @@ impl<'de> serde::Deserialize<'de> for MultiAgentSignature {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MultiAgentSignature", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MultiAgentSignature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MultiEd25519Signature {
@@ -5470,7 +5470,7 @@ impl serde::Serialize for MultiEd25519Signature {
         if !self.public_key_indices.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MultiEd25519Signature", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MultiEd25519Signature", len)?;
         if !self.public_keys.is_empty() {
             struct_ser.serialize_field("publicKeys", &self.public_keys.iter().map(pbjson::private::base64::encode).collect::<Vec<_>>())?;
         }
@@ -5544,7 +5544,7 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
             type Value = MultiEd25519Signature;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MultiEd25519Signature")
+                formatter.write_str("struct velor.transaction.v1.MultiEd25519Signature")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MultiEd25519Signature, V::Error>
@@ -5602,7 +5602,7 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MultiEd25519Signature", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MultiEd25519Signature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MultiKeySignature {
@@ -5622,7 +5622,7 @@ impl serde::Serialize for MultiKeySignature {
         if self.signatures_required != 0 {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MultiKeySignature", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MultiKeySignature", len)?;
         if !self.public_keys.is_empty() {
             struct_ser.serialize_field("publicKeys", &self.public_keys)?;
         }
@@ -5690,7 +5690,7 @@ impl<'de> serde::Deserialize<'de> for MultiKeySignature {
             type Value = MultiKeySignature;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MultiKeySignature")
+                formatter.write_str("struct velor.transaction.v1.MultiKeySignature")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MultiKeySignature, V::Error>
@@ -5731,7 +5731,7 @@ impl<'de> serde::Deserialize<'de> for MultiKeySignature {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MultiKeySignature", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MultiKeySignature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MultisigPayload {
@@ -5748,7 +5748,7 @@ impl serde::Serialize for MultisigPayload {
         if self.transaction_payload.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MultisigPayload", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MultisigPayload", len)?;
         if !self.multisig_address.is_empty() {
             struct_ser.serialize_field("multisigAddress", &self.multisig_address)?;
         }
@@ -5810,7 +5810,7 @@ impl<'de> serde::Deserialize<'de> for MultisigPayload {
             type Value = MultisigPayload;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MultisigPayload")
+                formatter.write_str("struct velor.transaction.v1.MultisigPayload")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MultisigPayload, V::Error>
@@ -5841,7 +5841,7 @@ impl<'de> serde::Deserialize<'de> for MultisigPayload {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MultisigPayload", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MultisigPayload", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MultisigTransactionPayload {
@@ -5858,7 +5858,7 @@ impl serde::Serialize for MultisigTransactionPayload {
         if self.payload.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MultisigTransactionPayload", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.MultisigTransactionPayload", len)?;
         if self.r#type != 0 {
             let v = multisig_transaction_payload::Type::from_i32(self.r#type)
                 .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
@@ -5925,7 +5925,7 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
             type Value = MultisigTransactionPayload;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.MultisigTransactionPayload")
+                formatter.write_str("struct velor.transaction.v1.MultisigTransactionPayload")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<MultisigTransactionPayload, V::Error>
@@ -5957,7 +5957,7 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.MultisigTransactionPayload", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.MultisigTransactionPayload", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for multisig_transaction_payload::Type {
@@ -6050,7 +6050,7 @@ impl serde::Serialize for ScriptPayload {
         if !self.arguments.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ScriptPayload", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.ScriptPayload", len)?;
         if let Some(v) = self.code.as_ref() {
             struct_ser.serialize_field("code", v)?;
         }
@@ -6117,7 +6117,7 @@ impl<'de> serde::Deserialize<'de> for ScriptPayload {
             type Value = ScriptPayload;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ScriptPayload")
+                formatter.write_str("struct velor.transaction.v1.ScriptPayload")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<ScriptPayload, V::Error>
@@ -6156,7 +6156,7 @@ impl<'de> serde::Deserialize<'de> for ScriptPayload {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.ScriptPayload", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.ScriptPayload", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for ScriptWriteSet {
@@ -6173,7 +6173,7 @@ impl serde::Serialize for ScriptWriteSet {
         if self.script.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ScriptWriteSet", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.ScriptWriteSet", len)?;
         if !self.execute_as.is_empty() {
             struct_ser.serialize_field("executeAs", &self.execute_as)?;
         }
@@ -6234,7 +6234,7 @@ impl<'de> serde::Deserialize<'de> for ScriptWriteSet {
             type Value = ScriptWriteSet;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ScriptWriteSet")
+                formatter.write_str("struct velor.transaction.v1.ScriptWriteSet")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<ScriptWriteSet, V::Error>
@@ -6265,7 +6265,7 @@ impl<'de> serde::Deserialize<'de> for ScriptWriteSet {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.ScriptWriteSet", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.ScriptWriteSet", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for Secp256k1Ecdsa {
@@ -6279,7 +6279,7 @@ impl serde::Serialize for Secp256k1Ecdsa {
         if !self.signature.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.Secp256k1Ecdsa", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.Secp256k1Ecdsa", len)?;
         if !self.signature.is_empty() {
             struct_ser.serialize_field("signature", pbjson::private::base64::encode(&self.signature).as_str())?;
         }
@@ -6333,7 +6333,7 @@ impl<'de> serde::Deserialize<'de> for Secp256k1Ecdsa {
             type Value = Secp256k1Ecdsa;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.Secp256k1Ecdsa")
+                formatter.write_str("struct velor.transaction.v1.Secp256k1Ecdsa")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<Secp256k1Ecdsa, V::Error>
@@ -6358,7 +6358,7 @@ impl<'de> serde::Deserialize<'de> for Secp256k1Ecdsa {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.Secp256k1Ecdsa", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.Secp256k1Ecdsa", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for Signature {
@@ -6375,7 +6375,7 @@ impl serde::Serialize for Signature {
         if self.signature.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.Signature", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.Signature", len)?;
         if self.r#type != 0 {
             let v = signature::Type::from_i32(self.r#type)
                 .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
@@ -6469,7 +6469,7 @@ impl<'de> serde::Deserialize<'de> for Signature {
             type Value = Signature;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.Signature")
+                formatter.write_str("struct velor.transaction.v1.Signature")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<Signature, V::Error>
@@ -6529,7 +6529,7 @@ impl<'de> serde::Deserialize<'de> for Signature {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.Signature", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.Signature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for signature::Type {
@@ -6631,7 +6631,7 @@ impl serde::Serialize for SingleKeySignature {
         if self.signature.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.SingleKeySignature", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.SingleKeySignature", len)?;
         if let Some(v) = self.public_key.as_ref() {
             struct_ser.serialize_field("publicKey", v)?;
         }
@@ -6692,7 +6692,7 @@ impl<'de> serde::Deserialize<'de> for SingleKeySignature {
             type Value = SingleKeySignature;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.SingleKeySignature")
+                formatter.write_str("struct velor.transaction.v1.SingleKeySignature")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<SingleKeySignature, V::Error>
@@ -6723,7 +6723,7 @@ impl<'de> serde::Deserialize<'de> for SingleKeySignature {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.SingleKeySignature", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.SingleKeySignature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for SingleSender {
@@ -6737,7 +6737,7 @@ impl serde::Serialize for SingleSender {
         if self.sender.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.SingleSender", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.SingleSender", len)?;
         if let Some(v) = self.sender.as_ref() {
             struct_ser.serialize_field("sender", v)?;
         }
@@ -6791,7 +6791,7 @@ impl<'de> serde::Deserialize<'de> for SingleSender {
             type Value = SingleSender;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.SingleSender")
+                formatter.write_str("struct velor.transaction.v1.SingleSender")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<SingleSender, V::Error>
@@ -6814,7 +6814,7 @@ impl<'de> serde::Deserialize<'de> for SingleSender {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.SingleSender", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.SingleSender", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for StateCheckpointTransaction {
@@ -6825,7 +6825,7 @@ impl serde::Serialize for StateCheckpointTransaction {
     {
         use serde::ser::SerializeStruct;
         let len = 0;
-        let struct_ser = serializer.serialize_struct("aptos.transaction.v1.StateCheckpointTransaction", len)?;
+        let struct_ser = serializer.serialize_struct("velor.transaction.v1.StateCheckpointTransaction", len)?;
         struct_ser.end()
     }
 }
@@ -6871,7 +6871,7 @@ impl<'de> serde::Deserialize<'de> for StateCheckpointTransaction {
             type Value = StateCheckpointTransaction;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.StateCheckpointTransaction")
+                formatter.write_str("struct velor.transaction.v1.StateCheckpointTransaction")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<StateCheckpointTransaction, V::Error>
@@ -6885,7 +6885,7 @@ impl<'de> serde::Deserialize<'de> for StateCheckpointTransaction {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.StateCheckpointTransaction", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.StateCheckpointTransaction", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for Transaction {
@@ -6920,7 +6920,7 @@ impl serde::Serialize for Transaction {
         if self.txn_data.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.Transaction", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.Transaction", len)?;
         if let Some(v) = self.timestamp.as_ref() {
             struct_ser.serialize_field("timestamp", v)?;
         }
@@ -7057,7 +7057,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
             type Value = Transaction;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.Transaction")
+                formatter.write_str("struct velor.transaction.v1.Transaction")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<Transaction, V::Error>
@@ -7178,7 +7178,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.Transaction", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.Transaction", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for transaction::TransactionType {
@@ -7304,7 +7304,7 @@ impl serde::Serialize for TransactionInfo {
         if !self.changes.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.TransactionInfo", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.TransactionInfo", len)?;
         if !self.hash.is_empty() {
             struct_ser.serialize_field("hash", pbjson::private::base64::encode(&self.hash).as_str())?;
         }
@@ -7412,7 +7412,7 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
             type Value = TransactionInfo;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.TransactionInfo")
+                formatter.write_str("struct velor.transaction.v1.TransactionInfo")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<TransactionInfo, V::Error>
@@ -7511,7 +7511,7 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.TransactionInfo", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.TransactionInfo", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for TransactionPayload {
@@ -7531,7 +7531,7 @@ impl serde::Serialize for TransactionPayload {
         if self.extra_config.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.TransactionPayload", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.TransactionPayload", len)?;
         if self.r#type != 0 {
             let v = transaction_payload::Type::from_i32(self.r#type)
                 .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
@@ -7630,7 +7630,7 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             type Value = TransactionPayload;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.TransactionPayload")
+                formatter.write_str("struct velor.transaction.v1.TransactionPayload")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<TransactionPayload, V::Error>
@@ -7692,7 +7692,7 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.TransactionPayload", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.TransactionPayload", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for transaction_payload::Type {
@@ -7794,7 +7794,7 @@ impl serde::Serialize for TransactionSizeInfo {
         if !self.write_op_size_info.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.TransactionSizeInfo", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.TransactionSizeInfo", len)?;
         if self.transaction_bytes != 0 {
             struct_ser.serialize_field("transactionBytes", &self.transaction_bytes)?;
         }
@@ -7863,7 +7863,7 @@ impl<'de> serde::Deserialize<'de> for TransactionSizeInfo {
             type Value = TransactionSizeInfo;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.TransactionSizeInfo")
+                formatter.write_str("struct velor.transaction.v1.TransactionSizeInfo")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<TransactionSizeInfo, V::Error>
@@ -7904,7 +7904,7 @@ impl<'de> serde::Deserialize<'de> for TransactionSizeInfo {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.TransactionSizeInfo", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.TransactionSizeInfo", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for UserTransaction {
@@ -7921,7 +7921,7 @@ impl serde::Serialize for UserTransaction {
         if !self.events.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.UserTransaction", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.UserTransaction", len)?;
         if let Some(v) = self.request.as_ref() {
             struct_ser.serialize_field("request", v)?;
         }
@@ -7981,7 +7981,7 @@ impl<'de> serde::Deserialize<'de> for UserTransaction {
             type Value = UserTransaction;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.UserTransaction")
+                formatter.write_str("struct velor.transaction.v1.UserTransaction")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<UserTransaction, V::Error>
@@ -8012,7 +8012,7 @@ impl<'de> serde::Deserialize<'de> for UserTransaction {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.UserTransaction", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.UserTransaction", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for UserTransactionRequest {
@@ -8044,7 +8044,7 @@ impl serde::Serialize for UserTransactionRequest {
         if self.signature.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.UserTransactionRequest", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.UserTransactionRequest", len)?;
         if !self.sender.is_empty() {
             struct_ser.serialize_field("sender", &self.sender)?;
         }
@@ -8138,7 +8138,7 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
             type Value = UserTransactionRequest;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.UserTransactionRequest")
+                formatter.write_str("struct velor.transaction.v1.UserTransactionRequest")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<UserTransactionRequest, V::Error>
@@ -8215,7 +8215,7 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.UserTransactionRequest", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.UserTransactionRequest", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for ValidatorTransaction {
@@ -8232,7 +8232,7 @@ impl serde::Serialize for ValidatorTransaction {
         if self.validator_transaction_type.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.ValidatorTransaction", len)?;
         if !self.events.is_empty() {
             struct_ser.serialize_field("events", &self.events)?;
         }
@@ -8304,7 +8304,7 @@ impl<'de> serde::Deserialize<'de> for ValidatorTransaction {
             type Value = ValidatorTransaction;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ValidatorTransaction")
+                formatter.write_str("struct velor.transaction.v1.ValidatorTransaction")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<ValidatorTransaction, V::Error>
@@ -8343,7 +8343,7 @@ impl<'de> serde::Deserialize<'de> for ValidatorTransaction {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.ValidatorTransaction", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.ValidatorTransaction", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for validator_transaction::DkgUpdate {
@@ -8357,7 +8357,7 @@ impl serde::Serialize for validator_transaction::DkgUpdate {
         if self.dkg_transcript.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction.DkgUpdate", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.ValidatorTransaction.DkgUpdate", len)?;
         if let Some(v) = self.dkg_transcript.as_ref() {
             struct_ser.serialize_field("dkgTranscript", v)?;
         }
@@ -8412,7 +8412,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::DkgUpdate {
             type Value = validator_transaction::DkgUpdate;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ValidatorTransaction.DkgUpdate")
+                formatter.write_str("struct velor.transaction.v1.ValidatorTransaction.DkgUpdate")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<validator_transaction::DkgUpdate, V::Error>
@@ -8435,7 +8435,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::DkgUpdate {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.ValidatorTransaction.DkgUpdate", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.ValidatorTransaction.DkgUpdate", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for validator_transaction::dkg_update::DkgTranscript {
@@ -8455,7 +8455,7 @@ impl serde::Serialize for validator_transaction::dkg_update::DkgTranscript {
         if !self.payload.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction.DkgUpdate.DkgTranscript", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.ValidatorTransaction.DkgUpdate.DkgTranscript", len)?;
         if self.epoch != 0 {
             struct_ser.serialize_field("epoch", ToString::to_string(&self.epoch).as_str())?;
         }
@@ -8521,7 +8521,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::dkg_update::DkgTran
             type Value = validator_transaction::dkg_update::DkgTranscript;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ValidatorTransaction.DkgUpdate.DkgTranscript")
+                formatter.write_str("struct velor.transaction.v1.ValidatorTransaction.DkgUpdate.DkgTranscript")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<validator_transaction::dkg_update::DkgTranscript, V::Error>
@@ -8564,7 +8564,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::dkg_update::DkgTran
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.ValidatorTransaction.DkgUpdate.DkgTranscript", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.ValidatorTransaction.DkgUpdate.DkgTranscript", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for validator_transaction::ObservedJwkUpdate {
@@ -8578,7 +8578,7 @@ impl serde::Serialize for validator_transaction::ObservedJwkUpdate {
         if self.quorum_certified_update.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate", len)?;
         if let Some(v) = self.quorum_certified_update.as_ref() {
             struct_ser.serialize_field("quorumCertifiedUpdate", v)?;
         }
@@ -8633,7 +8633,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::ObservedJwkUpdate {
             type Value = validator_transaction::ObservedJwkUpdate;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate")
+                formatter.write_str("struct velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<validator_transaction::ObservedJwkUpdate, V::Error>
@@ -8656,7 +8656,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::ObservedJwkUpdate {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for validator_transaction::observed_jwk_update::ExportedAggregateSignature {
@@ -8673,7 +8673,7 @@ impl serde::Serialize for validator_transaction::observed_jwk_update::ExportedAg
         if !self.sig.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedAggregateSignature", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedAggregateSignature", len)?;
         if !self.signer_indices.is_empty() {
             struct_ser.serialize_field("signerIndices", &self.signer_indices.iter().map(ToString::to_string).collect::<Vec<_>>())?;
         }
@@ -8734,7 +8734,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
             type Value = validator_transaction::observed_jwk_update::ExportedAggregateSignature;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedAggregateSignature")
+                formatter.write_str("struct velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedAggregateSignature")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<validator_transaction::observed_jwk_update::ExportedAggregateSignature, V::Error>
@@ -8770,7 +8770,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedAggregateSignature", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedAggregateSignature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for validator_transaction::observed_jwk_update::ExportedProviderJwKs {
@@ -8790,7 +8790,7 @@ impl serde::Serialize for validator_transaction::observed_jwk_update::ExportedPr
         if !self.jwks.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs", len)?;
         if !self.issuer.is_empty() {
             struct_ser.serialize_field("issuer", &self.issuer)?;
         }
@@ -8856,7 +8856,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
             type Value = validator_transaction::observed_jwk_update::ExportedProviderJwKs;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs")
+                formatter.write_str("struct velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<validator_transaction::observed_jwk_update::ExportedProviderJwKs, V::Error>
@@ -8897,7 +8897,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for validator_transaction::observed_jwk_update::exported_provider_jw_ks::Jwk {
@@ -8911,7 +8911,7 @@ impl serde::Serialize for validator_transaction::observed_jwk_update::exported_p
         if self.jwk_type.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK", len)?;
         if let Some(v) = self.jwk_type.as_ref() {
             match v {
                 validator_transaction::observed_jwk_update::exported_provider_jw_ks::jwk::JwkType::UnsupportedJwk(v) => {
@@ -8976,7 +8976,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
             type Value = validator_transaction::observed_jwk_update::exported_provider_jw_ks::Jwk;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK")
+                formatter.write_str("struct velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<validator_transaction::observed_jwk_update::exported_provider_jw_ks::Jwk, V::Error>
@@ -9007,7 +9007,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for validator_transaction::observed_jwk_update::exported_provider_jw_ks::jwk::Rsa {
@@ -9033,7 +9033,7 @@ impl serde::Serialize for validator_transaction::observed_jwk_update::exported_p
         if !self.n.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.RSA", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.RSA", len)?;
         if !self.kid.is_empty() {
             struct_ser.serialize_field("kid", &self.kid)?;
         }
@@ -9111,7 +9111,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
             type Value = validator_transaction::observed_jwk_update::exported_provider_jw_ks::jwk::Rsa;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.RSA")
+                formatter.write_str("struct velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.RSA")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<validator_transaction::observed_jwk_update::exported_provider_jw_ks::jwk::Rsa, V::Error>
@@ -9166,7 +9166,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.RSA", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.RSA", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for validator_transaction::observed_jwk_update::exported_provider_jw_ks::jwk::UnsupportedJwk {
@@ -9183,7 +9183,7 @@ impl serde::Serialize for validator_transaction::observed_jwk_update::exported_p
         if !self.payload.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.UnsupportedJWK", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.UnsupportedJWK", len)?;
         if !self.id.is_empty() {
             struct_ser.serialize_field("id", pbjson::private::base64::encode(&self.id).as_str())?;
         }
@@ -9243,7 +9243,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
             type Value = validator_transaction::observed_jwk_update::exported_provider_jw_ks::jwk::UnsupportedJwk;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.UnsupportedJWK")
+                formatter.write_str("struct velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.UnsupportedJWK")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<validator_transaction::observed_jwk_update::exported_provider_jw_ks::jwk::UnsupportedJwk, V::Error>
@@ -9278,7 +9278,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.UnsupportedJWK", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.UnsupportedJWK", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for validator_transaction::observed_jwk_update::QuorumCertifiedUpdate {
@@ -9295,7 +9295,7 @@ impl serde::Serialize for validator_transaction::observed_jwk_update::QuorumCert
         if self.multi_sig.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.QuorumCertifiedUpdate", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.QuorumCertifiedUpdate", len)?;
         if let Some(v) = self.update.as_ref() {
             struct_ser.serialize_field("update", v)?;
         }
@@ -9356,7 +9356,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
             type Value = validator_transaction::observed_jwk_update::QuorumCertifiedUpdate;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.QuorumCertifiedUpdate")
+                formatter.write_str("struct velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.QuorumCertifiedUpdate")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<validator_transaction::observed_jwk_update::QuorumCertifiedUpdate, V::Error>
@@ -9387,7 +9387,7 @@ impl<'de> serde::Deserialize<'de> for validator_transaction::observed_jwk_update
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.QuorumCertifiedUpdate", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.ValidatorTransaction.ObservedJwkUpdate.QuorumCertifiedUpdate", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for WebAuthn {
@@ -9401,7 +9401,7 @@ impl serde::Serialize for WebAuthn {
         if !self.signature.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.WebAuthn", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.WebAuthn", len)?;
         if !self.signature.is_empty() {
             struct_ser.serialize_field("signature", pbjson::private::base64::encode(&self.signature).as_str())?;
         }
@@ -9455,7 +9455,7 @@ impl<'de> serde::Deserialize<'de> for WebAuthn {
             type Value = WebAuthn;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.WebAuthn")
+                formatter.write_str("struct velor.transaction.v1.WebAuthn")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<WebAuthn, V::Error>
@@ -9480,7 +9480,7 @@ impl<'de> serde::Deserialize<'de> for WebAuthn {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.WebAuthn", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.WebAuthn", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for WriteModule {
@@ -9500,7 +9500,7 @@ impl serde::Serialize for WriteModule {
         if self.data.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.WriteModule", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.WriteModule", len)?;
         if !self.address.is_empty() {
             struct_ser.serialize_field("address", &self.address)?;
         }
@@ -9567,7 +9567,7 @@ impl<'de> serde::Deserialize<'de> for WriteModule {
             type Value = WriteModule;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.WriteModule")
+                formatter.write_str("struct velor.transaction.v1.WriteModule")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<WriteModule, V::Error>
@@ -9608,7 +9608,7 @@ impl<'de> serde::Deserialize<'de> for WriteModule {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.WriteModule", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.WriteModule", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for WriteOpSizeInfo {
@@ -9625,7 +9625,7 @@ impl serde::Serialize for WriteOpSizeInfo {
         if self.value_bytes != 0 {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.WriteOpSizeInfo", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.WriteOpSizeInfo", len)?;
         if self.key_bytes != 0 {
             struct_ser.serialize_field("keyBytes", &self.key_bytes)?;
         }
@@ -9687,7 +9687,7 @@ impl<'de> serde::Deserialize<'de> for WriteOpSizeInfo {
             type Value = WriteOpSizeInfo;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.WriteOpSizeInfo")
+                formatter.write_str("struct velor.transaction.v1.WriteOpSizeInfo")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<WriteOpSizeInfo, V::Error>
@@ -9722,7 +9722,7 @@ impl<'de> serde::Deserialize<'de> for WriteOpSizeInfo {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.WriteOpSizeInfo", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.WriteOpSizeInfo", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for WriteResource {
@@ -9748,7 +9748,7 @@ impl serde::Serialize for WriteResource {
         if !self.data.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.WriteResource", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.WriteResource", len)?;
         if !self.address.is_empty() {
             struct_ser.serialize_field("address", &self.address)?;
         }
@@ -9828,7 +9828,7 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
             type Value = WriteResource;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.WriteResource")
+                formatter.write_str("struct velor.transaction.v1.WriteResource")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<WriteResource, V::Error>
@@ -9885,7 +9885,7 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.WriteResource", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.WriteResource", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for WriteSet {
@@ -9902,7 +9902,7 @@ impl serde::Serialize for WriteSet {
         if self.write_set.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.WriteSet", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.WriteSet", len)?;
         if self.write_set_type != 0 {
             let v = write_set::WriteSetType::from_i32(self.write_set_type)
                 .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.write_set_type)))?;
@@ -9977,7 +9977,7 @@ impl<'de> serde::Deserialize<'de> for WriteSet {
             type Value = WriteSet;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.WriteSet")
+                formatter.write_str("struct velor.transaction.v1.WriteSet")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<WriteSet, V::Error>
@@ -10016,7 +10016,7 @@ impl<'de> serde::Deserialize<'de> for WriteSet {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.WriteSet", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.WriteSet", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for write_set::WriteSetType {
@@ -10109,7 +10109,7 @@ impl serde::Serialize for WriteSetChange {
         if self.change.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.WriteSetChange", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.WriteSetChange", len)?;
         if self.r#type != 0 {
             let v = write_set_change::Type::from_i32(self.r#type)
                 .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
@@ -10211,7 +10211,7 @@ impl<'de> serde::Deserialize<'de> for WriteSetChange {
             type Value = WriteSetChange;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.WriteSetChange")
+                formatter.write_str("struct velor.transaction.v1.WriteSetChange")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<WriteSetChange, V::Error>
@@ -10278,7 +10278,7 @@ impl<'de> serde::Deserialize<'de> for WriteSetChange {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.WriteSetChange", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.WriteSetChange", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for write_set_change::Type {
@@ -10380,7 +10380,7 @@ impl serde::Serialize for WriteSetPayload {
         if self.write_set.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.WriteSetPayload", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.WriteSetPayload", len)?;
         if let Some(v) = self.write_set.as_ref() {
             struct_ser.serialize_field("writeSet", v)?;
         }
@@ -10435,7 +10435,7 @@ impl<'de> serde::Deserialize<'de> for WriteSetPayload {
             type Value = WriteSetPayload;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.WriteSetPayload")
+                formatter.write_str("struct velor.transaction.v1.WriteSetPayload")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<WriteSetPayload, V::Error>
@@ -10458,7 +10458,7 @@ impl<'de> serde::Deserialize<'de> for WriteSetPayload {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.WriteSetPayload", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.WriteSetPayload", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for WriteTableData {
@@ -10481,7 +10481,7 @@ impl serde::Serialize for WriteTableData {
         if !self.value_type.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.WriteTableData", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.WriteTableData", len)?;
         if !self.key.is_empty() {
             struct_ser.serialize_field("key", &self.key)?;
         }
@@ -10555,7 +10555,7 @@ impl<'de> serde::Deserialize<'de> for WriteTableData {
             type Value = WriteTableData;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.WriteTableData")
+                formatter.write_str("struct velor.transaction.v1.WriteTableData")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<WriteTableData, V::Error>
@@ -10602,7 +10602,7 @@ impl<'de> serde::Deserialize<'de> for WriteTableData {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.WriteTableData", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.WriteTableData", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for WriteTableItem {
@@ -10625,7 +10625,7 @@ impl serde::Serialize for WriteTableItem {
         if self.data.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.WriteTableItem", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.transaction.v1.WriteTableItem", len)?;
         if !self.state_key_hash.is_empty() {
             struct_ser.serialize_field("stateKeyHash", pbjson::private::base64::encode(&self.state_key_hash).as_str())?;
         }
@@ -10698,7 +10698,7 @@ impl<'de> serde::Deserialize<'de> for WriteTableItem {
             type Value = WriteTableItem;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.WriteTableItem")
+                formatter.write_str("struct velor.transaction.v1.WriteTableItem")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<WriteTableItem, V::Error>
@@ -10747,6 +10747,6 @@ impl<'de> serde::Deserialize<'de> for WriteTableItem {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.WriteTableItem", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.transaction.v1.WriteTableItem", FIELDS, GeneratedVisitor)
     }
 }

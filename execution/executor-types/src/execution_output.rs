@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,11 +8,11 @@ use crate::{
     planned::Planned,
     transactions_with_output::{TransactionsToKeep, TransactionsWithOutput},
 };
-use aptos_drop_helper::DropHelper;
-use aptos_storage_interface::state_store::{
+use velor_drop_helper::DropHelper;
+use velor_storage_interface::state_store::{
     state::LedgerState, state_view::cached_state_view::ShardedStateCache,
 };
-use aptos_types::{
+use velor_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     transaction::{

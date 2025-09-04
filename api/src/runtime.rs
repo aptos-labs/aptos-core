@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -19,11 +19,11 @@ use crate::{
     view_function::ViewFunctionApi,
 };
 use anyhow::{anyhow, Context as AnyhowContext};
-use aptos_config::config::{ApiConfig, NodeConfig};
-use aptos_logger::info;
-use aptos_mempool::MempoolClientSender;
-use aptos_storage_interface::DbReader;
-use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
+use velor_config::config::{ApiConfig, NodeConfig};
+use velor_logger::info;
+use velor_mempool::MempoolClientSender;
+use velor_storage_interface::DbReader;
+use velor_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
 use futures::channel::oneshot;
 use poem::{
     handler,
@@ -49,7 +49,7 @@ pub fn bootstrap(
     port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<Runtime> {
     let max_runtime_workers = get_max_runtime_workers(&config.api);
-    let runtime = aptos_runtimes::spawn_named_runtime("api".into(), Some(max_runtime_workers));
+    let runtime = velor_runtimes::spawn_named_runtime("api".into(), Some(max_runtime_workers));
 
     let context = Context::new(chain_id, db, mp_sender, config.clone(), indexer_reader);
 
@@ -101,7 +101,7 @@ pub fn bootstrap(
 }
 
 // TODOs regarding spec generation:
-// TODO: https://github.com/aptos-labs/aptos-core/issues/2280
+// TODO: https://github.com/velor-chain/velor-core/issues/2280
 // TODO: https://github.com/poem-web/poem/issues/321
 // TODO: https://github.com/poem-web/poem/issues/332
 // TODO: https://github.com/poem-web/poem/issues/333
@@ -152,15 +152,15 @@ pub fn get_api_service(
     let license =
         LicenseObject::new("Apache 2.0").url("https://www.apache.org/licenses/LICENSE-2.0.html");
     let contact = ContactObject::new()
-        .name("Aptos Labs")
-        .url("https://github.com/aptos-labs/aptos-core");
+        .name("Velor Labs")
+        .url("https://github.com/velor-chain/velor-core");
 
-    OpenApiService::new(apis, "Aptos Node API", version.trim())
+    OpenApiService::new(apis, "Velor Node API", version.trim())
         .server("/v1")
-        .description("The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.")
+        .description("The Velor Node API is a RESTful API for client applications to interact with the Velor blockchain.")
         .license(license)
         .contact(contact)
-        .external_document("https://github.com/aptos-labs/aptos-core")
+        .external_document("https://github.com/velor-chain/velor-core")
 }
 
 /// Returns address it is running at.
@@ -272,7 +272,7 @@ pub fn attach_poem_to_runtime(
 async fn root_handler() -> Html<&'static str> {
     let response = "<html>
 <head>
-    <title>Aptos Node API</title>
+    <title>Velor Node API</title>
 </head>
 <body>
     <p>
@@ -299,14 +299,14 @@ fn get_max_runtime_workers(api_config: &ApiConfig) -> usize {
 mod tests {
     use super::bootstrap;
     use crate::runtime::get_max_runtime_workers;
-    use aptos_api_test_context::{new_test_context, TestContext};
-    use aptos_config::config::{ApiConfig, NodeConfig};
-    use aptos_types::chain_id::ChainId;
+    use velor_api_test_context::{new_test_context, TestContext};
+    use velor_config::config::{ApiConfig, NodeConfig};
+    use velor_types::chain_id::ChainId;
     use std::time::Duration;
 
     // TODO: Unignore this when I figure out why this only works when being
     // run alone (it fails when run with other tests).
-    // https://github.com/aptos-labs/aptos-core/issues/2977
+    // https://github.com/velor-chain/velor-core/issues/2977
     #[ignore]
     #[test]
     fn test_bootstrap_jsonprc_and_api_configured_at_different_port() {

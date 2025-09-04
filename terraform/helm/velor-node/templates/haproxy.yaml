@@ -1,0 +1,233 @@
+{{- if .Values.haproxy.enabled }}
+{{- range $i, $e := until (int .Values.numValidators) }}
+---
+# make the validator index available in tpl using $.Values.i 
+{{ $_ := set $.Values "i" $i }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "velor-validator.fullname" $ }}-{{$i}}-haproxy
+  labels:
+    {{- include "velor-validator.labels" $ | nindent 4 }}
+data:
+  haproxy.cfg: |
+{{ (tpl ($.Files.Get "files/haproxy.cfg") $) | indent 4 }}
+  blocked.ips: ""
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "velor-validator.fullname" $ }}-{{$i}}-validator-lb
+  labels:
+    {{- include "velor-validator.labels" $ | nindent 4 }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
+    {{- if $.Values.service.domain }}
+    external-dns.alpha.kubernetes.io/hostname: vn{{$i}}.{{ $.Values.service.domain }},val{{$i}}.{{ $.Values.service.domain }}
+    {{- end }}
+spec:
+  selector:
+    {{- include "velor-validator.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/instance: haproxy-{{$i}}
+  ports:
+  - name: validator
+    port: 6180
+  {{- if $.Values.service.validator.enableMetricsPort }}
+  - name: metrics
+    port: 9101
+    targetPort: 9102
+  {{- end }}
+  {{- if $.Values.service.validator.enableAdminPort }}
+  - name: admin
+    port: 9102
+    targetPort: 9202
+  {{- end }}
+  {{- if $.Values.service.validator.enableRestApi }}
+  - name: api
+    port: 80
+    targetPort: 8180
+  {{- end }}
+  type: {{ $.Values.service.validator.external.type }}
+  # Use externalTrafficPolicy if service type is LoadBalancer or Nodeport
+  {{- if and (ne "ClusterIP" $.Values.service.validator.external.type) $.Values.service.validator.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ $.Values.service.validator.externalTrafficPolicy }}
+  {{- end }}
+  {{- with $.Values.service.validator.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+{{- range $index, $config := $.Values.fullnode.groups }}
+{{- if lt $i (int $.Values.numFullnodeGroups) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "velor-validator.fullname" $ }}-{{$i}}-{{ $config.name }}-lb
+  labels:
+    {{- include "velor-validator.labels" $ | nindent 4 }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
+    {{- if $.Values.service.domain }}
+    external-dns.alpha.kubernetes.io/hostname: {{ $config.dns_name }}{{$i}}.{{ $.Values.service.domain }},{{ $config.name }}{{$i}}.{{ $.Values.service.domain }}
+    {{- end }}
+spec:
+  selector:
+    {{- include "velor-validator.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/instance: haproxy-{{$i}}
+  ports:
+  - name: velornet
+    port: 6182
+    targetPort: {{ add 6182 $index }}
+  {{- if $.Values.service.fullnode.enableMetricsPort }}
+  - name: metrics
+    port: 9101
+    targetPort: {{ add 9103 $index }}
+  {{- end }}
+  {{- if $.Values.service.fullnode.enableAdminPort }}
+  - name: admin
+    port: 9102
+    targetPort: {{ add 9203 $index }}
+  {{- end }}
+  {{- if $.Values.service.fullnode.enableRestApi }}
+  - name: api
+    port: 80
+    targetPort: {{ add 8080 $index }}
+  {{- if $.Values.haproxy.tls_secret }}
+  - name: api-tls
+    port: 443
+    targetPort: {{ add 8443 $index }}
+  {{- end }}
+  {{- end }}
+  type: {{ $.Values.service.fullnode.external.type }}
+  # Use externalTrafficPolicy if service type is LoadBalancer or Nodeport
+  {{- if and (ne "ClusterIP" $.Values.service.fullnode.external.type) $.Values.service.fullnode.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ $.Values.service.fullnode.externalTrafficPolicy }}
+  {{- end }}  
+  {{- with (index $.Values.service $config.name).loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+{{- end }}
+{{- end }}
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "velor-validator.fullname" $ }}-{{$i}}-haproxy
+  labels:
+    {{- include "velor-validator.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/instance: haproxy-{{$i}}
+spec:
+  replicas: {{ $.Values.haproxy.replicas }}
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "velor-validator.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/name: haproxy
+      app.kubernetes.io/instance: haproxy-{{$i}}
+  template:
+    metadata:
+      labels:
+        {{- include "velor-validator.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/name: haproxy
+        app.kubernetes.io/instance: haproxy-{{$i}}
+        {{- if $.Values.chain.name }}
+        chain_name: {{ $.Values.chain.name }}
+        {{- end}}
+      annotations:
+        checksum/haproxy.cfg: {{ tpl ($.Files.Get "files/haproxy.cfg") $ | sha256sum }}
+    spec:
+      {{- with $.Values.haproxy }}
+      containers:
+      - name: haproxy
+        image: {{ .image.repo }}:{{ .image.tag }}
+        args:
+          - /bin/sh
+          - -c
+          - |-
+            ulimit -n 1048576
+            exec haproxy -f /usr/local/etc/haproxy/haproxy.cfg
+        imagePullPolicy: {{ .image.pullPolicy }}
+        resources:
+          {{- toYaml .resources | nindent 10 }}
+        # These ports are exposed by HAProxy. See haproxy.cfg for more details
+        # Fullnode ports are dynamically assigned based on the number of fullnode groups
+        ports:
+        # Velornet
+        - containerPort: 6180 # validator
+        - containerPort: 6182 # fullnode
+        # Fullnode API
+        - containerPort: 8080
+        # Validator API
+        - containerPort: 8180
+        # HAProxy metrics port
+        - containerPort: 9101
+        # Node ports
+        - containerPort: 9102
+        - containerPort: 9103
+        # AdminService ports
+        - containerPort: 9202 # validator admin
+        - containerPort: 9203 # fullnode admin
+        volumeMounts:
+        - name: haproxy-config
+          mountPath: /usr/local/etc/haproxy
+        {{- if .tls_secret }}
+        - name: haproxy-tls
+          mountPath: /etc/haproxy/tls
+        {{- end }}
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - SETUID
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      {{- end }}
+      volumes:
+      - name: haproxy-config
+        configMap:
+          name: {{ include "velor-validator.fullname" $ }}-{{$i}}-haproxy
+      {{- if $.Values.haproxy.tls_secret }}
+      - name: haproxy-tls
+        secret:
+          secretName: {{ $.Values.haproxy.tls_secret }}
+      {{- end }}
+      serviceAccountName: {{ include "velor-validator.fullname" $ }}-haproxy
+      {{- if $.Values.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{ $.Values.imagePullSecret }}
+      {{- end }}
+{{- end }}
+{{- end }}

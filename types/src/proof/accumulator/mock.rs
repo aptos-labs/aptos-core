@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,7 +6,7 @@ use crate::{
     proof::{AccumulatorConsistencyProof, MerkleTreeInternalNode, TransactionAccumulatorSummary},
     transaction::Version,
 };
-use aptos_crypto::hash::{
+use velor_crypto::hash::{
     CryptoHash, HashValue, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH,
 };
 use std::{cell::RefCell, collections::HashMap};

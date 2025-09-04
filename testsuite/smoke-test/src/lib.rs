@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,9 +7,9 @@ extern crate core;
 #[cfg(test)]
 mod account_abstraction;
 #[cfg(test)]
-mod aptos;
+mod velor;
 #[cfg(test)]
-mod aptos_cli;
+mod velor_cli;
 #[cfg(test)]
 mod client;
 #[cfg(test)]

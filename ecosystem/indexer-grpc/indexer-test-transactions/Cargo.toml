@@ -1,5 +1,5 @@
 [package]
-name = "aptos-indexer-test-transactions"
+name = "velor-indexer-test-transactions"
 description = "Indexer integration testing framework."
 version = "1.0.0"
 
@@ -13,5 +13,5 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dev-dependencies]
-aptos-protos = { workspace = true }
+velor-protos = { workspace = true }
 serde_json = { workspace = true }

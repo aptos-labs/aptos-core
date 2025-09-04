@@ -20,7 +20,7 @@ runs:
       with:
         ref: ${{ github.event.pull_request.head.sha }}
         fetch-depth: 0 # Fetch all git history for accurate target determination
-    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+    - uses: velor-chain/velor-core/.github/actions/rust-setup@main
       with:
         GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
 

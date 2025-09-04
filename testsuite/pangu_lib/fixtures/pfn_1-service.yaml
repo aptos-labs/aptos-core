@@ -10,7 +10,7 @@ spec:
     port: 8080
     protocol: TCP
     targetPort: 8080
-  - name: aptosnet
+  - name: velornet
     port: 6182
     protocol: TCP
   - name: backup

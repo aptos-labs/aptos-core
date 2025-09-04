@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_indexer_grpc_server_framework::ServerArgs;
-use aptos_nft_metadata_crawler::config::NFTMetadataCrawlerConfig;
+use velor_indexer_grpc_server_framework::ServerArgs;
+use velor_nft_metadata_crawler::config::NFTMetadataCrawlerConfig;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

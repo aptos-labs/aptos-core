@@ -34,4 +34,4 @@ export ACCOUNT_MANAGER_0_AUD=407408718192.apps.googleusercontent.com
 export VUF_KEY_SEED_HEX=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 # Start the pepper service
-cargo run -p aptos-keyless-pepper-service
+cargo run -p velor-keyless-pepper-service

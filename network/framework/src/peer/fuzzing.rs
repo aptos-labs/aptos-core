@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,13 +12,13 @@ use crate::{
     testutils::fake_socket::ReadOnlyTestSocketVec,
     transport::{Connection, ConnectionId, ConnectionMetadata},
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::{config::PeerRole, network_id::NetworkContext};
-use aptos_memsocket::MemorySocket;
-use aptos_netcore::transport::ConnectionOrigin;
-use aptos_proptest_helpers::ValueGenerator;
-use aptos_time_service::TimeService;
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::{config::PeerRole, network_id::NetworkContext};
+use velor_memsocket::MemorySocket;
+use velor_netcore::transport::ConnectionOrigin;
+use velor_proptest_helpers::ValueGenerator;
+use velor_time_service::TimeService;
+use velor_types::{network_address::NetworkAddress, PeerId};
 use futures::{executor::block_on, future, io::AsyncReadExt, sink::SinkExt, stream::StreamExt};
 use proptest::{arbitrary::any, collection::vec};
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -88,10 +88,10 @@ pub fn fuzz(data: &[u8]) {
     );
     let connection = Connection { socket, metadata };
 
-    let (connection_notifs_tx, connection_notifs_rx) = aptos_channels::new_test(8);
+    let (connection_notifs_tx, connection_notifs_rx) = velor_channels::new_test(8);
     let channel_size = 8;
 
-    let (peer_reqs_tx, peer_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, channel_size, None);
+    let (peer_reqs_tx, peer_reqs_rx) = velor_channel::new(QueueStyle::FIFO, channel_size, None);
     let upstream_handlers = Arc::new(HashMap::new());
 
     // Spin up a new `Peer` actor

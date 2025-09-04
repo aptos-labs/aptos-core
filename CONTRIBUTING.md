@@ -1,30 +1,30 @@
 ---
 id: contributing
-title: Contributing to Aptos Core
+title: Contributing to Velor Core
 ---
 
 # Contributing
 
-Our goal is to make contributing to Aptos Core easy and transparent. See [Aptos Community](https://aptos.dev/community) for full details. This page describes [our development process](#our-development-process).
+Our goal is to make contributing to Velor Core easy and transparent. See [Velor Community](https://velor.dev/community) for full details. This page describes [our development process](#our-development-process).
 
-## Aptos Core
+## Velor Core
 
-To contribute to the Aptos Core implementation, first start with the proper development copy.
-You may want to use the GitHub interface to fork [aptos-core](https://github.com/aptos-labs/aptos-core) and check out your fork.
-For development environment setup and first build, see [Building Aptos From Source](https://aptos.dev/guides/building-from-source)
+To contribute to the Velor Core implementation, first start with the proper development copy.
+You may want to use the GitHub interface to fork [velor-core](https://github.com/velor-chain/velor-core) and check out your fork.
+For development environment setup and first build, see [Building Velor From Source](https://velor.dev/guides/building-from-source)
 
 ## Our Development Process
 
 ### Code Style, Hints, and Testing
 
-Refer to our Coding Guidelines for the [Move](https://aptos.dev/move/book/coding-conventions/) and [Rust](./RUST_CODING_STYLE.md) programming languages for detailed guidance about how to contribute to the project.
+Refer to our Coding Guidelines for the [Move](https://velor.dev/move/book/coding-conventions/) and [Rust](./RUST_CODING_STYLE.md) programming languages for detailed guidance about how to contribute to the project.
 
-Also, please ensure you follow our [Secure Coding Guidelines](./RUST_SECURE_CODING.md) to contribute to Aptos securely. 
+Also, please ensure you follow our [Secure Coding Guidelines](./RUST_SECURE_CODING.md) to contribute to Velor securely. 
 
 
 ### Documentation
 
-Aptos Core's developer website is also open source (the code can be found in this [repository](https://github.com/aptos-labs/developer-docs).  It is built using [Docusaurus](https://docusaurus.io/):
+Velor Core's developer website is also open source (the code can be found in this [repository](https://github.com/velor-chain/developer-docs).  It is built using [Docusaurus](https://docusaurus.io/):
 
 If you know Markdown, you can already contribute!
 
@@ -106,4 +106,4 @@ It is important that the project history is bisect-able so that when regressions
 
 ## Issues
 
-Aptos Core uses [GitHub issues](https://github.com/aptos-labs/aptos-core/issues) to track bugs. Please include necessary information and instructions to reproduce your issue.
+Velor Core uses [GitHub issues](https://github.com/velor-chain/velor-core/issues) to track bugs. Please include necessary information and instructions to reproduce your issue.

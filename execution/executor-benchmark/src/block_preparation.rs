@@ -1,16 +1,16 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     metrics::{NUM_TXNS, TIMER},
     pipeline::ExecuteBlockMessage,
 };
-use aptos_block_partitioner::{BlockPartitioner, PartitionerConfig};
-use aptos_crypto::HashValue;
-use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_logger::info;
-use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
-use aptos_types::{
+use velor_block_partitioner::{BlockPartitioner, PartitionerConfig};
+use velor_crypto::HashValue;
+use velor_experimental_runtimes::thread_manager::optimal_min_len;
+use velor_logger::info;
+use velor_metrics_core::{IntCounterVecHelper, TimerHelper};
+use velor_types::{
     block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
     transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
 };

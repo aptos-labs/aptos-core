@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -12,8 +12,8 @@ use crate::{
     transaction::authenticator::EphemeralSignature,
 };
 use anyhow::bail;
-use aptos_crypto::CryptoMaterialError;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_crypto::CryptoMaterialError;
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::{Bn254, Fr};
 use ark_ff::{BigInteger, PrimeField};
 use ark_groth16::{Groth16, PreparedVerifyingKey, Proof};

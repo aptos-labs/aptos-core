@@ -1,17 +1,17 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
 
-package aptos.indexer.v1;
+package velor.indexer.v1;
 
-import "aptos/indexer/v1/filter.proto";
-import "aptos/transaction/v1/transaction.proto";
+import "velor/indexer/v1/filter.proto";
+import "velor/transaction/v1/transaction.proto";
 
 // This is for storage only.
 message TransactionsInStorage {
   // Required; transactions data.
-  repeated aptos.transaction.v1.Transaction transactions = 1;
+  repeated velor.transaction.v1.Transaction transactions = 1;
   // Required; chain id.
   optional uint64 starting_version = 2;
 }
@@ -40,7 +40,7 @@ message ProcessedRange {
 // TransactionsResponse is a batch of transactions.
 message TransactionsResponse {
   // Required; transactions data.
-  repeated aptos.transaction.v1.Transaction transactions = 1;
+  repeated velor.transaction.v1.Transaction transactions = 1;
 
   // Required; chain id.
   optional uint64 chain_id = 2 [jstype = JS_STRING];

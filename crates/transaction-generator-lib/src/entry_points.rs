@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
     publishing::{entry_point_trait::EntryPointTrait, publish_util::Package},
     ReliableTransactionSubmitter, RootAccountHandle,
 };
-use aptos_sdk::{
+use velor_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };

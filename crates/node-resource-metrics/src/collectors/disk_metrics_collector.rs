@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::common::NAMESPACE;
 use crate::collectors::common::MeasureLatency;
-use aptos_infallible::Mutex;
-use aptos_metrics_core::const_metric::ConstMetric;
+use velor_infallible::Mutex;
+use velor_metrics_core::const_metric::ConstMetric;
 use prometheus::{
     core::{Collector, Desc, Describer},
     proto::MetricFamily,

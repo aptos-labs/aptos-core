@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
@@ -12,10 +12,10 @@ use crate::consensus_observer::{
         ConsensusObserverResponse,
     },
 };
-use aptos_config::network_id::PeerNetworkId;
-use aptos_logger::{debug, warn};
-use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
-use aptos_time_service::{TimeService, TimeServiceTrait};
+use velor_config::network_id::PeerNetworkId;
+use velor_logger::{debug, warn};
+use velor_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
+use velor_time_service::{TimeService, TimeServiceTrait};
 use bytes::Bytes;
 use rand::Rng;
 use std::{sync::Arc, time::Duration};

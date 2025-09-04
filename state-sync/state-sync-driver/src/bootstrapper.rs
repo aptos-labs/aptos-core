@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,16 +13,16 @@ use crate::{
     utils,
     utils::{OutputFallbackHandler, SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
 };
-use aptos_config::config::BootstrappingMode;
-use aptos_data_client::global_summary::GlobalDataSummary;
-use aptos_data_streaming_service::{
+use velor_config::config::BootstrappingMode;
+use velor_data_client::global_summary::GlobalDataSummary;
+use velor_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
     streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
 };
-use aptos_logger::{prelude::*, sample::SampleRate};
-use aptos_storage_interface::DbReader;
-use aptos_types::{
+use velor_logger::{prelude::*, sample::SampleRate};
+use velor_storage_interface::DbReader;
+use velor_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
@@ -312,7 +312,7 @@ pub struct Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient> {
     // The component used to sync state values (if downloading states)
     state_value_syncer: StateValueSyncer,
 
-    // The client through which to stream data from the Aptos network
+    // The client through which to stream data from the Velor network
     streaming_client: StreamingClient,
 
     // The interface to read from storage

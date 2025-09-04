@@ -1,0 +1,10 @@
+[package]
+name = "test"
+version = "0.0.0"
+
+[addresses]
+example_addr = "_"
+
+[dependencies]
+VelorFramework = { local = "../../../../../framework/velor-framework" }
+ManagedFungibleAsset =  { local = "../../../../../move-examples/fungible_asset/managed_fungible_asset" }

@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! This crate provides in-memory representation of Aptos core data structures used by the executor.
+//! This crate provides in-memory representation of Velor core data structures used by the executor.
 
 mod sparse_merkle;
 

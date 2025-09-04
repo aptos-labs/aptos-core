@@ -1,4 +1,4 @@
-# aptos-kube-state-metrics
+# velor-kube-state-metrics
 
 ![Version: 5.7.0](https://img.shields.io/badge/Version-5.7.0-informational?style=flat-square)
 

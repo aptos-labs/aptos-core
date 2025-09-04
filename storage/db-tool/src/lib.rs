@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 extern crate core;
@@ -15,12 +15,12 @@ mod tests;
 mod utils;
 
 use anyhow::Result;
-use aptos_db::db_debugger;
-use aptos_logger::info;
+use velor_db::db_debugger;
+use velor_logger::info;
 use clap::Parser;
 
 #[derive(Parser)]
-#[clap(name = "Aptos db tool", author, disable_version_flag = true)]
+#[clap(name = "Velor db tool", author, disable_version_flag = true)]
 pub enum DBTool {
     #[clap(subcommand)]
     Backup(backup::Command),

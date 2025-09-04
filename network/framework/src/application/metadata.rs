@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     protocols::wire::handshake::v1::{ProtocolId, ProtocolIdSet},
     transport::ConnectionMetadata,
 };
-use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
+use velor_peer_monitoring_service_types::PeerMonitoringMetadata;
 use serde::{Deserialize, Serialize};
 
 /// The current connection state of a peer

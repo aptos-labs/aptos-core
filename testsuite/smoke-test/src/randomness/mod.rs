@@ -1,14 +1,14 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::utils;
 use anyhow::{anyhow, ensure, Result};
-use aptos_crypto::{compat::Sha3_256, Uniform};
-use aptos_dkg::weighted_vuf::traits::WeightedVUF;
-use aptos_forge::LocalSwarm;
-use aptos_logger::info;
-use aptos_rest_client::Client;
-use aptos_types::{
+use velor_crypto::{compat::Sha3_256, Uniform};
+use velor_dkg::weighted_vuf::traits::WeightedVUF;
+use velor_forge::LocalSwarm;
+use velor_logger::info;
+use velor_rest_client::Client;
+use velor_types::{
     dkg::{DKGSessionState, DKGState, DKGTrait, DefaultDKG},
     on_chain_config::{OnChainConfig, OnChainConsensusConfig},
     randomness::{PerBlockRandomness, RandMetadata, WVUF},
@@ -258,18 +258,18 @@ async fn verify_randomness(
 fn script_to_enable_main_logic() -> String {
     r#"
 script {
-    use aptos_framework::aptos_governance;
-    use aptos_framework::randomness_config;
-    use aptos_std::fixed_point64;
+    use velor_framework::velor_governance;
+    use velor_framework::randomness_config;
+    use velor_std::fixed_point64;
 
     fun main(core_resources: &signer) {
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let framework_signer = velor_governance::get_signer_testnet_only(core_resources, @0x1);
         let config = randomness_config::new_v1(
             fixed_point64::create_from_rational(1, 2),
             fixed_point64::create_from_rational(2, 3)
         );
         randomness_config::set_for_next_epoch(&framework_signer, config);
-        aptos_governance::reconfigure(&framework_signer);
+        velor_governance::reconfigure(&framework_signer);
     }
 }
 "#
@@ -279,13 +279,13 @@ script {
 fn script_to_disable_main_logic() -> String {
     r#"
 script {
-    use aptos_framework::aptos_governance;
-    use aptos_framework::randomness_config;
+    use velor_framework::velor_governance;
+    use velor_framework::randomness_config;
     fun main(core_resources: &signer) {
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let framework_signer = velor_governance::get_signer_testnet_only(core_resources, @0x1);
         let config = randomness_config::new_off();
         randomness_config::set_for_next_epoch(&framework_signer, config);
-        aptos_governance::reconfigure(&framework_signer);
+        velor_governance::reconfigure(&framework_signer);
     }
 }
 "#
@@ -297,14 +297,14 @@ fn script_to_update_consensus_config(config: &OnChainConsensusConfig) -> String 
     format!(
         r#"
 script {{
-    use aptos_framework::aptos_governance;
-    use aptos_framework::consensus_config;
+    use velor_framework::velor_governance;
+    use velor_framework::consensus_config;
 
     fun main(core_resources: &signer) {{
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let framework_signer = velor_governance::get_signer_testnet_only(core_resources, @0x1);
         let config_bytes = vector{:?};
         consensus_config::set_for_next_epoch(&framework_signer, config_bytes);
-        aptos_governance::reconfigure(&framework_signer);
+        velor_governance::reconfigure(&framework_signer);
     }}
 }}
     "#,

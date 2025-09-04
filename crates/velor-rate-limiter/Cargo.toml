@@ -1,0 +1,23 @@
+[package]
+name = "velor-rate-limiter"
+description = "Token bucket rate limiter"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+futures = { workspace = true }
+pin-project = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+

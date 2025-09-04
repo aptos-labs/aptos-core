@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,16 +12,16 @@ use crate::{
     utils,
     utils::{OutputFallbackHandler, SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
 };
-use aptos_config::config::ContinuousSyncingMode;
-use aptos_data_streaming_service::{
+use velor_config::config::ContinuousSyncingMode;
+use velor_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
     streaming_client::{DataStreamingClient, Epoch, NotificationAndFeedback, NotificationFeedback},
 };
-use aptos_infallible::Mutex;
-use aptos_logger::{prelude::*, sample, sample::SampleRate};
-use aptos_storage_interface::DbReader;
-use aptos_types::{
+use velor_infallible::Mutex;
+use velor_logger::{prelude::*, sample, sample::SampleRate};
+use velor_storage_interface::DbReader;
+use velor_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
@@ -41,7 +41,7 @@ pub struct ContinuousSyncer<StorageSyncer, StreamingClient> {
     // The speculative state tracking the active data stream
     speculative_stream_state: Option<SpeculativeStreamState>,
 
-    // The client through which to stream data from the Aptos network
+    // The client through which to stream data from the Velor network
     streaming_client: StreamingClient,
 
     // The interface to read from storage

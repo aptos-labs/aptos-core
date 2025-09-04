@@ -1,16 +1,16 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
-use aptos_cached_packages::aptos_stdlib;
-use aptos_forge::Swarm;
-use aptos_keygen::KeyGen;
-use aptos_rest_client::{
-    aptos_api_types::{EntryFunctionPayload, TransactionPayload},
+use crate::smoke_test_environment::new_local_swarm_with_velor;
+use velor_cached_packages::velor_stdlib;
+use velor_forge::Swarm;
+use velor_keygen::KeyGen;
+use velor_rest_client::{
+    velor_api_types::{EntryFunctionPayload, TransactionPayload},
     Transaction,
 };
-use aptos_sdk::{
+use velor_sdk::{
     crypto::{PrivateKey, SigningKey},
     types::transaction::{authenticator::AuthenticationKey, SignedTransaction},
 };
@@ -19,8 +19,8 @@ use aptos_sdk::{
 #[ignore]
 #[tokio::test]
 async fn test_external_transaction_signer() {
-    let swarm = new_local_swarm_with_aptos(1).await;
-    let mut info = swarm.aptos_public_info();
+    let swarm = new_local_swarm_with_velor(1).await;
+    let mut info = swarm.velor_public_info();
 
     // generate key pair
     let mut key_gen = KeyGen::from_os_rng();
@@ -57,7 +57,7 @@ async fn test_external_transaction_signer() {
 
     let unsigned_txn = info
         .transaction_factory()
-        .payload(aptos_stdlib::aptos_coin_transfer(
+        .payload(velor_stdlib::velor_coin_transfer(
             receiver.address(),
             amount,
         ))

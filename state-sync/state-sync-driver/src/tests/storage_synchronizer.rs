@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -25,15 +25,15 @@ use crate::{
     },
 };
 use anyhow::format_err;
-use aptos_config::config::StateSyncDriverConfig;
-use aptos_data_streaming_service::data_notification::NotificationId;
-use aptos_event_notifications::EventSubscriptionService;
-use aptos_executor_types::ChunkCommitNotification;
-use aptos_infallible::{Mutex, RwLock};
-use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_storage_interface::{AptosDbError, DbReaderWriter};
-use aptos_storage_service_notifications::StorageServiceNotificationListener;
-use aptos_types::{
+use velor_config::config::StateSyncDriverConfig;
+use velor_data_streaming_service::data_notification::NotificationId;
+use velor_event_notifications::EventSubscriptionService;
+use velor_executor_types::ChunkCommitNotification;
+use velor_infallible::{Mutex, RwLock};
+use velor_mempool_notifications::MempoolNotificationListener;
+use velor_storage_interface::{VelorDbError, DbReaderWriter};
+use velor_storage_service_notifications::StorageServiceNotificationListener;
+use velor_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionOutputListWithProofV2, Version},
 };
@@ -659,7 +659,7 @@ async fn test_initialize_state_synchronizer_receiver_error() {
     db_writer
         .expect_get_state_snapshot_receiver()
         .returning(|_, _| {
-            Err(AptosDbError::Other(
+            Err(VelorDbError::Other(
                 "Failed to get snapshot receiver!".to_string(),
             ))
         });
@@ -833,7 +833,7 @@ async fn test_save_states_invalid_chunk() {
     snapshot_receiver
         .expect_add_chunk()
         .with(always(), always())
-        .returning(|_, _| Err(AptosDbError::Other("Invalid chunk!".to_string())));
+        .returning(|_, _| Err(VelorDbError::Other("Invalid chunk!".to_string())));
 
     // Setup the mock db writer
     let mut db_writer = create_mock_db_writer();
@@ -896,7 +896,7 @@ fn create_storage_synchronizer(
     StorageSynchronizer<MockChunkExecutor, PersistentMetadataStorage>,
     StorageSynchronizerHandles,
 ) {
-    aptos_logger::Logger::init_for_testing();
+    velor_logger::Logger::init_for_testing();
 
     // Create the notification channels
     let (commit_notification_sender, commit_notification_listener) =
@@ -910,17 +910,17 @@ fn create_storage_synchronizer(
 
     // Create the mempool notification handler
     let (mempool_notification_sender, mempool_notification_listener) =
-        aptos_mempool_notifications::new_mempool_notifier_listener_pair(100);
+        velor_mempool_notifications::new_mempool_notifier_listener_pair(100);
     let mempool_notification_handler = MempoolNotificationHandler::new(mempool_notification_sender);
 
     // Create the storage service handler
     let (storage_service_notifier, storage_service_listener) =
-        aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
+        velor_storage_service_notifications::new_storage_service_notifier_listener_pair();
     let storage_service_notification_handler =
         StorageServiceNotificationHandler::new(storage_service_notifier);
 
     // Create the metadata storage
-    let db_path = aptos_temppath::TempPath::new();
+    let db_path = velor_temppath::TempPath::new();
     let metadata_storage = PersistentMetadataStorage::new(db_path.path());
 
     // Create the storage synchronizer

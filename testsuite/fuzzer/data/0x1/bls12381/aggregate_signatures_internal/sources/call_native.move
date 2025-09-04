@@ -1,5 +1,5 @@
 module poc::aggregate_signatures_internal {
-    use aptos_std::bls12381::{Self, Signature};
+    use velor_std::bls12381::{Self, Signature};
     use std::vector;
 
     public entry fun main(_owner: &signer) {

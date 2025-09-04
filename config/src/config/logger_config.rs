@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,8 +9,8 @@ use crate::{
     },
     utils,
 };
-use aptos_logger::{Level, CHANNEL_SIZE};
-use aptos_types::chain_id::ChainId;
+use velor_logger::{Level, CHANNEL_SIZE};
+use velor_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 

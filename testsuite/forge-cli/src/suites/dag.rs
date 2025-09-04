@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,15 +6,15 @@ use super::{
     realistic_environment::wrap_with_realistic_env, ungrouped::changing_working_quorum_test_helper,
 };
 use crate::TestCommand;
-use aptos_forge::{
+use velor_forge::{
     success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria},
     EmitJobMode, EmitJobRequest, ForgeConfig,
 };
-use aptos_sdk::types::on_chain_config::{
+use velor_sdk::types::on_chain_config::{
     BlockGasLimitType, ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig,
     OnChainExecutionConfig, TransactionShufflerType, ValidatorTxnConfig, DEFAULT_WINDOW_SIZE,
 };
-use aptos_testcases::{
+use velor_testcases::{
     consensus_reliability_tests::ChangingWorkingQuorumTest,
     dag_onchain_enable_test::DagOnChainEnableTest, two_traffics_test::TwoTrafficsTest,
 };
@@ -135,7 +135,7 @@ fn dag_realistic_env_max_load_test(
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 100 })
-                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .gas_price(5 * velor_global_constants::GAS_UNIT_PRICE)
                 .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_success_criteria(

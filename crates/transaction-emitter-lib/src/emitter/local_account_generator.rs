@@ -1,12 +1,12 @@
 use anyhow::bail;
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_sdk::types::{
+use velor_crypto::ed25519::Ed25519PrivateKey;
+use velor_sdk::types::{
     AccountKey, EphemeralKeyPair, EphemeralPrivateKey, KeylessAccount, LocalAccount,
 };
-use aptos_transaction_generator_lib::ReliableTransactionSubmitter;
-use aptos_types::{
+use velor_transaction_generator_lib::ReliableTransactionSubmitter;
+use velor_types::{
     keyless,
     keyless::{Claims, OpenIdSig, Pepper, ZeroKnowledgeSig},
 };

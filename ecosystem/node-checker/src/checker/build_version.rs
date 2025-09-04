@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // TODO: Sometimes build_commit_hash is an empty string (so far I've noticed
@@ -16,10 +16,10 @@ use crate::{
     },
 };
 use anyhow::{anyhow, Result};
-use aptos_logger::debug;
+use velor_logger::debug;
 use serde::{Deserialize, Serialize};
 
-// TODO: Use the key in crates/aptos-telemetry/src/build_information.rs
+// TODO: Use the key in crates/velor-telemetry/src/build_information.rs
 const BUILD_COMMIT_HASH_KEY: &str = "build_commit_hash";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

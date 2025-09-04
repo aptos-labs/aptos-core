@@ -1,9 +1,9 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{errors::FilterError, traits::Filterable, utils::standardize_address};
 use anyhow::{anyhow, Error};
-use aptos_protos::transaction::v1::{
+use velor_protos::transaction::v1::{
     multisig_transaction_payload, transaction::TxnData, transaction_payload, EntryFunctionId,
     EntryFunctionPayload, Transaction, TransactionPayload,
 };
@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Example:
 /// ```
-/// use aptos_transaction_filter::UserTransactionFilterBuilder;
+/// use velor_transaction_filter::UserTransactionFilterBuilder;
 ///
 /// let address = "0x806b27f3d7824a1d78c4291b6d0371aa693437f9eb3393c6440519c0ffaa627f";
 /// let filter = UserTransactionFilterBuilder::default().sender(address).build().unwrap();
@@ -45,8 +45,8 @@ impl UserTransactionFilter {
     }
 }
 
-impl From<aptos_protos::indexer::v1::UserTransactionFilter> for UserTransactionFilter {
-    fn from(proto_filter: aptos_protos::indexer::v1::UserTransactionFilter) -> Self {
+impl From<velor_protos::indexer::v1::UserTransactionFilter> for UserTransactionFilter {
+    fn from(proto_filter: velor_protos::indexer::v1::UserTransactionFilter) -> Self {
         Self {
             standardized_sender: OnceCell::with_value(
                 proto_filter
@@ -60,7 +60,7 @@ impl From<aptos_protos::indexer::v1::UserTransactionFilter> for UserTransactionF
     }
 }
 
-impl From<UserTransactionFilter> for aptos_protos::indexer::v1::UserTransactionFilter {
+impl From<UserTransactionFilter> for velor_protos::indexer::v1::UserTransactionFilter {
     fn from(user_transaction_filter: UserTransactionFilter) -> Self {
         Self {
             sender: user_transaction_filter.sender,
@@ -117,7 +117,7 @@ impl Filterable<Transaction> for UserTransactionFilter {
 
 /// Example:
 /// ```
-/// use aptos_transaction_filter::EntryFunctionFilterBuilder;
+/// use velor_transaction_filter::EntryFunctionFilterBuilder;
 ///
 /// let filter = EntryFunctionFilterBuilder::default()
 ///   .address("0x0000000000000000000000000000000000000000000000000000000000000001")
@@ -152,8 +152,8 @@ impl EntryFunctionFilter {
     }
 }
 
-impl From<aptos_protos::indexer::v1::EntryFunctionFilter> for EntryFunctionFilter {
-    fn from(proto_filter: aptos_protos::indexer::v1::EntryFunctionFilter) -> Self {
+impl From<velor_protos::indexer::v1::EntryFunctionFilter> for EntryFunctionFilter {
+    fn from(proto_filter: velor_protos::indexer::v1::EntryFunctionFilter) -> Self {
         Self {
             standardized_address: OnceCell::with_value(
                 proto_filter
@@ -168,7 +168,7 @@ impl From<aptos_protos::indexer::v1::EntryFunctionFilter> for EntryFunctionFilte
     }
 }
 
-impl From<EntryFunctionFilter> for aptos_protos::indexer::v1::EntryFunctionFilter {
+impl From<EntryFunctionFilter> for velor_protos::indexer::v1::EntryFunctionFilter {
     fn from(entry_function_filter: EntryFunctionFilter) -> Self {
         Self {
             address: entry_function_filter.address,
@@ -213,7 +213,7 @@ impl Filterable<EntryFunctionId> for EntryFunctionFilter {
 
 /// Example:
 /// ```
-/// use aptos_transaction_filter::{EntryFunctionFilterBuilder, UserTransactionPayloadFilterBuilder};
+/// use velor_transaction_filter::{EntryFunctionFilterBuilder, UserTransactionPayloadFilterBuilder};
 ///
 /// let entry_function_filter = EntryFunctionFilterBuilder::default()
 ///   .address("0x0000000000000000000000000000000000000000000000000000000000000001")
@@ -235,10 +235,10 @@ pub struct UserTransactionPayloadFilter {
     pub function: Option<EntryFunctionFilter>,
 }
 
-impl From<aptos_protos::indexer::v1::UserTransactionPayloadFilter>
+impl From<velor_protos::indexer::v1::UserTransactionPayloadFilter>
     for UserTransactionPayloadFilter
 {
-    fn from(proto_filter: aptos_protos::indexer::v1::UserTransactionPayloadFilter) -> Self {
+    fn from(proto_filter: velor_protos::indexer::v1::UserTransactionPayloadFilter) -> Self {
         Self {
             function: proto_filter.entry_function_filter.map(|f| f.into()),
         }
@@ -246,7 +246,7 @@ impl From<aptos_protos::indexer::v1::UserTransactionPayloadFilter>
 }
 
 impl From<UserTransactionPayloadFilter>
-    for aptos_protos::indexer::v1::UserTransactionPayloadFilter
+    for velor_protos::indexer::v1::UserTransactionPayloadFilter
 {
     fn from(user_transaction_payload_filter: UserTransactionPayloadFilter) -> Self {
         Self {

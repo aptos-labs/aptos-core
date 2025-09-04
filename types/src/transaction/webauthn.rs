@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction::authenticator::AnyPublicKey;
 use anyhow::{anyhow, Result};
-use aptos_crypto::{
+use velor_crypto::{
     hash::CryptoHash, secp256r1_ecdsa, signing_message, CryptoMaterialError, HashValue, Signature,
 };
 use passkey_types::{crypto::sha256, webauthn::CollectedClientData, Bytes};
@@ -61,10 +61,10 @@ pub enum AssertionSignature {
 impl<'a> arbitrary::Arbitrary<'a> for AssertionSignature {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         // Generate a fixed-length byte array for the signature
-        let bytes: [u8; aptos_crypto::secp256r1_ecdsa::Signature::LENGTH] = u.arbitrary()?;
+        let bytes: [u8; velor_crypto::secp256r1_ecdsa::Signature::LENGTH] = u.arbitrary()?;
 
         // Create a signature without validating it
-        let signature = aptos_crypto::secp256r1_ecdsa::Signature::from_bytes_unchecked(&bytes)
+        let signature = velor_crypto::secp256r1_ecdsa::Signature::from_bytes_unchecked(&bytes)
             .map_err(|_| arbitrary::Error::IncorrectFormat)?;
 
         Ok(AssertionSignature::Secp256r1Ecdsa { signature })
@@ -231,7 +231,7 @@ mod tests {
         },
     };
     use anyhow::anyhow;
-    use aptos_crypto::{
+    use velor_crypto::{
         secp256r1_ecdsa,
         secp256r1_ecdsa::{PrivateKey, PublicKey, Signature},
         signing_message, HashValue, PrivateKey as PrivateKeyTrait, Uniform,
@@ -288,7 +288,7 @@ mod tests {
     /// [AuthenticatorAttestationResponse](passkey_types::webauthn::AuthenticatorAttestationResponse)
     /// using `passkeys-ts`
     ///
-    /// See <https://github.com/aptos-labs/passkeys-ts>
+    /// See <https://github.com/velor-chain/passkeys-ts>
     static ATTESTATION_OBJECT: &str = "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YViYSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NdAAAAAAAAAAAAAAAAAAAAAAAAAAAAFG_FKuGMNWGiFATwhbpPPcm-wkFLpQECAyYgASFYIMXShkyn1SgV8l9FKzTdChTDgnn9HB2TuXHLf1GA_VuGIlggRj8IW2yK6AcefsrfbM_6WIqK5CTVpkhtT8WFRvUAfcg";
 
     /// Contains the public key of a Secure Payment Confirmation (SPC) enabled Passkey credential
@@ -296,7 +296,7 @@ mod tests {
     /// [AuthenticatorAttestationResponse](passkey_types::webauthn::AuthenticatorAttestationResponse)
     /// using `passkeys-ts`
     ///
-    /// See <https://github.com/aptos-labs/passkeys-ts>
+    /// See <https://github.com/velor-chain/passkeys-ts>
     static SPC_ATTESTATION_OBJECT: &str = "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVikSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAAAK3OAAI1vMYKZIsLJfHwVQMAIIwkb4vzhrcbFEOzI6_J233DJiKugvfuflXjcIXQunjupQECAyYgASFYIB1yTmeAb93Xv2GaYO_SV3cDKqJeRX5jYqqgijy_9d0bIlggur6NDT5HhEu0VPlzpevZt2lOGh0qiNXfFytsqCLPZ8E";
 
     /// BCS encoded coin transfer raw transaction
@@ -316,7 +316,7 @@ mod tests {
     /// This is generated from a real [AuthenticatorAssertionResponse](passkey_types::webauthn::AuthenticatorAssertionResponse)
     /// using `passkeys-ts`
     ///
-    /// See <https://github.com/aptos-labs/passkeys-ts>
+    /// See <https://github.com/velor-chain/passkeys-ts>
     static AUTHENTICATOR_DATA: &[u8] = &[
         73, 150, 13, 229, 136, 14, 140, 104, 116, 52, 23, 15, 100, 118, 96, 91, 143, 228, 174, 185,
         162, 134, 50, 199, 153, 92, 243, 186, 131, 29, 151, 99, 29, 0, 0, 0, 0,
@@ -326,7 +326,7 @@ mod tests {
     /// This is generated from a real [AuthenticatorAssertionResponse](passkey_types::webauthn::AuthenticatorAssertionResponse)
     /// using `passkeys-ts`
     ///
-    /// See <https://github.com/aptos-labs/passkeys-ts>
+    /// See <https://github.com/velor-chain/passkeys-ts>
     static CLIENT_DATA_JSON: &[u8] = &[
         123, 34, 116, 121, 112, 101, 34, 58, 34, 119, 101, 98, 97, 117, 116, 104, 110, 46, 103,
         101, 116, 34, 44, 34, 99, 104, 97, 108, 108, 101, 110, 103, 101, 34, 58, 34, 101, 85, 102,
@@ -343,7 +343,7 @@ mod tests {
     /// This is generated from a real [AuthenticatorAssertionResponse](passkey_types::webauthn::AuthenticatorAssertionResponse)
     /// using `passkeys-ts`
     ///
-    /// See <https://github.com/aptos-labs/passkeys-ts>
+    /// See <https://github.com/velor-chain/passkeys-ts>
     static SIGNATURE: &[u8] = &[
         113, 168, 216, 132, 231, 240, 12, 39, 184, 16, 246, 230, 166, 142, 70, 117, 131, 2, 3, 155,
         44, 87, 236, 192, 192, 28, 110, 2, 33, 143, 17, 200, 62, 221, 102, 227, 147, 24, 126, 96,
@@ -588,8 +588,8 @@ mod tests {
         // The user entity
         let user_entity = PublicKeyCredentialUserEntity {
             id: random_vec(32).into(),
-            display_name: "Aptos Passkey".into(),
-            name: "aptos@aptos.dev".into(),
+            display_name: "Velor Passkey".into(),
+            name: "velor@velor.dev".into(),
         };
         let origin = Url::parse("http://localhost:4000")?;
         // First create an Authenticator for the Client to use.
@@ -740,7 +740,7 @@ mod tests {
     /// This test uses a real WebAuthn [AuthenticatorAssertionResponse](passkey_types::webauthn::AuthenticatorAssertionResponse)
     /// from a passkey generated with the `passkeys-ts` test client.
     ///
-    /// See <https://github.com/aptos-labs/passkeys-ts>
+    /// See <https://github.com/velor-chain/passkeys-ts>
     #[tokio::test]
     async fn verify_real_partial_authenticator_assertion_response() {
         // Parse passkey credential registration response to get the public key
@@ -830,7 +830,7 @@ mod tests {
                   "currency": "APT"
                 },
                 "instrument": {
-                  "icon": "https://aptoslabs.com/assets/favicon-2c9e23abc3a3f4c45038e8c784b0a4ecb9051baa.ico",
+                  "icon": "https://velorlabs.com/assets/favicon-2c9e23abc3a3f4c45038e8c784b0a4ecb9051baa.ico",
                   "displayName": "Petra test"
                 }
               },
@@ -929,7 +929,7 @@ mod tests {
         );
         let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
         let bad_private_key: secp256r1_ecdsa::PrivateKey =
-            aptos_crypto::Uniform::generate(&mut rng);
+            velor_crypto::Uniform::generate(&mut rng);
         let bad_public_key = PrivateKey::public_key(&bad_private_key);
         let bad_any_public_key = AnyPublicKey::Secp256r1Ecdsa {
             public_key: bad_public_key,

@@ -1,0 +1,27 @@
+[package]
+name = "velor-speculative-state-helper"
+description = "Velor utils for speculative events & state (due to speculative txn execution)"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+# Do NOT add any inter-project dependencies.
+# This is to avoid ever having a circular dependency with the velor-speculative crate.
+[dependencies]
+anyhow = { workspace = true }
+velor-infallible = { workspace = true }
+crossbeam = { workspace = true }
+rayon = { workspace = true }
+
+[dev-dependencies]
+claims = { workspace = true }
+parking_lot = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }

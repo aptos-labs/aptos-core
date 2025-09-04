@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,17 +6,17 @@ use crate::{
     counters::DISCOVERY_COUNTS, file::FileStream, rest::RestStream,
     validator_set::ValidatorSetStream,
 };
-use aptos_config::{config::PeerSet, network_id::NetworkContext};
-use aptos_crypto::x25519;
-use aptos_event_notifications::ReconfigNotificationListener;
-use aptos_logger::prelude::*;
-use aptos_network::{
+use velor_config::{config::PeerSet, network_id::NetworkContext};
+use velor_crypto::x25519;
+use velor_event_notifications::ReconfigNotificationListener;
+use velor_logger::prelude::*;
+use velor_network::{
     connectivity_manager::{ConnectivityRequest, DiscoverySource},
     counters::inc_by_with_context,
     logging::NetworkSchema,
 };
-use aptos_time_service::TimeService;
-use aptos_types::on_chain_config::OnChainConfigProvider;
+use velor_time_service::TimeService;
+use velor_types::on_chain_config::OnChainConfigProvider;
 use futures::{Stream, StreamExt};
 use std::{
     path::Path,
@@ -35,14 +35,14 @@ mod validator_set;
 pub enum DiscoveryError {
     IO(std::io::Error),
     Parsing(String),
-    Rest(aptos_rest_client::error::RestError),
+    Rest(velor_rest_client::error::RestError),
 }
 
 /// A union type for all implementations of `DiscoveryChangeListenerTrait`
 pub struct DiscoveryChangeListener<P: OnChainConfigProvider> {
     discovery_source: DiscoverySource,
     network_context: NetworkContext,
-    update_channel: aptos_channels::Sender<ConnectivityRequest>,
+    update_channel: velor_channels::Sender<ConnectivityRequest>,
     source_stream: DiscoveryChangeStream<P>,
 }
 
@@ -67,7 +67,7 @@ impl<P: OnChainConfigProvider> Stream for DiscoveryChangeStream<P> {
 impl<P: OnChainConfigProvider> DiscoveryChangeListener<P> {
     pub fn validator_set(
         network_context: NetworkContext,
-        update_channel: aptos_channels::Sender<ConnectivityRequest>,
+        update_channel: velor_channels::Sender<ConnectivityRequest>,
         expected_pubkey: x25519::PublicKey,
         reconfig_events: ReconfigNotificationListener<P>,
     ) -> Self {
@@ -86,7 +86,7 @@ impl<P: OnChainConfigProvider> DiscoveryChangeListener<P> {
 
     pub fn file(
         network_context: NetworkContext,
-        update_channel: aptos_channels::Sender<ConnectivityRequest>,
+        update_channel: velor_channels::Sender<ConnectivityRequest>,
         file_path: &Path,
         interval_duration: Duration,
         time_service: TimeService,
@@ -106,7 +106,7 @@ impl<P: OnChainConfigProvider> DiscoveryChangeListener<P> {
 
     pub fn rest(
         network_context: NetworkContext,
-        update_channel: aptos_channels::Sender<ConnectivityRequest>,
+        update_channel: velor_channels::Sender<ConnectivityRequest>,
         rest_url: url::Url,
         interval_duration: Duration,
         time_service: TimeService,

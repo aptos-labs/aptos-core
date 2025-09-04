@@ -1,5 +1,5 @@
 [package]
-name = "aptos-backup-service"
+name = "velor-backup-service"
 description = "Backup service"
 version = "0.1.0"
 
@@ -13,13 +13,13 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-crypto = { workspace = true }
-aptos-db = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-runtimes = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-types = { workspace = true }
+velor-crypto = { workspace = true }
+velor-db = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-runtimes = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 hyper = { workspace = true }
@@ -30,10 +30,10 @@ tokio-stream = { workspace = true }
 warp = { workspace = true }
 
 [dev-dependencies]
-aptos-config = { workspace = true }
-aptos-db = { workspace = true, features = ["fuzzing"] }
-aptos-temppath = { workspace = true }
+velor-config = { workspace = true }
+velor-db = { workspace = true, features = ["fuzzing"] }
+velor-temppath = { workspace = true }
 reqwest = { workspace = true }
 
 [features]
-fuzzing = ["aptos-db/fuzzing"]
+fuzzing = ["velor-db/fuzzing"]

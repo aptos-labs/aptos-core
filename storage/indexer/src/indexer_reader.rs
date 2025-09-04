@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{db_indexer::DBIndexer, db_v2::IndexerAsyncV2};
 use anyhow::anyhow;
-use aptos_types::{
+use velor_types::{
     account_address::AccountAddress,
     contract_event::{ContractEventV1, ContractEventV2, EventWithVersion},
     event::EventKey,

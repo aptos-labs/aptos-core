@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
@@ -6,7 +6,7 @@ use super::{
     generate_blob_name, BackupRestoreMetadata, JSON_FILE_TYPE, METADATA_FILE_NAME, TAR_FILE_TYPE,
 };
 use anyhow::Context;
-use aptos_logger::{error, info};
+use velor_logger::{error, info};
 use futures::TryFutureExt;
 use google_cloud_storage::{
     client::{Client, ClientConfig},
@@ -141,7 +141,7 @@ impl GcsBackupRestoreOperator {
                 .await
             {
                 Ok(_) => {
-                    aptos_logger::info!(
+                    velor_logger::info!(
                         "[Table Info] Successfully updated metadata to GCS bucket: {}",
                         METADATA_FILE_NAME
                     );
@@ -172,13 +172,13 @@ impl GcsBackupRestoreOperator {
         // chain id + epoch is the unique identifier for the snapshot.
         let snapshot_tar_file_name = format!("chain_id_{}_epoch_{}", chain_id, epoch);
         let snapshot_path_closure = snapshot_path.clone();
-        aptos_logger::info!(
+        velor_logger::info!(
             snapshot_tar_file_name = snapshot_tar_file_name.as_str(),
             "[Table Info] Starting to compress the folder.",
         );
         // If target path does not exist, wait and log.
         if !snapshot_path.exists() {
-            aptos_logger::warn!(
+            velor_logger::warn!(
                 snapshot_path = snapshot_path.to_str(),
                 snapshot_tar_file_name = snapshot_tar_file_name.as_str(),
                 epoch = epoch,
@@ -188,12 +188,12 @@ impl GcsBackupRestoreOperator {
             return Ok(());
         }
         let tar_file = task::spawn_blocking(move || {
-            aptos_logger::info!(
+            velor_logger::info!(
                 snapshot_tar_file_name = snapshot_tar_file_name.as_str(),
                 "[Table Info] Compressing the folder."
             );
             let result = create_tar_gz(snapshot_path_closure.clone(), &snapshot_tar_file_name);
-            aptos_logger::info!(
+            velor_logger::info!(
                 snapshot_tar_file_name = snapshot_tar_file_name.as_str(),
                 result = result.is_ok(),
                 "[Table Info] Compressed the folder."
@@ -203,7 +203,7 @@ impl GcsBackupRestoreOperator {
         .await
         .context("Failed to spawn task to create snapshot backup file.")?
         .context("Failed to create tar.gz file in blocking task")?;
-        aptos_logger::info!(
+        velor_logger::info!(
             "[Table Info] Created snapshot tar file: {:?}",
             tar_file.file_name().unwrap()
         );
@@ -216,7 +216,7 @@ impl GcsBackupRestoreOperator {
 
         let filename = generate_blob_name(chain_id, epoch);
 
-        aptos_logger::info!(
+        velor_logger::info!(
             "[Table Info] Uploading snapshot to GCS bucket: {}",
             filename
         );
@@ -243,7 +243,7 @@ impl GcsBackupRestoreOperator {
                     .and_then(|_| fs::remove_dir_all(snapshot_path_clone))
                     .await
                     .expect("Failed to clean up after db snapshot upload");
-                aptos_logger::info!(
+                velor_logger::info!(
                     "[Table Info] Successfully uploaded snapshot to GCS bucket: {}",
                     filename
                 );

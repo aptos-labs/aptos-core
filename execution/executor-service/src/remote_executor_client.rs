@@ -1,14 +1,14 @@
-// Copyright © Aptos Foundation
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
     remote_state_view_service::RemoteStateViewService, ExecuteBlockCommand, RemoteExecutionRequest,
     RemoteExecutionResult,
 };
-use aptos_logger::{info, trace};
-use aptos_secure_net::network_controller::{Message, NetworkController};
-use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
-use aptos_types::{
+use velor_logger::{info, trace};
+use velor_secure_net::network_controller::{Message, NetworkController};
+use velor_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
+use velor_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
     },
@@ -16,7 +16,7 @@ use aptos_types::{
     transaction::TransactionOutput,
     vm_status::VMStatus,
 };
-use aptos_vm::sharded_block_executor::{
+use velor_vm::sharded_block_executor::{
     executor_client::{ExecutorClient, ShardedExecutionOutput},
     ShardedBlockExecutor,
 };
@@ -57,13 +57,13 @@ pub fn get_coordinator_address() -> SocketAddr {
 
 pub static REMOTE_SHARDED_BLOCK_EXECUTOR: Lazy<
     Arc<
-        aptos_infallible::Mutex<
+        velor_infallible::Mutex<
             ShardedBlockExecutor<CachedStateView, RemoteExecutorClient<CachedStateView>>,
         >,
     >,
 > = Lazy::new(|| {
     info!("REMOTE_SHARDED_BLOCK_EXECUTOR created");
-    Arc::new(aptos_infallible::Mutex::new(
+    Arc::new(velor_infallible::Mutex::new(
         RemoteExecutorClient::create_remote_sharded_block_executor(
             get_coordinator_address(),
             get_remote_addresses(),

@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{block_info::Round, on_chain_config::OnChainConfig};
-use aptos_crypto::HashValue;
-use aptos_crypto_derive::SilentDebug;
-use aptos_dkg::{weighted_vuf, weighted_vuf::traits::WeightedVUF};
+use velor_crypto::HashValue;
+use velor_crypto_derive::SilentDebug;
+use velor_dkg::{weighted_vuf, weighted_vuf::traits::WeightedVUF};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 

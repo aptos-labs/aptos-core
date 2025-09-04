@@ -6,7 +6,7 @@
 # metrics port for example, we'll only run metrics checks.
 ---
 node_address:
-  url: "https://fullnode.devnet.aptoslabs.com/"
+  url: "https://fullnode.devnet.velorlabs.com/"
   api_port: 443
 configuration_id: devnet_fullnode
 configuration_name: "Devnet Fullnode"

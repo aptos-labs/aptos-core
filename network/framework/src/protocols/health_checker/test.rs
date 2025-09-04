@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -19,9 +19,9 @@ use crate::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkId;
-use aptos_time_service::{MockTimeService, TimeService};
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::network_id::NetworkId;
+use velor_time_service::{MockTimeService, TimeService};
 use futures::future;
 use maplit::hashmap;
 use std::sync::Arc;
@@ -31,9 +31,9 @@ const PING_TIMEOUT: Duration = Duration::from_millis(500);
 
 struct TestHarness {
     mock_time: MockTimeService,
-    peer_mgr_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
-    peer_mgr_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
-    connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
+    peer_mgr_reqs_rx: velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+    peer_mgr_notifs_tx: velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
+    connection_reqs_rx: velor_channel::Receiver<PeerId, ConnectionRequest>,
     connection_notifs_tx: tokio::sync::mpsc::Sender<ConnectionNotification>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 }
@@ -42,14 +42,14 @@ impl TestHarness {
     fn new_permissive(
         ping_failures_tolerated: u64,
     ) -> (Self, HealthChecker<NetworkClient<HealthCheckerMsg>>) {
-        ::aptos_logger::Logger::init_for_testing();
+        ::velor_logger::Logger::init_for_testing();
         let mock_time = TimeService::mock();
 
-        let (peer_mgr_reqs_tx, peer_mgr_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 1, None);
+        let (peer_mgr_reqs_tx, peer_mgr_reqs_rx) = velor_channel::new(QueueStyle::FIFO, 1, None);
         let (connection_reqs_tx, connection_reqs_rx) =
-            aptos_channel::new(QueueStyle::FIFO, 1, None);
+            velor_channel::new(QueueStyle::FIFO, 1, None);
         let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) =
-            aptos_channel::new(QueueStyle::FIFO, 1, None);
+            velor_channel::new(QueueStyle::FIFO, 1, None);
         let (connection_notifs_tx, connection_notifs_rx) = tokio::sync::mpsc::channel(10);
 
         let network_sender = NetworkSender::new(

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,19 +13,19 @@ use crate::{
     },
     storage_synchronizer::{NotificationMetadata, StorageSynchronizerInterface},
 };
-use aptos_data_streaming_service::{
+use velor_data_streaming_service::{
     data_notification::DataNotification,
     data_stream::{DataStreamId, DataStreamListener},
     streaming_client::{DataStreamingClient, NotificationAndFeedback},
 };
-use aptos_event_notifications::EventSubscriptionService;
-use aptos_infallible::Mutex;
-use aptos_logger::prelude::*;
-use aptos_mempool_notifications::MempoolNotificationSender;
-use aptos_storage_interface::DbReader;
-use aptos_storage_service_notifications::StorageServiceNotificationSender;
-use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::{
+use velor_event_notifications::EventSubscriptionService;
+use velor_infallible::Mutex;
+use velor_logger::prelude::*;
+use velor_mempool_notifications::MempoolNotificationSender;
+use velor_storage_interface::DbReader;
+use velor_storage_service_notifications::StorageServiceNotificationSender;
+use velor_time_service::{TimeService, TimeServiceTrait};
+use velor_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,

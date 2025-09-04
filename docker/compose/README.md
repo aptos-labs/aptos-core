@@ -1,7 +1,7 @@
 ---
 id: docker_compose
-title: Aptos Docker-Compose Configuration
-custom_edit_url: https://github.com/aptos/aptos/edit/main/docker/compose/README.md
+title: Velor Docker-Compose Configuration
+custom_edit_url: https://github.com/velor/velor/edit/main/docker/compose/README.md
 ---
 
 This directory contains the following compose configurations:
@@ -24,7 +24,7 @@ To build your own complete testnet:
     1. Faucet will be available at http://127.0.0.1:8000
     2. JSON-RPC will be available at http://127.0.0.1:8080
 
-If you would like to clear the validator/blockchain data and start from scratch, either remove the docker volume `aptos-shared`,
-or run `docker-compose run validator rm -rf '/opt/aptos/var/*'` from the **validator-testnet** directory.
+If you would like to clear the validator/blockchain data and start from scratch, either remove the docker volume `velor-shared`,
+or run `docker-compose run validator rm -rf '/opt/velor/var/*'` from the **validator-testnet** directory.
 
-To clear just the validator logs, run  `docker-compose run validator rm -rf '/opt/aptos/var/validator.log'`
+To clear just the validator logs, run  `docker-compose run validator rm -rf '/opt/velor/var/validator.log'`

@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::ungrouped::mixed_compatible_emit_job;
 use crate::{suites::realistic_environment::realistic_env_max_load_test, TestCommand};
-use aptos_forge::{success_criteria::SuccessCriteria, ForgeConfig};
-use aptos_testcases::{
+use velor_forge::{success_criteria::SuccessCriteria, ForgeConfig};
+use velor_testcases::{
     compatibility_test::SimpleValidatorUpgrade, framework_upgrade::FrameworkUpgrade,
 };
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};

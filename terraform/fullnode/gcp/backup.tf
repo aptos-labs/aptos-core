@@ -3,13 +3,13 @@ resource "random_id" "backup-bucket" {
 }
 
 resource "google_storage_bucket" "backup" {
-  name                        = "aptos-${terraform.workspace}-backup-${random_id.backup-bucket.hex}"
+  name                        = "velor-${terraform.workspace}-backup-${random_id.backup-bucket.hex}"
   location                    = var.region
   uniform_bucket_level_access = true
 }
 
 resource "google_service_account" "backup" {
-  account_id = "aptos-${terraform.workspace}-backup"
+  account_id = "velor-${terraform.workspace}-backup"
 }
 
 resource "google_storage_bucket_iam_member" "backup" {
@@ -21,7 +21,7 @@ resource "google_storage_bucket_iam_member" "backup" {
 resource "google_service_account_iam_binding" "backup" {
   service_account_id = google_service_account.backup.name
   role               = "roles/iam.workloadIdentityUser"
-  members            = [for i in range(var.num_fullnodes) : "serviceAccount:${google_container_cluster.aptos.workload_identity_config[0].workload_pool}[${var.k8s_namespace}/pfn${i}-aptos-fullnode]"]
+  members            = [for i in range(var.num_fullnodes) : "serviceAccount:${google_container_cluster.velor.workload_identity_config[0].workload_pool}[${var.k8s_namespace}/pfn${i}-velor-fullnode]"]
 }
 
 # backup public access

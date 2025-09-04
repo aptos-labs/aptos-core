@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{common::error::Error, observer::subscription_utils};
-use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
-use aptos_network::application::metadata::PeerMetadata;
-use aptos_storage_interface::DbReader;
-use aptos_time_service::{TimeService, TimeServiceTrait};
+use velor_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
+use velor_network::application::metadata::PeerMetadata;
+use velor_storage_interface::DbReader;
+use velor_time_service::{TimeService, TimeServiceTrait};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -235,16 +235,16 @@ impl ConsensusObserverSubscription {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_config::config::PeerRole;
-    use aptos_netcore::transport::ConnectionOrigin;
-    use aptos_network::{
+    use velor_config::config::PeerRole;
+    use velor_netcore::transport::ConnectionOrigin;
+    use velor_network::{
         protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
         transport::{ConnectionId, ConnectionMetadata},
         ProtocolId,
     };
-    use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
-    use aptos_storage_interface::Result;
-    use aptos_types::{network_address::NetworkAddress, transaction::Version};
+    use velor_peer_monitoring_service_types::PeerMonitoringMetadata;
+    use velor_storage_interface::Result;
+    use velor_types::{network_address::NetworkAddress, transaction::Version};
     use claims::assert_matches;
     use mockall::mock;
 

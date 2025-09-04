@@ -23,9 +23,9 @@ def wipe_node_main(testnet_name: str, node_name: str, kubernetes: Kubernetes):
 
     #
     # Get the node's data paths.
-    ledger_db_path = path.join(util.APTOS_DATA_DIR, "db", util.LEDGER_DB_NAME)
-    state_db_path = path.join(util.APTOS_DATA_DIR, "db", util.STATE_MERKLE_DB_NAME)
-    state_sync_db_path = path.join(util.APTOS_DATA_DIR, "db", util.STATE_SYNC_DB_NAME)
+    ledger_db_path = path.join(util.VELOR_DATA_DIR, "db", util.LEDGER_DB_NAME)
+    state_db_path = path.join(util.VELOR_DATA_DIR, "db", util.STATE_MERKLE_DB_NAME)
+    state_sync_db_path = path.join(util.VELOR_DATA_DIR, "db", util.STATE_SYNC_DB_NAME)
 
     #
     # Deletion commands

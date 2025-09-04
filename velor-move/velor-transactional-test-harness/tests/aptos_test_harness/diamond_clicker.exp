@@ -1,0 +1,61 @@
+processed 4 tasks
+task 1 lines 4-35:  print-bytecode --input=module [module Alice::game {]
+// Bytecode version v8
+module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::game
+use 0x1::signer
+use 0x1::debug
+struct InnerStruct has copy + store + key
+  amount: u64
+
+struct OuterStruct has key
+  any_field: vector<InnerStruct>
+
+// Function definition at index 0
+entry public fun test_upgrade(l0: &signer) acquires OuterStruct
+    local l1: &mut vector<InnerStruct>
+    local l2: u64
+    local l3: u64
+    copy_loc l0
+    call signer::address_of
+    move_loc l0
+    vec_pack <InnerStruct>, 0
+    pack OuterStruct
+    // @5
+    move_to OuterStruct
+    mut_borrow_global OuterStruct
+    mut_borrow_field OuterStruct, any_field
+    st_loc l1
+    ld_u64 0
+    // @10
+    st_loc l2
+    copy_loc l1
+    freeze_ref
+    vec_len <InnerStruct>
+    st_loc l3
+    // @15
+l1: copy_loc l2
+    copy_loc l3
+    lt
+    br_false l0
+    copy_loc l1
+    // @20
+    copy_loc l2
+    vec_mut_borrow <InnerStruct>
+    freeze_ref
+    call debug::print<InnerStruct>
+    move_loc l2
+    // @25
+    ld_u64 1
+    add
+    st_loc l2
+    branch l1
+l0: move_loc l1
+    // @30
+    pop
+    ret
+
+
+task 2 lines 37-68:  publish --private-key Alice [module Alice::game {]
+task 3 lines 70-70:  run Alice::game::test_upgrade --signers Alice --private-key Alice
+mutable inputs after call: local#0: 0
+return values: 0

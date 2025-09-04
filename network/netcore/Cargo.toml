@@ -1,6 +1,6 @@
 [package]
-name = "aptos-netcore"
-description = "Aptos netcore"
+name = "velor-netcore"
+description = "Velor netcore"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,9 +13,9 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-memsocket = { workspace = true }
-aptos-proxy = { workspace = true }
-aptos-types = { workspace = true }
+velor-memsocket = { workspace = true }
+velor-proxy = { workspace = true }
+velor-types = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
 pin-project = { workspace = true }
@@ -25,10 +25,10 @@ tokio-util = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
-aptos-memsocket = { workspace = true }
-aptos-types = { workspace = true, features = ["fuzzing"] }
+velor-memsocket = { workspace = true }
+velor-types = { workspace = true, features = ["fuzzing"] }
 
 [features]
 default = []
-fuzzing = ["aptos-memsocket/fuzzing", "aptos-types/fuzzing"]
-testing = ["aptos-memsocket/testing"]
+fuzzing = ["velor-memsocket/fuzzing", "velor-types/fuzzing"]
+testing = ["velor-memsocket/testing"]

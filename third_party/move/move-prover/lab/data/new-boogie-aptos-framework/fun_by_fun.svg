@@ -133,7 +133,7 @@ gas_schedule::set_gas_schedule
 23.993
 </text>
 <text x="0" y="535" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::toggle_features
+velor_governance::toggle_features
 </text>
 <rect x="0" y="550" width="340" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="350" y="551" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -187,7 +187,7 @@ gas_schedule::set_storage_gas_config
 18.976
 </text>
 <text x="0" y="755" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::reconfigure
+velor_governance::reconfigure
 </text>
 <rect x="0" y="770" width="281" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="290" y="771" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -349,7 +349,7 @@ stake::on_new_epoch
 7.771
 </text>
 <text x="0" y="1414" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::vote_internal
+velor_governance::vote_internal
 </text>
 <rect x="0" y="1429" width="111" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="120" y="1430" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -376,7 +376,7 @@ aptos_governance::vote_internal
 6.911
 </text>
 <text x="0" y="1524" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::vote
+velor_governance::vote
 </text>
 <rect x="0" y="1539" width="100" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="110" y="1540" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -403,7 +403,7 @@ aptos_governance::vote
 6.252
 </text>
 <text x="0" y="1633" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::partial_vote
+velor_governance::partial_vote
 </text>
 <rect x="0" y="1649" width="93" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="102" y="1650" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -673,7 +673,7 @@ staking_contract::create_staking_contract_with_coins
 3.518
 </text>
 <text x="0" y="2732" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::resolve_multi_step_proposal
+velor_governance::resolve_multi_step_proposal
 </text>
 <rect x="0" y="2747" width="56" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="65" y="2748" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -781,7 +781,7 @@ staking_contract::create_staking_contract
 3.205
 </text>
 <text x="0" y="3171" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::create_proposal_v2
+velor_governance::create_proposal_v2
 </text>
 <rect x="0" y="3186" width="47" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="56" y="3188" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -835,7 +835,7 @@ transaction_validation::epilogue_gas_payer
 2.905
 </text>
 <text x="0" y="3391" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::create_proposal
+velor_governance::create_proposal
 </text>
 <rect x="0" y="3406" width="45" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="54" y="3407" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -889,7 +889,7 @@ staking_contract::switch_operator_with_same_commission
 2.763
 </text>
 <text x="0" y="3611" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::create_proposal_v2_impl
+velor_governance::create_proposal_v2_impl
 </text>
 <rect x="0" y="3626" width="39" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="48" y="3627" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -1078,7 +1078,7 @@ staking_config::initialize_rewards
 1.916
 </text>
 <text x="0" y="4380" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::resolve
+velor_governance::resolve
 </text>
 <rect x="0" y="4395" width="29" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="38" y="4396" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -1240,7 +1240,7 @@ staking_config::calculate_and_save_latest_rewards_config
 1.569
 </text>
 <text x="0" y="5039" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_account::transfer_coins
+velor_account::transfer_coins
 </text>
 <rect x="0" y="5054" width="24" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="33" y="5055" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -1591,7 +1591,7 @@ multisig_account::create_with_owners
 1.245
 </text>
 <text x="0" y="6467" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::get_remaining_voting_power
+velor_governance::get_remaining_voting_power
 </text>
 <rect x="0" y="6482" width="20" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="29" y="6483" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -1618,7 +1618,7 @@ aptos_governance::get_remaining_voting_power
 1.237
 </text>
 <text x="0" y="6576" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_account::deposit_coins
+velor_account::deposit_coins
 </text>
 <rect x="0" y="6592" width="20" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="29" y="6593" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -1861,7 +1861,7 @@ staking_proxy::set_voter
 1.113
 </text>
 <text x="0" y="7565" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::initialize
+velor_governance::initialize
 </text>
 <rect x="0" y="7580" width="17" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="26" y="7582" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -1915,7 +1915,7 @@ transaction_validation::fee_payer_script_prologue
 1.070
 </text>
 <text x="0" y="7785" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-genesis::initialize_core_resources_and_aptos_coin
+genesis::initialize_core_resources_and_velor_coin
 </text>
 <rect x="0" y="7800" width="17" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="26" y="7801" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -2050,7 +2050,7 @@ stake::join_validator_set
 1.063
 </text>
 <text x="0" y="8334" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-system_addresses::assert_aptos_framework
+system_addresses::assert_velor_framework
 </text>
 <rect x="0" y="8349" width="16" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="26" y="8350" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -2131,7 +2131,7 @@ genesis::initialize_validator
 1.032
 </text>
 <text x="0" y="8664" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_account::transfer
+velor_account::transfer
 </text>
 <rect x="0" y="8679" width="16" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="25" y="8680" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -2212,7 +2212,7 @@ stake::join_validator_set_internal
 1.025
 </text>
 <text x="0" y="8993" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::add_approved_script_hash
+velor_governance::add_approved_script_hash
 </text>
 <rect x="0" y="9008" width="16" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="25" y="9010" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -2239,7 +2239,7 @@ aptos_governance::add_approved_script_hash
 1.016
 </text>
 <text x="0" y="9103" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::add_approved_script_hash_script
+velor_governance::add_approved_script_hash_script
 </text>
 <rect x="0" y="9118" width="16" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="25" y="9119" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -2347,7 +2347,7 @@ code::publish_package
 0.981
 </text>
 <text x="0" y="9542" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::get_voting_power
+velor_governance::get_voting_power
 </text>
 <rect x="0" y="9557" width="15" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="24" y="9559" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -3400,7 +3400,7 @@ multisig_account::create_transaction_with_hash
 0.846
 </text>
 <text x="0" y="13826" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_account::create_account
+velor_account::create_account
 </text>
 <rect x="0" y="13841" width="14" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="23" y="13843" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -3427,7 +3427,7 @@ aptos_account::create_account
 0.876
 </text>
 <text x="0" y="13936" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-genesis::initialize_aptos_coin
+genesis::initialize_velor_coin
 </text>
 <rect x="0" y="13951" width="14" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="23" y="13953" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -3697,7 +3697,7 @@ transaction_fee::burn_fee
 0.848
 </text>
 <text x="0" y="15035" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_coin::initialize
+velor_coin::initialize
 </text>
 <rect x="0" y="15050" width="13" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="22" y="15051" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -5290,7 +5290,7 @@ coin::supply
 0.778
 </text>
 <text x="0" y="21515" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_account::assert_account_is_registered_for_apt
+velor_account::assert_account_is_registered_for_apt
 </text>
 <rect x="0" y="21530" width="12" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="21" y="21532" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -5479,7 +5479,7 @@ stake::update_voting_power_increase
 0.770
 </text>
 <text x="0" y="22284" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::remove_approved_hash
+velor_governance::remove_approved_hash
 </text>
 <rect x="0" y="22299" width="12" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="21" y="22301" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -6910,7 +6910,7 @@ vesting::verify_admin
 0.734
 </text>
 <text x="0" y="28106" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_coin::destroy_mint_cap
+velor_coin::destroy_mint_cap
 </text>
 <rect x="0" y="28121" width="11" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="21" y="28123" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -8233,7 +8233,7 @@ optional_aggregator::switch_to_integer_and_zero_out
 0.700
 </text>
 <text x="0" y="33488" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_account::set_allow_direct_coin_transfers
+velor_account::set_allow_direct_coin_transfers
 </text>
 <rect x="0" y="33504" width="11" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="20" y="33505" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -8287,7 +8287,7 @@ account::create_account_if_does_not_exist
 0.716
 </text>
 <text x="0" y="33708" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_coin::find_delegation
+velor_coin::find_delegation
 </text>
 <rect x="0" y="33723" width="11" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="20" y="33725" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -9016,7 +9016,7 @@ stake::assert_owner_cap_exists
 0.644
 </text>
 <text x="0" y="36674" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_account::assert_account_exists
+velor_account::assert_account_exists
 </text>
 <rect x="0" y="36689" width="11" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="20" y="36690" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -9799,7 +9799,7 @@ object::transfer
 0.697
 </text>
 <text x="0" y="39859" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::create_proposal_metadata
+velor_governance::create_proposal_metadata
 </text>
 <rect x="0" y="39875" width="10" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="39876" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -9826,7 +9826,7 @@ aptos_governance::create_proposal_metadata
 0.667
 </text>
 <text x="0" y="39969" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::update_governance_config
+velor_governance::update_governance_config
 </text>
 <rect x="0" y="39984" width="10" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="39986" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -9907,7 +9907,7 @@ stake::initialize_validator_fees
 0.656
 </text>
 <text x="0" y="40299" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::store_signer_cap
+velor_governance::store_signer_cap
 </text>
 <rect x="0" y="40314" width="10" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="40315" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -10042,7 +10042,7 @@ object::transfer_raw
 0.664
 </text>
 <text x="0" y="40848" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::get_signer_testnet_only
+velor_governance::get_signer_testnet_only
 </text>
 <rect x="0" y="40863" width="10" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="40865" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -10501,7 +10501,7 @@ storage_gas::calculate_create_gas
 0.656
 </text>
 <text x="0" y="42715" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::assert_voting_initialization
+velor_governance::assert_voting_initialization
 </text>
 <rect x="0" y="42731" width="10" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="42732" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -10879,7 +10879,7 @@ staking_config::update_required_stake
 0.642
 </text>
 <text x="0" y="44253" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::has_entirely_voted
+velor_governance::has_entirely_voted
 </text>
 <rect x="0" y="44268" width="10" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="44270" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -11230,7 +11230,7 @@ event::new_event_handle
 0.635
 </text>
 <text x="0" y="45681" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::get_signer
+velor_governance::get_signer
 </text>
 <rect x="0" y="45696" width="10" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="45698" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -11338,7 +11338,7 @@ account::initialize
 0.645
 </text>
 <text x="0" y="46121" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::initialize_partial_voting
+velor_governance::initialize_partial_voting
 </text>
 <rect x="0" y="46136" width="10" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="46137" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -11554,7 +11554,7 @@ aggregator_factory::initialize_aggregator_factory
 0.642
 </text>
 <text x="0" y="46999" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-transaction_fee::store_aptos_coin_burn_cap
+transaction_fee::store_velor_coin_burn_cap
 </text>
 <rect x="0" y="47014" width="10" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="47016" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -11689,7 +11689,7 @@ event::emit
 0.625
 </text>
 <text x="0" y="47549" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_account::can_receive_direct_coin_transfers
+velor_account::can_receive_direct_coin_transfers
 </text>
 <rect x="0" y="47564" width="10" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="47565" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -11743,7 +11743,7 @@ stake::extract_owner_cap
 0.650
 </text>
 <text x="0" y="47768" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-stake::store_aptos_coin_mint_cap
+stake::store_velor_coin_mint_cap
 </text>
 <rect x="0" y="47783" width="10" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="47785" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -11905,7 +11905,7 @@ reconfiguration::current_epoch
 0.647
 </text>
 <text x="0" y="48427" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::get_required_proposer_stake
+velor_governance::get_required_proposer_stake
 </text>
 <rect x="0" y="48442" width="10" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="48444" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -12040,7 +12040,7 @@ transaction_validation::initialize
 0.647
 </text>
 <text x="0" y="48977" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-transaction_fee::store_aptos_coin_mint_cap
+transaction_fee::store_velor_coin_mint_cap
 </text>
 <rect x="0" y="48992" width="10" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="48993" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -12148,7 +12148,7 @@ staking_config::get_required_stake
 0.643
 </text>
 <text x="0" y="49416" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::get_min_voting_threshold
+velor_governance::get_min_voting_threshold
 </text>
 <rect x="0" y="49431" width="10" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="49432" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -12175,7 +12175,7 @@ aptos_governance::get_min_voting_threshold
 0.635
 </text>
 <text x="0" y="49526" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::get_voting_duration_secs
+velor_governance::get_voting_duration_secs
 </text>
 <rect x="0" y="49541" width="10" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="49542" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -12364,7 +12364,7 @@ coin::initialize_supply_config
 0.630
 </text>
 <text x="0" y="50295" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_coin::has_mint_capability
+velor_coin::has_mint_capability
 </text>
 <rect x="0" y="50310" width="10" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="50311" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -13795,7 +13795,7 @@ system_addresses::is_vm_address
 0.633
 </text>
 <text x="0" y="56116" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-system_addresses::is_aptos_framework_address
+system_addresses::is_velor_framework_address
 </text>
 <rect x="0" y="56132" width="10" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="19" y="56133" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -14335,7 +14335,7 @@ transaction_context::get_script_hash
 0.414
 </text>
 <text x="0" y="58313" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_governance::initialize_for_verification
+velor_governance::initialize_for_verification
 </text>
 <rect x="0" y="58328" width="6" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="15" y="58330" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -15712,7 +15712,7 @@ create_signer::create_signer
 0.410
 </text>
 <text x="0" y="63915" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_coin::delegate_mint_capability
+velor_coin::delegate_mint_capability
 </text>
 <rect x="0" y="63931" width="6" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="15" y="63932" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -17251,7 +17251,7 @@ aggregator::read
 0.413
 </text>
 <text x="0" y="70177" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_coin::claim_mint_capability
+velor_coin::claim_mint_capability
 </text>
 <rect x="0" y="70192" width="6" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="15" y="70193" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -17278,7 +17278,7 @@ aptos_coin::claim_mint_capability
 0.416
 </text>
 <text x="0" y="70286" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_account::batch_transfer
+velor_account::batch_transfer
 </text>
 <rect x="0" y="70302" width="6" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="15" y="70303" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -17305,7 +17305,7 @@ aptos_account::batch_transfer
 0.417
 </text>
 <text x="0" y="70396" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_account::batch_transfer_coins
+velor_account::batch_transfer_coins
 </text>
 <rect x="0" y="70411" width="6" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="15" y="70413" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -17872,7 +17872,7 @@ aggregator_factory::new_aggregator
 0.411
 </text>
 <text x="0" y="72703" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_coin::mint
+velor_coin::mint
 </text>
 <rect x="0" y="72718" width="6" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="15" y="72720" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -17899,7 +17899,7 @@ aptos_coin::mint
 0.411
 </text>
 <text x="0" y="72813" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_coin::configure_accounts_for_test
+velor_coin::configure_accounts_for_test
 </text>
 <rect x="0" y="72828" width="6" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="15" y="72829" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">

@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 use crate::transaction::authenticator::{AuthenticationKey, Scheme};
 use anyhow::bail;
-use aptos_crypto::{
+use velor_crypto::{
     ed25519::Ed25519PublicKey,
     hash::{CryptoHasher, HashValue},
     x25519,
@@ -15,9 +15,9 @@ use std::{
     str::FromStr,
 };
 
-const MULTISIG_ACCOUNT_DOMAIN_SEPARATOR: &[u8] = b"aptos_framework::multisig_account";
-const STAKING_CONTRACT_DOMAIN_SEPARATOR: &[u8] = b"aptos_framework::staking_contract";
-const VESTING_POOL_DOMAIN_SEPARATOR: &[u8] = b"aptos_framework::vesting";
+const MULTISIG_ACCOUNT_DOMAIN_SEPARATOR: &[u8] = b"velor_framework::multisig_account";
+const STAKING_CONTRACT_DOMAIN_SEPARATOR: &[u8] = b"velor_framework::staking_contract";
+const VESTING_POOL_DOMAIN_SEPARATOR: &[u8] = b"velor_framework::vesting";
 
 /// A wrapper struct that gives better error messages when the account address
 /// can't be deserialized in a human readable format
@@ -137,7 +137,7 @@ pub fn from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
 // from consensus key which is of type Ed25519PublicKey. Since AccountAddress does
 // not mean anything in a setting without remote authentication, we use the network
 // public key to generate a peer_id for the peer.
-// See this issue for potential improvements: https://github.com/aptos-labs/aptos-core/issues/3960
+// See this issue for potential improvements: https://github.com/velor-chain/velor-core/issues/3960
 pub fn from_identity_public_key(identity_public_key: x25519::PublicKey) -> AccountAddress {
     let mut array = [0u8; AccountAddress::LENGTH];
     let pubkey_slice = identity_public_key.as_slice();
@@ -251,7 +251,7 @@ pub fn create_multisig_account_address(
 // with the imported `AccountAddress` from move-core-types. It needs to have the same name since
 // the hash salt is calculated using the name of the type.
 mod hasher {
-    #[derive(serde::Deserialize, aptos_crypto_derive::CryptoHasher)]
+    #[derive(serde::Deserialize, velor_crypto_derive::CryptoHasher)]
     struct AccountAddress;
 }
 
@@ -270,7 +270,7 @@ impl HashAccountAddress for AccountAddress {
 #[cfg(test)]
 mod test {
     use super::{AccountAddress, HashAccountAddress};
-    use aptos_crypto::hash::HashValue;
+    use velor_crypto::hash::HashValue;
     use hex::FromHex;
 
     #[test]

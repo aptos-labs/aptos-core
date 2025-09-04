@@ -1,6 +1,6 @@
 [package]
-name = "aptos-storage-interface"
-description = "Aptos storage interface"
+name = "velor-storage-interface"
+description = "Velor storage interface"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,13 +14,13 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-experimental-layered-map = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-scratchpad = { workspace = true }
-aptos-secure-net = { workspace = true }
-aptos-types = { workspace = true }
+velor-crypto = { workspace = true }
+velor-experimental-layered-map = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-scratchpad = { workspace = true }
+velor-secure-net = { workspace = true }
+velor-types = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
 dashmap = { workspace = true }
@@ -36,12 +36,12 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-aptos-types = { workspace = true, features = ["fuzzing"] }
+velor-types = { workspace = true, features = ["fuzzing"] }
 lru = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["aptos-types/fuzzing"]
+fuzzing = ["velor-types/fuzzing"]
 
 [package.metadata.cargo-machete]
 ignored = ["proptest"]

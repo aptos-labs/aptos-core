@@ -1,5 +1,5 @@
 [package]
-name = "aptos-indexer-grpc-file-store"
+name = "velor-indexer-grpc-file-store"
 description = "Indexer gRPC file store saves transactions to persistent storage."
 version = "1.0.0"
 
@@ -14,10 +14,10 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-indexer-grpc-server-framework = { workspace = true }
-aptos-indexer-grpc-utils = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-moving-average = { workspace = true }
+velor-indexer-grpc-server-framework = { workspace = true }
+velor-indexer-grpc-utils = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-moving-average = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }

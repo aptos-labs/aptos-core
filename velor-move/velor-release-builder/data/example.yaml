@@ -1,0 +1,69 @@
+---
+remote_endpoint: ~
+proposals:
+  - name: framework
+    metadata:
+      title: ""
+      description: ""
+      source_code_url: ""
+      discussion_url: ""
+    execution_mode: MultiStep
+    update_sequence:
+      - Framework:
+          bytecode_version: 7
+          git_hash: ~
+  - name: gas
+    metadata:
+      title: ""
+      description: ""
+      source_code_url: ""
+      discussion_url: ""
+    execution_mode: MultiStep
+    update_sequence:
+      - DefaultGas
+  - name: feature_flags
+    metadata:
+      title: ""
+      description: ""
+      source_code_url: ""
+      discussion_url: ""
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - code_dependency_check
+            - treat_friend_as_private
+            - sha512_and_ripe_md160_natives
+            - velor_std_chain_id_natives
+            - v_m_binary_format_v6
+            - multi_ed25519_pk_validate_v2_natives
+            - blake2b256_native
+            - resource_groups
+            - multisig_accounts
+            - delegation_pools
+            - ed25519_pubkey_validate_return_false_wrong_length
+            - struct_constructors
+            - cryptography_algebra_natives
+            - bls12381_structures
+          disabled: []
+      - Consensus:
+          V1:
+            decoupled_execution: true
+            back_pressure_limit: 10
+            exclude_round: 40
+            proposer_election_type:
+              leader_reputation:
+                proposer_and_voter_v2:
+                  active_weight: 1000
+                  inactive_weight: 10
+                  failed_weight: 1
+                  failure_threshold_percent: 10
+                  proposer_window_num_validators_multiplier: 10
+                  voter_window_num_validators_multiplier: 1
+                  weight_by_voting_power: true
+                  use_history_from_previous_epoch_max_count: 5
+            max_failed_authors_to_store: 10
+      - Execution:
+          V1:
+            transaction_shuffler_type: no_shuffling
+      - RawScript: data/example_proposals/empty_multi_step.move

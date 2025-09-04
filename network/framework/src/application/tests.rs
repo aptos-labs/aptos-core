@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -25,13 +25,13 @@ use crate::{
     },
     transport::ConnectionMetadata,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::{
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::{
     config::{Peer, PeerRole, PeerSet},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
-use aptos_types::{account_address::AccountAddress, PeerId};
+use velor_peer_monitoring_service_types::PeerMonitoringMetadata;
+use velor_types::{account_address::AccountAddress, PeerId};
 use futures_util::StreamExt;
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
@@ -1000,10 +1000,10 @@ fn compare_vectors_ignore_order<T: Clone + Debug + Ord>(
     assert_eq!(vector_1, vector_2);
 }
 
-/// Returns an aptos channel for testing
-fn create_aptos_channel<K: Eq + Hash + Clone, T>(
-) -> (aptos_channel::Sender<K, T>, aptos_channel::Receiver<K, T>) {
-    aptos_channel::new(QueueStyle::FIFO, 10, None)
+/// Returns an velor channel for testing
+fn create_velor_channel<K: Eq + Hash + Clone, T>(
+) -> (velor_channel::Sender<K, T>, velor_channel::Receiver<K, T>) {
+    velor_channel::new(QueueStyle::FIFO, 10, None)
 }
 
 /// Creates a set of network senders and events for the specified
@@ -1014,8 +1014,8 @@ fn create_network_sender_and_events(
 ) -> (
     HashMap<NetworkId, NetworkSender<DummyMessage>>,
     NetworkServiceEvents<DummyMessage>,
-    HashMap<NetworkId, aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>>,
-    HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
+    HashMap<NetworkId, velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>>,
+    HashMap<NetworkId, velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
 ) {
     let mut network_senders = HashMap::new();
     let mut network_and_events = HashMap::new();
@@ -1024,9 +1024,9 @@ fn create_network_sender_and_events(
 
     for network_id in network_ids {
         // Create the peer manager and connection channels
-        let (inbound_request_sender, inbound_request_receiver) = create_aptos_channel();
-        let (outbound_request_sender, outbound_request_receiver) = create_aptos_channel();
-        let (connection_outbound_sender, _connection_outbound_receiver) = create_aptos_channel();
+        let (inbound_request_sender, inbound_request_receiver) = create_velor_channel();
+        let (outbound_request_sender, outbound_request_receiver) = create_velor_channel();
+        let (connection_outbound_sender, _connection_outbound_receiver) = create_velor_channel();
 
         // Create the network sender and events
         let network_sender = NetworkSender::new(
@@ -1178,11 +1178,11 @@ async fn wait_for_network_event(
     expected_peer_network_id: PeerNetworkId,
     outbound_request_receivers: &mut HashMap<
         NetworkId,
-        aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+        velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     >,
     inbound_request_senders: &mut HashMap<
         NetworkId,
-        aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
+        velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
     >,
     network_events: &mut NetworkEvents<DummyMessage>,
     is_rpc_request: bool,

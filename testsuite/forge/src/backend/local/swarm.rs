@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,18 +7,18 @@ use crate::{
     SwarmExt, Validator, Version,
 };
 use anyhow::{anyhow, bail, Result};
-use aptos_config::{
+use velor_config::{
     config::{NetworkConfig, NodeConfig, OverrideNodeConfig, PersistableConfig},
     keys::ConfigKey,
     network_id::NetworkId,
 };
-use aptos_framework::ReleaseBundle;
-use aptos_genesis::builder::{
+use velor_framework::ReleaseBundle;
+use velor_genesis::builder::{
     FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn, InitGenesisStakeFn,
 };
-use aptos_infallible::Mutex;
-use aptos_logger::{info, warn};
-use aptos_sdk::{
+use velor_infallible::Mutex;
+use velor_logger::{info, warn};
+use velor_sdk::{
     crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType},
     types::{
         chain_id::ChainId, transaction::Transaction, waypoint::Waypoint, AccountKey, LocalAccount,
@@ -133,10 +133,10 @@ impl LocalSwarm {
         };
 
         let (root_key, genesis, genesis_waypoint, validators) =
-            aptos_genesis::builder::Builder::new(
+            velor_genesis::builder::Builder::new(
                 &dir_actual,
                 genesis_framework
-                    .unwrap_or_else(|| aptos_cached_packages::head_release_bundle().clone()),
+                    .unwrap_or_else(|| velor_cached_packages::head_release_bundle().clone()),
             )?
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(move |index, config, base| {
@@ -241,7 +241,7 @@ impl LocalSwarm {
 
         let root_key = ConfigKey::new(root_key);
         let root_account = LocalAccount::new(
-            aptos_sdk::types::account_config::aptos_test_root_address(),
+            velor_sdk::types::account_config::velor_test_root_address(),
             AccountKey::from_private_key(root_key.private_key()),
             0,
         );

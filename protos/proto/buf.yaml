@@ -12,12 +12,12 @@ lint:
   ignore_only:
     PACKAGE_VERSION_SUFFIX:
       # Timestamp package is well-adpoted and we don't want to change it.
-      - aptos/util/timestamp/timestamp.proto
+      - velor/util/timestamp/timestamp.proto
     SERVICE_SUFFIX:
       # ServiceService is annoying; let's not follow this.
-      - aptos/indexer/v1/raw_data.proto
-      - aptos/internal/fullnode/v1/fullnode_data.proto
+      - velor/indexer/v1/raw_data.proto
+      - velor/internal/fullnode/v1/fullnode_data.proto
     RPC_RESPONSE_STANDARD_NAME:
       # We may reuse the response.
-      - aptos/indexer/v1/raw_data.proto
-      - aptos/internal/fullnode/v1/fullnode_data.proto
+      - velor/indexer/v1/raw_data.proto
+      - velor/internal/fullnode/v1/fullnode_data.proto

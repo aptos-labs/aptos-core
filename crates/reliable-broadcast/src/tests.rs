@@ -1,14 +1,14 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{BroadcastStatus, RBMessage, RBNetworkSender, ReliableBroadcast};
 use anyhow::bail;
-use aptos_bounded_executor::BoundedExecutor;
-use aptos_consensus_types::common::Author;
-use aptos_enum_conversion_derive::EnumConversion;
-use aptos_infallible::Mutex;
-use aptos_time_service::TimeService;
-use aptos_types::validator_verifier::random_validator_verifier;
+use velor_bounded_executor::BoundedExecutor;
+use velor_consensus_types::common::Author;
+use velor_enum_conversion_derive::EnumConversion;
+use velor_infallible::Mutex;
+use velor_time_service::TimeService;
+use velor_types::validator_verifier::random_validator_verifier;
 use async_trait::async_trait;
 use bytes::Bytes;
 use claims::assert_ok_eq;

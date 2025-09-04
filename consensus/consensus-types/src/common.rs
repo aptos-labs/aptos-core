@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,13 +7,13 @@ use crate::{
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
 use anyhow::ensure;
-use aptos_crypto::{
+use velor_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
 };
-use aptos_crypto_derive::CryptoHasher;
-use aptos_logger::prelude::*;
-use aptos_types::{
+use velor_crypto_derive::CryptoHasher;
+use velor_logger::prelude::*;
+use velor_types::{
     account_address::AccountAddress,
     transaction::{ReplayProtector, SignedTransaction},
     validator_verifier::ValidatorVerifier,

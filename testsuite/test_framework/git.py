@@ -40,7 +40,7 @@ class Git:
 
     def branch_matches_remote(self, remote: str, ref: str) -> bool:
         """Check if the current branch matches the remote branch"""
-        # git ls-remote --heads  https://github.com/aptos-labs/aptos-core.git rustielin/exp
+        # git ls-remote --heads  https://github.com/velor-chain/velor-core.git rustielin/exp
         remote_commit_hash = self.resolve_remote_ref(remote, ref)
         if remote_commit_hash is None:
             return False
@@ -84,7 +84,7 @@ class Git:
         self, remote: str, pattern: str, regex: str
     ) -> list[str]:
         """
-        Get remote branches that match a specific pattern (e.g. aptos-release-v*).
+        Get remote branches that match a specific pattern (e.g. velor-release-v*).
         This uses ls-remote and a user-specified regex pattern to filter branches.
         """
         result = self.run(["ls-remote", "--heads", remote, pattern])

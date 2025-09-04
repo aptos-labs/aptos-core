@@ -1,10 +1,10 @@
 resource "aws_cloudwatch_log_group" "eks" {
-  name              = "/aws/eks/aptos-${local.workspace_name}/cluster"
+  name              = "/aws/eks/velor-${local.workspace_name}/cluster"
   retention_in_days = 7
   tags              = local.default_tags
 }
 
-resource "aws_eks_cluster" "aptos" {
+resource "aws_eks_cluster" "velor" {
   name                      = var.eks_cluster_name
   role_arn                  = aws_iam_role.cluster.arn
   version                   = var.kubernetes_version
@@ -32,8 +32,8 @@ resource "aws_eks_cluster" "aptos" {
   ]
 }
 
-data "aws_eks_cluster_auth" "aptos" {
-  name = aws_eks_cluster.aptos.name
+data "aws_eks_cluster_auth" "velor" {
+  name = aws_eks_cluster.velor.name
 }
 
 locals {
@@ -53,7 +53,7 @@ locals {
 
 resource "aws_launch_template" "nodes" {
   for_each      = local.pools
-  name          = "aptos-${local.workspace_name}/${each.key}"
+  name          = "velor-${local.workspace_name}/${each.key}"
   instance_type = each.value.instance_type
 
   block_device_mappings {
@@ -69,16 +69,16 @@ resource "aws_launch_template" "nodes" {
   tag_specifications {
     resource_type = "instance"
     tags = merge(local.default_tags, {
-      Name = "aptos-${local.workspace_name}/${each.key}",
+      Name = "velor-${local.workspace_name}/${each.key}",
     })
   }
 }
 
 resource "aws_eks_node_group" "nodes" {
   for_each        = local.pools
-  cluster_name    = aws_eks_cluster.aptos.name
+  cluster_name    = aws_eks_cluster.velor.name
   node_group_name = each.key
-  version         = aws_eks_cluster.aptos.version
+  version         = aws_eks_cluster.velor.version
   node_role_arn   = aws_iam_role.nodes.arn
   subnet_ids      = [aws_subnet.private[0].id]
   tags            = local.default_tags
@@ -120,7 +120,7 @@ resource "aws_eks_node_group" "nodes" {
 resource "aws_iam_openid_connect_provider" "cluster" {
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = ["9e99a48a9960b14926bb7f3b02e22da2b0ab7280"] # Thumbprint of Root CA for EKS OIDC, Valid until 2037
-  url             = aws_eks_cluster.aptos.identity[0].oidc[0].issuer
+  url             = aws_eks_cluster.velor.identity[0].oidc[0].issuer
 }
 
 locals {
@@ -155,7 +155,7 @@ data "aws_iam_policy_document" "aws-ebs-csi-driver-trust-policy" {
 }
 
 resource "aws_iam_role" "aws-ebs-csi-driver" {
-  name                 = "aptos-${local.workspace_name}-ebs-csi-controller"
+  name                 = "velor-${local.workspace_name}-ebs-csi-controller"
   path                 = var.iam_path
   permissions_boundary = var.permissions_boundary_policy
   assume_role_policy   = data.aws_iam_policy_document.aws-ebs-csi-driver-trust-policy.json
@@ -168,7 +168,7 @@ resource "aws_iam_role_policy_attachment" "caws-ebs-csi-driver" {
 }
 
 resource "aws_eks_addon" "aws-ebs-csi-driver" {
-  cluster_name             = aws_eks_cluster.aptos.name
+  cluster_name             = aws_eks_cluster.velor.name
   addon_name               = "aws-ebs-csi-driver"
   service_account_role_arn = aws_iam_role.aws-ebs-csi-driver.arn
 }
@@ -210,7 +210,7 @@ data "aws_iam_policy_document" "cluster-autoscaler" {
     resources = ["*"]
     condition {
       test     = "StringEquals"
-      variable = "aws:ResourceTag/k8s.io/cluster-autoscaler/${aws_eks_cluster.aptos.name}"
+      variable = "aws:ResourceTag/k8s.io/cluster-autoscaler/${aws_eks_cluster.velor.name}"
       values   = ["owned"]
     }
   }
@@ -235,7 +235,7 @@ data "aws_iam_policy_document" "cluster-autoscaler" {
 }
 
 resource "aws_iam_role" "cluster-autoscaler" {
-  name                 = "aptos-fullnode-${local.workspace_name}-cluster-autoscaler"
+  name                 = "velor-fullnode-${local.workspace_name}-cluster-autoscaler"
   path                 = var.iam_path
   permissions_boundary = var.permissions_boundary_policy
   assume_role_policy   = data.aws_iam_policy_document.cluster-autoscaler-assume-role.json
@@ -262,10 +262,10 @@ resource "helm_release" "autoscaling" {
     jsonencode({
       autoscaler = {
         enabled     = true
-        clusterName = aws_eks_cluster.aptos.name
+        clusterName = aws_eks_cluster.velor.name
         image = {
           # EKS does not report patch version
-          tag = "v${aws_eks_cluster.aptos.version}.0"
+          tag = "v${aws_eks_cluster.velor.version}.0"
         }
         serviceAccount = {
           annotations = {

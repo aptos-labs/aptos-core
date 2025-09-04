@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{account_config::TypeInfoResource, move_utils::move_event_v1::MoveEventV1Type};

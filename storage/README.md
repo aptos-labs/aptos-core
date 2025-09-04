@@ -1,32 +1,32 @@
 ---
 id: storage
 title: Storage
-custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/storage/README.md
+custom_edit_url: https://github.com/velor-chain/velor-core/edit/main/storage/README.md
 ---
 
 ## Overview
 
 The storage modules implement:
-* the AptosDB which holds the authenticated blockchain data structure within a
-Aptos Node. It serves the current "state" readable by Move contracts being
+* the VelorDB which holds the authenticated blockchain data structure within a
+Velor Node. It serves the current "state" readable by Move contracts being
 executed, as well as a configurable length of the blockchain history to fellow
-Aptos Nodes and the Rest API. It takes in new data from either the consensus or
+Velor Nodes and the Rest API. It takes in new data from either the consensus or
 the state sync components to grow the history.
 * the backup system which persists the entire history of transactions. The
 backups are not required for running the blockchain in normal situations, but
-can be critical when emergency happens were an AptosDB needs to be recreated
-a. without the help of widely available healthy running Aptos Nodes b. to
+can be critical when emergency happens were an VelorDB needs to be recreated
+a. without the help of widely available healthy running Velor Nodes b. to
 recover a historical state back in time. c. specifically, to do b. in order to
 create an alternative ledger and redistribute the result to overcome
 unforeseeable catastrophic situations (to hard fork)
 
 More to read:
 * To understand the authenticated blockchain data structure, see
-https://github.com/aptos-labs/aptos-core/tree/main/documentation/specifications/common
+https://github.com/velor-chain/velor-core/tree/main/documentation/specifications/common
 * To know more about the state authentication data structure, see
-https://github.com/aptos-labs/aptos-core/developer-docs-site/static/papers/jellyfish-merkle-tree/2021-01-14.pdf
+https://github.com/velor-chain/velor-core/developer-docs-site/static/papers/jellyfish-merkle-tree/2021-01-14.pdf
 * To learn more about the backup system including the backup data format, see
-https://github.com/aptos-labs/aptos-core/blob/main/documentation/specifications/db_backup/spec.md
+https://github.com/velor-chain/velor-core/blob/main/documentation/specifications/db_backup/spec.md
 
 ## System Architecture
 
@@ -38,7 +38,7 @@ Notice that the whole "Execution" block is outside of this folder but highly rel
 
 ##  Configs
 
-As part of the Aptos Node config, these are specific for the storage components.
+As part of the Velor Node config, these are specific for the storage components.
 Notice that to use the default configs one doesn't need to put in anything in
 the config file. Only when one needs to overwrite a certain config value she
 needs put in something. For example, to enable the internal indexer, one can
@@ -51,12 +51,12 @@ storage:
 
 Now here's the full set of configs, with their default values and explanations.
 The default values should work in most cases and generally speaking don't need
-to be changed. Another reason to not overriding them is the developers of Aptos
+to be changed. Another reason to not overriding them is the developers of Velor
 can tune the default configs with new software releases and a override will
 make your node miss it.
 If you do have a reason to change them, probably read the more
 detailed comments in
-https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/storage_config.rs
+https://github.com/velor-chain/velor-core/blob/main/config/src/config/storage_config.rs
 to understand it better.
 
 ```yaml
@@ -69,12 +69,12 @@ storage:
   # For example, if in the top level config we have
   # ``` yaml
   # base:
-  #   data_dir: /opt/aptos/data
+  #   data_dir: /opt/velor/data
   # ```
   # and this config has the default value (`db`), the DBs will be at
-  # `/opt/aptos/data/db/ledger_db` and  `/opt/aptos/data/db/state_merkle_db`
+  # `/opt/velor/data/db/ledger_db` and  `/opt/velor/data/db/state_merkle_db`
   dir: db
-  # AptosDB persists the state authentication structure off the critical path
+  # VelorDB persists the state authentication structure off the critical path
   # of transaction execution and batch up recent changes for performance. Once
   # the number of buffered state updates exceeds this config, a dump of all
   # buffered values into a snapshot is triggered. (Alternatively, if too many
@@ -85,7 +85,7 @@ storage:
   # helps with performance but consumes a lot of memory and can compete with
   # the filesystem cache.
   max_num_nodes_per_lru_cache_shard: 8192
-  # AptosDB keeps recent history of the blockchain ledger and recent versions
+  # VelorDB keeps recent history of the blockchain ledger and recent versions
   # of the state trees. And a pruner is responsible for pruning old data. The
   # default values makes sure the network is in good health in terms of
   # data availability and won't occupy too much space on recommended hardware
@@ -181,42 +181,42 @@ indexer_db_config:
 The DB backup is a concise format to preserve the raw data of the blockchain. It
  means a lot for the data security of the blockchain overall, and provides a way
 to batch process the blockchain data off chain. But it's not the preferred way
-to boot up a AptosDB instance on an empty disk. Use State Sync (it's Fast Sync
+to boot up a VelorDB instance on an empty disk. Use State Sync (it's Fast Sync
 mode). Read more about state sync here:
-https://github.com/aptos-labs/aptos-core/blob/main/state-sync/README.md
+https://github.com/velor-chain/velor-core/blob/main/state-sync/README.md
 
 
 ### Continuously backing up to a cloud storage
 
 The backup coordinator runs continuously, talks to the backup service embedded
-inside a Aptos Node and writes backup data automatically to a configured cloud
+inside a Velor Node and writes backup data automatically to a configured cloud
 storage.
 
 One can make a config file for a specific cloud storage position by updating
 one of the examples here
-https://github.com/aptos-labs/aptos-core/tree/main/storage/backup/backup-cli/src/storage/command_adapter/sample_configs/
+https://github.com/velor-chain/velor-core/tree/main/storage/backup/backup-cli/src/storage/command_adapter/sample_configs/
 
 
 ```bash
-$ cargo run -p aptos-debugger aptos-db backup continuously --help
+$ cargo run -p velor-debugger velor-db backup continuously --help
     Finished dev [unoptimized + debuginfo] target(s) in 1.06s
-     Running `target/debug/aptos-debugger aptos-db backup continuously --help`
-aptos-db-tool-backup-continuously 0.1.0
-Run the backup coordinator which backs up blockchain data continuously off a Aptos Node.
+     Running `target/debug/velor-debugger velor-db backup continuously --help`
+velor-db-tool-backup-continuously 0.1.0
+Run the backup coordinator which backs up blockchain data continuously off a Velor Node.
 
 USAGE:
-    aptos-debugger aptos-db backup continuously [OPTIONS] <--local-fs-dir <LOCAL_FS_DIR>|--command-adapter-config <COMMAND_ADAPTER_CONFIG>>
+    velor-debugger velor-db backup continuously [OPTIONS] <--local-fs-dir <LOCAL_FS_DIR>|--command-adapter-config <COMMAND_ADAPTER_CONFIG>>
 
 OPTIONS:
         --backup-service-address <ADDRESS>
-            Backup service address. By default a Aptos Node runs the backup service serving on tcp
+            Backup service address. By default a Velor Node runs the backup service serving on tcp
             port 6186 to localhost only. [default: http://localhost:6186]
 
         --command-adapter-config <COMMAND_ADAPTER_CONFIG>
             Select the CommandAdapter backup storage type, which reads shell commands with which it
             communicates with either a local file system or a remote cloud storage. Compression or
             other filters can be added as part of the commands. See a sample config here:
-            https://github.com/aptos-labs/aptos-networks/tree/main/testnet/backups
+            https://github.com/velor-chain/velor-networks/tree/main/testnet/backups
 
         --concurrent-downloads <CONCURRENT_DOWNLOADS>
             Number of concurrent downloads from the backup storage. This covers the initial metadata
@@ -263,30 +263,30 @@ OPTIONS:
 
 Example command:
 ```
-$ cargo run -p aptos-debugger aptos-db backup continuously \
+$ cargo run -p velor-debugger velor-db backup continuously \
     --metadata-cache-dir ./mc \
     --state-snapshot-interval-epochs 1 \
     --concurrent-downloads 4 \
     --command-adapter-config s3.yaml
 ```
 
-There are other subcommands of the aptos-debugger aptos-db, all of which are experimental
+There are other subcommands of the velor-debugger velor-db, all of which are experimental
 and can mess up with the backup storage, use only at your own risk.
 
-### Creating an AptosDB with minimal data at the latest epoch ending in a backup
+### Creating an VelorDB with minimal data at the latest epoch ending in a backup
 
-It's part of the Aptos API functionality to bootstrap a AptosDB with a backup.
+It's part of the Velor API functionality to bootstrap a VelorDB with a backup.
 When emergency happens and the need to do the somewhat manual bootstrapping is
-high, Aptos will provide a backup source in the form of a yaml config file. Otherwise
+high, Velor will provide a backup source in the form of a yaml config file. Otherwise
 one can play with a config created by herself (probably the same one used in the
 backup process described in the previous section.).
 
 ```bash
-aptos-node-bootstrap-db-from-backup 0.3.5
+velor-node-bootstrap-db-from-backup 0.3.5
 Tool to bootstrap DB from backup
 
 USAGE:
-    aptos node bootstrap-db-from-backup [OPTIONS] --config-path <CONFIG_PATH> --target-db-dir <DB_DIR>
+    velor node bootstrap-db-from-backup [OPTIONS] --config-path <CONFIG_PATH> --target-db-dir <DB_DIR>
 
 OPTIONS:
         --concurrent-downloads <CONCURRENT_DOWNLOADS>
@@ -311,9 +311,9 @@ OPTIONS:
             transactions after a state snapshot. [Defaults to number of CPUs]
 
         --target-db-dir <DB_DIR>
-            Target dir where the tool recreates a AptosDB with snapshots and transactions provided
-            in the backup. The data folder can later be used to start an Aptos node. e.g. /opt/
-            aptos/data/db
+            Target dir where the tool recreates a VelorDB with snapshots and transactions provided
+            in the backup. The data folder can later be used to start an Velor node. e.g. /opt/
+            velor/data/db
 
     -V, --version
             Print version information
@@ -322,7 +322,7 @@ OPTIONS:
 Example command:
 
 ```bash
-RUST_LOG=info ./aptos \
+RUST_LOG=info ./velor \
 	node bootstrap-db-from-backup \
   --metadata-cache-dir ./mc \
   --config-path s3.yaml \
@@ -330,7 +330,7 @@ RUST_LOG=info ./aptos \
 ```
 
 This is basically the same functionality with
-the "auto" mode of `cargo run -p aptos-debugger aptos-db restore`, but with more
+the "auto" mode of `cargo run -p velor-debugger velor-db restore`, but with more
 limited options. The `restore` tool mentioned has the ability to manually
 hack a local DB and is highly experimental. It's not recommended is be used if
 you are not 100% aware of what you are doing.

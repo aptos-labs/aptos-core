@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -24,25 +24,25 @@ use crate::{
     tests::utils::{
         create_data_client_response, create_ledger_info, create_output_list_with_proof,
         create_random_u64, create_transaction_list_with_proof, get_data_notification,
-        initialize_logger, MockAptosDataClient, NoopResponseCallback, MAX_ADVERTISED_EPOCH_END,
+        initialize_logger, MockVelorDataClient, NoopResponseCallback, MAX_ADVERTISED_EPOCH_END,
         MAX_ADVERTISED_STATES, MAX_ADVERTISED_TRANSACTION, MAX_ADVERTISED_TRANSACTION_OUTPUT,
         MAX_NOTIFICATION_TIMEOUT_SECS, MIN_ADVERTISED_EPOCH_END, MIN_ADVERTISED_STATES,
         MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT,
     },
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{
-    AptosDataClientConfig, DataStreamingServiceConfig, DynamicPrefetchingConfig,
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::config::{
+    VelorDataClientConfig, DataStreamingServiceConfig, DynamicPrefetchingConfig,
 };
-use aptos_data_client::{
+use velor_data_client::{
     global_summary::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes},
     interface::{Response, ResponseContext, ResponsePayload},
 };
-use aptos_id_generator::U64IdGenerator;
-use aptos_infallible::Mutex;
-use aptos_storage_service_types::responses::CompleteDataRange;
-use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::{
+use velor_id_generator::U64IdGenerator;
+use velor_infallible::Mutex;
+use velor_storage_service_types::responses::CompleteDataRange;
+use velor_time_service::{TimeService, TimeServiceTrait};
+use velor_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleRangeProof,
     state_store::{
@@ -61,7 +61,7 @@ async fn test_stream_blocked() {
     // Create a state value stream
     let streaming_service_config = DataStreamingServiceConfig::default();
     let (mut data_stream, mut stream_listener) = create_state_value_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_STATES,
     );
@@ -127,7 +127,7 @@ async fn test_stream_garbage_collection() {
     // Create a transaction stream
     let streaming_service_config = DataStreamingServiceConfig::default();
     let (mut data_stream, mut stream_listener) = create_transaction_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_TRANSACTION_OUTPUT,
         MAX_ADVERTISED_TRANSACTION_OUTPUT,
@@ -164,7 +164,7 @@ async fn test_stream_initialization() {
     // Create an epoch ending data stream
     let streaming_service_config = DataStreamingServiceConfig::default();
     let (mut data_stream, _) = create_epoch_ending_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_EPOCH_END,
     );
@@ -189,7 +189,7 @@ async fn test_stream_data_error() {
     // Create an epoch ending data stream
     let streaming_service_config = DataStreamingServiceConfig::default();
     let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_EPOCH_END,
     );
@@ -205,7 +205,7 @@ async fn test_stream_data_error() {
     });
     let pending_response = PendingClientResponse::new_with_response(
         client_request.clone(),
-        Err(aptos_data_client::error::Error::DataIsUnavailable(
+        Err(velor_data_client::error::Error::DataIsUnavailable(
             "Missing data!".into(),
         )),
     );
@@ -222,7 +222,7 @@ async fn test_stream_invalid_response() {
     // Create an epoch ending data stream
     let streaming_service_config = DataStreamingServiceConfig::default();
     let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_EPOCH_END,
     );
@@ -259,7 +259,7 @@ async fn test_epoch_stream_out_of_order_responses() {
         ..Default::default()
     };
     let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_EPOCH_END,
     );
@@ -328,7 +328,7 @@ async fn test_state_stream_out_of_order_responses() {
         ..Default::default()
     };
     let (mut data_stream, mut stream_listener) = create_state_value_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_STATES,
     );
@@ -407,7 +407,7 @@ async fn test_state_stream_out_of_order_responses_dynamic() {
         ..Default::default()
     };
     let (mut data_stream, mut stream_listener) = create_state_value_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_STATES,
     );
@@ -511,7 +511,7 @@ async fn test_stream_max_pending_requests() {
         ..Default::default()
     };
     let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_EPOCH_END,
     );
@@ -653,7 +653,7 @@ async fn test_stream_max_pending_requests_dynamic() {
         ..Default::default()
     };
     let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_EPOCH_END,
     );
@@ -788,7 +788,7 @@ async fn test_stream_max_pending_requests_flushing() {
         ..Default::default()
     };
     let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_EPOCH_END,
     );
@@ -903,7 +903,7 @@ async fn test_stream_max_pending_requests_flushing_dynamic() {
         ..Default::default()
     };
     let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_EPOCH_END,
     );
@@ -1027,7 +1027,7 @@ async fn test_stream_max_pending_requests_freeze_dynamic() {
             start_epoch: MIN_ADVERTISED_EPOCH_END,
         });
     let (mut data_stream, mut stream_listener, time_service) = create_data_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         stream_request,
     );
@@ -1137,7 +1137,7 @@ async fn test_stream_max_pending_requests_missing_data() {
         ..Default::default()
     };
     let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_EPOCH_END,
     );
@@ -1204,7 +1204,7 @@ async fn test_stream_max_pending_requests_missing_data_dynamic() {
         ..Default::default()
     };
     let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_EPOCH_END,
     );
@@ -1275,19 +1275,19 @@ async fn test_continuous_stream_epoch_change_retry() {
 
     // Test all types of continuous data streams
     let (data_stream_1, _stream_listener_1, _) = create_continuous_transaction_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_TRANSACTION,
         MIN_ADVERTISED_EPOCH_END,
     );
     let (data_stream_2, _stream_listener_2, _) = create_continuous_transaction_output_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_TRANSACTION_OUTPUT,
         MIN_ADVERTISED_EPOCH_END,
     );
     let (data_stream_3, _stream_listener_3, _) = create_continuous_transaction_or_output_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_TRANSACTION_OUTPUT,
         MIN_ADVERTISED_EPOCH_END,
@@ -1352,19 +1352,19 @@ async fn test_continuous_stream_epoch_change_retry_dynamic() {
 
     // Test all types of continuous data streams
     let (data_stream_1, _stream_listener_1, _) = create_continuous_transaction_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_TRANSACTION,
         MIN_ADVERTISED_EPOCH_END,
     );
     let (data_stream_2, _stream_listener_2, _) = create_continuous_transaction_output_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_TRANSACTION_OUTPUT,
         MIN_ADVERTISED_EPOCH_END,
     );
     let (data_stream_3, _stream_listener_3, _) = create_continuous_transaction_or_output_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_TRANSACTION_OUTPUT,
         MIN_ADVERTISED_EPOCH_END,
@@ -1421,7 +1421,7 @@ async fn test_continuous_stream_optimistic_fetch_retry() {
 
     // Test all types of continuous data streams
     let continuous_data_streams = enumerate_continuous_data_streams(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
     );
     for (
@@ -1498,7 +1498,7 @@ async fn test_continuous_stream_optimistic_fetch_retry() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_continuous_stream_optimistic_fetch_timeout() {
     // Create a test data client config
-    let data_client_config = AptosDataClientConfig {
+    let data_client_config = VelorDataClientConfig {
         optimistic_fetch_timeout_ms: 1005,
         ..Default::default()
     };
@@ -1539,7 +1539,7 @@ async fn test_continuous_stream_subscription_failures() {
 
     // Test all types of continuous data streams
     let continuous_data_streams = enumerate_continuous_data_streams(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
     );
     for (
@@ -1679,7 +1679,7 @@ async fn test_continuous_stream_subscription_failures_prefetching() {
 
     // Test all types of continuous data streams
     let continuous_data_streams = enumerate_continuous_data_streams(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
     );
     for (
@@ -1817,7 +1817,7 @@ async fn test_continuous_stream_subscription_lag() {
 
     // Test all types of continuous data streams
     let continuous_data_streams = enumerate_continuous_data_streams(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
     );
     for (
@@ -1923,7 +1923,7 @@ async fn test_continuous_stream_subscription_lag_bounded() {
 
     // Test all types of continuous data streams
     let continuous_data_streams = enumerate_continuous_data_streams(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
     );
     for (mut data_stream, mut stream_listener, time_service, transactions_only, _) in
@@ -2082,7 +2082,7 @@ async fn test_continuous_stream_subscription_lag_catch_up() {
 
     // Test all types of continuous data streams
     let continuous_data_streams = enumerate_continuous_data_streams(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
     );
     for (
@@ -2204,7 +2204,7 @@ async fn test_continuous_stream_subscription_lag_catch_up_prefetching() {
 
     // Test all types of continuous data streams
     let continuous_data_streams = enumerate_continuous_data_streams(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
     );
     for (
@@ -2326,7 +2326,7 @@ async fn test_continuous_stream_subscription_lag_prefetching() {
 
     // Test all types of continuous data streams
     let continuous_data_streams = enumerate_continuous_data_streams(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
     );
     for (
@@ -2432,7 +2432,7 @@ async fn test_continuous_stream_subscription_lag_time() {
 
     // Test all types of continuous data streams
     let continuous_data_streams = enumerate_continuous_data_streams(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
     );
     for (mut data_stream, mut stream_listener, time_service, transactions_only, _) in
@@ -2544,7 +2544,7 @@ async fn test_continuous_stream_subscription_max() {
 
     // Test all types of continuous data streams
     let continuous_data_streams = enumerate_continuous_data_streams(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
     );
     for (mut data_stream, _stream_listener, _, transactions_only, allow_transactions_or_outputs) in
@@ -2631,7 +2631,7 @@ async fn test_continuous_stream_subscription_max_pending() {
 
     // Test all types of continuous data streams
     let continuous_data_streams = enumerate_continuous_data_streams(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
     );
     for (mut data_stream, _stream_listener, _, transactions_only, allow_transactions_or_outputs) in
@@ -2732,7 +2732,7 @@ async fn test_continuous_stream_subscription_max_pending_prefetching() {
 
     // Test all types of continuous data streams
     let continuous_data_streams = enumerate_continuous_data_streams(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
     );
     for (mut data_stream, _stream_listener, _, transactions_only, allow_transactions_or_outputs) in
@@ -2831,7 +2831,7 @@ async fn test_continuous_stream_subscription_max_prefetching() {
 
     // Test all types of continuous data streams
     let continuous_data_streams = enumerate_continuous_data_streams(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
     );
     for (mut data_stream, _stream_listener, _, transactions_only, allow_transactions_or_outputs) in
@@ -2902,7 +2902,7 @@ async fn test_continuous_stream_subscription_max_prefetching() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_continuous_stream_subscription_timeout() {
     // Create a test data client config
-    let data_client_config = AptosDataClientConfig {
+    let data_client_config = VelorDataClientConfig {
         subscription_response_timeout_ms: 2022,
         ..Default::default()
     };
@@ -2934,7 +2934,7 @@ async fn test_continuous_stream_subscription_timeout() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_continuous_stream_subscription_timeout_prefetching() {
     // Create a test data client config
-    let data_client_config = AptosDataClientConfig {
+    let data_client_config = VelorDataClientConfig {
         subscription_response_timeout_ms: 500,
         ..Default::default()
     };
@@ -2968,7 +2968,7 @@ async fn test_stream_timeouts() {
     // Create a test data client config
     let max_response_timeout_ms = 85;
     let response_timeout_ms = 7;
-    let data_client_config = AptosDataClientConfig {
+    let data_client_config = VelorDataClientConfig {
         max_response_timeout_ms,
         response_timeout_ms,
         ..Default::default()
@@ -3082,7 +3082,7 @@ async fn test_stream_timeouts_dynamic() {
     // Create a test data client config
     let max_response_timeout_ms = 85;
     let response_timeout_ms = 7;
-    let data_client_config = AptosDataClientConfig {
+    let data_client_config = VelorDataClientConfig {
         max_response_timeout_ms,
         response_timeout_ms,
         ..Default::default()
@@ -3204,7 +3204,7 @@ async fn test_stream_listener_dropped() {
         ..Default::default()
     };
     let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(
-        AptosDataClientConfig::default(),
+        VelorDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_EPOCH_END,
     );
@@ -3257,7 +3257,7 @@ async fn test_stream_listener_dropped() {
 /// Advertises new data (beyond the highest advertised data) and verifies
 /// that data client requests are sent to fetch the missing data.
 async fn advertise_new_data_and_verify_requests(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     global_data_summary: GlobalDataSummary,
     transactions_only: bool,
     allow_transactions_or_outputs: bool,
@@ -3312,10 +3312,10 @@ async fn advertise_new_data_and_verify_requests(
 
 /// Creates a state value stream for the given `version`.
 fn create_state_value_stream(
-    data_client_config: AptosDataClientConfig,
+    data_client_config: VelorDataClientConfig,
     streaming_service_config: DataStreamingServiceConfig,
     version: Version,
-) -> (DataStream<MockAptosDataClient>, DataStreamListener) {
+) -> (DataStream<MockVelorDataClient>, DataStreamListener) {
     // Create a state value stream request
     let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
         version,
@@ -3329,10 +3329,10 @@ fn create_state_value_stream(
 
 /// Creates an epoch ending stream starting at `start_epoch`
 fn create_epoch_ending_stream(
-    data_client_config: AptosDataClientConfig,
+    data_client_config: VelorDataClientConfig,
     streaming_service_config: DataStreamingServiceConfig,
     start_epoch: u64,
-) -> (DataStream<MockAptosDataClient>, DataStreamListener) {
+) -> (DataStream<MockVelorDataClient>, DataStreamListener) {
     // Create an epoch ending stream request
     let stream_request =
         StreamRequest::GetAllEpochEndingLedgerInfos(GetAllEpochEndingLedgerInfosRequest {
@@ -3346,12 +3346,12 @@ fn create_epoch_ending_stream(
 
 /// Creates a continuous transaction output stream for the given `version`.
 fn create_continuous_transaction_output_stream(
-    data_client_config: AptosDataClientConfig,
+    data_client_config: VelorDataClientConfig,
     streaming_service_config: DataStreamingServiceConfig,
     known_version: Version,
     known_epoch: Version,
 ) -> (
-    DataStream<MockAptosDataClient>,
+    DataStream<MockVelorDataClient>,
     DataStreamListener,
     TimeService,
 ) {
@@ -3368,12 +3368,12 @@ fn create_continuous_transaction_output_stream(
 
 /// Creates a continuous transaction stream for the given `version`.
 fn create_continuous_transaction_stream(
-    data_client_config: AptosDataClientConfig,
+    data_client_config: VelorDataClientConfig,
     streaming_service_config: DataStreamingServiceConfig,
     known_version: Version,
     known_epoch: Version,
 ) -> (
-    DataStream<MockAptosDataClient>,
+    DataStream<MockVelorDataClient>,
     DataStreamListener,
     TimeService,
 ) {
@@ -3390,12 +3390,12 @@ fn create_continuous_transaction_stream(
 
 /// Creates a continuous transaction or output stream for the given `version`.
 fn create_continuous_transaction_or_output_stream(
-    data_client_config: AptosDataClientConfig,
+    data_client_config: VelorDataClientConfig,
     streaming_service_config: DataStreamingServiceConfig,
     known_version: Version,
     known_epoch: Version,
 ) -> (
-    DataStream<MockAptosDataClient>,
+    DataStream<MockVelorDataClient>,
     DataStreamListener,
     TimeService,
 ) {
@@ -3413,11 +3413,11 @@ fn create_continuous_transaction_or_output_stream(
 
 /// Creates a transaction stream for the given `version`.
 fn create_transaction_stream(
-    data_client_config: AptosDataClientConfig,
+    data_client_config: VelorDataClientConfig,
     streaming_service_config: DataStreamingServiceConfig,
     start_version: Version,
     end_version: Version,
-) -> (DataStream<MockAptosDataClient>, DataStreamListener) {
+) -> (DataStream<MockVelorDataClient>, DataStreamListener) {
     // Create a transaction stream request
     let stream_request = StreamRequest::GetAllTransactions(GetAllTransactionsRequest {
         start_version,
@@ -3433,11 +3433,11 @@ fn create_transaction_stream(
 
 /// Creates an output stream for the given `version`.
 fn create_output_stream(
-    data_client_config: AptosDataClientConfig,
+    data_client_config: VelorDataClientConfig,
     streaming_service_config: DataStreamingServiceConfig,
     start_version: Version,
     end_version: Version,
-) -> (DataStream<MockAptosDataClient>, DataStreamListener) {
+) -> (DataStream<MockVelorDataClient>, DataStreamListener) {
     // Create an output stream request
     let stream_request = StreamRequest::GetAllTransactionOutputs(GetAllTransactionOutputsRequest {
         start_version,
@@ -3452,11 +3452,11 @@ fn create_output_stream(
 
 /// Creates an output stream for the given `version`.
 fn create_transactions_or_output_stream(
-    data_client_config: AptosDataClientConfig,
+    data_client_config: VelorDataClientConfig,
     streaming_service_config: DataStreamingServiceConfig,
     start_version: Version,
     end_version: Version,
-) -> (DataStream<MockAptosDataClient>, DataStreamListener) {
+) -> (DataStream<MockVelorDataClient>, DataStreamListener) {
     // Create a transaction or output stream request
     let stream_request =
         StreamRequest::GetAllTransactionsOrOutputs(GetAllTransactionsOrOutputsRequest {
@@ -3472,11 +3472,11 @@ fn create_transactions_or_output_stream(
 }
 
 fn create_data_stream(
-    data_client_config: AptosDataClientConfig,
+    data_client_config: VelorDataClientConfig,
     streaming_service_config: DataStreamingServiceConfig,
     stream_request: StreamRequest,
 ) -> (
-    DataStream<MockAptosDataClient>,
+    DataStream<MockVelorDataClient>,
     DataStreamListener,
     TimeService,
 ) {
@@ -3485,8 +3485,8 @@ fn create_data_stream(
     // Create an advertised data
     let advertised_data = create_advertised_data();
 
-    // Create an aptos data client mock and notification generator
-    let aptos_data_client = MockAptosDataClient::new(data_client_config, true, false, true, false);
+    // Create an velor data client mock and notification generator
+    let velor_data_client = MockVelorDataClient::new(data_client_config, true, false, true, false);
     let notification_generator = Arc::new(U64IdGenerator::new());
 
     // Create the data stream and listener pair
@@ -3497,7 +3497,7 @@ fn create_data_stream(
         create_random_u64(10000),
         &stream_request,
         create_stream_update_notifier(),
-        aptos_data_client,
+        velor_data_client,
         notification_generator,
         &advertised_data,
         time_service.clone(),
@@ -3550,8 +3550,8 @@ fn create_optimal_chunk_sizes(chunk_sizes: u64) -> OptimalChunkSizes {
 }
 
 /// Creates a returns a new stream update notifier (dropping the listener)
-fn create_stream_update_notifier() -> aptos_channel::Sender<(), StreamUpdateNotification> {
-    let (stream_update_notifier, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+fn create_stream_update_notifier() -> velor_channel::Sender<(), StreamUpdateNotification> {
+    let (stream_update_notifier, _) = velor_channel::new(QueueStyle::LIFO, 1, None);
     stream_update_notifier
 }
 
@@ -3559,10 +3559,10 @@ fn create_stream_update_notifier() -> aptos_channel::Sender<(), StreamUpdateNoti
 /// continuous data streams. This is useful for tests that verify
 /// all stream types.
 fn enumerate_continuous_data_streams(
-    data_client_config: AptosDataClientConfig,
+    data_client_config: VelorDataClientConfig,
     streaming_service_config: DataStreamingServiceConfig,
 ) -> Vec<(
-    DataStream<MockAptosDataClient>,
+    DataStream<MockVelorDataClient>,
     DataStreamListener,
     TimeService,
     bool,
@@ -3629,7 +3629,7 @@ fn enumerate_continuous_data_streams(
 /// For indices that are not specified, either an error response is set,
 /// or nothing (to emulate the request failing or still being in-flight).
 fn set_epoch_ending_response_for_indices(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     max_queue_length: u64,
     indices: Vec<u64>,
 ) {
@@ -3650,7 +3650,7 @@ fn set_epoch_ending_response_for_indices(
 /// Sets the client response at the index in the pending queue to contain an
 /// epoch ending data response.
 fn set_epoch_ending_response_in_queue(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     index: usize,
     version: u64,
 ) {
@@ -3669,7 +3669,7 @@ fn set_epoch_ending_response_in_queue(
 /// Sets the client response at the index in the pending queue to contain a
 /// number of state values response.
 fn set_num_state_values_response_in_queue(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     index: usize,
 ) {
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
@@ -3683,7 +3683,7 @@ fn set_num_state_values_response_in_queue(
 /// Sets the client response at the index in the pending queue to contain an
 /// state value data response.
 fn set_state_value_response_in_queue(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     first_state_value_index: u64,
     last_state_value_index: u64,
     request_index: usize,
@@ -3711,7 +3711,7 @@ fn set_state_value_response_in_queue(
 /// Sets the client response at the index in the pending
 /// queue to contain new data.
 fn set_new_data_response_in_queue(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     index: usize,
     single_data_version: u64,
     transactions_only: bool,
@@ -3737,17 +3737,17 @@ fn set_new_data_response_in_queue(
 }
 
 /// Sets the client response at the index in the pending queue to contain a failure
-fn set_failure_response_in_queue(data_stream: &mut DataStream<MockAptosDataClient>, index: usize) {
+fn set_failure_response_in_queue(data_stream: &mut DataStream<MockVelorDataClient>, index: usize) {
     set_response_in_queue(
         data_stream,
         index,
-        aptos_data_client::error::Error::UnexpectedErrorEncountered("Oops!".into()),
+        velor_data_client::error::Error::UnexpectedErrorEncountered("Oops!".into()),
     );
 }
 
 /// Sets the client response at the index in the pending
 /// queue to contain a pending response.
-fn set_pending_response_in_queue(data_stream: &mut DataStream<MockAptosDataClient>, index: usize) {
+fn set_pending_response_in_queue(data_stream: &mut DataStream<MockVelorDataClient>, index: usize) {
     // Get the pending response at the specified index
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
     let pending_response = sent_requests.as_mut().unwrap().get_mut(index).unwrap();
@@ -3758,19 +3758,19 @@ fn set_pending_response_in_queue(data_stream: &mut DataStream<MockAptosDataClien
 
 /// Sets the client response at the index in the pending
 /// queue to contain a timeout response.
-fn set_timeout_response_in_queue(data_stream: &mut DataStream<MockAptosDataClient>, index: usize) {
+fn set_timeout_response_in_queue(data_stream: &mut DataStream<MockVelorDataClient>, index: usize) {
     set_response_in_queue(
         data_stream,
         index,
-        aptos_data_client::error::Error::TimeoutWaitingForResponse("Timed out!".into()),
+        velor_data_client::error::Error::TimeoutWaitingForResponse("Timed out!".into()),
     );
 }
 
 /// Sets the given error response at the index in the pending queue
 fn set_response_in_queue(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     index: usize,
-    error_response: aptos_data_client::error::Error,
+    error_response: velor_data_client::error::Error,
 ) {
     // Get the pending response at the specified index
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
@@ -3783,7 +3783,7 @@ fn set_response_in_queue(
 /// Waits for the data client to set the response at the index in the
 /// pending queue.
 async fn wait_for_data_client_to_respond(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     index: usize,
 ) {
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
@@ -3793,7 +3793,7 @@ async fn wait_for_data_client_to_respond(
         if let Some(client_response) = &pending_response.lock().client_response {
             if !matches!(
                 client_response,
-                Err(aptos_data_client::error::Error::TimeoutWaitingForResponse(
+                Err(velor_data_client::error::Error::TimeoutWaitingForResponse(
                     _
                 ))
             ) {
@@ -3806,7 +3806,7 @@ async fn wait_for_data_client_to_respond(
 
 /// Sets the client response at the head of the pending queue to contain an
 /// transaction response.
-fn set_transaction_response_at_queue_head(data_stream: &mut DataStream<MockAptosDataClient>) {
+fn set_transaction_response_at_queue_head(data_stream: &mut DataStream<MockVelorDataClient>) {
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
     if !sent_requests.as_mut().unwrap().is_empty() {
         let pending_response = sent_requests.as_mut().unwrap().get_mut(0).unwrap();
@@ -3820,7 +3820,7 @@ fn set_transaction_response_at_queue_head(data_stream: &mut DataStream<MockAptos
 /// Clears the pending queue of the given data stream and inserts a single
 /// response into the head of the queue.
 fn insert_response_into_pending_queue(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     pending_response: PendingClientResponse,
 ) {
     // Clear the queue
@@ -3835,7 +3835,7 @@ fn insert_response_into_pending_queue(
 /// Verifies that a client request was resubmitted (i.e., pushed to the head of the
 /// sent request queue)
 fn verify_client_request_resubmitted(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     client_request: DataClientRequest,
 ) {
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
@@ -3847,7 +3847,7 @@ fn verify_client_request_resubmitted(
 /// Verifies the timeouts of all continuous data stream requests
 /// in the presence of RPC timeouts and failures.
 async fn verify_continuous_stream_request_timeouts(
-    data_client_config: AptosDataClientConfig,
+    data_client_config: VelorDataClientConfig,
     streaming_service_config: DataStreamingServiceConfig,
     num_expected_requests: u64,
 ) {
@@ -3925,7 +3925,7 @@ async fn verify_epoch_ending_notification(
 
 /// Helper function to initialize the data requests
 fn initialize_data_requests(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     global_data_summary: &GlobalDataSummary,
 ) {
     data_stream
@@ -3935,7 +3935,7 @@ fn initialize_data_requests(
 
 /// Helper function to process data responses on the given data stream
 async fn process_data_responses(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     global_data_summary: &GlobalDataSummary,
 ) {
     data_stream
@@ -3947,7 +3947,7 @@ async fn process_data_responses(
 /// Helper function to get the pending client request at
 /// the specified index.
 fn get_pending_client_request(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     index: usize,
 ) -> DataClientRequest {
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
@@ -3958,7 +3958,7 @@ fn get_pending_client_request(
 
 /// Returns the subscription stream ID from the pending client request at the given index
 fn get_subscription_stream_id(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     index: usize,
 ) -> u64 {
     // Get the pending client request
@@ -3982,7 +3982,7 @@ fn get_subscription_stream_id(
 /// Verifies that the length of the pending requests queue is
 /// equal to the expected length.
 fn verify_num_sent_requests(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     expected_length: u64,
 ) {
     // Get the number of sent requests
@@ -3996,7 +3996,7 @@ fn verify_num_sent_requests(
 /// Verifies that a single pending optimistic fetch exists and
 /// that it is for the correct data.
 fn verify_pending_optimistic_fetch(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     transactions_only: bool,
     allow_transactions_or_outputs: bool,
     known_version_offset: u64,
@@ -4031,7 +4031,7 @@ fn verify_pending_optimistic_fetch(
 
 /// Verifies that the pending requests are fulfilled for the specified indices
 fn verify_pending_responses_for_indices(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     max_queue_length: u64,
     indices: Vec<u64>,
 ) {
@@ -4061,7 +4061,7 @@ fn verify_pending_responses_for_indices(
 /// Verifies that the pending subscription requests are well formed
 /// and for the correct data.
 fn verify_pending_subscription_requests(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     max_concurrent_requests: u64,
     allow_transactions_or_outputs: bool,
     transactions_only: bool,
@@ -4112,7 +4112,7 @@ fn verify_pending_subscription_requests(
 /// Verifies a notification along the given listener and
 /// continues to drive progress until one is received.
 async fn wait_for_notification_and_verify(
-    data_stream: &mut DataStream<MockAptosDataClient>,
+    data_stream: &mut DataStream<MockVelorDataClient>,
     stream_listener: &mut DataStreamListener,
     transaction_syncing: bool,
     allow_transactions_or_outputs: bool,

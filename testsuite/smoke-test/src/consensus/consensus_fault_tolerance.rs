@@ -1,17 +1,17 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
     utils::{create_and_fund_account, transfer_coins_non_blocking},
 };
-use aptos_forge::{
+use velor_forge::{
     test_utils::consensus_utils::{
         no_failure_injection, test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
     },
     LocalSwarm, NodeExt, Swarm, SwarmExt,
 };
-use aptos_logger::info;
+use velor_logger::info;
 use rand::{self, rngs::SmallRng, Rng, SeedableRng};
 use std::{
     sync::{
@@ -150,7 +150,7 @@ async fn run_fail_point_test(
     let (validator_clients, public_info) = {
         (
             swarm.get_validator_clients_with_names(),
-            swarm.aptos_public_info(),
+            swarm.velor_public_info(),
         )
     };
     test_consensus_fault_tolerance(
@@ -191,7 +191,7 @@ async fn test_no_failures() {
     let (validator_clients, public_info) = {
         (
             swarm.get_validator_clients_with_names(),
-            swarm.aptos_public_info(),
+            swarm.velor_public_info(),
         )
     };
     test_consensus_fault_tolerance(
@@ -223,7 +223,7 @@ async fn test_faulty_votes() {
     let (validator_clients, public_info) = {
         (
             swarm.get_validator_clients_with_names(),
-            swarm.aptos_public_info(),
+            swarm.velor_public_info(),
         )
     };
     test_consensus_fault_tolerance(
@@ -276,7 +276,7 @@ async fn test_ordered_only_cert() {
     let (validator_clients, public_info) = {
         (
             swarm.get_validator_clients_with_names(),
-            swarm.aptos_public_info(),
+            swarm.velor_public_info(),
         )
     };
     test_consensus_fault_tolerance(
@@ -316,7 +316,7 @@ async fn test_execution_retry() {
     let (validator_clients, public_info) = {
         (
             swarm.get_validator_clients_with_names(),
-            swarm.aptos_public_info(),
+            swarm.velor_public_info(),
         )
     };
     test_consensus_fault_tolerance(
@@ -614,7 +614,7 @@ async fn test_round_timeout_msg_rollout() {
     let (validator_clients, public_info) = {
         (
             swarm.get_validator_clients_with_names(),
-            swarm.aptos_public_info(),
+            swarm.velor_public_info(),
         )
     };
     test_consensus_fault_tolerance(

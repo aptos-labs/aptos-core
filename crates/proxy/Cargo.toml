@@ -1,6 +1,6 @@
 [package]
-name = "aptos-proxy"
-description = "Aptos proxy"
+name = "velor-proxy"
+description = "Velor proxy"
 version = "0.1.0"
 
 # Workspace inherited keys

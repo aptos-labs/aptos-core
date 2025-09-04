@@ -1,8 +1,8 @@
-# A simple composite action that checks if the calling repository is aptos-core
-# There are some actions that should only be run on aptos-core, e.g. publishing or some expensive cron-jobs
+# A simple composite action that checks if the calling repository is velor-core
+# There are some actions that should only be run on velor-core, e.g. publishing or some expensive cron-jobs
 inputs:
   cancel-workflow:
-    description: "Cancel the workflow if the calling repository is not aptos-core"
+    description: "Cancel the workflow if the calling repository is not velor-core"
     required: false
     default: false
   token:
@@ -10,9 +10,9 @@ inputs:
     required: false
     default: ${{ github.token }}
 outputs:
-  is-aptos-core:
-    description: "Whether the calling repository is aptos-core"
-    value: ${{ steps.determine-repo.outputs.is-aptos-core }}
+  is-velor-core:
+    description: "Whether the calling repository is velor-core"
+    value: ${{ steps.determine-repo.outputs.is-velor-core }}
 runs:
   using: composite
   steps:
@@ -20,17 +20,17 @@ runs:
       id: determine-repo
       shell: bash
       run: |
-        if [[ "${{ github.repository }}" == "aptos-labs/aptos-core" ]]; then
-          echo "is-aptos-core=true" >> $GITHUB_OUTPUT
+        if [[ "${{ github.repository }}" == "velor-chain/velor-core" ]]; then
+          echo "is-velor-core=true" >> $GITHUB_OUTPUT
         else
-          echo "is-aptos-core=false" >> $GITHUB_OUTPUT
+          echo "is-velor-core=false" >> $GITHUB_OUTPUT
         fi
         echo "Calling repo: ${{ github.repository }}"
-    - name: Cancel the workflow if the calling repo is not aptos-core
-      if: ${{ inputs.cancel-workflow == 'true' && steps.determine-repo.outputs.is-aptos-core == 'false' }}
+    - name: Cancel the workflow if the calling repo is not velor-core
+      if: ${{ inputs.cancel-workflow == 'true' && steps.determine-repo.outputs.is-velor-core == 'false' }}
       shell: bash
       run: |
-        echo "Canceling workflow because the calling repo is not aptos-core"
+        echo "Canceling workflow because the calling repo is not velor-core"
         gh run cancel ${{ github.run_id }}
       env:
         GH_TOKEN: ${{ inputs.token }} # this is required for gh commands to work https://cli.github.com/manual/gh_help_environment

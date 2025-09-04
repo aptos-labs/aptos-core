@@ -1,7 +1,7 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_sdk::types::PeerId;
+use velor_sdk::types::PeerId;
 use std::fmt::{Display, Formatter};
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]

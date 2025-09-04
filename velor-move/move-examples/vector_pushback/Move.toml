@@ -1,0 +1,13 @@
+[package]
+name = "vector_pushback"
+version = "1.0.0"
+authors = []
+
+[addresses]
+
+[dev-addresses]
+
+[dependencies.VelorFramework]
+local = "../../framework/velor-framework/"
+
+[dev-dependencies]

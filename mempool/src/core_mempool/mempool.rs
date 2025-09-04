@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -17,11 +17,11 @@ use crate::{
         MempoolSenderBucket, MultiBucketTimelineIndexIds, TimelineIndexIdentifier,
     },
 };
-use aptos_config::config::NodeConfig;
-use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
-use aptos_crypto::HashValue;
-use aptos_logger::prelude::*;
-use aptos_types::{
+use velor_config::config::NodeConfig;
+use velor_consensus_types::common::{TransactionInProgress, TransactionSummary};
+use velor_crypto::HashValue;
+use velor_logger::prelude::*;
+use velor_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::{use_case::UseCaseKey, ReplayProtector, SignedTransaction},
@@ -267,7 +267,7 @@ impl Mempool {
             );
 
             let insertion_timestamp =
-                aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
+                velor_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
             if let Some(insertion_to_block) = block_timestamp.checked_sub(insertion_timestamp) {
                 counters::core_mempool_txn_commit_latency(
                     counters::COMMIT_ACCEPTED_BLOCK_LABEL,
@@ -332,7 +332,7 @@ impl Mempool {
 
         let now = SystemTime::now();
         let expiration_time =
-            aptos_infallible::duration_since_epoch_at(&now) + self.system_transaction_timeout;
+            velor_infallible::duration_since_epoch_at(&now) + self.system_transaction_timeout;
 
         let sender = txn.sender();
         let txn_info = MempoolTransaction::new(
@@ -347,7 +347,7 @@ impl Mempool {
 
         let submitted_by_label = txn_info.insertion_info.submitted_by_label();
         let status = self.transactions.insert(txn_info, account_sequence_number);
-        let now = aptos_infallible::duration_since_epoch().as_millis() as u64;
+        let now = velor_infallible::duration_since_epoch().as_millis() as u64;
 
         if status.code == MempoolStatusCode::Accepted {
             counters::SENDER_BUCKET_FREQUENCIES
@@ -589,7 +589,7 @@ impl Mempool {
     /// Removes all expired transactions and clears expired entries in metrics
     /// cache and sequence number cache.
     pub(crate) fn gc(&mut self) {
-        let now = aptos_infallible::duration_since_epoch();
+        let now = velor_infallible::duration_since_epoch();
         self.transactions.gc_by_system_ttl(now);
     }
 

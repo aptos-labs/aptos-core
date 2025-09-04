@@ -125,13 +125,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"775443600\"},\"deposit_events\":{\"counter\":\"16\",\"guid\":{\"id\":{\"addr\":\"0x8eb76c7294a50b594c48ef13c7ce0a953320c9b25cdf1dd681fbeb9937524703\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"8079\",\"guid\":{\"id\":{\"addr\":\"0x8eb76c7294a50b594c48ef13c7ce0a953320c9b25cdf1dd681fbeb9937524703\",\"creation_num\":\"3\"}}}}"
         }
       },

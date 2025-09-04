@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{models::transactions::Transaction, schema::signatures, util::standardize_address};
 use anyhow::{Context, Result};
-use aptos_api_types::{
+use velor_api_types::{
     AbstractionSignature as APIAbstractionSignature, AccountSignature as APIAccountSignature,
     Ed25519Signature as APIEd25519Signature, FeePayerSignature as APIFeePayerSignature,
     MultiAgentSignature as APIMultiAgentSignature,
@@ -12,7 +12,7 @@ use aptos_api_types::{
     NoAccountSignature as APINoAccountSignature, SingleKeySignature as APISingleKeySignature,
     TransactionSignature as APITransactionSignature,
 };
-use aptos_bitvec::BitVec;
+use velor_bitvec::BitVec;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 

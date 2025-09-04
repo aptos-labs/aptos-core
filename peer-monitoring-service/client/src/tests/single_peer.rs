@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -26,11 +26,11 @@ use crate::{
     },
     PeerState,
 };
-use aptos_config::{
+use velor_config::{
     config::{NodeConfig, PeerRole},
     network_id::NetworkId,
 };
-use aptos_time_service::TimeServiceTrait;
+use velor_time_service::TimeServiceTrait;
 use std::cmp::min;
 
 #[tokio::test(flavor = "multi_thread")]

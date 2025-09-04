@@ -1,10 +1,10 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::TransactionImporterPerNetworkConfig;
 use anyhow::Context;
-use aptos_indexer_grpc_utils::create_data_service_grpc_client;
-use aptos_protos::indexer::v1::GetTransactionsRequest;
+use velor_indexer_grpc_utils::create_data_service_grpc_client;
+use velor_protos::indexer::v1::GetTransactionsRequest;
 use std::{path::Path, time::Duration};
 
 /// GRPC request metadata key for the token ID.
@@ -66,7 +66,7 @@ impl TransactionImporterPerNetworkConfig {
 #[cfg(test)]
 mod tests {
     use crate::config::TransactionImporterPerNetworkConfig;
-    use aptos_protos::{
+    use velor_protos::{
         indexer::v1::{
             raw_data_server::{RawData, RawDataServer},
             GetTransactionsRequest, TransactionsResponse,

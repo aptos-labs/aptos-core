@@ -41,9 +41,9 @@
       "icon": "external link",
       "includeVars": true,
       "keepTime": true,
-      "tags": ["aptos-core"],
+      "tags": ["velor-core"],
       "targetBlank": true,
-      "title": "aptos core",
+      "title": "velor core",
       "type": "dashboards"
     }
   ],
@@ -103,7 +103,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (velor_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -169,7 +169,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (velor_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "range": true,
               "refId": "A"
@@ -233,7 +233,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(velor_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "range": true,
               "refId": "A"
@@ -297,7 +297,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "rate(aptos_connections_rejected{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})[1m]",
+              "expr": "rate(velor_connections_rejected{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})[1m]",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}-{{direction}}",
               "range": true,
@@ -360,7 +360,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_network_key_mismatch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (velor_network_key_mismatch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
@@ -442,7 +442,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m])",
+          "expr": "rate(velor_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}-{{protocol_id}}",
           "range": true,
           "refId": "A"
@@ -450,7 +450,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(aptos_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
+          "expr": "quantile(0.5, rate(velor_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
           "hide": true,
           "legendFormat": "p50",
           "range": true,
@@ -459,7 +459,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(aptos_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
+          "expr": "quantile(0.9, rate(velor_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
           "hide": true,
           "legendFormat": "p90",
           "range": true,
@@ -468,7 +468,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.99, rate(aptos_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
+          "expr": "quantile(0.99, rate(velor_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
           "hide": true,
           "legendFormat": "p99",
           "range": true,
@@ -477,7 +477,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.1, rate(aptos_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
+          "expr": "quantile(0.1, rate(velor_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
           "hide": true,
           "legendFormat": "p10",
           "range": true,
@@ -546,7 +546,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m])",
+          "expr": "rate(velor_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}-{{protocol_id}}",
           "queryType": "list",
           "range": true,
@@ -555,7 +555,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(aptos_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
+          "expr": "quantile(0.5, rate(velor_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
           "hide": true,
           "legendFormat": "p50",
           "queryType": "list",
@@ -565,7 +565,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(aptos_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
+          "expr": "quantile(0.9, rate(velor_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
           "hide": true,
           "legendFormat": "p90",
           "queryType": "list",
@@ -575,7 +575,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(.99, rate(aptos_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
+          "expr": "quantile(.99, rate(velor_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
           "hide": true,
           "legendFormat": "p99",
           "queryType": "list",
@@ -585,7 +585,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(.1, rate(aptos_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
+          "expr": "quantile(.1, rate(velor_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
           "hide": true,
           "legendFormat": "p10",
           "queryType": "list",
@@ -642,7 +642,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(sum by (metrics_source, namespace, kubernetes_pod_name, role_type) (aptos_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}))[1m]",
+          "expr": "rate(sum by (metrics_source, namespace, kubernetes_pod_name, role_type) (velor_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}))[1m]",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}",
           "range": true,
           "refId": "A"
@@ -706,7 +706,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(sum by (metrics_source, namespace, kubernetes_pod_name, role_type) (aptos_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}))[1m]",
+          "expr": "rate(sum by (metrics_source, namespace, kubernetes_pod_name, role_type) (velor_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}))[1m]",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}",
           "range": true,
           "refId": "A"
@@ -770,7 +770,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_network_app_inbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m])",
+          "expr": "rate(velor_network_app_inbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m])",
           "hide": false,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}-{{protocol_id}}",
           "range": true,
@@ -835,7 +835,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_network_app_outbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m])",
+          "expr": "rate(velor_network_app_outbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m])",
           "hide": false,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}-{{protocol_id}}",
           "range": true,
@@ -900,7 +900,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by (metrics_source, namespace, kubernetes_pod_name, role_type) (rate(aptos_network_app_inbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
+          "expr": "sum by (metrics_source, namespace, kubernetes_pod_name, role_type) (rate(velor_network_app_inbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
           "hide": false,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}",
           "range": true,
@@ -965,7 +965,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by (metrics_source, namespace, kubernetes_pod_name, role_type) (rate(aptos_network_app_outbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
+          "expr": "sum by (metrics_source, namespace, kubernetes_pod_name, role_type) (rate(velor_network_app_outbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]))",
           "hide": false,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}",
           "range": true,
@@ -1029,7 +1029,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]/aptos_network_app_inbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]",
+          "expr": "velor_network_app_inbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]/velor_network_app_inbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]",
           "hide": false,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}-{{protocol_id}}",
           "range": true,
@@ -1093,7 +1093,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "aptos_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]/aptos_network_app_outbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]",
+          "expr": "velor_network_app_outbound_traffic_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]/velor_network_app_outbound_traffic_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\"}[1m]",
           "hide": false,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}-{{protocol_id}}",
           "range": true,
@@ -1159,7 +1159,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "aptos_network_serialization_metric_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"serialization\"}/aptos_network_serialization_metric_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"serialization\"}",
+              "expr": "velor_network_serialization_metric_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"serialization\"}/velor_network_serialization_metric_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"serialization\"}",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{protocol_id}}",
               "range": true,
@@ -1211,7 +1211,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "aptos_network_serialization_metric_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"deserialization\"}/aptos_network_serialization_metric_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"deserialization\"}",
+              "expr": "velor_network_serialization_metric_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"deserialization\"}/velor_network_serialization_metric_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"deserialization\"}",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{protocol_id}}",
               "range": true,
@@ -1263,7 +1263,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum(rate(aptos_network_serialization_metric_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"serialization\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(velor_network_serialization_metric_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"serialization\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P99",
               "range": true,
@@ -1272,7 +1272,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.70, sum(rate(aptos_network_serialization_metric_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"serialization\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.70, sum(rate(velor_network_serialization_metric_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"serialization\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P70",
               "range": true,
@@ -1281,7 +1281,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.90, sum(rate(aptos_network_serialization_metric_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"serialization\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.90, sum(rate(velor_network_serialization_metric_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"serialization\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P90",
               "range": true,
@@ -1333,7 +1333,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum(rate(aptos_network_serialization_metric_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"deserialization\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(velor_network_serialization_metric_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"deserialization\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P99",
               "range": true,
@@ -1342,7 +1342,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.70, sum(rate(aptos_network_serialization_metric_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"deserialization\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.70, sum(rate(velor_network_serialization_metric_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"deserialization\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P70",
               "range": true,
@@ -1351,7 +1351,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.90, sum(rate(aptos_network_serialization_metric_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"deserialization\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.90, sum(rate(velor_network_serialization_metric_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"deserialization\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P90",
               "range": true,
@@ -1403,7 +1403,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "aptos_compression_operation_latency_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"compress\"}/aptos_compression_operation_latency_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"compress\"}",
+              "expr": "velor_compression_operation_latency_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"compress\"}/velor_compression_operation_latency_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"compress\"}",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{client}}",
               "range": true,
@@ -1455,7 +1455,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "aptos_compression_operation_latency_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"decompress\"}/aptos_compression_operation_latency_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"decompress\"}",
+              "expr": "velor_compression_operation_latency_sum{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"decompress\"}/velor_compression_operation_latency_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"decompress\"}",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{client}}",
               "range": true,
@@ -1507,7 +1507,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum(rate(aptos_compression_operation_latency_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"compress\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(velor_compression_operation_latency_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"compress\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P99",
               "range": true,
@@ -1516,7 +1516,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.70, sum(rate(aptos_compression_operation_latency_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"compress\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.70, sum(rate(velor_compression_operation_latency_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"compress\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P70",
               "range": true,
@@ -1525,7 +1525,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.90, sum(rate(aptos_compression_operation_latency_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"compress\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.90, sum(rate(velor_compression_operation_latency_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"compress\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P90",
               "range": true,
@@ -1577,7 +1577,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum(rate(aptos_compression_operation_latency_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"decompress\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(velor_compression_operation_latency_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"decompress\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P99",
               "range": true,
@@ -1586,7 +1586,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.70, sum(rate(aptos_compression_operation_latency_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"decompress\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.70, sum(rate(velor_compression_operation_latency_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"decompress\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P70",
               "range": true,
@@ -1595,7 +1595,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.90, sum(rate(aptos_compression_operation_latency_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"decompress\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.90, sum(rate(velor_compression_operation_latency_bucket{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\",operation=\"decompress\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "P90",
               "range": true,
@@ -1647,7 +1647,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
               "editorMode": "code",
-              "expr": "sum by (kubernetes_pod_name, role, client) (aptos_compression_byte_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\", data_type=\"compressed_bytes\"}) / sum by (kubernetes_pod_name, role, client) (aptos_compression_byte_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\", data_type=\"raw_bytes\"}) * 100",
+              "expr": "sum by (kubernetes_pod_name, role, client) (velor_compression_byte_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\", data_type=\"compressed_bytes\"}) / sum by (kubernetes_pod_name, role, client) (velor_compression_byte_count{metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",chain_name=~\"$chain_name\", cluster=~\"$cluster\", data_type=\"raw_bytes\"}) * 100",
               "hide": false,
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{client}}",
               "range": true,
@@ -1711,7 +1711,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+              "expr": "rate(velor_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
               "legendFormat": "{{kubernetes_pod_name}}",
               "refId": "A"
             }
@@ -1773,7 +1773,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+              "expr": "rate(velor_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
               "legendFormat": "{{kubernetes_pod_name}}",
               "refId": "A"
             }
@@ -1835,7 +1835,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+              "expr": "rate(velor_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
               "legendFormat": "{{kubernetes_pod_name}}",
               "refId": "A"
             }
@@ -1897,7 +1897,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+              "expr": "rate(velor_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
               "legendFormat": "{{kubernetes_pod_name}}",
               "refId": "A"
             }
@@ -1976,7 +1976,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
+          "expr": "sum by (kubernetes_pod_name, role)(velor_network_pending_network_notifications{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(velor_network_pending_network_notifications{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
@@ -2038,7 +2038,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
+          "expr": "sum by (kubernetes_pod_name, role)(velor_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(velor_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "B"
         }
@@ -2100,7 +2100,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
+          "expr": "sum by (kubernetes_pod_name, role)(velor_network_pending_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(velor_network_pending_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
@@ -2162,7 +2162,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
+          "expr": "sum by (kubernetes_pod_name, role)(velor_network_pending_health_check_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(velor_network_pending_health_check_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
@@ -2224,7 +2224,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_pending_wire_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
+          "expr": "rate(velor_network_pending_wire_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "B"
         }
@@ -2286,7 +2286,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_pending_connectivity_manager_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
+          "expr": "rate(velor_network_pending_connectivity_manager_requests{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "B"
         }
@@ -2362,7 +2362,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})[$AggInterval]",
+          "expr": "rate(velor_consensus_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})[$AggInterval]",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -2373,7 +2373,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",state=\"dropped\"})[$AggInterval]",
+          "expr": "rate(velor_consensus_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",state=\"dropped\"})[$AggInterval]",
           "format": "time_series",
           "hide": true,
           "intervalFactor": 1,
@@ -2440,7 +2440,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",state=\"dropped\"})[$AggInterval]",
+          "expr": "rate(velor_consensus_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",state=\"dropped\"})[$AggInterval]",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -2451,7 +2451,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",state=\"dropped\"})[$AggInterval]",
+          "expr": "rate(velor_consensus_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",state=\"dropped\"})[$AggInterval]",
           "format": "time_series",
           "hide": true,
           "intervalFactor": 1,
@@ -2518,7 +2518,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_mempool_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})[$AggInterval]",
+          "expr": "rate(velor_mempool_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})[$AggInterval]",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -2585,7 +2585,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_mempool_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",state=\"dropped\"})[$AggInterval]",
+          "expr": "rate(velor_mempool_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",state=\"dropped\"})[$AggInterval]",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -2652,7 +2652,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_storage_service_server_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})[$AggInterval]",
+          "expr": "rate(velor_storage_service_server_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})[$AggInterval]",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -2719,7 +2719,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_storage_service_server_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",state=\"dropped\"})[$AggInterval]",
+          "expr": "rate(velor_storage_service_server_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",state=\"dropped\"})[$AggInterval]",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -2786,7 +2786,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_peer_monitoring_service_server_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})[$AggInterval]",
+          "expr": "rate(velor_peer_monitoring_service_server_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})[$AggInterval]",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -2853,7 +2853,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_peer_monitoring_service_server_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",state=\"dropped\"})[$AggInterval]",
+          "expr": "rate(velor_peer_monitoring_service_server_pending_network_events{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",state=\"dropped\"})[$AggInterval]",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -2919,7 +2919,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"(declined|canceled)\"}[$AggInterval])",
+          "expr": "rate(velor_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"(declined|canceled)\"}[$AggInterval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}",
@@ -2992,7 +2992,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\" }[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(velor_network_pending_connection_upgrades{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\" }[$AggInterval]))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
@@ -3050,7 +3050,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\" }[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(velor_network_pending_connection_upgrades{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\" }[$AggInterval]))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
@@ -3104,7 +3104,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(velor_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "C"
             }
@@ -3167,7 +3167,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(velor_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "C"
             }
@@ -3230,7 +3230,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(velor_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "C"
             }
@@ -3293,7 +3293,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(velor_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "C"
             }
@@ -3356,7 +3356,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(velor_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "C"
             }
@@ -3419,7 +3419,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(velor_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "C"
             }
@@ -3496,7 +3496,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=~\"(sent|failed)\"}[$AggInterval]))",
+              "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(velor_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(velor_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=~\"(sent|failed)\"}[$AggInterval]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -3561,7 +3561,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"response\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"received\"}[$AggInterval]))",
+              "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(velor_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"response\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(velor_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"received\"}[$AggInterval]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -3626,7 +3626,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(velor_network_rpc_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -3691,7 +3691,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_rpc_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -3756,7 +3756,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\",state=\"sent\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\",state=\"sent\"}[$AggInterval]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -3821,7 +3821,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\", state=\"received\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\", state=\"received\"}[$AggInterval]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
@@ -3886,7 +3886,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(velor_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
@@ -3949,7 +3949,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(velor_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
@@ -4012,7 +4012,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(velor_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
@@ -4075,7 +4075,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(velor_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
@@ -4138,7 +4138,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(velor_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
@@ -4201,7 +4201,7 @@
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(velor_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
@@ -4283,7 +4283,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "avg(sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval])))",
+          "expr": "avg(sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval])))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "avg",
@@ -4293,7 +4293,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval])))",
+          "expr": "quantile(0.5, sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -4304,7 +4304,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval])))",
+          "expr": "quantile(0.9, sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -4315,7 +4315,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval])))",
+          "expr": "quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -4326,7 +4326,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.1, sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval])))",
+          "expr": "quantile(0.1, sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -4393,7 +4393,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "avg(sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval])))",
+          "expr": "avg(sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval])))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "avg",
@@ -4403,7 +4403,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval])))",
+          "expr": "quantile(0.5, sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -4414,7 +4414,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval])))",
+          "expr": "quantile(0.9, sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -4425,7 +4425,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval])))",
+          "expr": "quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -4436,7 +4436,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.1, sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval])))",
+          "expr": "quantile(0.1, sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -4502,7 +4502,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_direct_send_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -4564,7 +4564,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(velor_network_direct_send_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -4627,7 +4627,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "rate(aptos_network_benchmark_direct_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"})",
+          "expr": "rate(velor_network_benchmark_direct_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"})",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "range": true,
           "refId": "A"
@@ -4912,7 +4912,7 @@
   ],
   "refresh": false,
   "schemaVersion": 38,
-  "tags": ["aptos-core"],
+  "tags": ["velor-core"],
   "templating": {
     "list": [
       {

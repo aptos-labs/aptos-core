@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -10,10 +10,10 @@ use crate::{
     DbReader,
 };
 use anyhow::Result;
-use aptos_crypto::{hash::CORRUPTION_SENTINEL, HashValue};
-use aptos_metrics_core::TimerHelper;
-use aptos_scratchpad::{ProofRead, SparseMerkleTree};
-use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};
+use velor_crypto::{hash::CORRUPTION_SENTINEL, HashValue};
+use velor_metrics_core::TimerHelper;
+use velor_scratchpad::{ProofRead, SparseMerkleTree};
+use velor_types::{proof::SparseMerkleProofExt, transaction::Version};
 use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;

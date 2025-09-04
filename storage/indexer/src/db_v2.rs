@@ -1,22 +1,22 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 /// This file is a copy of the file storage/indexer/src/lib.rs.
 /// At the end of the migration to migrate table info mapping
 /// from storage critical path to indexer, the other file will be removed
 /// and this file will be moved to /ecosystem/indexer-grpc/indexer-grpc-table-info.
-use aptos_db_indexer_schemas::{
+use velor_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue},
     schema::{indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema},
 };
-use aptos_logger::{info, sample, sample::SampleRate};
-use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
-use aptos_schemadb::{batch::SchemaBatch, DB};
-use aptos_storage_interface::{
+use velor_logger::{info, sample, sample::SampleRate};
+use velor_resource_viewer::{AnnotatedMoveValue, VelorValueAnnotator};
+use velor_schemadb::{batch::SchemaBatch, DB};
+use velor_storage_interface::{
     db_other_bail as bail, state_store::state_view::db_state_view::DbStateViewAtVersion,
-    AptosDbError, DbReader, Result,
+    VelorDbError, DbReader, Result,
 };
-use aptos_types::{
+use velor_types::{
     access_path::Path,
     account_address::AccountAddress,
     state_store::{
@@ -82,7 +82,7 @@ impl IndexerAsyncV2 {
     ) -> Result<()> {
         let last_version = first_version + write_sets.len() as Version;
         let state_view = db_reader.state_view_at_version(Some(last_version))?;
-        let annotator = AptosValueAnnotator::new(&state_view);
+        let annotator = VelorValueAnnotator::new(&state_view);
         self.index_with_annotator(&annotator, first_version, write_sets)
     }
 
@@ -90,7 +90,7 @@ impl IndexerAsyncV2 {
     /// After the current batch's parsed, write the mapping to the rocksdb, also update the next version to be processed
     pub fn index_with_annotator<R: StateView>(
         &self,
-        annotator: &AptosValueAnnotator<R>,
+        annotator: &VelorValueAnnotator<R>,
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
@@ -105,7 +105,7 @@ impl IndexerAsyncV2 {
         match self.finish_table_info_parsing(&mut batch, &table_info_parser.result) {
             Ok(_) => {},
             Err(err) => {
-                aptos_logger::error!(
+                velor_logger::error!(
                     first_version = first_version,
                     end_version = end_version,
                     error = ?&err,
@@ -180,7 +180,7 @@ impl IndexerAsyncV2 {
         if !self.pending_on.is_empty() {
             let pending_keys: Vec<TableHandle> =
                 self.pending_on.iter().map(|entry| *entry.key()).collect();
-            aptos_logger::warn!(
+            velor_logger::warn!(
                 "There are still pending table items to parse due to unknown table info for table handles: {:?}",
                 pending_keys
             );
@@ -211,7 +211,7 @@ fn log_table_info_failure(handle: TableHandle, retried: u64) {
 
 struct TableInfoParser<'a, R> {
     indexer_async_v2: &'a IndexerAsyncV2,
-    annotator: &'a AptosValueAnnotator<'a, R>,
+    annotator: &'a VelorValueAnnotator<'a, R>,
     result: HashMap<TableHandle, TableInfo>,
     pending_on: &'a DashMap<TableHandle, DashSet<Bytes>>,
 }
@@ -219,7 +219,7 @@ struct TableInfoParser<'a, R> {
 impl<'a, R: StateView> TableInfoParser<'a, R> {
     pub fn new(
         indexer_async_v2: &'a IndexerAsyncV2,
-        annotator: &'a AptosValueAnnotator<R>,
+        annotator: &'a VelorValueAnnotator<R>,
         pending_on: &'a DashMap<TableHandle, DashSet<Bytes>>,
     ) -> Self {
         Self {

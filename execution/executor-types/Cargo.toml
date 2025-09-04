@@ -1,6 +1,6 @@
 [package]
-name = "aptos-executor-types"
-description = "Aptos executor interface types"
+name = "velor-executor-types"
+description = "Velor executor interface types"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,14 +14,14 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-drop-helper = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-scratchpad = { workspace = true }
-aptos-secure-net = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-types = { workspace = true }
+velor-crypto = { workspace = true }
+velor-drop-helper = { workspace = true }
+velor-infallible = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-scratchpad = { workspace = true }
+velor-secure-net = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-types = { workspace = true }
 bcs = { workspace = true }
 criterion = { workspace = true }
 derive_more = { workspace = true }
@@ -33,11 +33,11 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-aptos-types = { workspace = true, features = ["fuzzing"] }
+velor-types = { workspace = true, features = ["fuzzing"] }
 
 [features]
 default = []
-fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
+fuzzing = ["velor-crypto/fuzzing", "velor-types/fuzzing"]
 bench = []
 
 [[bench]]

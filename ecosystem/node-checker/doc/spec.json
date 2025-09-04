@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "Aptos Node Checker",
+    "title": "Velor Node Checker",
     "version": "0.1.1"
   },
   "servers": [

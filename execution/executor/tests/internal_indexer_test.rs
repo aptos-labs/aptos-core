@@ -1,23 +1,23 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_cached_packages::aptos_stdlib;
-use aptos_db::AptosDB;
-use aptos_db_indexer::db_indexer::DBIndexer;
-use aptos_executor_test_helpers::{
+use velor_cached_packages::velor_stdlib;
+use velor_db::VelorDB;
+use velor_db_indexer::db_indexer::DBIndexer;
+use velor_executor_test_helpers::{
     gen_block_id, gen_ledger_info_with_sigs, integration_test_impl::create_db_and_executor,
 };
-use aptos_executor_types::BlockExecutorTrait;
-use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
-use aptos_sdk::{
+use velor_executor_types::BlockExecutorTrait;
+use velor_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
+use velor_sdk::{
     transaction_builder::TransactionFactory,
     types::{AccountKey, LocalAccount},
 };
-use aptos_storage_interface::DbReader;
-use aptos_temppath::TempPath;
-use aptos_types::{
+use velor_storage_interface::DbReader;
+use velor_temppath::TempPath;
+use velor_types::{
     account_address::AccountAddress,
-    account_config::aptos_test_root_address,
+    account_config::velor_test_root_address,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     state_store::state_key::{prefix::StateKeyPrefix, StateKey},
@@ -35,24 +35,24 @@ use std::{fmt::Debug, str::FromStr, sync::Arc};
 const B: u64 = 1_000_000_000;
 
 #[cfg(test)]
-pub fn create_test_db() -> (Arc<AptosDB>, LocalAccount) {
+pub fn create_test_db() -> (Arc<VelorDB>, LocalAccount) {
     // create test db
-    let path = aptos_temppath::TempPath::new();
-    let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let path = velor_temppath::TempPath::new();
+    let (genesis, validators) = velor_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
     let core_resources_account: LocalAccount = LocalAccount::new(
-        aptos_test_root_address(),
-        AccountKey::from_private_key(aptos_vm_genesis::GENESIS_KEYPAIR.0.clone()),
+        velor_test_root_address(),
+        AccountKey::from_private_key(velor_vm_genesis::GENESIS_KEYPAIR.0.clone()),
         0,
     );
-    let (aptos_db, _db, executor, _waypoint) =
+    let (velor_db, _db, executor, _waypoint) =
         create_db_and_executor(path.path(), &genesis_txn, true);
     let parent_block_id = executor.committed_block_id();
 
     // This generates accounts that do not overlap with genesis
     let seed = [3u8; 32];
     let mut rng = ::rand::rngs::StdRng::from_seed(seed);
-    let signer = aptos_types::validator_signer::ValidatorSigner::new(
+    let signer = velor_types::validator_signer::ValidatorSigner::new(
         validators[0].data.owner_address,
         Arc::new(validators[0].consensus_key.clone()),
     );
@@ -104,7 +104,7 @@ pub fn create_test_db() -> (Arc<AptosDB>, LocalAccount) {
         account1.sign_with_transaction_builder(txn_factory.transfer(account3.address(), 70 * B));
 
     let reconfig1 = core_resources_account.sign_with_transaction_builder(
-        txn_factory.payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
+        txn_factory.payload(velor_stdlib::velor_governance_force_end_epoch_test_only()),
     );
 
     let block1: Vec<_> = into_signature_verified_block(vec![
@@ -129,18 +129,18 @@ pub fn create_test_db() -> (Arc<AptosDB>, LocalAccount) {
         .unwrap();
     let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, &[signer.clone()]);
     executor.commit_blocks(vec![block1_id], li1).unwrap();
-    (aptos_db, core_resources_account)
+    (velor_db, core_resources_account)
 }
 
 #[test]
 fn test_db_indexer_data() {
     use std::{thread, time::Duration};
     // create test db
-    let (aptos_db, core_account) = create_test_db();
-    let total_version = aptos_db.expect_synced_version();
+    let (velor_db, core_account) = create_test_db();
+    let total_version = velor_db.expect_synced_version();
     assert_eq!(total_version, 11);
     let temp_path = TempPath::new();
-    let mut node_config = aptos_config::config::NodeConfig::default();
+    let mut node_config = velor_config::config::NodeConfig::default();
     node_config.storage.dir = temp_path.path().to_path_buf();
     node_config.indexer_db_config.enable_event = true;
     node_config.indexer_db_config.enable_transaction = true;
@@ -148,7 +148,7 @@ fn test_db_indexer_data() {
 
     let internal_indexer_db = InternalIndexerDBService::get_indexer_db(&node_config).unwrap();
 
-    let db_indexer = DBIndexer::new(internal_indexer_db.clone(), aptos_db.clone());
+    let db_indexer = DBIndexer::new(internal_indexer_db.clone(), velor_db.clone());
     // assert the data matches the expected data
     let version = internal_indexer_db.get_persisted_version().unwrap();
     assert_eq!(version, None);
@@ -198,7 +198,7 @@ fn test_db_indexer_data() {
     let (code, resources): (Vec<_>, Vec<_>) = address_one_kv_res
         .into_iter()
         .map(|(s, _)| s)
-        .partition(|s| s.is_aptos_code());
+        .partition(|s| s.is_velor_code());
 
     let expected_code = vec![
         ident_str!("acl"),
@@ -246,8 +246,8 @@ fn test_db_indexer_data() {
         ident_str!("timestamp"),
         ident_str!("type_info"),
         ident_str!("aggregator"),
-        ident_str!("aptos_coin"),
-        ident_str!("aptos_hash"),
+        ident_str!("velor_coin"),
+        ident_str!("velor_hash"),
         ident_str!("bcs_stream"),
         ident_str!("big_vector"),
         ident_str!("bit_vector"),
@@ -270,7 +270,7 @@ fn test_db_indexer_data() {
         ident_str!("smart_vector"),
         ident_str!("string_utils"),
         ident_str!("aggregator_v2"),
-        ident_str!("aptos_account"),
+        ident_str!("velor_account"),
         ident_str!("bn254_algebra"),
         ident_str!("config_buffer"),
         ident_str!("create_signer"),
@@ -288,7 +288,7 @@ fn test_db_indexer_data() {
         ident_str!("keyless_account"),
         ident_str!("reconfiguration"),
         ident_str!("transaction_fee"),
-        ident_str!("aptos_governance"),
+        ident_str!("velor_governance"),
         ident_str!("bls12381_algebra"),
         ident_str!("consensus_config"),
         ident_str!("execution_config"),
@@ -352,7 +352,7 @@ fn test_db_indexer_data() {
         (false, "0x1::account::OriginatingAddress"),
         (false, "0x1::gas_schedule::GasScheduleV2"),
         (false, "0x1::jwks::SupportedOIDCProviders"),
-        (false, "0x1::stake::AptosCoinCapabilities"),
+        (false, "0x1::stake::VelorCoinCapabilities"),
         (false, "0x1::stake::PendingTransactionFee"),
         (false, "0x1::reconfiguration_state::State"),
         (false, "0x1::version::SetVersionCapability"),
@@ -363,22 +363,22 @@ fn test_db_indexer_data() {
         (false, "0x1::chain_status::GenesisEndMarker"),
         (false, "0x1::reconfiguration::Configuration"),
         (false, "0x1::nonce_validation::NonceHistory"),
-        (false, "0x1::aptos_governance::VotingRecords"),
+        (false, "0x1::velor_governance::VotingRecords"),
         (false, "0x1::state_storage::StateStorageUsage"),
-        (false, "0x1::aptos_governance::VotingRecordsV2"),
+        (false, "0x1::velor_governance::VotingRecordsV2"),
         (false, "0x1::consensus_config::ConsensusConfig"),
         (false, "0x1::execution_config::ExecutionConfig"),
         (false, "0x1::timestamp::CurrentTimeMicroseconds"),
-        (false, "0x1::aptos_governance::GovernanceConfig"),
-        (false, "0x1::aptos_governance::GovernanceEvents"),
+        (false, "0x1::velor_governance::GovernanceConfig"),
+        (false, "0x1::velor_governance::GovernanceEvents"),
         (false, "0x1::randomness_config::RandomnessConfig"),
         (false, "0x1::staking_config::StakingRewardsConfig"),
         (false, "0x1::aggregator_factory::AggregatorFactory"),
-        (false, "0x1::transaction_fee::AptosCoinMintCapability"),
-        (false, "0x1::transaction_fee::AptosFABurnCapabilities"),
+        (false, "0x1::transaction_fee::VelorCoinMintCapability"),
+        (false, "0x1::transaction_fee::VelorFABurnCapabilities"),
         (false, "0x1::jwk_consensus_config::JWKConsensusConfig"),
-        (false, "0x1::aptos_governance::ApprovedExecutionHashes"),
-        (false, "0x1::aptos_governance::GovernanceResponsbility"),
+        (false, "0x1::velor_governance::ApprovedExecutionHashes"),
+        (false, "0x1::velor_governance::GovernanceResponsbility"),
         (false, "0x1::randomness_api_v0_config::RequiredGasDeposit"),
         (false, "0x1::transaction_validation::TransactionValidation"),
         (
@@ -393,7 +393,7 @@ fn test_db_indexer_data() {
             false,
             "0x1::account_abstraction::DerivableDispatchableAuthenticator",
         ),
-        (false, "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>"),
+        (false, "0x1::coin::CoinInfo<0x1::velor_coin::VelorCoin>"),
         (
             false,
             "0x1::voting::VotingForum<0x1::governance_proposal::GovernanceProposal>",

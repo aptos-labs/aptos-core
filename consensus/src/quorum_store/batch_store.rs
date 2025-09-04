@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -12,12 +12,12 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_consensus_types::proof_of_store::{BatchInfo, SignedBatchInfo};
-use aptos_crypto::{CryptoMaterialError, HashValue};
-use aptos_executor_types::{ExecutorError, ExecutorResult};
-use aptos_infallible::Mutex;
-use aptos_logger::prelude::*;
-use aptos_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
+use velor_consensus_types::proof_of_store::{BatchInfo, SignedBatchInfo};
+use velor_crypto::{CryptoMaterialError, HashValue};
+use velor_executor_types::{ExecutorError, ExecutorResult};
+use velor_infallible::Mutex;
+use velor_logger::prelude::*;
+use velor_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
 use dashmap::{
     mapref::entry::Entry::{Occupied, Vacant},
     DashMap,
@@ -386,7 +386,7 @@ impl BatchStore {
             Ok(SignedBatchInfo::new_with_signature(
                 batch_info.clone(),
                 self.validator_signer.author(),
-                aptos_crypto::bls12381::Signature::dummy_signature(),
+                velor_crypto::bls12381::Signature::dummy_signature(),
             ))
         });
         SignedBatchInfo::new(batch_info, &self.validator_signer)

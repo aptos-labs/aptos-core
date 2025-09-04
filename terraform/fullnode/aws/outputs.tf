@@ -11,7 +11,7 @@ output "kubernetes_ca_certificate" {
 }
 
 output "kubernetes_token" {
-  value = data.aws_eks_cluster_auth.aptos.token
+  value = data.aws_eks_cluster_auth.velor.token
 }
 
 output "s3_backup_role" {

@@ -1,17 +1,17 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! aptos_channel provides an mpsc channel which has two ends `aptos_channel::Receiver`
-//! and `aptos_channel::Sender` similar to existing mpsc data structures.
+//! velor_channel provides an mpsc channel which has two ends `velor_channel::Receiver`
+//! and `velor_channel::Sender` similar to existing mpsc data structures.
 //! What makes it different from existing mpsc channels is that we have full control
 //! over how the internal queueing in the channel happens and how we schedule messages
 //! to be sent out from this channel.
 //! Internally, it uses the `PerKeyQueue` to store messages
 use crate::message_queues::{PerKeyQueue, QueueStyle};
 use anyhow::{ensure, Result};
-use aptos_infallible::{Mutex, NonZeroUsize};
-use aptos_metrics_core::IntCounterVec;
+use velor_infallible::{Mutex, NonZeroUsize};
+use velor_metrics_core::IntCounterVec;
 use futures::{
     channel::oneshot,
     stream::{FusedStream, Stream},
@@ -47,13 +47,13 @@ struct SharedState<K: Eq + Hash + Clone, M> {
     stream_terminated: bool,
 }
 
-/// The sending end of the aptos_channel.
+/// The sending end of the velor_channel.
 #[derive(Debug)]
 pub struct Sender<K: Eq + Hash + Clone, M> {
     shared_state: Arc<Mutex<SharedState<K, M>>>,
 }
 
-/// The status of an element inserted into a aptos_channel. If the element is successfully
+/// The status of an element inserted into a velor_channel. If the element is successfully
 /// dequeued, ElementStatus::Dequeued is sent to the sender. If it is dropped
 /// ElementStatus::Dropped is sent to the sender along with the dropped element.
 pub enum ElementStatus<M> {
@@ -140,7 +140,7 @@ impl<K: Eq + Hash + Clone, M> Drop for Sender<K, M> {
     }
 }
 
-/// The receiving end of the aptos_channel.
+/// The receiving end of the velor_channel.
 #[derive(Debug)]
 pub struct Receiver<K: Eq + Hash + Clone, M> {
     shared_state: Arc<Mutex<SharedState<K, M>>>,
@@ -193,7 +193,7 @@ impl<K: Eq + Hash + Clone, M> FusedStream for Receiver<K, M> {
     }
 }
 
-/// Configuration for a new aptos_channel queue.
+/// Configuration for a new velor_channel queue.
 #[derive(Clone, Copy)]
 pub struct Config {
     pub queue_style: QueueStyle,
@@ -202,7 +202,7 @@ pub struct Config {
 }
 
 impl Config {
-    /// The aptos_channel has a "sub-queue" per key. The `max_capacity` controls
+    /// The velor_channel has a "sub-queue" per key. The `max_capacity` controls
     /// the capacity of each "sub-queue"; when the queues exceed the max
     /// capacity the messages will be dropped according to the queue style/eviction
     /// policy.
@@ -239,7 +239,7 @@ pub fn new<K: Eq + Hash + Clone, M>(
     counters: Option<&'static IntCounterVec>,
 ) -> (Sender<K, M>, Receiver<K, M>) {
     let max_queue_size_per_key =
-        NonZeroUsize!(max_queue_size_per_key, "aptos_channel cannot be of size 0");
+        NonZeroUsize!(max_queue_size_per_key, "velor_channel cannot be of size 0");
     if let Some(counters) = counters {
         counters.reset();
     }

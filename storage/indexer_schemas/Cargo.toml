@@ -1,6 +1,6 @@
 [package]
-name = "aptos-db-indexer-schemas"
-description = "AptosDB Internal Indexer DB schemas"
+name = "velor-db-indexer-schemas"
+description = "VelorDB Internal Indexer DB schemas"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,10 +14,10 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-schemadb = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-types = { workspace = true }
+velor-crypto = { workspace = true }
+velor-schemadb = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-types = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
 proptest = { workspace = true, optional = true }
@@ -25,13 +25,13 @@ proptest-derive = { workspace = true, optional = true }
 serde = { workspace = true }
 
 [dev-dependencies]
-aptos-proptest-helpers = { workspace = true }
-aptos-schemadb = { workspace = true, features = ["fuzzing"] }
-aptos-types = { workspace = true, features = ["fuzzing"] }
+velor-proptest-helpers = { workspace = true }
+velor-schemadb = { workspace = true, features = ["fuzzing"] }
+velor-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["proptest", "proptest-derive", "aptos-types/fuzzing", "aptos-schemadb/fuzzing"]
+fuzzing = ["proptest", "proptest-derive", "velor-types/fuzzing", "velor-schemadb/fuzzing"]

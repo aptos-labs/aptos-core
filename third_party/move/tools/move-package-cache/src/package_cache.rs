@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -7,7 +7,7 @@ use crate::{
     listener::{EmptyPackageCacheListener, PackageCacheListener},
 };
 use anyhow::{anyhow, bail, Result};
-use aptos_framework::natives::code::PackageRegistry;
+use velor_framework::natives::code::PackageRegistry;
 use futures::future;
 use git2::{
     build::RepoBuilder, FetchOptions, ObjectType, Oid, RemoteCallbacks, Repository, TreeWalkResult,
@@ -328,7 +328,7 @@ impl<L> PackageCache<L> {
         self.listener
             .on_bytecode_package_download_start(address, package_name);
 
-        let client = aptos_rest_client::Client::new(fullnode_url.clone());
+        let client = velor_rest_client::Client::new(fullnode_url.clone());
 
         let package_registry = client
             .get_account_resource_at_version_bcs::<PackageRegistry>(

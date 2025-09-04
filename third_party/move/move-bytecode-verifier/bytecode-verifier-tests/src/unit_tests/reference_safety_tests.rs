@@ -12,7 +12,7 @@ use move_core_types::{identifier::Identifier, vm_status::StatusCode};
 
 #[test]
 fn test_bicliques() {
-    // See also: github.com/aptos-labs/aptos-core/security/advisories/GHSA-xm6p-ffcq-5p2v
+    // See also: github.com/velor-chain/velor-core/security/advisories/GHSA-xm6p-ffcq-5p2v
     const NUM_LOCALS: u8 = 128;
     const NUM_CALLS: u16 = 76;
     const NUM_FUNCTIONS: u16 = 1;
@@ -142,7 +142,7 @@ fn test_bicliques() {
 
 #[test]
 fn test_merge_state_large_graph() {
-    // See also: github.com/aptos-labs/aptos-core/security/advisories/GHSA-g8v8-fw4c-8h82
+    // See also: github.com/velor-chain/velor-core/security/advisories/GHSA-g8v8-fw4c-8h82
     const N: u8 = 127;
     const NUM_NOP_BLOCKS: u16 = 950;
     const NUM_FUNCTIONS: u16 = 18;
@@ -269,7 +269,7 @@ fn test_merge_state_large_graph() {
 
 #[test]
 fn test_merge_state() {
-    // See also: github.com/aptos-labs/aptos-core/security/advisories/GHSA-g8v8-fw4c-8h82
+    // See also: github.com/velor-chain/velor-core/security/advisories/GHSA-g8v8-fw4c-8h82
     const NUM_NOP_BLOCKS: u16 = 965;
     const NUM_LOCALS: u8 = 32;
     const NUM_FUNCTIONS: u16 = 21;
@@ -361,7 +361,7 @@ fn test_merge_state() {
 
 #[test]
 fn test_copyloc_pop() {
-    // See also: github.com/aptos-labs/aptos-core/security/advisories/GHSA-2qvr-c9qp-wch7
+    // See also: github.com/velor-chain/velor-core/security/advisories/GHSA-2qvr-c9qp-wch7
     const NUM_COPYLOCS: u16 = 1880;
     const NUM_CHILDREN: u16 = 1020;
     const NUM_FUNCTIONS: u16 = 2;

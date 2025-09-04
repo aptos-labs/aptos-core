@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     cached_resources::CachedResources, error::PepperServiceError, HandlerTrait, V0FetchHandler,
     V0SignatureHandler, V0VerifyHandler,
 };
-use aptos_build_info::build_information;
-use aptos_keyless_pepper_common::BadPepperRequestError;
-use aptos_logger::{error, info, warn};
+use velor_build_info::build_information;
+use velor_keyless_pepper_common::BadPepperRequestError;
+use velor_logger::{error, info, warn};
 use hyper::{
     header::{
         ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS,

@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod processor;
 
 use anyhow::Result;
-use aptos_indexer_grpc_server_framework::RunnableConfig;
-use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
+use velor_indexer_grpc_server_framework::RunnableConfig;
+use velor_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
 use processor::Processor;
 use serde::{Deserialize, Serialize};
 use url::Url;

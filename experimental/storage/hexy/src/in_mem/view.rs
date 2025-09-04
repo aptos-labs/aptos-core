@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,9 +9,9 @@ use crate::{
     LeafIdx, NodePosition, ARITY,
 };
 use anyhow::Result;
-use aptos_crypto::{hash::HOT_STATE_PLACE_HOLDER_HASH, HashValue};
-use aptos_experimental_layered_map::LayeredMap;
-use aptos_metrics_core::TimerHelper;
+use velor_crypto::{hash::HOT_STATE_PLACE_HOLDER_HASH, HashValue};
+use velor_experimental_layered_map::LayeredMap;
+use velor_metrics_core::TimerHelper;
 use itertools::Itertools;
 use std::sync::{atomic, atomic::Ordering, Arc};
 

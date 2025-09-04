@@ -8,9 +8,9 @@ B = "0x43"
 
 [dev-addresses]
 
-[dependencies.AptosFramework]
-git = "https://github.com/aptos-labs/aptos-framework.git"
+[dependencies.VelorFramework]
+git = "https://github.com/velor-chain/velor-framework.git"
 rev = "mainnet"
-subdir = "aptos-framework"
+subdir = "velor-framework"
 
 [dev-dependencies]

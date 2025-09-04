@@ -1,5 +1,5 @@
 module poc::public_key_validate_internal {
-    use aptos_std::ed25519::{Self};
+    use velor_std::ed25519::{Self};
     use std::option::{Self};
     use std::vector;
 

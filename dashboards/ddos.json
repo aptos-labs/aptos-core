@@ -107,7 +107,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", direction=\"inbound\"})",
+          "expr": "sum by (role_type, network_id) (velor_connections{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", direction=\"inbound\"})",
           "legendFormat": "{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -170,7 +170,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", direction=\"inbound\" }[$AggInterval]))",
+          "expr": "sum by (role_type, network_id) (rate(velor_network_pending_connection_upgrades{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", direction=\"inbound\" }[$AggInterval]))",
           "legendFormat": "{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -233,7 +233,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_connections_rejected{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", direction=\"inbound\"}[1m])",
+          "expr": "rate(velor_connections_rejected{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", direction=\"inbound\"}[1m])",
           "legendFormat": "{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -296,7 +296,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (role_type, network_id)(rate(velor_network_rpc_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{role_type}}-{{network_id}}",
@@ -361,7 +361,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", type=\"request\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (role_type, network_id)(rate(velor_network_rpc_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", type=\"request\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{role_type}}-{{network_id}}",
@@ -426,7 +426,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (role_type, network_id)(rate(velor_network_direct_send_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{role_type}}-{{network_id}}",
@@ -491,7 +491,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (role_type, network_id)(rate(velor_network_direct_send_messages{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", state=\"received\"}[$AggInterval]))",
           "legendFormat": "{{role_type}}-{{network_id}}",
           "refId": "A"
         }
@@ -554,7 +554,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\"}[$AggInterval])",
+          "expr": "rate(velor_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\"}[$AggInterval])",
           "refId": "A"
         }
       ],
@@ -616,7 +616,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\"}[$AggInterval])",
+          "expr": "rate(velor_network_rate_limit_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\"}[$AggInterval])",
           "refId": "A"
         }
       ],

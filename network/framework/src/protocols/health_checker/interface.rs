@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,9 +13,9 @@ use crate::{
         network::Event,
     },
 };
-use aptos_config::network_id::PeerNetworkId;
-use aptos_infallible::RwLock;
-use aptos_types::PeerId;
+use velor_config::network_id::PeerNetworkId;
+use velor_infallible::RwLock;
+use velor_types::PeerId;
 use futures::{stream::FusedStream, Stream};
 use std::{
     collections::HashMap,

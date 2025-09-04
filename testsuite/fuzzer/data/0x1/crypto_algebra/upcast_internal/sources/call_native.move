@@ -1,6 +1,6 @@
 module poc::upcast_internal {
-    use aptos_std::crypto_algebra::{Self, Element};
-    use aptos_std::bls12381_algebra::{Gt, Fq12};
+    use velor_std::crypto_algebra::{Self, Element};
+    use velor_std::bls12381_algebra::{Gt, Fq12};
 
     public entry fun main(_owner:&signer) {
         let gt_element: Element<Gt> = crypto_algebra::one<Gt>();

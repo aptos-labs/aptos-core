@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::{
@@ -13,9 +13,9 @@ use crate::dag::{
     types::NodeMetadata,
     CertifiedNode,
 };
-use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::Mutex;
-use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
+use velor_consensus_types::common::{Author, Round};
+use velor_infallible::Mutex;
+use velor_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
 use async_trait::async_trait;
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use proptest::prelude::*;

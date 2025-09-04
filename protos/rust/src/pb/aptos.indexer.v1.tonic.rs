@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
@@ -113,11 +113,11 @@ pub mod raw_data_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/aptos.indexer.v1.RawData/GetTransactions",
+                "/velor.indexer.v1.RawData/GetTransactions",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(GrpcMethod::new("aptos.indexer.v1.RawData", "GetTransactions"));
+                .insert(GrpcMethod::new("velor.indexer.v1.RawData", "GetTransactions"));
             self.inner.server_streaming(req, path, codec).await
         }
     }
@@ -228,7 +228,7 @@ pub mod raw_data_server {
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             match req.uri().path() {
-                "/aptos.indexer.v1.RawData/GetTransactions" => {
+                "/velor.indexer.v1.RawData/GetTransactions" => {
                     #[allow(non_camel_case_types)]
                     struct GetTransactionsSvc<T: RawData>(pub Arc<T>);
                     impl<
@@ -308,7 +308,7 @@ pub mod raw_data_server {
         }
     }
     /// Generated gRPC service name
-    pub const SERVICE_NAME: &str = "aptos.indexer.v1.RawData";
+    pub const SERVICE_NAME: &str = "velor.indexer.v1.RawData";
     impl<T> tonic::server::NamedService for RawDataServer<T> {
         const NAME: &'static str = SERVICE_NAME;
     }
@@ -423,11 +423,11 @@ pub mod grpc_manager_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/aptos.indexer.v1.GrpcManager/Heartbeat",
+                "/velor.indexer.v1.GrpcManager/Heartbeat",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(GrpcMethod::new("aptos.indexer.v1.GrpcManager", "Heartbeat"));
+                .insert(GrpcMethod::new("velor.indexer.v1.GrpcManager", "Heartbeat"));
             self.inner.unary(req, path, codec).await
         }
         ///
@@ -448,12 +448,12 @@ pub mod grpc_manager_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/aptos.indexer.v1.GrpcManager/GetTransactions",
+                "/velor.indexer.v1.GrpcManager/GetTransactions",
             );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(
-                    GrpcMethod::new("aptos.indexer.v1.GrpcManager", "GetTransactions"),
+                    GrpcMethod::new("velor.indexer.v1.GrpcManager", "GetTransactions"),
                 );
             self.inner.unary(req, path, codec).await
         }
@@ -475,13 +475,13 @@ pub mod grpc_manager_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/aptos.indexer.v1.GrpcManager/GetDataServiceForRequest",
+                "/velor.indexer.v1.GrpcManager/GetDataServiceForRequest",
             );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(
                     GrpcMethod::new(
-                        "aptos.indexer.v1.GrpcManager",
+                        "velor.indexer.v1.GrpcManager",
                         "GetDataServiceForRequest",
                     ),
                 );
@@ -604,7 +604,7 @@ pub mod grpc_manager_server {
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             match req.uri().path() {
-                "/aptos.indexer.v1.GrpcManager/Heartbeat" => {
+                "/velor.indexer.v1.GrpcManager/Heartbeat" => {
                     #[allow(non_camel_case_types)]
                     struct HeartbeatSvc<T: GrpcManager>(pub Arc<T>);
                     impl<
@@ -649,7 +649,7 @@ pub mod grpc_manager_server {
                     };
                     Box::pin(fut)
                 }
-                "/aptos.indexer.v1.GrpcManager/GetTransactions" => {
+                "/velor.indexer.v1.GrpcManager/GetTransactions" => {
                     #[allow(non_camel_case_types)]
                     struct GetTransactionsSvc<T: GrpcManager>(pub Arc<T>);
                     impl<
@@ -694,7 +694,7 @@ pub mod grpc_manager_server {
                     };
                     Box::pin(fut)
                 }
-                "/aptos.indexer.v1.GrpcManager/GetDataServiceForRequest" => {
+                "/velor.indexer.v1.GrpcManager/GetDataServiceForRequest" => {
                     #[allow(non_camel_case_types)]
                     struct GetDataServiceForRequestSvc<T: GrpcManager>(pub Arc<T>);
                     impl<
@@ -778,7 +778,7 @@ pub mod grpc_manager_server {
         }
     }
     /// Generated gRPC service name
-    pub const SERVICE_NAME: &str = "aptos.indexer.v1.GrpcManager";
+    pub const SERVICE_NAME: &str = "velor.indexer.v1.GrpcManager";
     impl<T> tonic::server::NamedService for GrpcManagerServer<T> {
         const NAME: &'static str = SERVICE_NAME;
     }
@@ -893,11 +893,11 @@ pub mod data_service_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/aptos.indexer.v1.DataService/Ping",
+                "/velor.indexer.v1.DataService/Ping",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(GrpcMethod::new("aptos.indexer.v1.DataService", "Ping"));
+                .insert(GrpcMethod::new("velor.indexer.v1.DataService", "Ping"));
             self.inner.unary(req, path, codec).await
         }
         ///
@@ -918,12 +918,12 @@ pub mod data_service_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/aptos.indexer.v1.DataService/GetTransactions",
+                "/velor.indexer.v1.DataService/GetTransactions",
             );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(
-                    GrpcMethod::new("aptos.indexer.v1.DataService", "GetTransactions"),
+                    GrpcMethod::new("velor.indexer.v1.DataService", "GetTransactions"),
                 );
             self.inner.server_streaming(req, path, codec).await
         }
@@ -1042,7 +1042,7 @@ pub mod data_service_server {
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             match req.uri().path() {
-                "/aptos.indexer.v1.DataService/Ping" => {
+                "/velor.indexer.v1.DataService/Ping" => {
                     #[allow(non_camel_case_types)]
                     struct PingSvc<T: DataService>(pub Arc<T>);
                     impl<
@@ -1087,7 +1087,7 @@ pub mod data_service_server {
                     };
                     Box::pin(fut)
                 }
-                "/aptos.indexer.v1.DataService/GetTransactions" => {
+                "/velor.indexer.v1.DataService/GetTransactions" => {
                     #[allow(non_camel_case_types)]
                     struct GetTransactionsSvc<T: DataService>(pub Arc<T>);
                     impl<
@@ -1167,7 +1167,7 @@ pub mod data_service_server {
         }
     }
     /// Generated gRPC service name
-    pub const SERVICE_NAME: &str = "aptos.indexer.v1.DataService";
+    pub const SERVICE_NAME: &str = "velor.indexer.v1.DataService";
     impl<T> tonic::server::NamedService for DataServiceServer<T> {
         const NAME: &'static str = SERVICE_NAME;
     }

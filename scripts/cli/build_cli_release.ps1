@@ -1,15 +1,15 @@
-# Copyright © Aptos Foundation
+# Copyright © Velor Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 ###########################################
 # Build and package a release for the CLI #
 ###########################################
 
-# Note: This must be run from the root of the aptos-core repository.
+# Note: This must be run from the root of the velor-core repository.
 
 # Set up basic variables.
-$NAME="aptos-cli"
-$CRATE_NAME="aptos"
+$NAME="velor-cli"
+$CRATE_NAME="velor"
 $CARGO_PATH="crates\$CRATE_NAME\Cargo.toml"
 $Env:VCPKG_ROOT = 'C:\vcpkg\'
 

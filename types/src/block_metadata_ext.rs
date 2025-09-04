@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{block_metadata::BlockMetadata, randomness::Randomness};
-use aptos_crypto::HashValue;
+use velor_crypto::HashValue;
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 

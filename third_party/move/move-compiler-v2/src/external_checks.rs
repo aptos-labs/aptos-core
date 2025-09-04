@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module contains the interface for externally specified checks
@@ -13,7 +13,7 @@ use move_stackless_bytecode::function_target::FunctionTarget;
 use std::{collections::BTreeSet, fmt, sync::Arc};
 
 /// Base URL for the linter documentation.
-const LINTER_URL_BASE: &str = "https://aptos.dev/en/build/smart-contracts/linter";
+const LINTER_URL_BASE: &str = "https://velor.dev/en/build/smart-contracts/linter";
 
 /// Implement this trait to provide a collection of external checks.
 pub trait ExternalChecks {

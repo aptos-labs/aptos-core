@@ -19,11 +19,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 ### Even if version slightly off, still mostly works
 RUN ln -sf /usr/bin/perf_* /usr/bin/perf
 
-RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos
+RUN addgroup --system --gid 6180 velor && adduser --system --ingroup velor --no-create-home --uid 6180 velor
 
-RUN mkdir -p /opt/aptos/etc
-COPY --link --from=node-builder /aptos/dist/aptos-node /usr/local/bin/
-COPY --link --from=tools-builder /aptos/dist/aptos-debugger /usr/local/bin/
+RUN mkdir -p /opt/velor/etc
+COPY --link --from=node-builder /velor/dist/velor-node /usr/local/bin/
+COPY --link --from=tools-builder /velor/dist/velor-debugger /usr/local/bin/
 
 # Admission control
 EXPOSE 8000

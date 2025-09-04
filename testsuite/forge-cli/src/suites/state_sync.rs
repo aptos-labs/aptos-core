@@ -1,14 +1,14 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::ungrouped::changing_working_quorum_test_helper;
-use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, StateSyncConfig};
-use aptos_forge::{
+use velor_config::config::{BootstrappingMode, ContinuousSyncingMode, StateSyncConfig};
+use velor_forge::{
     args::TransactionTypeArg, success_criteria::SuccessCriteria, EmitJobMode, EmitJobRequest,
     ForgeConfig,
 };
-use aptos_testcases::{
+use velor_testcases::{
     consensus_reliability_tests::ChangingWorkingQuorumTest,
     state_sync_performance::{
         StateSyncFullnodeFastSyncPerformance, StateSyncFullnodePerformance,

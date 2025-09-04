@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -11,8 +11,8 @@ use crate::{
     IntGaugeGuard,
 };
 use anyhow::anyhow;
-use aptos_consensus_notifications::ConsensusNotificationSender;
-use aptos_consensus_types::{
+use velor_consensus_notifications::ConsensusNotificationSender;
+use velor_consensus_types::{
     block::Block,
     common::Round,
     pipeline::commit_vote::CommitVote,
@@ -25,12 +25,12 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
-use aptos_crypto::HashValue;
-use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
-use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_infallible::Mutex;
-use aptos_logger::{error, info, trace, warn};
-use aptos_types::{
+use velor_crypto::HashValue;
+use velor_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
+use velor_experimental_runtimes::thread_manager::optimal_min_len;
+use velor_infallible::Mutex;
+use velor_logger::{error, info, trace, warn};
+use velor_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     randomness::Randomness,

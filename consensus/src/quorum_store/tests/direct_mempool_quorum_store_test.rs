@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore;
-use aptos_consensus_types::{
+use velor_consensus_types::{
     common::PayloadFilter,
     request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
     utils::PayloadTxnsSize,
 };
-use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
+use velor_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use futures::{
     channel::{mpsc, oneshot},
     StreamExt,
@@ -38,7 +38,7 @@ async fn test_block_request_no_txns() {
             return_non_full: true,
             filter: PayloadFilter::DirectMempool(vec![]),
             callback: consensus_callback,
-            block_timestamp: aptos_infallible::duration_since_epoch(),
+            block_timestamp: velor_infallible::duration_since_epoch(),
             maybe_optqs_payload_pull_params: None,
         }))
         .unwrap();

@@ -35,7 +35,7 @@ spec:
         {{- end}}
       annotations:
         {{- if $.Values.metrics.destination }}
-        aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
+        velor.dev/metrics-destination: {{ $.Values.metrics.destination }}
         {{- end}}
     spec:
       containers:
@@ -48,13 +48,13 @@ spec:
         imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
         resources:
           {{- toYaml .Values.backup.resources | nindent 10 }}
-        command: ["/usr/local/bin/aptos-debugger"]
+        command: ["/usr/local/bin/velor-debugger"]
         args:
-        - "aptos-db"
+        - "velor-db"
         - "backup"
         - "continuously"
         - "--metadata-cache-dir"
-        - "/tmp/aptos-backup-metadata"
+        - "/tmp/velor-backup-metadata"
         - "--backup-service-address"
         - "http://{{ include "backup.backupService" . }}"
         {{- with .Values.backup }}
@@ -67,7 +67,7 @@ spec:
         - "{{ int .config.concurrent_data_requests }}"
         {{- end }}
         - "--command-adapter-config"
-        - "/opt/aptos/etc/{{ .config.location }}.yaml"
+        - "/opt/velor/etc/{{ .config.location }}.yaml"
         env:
         - name: RUST_LOG
           value: "info"
@@ -84,7 +84,7 @@ spec:
         {{- include "backup.backupEnvironment" (dict "config" .config "era" $.Values.chain.era) | nindent 8 }}
         volumeMounts:
         - name: backup-config
-          mountPath: /opt/aptos/etc
+          mountPath: /opt/velor/etc
         - name: tmp
           mountPath: /tmp
         securityContext:

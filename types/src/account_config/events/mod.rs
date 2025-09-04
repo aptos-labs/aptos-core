@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -122,7 +122,7 @@ pub use uri_mutation::*;
 pub use uri_mutation_event::*;
 pub use withdraw_event::*;
 
-pub fn is_aptos_governance_create_proposal_event(event_type: &str) -> bool {
-    event_type == "0x1::aptos_governance::CreateProposal"
-        || event_type == "0x1::aptos_governance::CreateProposalEvent"
+pub fn is_velor_governance_create_proposal_event(event_type: &str) -> bool {
+    event_type == "0x1::velor_governance::CreateProposal"
+        || event_type == "0x1::velor_governance::CreateProposalEvent"
 }

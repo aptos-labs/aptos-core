@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{dag_store::DagStore, health::HealthBackoff, order_rule::TOrderRule};
@@ -18,11 +18,11 @@ use crate::{
     util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure, Context};
-use aptos_config::config::DagPayloadConfig;
-use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::Mutex;
-use aptos_logger::{debug, error};
-use aptos_types::{
+use velor_config::config::DagPayloadConfig;
+use velor_consensus_types::common::{Author, Round};
+use velor_infallible::Mutex;
+use velor_logger::{debug, error};
+use velor_types::{
     epoch_state::EpochState,
     on_chain_config::{OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig},
     validator_signer::ValidatorSigner,

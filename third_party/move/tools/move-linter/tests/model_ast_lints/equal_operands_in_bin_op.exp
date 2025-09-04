@@ -7,7 +7,7 @@ warning: [lint] This operation always evaluates to `0`.
    │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `0`.
    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:20:13
@@ -16,7 +16,7 @@ warning: [lint] This operation always evaluates to `0`.
    │             ^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `true`.
    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:23:13
@@ -25,7 +25,7 @@ warning: [lint] This operation always evaluates to `true`.
    │             ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `true`.
    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:26:13
@@ -34,7 +34,7 @@ warning: [lint] This operation always evaluates to `true`.
    │             ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `true`.
    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:29:13
@@ -43,7 +43,7 @@ warning: [lint] This operation always evaluates to `true`.
    │             ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to the same value: `x | x` and `x & x` can be simplified to `x`.
    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:32:13
@@ -52,7 +52,7 @@ warning: [lint] This operation always evaluates to the same value: `x | x` and `
    │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to the same value: `x | x` and `x & x` can be simplified to `x`.
    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:35:13
@@ -61,7 +61,7 @@ warning: [lint] This operation always evaluates to the same value: `x | x` and `
    │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `1`.
    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:38:13
@@ -70,7 +70,7 @@ warning: [lint] This operation always evaluates to `1`.
    │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `true`.
    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:42:13
@@ -79,7 +79,7 @@ warning: [lint] This operation always evaluates to `true`.
    │             ^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `true`.
    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:46:13
@@ -88,7 +88,7 @@ warning: [lint] This operation always evaluates to `true`.
    │             ^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `false`.
    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:54:13
@@ -97,7 +97,7 @@ warning: [lint] This operation always evaluates to `false`.
    │             ^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `false`.
    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:58:13
@@ -106,7 +106,7 @@ warning: [lint] This operation always evaluates to `false`.
    │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `false`.
    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:62:13
@@ -115,4 +115,4 @@ warning: [lint] This operation always evaluates to `false`.
    │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.

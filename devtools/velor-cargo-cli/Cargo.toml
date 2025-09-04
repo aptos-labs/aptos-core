@@ -1,0 +1,26 @@
+[package]
+name = "velor-cargo-cli"
+description = "A target-determinator-based Cargo CLI"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+camino = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+clap-verbosity-flag = { workspace = true }
+determinator = { workspace = true }
+env_logger = { workspace = true }
+guppy = { workspace = true }
+log = { workspace = true }
+reqwest = { workspace = true }
+url = { workspace = true }

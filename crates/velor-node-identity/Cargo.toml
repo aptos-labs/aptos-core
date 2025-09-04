@@ -1,0 +1,19 @@
+[package]
+name = "velor-node-identity"
+description = "Provides identifying information about the running node"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-types = { workspace = true }
+claims = { workspace = true }
+once_cell = { workspace = true }

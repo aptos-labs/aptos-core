@@ -1,6 +1,6 @@
 [package]
-name = "aptos-reliable-broadcast"
-description = "Aptos Reliable Broadcast Implementation"
+name = "velor-reliable-broadcast"
+description = "Velor Reliable Broadcast Implementation"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,13 +14,13 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-bounded-executor = { workspace = true }
-aptos-consensus-types = { workspace = true }
-aptos-enum-conversion-derive = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-time-service = { workspace = true }
-aptos-types = { workspace = true }
+velor-bounded-executor = { workspace = true }
+velor-consensus-types = { workspace = true }
+velor-enum-conversion-derive = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-time-service = { workspace = true }
+velor-types = { workspace = true }
 async-trait = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
@@ -30,8 +30,8 @@ tokio = { workspace = true }
 tokio-retry = { workspace = true }
 
 [dev-dependencies]
-aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
-aptos-time-service = { workspace = true, features = ["testing"] }
+velor-consensus-types = { workspace = true, features = ["fuzzing"] }
+velor-time-service = { workspace = true, features = ["testing"] }
 
 [features]
 default = []

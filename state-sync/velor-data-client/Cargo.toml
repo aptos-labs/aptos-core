@@ -1,0 +1,59 @@
+[package]
+name = "velor-data-client"
+description = "The Velor data client"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+velor-config = { workspace = true }
+velor-crypto = { workspace = true }
+velor-id-generator = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-netcore = { workspace = true }
+velor-network = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-storage-service-client = { workspace = true }
+velor-storage-service-types = { workspace = true }
+velor-time-service = { workspace = true }
+velor-types = { workspace = true }
+arc-swap = { workspace = true }
+async-trait = { workspace = true }
+dashmap = { workspace = true }
+futures = { workspace = true }
+itertools = { workspace = true }
+maplit = { workspace = true }
+ordered-float = { workspace = true }
+# Note: we cannot rely on the workspace version of rand because it's out-of-date
+# and does not provide the necessary interfaces for weighted sampling. Similarly,
+# it's not trivial to update rand on the workspace because of several dependency
+# issues (e.g., other outdated crate versions). This is why we fix the version here.
+# Eventually we'll need to update the workspace to use the latest version of rand.
+# See also https://github.com/velor-chain/velor-core/issues/13031
+rand = "0.8.5"
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+velor-channels = { workspace = true }
+velor-network = { workspace = true, features = ["fuzzing"] }
+velor-peer-monitoring-service-types = { workspace = true }
+velor-storage-service-server = { workspace = true }
+velor-time-service = { workspace = true, features = ["async", "testing"] }
+async-trait = { workspace = true }
+bcs = { workspace = true }
+claims = { workspace = true }
+maplit = { workspace = true }
+mockall = { workspace = true }
+tokio = { workspace = true }

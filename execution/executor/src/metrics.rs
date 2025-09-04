@@ -1,14 +1,14 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::{prelude::*, sample, warn};
-use aptos_metrics_core::{
+use velor_logger::{prelude::*, sample, warn};
+use velor_metrics_core::{
     exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
     register_int_counter_vec, register_int_gauge_vec, Histogram, HistogramVec, IntCounter,
     IntCounterVec, IntGaugeVec, TimerHelper,
 };
-use aptos_types::{
+use velor_types::{
     contract_event::ContractEvent,
     transaction::{
         authenticator::AccountAuthenticator, signature_verified_transaction::TransactionProvider,
@@ -16,7 +16,7 @@ use aptos_types::{
         TransactionStatus,
     },
 };
-use aptos_vm::AptosVM;
+use velor_vm::VelorVM;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, vm_status::StatusCode};
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -24,9 +24,9 @@ use std::time::Duration;
 pub static EXECUTE_CHUNK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_executor_execute_chunk_seconds",
+        "velor_executor_execute_chunk_seconds",
         // metric description
-        "The time spent in seconds of chunk execution in Aptos executor",
+        "The time spent in seconds of chunk execution in Velor executor",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()
@@ -35,9 +35,9 @@ pub static EXECUTE_CHUNK: Lazy<Histogram> = Lazy::new(|| {
 pub static APPLY_CHUNK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_executor_apply_chunk_seconds",
+        "velor_executor_apply_chunk_seconds",
         // metric description
-        "The time spent in seconds of applying txn output chunk in Aptos executor",
+        "The time spent in seconds of applying txn output chunk in Velor executor",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()
@@ -46,9 +46,9 @@ pub static APPLY_CHUNK: Lazy<Histogram> = Lazy::new(|| {
 pub static COMMIT_CHUNK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_executor_commit_chunk_seconds",
+        "velor_executor_commit_chunk_seconds",
         // metric description
-        "The time spent in seconds of committing chunk in Aptos executor",
+        "The time spent in seconds of committing chunk in Velor executor",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()
@@ -57,7 +57,7 @@ pub static COMMIT_CHUNK: Lazy<Histogram> = Lazy::new(|| {
 pub static GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_executor_get_block_execution_output_by_executing_seconds",
+        "velor_executor_get_block_execution_output_by_executing_seconds",
         // metric description
         "The total time spent in seconds in executing execute_and_state_checkpoint in the BlockExecutorInner.",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
@@ -68,9 +68,9 @@ pub static GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING: Lazy<Histogram> = Lazy::new(
 pub static OTHER_TIMERS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
-        "aptos_executor_other_timers_seconds",
+        "velor_executor_other_timers_seconds",
         // metric description
-        "The time spent in seconds of others in Aptos executor",
+        "The time spent in seconds of others in Velor executor",
         &["name"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
@@ -78,13 +78,13 @@ pub static OTHER_TIMERS: Lazy<HistogramVec> = Lazy::new(|| {
 });
 
 pub static EXECUTOR_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!("aptos_executor_error_total", "Cumulative number of errors").unwrap()
+    register_int_counter!("velor_executor_error_total", "Cumulative number of errors").unwrap()
 });
 
 pub static BLOCK_EXECUTION_WORKFLOW_WHOLE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_executor_block_execution_workflow_whole_seconds",
+        "velor_executor_block_execution_workflow_whole_seconds",
         // metric description
         "The total time spent in seconds in executing execute_and_state_checkpoint in the BlockExecutorInner.",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
@@ -95,7 +95,7 @@ pub static BLOCK_EXECUTION_WORKFLOW_WHOLE: Lazy<Histogram> = Lazy::new(|| {
 pub static UPDATE_LEDGER: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_executor_ledger_update_seconds",
+        "velor_executor_ledger_update_seconds",
         // metric description
         "The total time spent in ledger update in the block executor.",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
@@ -106,7 +106,7 @@ pub static UPDATE_LEDGER: Lazy<Histogram> = Lazy::new(|| {
 pub static CHUNK_OTHER_TIMERS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
-        "aptos_chunk_executor_other_seconds",
+        "velor_chunk_executor_other_seconds",
         // metric description
         "The time spent in seconds of others in chunk executor.",
         &["name"],
@@ -118,7 +118,7 @@ pub static CHUNK_OTHER_TIMERS: Lazy<HistogramVec> = Lazy::new(|| {
 pub static VM_EXECUTE_CHUNK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_executor_vm_execute_chunk_seconds",
+        "velor_executor_vm_execute_chunk_seconds",
         // metric description
         "The total time spent in seconds of chunk execution in the chunk executor.",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
@@ -129,9 +129,9 @@ pub static VM_EXECUTE_CHUNK: Lazy<Histogram> = Lazy::new(|| {
 pub static COMMIT_BLOCKS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_executor_commit_blocks_seconds",
+        "velor_executor_commit_blocks_seconds",
         // metric description
-        "The total time spent in seconds of commiting blocks in Aptos executor ",
+        "The total time spent in seconds of commiting blocks in Velor executor ",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()
@@ -140,9 +140,9 @@ pub static COMMIT_BLOCKS: Lazy<Histogram> = Lazy::new(|| {
 pub static SAVE_TRANSACTIONS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_executor_save_transactions_seconds",
+        "velor_executor_save_transactions_seconds",
         // metric description
-        "The time spent in seconds of calling save_transactions to storage in Aptos executor",
+        "The time spent in seconds of calling save_transactions to storage in Velor executor",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()
@@ -151,9 +151,9 @@ pub static SAVE_TRANSACTIONS: Lazy<Histogram> = Lazy::new(|| {
 pub static TRANSACTIONS_SAVED: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
-        "aptos_executor_transactions_saved",
+        "velor_executor_transactions_saved",
         // metric description
-        "The number of transactions saved to storage in Aptos executor"
+        "The number of transactions saved to storage in Velor executor"
     )
     .unwrap()
 });
@@ -165,7 +165,7 @@ pub static TRANSACTIONS_SAVED: Lazy<Histogram> = Lazy::new(|| {
 /// Count of the executed transactions since last restart.
 pub static PROCESSED_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_processed_txns_count",
+        "velor_processed_txns_count",
         "Count of the transactions since last restart. state is success, failed or retry",
         &["process", "kind", "state"]
     )
@@ -175,7 +175,7 @@ pub static PROCESSED_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Count of the executed transactions since last restart.
 pub static PROCESSED_FAILED_TXNS_REASON_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_processed_failed_txns_reason_count",
+        "velor_processed_failed_txns_reason_count",
         "Count of the transactions since last restart. state is success, failed or retry",
         &["is_detailed", "process", "state", "reason", "error_code"]
     )
@@ -185,7 +185,7 @@ pub static PROCESSED_FAILED_TXNS_REASON_COUNT: Lazy<IntCounterVec> = Lazy::new(|
 /// Counter of executed user transactions by payload type
 pub static PROCESSED_USER_TXNS_BY_PAYLOAD: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_processed_user_transactions_by_payload",
+        "velor_processed_user_transactions_by_payload",
         "Counter of processed user transactions by payload type",
         &["process", "payload_type", "state"]
     )
@@ -195,7 +195,7 @@ pub static PROCESSED_USER_TXNS_BY_PAYLOAD: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter of executed EntryFunction user transactions by module
 pub static PROCESSED_USER_TXNS_ENTRY_FUNCTION_BY_MODULE: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_processed_user_transactions_entry_function_by_module",
+        "velor_processed_user_transactions_entry_function_by_module",
         "Counter of processed EntryFunction user transactions by module",
         &["is_detailed", "process", "account", "name", "state"]
     )
@@ -206,7 +206,7 @@ pub static PROCESSED_USER_TXNS_ENTRY_FUNCTION_BY_MODULE: Lazy<IntCounterVec> = L
 pub static PROCESSED_USER_TXNS_ENTRY_FUNCTION_BY_CORE_METHOD: Lazy<IntCounterVec> =
     Lazy::new(|| {
         register_int_counter_vec!(
-            "aptos_processed_user_transactions_entry_function_by_core_method",
+            "velor_processed_user_transactions_entry_function_by_core_method",
             "Counter of processed EntryFunction user transaction for core address by method",
             &["process", "module", "method", "state"]
         )
@@ -216,7 +216,7 @@ pub static PROCESSED_USER_TXNS_ENTRY_FUNCTION_BY_CORE_METHOD: Lazy<IntCounterVec
 /// Counter of executed EntryFunction user transaction for core address by method
 pub static PROCESSED_USER_TXNS_CORE_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_processed_user_transactions_core_events",
+        "velor_processed_user_transactions_core_events",
         "Counter of processed EntryFunction user transaction for core address by method",
         &["is_detailed", "process", "account", "creation_number"]
     )
@@ -225,7 +225,7 @@ pub static PROCESSED_USER_TXNS_CORE_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
 
 pub static PROCESSED_TXNS_OUTPUT_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "aptos_processed_txns_output_size",
+        "velor_processed_txns_output_size",
         "Histogram of transaction output sizes",
         &["process"],
         exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 25).unwrap()
@@ -235,7 +235,7 @@ pub static PROCESSED_TXNS_OUTPUT_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
 
 pub static PROCESSED_TXNS_NUM_AUTHENTICATORS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "aptos_processed_txns_num_authenticators",
+        "velor_processed_txns_num_authenticators",
         "Histogram of number of authenticators in a transaction",
         &["process"],
         exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 6).unwrap()
@@ -245,7 +245,7 @@ pub static PROCESSED_TXNS_NUM_AUTHENTICATORS: Lazy<HistogramVec> = Lazy::new(|| 
 
 pub static PROCESSED_TXNS_AUTHENTICATOR: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_processed_txns_authenticator",
+        "velor_processed_txns_authenticator",
         "Counter of authenticators by type, for processed transactions",
         &["process", "auth_type"]
     )
@@ -254,7 +254,7 @@ pub static PROCESSED_TXNS_AUTHENTICATOR: Lazy<IntCounterVec> = Lazy::new(|| {
 
 pub static CONCURRENCY_GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "aptos_executor_call_concurrency",
+        "velor_executor_call_concurrency",
         "Call concurrency by API.",
         &["executor", "call"]
     )
@@ -268,7 +268,7 @@ pub fn update_counters_for_processed_chunk<T>(
 ) where
     T: TransactionProvider,
 {
-    let detailed_counters = AptosVM::get_processed_transactions_detailed_counters();
+    let detailed_counters = VelorVM::get_processed_transactions_detailed_counters();
     let detailed_counters_label = if detailed_counters { "true" } else { "false" };
     if transactions.len() != transaction_outputs.len() {
         warn!(

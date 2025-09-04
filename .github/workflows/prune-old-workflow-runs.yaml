@@ -1,5 +1,5 @@
 # This workflow runs periodically to delete obsolete workflow runs of workflows that don't exist anymore in the repo.
-# This is the keep the Workflow list on the left here https://github.com/aptos-labs/aptos-core/actions tidy.
+# This is the keep the Workflow list on the left here https://github.com/velor-chain/velor-core/actions tidy.
 # The only way to remove a workflow from that list is to delete _all_ runs of a workflow.
 name: Prune old workflow runs
 on:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   prune:
-    if: github.repository == 'aptos-labs/aptos-core'
+    if: github.repository == 'velor-chain/velor-core'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

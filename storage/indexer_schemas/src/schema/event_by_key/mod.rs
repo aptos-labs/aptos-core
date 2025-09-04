@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,11 +13,11 @@
 
 use crate::{schema::EVENT_BY_KEY_CF_NAME, utils::ensure_slice_len_eq};
 use anyhow::Result;
-use aptos_schemadb::{
+use velor_schemadb::{
     define_pub_schema,
     schema::{KeyCodec, ValueCodec},
 };
-use aptos_types::{event::EventKey, transaction::Version};
+use velor_types::{event::EventKey, transaction::Version};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::mem::size_of;
 

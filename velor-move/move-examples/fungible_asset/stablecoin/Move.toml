@@ -1,0 +1,21 @@
+[package]
+name = "stablecoin"
+version = "0.0.0"
+
+
+[addresses]
+stablecoin = "_"
+master_minter = "_"
+minter = "_"
+pauser = "_"
+denylister = "_"
+
+[dev-addresses]
+stablecoin = "0xcafe"
+master_minter = "0xbab"
+minter = "0xface"
+pauser = "0xdafe"
+denylister = "0xcade"
+
+[dependencies]
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-framework", rev = "mainnet" }

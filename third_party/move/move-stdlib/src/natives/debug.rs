@@ -466,9 +466,9 @@ mod testing {
                 }
             },
             MoveValue::Closure(_) => {
-                // Using non-Aptos Move stdlib with function values is not supported. In general,
+                // Using non-Velor Move stdlib with function values is not supported. In general,
                 // this debug implementation should be removed and replaced by the new one from
-                // Aptos Move.
+                // Velor Move.
                 return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED));
             },
             MoveValue::Struct(move_struct) => match move_struct {

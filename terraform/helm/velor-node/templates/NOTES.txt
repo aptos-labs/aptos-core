@@ -1,0 +1,13 @@
+Your {{ .Chart.Name }} deployment named {{ .Release.Name }} is now deployed.
+
+To start the nodes, specify either .Values.loadTestGenesis or populate the following Secrets with genesis data:
+{{- range $i, $e := until (int .Values.numValidators) }}
+    - {{ include "velor-validator.fullname" $ }}-{{$i}}-genesis-e{{ $.Values.chain.era }}
+{{- end }}
+
+{{- if .Values.overrideNodeConfig }}
+NodeConfig overrides must also be populated into the following ConfigMaps:
+{{- range $i, $e := until (int .Values.numValidators) }}
+    - {{ include "velor-validator.fullname" $ }}-{{$i}}
+{{- end }}
+{{- end }}

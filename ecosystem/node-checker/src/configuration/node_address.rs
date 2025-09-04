@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, bail, Context, Result};
-use aptos_crypto::x25519;
-use aptos_rest_client::Client as AptosRestClient;
-use aptos_sdk::types::network_address::NetworkAddress;
+use velor_crypto::x25519;
+use velor_rest_client::Client as VelorRestClient;
+use velor_sdk::types::network_address::NetworkAddress;
 use reqwest::cookie::Jar;
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
@@ -104,14 +104,14 @@ impl NodeAddress {
         }
     }
 
-    pub fn get_api_client(&self, timeout: Duration) -> Result<AptosRestClient> {
+    pub fn get_api_client(&self, timeout: Duration) -> Result<VelorRestClient> {
         let client = reqwest::ClientBuilder::new()
             .timeout(timeout)
             .cookie_provider(self.cookie_store.clone())
             .build()
             .unwrap();
 
-        Ok(AptosRestClient::from((client, self.get_api_url()?)))
+        Ok(VelorRestClient::from((client, self.get_api_url()?)))
     }
 
     /// Gets the NodeAddress as a NetworkAddress. If the URL is a domain name,
@@ -140,7 +140,7 @@ impl NodeAddress {
             );
         }
         if socket_addrs.len() > 1 {
-            aptos_logger::warn!(
+            velor_logger::warn!(
                 "NodeAddress {} resolved to multiple SocketAddrs, but we're only checking the first one: {:?}",
                 self.url,
                 socket_addrs,

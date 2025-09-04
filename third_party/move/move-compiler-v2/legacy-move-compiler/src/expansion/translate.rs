@@ -54,7 +54,7 @@ struct Context<'env, 'map> {
     is_source_definition: bool,
     in_spec_context: bool,
     in_deprecated_code: bool,
-    in_aptos_libs: bool,
+    in_velor_libs: bool,
     exp_specs: BTreeMap<SpecId, E::SpecBlock>,
     env: &'env mut CompilationEnv,
 }
@@ -75,7 +75,7 @@ impl<'env> Context<'env, '_> {
             is_source_definition: false,
             in_spec_context: false,
             in_deprecated_code: false,
-            in_aptos_libs: false,
+            in_velor_libs: false,
             exp_specs: BTreeMap::new(),
         }
     }
@@ -452,21 +452,21 @@ fn set_sender_address(
     })
 }
 
-// This is a hack to recognize APTOS StdLib, Framework, and Token libs to avoid warnings on some old errors.
+// This is a hack to recognize VELOR StdLib, Framework, and Token libs to avoid warnings on some old errors.
 // This will be removed after library attributes are cleaned up.
-// (See https://github.com/aptos-labs/aptos-core/issues/9410)
-fn module_is_in_aptos_libs(module_address: Option<Spanned<Address>>) -> bool {
-    const APTOS_STDLIB_NAME: &str = "aptos_std";
-    static APTOS_STDLIB_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
+// (See https://github.com/velor-chain/velor-core/issues/9410)
+fn module_is_in_velor_libs(module_address: Option<Spanned<Address>>) -> bool {
+    const VELOR_STDLIB_NAME: &str = "velor_std";
+    static VELOR_STDLIB_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
         Lazy::new(|| NumericalAddress::parse_str("0x1").unwrap());
-    const APTOS_FRAMEWORK_NAME: &str = "aptos_framework";
-    static APTOS_FRAMEWORK_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
+    const VELOR_FRAMEWORK_NAME: &str = "velor_framework";
+    static VELOR_FRAMEWORK_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
         Lazy::new(|| NumericalAddress::parse_str("0x1").unwrap());
-    const APTOS_TOKEN_NAME: &str = "aptos_token";
-    static APTOS_TOKEN_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
+    const VELOR_TOKEN_NAME: &str = "velor_token";
+    static VELOR_TOKEN_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
         Lazy::new(|| NumericalAddress::parse_str("0x3").unwrap());
-    const APTOS_TOKEN_OBJECTS_NAME: &str = "aptos_token_objects";
-    static APTOS_TOKEN_OBJECTS_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
+    const VELOR_TOKEN_OBJECTS_NAME: &str = "velor_token_objects";
+    static VELOR_TOKEN_OBJECTS_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
         Lazy::new(|| NumericalAddress::parse_str("0x4").unwrap());
     match &module_address {
         Some(spanned_address) => {
@@ -475,17 +475,17 @@ fn module_is_in_aptos_libs(module_address: Option<Spanned<Address>>) -> bool {
                 Address::Numerical(optional_name, spanned_numerical_address) => match optional_name
                 {
                     Some(spanned_symbol) => {
-                        ((&spanned_symbol.value as &str) == APTOS_STDLIB_NAME
-                            && (spanned_numerical_address.value == *APTOS_STDLIB_NUMERICAL_ADDRESS))
-                            || ((&spanned_symbol.value as &str) == APTOS_FRAMEWORK_NAME
+                        ((&spanned_symbol.value as &str) == VELOR_STDLIB_NAME
+                            && (spanned_numerical_address.value == *VELOR_STDLIB_NUMERICAL_ADDRESS))
+                            || ((&spanned_symbol.value as &str) == VELOR_FRAMEWORK_NAME
                                 && (spanned_numerical_address.value
-                                    == *APTOS_FRAMEWORK_NUMERICAL_ADDRESS))
-                            || ((&spanned_symbol.value as &str) == APTOS_TOKEN_NAME
+                                    == *VELOR_FRAMEWORK_NUMERICAL_ADDRESS))
+                            || ((&spanned_symbol.value as &str) == VELOR_TOKEN_NAME
                                 && (spanned_numerical_address.value
-                                    == *APTOS_TOKEN_NUMERICAL_ADDRESS))
-                            || ((&spanned_symbol.value as &str) == APTOS_TOKEN_OBJECTS_NAME
+                                    == *VELOR_TOKEN_NUMERICAL_ADDRESS))
+                            || ((&spanned_symbol.value as &str) == VELOR_TOKEN_OBJECTS_NAME
                                 && (spanned_numerical_address.value
-                                    == *APTOS_TOKEN_OBJECTS_NUMERICAL_ADDRESS))
+                                    == *VELOR_TOKEN_OBJECTS_NUMERICAL_ADDRESS))
                     },
                     None => false,
                 },
@@ -534,10 +534,10 @@ fn module_(
     {
         context.in_deprecated_code = true;
     }
-    if context.env.flags().warn_of_deprecation_use_in_aptos_libs() {
-        context.in_aptos_libs = false;
+    if context.env.flags().warn_of_deprecation_use_in_velor_libs() {
+        context.in_velor_libs = false;
     } else {
-        context.in_aptos_libs = module_is_in_aptos_libs(module_address);
+        context.in_velor_libs = module_is_in_velor_libs(module_address);
     }
 
     let mut new_scope = AliasMapBuilder::new();
@@ -635,7 +635,7 @@ fn script_(context: &mut Context, package_name: Option<Symbol>, pscript: P::Scri
         "ICE there should be no aliases entering a script"
     );
     context.set_current_module(None);
-    context.in_aptos_libs = false;
+    context.in_velor_libs = false;
 
     let mut constants = UniqueMap::new();
     for c in pconstants {
@@ -1204,7 +1204,7 @@ fn member_has_deprecated_annotation(
 
 fn check_for_deprecated_module_use(context: &mut Context, mident: &ModuleIdent) -> bool {
     let warn_deprecation = &context.env.flags().warn_of_deprecation_use();
-    if !warn_deprecation || context.in_deprecated_code || context.in_aptos_libs {
+    if !warn_deprecation || context.in_deprecated_code || context.in_velor_libs {
         return false;
     }
     if let Some(loc) = module_has_deprecated_annotation(context, mident) {
@@ -1229,7 +1229,7 @@ fn check_for_deprecated_member_use(
     deprecated_item: DeprecatedItem,
 ) {
     let warn_deprecation = &context.env.flags().warn_of_deprecation_use();
-    if !warn_deprecation || context.in_deprecated_code || context.in_aptos_libs {
+    if !warn_deprecation || context.in_deprecated_code || context.in_velor_libs {
         return;
     }
     let mident = match mident_in {

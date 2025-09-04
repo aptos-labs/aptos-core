@@ -1,0 +1,2 @@
+processed 2 tasks
+task 1 lines 4-9:  publish --private-key Alice [module Alice::M {]

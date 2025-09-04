@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,11 +6,11 @@ use crate::{
     utils::sort_dedup,
     LeafIdx, NodePosition, ARITY,
 };
-use aptos_crypto::{
+use velor_crypto::{
     hash::{CryptoHasher, HexyHasher, HOT_STATE_PLACE_HOLDER_HASH},
     HashValue,
 };
-use aptos_infallible::Mutex;
+use velor_infallible::Mutex;
 use itertools::Itertools;
 use proptest::{collection::vec, prelude::*};
 use std::{

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(unused_variables)]
@@ -14,8 +14,8 @@ use crate::{
     },
     Sender,
 };
-use aptos_metrics_core::TimerHelper;
-use aptos_types::{
+use velor_metrics_core::TimerHelper;
+use velor_types::{
     block_executor::partitioner::{
         CrossShardDependencies, RoundId, ShardId, ShardedTxnIndex, SubBlock,
         TransactionWithDependencies,

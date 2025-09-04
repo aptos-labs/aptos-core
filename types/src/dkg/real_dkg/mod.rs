@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -11,9 +11,9 @@ use crate::{
 };
 use anyhow::{anyhow, bail, ensure, Context};
 #[cfg(any(test, feature = "testing"))]
-use aptos_crypto::Uniform;
-use aptos_crypto::{bls12381, bls12381::PrivateKey};
-use aptos_dkg::{
+use velor_crypto::Uniform;
+use velor_crypto::{bls12381, bls12381::PrivateKey};
+use velor_dkg::{
     pvss,
     pvss::{
         traits::{Convert, Reconstructable, Transcript},

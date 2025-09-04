@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -13,10 +13,10 @@ use crate::{
     responses::{CompleteDataRange, DataSummary, ProtocolMetadata},
     Epoch, StorageServiceRequest,
 };
-use aptos_config::config::AptosDataClientConfig;
-use aptos_crypto::hash::HashValue;
-use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::{
+use velor_config::config::VelorDataClientConfig;
+use velor_crypto::hash::HashValue;
+use velor_time_service::{TimeService, TimeServiceTrait};
+use velor_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -49,7 +49,7 @@ fn test_complete_data_ranges() {
 #[test]
 fn test_data_summary_service_epoch_ending_ledger_infos() {
     // Create a data client config and data summary
-    let data_client_config = AptosDataClientConfig::default();
+    let data_client_config = VelorDataClientConfig::default();
     let data_summary = DataSummary {
         epoch_ending_ledger_infos: Some(create_data_range(100, 200)),
         ..Default::default()
@@ -95,7 +95,7 @@ fn test_data_summary_service_optimistic_fetch() {
     for use_request_v2 in [false, true] {
         // Create a data client config with the specified max optimistic fetch lag
         let max_optimistic_fetch_lag_secs = 50;
-        let data_client_config = AptosDataClientConfig {
+        let data_client_config = VelorDataClientConfig {
             max_optimistic_fetch_lag_secs,
             ..Default::default()
         };
@@ -163,7 +163,7 @@ fn test_data_summary_service_subscription() {
     for use_request_v2 in [false, true] {
         // Create a data client config with the specified max subscription lag
         let max_subscription_lag_secs = 100;
-        let data_client_config = AptosDataClientConfig {
+        let data_client_config = VelorDataClientConfig {
             max_subscription_lag_secs,
             ..Default::default()
         };
@@ -230,7 +230,7 @@ fn test_data_summary_service_transactions() {
     // Test both v1 and v2 transaction requests
     for use_request_v2 in [false, true] {
         // Create a data client config and data summary
-        let data_client_config = AptosDataClientConfig::default();
+        let data_client_config = VelorDataClientConfig::default();
         let data_summary = DataSummary {
             synced_ledger_info: Some(create_ledger_info_at_version(250)),
             transactions: Some(create_data_range(100, 200)),
@@ -300,7 +300,7 @@ fn test_data_summary_service_transaction_outputs() {
     // Test both v1 and v2 transaction requests
     for use_request_v2 in [false, true] {
         // Create a data client config and data summary
-        let data_client_config = AptosDataClientConfig::default();
+        let data_client_config = VelorDataClientConfig::default();
         let data_summary = DataSummary {
             synced_ledger_info: Some(create_ledger_info_at_version(250)),
             transaction_outputs: Some(create_data_range(100, 200)),
@@ -381,7 +381,7 @@ fn test_data_summary_service_transactions_or_outputs() {
     // Test both v1 and v2 transaction requests
     for use_request_v2 in [false, true] {
         // Create a data client config and data summary
-        let data_client_config = AptosDataClientConfig::default();
+        let data_client_config = VelorDataClientConfig::default();
         let data_summary = DataSummary {
             synced_ledger_info: Some(create_ledger_info_at_version(250)),
             transactions: Some(create_data_range(50, 200)),
@@ -467,7 +467,7 @@ fn test_data_summary_service_transactions_or_outputs() {
 #[test]
 fn test_data_summary_service_state_chunk_request() {
     // Create a data client config and data summary
-    let data_client_config = AptosDataClientConfig::default();
+    let data_client_config = VelorDataClientConfig::default();
     let data_summary = DataSummary {
         synced_ledger_info: Some(create_ledger_info_at_version(250)),
         states: Some(create_data_range(100, 300)),
@@ -888,7 +888,7 @@ fn get_random_u64() -> u64 {
 /// the specified data summary. If `expect_service` is true, then the
 /// request should be serviceable.
 fn verify_can_service_epoch_ending_requests(
-    data_client_config: &AptosDataClientConfig,
+    data_client_config: &VelorDataClientConfig,
     data_summary: &DataSummary,
     compression: bool,
     epoch_ranges: Vec<(Epoch, Epoch)>,
@@ -914,7 +914,7 @@ fn verify_can_service_epoch_ending_requests(
 /// request should be serviceable.
 fn verify_can_service_optimistic_fetch_requests(
     use_request_v2: bool,
-    data_client_config: &AptosDataClientConfig,
+    data_client_config: &VelorDataClientConfig,
     data_summary: &DataSummary,
     time_service: TimeService,
     compression: bool,
@@ -944,7 +944,7 @@ fn verify_can_service_optimistic_fetch_requests(
 /// against the specified data summary. If `expect_service` is true,
 /// then the request should be serviceable.
 fn verify_can_service_state_chunk_requests(
-    data_client_config: &AptosDataClientConfig,
+    data_client_config: &VelorDataClientConfig,
     data_summary: &DataSummary,
     use_compression: bool,
     versions: Vec<u64>,
@@ -970,7 +970,7 @@ fn verify_can_service_state_chunk_requests(
 /// request should be serviceable.
 fn verify_can_service_subscription_requests(
     use_request_v2: bool,
-    data_client_config: &AptosDataClientConfig,
+    data_client_config: &VelorDataClientConfig,
     data_summary: &DataSummary,
     time_service: TimeService,
     compression: bool,
@@ -1001,7 +1001,7 @@ fn verify_can_service_subscription_requests(
 /// request should be serviceable.
 fn verify_can_service_transaction_requests(
     use_request_v2: bool,
-    data_client_config: &AptosDataClientConfig,
+    data_client_config: &VelorDataClientConfig,
     data_summary: &DataSummary,
     use_compression: bool,
     transaction_ranges: Vec<(u64, u64, u64)>,
@@ -1036,7 +1036,7 @@ fn verify_can_service_transaction_requests(
 /// true, then the request should be serviceable.
 fn verify_can_service_transaction_or_output_requests(
     use_request_v2: bool,
-    data_client_config: &AptosDataClientConfig,
+    data_client_config: &VelorDataClientConfig,
     data_summary: &DataSummary,
     use_compression: bool,
     transaction_ranges: Vec<(u64, u64, u64)>,
@@ -1076,7 +1076,7 @@ fn verify_can_service_transaction_or_output_requests(
 /// request should be serviceable.
 fn verify_can_service_output_requests(
     use_request_v2: bool,
-    data_client_config: &AptosDataClientConfig,
+    data_client_config: &VelorDataClientConfig,
     data_summary: &DataSummary,
     use_compression: bool,
     output_ranges: Vec<(u64, u64, u64)>,
@@ -1103,7 +1103,7 @@ fn verify_can_service_output_requests(
 
 /// A simple helper method to verify the serviceability of a request
 fn verify_serviceability(
-    data_client_config: &AptosDataClientConfig,
+    data_client_config: &VelorDataClientConfig,
     data_summary: &DataSummary,
     time_service: Option<TimeService>,
     request: StorageServiceRequest,

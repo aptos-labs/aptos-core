@@ -1,6 +1,6 @@
 module poc::double_internal {
-    use aptos_std::crypto_algebra::{Self};
-    use aptos_std::bls12381_algebra::{G1};
+    use velor_std::crypto_algebra::{Self};
+    use velor_std::bls12381_algebra::{G1};
 
     public entry fun main(_owner: &signer) {
         let p = crypto_algebra::one<G1>();

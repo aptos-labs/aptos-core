@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "aptos_testsuite"
+name = "velor_testsuite"
 version = "0.1.0"
-description = "Aptos E2E tests and utilities in python, including Forge"
+description = "Velor E2E tests and utilities in python, including Forge"
 authors = []
 readme = "README.md"
 

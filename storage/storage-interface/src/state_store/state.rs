@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -15,9 +15,9 @@ use crate::{
     DbReader,
 };
 use anyhow::Result;
-use aptos_experimental_layered_map::{LayeredMap, MapLayer};
-use aptos_metrics_core::TimerHelper;
-use aptos_types::{
+use velor_experimental_layered_map::{LayeredMap, MapLayer};
+use velor_metrics_core::TimerHelper;
+use velor_types::{
     state_store::{
         state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
         StateViewId, NUM_STATE_SHARDS,

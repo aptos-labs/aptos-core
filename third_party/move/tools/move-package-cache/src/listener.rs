@@ -1,7 +1,7 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_framework::natives::code::PackageMetadata;
+use velor_framework::natives::code::PackageMetadata;
 use move_core_types::account_address::AccountAddress;
 use std::path::Path;
 

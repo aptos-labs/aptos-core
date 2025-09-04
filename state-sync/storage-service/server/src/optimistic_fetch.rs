@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -11,13 +11,13 @@ use crate::{
     subscription::SubscriptionStreamRequests,
     utils, LogEntry, LogSchema,
 };
-use aptos_config::{
+use velor_config::{
     config::StorageServiceConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_infallible::Mutex;
-use aptos_logger::{error, warn};
-use aptos_storage_service_types::{
+use velor_infallible::Mutex;
+use velor_logger::{error, warn};
+use velor_storage_service_types::{
     requests::{
         DataRequest, GetTransactionDataWithProofRequest, StorageServiceRequest,
         TransactionDataRequestType, TransactionOutputsWithProofRequest,
@@ -25,8 +25,8 @@ use aptos_storage_service_types::{
     },
     responses::{StorageServerSummary, StorageServiceResponse},
 };
-use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use velor_time_service::{TimeService, TimeServiceTrait};
+use velor_types::ledger_info::LedgerInfoWithSignatures;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use futures::future::join_all;
@@ -62,7 +62,7 @@ impl OptimisticFetchRequest {
         &self,
         config: StorageServiceConfig,
         target_ledger_info: &LedgerInfoWithSignatures,
-    ) -> aptos_storage_service_types::Result<StorageServiceRequest, Error> {
+    ) -> velor_storage_service_types::Result<StorageServiceRequest, Error> {
         // Verify that the target version is higher than the highest known version
         let known_version = self.highest_known_version();
         let target_version = target_ledger_info.ledger_info().version();
@@ -346,7 +346,7 @@ pub(crate) async fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInte
     storage: T,
     subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
     time_service: TimeService,
-) -> aptos_storage_service_types::Result<Vec<(PeerNetworkId, LedgerInfoWithSignatures)>, Error> {
+) -> velor_storage_service_types::Result<Vec<(PeerNetworkId, LedgerInfoWithSignatures)>, Error> {
     // Fetch the latest storage summary and highest synced version
     let latest_storage_summary = cached_storage_server_summary.load().clone();
     let highest_synced_ledger_info = match &latest_storage_summary.data_summary.synced_ledger_info {

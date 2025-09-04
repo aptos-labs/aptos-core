@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -14,11 +14,11 @@ use crate::{
     },
 };
 use anyhow::ensure;
-use aptos_config::config::BatchTransactionFilterConfig;
-use aptos_consensus_types::payload::TDataInfo;
-use aptos_logger::prelude::*;
-use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::PeerId;
+use velor_config::config::BatchTransactionFilterConfig;
+use velor_consensus_types::payload::TDataInfo;
+use velor_logger::prelude::*;
+use velor_short_hex_str::AsShortHexStr;
+use velor_types::PeerId;
 use std::sync::Arc;
 use tokio::sync::{
     mpsc::{Receiver, Sender},

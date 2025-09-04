@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,16 +6,16 @@ use crate::{
     DKGMessage,
 };
 use anyhow::bail;
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkId;
-use aptos_infallible::RwLock;
-use aptos_logger::warn;
-use aptos_network::{
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::network_id::NetworkId;
+use velor_infallible::RwLock;
+use velor_logger::warn;
+use velor_network::{
     application::interface::{NetworkClient, NetworkServiceEvents},
     protocols::network::{Event, RpcError},
     ProtocolId,
 };
-use aptos_reliable_broadcast::RBNetworkSender;
+use velor_reliable_broadcast::RBNetworkSender;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{
@@ -40,14 +40,14 @@ pub struct NetworkSender {
     dkg_network_client: DKGNetworkClient<NetworkClient<DKGMessage>>,
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
-    self_sender: aptos_channels::Sender<Event<DKGMessage>>,
+    self_sender: velor_channels::Sender<Event<DKGMessage>>,
 }
 
 impl NetworkSender {
     pub fn new(
         author: AccountAddress,
         dkg_network_client: DKGNetworkClient<NetworkClient<DKGMessage>>,
-        self_sender: aptos_channels::Sender<Event<DKGMessage>>,
+        self_sender: velor_channels::Sender<Event<DKGMessage>>,
     ) -> Self {
         NetworkSender {
             author,
@@ -124,21 +124,21 @@ impl RBNetworkSender<DKGMessage> for NetworkSender {
 }
 
 pub struct NetworkReceivers {
-    pub rpc_rx: aptos_channel::Receiver<AccountAddress, (AccountAddress, IncomingRpcRequest)>,
+    pub rpc_rx: velor_channel::Receiver<AccountAddress, (AccountAddress, IncomingRpcRequest)>,
 }
 
 pub struct NetworkTask {
     all_events: Box<dyn Stream<Item = Event<DKGMessage>> + Send + Unpin>,
-    rpc_tx: aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>,
+    rpc_tx: velor_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>,
 }
 
 impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
     pub fn new(
         network_service_events: NetworkServiceEvents<DKGMessage>,
-        self_receiver: aptos_channels::Receiver<Event<DKGMessage>>,
+        self_receiver: velor_channels::Receiver<Event<DKGMessage>>,
     ) -> (NetworkTask, NetworkReceivers) {
-        let (rpc_tx, rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
+        let (rpc_tx, rpc_rx) = velor_channel::new(QueueStyle::FIFO, 10, None);
 
         let network_and_events = network_service_events.into_network_and_events();
         if (network_and_events.values().len() != 1)
@@ -171,7 +171,7 @@ impl NetworkTask {
                     };
 
                     if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req)) {
-                        warn!(error = ?e, "aptos channel closed");
+                        warn!(error = ?e, "velor channel closed");
                     };
                 },
                 _ => {

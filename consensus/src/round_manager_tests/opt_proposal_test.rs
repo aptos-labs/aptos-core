@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -14,8 +14,8 @@ use crate::{
     },
     test_utils::{consensus_runtime, timed_block_on},
 };
-use aptos_config::config::ConsensusConfig;
-use aptos_consensus_types::{
+use velor_config::config::ConsensusConfig;
+use velor_consensus_types::{
     common::Payload, opt_block_data::OptBlockData, opt_proposal_msg::OptProposalMsg,
 };
 use futures::StreamExt;

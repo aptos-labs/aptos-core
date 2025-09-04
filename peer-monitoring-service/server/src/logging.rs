@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::Error;
-use aptos_logger::Schema;
-use aptos_peer_monitoring_service_types::request::PeerMonitoringServiceRequest;
+use velor_logger::Schema;
+use velor_peer_monitoring_service_types::request::PeerMonitoringServiceRequest;
 use serde::Serialize;
 
 #[derive(Schema)]

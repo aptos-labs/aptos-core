@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dkg::real_dkg::rounding::{
@@ -6,7 +6,7 @@ use crate::dkg::real_dkg::rounding::{
     DKGRoundingProfile, DEFAULT_FAST_PATH_SECRECY_THRESHOLD, DEFAULT_RECONSTRUCT_THRESHOLD,
     DEFAULT_SECRECY_THRESHOLD,
 };
-use aptos_dkg::pvss::WeightedConfig;
+use velor_dkg::pvss::WeightedConfig;
 use claims::assert_le;
 use fixed::types::U64F64;
 use rand::{thread_rng, Rng};

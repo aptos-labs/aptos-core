@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -15,8 +15,8 @@ use crate::{
     DbReader,
 };
 use anyhow::Result;
-use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
-use aptos_types::{
+use velor_metrics_core::{IntCounterVecHelper, TimerHelper};
+use velor_types::{
     state_store::{
         hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
         state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewId,

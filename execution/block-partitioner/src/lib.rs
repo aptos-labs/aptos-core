@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,7 +6,7 @@ pub mod v2;
 
 pub mod test_utils;
 
-use aptos_types::{
+use velor_types::{
     block_executor::partitioner::{PartitionedTransactions, ShardId},
     transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
 };

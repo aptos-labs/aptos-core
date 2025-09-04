@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -16,10 +16,10 @@ use crate::{
     subscription::{SubscriptionRequest, SubscriptionStreamRequests},
     utils,
 };
-use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
-use aptos_logger::{debug, sample, sample::SampleRate, trace, warn};
-use aptos_network::protocols::wire::handshake::v1::ProtocolId;
-use aptos_storage_service_types::{
+use velor_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
+use velor_logger::{debug, sample, sample::SampleRate, trace, warn};
+use velor_network::protocols::wire::handshake::v1::ProtocolId;
+use velor_storage_service_types::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, GetTransactionDataWithProofRequest,
         StateValuesWithProofRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
@@ -30,8 +30,8 @@ use aptos_storage_service_types::{
     },
     StorageServiceError,
 };
-use aptos_time_service::TimeService;
-use aptos_types::transaction::Version;
+use velor_time_service::TimeService;
+use velor_types::transaction::Version;
 use arc_swap::ArcSwap;
 use dashmap::{mapref::entry::Entry, DashMap};
 use mini_moka::sync::Cache;
@@ -144,7 +144,7 @@ impl<T: StorageReaderInterface> Handler<T> {
         peer_network_id: &PeerNetworkId,
         request: StorageServiceRequest,
         optimistic_fetch_related: bool,
-    ) -> aptos_storage_service_types::Result<StorageServiceResponse> {
+    ) -> velor_storage_service_types::Result<StorageServiceResponse> {
         // Process the request and time the operation
         let process_request = || {
             // Process the request and handle any errors
@@ -232,7 +232,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     pub(crate) fn send_response(
         &self,
         request: StorageServiceRequest,
-        response: aptos_storage_service_types::Result<StorageServiceResponse>,
+        response: velor_storage_service_types::Result<StorageServiceResponse>,
         response_sender: ResponseSender,
     ) {
         log_storage_response(request, &response);
@@ -385,7 +385,7 @@ impl<T: StorageReaderInterface> Handler<T> {
         &self,
         peer_network_id: &PeerNetworkId,
         request: &StorageServiceRequest,
-    ) -> aptos_storage_service_types::Result<StorageServiceResponse, Error> {
+    ) -> velor_storage_service_types::Result<StorageServiceResponse, Error> {
         // Increment the LRU cache probe counter
         increment_counter(
             &metrics::LRU_CACHE_EVENT,
@@ -463,7 +463,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     fn get_state_value_chunk_with_proof(
         &self,
         request: &StateValuesWithProofRequest,
-    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+    ) -> velor_storage_service_types::Result<DataResponse, Error> {
         let state_value_chunk_with_proof = self.storage.get_state_value_chunk_with_proof(
             request.version,
             request.start_index,
@@ -478,7 +478,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     fn get_epoch_ending_ledger_infos(
         &self,
         request: &EpochEndingLedgerInfoRequest,
-    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+    ) -> velor_storage_service_types::Result<DataResponse, Error> {
         let epoch_change_proof = self
             .storage
             .get_epoch_ending_ledger_infos(request.start_epoch, request.expected_end_epoch)?;
@@ -489,7 +489,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     fn get_number_of_states_at_version(
         &self,
         version: Version,
-    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+    ) -> velor_storage_service_types::Result<DataResponse, Error> {
         let number_of_states = self.storage.get_number_of_states(version)?;
 
         Ok(DataResponse::NumberOfStatesAtVersion(number_of_states))
@@ -510,7 +510,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     fn get_transaction_outputs_with_proof(
         &self,
         request: &TransactionOutputsWithProofRequest,
-    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+    ) -> velor_storage_service_types::Result<DataResponse, Error> {
         let response = self.storage.get_transaction_outputs_with_proof(
             request.proof_version,
             request.start_version,
@@ -528,7 +528,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     fn get_transactions_with_proof(
         &self,
         request: &TransactionsWithProofRequest,
-    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+    ) -> velor_storage_service_types::Result<DataResponse, Error> {
         let response = self.storage.get_transactions_with_proof(
             request.proof_version,
             request.start_version,
@@ -547,7 +547,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     fn get_transactions_or_outputs_with_proof(
         &self,
         request: &TransactionsOrOutputsWithProofRequest,
-    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+    ) -> velor_storage_service_types::Result<DataResponse, Error> {
         let response = self.storage.get_transactions_or_outputs_with_proof(
             request.proof_version,
             request.start_version,
@@ -569,7 +569,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     fn get_transaction_data_with_proof(
         &self,
         request: &GetTransactionDataWithProofRequest,
-    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+    ) -> velor_storage_service_types::Result<DataResponse, Error> {
         let transaction_data_with_proof = self.storage.get_transaction_data_with_proof(request)?;
         Ok(DataResponse::TransactionDataWithProof(
             transaction_data_with_proof,
@@ -607,7 +607,7 @@ fn update_new_subscription_metrics(peer_network_id: PeerNetworkId) {
 /// Logs the response sent by storage for a peer request
 fn log_storage_response(
     storage_request: StorageServiceRequest,
-    storage_response: &aptos_storage_service_types::Result<
+    storage_response: &velor_storage_service_types::Result<
         StorageServiceResponse,
         StorageServiceError,
     >,

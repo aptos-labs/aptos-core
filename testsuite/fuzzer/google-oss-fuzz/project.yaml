@@ -1,12 +1,12 @@
-homepage: "https://aptos.dev"
+homepage: "https://velor.dev"
 language: rust
-primary_contact: "gerardo@aptoslabs.com"
-main_repo: "https://github.com/aptos-labs/aptos-core"
+primary_contact: "gerardo@velorlabs.com"
+main_repo: "https://github.com/velor-chain/velor-core"
 auto_ccs:
-  - "oss-fuzz-notifications@aptoslabs.com"
-  - "security@aptoslabs.com"
-  - "andrea.cappa@aptoslabs.com"
-  - "marco.ilardi@aptoslabs.com"
+  - "oss-fuzz-notifications@velorlabs.com"
+  - "security@velorlabs.com"
+  - "andrea.cappa@velorlabs.com"
+  - "marco.ilardi@velorlabs.com"
 sanitizers:
   - none
 fuzzing_engines:

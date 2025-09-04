@@ -1,6 +1,6 @@
 [package]
 name = "smoke-test"
-description = "Aptos end to end tests"
+description = "Velor end to end tests"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,37 +14,37 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos = { workspace = true, features = ["fuzzing"] }
-aptos-api-types = { workspace = true }
-aptos-bitvec = { path = "../../crates/aptos-bitvec" }
-aptos-cached-packages = { workspace = true }
-aptos-config = { workspace = true, features = ["smoke-test"] }
-aptos-consensus = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-db = { workspace = true }
-aptos-db-indexer-schemas = { workspace = true }
-aptos-dkg = { workspace = true }
-aptos-faucet-core = { workspace = true }
-aptos-forge = { workspace = true }
-aptos-framework = { workspace = true }
-aptos-gas-algebra = { workspace = true }
-aptos-gas-schedule = { workspace = true, features = ["testing"] }
-aptos-global-constants = { workspace = true }
-aptos-indexer = { workspace = true }
-aptos-indexer-grpc-table-info = { workspace = true }
-aptos-inspection-service = { workspace = true }
-aptos-keygen = { workspace = true }
-aptos-move-debugger = { workspace = true }
-aptos-release-builder = { workspace = true }
-aptos-rest-client = { workspace = true }
-aptos-rosetta = { workspace = true }
-aptos-schemadb = { workspace = true }
-aptos-sdk = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-temppath = { workspace = true }
-aptos-transaction-filters = { workspace = true }
-aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
+velor = { workspace = true, features = ["fuzzing"] }
+velor-api-types = { workspace = true }
+velor-bitvec = { path = "../../crates/velor-bitvec" }
+velor-cached-packages = { workspace = true }
+velor-config = { workspace = true, features = ["smoke-test"] }
+velor-consensus = { workspace = true }
+velor-crypto = { workspace = true }
+velor-db = { workspace = true }
+velor-db-indexer-schemas = { workspace = true }
+velor-dkg = { workspace = true }
+velor-faucet-core = { workspace = true }
+velor-forge = { workspace = true }
+velor-framework = { workspace = true }
+velor-gas-algebra = { workspace = true }
+velor-gas-schedule = { workspace = true, features = ["testing"] }
+velor-global-constants = { workspace = true }
+velor-indexer = { workspace = true }
+velor-indexer-grpc-table-info = { workspace = true }
+velor-inspection-service = { workspace = true }
+velor-keygen = { workspace = true }
+velor-move-debugger = { workspace = true }
+velor-release-builder = { workspace = true }
+velor-rest-client = { workspace = true }
+velor-rosetta = { workspace = true }
+velor-schemadb = { workspace = true }
+velor-sdk = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-temppath = { workspace = true }
+velor-transaction-filters = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true }
 bcs = { workspace = true }
 diesel = { workspace = true, features = [
     "chrono",
@@ -67,14 +67,14 @@ url = { workspace = true }
 walkdir = { workspace = true }
 
 [dev-dependencies]
-aptos-backup-cli = { workspace = true }
-aptos-db-indexer = { workspace = true, features = ["fuzzing"] }
-aptos-genesis = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-secure-storage = { workspace = true }
-aptos-time-service = { workspace = true }
-aptos-vault-client = { workspace = true }
+velor-backup-cli = { workspace = true }
+velor-db-indexer = { workspace = true, features = ["fuzzing"] }
+velor-genesis = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-secure-storage = { workspace = true }
+velor-time-service = { workspace = true }
+velor-vault-client = { workspace = true }
 base64 = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }

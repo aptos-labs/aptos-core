@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::{mock, mock::MockClient, utils};
-use aptos_config::{
+use velor_config::{
     config::StorageServiceConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_network::protocols::network::RpcError;
-use aptos_types::{
+use velor_network::protocols::network::RpcError;
+use velor_types::{
     epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
     transaction::TransactionListWithProofV2, PeerId,
 };

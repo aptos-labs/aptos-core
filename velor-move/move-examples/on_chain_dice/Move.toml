@@ -1,0 +1,9 @@
+[package]
+name = "OnChainDice"
+version = "0.0.0"
+
+[addresses]
+module_owner = "_"
+
+[dependencies]
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-framework", rev = "mainnet" }

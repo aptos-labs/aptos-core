@@ -32,17 +32,17 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
       - devnet
       - testnet
       - mainnet
-      - aptos-node-v*
-      - aptos-release-v*
+      - velor-node-v*
+      - velor-release-v*
       # experimental branches
       - performance_benchmark
       - preview
       - preview-networking
       # grpc release branches
-      - aptos-indexer-grpc-devnet
-      - aptos-indexer-grpc-testnet
-      - aptos-indexer-grpc-mainnet
-      - aptos-indexer-grpc-v*
+      - velor-indexer-grpc-devnet
+      - velor-indexer-grpc-testnet
+      - velor-indexer-grpc-mainnet
+      - velor-indexer-grpc-v*
 
 # cancel redundant builds
 concurrency:
@@ -140,7 +140,7 @@ jobs:
   # This is a PR required job.
   rust-images:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -151,7 +151,7 @@ jobs:
 
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
@@ -167,7 +167,7 @@ jobs:
 
   rust-images-performance:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
@@ -185,7 +185,7 @@ jobs:
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image') ||
       contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test')
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -223,7 +223,7 @@ jobs:
         github.event.pull_request.auto_merge != null) ||
         contains(github.event.pull_request.body, '#e2e'
       )
-    uses: aptos-labs/aptos-core/.github/workflows/cli-e2e-tests.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/cli-e2e-tests.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -264,7 +264,7 @@ jobs:
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -302,7 +302,7 @@ jobs:
           ref: ${{ github.ref }}
       
       # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
-      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+      - uses: velor-chain/velor-core/.github/actions/docker-setup@main
         id: docker-setup
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -347,7 +347,7 @@ jobs:
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -377,7 +377,7 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') ||
         github.event.pull_request.auto_merge != null
       )
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -400,7 +400,7 @@ jobs:
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' &&
       contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test')
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -422,7 +422,7 @@ jobs:
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' &&
       contains(github.event.pull_request.labels.*.name, 'CICD:run-multiregion-test')
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: velor-chain/velor-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}

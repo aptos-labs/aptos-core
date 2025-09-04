@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,10 +6,10 @@
 //! This module is to contain all networking logging information.
 //!
 //! ```
-//! use aptos_config::network_id::NetworkContext;
-//! use aptos_logger::info;
-//! use aptos_types::{PeerId, network_address::NetworkAddress};
-//! use aptos_network::logging::NetworkSchema;
+//! use velor_config::network_id::NetworkContext;
+//! use velor_logger::info;
+//! use velor_types::{PeerId, network_address::NetworkAddress};
+//! use velor_network::logging::NetworkSchema;
 //!
 //! info!(
 //!   NetworkSchema::new(&NetworkContext::mock())
@@ -25,10 +25,10 @@ use crate::{
     connectivity_manager::DiscoverySource,
     transport::{ConnectionId, ConnectionMetadata},
 };
-use aptos_config::network_id::NetworkContext;
-use aptos_logger::Schema;
-use aptos_netcore::transport::ConnectionOrigin;
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use velor_config::network_id::NetworkContext;
+use velor_logger::Schema;
+use velor_netcore::transport::ConnectionOrigin;
+use velor_types::{network_address::NetworkAddress, PeerId};
 
 #[derive(Schema)]
 pub struct NetworkSchema<'a> {

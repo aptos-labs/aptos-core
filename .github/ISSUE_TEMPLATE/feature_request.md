@@ -1,6 +1,6 @@
 ---
 name: "\U0001F680 Feature request"
-about: Suggest a new feature in Aptos Core
+about: Suggest a new feature in Velor Core
 title: "[Feature Request]"
 labels: enhancement
 assignees: ''

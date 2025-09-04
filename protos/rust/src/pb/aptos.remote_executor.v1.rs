@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
@@ -15,7 +15,7 @@ pub struct NetworkMessage {
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct Empty {
 }
-/// Encoded file descriptor set for the `aptos.remote_executor.v1` package
+/// Encoded file descriptor set for the `velor.remote_executor.v1` package
 pub const FILE_DESCRIPTOR_SET: &[u8] = &[
     0x0a, 0xa0, 0x06, 0x0a, 0x2a, 0x61, 0x70, 0x74, 0x6f, 0x73, 0x2f, 0x72, 0x65, 0x6d, 0x6f, 0x74,
     0x65, 0x5f, 0x65, 0x78, 0x65, 0x63, 0x75, 0x74, 0x6f, 0x72, 0x2f, 0x76, 0x31, 0x2f, 0x6e, 0x65,
@@ -69,6 +69,6 @@ pub const FILE_DESCRIPTOR_SET: &[u8] = &[
     0x05, 0x06, 0x00, 0x02, 0x00, 0x03, 0x12, 0x03, 0x0f, 0x31, 0x36, 0x62, 0x06, 0x70, 0x72, 0x6f,
     0x74, 0x6f, 0x33,
 ];
-include!("aptos.remote_executor.v1.serde.rs");
-include!("aptos.remote_executor.v1.tonic.rs");
+include!("velor.remote_executor.v1.serde.rs");
+include!("velor.remote_executor.v1.tonic.rs");
 // @@protoc_insertion_point(module)

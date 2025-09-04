@@ -1,15 +1,15 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(dead_code)]
 
 use crate::tdbg;
-use aptos_cached_packages::aptos_stdlib::code_publish_package_txn;
-use aptos_framework::natives::code::{
+use velor_cached_packages::velor_stdlib::code_publish_package_txn;
+use velor_framework::natives::code::{
     ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
 };
-use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
-use aptos_types::transaction::{ExecutionStatus, TransactionPayload, TransactionStatus};
+use velor_language_e2e_tests::{account::Account, executor::FakeExecutor};
+use velor_types::transaction::{ExecutionStatus, TransactionPayload, TransactionStatus};
 use arbitrary::Arbitrary;
 use fuzzer::UserAccount;
 use libfuzzer_sys::Corpus;
@@ -146,7 +146,7 @@ pub(crate) fn check_for_invariant_violation(e: VMStatus) {
             e,
             "RUST_BACKTRACE=1 DEBUG_VM_STATUS=",
             e.status_code(),
-            "./fuzz.sh run move_aptosvm_publish_and_run <ARTIFACT>"
+            "./fuzz.sh run move_velorvm_publish_and_run <ARTIFACT>"
         );
     }
 }

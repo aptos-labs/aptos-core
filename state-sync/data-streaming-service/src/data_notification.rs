@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::streaming_client::Epoch;
-use aptos_data_client::interface::{Response, ResponsePayload};
-use aptos_types::{
+use velor_data_client::interface::{Response, ResponsePayload};
+use velor_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
@@ -51,7 +51,7 @@ pub enum DataPayload {
     TransactionsWithProof(TransactionListWithProofV2),
 }
 
-/// A request that has been sent to the Aptos data client.
+/// A request that has been sent to the Velor data client.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataClientRequest {
     EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest),
@@ -223,7 +223,7 @@ pub struct TransactionsOrOutputsWithProofRequest {
 /// network and will be available in `client_response` when received.
 pub struct PendingClientResponse {
     pub client_request: DataClientRequest,
-    pub client_response: Option<Result<Response<ResponsePayload>, aptos_data_client::error::Error>>,
+    pub client_response: Option<Result<Response<ResponsePayload>, velor_data_client::error::Error>>,
 }
 
 impl PendingClientResponse {
@@ -238,7 +238,7 @@ impl PendingClientResponse {
     /// Creates a new pending client response with a response already available
     pub fn new_with_response(
         client_request: DataClientRequest,
-        client_response: Result<Response<ResponsePayload>, aptos_data_client::error::Error>,
+        client_response: Result<Response<ResponsePayload>, velor_data_client::error::Error>,
     ) -> Self {
         Self {
             client_request,

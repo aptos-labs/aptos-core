@@ -1,6 +1,6 @@
 [package]
-name = "aptos-keyless-pepper-common"
-description = "Aptos Keyless pepper library"
+name = "velor-keyless-pepper-common"
+description = "Velor Keyless pepper library"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,10 +14,10 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-crypto-derive = { workspace = true }
-aptos-dkg = { workspace = true }
-aptos-types = { workspace = true }
+velor-crypto = { workspace = true }
+velor-crypto-derive = { workspace = true }
+velor-dkg = { workspace = true }
+velor-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::internal_indexer_db_config::InternalIndexerDBConfig;
@@ -9,7 +9,7 @@ use crate::config::{
     ExecutionConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig,
     NetbenchConfig, NodeConfig, StateSyncConfig, StorageConfig,
 };
-use aptos_types::chain_id::ChainId;
+use velor_types::chain_id::ChainId;
 use std::collections::HashSet;
 
 // Useful sanitizer constants

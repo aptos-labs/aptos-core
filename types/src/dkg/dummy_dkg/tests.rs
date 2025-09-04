@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,7 +9,7 @@ use crate::{
     on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
 };
-use aptos_crypto::{bls12381, Uniform};
+use velor_crypto::{bls12381, Uniform};
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 

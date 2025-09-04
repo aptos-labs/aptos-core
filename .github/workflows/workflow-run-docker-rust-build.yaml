@@ -76,7 +76,7 @@ env:
   AWS_ECR_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
   GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
   TARGET_REGISTRY: ${{ inputs.TARGET_REGISTRY }}
-  GCP_DOCKER_BUILD_LOCK_BUCKET: "aptos-docker-build-lock-bucket"
+  GCP_DOCKER_BUILD_LOCK_BUCKET: "velor-docker-build-lock-bucket"
   PROFILE_RELEASE: ${{ inputs.PROFILE == 'release' && inputs.FEATURES == '' }}
   PROFILE_PERF: ${{ inputs.PROFILE == 'performance' }}
   FEATURE_FAILPOINTS: ${{ inputs.FEATURES == 'failpoints' }}
@@ -87,7 +87,7 @@ permissions:
 
 jobs:
   rust-all:
-    runs-on: runs-on,cpu=64,family=c7,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co,disk=large
+    runs-on: runs-on,cpu=64,family=c7,image=velor-ubuntu-x64,run-id=${{ github.run_id }},spot=co,disk=large
     steps:
       - uses: actions/checkout@v4
         with:
@@ -108,7 +108,7 @@ jobs:
             sudo systemctl start docker
           fi          
 
-      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+      - uses: velor-chain/velor-core/.github/actions/docker-setup@main
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
@@ -119,7 +119,7 @@ jobs:
 
       - name: Check if docker images already exist
         id: check-images
-        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@main
+        uses: velor-chain/velor-core/.github/actions/wait-images-ci@main
         continue-on-error: true
         with:
           GIT_SHA: ${{ env.GIT_SHA }}
@@ -161,7 +161,7 @@ jobs:
           fi
       
       - name: Wait for docker images to build
-        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@main
+        uses: velor-chain/velor-core/.github/actions/wait-images-ci@main
         if: ${{ steps.lock.outputs.wait_images == 'true' }}
         with:
           GIT_SHA: ${{ env.GIT_SHA }}

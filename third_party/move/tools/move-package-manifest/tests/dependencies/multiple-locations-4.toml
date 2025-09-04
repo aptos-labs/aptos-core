@@ -3,5 +3,5 @@ name = "some_package_name"
 version = "0.1.2"
 
 [dependencies]
-a = { git = "https://github.com/a/b", local = "../a", aptos = "mainnet" }
+a = { git = "https://github.com/a/b", local = "../a", velor = "mainnet" }
 

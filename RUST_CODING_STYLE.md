@@ -1,7 +1,7 @@
-# Coding Guidelines for Aptos Core
+# Coding Guidelines for Velor Core
 
-This document describes the coding guidelines for the [Aptos Core](https://github.com/aptos-labs/aptos-core) Rust codebase. For the Move language, see the [Move Coding Conventions](https://aptos.dev/move/book/SUMMARY).
-Secure coding guidance is provided in the [Aptos Rust Secure Coding Guidelines](./RUST_SECURE_CODING.md).
+This document describes the coding guidelines for the [Velor Core](https://github.com/velor-chain/velor-core) Rust codebase. For the Move language, see the [Move Coding Conventions](https://velor.dev/move/book/SUMMARY).
+Secure coding guidance is provided in the [Velor Rust Secure Coding Guidelines](./RUST_SECURE_CODING.md).
 
 ## Code formatting & Code analysis
 
@@ -44,7 +44,7 @@ struct Point {
 
 ### Terminology
 
-The Aptos codebase uses inclusive terminology (similar to other projects such as [the Linux kernel](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=49decddd39e5f6132ccd7d9fdc3d7c470b0061bb)). The terms below are recommended when appropriate.
+The Velor codebase uses inclusive terminology (similar to other projects such as [the Linux kernel](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=49decddd39e5f6132ccd7d9fdc3d7c470b0061bb)). The terms below are recommended when appropriate.
 
 - allowlist - a set of entities allowed access
 - blocklist - a set of entities that are blocked from access
@@ -68,9 +68,9 @@ Document the following for each function:
 
 ### README.md for top-level directories and other major components
 
-Each major component of Aptos Core needs to have a `README.md` file. Major components are:
+Each major component of Velor Core needs to have a `README.md` file. Major components are:
 
-- top-level directories (e.g. `aptos-core/network`, `aptos-core/language`)
+- top-level directories (e.g. `velor-core/network`, `velor-core/language`)
 - the most important crates in the system (e.g. `vm-runtime`)
 
 This file should contain:
@@ -111,14 +111,14 @@ For the external API of this crate refer to [Link to rustdoc API].
 
 ## Contributing
 
-Refer to the Aptos Project contributing guide [LINK].
+Refer to the Velor Project contributing guide [LINK].
 
 ## License
 
-Refer to the Aptos Project License [LINK].
+Refer to the Velor Project License [LINK].
 ```
 
-A good example of README.md is `aptos-core/network/README.md` that describes the networking crate.
+A good example of README.md is `velor-core/network/README.md` that describes the networking crate.
 
 ## Binary, Argument, and Crate Naming
 
@@ -174,8 +174,8 @@ Error handling suggestions follow the [Rust book guidance](https://doc.rust-lang
 
 _Fallible functions_
 
-- `duration_since_epoch()` - to obtain the Unix time, call the function provided by `aptos-infallible`.
-- `RwLock` and `Mutex` - Instead of calling `unwrap()` on the standard library implementations of these functions, use the infallible equivalent types that we provide in `aptos-infallible`.
+- `duration_since_epoch()` - to obtain the Unix time, call the function provided by `velor-infallible`.
+- `RwLock` and `Mutex` - Instead of calling `unwrap()` on the standard library implementations of these functions, use the infallible equivalent types that we provide in `velor-infallible`.
 
 _Panic_
 
@@ -264,9 +264,9 @@ mod tests {
 
 _Property-based tests_
 
-Aptos contains [property-based tests](https://blog.jessitron.com/2013/04/25/property-based-testing-what-is-it/) written in Rust using the [`proptest` framework](https://github.com/AltSysrq/proptest). Property-based tests generate random test cases and assert that invariants, also called _properties_, hold for the code under test.
+Velor contains [property-based tests](https://blog.jessitron.com/2013/04/25/property-based-testing-what-is-it/) written in Rust using the [`proptest` framework](https://github.com/AltSysrq/proptest). Property-based tests generate random test cases and assert that invariants, also called _properties_, hold for the code under test.
 
-Some examples of properties tested in Aptos:
+Some examples of properties tested in Velor:
 
 - Every serializer and deserializer pair is tested for correctness with random inputs to the serializer. Any pair of functions that are inverses of each other can be tested this way.
 - The results of executing common transactions through the VM are tested using randomly generated scenarios and verified with an _Oracle_.
@@ -281,7 +281,7 @@ References:
 
 ### Conditional compilation of tests
 
-Aptos [conditionally
+Velor [conditionally
 compiles](https://doc.rust-lang.org/stable/reference/conditional-compilation.html)
 code that is _only relevant for tests, but does not consist of tests_ (unitary
 or otherwise). Examples of this include proptest strategies, implementations
@@ -301,7 +301,7 @@ As a consequence, it is recommended that you set up your test-only code in the f
 
 **For production crates:**
 
-Production crates are defined as the set of crates that create externally published artifacts, e.g. the Aptos validator,
+Production crates are defined as the set of crates that create externally published artifacts, e.g. the Velor validator,
 the Move compiler, and so on.
 
 For the sake of example, we'll consider you are defining a test-only helper function `foo` in `foo_crate`:
@@ -349,7 +349,7 @@ elements in another crate need to activate the "fuzzing" feature through the
 `[features]` section in their `Cargo.toml`. [Integration
 tests](https://doc.rust-lang.org/rust-by-example/testing/integration_testing.html)
 can neither rely on the `test` flag nor do they have a proper `Cargo.toml` for
-feature activation. In the Aptos codebase, we therefore recommend that
+feature activation. In the Velor codebase, we therefore recommend that
 _integration tests which depend on test-only code in their tested crate_ be
 extracted to their own test-only crate. See `language/move-binary-format/serializer_tests`
 for an example of such an extracted integration test.

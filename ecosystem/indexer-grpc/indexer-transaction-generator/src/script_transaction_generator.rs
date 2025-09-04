@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,13 +6,13 @@ use crate::{
     config::{ScriptTransaction, ScriptTransactions},
 };
 use anyhow::Context;
-use aptos::{
+use velor::{
     account::fund::FundWithFaucet,
     common::types::{CliCommand, MovePackageOptions, ScriptFunctionArguments, TransactionOptions},
     governance::CompileScriptFunction,
     move_tool::{CompileScript, RunScript},
 };
-use aptos_protos::{
+use velor_protos::{
     indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest},
     transaction::v1::Transaction,
 };
@@ -154,7 +154,7 @@ impl ScriptTransactions {
         let first_version = versions_to_capture.first().unwrap().0;
         let last_version = versions_to_capture.last().unwrap().0;
         let transactions_count = last_version + 1 - first_version;
-        let request = tonic::Request::new(aptos_protos::indexer::v1::GetTransactionsRequest {
+        let request = tonic::Request::new(velor_protos::indexer::v1::GetTransactionsRequest {
             starting_version: Some(first_version),
             transactions_count: Some(transactions_count),
             ..GetTransactionsRequest::default()

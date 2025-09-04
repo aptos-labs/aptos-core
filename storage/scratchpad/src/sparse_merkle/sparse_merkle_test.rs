@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,11 +7,11 @@ use crate::test_utils::{
     proof_reader::ProofReader,
     proptest_helpers::{arb_smt_correctness_case, test_smt_correctness_impl},
 };
-use aptos_crypto::{
+use velor_crypto::{
     hash::{CryptoHash, TestOnlyHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_types::{
+use velor_types::{
     proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt},
     state_store::state_value::StateValue,
 };
@@ -26,7 +26,7 @@ fn update_byte(original_key: &HashValue, n: usize, byte: u8) -> HashValue {
 }
 
 fn hash_internal(left_child: HashValue, right_child: HashValue) -> HashValue {
-    aptos_types::proof::SparseMerkleInternalNode::new(left_child, right_child).hash()
+    velor_types::proof::SparseMerkleInternalNode::new(left_child, right_child).hash()
 }
 
 fn hash_leaf(key: HashValue, value_hash: HashValue) -> HashValue {

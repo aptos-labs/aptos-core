@@ -1,5 +1,5 @@
 module poc::native_format_list {
-   use aptos_std::string_utils;
+   use velor_std::string_utils;
    use std::string::{String};
 
    public entry fun main(_owner: &signer) {

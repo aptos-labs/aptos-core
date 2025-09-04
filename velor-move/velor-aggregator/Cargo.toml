@@ -1,0 +1,29 @@
+[package]
+name = "velor-aggregator"
+description = "Aggregator sources for the Velor blockchain"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+velor-types = { workspace = true }
+bcs = { workspace = true }
+claims = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-types = { workspace = true }
+
+[dev-dependencies]
+once_cell = { workspace = true }
+test-case = { workspace = true }
+
+[features]
+default = []
+testing = []

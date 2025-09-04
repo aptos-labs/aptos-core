@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
@@ -28,8 +28,8 @@ impl Error {
     }
 }
 
-impl From<aptos_storage_service_types::responses::Error> for Error {
-    fn from(error: aptos_storage_service_types::responses::Error) -> Self {
+impl From<velor_storage_service_types::responses::Error> for Error {
+    fn from(error: velor_storage_service_types::responses::Error) -> Self {
         Error::UnexpectedErrorEncountered(error.to_string())
     }
 }
@@ -40,8 +40,8 @@ impl From<anyhow::Error> for Error {
     }
 }
 
-impl From<aptos_storage_interface::AptosDbError> for Error {
-    fn from(error: aptos_storage_interface::AptosDbError) -> Self {
+impl From<velor_storage_interface::VelorDbError> for Error {
+    fn from(error: velor_storage_interface::VelorDbError) -> Self {
         Error::StorageErrorEncountered(error.to_string())
     }
 }

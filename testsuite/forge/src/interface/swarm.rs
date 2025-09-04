@@ -1,17 +1,17 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    AptosPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
+    VelorPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
 };
 use anyhow::{anyhow, bail};
-use aptos_config::{
+use velor_config::{
     config::{NodeConfig, OverrideNodeConfig},
     network_id::NetworkId,
 };
-use aptos_rest_client::Client as RestClient;
-use aptos_sdk::types::PeerId;
+use velor_rest_client::Client as RestClient;
+use velor_sdk::types::PeerId;
 use futures::future::{join_all, try_join_all};
 use log::info;
 use prometheus_http_query::response::{PromqlResult, Sample};
@@ -94,14 +94,14 @@ pub trait Swarm: Sync + Send {
         timeout: Option<i64>,
     ) -> Result<Vec<Sample>>;
 
-    fn aptos_public_info(&self) -> AptosPublicInfo {
-        self.chain_info().into_aptos_public_info()
+    fn velor_public_info(&self) -> VelorPublicInfo {
+        self.chain_info().into_velor_public_info()
     }
 
     fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo;
 
-    fn aptos_public_info_for_node(&mut self, idx: usize) -> AptosPublicInfo {
-        self.chain_info_for_node(idx).into_aptos_public_info()
+    fn velor_public_info_for_node(&mut self, idx: usize) -> VelorPublicInfo {
+        self.chain_info_for_node(idx).into_velor_public_info()
     }
 
     fn get_default_pfn_node_config(&self) -> NodeConfig;

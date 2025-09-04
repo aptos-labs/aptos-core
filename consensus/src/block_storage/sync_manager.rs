@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -25,7 +25,7 @@ use crate::{
     util::calculate_window_start_round,
 };
 use anyhow::{anyhow, bail, ensure, Context};
-use aptos_consensus_types::{
+use velor_consensus_types::{
     block::Block,
     block_retrieval::{
         BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalRequestV2,
@@ -37,10 +37,10 @@ use aptos_consensus_types::{
     sync_info::SyncInfo,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
-use aptos_crypto::HashValue;
-use aptos_infallible::Mutex;
-use aptos_logger::prelude::*;
-use aptos_types::{
+use velor_crypto::HashValue;
+use velor_infallible::Mutex;
+use velor_logger::prelude::*;
+use velor_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
 };

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -13,13 +13,13 @@ use crate::{
     round_manager::VerifiedEvent,
 };
 use anyhow::{anyhow, ensure, Context, Result};
-use aptos_channels::aptos_channel;
-use aptos_consensus_types::{
+use velor_channels::velor_channel;
+use velor_consensus_types::{
     common::Author, proposal_msg::ProposalMsg, sync_info::SyncInfo, vote_msg::VoteMsg,
 };
-use aptos_infallible::Mutex;
-use aptos_logger::prelude::*;
-use aptos_types::{block_info::Round, epoch_state::EpochState};
+use velor_infallible::Mutex;
+use velor_logger::prelude::*;
+use velor_types::{block_info::Round, epoch_state::EpochState};
 use futures::{FutureExt, StreamExt};
 use futures_channel::oneshot;
 use std::{mem::Discriminant, process, sync::Arc};
@@ -118,7 +118,7 @@ impl RecoveryManager {
 
     pub async fn start(
         mut self,
-        mut event_rx: aptos_channel::Receiver<
+        mut event_rx: velor_channel::Receiver<
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
         >,

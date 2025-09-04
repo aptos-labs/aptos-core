@@ -1,15 +1,15 @@
 # Cloud provider
 cloud: EKS
 
-# -- Default image tag to use for all aptos images
+# -- Default image tag to use for all velor images
 imageTag: devnet
 
 genesis:
-  # -- Validator username prefix, used to get genesis secrets. This should be the fullname for the aptos-node helm release
-  username_prefix: aptos-node
+  # -- Validator username prefix, used to get genesis secrets. This should be the fullname for the velor-node helm release
+  username_prefix: velor-node
   # -- Number of validators deployed in this testnet
   numValidators:
-  # -- Aptos Chain ID
+  # -- Velor Chain ID
   chain_id:
 
 waypoint:

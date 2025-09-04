@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This file contains logic for checking a node, common to both VFNs and PFNs.
@@ -6,9 +6,9 @@
 //! VFN information on chain or PFN information from a file, and has converted
 //! it into a common format that these functions can ingest.
 
-use aptos_logger::{debug, info};
-use aptos_node_checker_lib::CheckSummary;
-use aptos_sdk::{
+use velor_logger::{debug, info};
+use velor_node_checker_lib::CheckSummary;
+use velor_sdk::{
     crypto::{x25519, ValidCryptoMaterialStringExt},
     types::account_address::AccountAddress,
 };

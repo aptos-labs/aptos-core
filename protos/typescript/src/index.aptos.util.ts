@@ -1,3 +1,3 @@
 /* eslint-disable */
 
-export * as timestamp from "./index.aptos.util.timestamp";
+export * as timestamp from "./index.velor.util.timestamp";

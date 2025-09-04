@@ -1,16 +1,16 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "aptos-fullnode.fullname" . }}-lb
+  name: {{ include "velor-fullnode.fullname" . }}-lb
   labels:
-    {{- include "aptos-fullnode.labels" . | nindent 4 }}
+    {{- include "velor-fullnode.labels" . | nindent 4 }}
   {{- with .Values.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
   selector:
-    {{- include "aptos-fullnode.selectorLabels" . | nindent 4 }}
+    {{- include "velor-fullnode.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: fullnode
   ports:
   {{- if .Values.service.exposeApi }}
@@ -28,7 +28,7 @@ spec:
     port: 9102
     targetPort: 9102
   {{- end }}
-  - name: aptosnet
+  - name: velornet
     port: 6182
   {{- with .Values.service }}
   type: {{ .type }}
@@ -42,12 +42,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "aptos-fullnode.fullname" . }}
+  name: {{ include "velor-fullnode.fullname" . }}
   labels:
-    {{- include "aptos-fullnode.labels" . | nindent 4 }}
+    {{- include "velor-fullnode.labels" . | nindent 4 }}
 spec:
   selector:
-    {{- include "aptos-fullnode.selectorLabels" . | nindent 4 }}
+    {{- include "velor-fullnode.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: fullnode
   ports:
   - name: backup

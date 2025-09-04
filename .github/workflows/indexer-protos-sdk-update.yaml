@@ -5,7 +5,7 @@ name: Checks the proto changes and release
     branches:
       - main
     paths:
-      - protos/proto/aptos/transaction/v1/transaction.proto
+      - protos/proto/velor/transaction/v1/transaction.proto
 
 jobs:
   check-protos:
@@ -72,7 +72,7 @@ jobs:
       - name: Check the format of the proto files
         run: |
           set -e
-          buf format -d aptos/transaction/v1/transaction.proto --exit-code
+          buf format -d velor/transaction/v1/transaction.proto --exit-code
         working-directory: protos/proto
       - name: Capture the commit hash
         id: commit_hash
@@ -93,13 +93,13 @@ jobs:
         uses: 'google-github-actions/get-secretmanager-secrets@v2'
         with:
           secrets: |-
-            token:aptos-ci/github-actions-repository-dispatch
+            token:velor-ci/github-actions-repository-dispatch
 
       - name: Dispatch Event to SDK Repo
         uses: peter-evans/repository-dispatch@v3.0.0
         with:
           token: ${{ steps.secrets.outputs.token }}
-          repository: 'aptos-labs/aptos-indexer-processor-sdk'
+          repository: 'velor-chain/velor-indexer-processor-sdk'
           event-type: 'proto-dependency-update'
           client-payload: '{"commit_hash": "${{ github.sha }}", "branch_name": "${{ steps.commit_hash.outputs.branch_name }}"}'
       - name: Poll for Workflow Run and Wait for Job Completion
@@ -107,7 +107,7 @@ jobs:
           . scripts/indexer_proto_update_status_poll.sh
         env:
           PAT_TOKEN: ${{ steps.secrets.outputs.token }}
-          TARGET_BRANCH: ${{ steps.commit_hash.outputs.branch_name }}-update-aptos-protos-update-sdk
+          TARGET_BRANCH: ${{ steps.commit_hash.outputs.branch_name }}-update-velor-protos-update-sdk
       # TOOD: enable this once the forge test is stable.
       # - name: Run Forge Tests
       #   uses: ./.github/workflows/workflow-run-forge

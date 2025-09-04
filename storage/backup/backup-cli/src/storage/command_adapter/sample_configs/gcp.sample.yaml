@@ -1,6 +1,6 @@
 env_vars:
   - key: "BUCKET"
-    value: "aptos-backup/backup1"
+    value: "velor-backup/backup1"
   - key: "SUB_DIR"
     value: "e1"
 commands:

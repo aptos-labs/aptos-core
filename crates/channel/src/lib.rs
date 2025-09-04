@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,12 +9,12 @@
 //! queued items. While there is only one [`Receiver`], there can be
 //! many [`Sender`]s, which are also cheap to clone.
 //!
-//! This channel differs from our other channel implementation, [`aptos_channel`],
+//! This channel differs from our other channel implementation, [`velor_channel`],
 //! in that it is just a single queue (vs. different queues for different keys)
 //! with backpressure (senders will block if the queue is full instead of evicting
 //! another item in the queue) that only implements FIFO (vs. LIFO or KLAST).
 
-use aptos_metrics_core::IntGauge;
+use velor_metrics_core::IntGauge;
 use futures::{
     channel::mpsc,
     sink::Sink,
@@ -26,9 +26,9 @@ use std::pin::Pin;
 #[cfg(test)]
 mod test;
 
-pub mod aptos_channel;
+pub mod velor_channel;
 #[cfg(test)]
-mod aptos_channel_test;
+mod velor_channel_test;
 
 pub mod message_queues;
 #[cfg(test)]

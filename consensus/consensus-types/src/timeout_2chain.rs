@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{common::Author, quorum_cert::QuorumCert};
 use anyhow::ensure;
-use aptos_crypto::{bls12381, CryptoMaterialError};
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::{
+use velor_crypto::{bls12381, CryptoMaterialError};
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_types::{
     account_address::AccountAddress,
     aggregate_signature::{AggregateSignature, PartialSignatures},
     block_info::Round,
@@ -21,7 +21,7 @@ use std::{
 };
 
 /// This structure contains all the information necessary to construct a signature
-/// on the equivalent of a AptosBFT v4 timeout message.
+/// on the equivalent of a VelorBFT v4 timeout message.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TwoChainTimeout {
     /// Epoch number corresponds to the set of validators that are active for this round.
@@ -104,7 +104,7 @@ pub struct TimeoutSigningRepr {
 }
 
 /// TimeoutCertificate is a proof that 2f+1 participants in epoch i
-/// have voted in round r and we can now move to round r+1. AptosBFT v4 requires signature to sign on
+/// have voted in round r and we can now move to round r+1. VelorBFT v4 requires signature to sign on
 /// the TimeoutSigningRepr and carry the TimeoutWithHighestQC with highest quorum cert among 2f+1.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct TwoChainTimeoutCertificate {
@@ -403,13 +403,13 @@ mod tests {
         quorum_cert::QuorumCert,
         timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
     };
-    use aptos_crypto::bls12381;
+    use velor_crypto::bls12381;
 
     #[test]
     fn test_2chain_timeout_certificate() {
         use crate::vote_data::VoteData;
-        use aptos_crypto::hash::CryptoHash;
-        use aptos_types::{
+        use velor_crypto::hash::CryptoHash;
+        use velor_types::{
             aggregate_signature::PartialSignatures,
             block_info::BlockInfo,
             ledger_info::{LedgerInfo, LedgerInfoWithVerifiedSignatures},

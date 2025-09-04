@@ -1,0 +1,9 @@
+[package]
+name = "VelorExperimental"
+version = "1.0.0"
+
+[addresses]
+velor_experimental = "0x7"
+
+[dependencies]
+VelorFramework = { local = "../velor-framework" }

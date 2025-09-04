@@ -1,16 +1,16 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::TIMER;
-use aptos_block_executor::counters::{
+use velor_block_executor::counters::{
     self as block_executor_counters, GasType, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK,
 };
-use aptos_executor::metrics::{
+use velor_executor::metrics::{
     COMMIT_BLOCKS, GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING, OTHER_TIMERS,
     PROCESSED_TXNS_OUTPUT_SIZE, UPDATE_LEDGER,
 };
-use aptos_logger::info;
-use aptos_metrics_core::Histogram;
+use velor_logger::info;
+use velor_metrics_core::Histogram;
 use move_core_types::language_storage::StructTag;
 use std::{
     collections::{BTreeMap, HashMap},

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -11,12 +11,12 @@ use crate::{
     thread::ThreadService,
     SafetyRules, TSafetyRules,
 };
-use aptos_config::config::{InitialSafetyRulesConfig, SafetyRulesConfig, SafetyRulesService};
-use aptos_crypto::bls12381::PublicKey;
-use aptos_global_constants::CONSENSUS_KEY;
-use aptos_infallible::RwLock;
-use aptos_logger::{info, warn};
-use aptos_secure_storage::{KVStorage, Storage};
+use velor_config::config::{InitialSafetyRulesConfig, SafetyRulesConfig, SafetyRulesService};
+use velor_crypto::bls12381::PublicKey;
+use velor_global_constants::CONSENSUS_KEY;
+use velor_infallible::RwLock;
+use velor_logger::{info, warn};
+use velor_secure_storage::{KVStorage, Storage};
 use std::{net::SocketAddr, sync::Arc, time::Instant};
 
 pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {

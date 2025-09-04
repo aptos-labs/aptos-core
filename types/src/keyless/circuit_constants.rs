@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! These constants are from commit 125522b4b226f8ece3e3162cecfefe915d13bc30 of keyless-circuit.
@@ -7,7 +7,7 @@ use crate::keyless::{
     bn254_circom::{g1_projective_str_to_affine, g2_projective_str_to_affine},
     proof_simulation::{Groth16SimulatorBn254, Trapdoor},
 };
-use aptos_crypto::poseidon_bn254;
+use velor_crypto::poseidon_bn254;
 use ark_bn254::Bn254;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use once_cell::sync::Lazy;
@@ -26,7 +26,7 @@ pub(crate) const MAX_COMMITED_EPK_BYTES: u16 =
     3 * poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR as u16;
 
 /// This function uses the decimal uncompressed point serialization which is outputted by circom.
-/// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
+/// https://github.com/velor-chain/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub fn prepared_vk_for_testing() -> PreparedVerifyingKey<Bn254> {
     // Convert the projective points to affine.
     let alpha_g1 = g1_projective_str_to_affine(

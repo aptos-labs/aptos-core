@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -19,25 +19,25 @@ use crate::{
     },
     MempoolEventsReceiver, QuorumStoreRequest,
 };
-use aptos_bounded_executor::BoundedExecutor;
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_event_notifications::ReconfigNotificationListener;
-use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::prelude::*;
-use aptos_mempool_notifications::{MempoolCommitNotification, MempoolNotificationListener};
-use aptos_network::{
+use velor_bounded_executor::BoundedExecutor;
+use velor_config::network_id::{NetworkId, PeerNetworkId};
+use velor_event_notifications::ReconfigNotificationListener;
+use velor_infallible::{Mutex, RwLock};
+use velor_logger::prelude::*;
+use velor_mempool_notifications::{MempoolCommitNotification, MempoolNotificationListener};
+use velor_network::{
     application::{
         interface::{NetworkClientInterface, NetworkServiceEvents},
         storage::PeersAndMetadata,
     },
     protocols::network::Event,
 };
-use aptos_types::{
+use velor_types::{
     on_chain_config::{OnChainConfigPayload, OnChainConfigProvider},
     transaction::SignedTransaction,
     PeerId,
 };
-use aptos_vm_validator::vm_validator::TransactionValidation;
+use velor_vm_validator::vm_validator::TransactionValidation;
 use futures::{
     channel::mpsc,
     stream::{select_all, FuturesUnordered},

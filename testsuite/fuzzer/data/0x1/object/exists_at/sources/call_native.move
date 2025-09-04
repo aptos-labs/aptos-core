@@ -1,5 +1,5 @@
 module poc::exists_at {
-    use aptos_framework::object::{Self, Object};
+    use velor_framework::object::{Self, Object};
     use std::signer;
 
     struct MyObject has key {

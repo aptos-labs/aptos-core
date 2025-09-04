@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -16,7 +16,7 @@
 use super::ensure_slice_len_eq;
 use crate::define_schema;
 use anyhow::{format_err, Result};
-use aptos_schemadb::{
+use velor_schemadb::{
     schema::{KeyCodec, ValueCodec},
     ColumnFamilyName,
 };

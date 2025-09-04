@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -27,14 +27,14 @@ use crate::{
         Epoch, GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, StreamRequest,
     },
 };
-use aptos_config::config::DataStreamingServiceConfig;
-use aptos_data_client::{
+use velor_config::config::DataStreamingServiceConfig;
+use velor_data_client::{
     global_summary::{AdvertisedData, GlobalDataSummary},
     interface::ResponsePayload,
 };
-use aptos_id_generator::{IdGenerator, U64IdGenerator};
-use aptos_logger::prelude::*;
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
+use velor_id_generator::{IdGenerator, U64IdGenerator};
+use velor_logger::prelude::*;
+use velor_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use enum_dispatch::enum_dispatch;
 use std::{cmp, cmp::min, sync::Arc};
 
@@ -69,7 +69,7 @@ macro_rules! invalid_stream_request {
 #[enum_dispatch]
 pub trait DataStreamEngine {
     /// Creates a batch of data client requests that can be sent to the
-    /// Aptos data client to progress the stream. The number of requests
+    /// Velor data client to progress the stream. The number of requests
     /// created is bound by the `max_number_of_requests`.
     fn create_data_client_requests(
         &mut self,
@@ -95,7 +95,7 @@ pub trait DataStreamEngine {
     fn notify_new_data_request_error(
         &mut self,
         client_request: &DataClientRequest,
-        request_error: aptos_data_client::error::Error,
+        request_error: velor_data_client::error::Error,
     ) -> Result<(), Error> {
         Err(Error::UnexpectedErrorEncountered(format!(
             "Received a new data request error notification but no request was sent! Reported error: {:?}, request: {:?}",
@@ -268,7 +268,7 @@ impl DataStreamEngine for StateStreamEngine {
 
         // Otherwise, we need to request the number of states
         info!(
-            (LogSchema::new(LogEntry::AptosDataClient)
+            (LogSchema::new(LogEntry::VelorDataClient)
                 .event(LogEvent::Pending)
                 .message(&format!(
                     "Requested the number of states at version: {:?}",
@@ -321,7 +321,7 @@ impl DataStreamEngine for StateStreamEngine {
                     ResponsePayload::StateValuesWithProof(state_values_with_proof) => {
                         // Verify that we received at least one state value
                         if state_values_with_proof.raw_values.is_empty() {
-                            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                            return Err(Error::VelorDataClientResponseIsInvalid(format!(
                                 "Received an empty state values response! Request: {:?}",
                                 client_request
                             )));
@@ -526,7 +526,7 @@ impl ContinuousTransactionStreamEngine {
             _ => invalid_response_type!(client_response_payload),
         };
         if num_received_versions == 0 {
-            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+            return Err(Error::VelorDataClientResponseIsInvalid(format!(
                 "Received an empty continuous data response! Request: {:?}",
                 self.request
             )));
@@ -810,7 +810,7 @@ impl ContinuousTransactionStreamEngine {
                 },
                 response_payload => {
                     // TODO(joshlind): eventually we want to notify the data client of the bad response
-                    Err(Error::AptosDataClientResponseIsInvalid(format!(
+                    Err(Error::VelorDataClientResponseIsInvalid(format!(
                         "Received an incorrect number of epoch ending ledger infos. Response: {:?}",
                         response_payload
                     )))
@@ -818,7 +818,7 @@ impl ContinuousTransactionStreamEngine {
             }
         } else {
             // TODO(joshlind): eventually we want to notify the data client of the bad response
-            Err(Error::AptosDataClientResponseIsInvalid(format!(
+            Err(Error::VelorDataClientResponseIsInvalid(format!(
                 "Expected an epoch ending ledger response but got: {:?}",
                 response_payload
             )))
@@ -839,7 +839,7 @@ impl ContinuousTransactionStreamEngine {
     fn handle_optimistic_fetch_error(
         &mut self,
         client_request: &DataClientRequest,
-        request_error: aptos_data_client::error::Error,
+        request_error: velor_data_client::error::Error,
     ) -> Result<(), Error> {
         // We should only receive an error notification if we sent an optimistic fetch request
         if !self.optimistic_fetch_requested {
@@ -906,7 +906,7 @@ impl ContinuousTransactionStreamEngine {
     fn handle_subscription_error(
         &mut self,
         client_request: &DataClientRequest,
-        request_error: aptos_data_client::error::Error,
+        request_error: velor_data_client::error::Error,
     ) -> Result<(), Error> {
         // We should only receive an error notification if we have an active stream
         if self.active_subscription_stream.is_none() {
@@ -1161,7 +1161,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                 if target_ledger_info.ledger_info().epoch() > next_request_epoch {
                     // There was an epoch change. Request an epoch ending ledger info.
                     info!(
-                        (LogSchema::new(LogEntry::AptosDataClient)
+                        (LogSchema::new(LogEntry::VelorDataClient)
                             .event(LogEvent::Pending)
                             .message(&format!(
                                 "Requested an epoch ending ledger info for epoch: {:?}",
@@ -1284,7 +1284,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
     fn notify_new_data_request_error(
         &mut self,
         client_request: &DataClientRequest,
-        request_error: aptos_data_client::error::Error,
+        request_error: velor_data_client::error::Error,
     ) -> Result<(), Error> {
         // If subscription streaming is enabled, the timeout should be for
         // subscription data. Otherwise, it should be for optimistic fetch data.
@@ -1573,7 +1573,7 @@ impl DataStreamEngine for EpochEndingStreamEngine {
                     ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
                         // Verify that we received at least one ledger info
                         if ledger_infos.is_empty() {
-                            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                            return Err(Error::VelorDataClientResponseIsInvalid(format!(
                                 "Received an empty epoch ending ledger info response! Request: {:?}",
                                 client_request
                             )));
@@ -1682,7 +1682,7 @@ impl TransactionStreamEngine {
             _ => invalid_response_type!(client_response_payload),
         };
         if num_received_versions == 0 {
-            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+            return Err(Error::VelorDataClientResponseIsInvalid(format!(
                 "Received an empty response! Request: {:?}",
                 self.request
             )));
@@ -2255,7 +2255,7 @@ fn extract_new_versions_and_target(
         ),
         response_payload => {
             // TODO(joshlind): eventually we want to notify the data client of the bad response
-            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+            return Err(Error::VelorDataClientResponseIsInvalid(format!(
                 "Expected new transactions or outputs but got: {:?}",
                 response_payload
             )));
@@ -2265,7 +2265,7 @@ fn extract_new_versions_and_target(
     // Ensure that we have at least one data item
     if num_versions == 0 {
         // TODO(joshlind): eventually we want to notify the data client of the bad response
-        return Err(Error::AptosDataClientResponseIsInvalid(
+        return Err(Error::VelorDataClientResponseIsInvalid(
             "Received an empty transaction or output list!".into(),
         ));
     }

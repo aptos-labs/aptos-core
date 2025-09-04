@@ -1,0 +1,49 @@
+[package]
+name = "velor-telemetry"
+description = "Velor utilities to collect observability data from a node and send it to a remote destination"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-api = { workspace = true }
+velor-config = { workspace = true }
+velor-consensus = { workspace = true }
+velor-crypto = { workspace = true }
+velor-db = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-mempool = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-network = { workspace = true }
+velor-node-resource-metrics = { workspace = true }
+velor-runtimes = { workspace = true }
+velor-state-sync-driver = { workspace = true }
+velor-telemetry-service = { workspace = true }
+velor-types = { workspace = true }
+flate2 = { workspace = true }
+futures = { workspace = true }
+once_cell = { workspace = true }
+prometheus = { workspace = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+reqwest = { workspace = true }
+reqwest-middleware = { workspace = true }
+reqwest-retry = { workspace = true }
+serde_json = { workspace = true }
+sysinfo = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+httpmock = { workspace = true }

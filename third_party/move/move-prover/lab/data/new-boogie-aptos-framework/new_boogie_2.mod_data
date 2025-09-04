@@ -10,8 +10,8 @@
 0x1::aggregator_factory                           683           ok
 0x1::optional_aggregator                         1225           ok
 0x1::coin                                        2662           ok
-0x1::aptos_coin                                  1007           ok
-0x1::aptos_account                               2438           ok
+0x1::velor_coin                                  1007           ok
+0x1::velor_account                               2438           ok
 0x1::transaction_context                          671           ok
 0x1::chain_status                                 962           ok
 0x1::timestamp                                    891           ok
@@ -23,7 +23,7 @@
 0x1::storage_gas                                 3541           ok
 0x1::reconfiguration                            19691           ok
 0x1::governance_proposal                          643           ok
-0x1::aptos_governance                           65225           ok
+0x1::velor_governance                           65225           ok
 0x1::block                                      61399           ok
 0x1::util                                         628           ok
 0x1::code                                        1232           ok

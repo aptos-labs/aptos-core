@@ -1,0 +1,206 @@
+chain:
+  # -- Internal: name of the testnet to connect to
+  name: testnet
+  # -- Bump this number to wipe the underlying storage
+  era: 1
+  # -- Chain ID
+  chain_id: 4
+
+# -- Default image tag to use for all validator and fullnode images
+imageTag: devnet
+
+# -- Number of validators to deploy
+numValidators: 1
+# -- Total number of fullnode groups to deploy
+numFullnodeGroups: 1
+
+# -- Options for multicluster mode. This is *experimental only*.
+multicluster:
+  enabled: false
+  targetClusters: ["forge-multiregion-1", "forge-multiregion-2", "forge-multiregion-3"]
+
+# -- Specify validator and fullnode NodeConfigs via named ConfigMaps, rather than the generated ones from this chart.
+overrideNodeConfig: false
+
+# -- If true, helm will always override the deployed image with what is configured in the helm values. If not, helm will take the latest image from the currently running workloads, which is useful if you have a separate procedure to update images (e.g. rollout)
+manageImages: true
+
+haproxy:
+  # -- Enable HAProxy deployment in front of validator and fullnodes
+  enabled: true
+  # -- Number of HAProxy replicas
+  replicas: 1
+  image:
+    # -- Image repo to use for HAProxy images
+    repo: haproxy
+    # -- Image tag to use for HAProxy images
+    tag: 3.0.2@sha256:3fa2e323a2f422239a39eff345b41ab20a7a91aa4ad8c3c82b9ae85dd241214b
+    # -- Image pull policy to use for HAProxy images
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 7
+      memory: 16Gi
+    requests:
+      cpu: 7
+      memory: 16Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  config:
+    # -- Whether to send Proxy Protocol v2
+    send_proxy_protocol: &send_proxy_protocol false
+    # -- System user to run HA
+    user: nobody
+  # -- Name of the Kubernetes TLS secret to use for HAProxy
+  tls_secret:
+
+validator:
+  # -- Internal: name of your validator for use in labels
+  name:
+  image:
+    # -- Image repo to use for validator images
+    repo: velorlabs/validator
+    # -- Image tag to use for validator images. If set, overrides `imageTag`
+    tag:
+    # -- Image pull policy to use for validator images
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 30
+      memory: 60Gi
+    requests:
+      cpu: 30
+      memory: 60Gi
+  storage:
+    # -- Kubernetes storage class to use for validator persistent storage
+    class:
+    # -- Size of validator persistent storage
+    size: 2048Gi
+  # -- Log level for the validator
+  rust_log: info
+  # -- Flag to force enable telemetry service (useful for forge tests)
+  force_enable_telemetry: false
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  # -- Validator configuration. See NodeConfig https://github.com/velor-chain/velor-core/blob/main/config/src/config/mod.rs
+  config: {}
+  # -- DEPRECATED: it's broken with Cillium a.k.a. GKE DataplaneV2.
+  # -- templates/networkpolicy.yaml kept around for reference in case we want to resurrect it.
+  # -- Lock down network ingress and egress with Kubernetes NetworkPolicy
+  enableNetworkPolicy: false
+  podAnnotations:
+    # Determines which log levels are retained by the Vector pipeline
+    # velor.dev/min-log-level-to-retain: warn
+  useConsensusHealthCheckAsStartupProbe: false # once https://github.com/velor-chain/velor-core/pull/15512 is rolled out to all networks (at the time of writing (dec 21 2024) it's only in devnet) we can remove this flag and always add this probe
+
+fullnode:
+  # -- Specify fullnode groups by `name` and number of `replicas`
+  groups:
+    - name: fullnode
+      dns_name: vfn
+      replicas: 1
+  resources:
+    limits:
+      cpu: 30
+      memory: 60Gi
+    requests:
+      cpu: 30
+      memory: 60Gi
+  storage:
+    # -- Kubernetes storage class to use for fullnode persistent storage
+    class:
+    # -- Size of fullnode persistent storage
+    size: 2048Gi
+  # -- Log level for the fullnode
+  rust_log: info
+  # -- Flag to force enable telemetry service (useful for forge tests)
+  force_enable_telemetry: false
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  # -- Fullnode configuration. See NodeConfig https://github.com/velor-chain/velor-core/blob/main/config/src/config/mod.rs
+  config:
+    # This full_node_networks config block allows changing only the below parameters for public fullnode networks
+    # The rest of the configs are inherited from fullnode-base.yaml
+    # Arrays in helm are immutable, so we fall back to string templating
+    full_node_networks:
+      # The first item in the array `full_node_networks` must always refer to the public fullnode network
+      - network_id: "public"
+  podAnnotations:
+    # Determines which log levels are retained by the Vector pipeline
+    # velor.dev/min-log-level-to-retain: warn
+
+service:
+  # -- If set, the base domain name to use for External DNS
+  domain:
+  # -- If set, the base domain name to use for internal LBs
+  internalDomain:
+  validator:
+    external:
+      # -- The Kubernetes ServiceType to use for validator's HAProxy
+      type: LoadBalancer
+    internal:
+      # -- The Kubernetes ServiceType to use for validator
+      type: ClusterIP
+      headless: false
+      annotations: {}
+    # -- The externalTrafficPolicy for the validator service
+    externalTrafficPolicy: Local
+    # -- If set and if the ServiceType is LoadBalancer, allow traffic to validators from these CIDRs
+    loadBalancerSourceRanges:
+    # -- Enable the REST API on the validator
+    enableRestApi: true
+    # -- Enable the metrics port on the validator
+    enableMetricsPort: false
+    # -- Enable the admin port on the validator
+    enableAdminPort: false
+  fullnode:
+    external:
+      # -- The Kubernetes ServiceType to use for fullnodes' HAProxy
+      type: LoadBalancer
+    internal:
+      # -- The Kubernetes ServiceType to use for fullnodes
+      type: ClusterIP
+      headless: false
+      annotations: {}
+    # -- The externalTrafficPolicy for the fullnode service
+    externalTrafficPolicy: Local
+    # -- If set and if the ServiceType is LoadBalancer, allow traffic to fullnodes from these CIDRs
+    loadBalancerSourceRanges:
+    # -- Enable the REST API on fullnodes
+    enableRestApi: true
+    # -- Enable the metrics port on fullnodes
+    enableMetricsPort: false
+    # -- Enable the admin port on fullnodes
+    enableAdminPort: false
+
+serviceAccount:
+  # -- Specifies whether a service account should be created
+  create: true
+  # -- The name of the service account to use. If not set and create is true, a name is generated using the fullname template
+  name:
+
+metrics:
+  # -- The upstream sink for metrics. Supported values are "dev" and "prod"
+  destination: dev
+
+# -- Load test-data for starting a test network
+loadTestGenesis: false
+
+# -- TEST ONLY: Enable running as root for profiling
+enablePrivilegedMode: false
+
+genesis_blob_upload_url: https://us-west1-velor-forge-gcp-0.cloudfunctions.net/signed-url?cluster_name=unknown&era=1
+cluster_name: unknown
+
+# Additional labels
+labels:
+
+# Infra migrations
+migrations:
+  # -- Explicitly define a PVC for VFNs.
+  # -- See templates/fullnode.yaml
+  enable_vfn_explicit_pvc: false

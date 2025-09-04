@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
@@ -8,7 +8,7 @@ datatest_stable::harness!(
     parse_framework_manifests,
     {
         Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../../aptos-move/framework")
+            .join("../../../../velor-move/framework")
             .display()
     },
     r"\bMove\.toml$"

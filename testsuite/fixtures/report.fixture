@@ -37,7 +37,7 @@ Test Ok
 }
 ====json-report-end===
 {"level":"INFO","source":{"package":"forge","file":"testsuite/forge/src/backend/k8s/cluster_helper.rs:260"},"thread_name":"main","hostname":"forge-shadow-1661918266-914372dc19fd1da295423c6abb75e61dced1339","timestamp":"2022-08-31T04:04:13.377504Z","message":"Deleting namespace forge-shadow: Some(NamespaceStatus { phase: Some(\"Terminating\") })"}
-{"level":"INFO","source":{"package":"forge","file":"testsuite/forge/src/backend/k8s/cluster_helper.rs:368"},"thread_name":"main","hostname":"forge-shadow-1661918266-914372dc19fd1da295423c6abb75e61dced1339","timestamp":"2022-08-31T04:04:13.377526Z","message":"aptos-node resources for Forge removed in namespace: forge-shadow"}
+{"level":"INFO","source":{"package":"forge","file":"testsuite/forge/src/backend/k8s/cluster_helper.rs:368"},"thread_name":"main","hostname":"forge-shadow-1661918266-914372dc19fd1da295423c6abb75e61dced1339","timestamp":"2022-08-31T04:04:13.377526Z","message":"velor-node resources for Forge removed in namespace: forge-shadow"}
 
 test result: ok. 1 passed; 0 failed; 0 filtered out
 

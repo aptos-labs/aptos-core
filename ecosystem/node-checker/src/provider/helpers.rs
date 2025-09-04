@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub const MISSING_PROVIDER_MESSAGE: &str = "Incomplete request";
@@ -11,7 +11,7 @@ pub const MISSING_PROVIDER_MESSAGE: &str = "Incomplete request";
 ///
 /// ```ignore
 /// # use std::io;
-/// let target_metrics_provider = aptos_node_checker_lib::get_provider!(
+/// let target_metrics_provider = velor_node_checker_lib::get_provider!(
 ///     input.target_metrics_provider,
 ///     true,
 ///     MetricsProvider

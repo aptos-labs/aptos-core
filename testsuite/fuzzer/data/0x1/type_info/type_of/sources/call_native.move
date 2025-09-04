@@ -1,6 +1,6 @@
 module poc::type_of {
-   use aptos_std::type_info;
-   use aptos_std::table::Table;
+   use velor_std::type_info;
+   use velor_std::table::Table;
 
 
    struct TestStruct has copy, drop, store {

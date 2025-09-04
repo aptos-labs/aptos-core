@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,13 +8,13 @@ use crate::{
     },
     EmitModeParams,
 };
-use aptos_logger::{sample, sample::SampleRate};
-use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{
+use velor_logger::{sample, sample::SampleRate};
+use velor_rest_client::Client as RestClient;
+use velor_sdk::{
     move_types::account_address::AccountAddress,
     types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount},
 };
-use aptos_transaction_generator_lib::TransactionGenerator;
+use velor_transaction_generator_lib::TransactionGenerator;
 use core::{
     cmp::{max, min},
     result::Result::{Err, Ok},

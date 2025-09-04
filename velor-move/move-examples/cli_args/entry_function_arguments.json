@@ -1,0 +1,43 @@
+{
+    "function_id": "<test_account>::cli_args::set_vals",
+    "type_args": [
+        "0x1::account::Account",
+        "0x1::chain_id::ChainId"
+    ],
+    "args": [
+        {
+            "type": "u8",
+            "value": 123
+        },
+        {
+            "type": "hex",
+            "value": "0x1234"
+        },
+        {
+            "type": "string",
+            "value": "hello, world! ♥"
+        },
+        {
+            "type": "bool",
+            "value": [
+                false,
+                true,
+                false,
+                false
+            ]
+        },
+        {
+            "type": "address",
+            "value": [
+                [
+                    "0xace",
+                    "0xbee"
+                ],
+                [
+                    "0xcad"
+                ],
+                []
+            ]
+        }
+    ]
+}

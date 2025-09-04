@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::{
@@ -6,14 +6,14 @@ use crate::tests::{
     mock::{MockClient, MockDatabaseReader},
     utils,
 };
-use aptos_config::config::StorageServiceConfig;
-use aptos_crypto::hash::HashValue;
-use aptos_storage_service_types::{
+use velor_config::config::StorageServiceConfig;
+use velor_crypto::hash::HashValue;
+use velor_storage_service_types::{
     requests::{DataRequest, StateValuesWithProofRequest},
     responses::{DataResponse, StorageServiceResponse},
     StorageServiceError,
 };
-use aptos_types::{
+use velor_types::{
     proof::definition::SparseMerkleRangeProof,
     state_store::{
         state_key::StateKey,

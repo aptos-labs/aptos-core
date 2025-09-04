@@ -1,12 +1,12 @@
 {
-  "name": "aptos-node-checker-client",
-  "description": "Generated client for the Aptos Node Health Checker",
+  "name": "velor-node-checker-client",
+  "description": "Generated client for the Velor Node Health Checker",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=11.0.0"
   },
   "main": "./dist/index.js",
-  "module": "./dist/aptos.esm.js",
+  "module": "./dist/velor.esm.js",
   "types": "./dist/index.d.ts",
   "scripts": {
     "prepack": "tsup",
@@ -17,16 +17,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/aptos-labs/aptos-core.git"
+    "url": "https://github.com/velor-chain/velor-core.git"
   },
-  "homepage": "https://github.com/aptos-labs/aptos-core",
+  "homepage": "https://github.com/velor-chain/velor-core",
   "bugs": {
-    "url": "https://github.com/aptos-labs/aptos-core/issues"
+    "url": "https://github.com/velor-chain/velor-core/issues"
   },
-  "author": "aptoslabs.com",
+  "author": "velorlabs.com",
   "keywords": [
-    "Aptos",
-    "Aptos Labs",
+    "Velor",
+    "Velor Labs",
     "Node Health Checker"
   ],
   "dependencies": {
@@ -41,7 +41,7 @@
     "dotenv": "16.0.3",
     "eslint": "^8.29.0",
     "jest": "29.3.1",
-    "openapi-typescript-codegen": "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0-p1/openapi-typescript-codegen-v0.24.0-p1.tgz",
+    "openapi-typescript-codegen": "https://github.com/velor-chain/openapi-typescript-codegen/releases/download/v0.24.0-p1/openapi-typescript-codegen-v0.24.0-p1.tgz",
     "ts-jest": "29.0.3",
     "ts-loader": "9.4.2",
     "ts-node": "10.9.1",

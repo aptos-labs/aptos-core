@@ -1,8 +1,8 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction_shuffler::TransactionShuffler;
-use aptos_types::transaction::{
+use velor_types::transaction::{
     signature_verified_transaction::SignatureVerifiedTransaction, use_case::UseCaseKey,
     SignedTransaction,
 };
@@ -46,7 +46,7 @@ pub struct UseCaseAwareShuffler {
 #[cfg(feature = "fuzzing")]
 impl UseCaseAwareShuffler {
     pub fn shuffle_generic<
-        Txn: aptos_types::transaction::use_case::UseCaseAwareTransaction + Debug,
+        Txn: velor_types::transaction::use_case::UseCaseAwareTransaction + Debug,
     >(
         &self,
         txns: Vec<Txn>,

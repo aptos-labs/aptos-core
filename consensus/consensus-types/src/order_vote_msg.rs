@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{common::Author, order_vote::OrderVote, quorum_cert::QuorumCert};
 use anyhow::{ensure, Context};
-use aptos_types::validator_verifier::ValidatorVerifier;
+use velor_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 

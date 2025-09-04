@@ -88,7 +88,7 @@ implement the same user flows and API calls in the example.
 ## Additional Testing
 
 If you wish to test the `v0/verify` API endpoint of the Pepper Service, you can do so manually.
-Since this endpoint requires fetching blockchain resources from an Aptos fullnode, you will
+Since this endpoint requires fetching blockchain resources from an Velor fullnode, you will
 need to set up a mock HTTP server to serve the following two resources:
 1. `0x1::keyless_account::Groth16VerificationKey`: This is the verification key for the Groth16 proof.
 2. `0x1::keyless_account::Configuration`: This is the configuration for the keyless account.
@@ -102,10 +102,10 @@ export ONCHAIN_KEYLESS_CONFIG_URL=http://localhost:4444/keyless_config.json
 ```
 
 The export commands above will override the default location where the Pepper Service fetches these resources
-(i.e., instead of connecting to an Aptos fullnode, it will connect to the service running on localhost at
+(i.e., instead of connecting to an Velor fullnode, it will connect to the service running on localhost at
 port `4444`, which will be the mock HTTP server we deploy below.)
 
-To verify that the resources have not yet been fetched from the mocked Aptos node and cached by the pepper service,
+To verify that the resources have not yet been fetched from the mocked Velor node and cached by the pepper service,
 ensure the following curl commands return a 404:
 
 ```bash
@@ -115,7 +115,7 @@ curl -v http://localhost:8000/cached/keyless-config
 
 These commands will connect to the Pepper Service (running on port `8000`) and attempt to fetch the cached resources.
 
-Next, to mock an Aptos fullnode, run a naive HTTP server to serve the resources to the Pepper Service:
+Next, to mock an Velor fullnode, run a naive HTTP server to serve the resources to the Pepper Service:
 ```bash
 cd keyless/pepper/service/resources
 python3 -m http.server 4444

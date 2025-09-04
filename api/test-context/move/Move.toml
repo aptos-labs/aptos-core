@@ -6,4 +6,4 @@ version = "0.0.0"
 entry_func_failed= "0x1"
 
 [dependencies]
-AptosFramework = { local = "../../../aptos-move/framework/aptos-framework" }
+VelorFramework = { local = "../../../velor-move/framework/velor-framework" }

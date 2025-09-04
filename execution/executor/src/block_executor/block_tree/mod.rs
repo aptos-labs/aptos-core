@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,14 +12,14 @@ use crate::{
     types::partial_state_compute_result::PartialStateComputeResult,
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_consensus_types::block::Block as ConsensusBlock;
-use aptos_crypto::HashValue;
-use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_executor_types::ExecutorError;
-use aptos_infallible::Mutex;
-use aptos_logger::{debug, info};
-use aptos_storage_interface::DbReader;
-use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
+use velor_consensus_types::block::Block as ConsensusBlock;
+use velor_crypto::HashValue;
+use velor_drop_helper::DEFAULT_DROPPER;
+use velor_executor_types::ExecutorError;
+use velor_infallible::Mutex;
+use velor_logger::{debug, info};
+use velor_storage_interface::DbReader;
+use velor_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::{mpsc::Receiver, Arc, Weak},

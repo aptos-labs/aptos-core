@@ -1,23 +1,23 @@
-{{ $fullnode_statefulset := lookup "apps/v1" "StatefulSet" $.Release.Namespace (include "aptos-fullnode.fullname" .) }}
+{{ $fullnode_statefulset := lookup "apps/v1" "StatefulSet" $.Release.Namespace (include "velor-fullnode.fullname" .) }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "aptos-fullnode.fullname" . }}
+  name: {{ include "velor-fullnode.fullname" . }}
   labels:
-    {{- include "aptos-fullnode.labels" . | nindent 4 }}
+    {{- include "velor-fullnode.labels" . | nindent 4 }}
     app.kubernetes.io/name: fullnode
 spec:
-  serviceName: {{ include "aptos-fullnode.fullname" . }}
+  serviceName: {{ include "velor-fullnode.fullname" . }}
   replicas: 1
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      {{- include "aptos-fullnode.selectorLabels" . | nindent 6 }}
+      {{- include "velor-fullnode.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/name: fullnode
   template:
     metadata:
       labels:
-        {{- include "aptos-fullnode.selectorLabels" . | nindent 8 }}
+        {{- include "velor-fullnode.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: fullnode
         {{- if or $.Values.chain.label $.Values.chain.name }}
         chain_name: {{ $.Values.chain.label | default $.Values.chain.name }}
@@ -26,7 +26,7 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9101"
         {{- if $.Values.metrics.destination }}
-        aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
+        velor.dev/metrics-destination: {{ $.Values.metrics.destination }}
         {{- end}}
     spec:
       initContainers:
@@ -42,33 +42,33 @@ spec:
         - -c
         - |-
           set -euxo pipefail
-          # cleanup aptosdb
-          if [ -f /opt/aptos/data/restore-failed ] || \
-              [ ! -f /opt/aptos/data/restore-uid ] || \
-              [ "$(cat /opt/aptos/data/restore-uid)" != "{{ .config.restore_epoch }}" ]; then
-            rm -rf /opt/aptos/data/db /opt/aptos/data/restore-{complete,failed}
-            echo "{{ .config.restore_epoch }}" > /opt/aptos/data/restore-uid
+          # cleanup velordb
+          if [ -f /opt/velor/data/restore-failed ] || \
+              [ ! -f /opt/velor/data/restore-uid ] || \
+              [ "$(cat /opt/velor/data/restore-uid)" != "{{ .config.restore_epoch }}" ]; then
+            rm -rf /opt/velor/data/db /opt/velor/data/restore-{complete,failed}
+            echo "{{ .config.restore_epoch }}" > /opt/velor/data/restore-uid
           fi
 
-          [ -f /opt/aptos/data/restore-complete ] && exit 0
+          [ -f /opt/velor/data/restore-complete ] && exit 0
           # start restore process
-          /usr/local/bin/aptos-debugger aptos-db restore bootstrap-db \
+          /usr/local/bin/velor-debugger velor-db restore bootstrap-db \
             --concurrent-downloads {{ .config.concurrent_downloads }} \
             {{ range .config.trusted_waypoints }} --trust-waypoint {{ . }}{{ end }} \
-            --target-db-dir /opt/aptos/data/db \
-            --metadata-cache-dir /opt/aptos/data/aptos-restore-metadata \
+            --target-db-dir /opt/velor/data/db \
+            --metadata-cache-dir /opt/velor/data/velor-restore-metadata \
             --ledger-history-start-version {{ .config.start_version }} \
             {{- if .config.target_version }} --target-version {{- .config.target_version }}{{- end }}
-            --command-adapter-config /opt/aptos/etc/{{ .config.location }}.yaml
+            --command-adapter-config /opt/velor/etc/{{ .config.location }}.yaml
 
           if [ $? -gt 0 ]; then
             # mark restore as failed
-            touch /opt/aptos/data/restore-failed
+            touch /opt/velor/data/restore-failed
             exit 1
           else
             # success, remove the marker
-            rm -f /opt/aptos/data/restore-failed
-            touch /opt/aptos/data/restore-complete
+            rm -f /opt/velor/data/restore-failed
+            touch /opt/velor/data/restore-complete
           fi
         env:
         - name: RUST_LOG
@@ -90,9 +90,9 @@ spec:
         {{- include "backup.backupEnvironment" (dict "config" .config "era" (default $.Values.chain.era .config.restore_era)) | nindent 8 }}
         volumeMounts:
         - name: backup-config
-          mountPath: /opt/aptos/etc
-        - name: aptos-data
-          mountPath: /opt/aptos/data
+          mountPath: /opt/velor/etc
+        - name: velor-data
+          mountPath: /opt/velor/data
         - name: tmp
           mountPath: /tmp
         securityContext:
@@ -116,19 +116,19 @@ spec:
         - -c
         - |-
           set -euxo pipefail
-          if [[ -f /opt/aptos/data/wipe-db ]]; then
+          if [[ -f /opt/velor/data/wipe-db ]]; then
             # Wipe DB
-            rm -rf /opt/aptos/data/db
+            rm -rf /opt/velor/data/db
             # Delete the command file so we only wipe the DB once
-            rm -vf /opt/aptos/data/wipe-db
+            rm -vf /opt/velor/data/wipe-db
           fi
           {{- if and (not .Values.chain.genesisConfigmap) (not .Values.chain.genesisSecret) }}
           # Download genesis and waypoint if necessary
-          curl -o /opt/aptos/genesis/waypoint.txt {{ (get .Values.aptos_chains .Values.chain.name).waypoint_txt_url }}
-          curl -o /opt/aptos/genesis/genesis.blob {{ (get .Values.aptos_chains .Values.chain.name).genesis_blob_url }}
+          curl -o /opt/velor/genesis/waypoint.txt {{ (get .Values.velor_chains .Values.chain.name).waypoint_txt_url }}
+          curl -o /opt/velor/genesis/genesis.blob {{ (get .Values.velor_chains .Values.chain.name).genesis_blob_url }}
           {{- end }}
           # Start the node
-          exec /usr/local/bin/aptos-node -f /opt/aptos/etc/fullnode.yaml
+          exec /usr/local/bin/velor-node -f /opt/velor/etc/fullnode.yaml
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
         env:
@@ -141,12 +141,12 @@ spec:
         - name: RUST_BACKTRACE
           value: "0"
         volumeMounts:
-        - name: aptos-config
-          mountPath: /opt/aptos/etc
-        - name: aptos-genesis
-          mountPath: /opt/aptos/genesis
-        - name: aptos-data
-          mountPath: /opt/aptos/data
+        - name: velor-config
+          mountPath: /opt/velor/etc
+        - name: velor-genesis
+          mountPath: /opt/velor/genesis
+        - name: velor-data
+          mountPath: /opt/velor/data
         - name: tmp
           mountPath: /tmp
         ports:
@@ -213,10 +213,10 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       volumes:
-      - name: aptos-config
+      - name: velor-config
         configMap:
-          name: {{ include "aptos-fullnode.fullname" . }}
-      - name: aptos-genesis
+          name: {{ include "velor-fullnode.fullname" . }}
+      - name: velor-genesis
       {{- if .Values.chain.genesisConfigmap }}
         configMap:
           name: {{ .Values.chain.genesisConfigmap }}
@@ -226,15 +226,15 @@ spec:
       {{- else }}
         emptyDir: {}
       {{- end }}
-      - name: aptos-data
+      - name: velor-data
         persistentVolumeClaim:
-          claimName: {{ include "aptos-fullnode.fullname" . }}-e{{ .Values.chain.era }}
+          claimName: {{ include "velor-fullnode.fullname" . }}-e{{ .Values.chain.era }}
       - name: backup-config
         configMap:
           name: {{ include "backup.fullname" . }}-backup
       - name: tmp
         emptyDir: {}
-      serviceAccountName: {{ include "aptos-fullnode.serviceAccountName" . }}
+      serviceAccountName: {{ include "velor-fullnode.serviceAccountName" . }}
       {{- if .Values.imagePullSecret }}
       imagePullSecrets:
       - name: {{.Values.imagePullSecret}}

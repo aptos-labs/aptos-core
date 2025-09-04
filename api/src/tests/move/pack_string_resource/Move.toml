@@ -3,7 +3,7 @@ name = "pack_string_resource"
 version = "0.0.0"
 
 [dependencies]
-MoveStdlib = { local = "../../../../../aptos-move/framework/move-stdlib" }
+MoveStdlib = { local = "../../../../../velor-move/framework/move-stdlib" }
 
 [addresses]
 addr = "_"

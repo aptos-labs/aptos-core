@@ -1,0 +1,11 @@
+[package]
+name = 'ambassador_token'
+version = '1.0.0'
+
+# do not change to "_", concrete address needed for module-publish testing framework
+[addresses]
+ambassador = "0xCAFE"
+
+[dependencies]
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-framework", rev = "mainnet" }
+VelorTokenObjects = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-token-objects", rev = "mainnet" }

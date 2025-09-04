@@ -16,7 +16,7 @@ from pathlib import Path
 from time import time
 
 # Typically you are making a new version of gas schedule,
-# so this should be larger than `LATEST_GAS_FEATURE_VERSION` in `aptos-move/aptos-gas/src/gas_meter.rs`.
+# so this should be larger than `LATEST_GAS_FEATURE_VERSION` in `velor-move/velor-gas/src/gas_meter.rs`.
 TARGET_GAS_VERSION = 12
 
 def get_bench_ns_linear(bench_path):
@@ -123,7 +123,7 @@ def main(gas_per_ns):
     new_lines = lines[:line_id_begin+1] + [generator_note_line] + get_algebra_lines(gas_per_ns) + lines[line_id_end:]
     path.write_text('\n'.join(new_lines))
 
-PATH_STR = 'aptos-move/aptos-gas-schedule/src/gas_schedule/aptos_framework.rs'
+PATH_STR = 'velor-move/velor-gas-schedule/src/gas_schedule/velor_framework.rs'
 if __name__=='__main__':
     parser = argparse.ArgumentParser(
         description=f'Generate gas parameters for BN254 algebra module in `{PATH_STR}`.')

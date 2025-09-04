@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::unwrap_used)]
 
-use aptos_metrics_core::{
+use velor_metrics_core::{
     register_histogram_vec, register_int_counter_vec, register_int_gauge_vec, HistogramTimer,
     HistogramVec, IntCounterVec, IntGaugeVec,
 };
@@ -18,7 +18,7 @@ pub const WAYPOINT_VERSION: &str = "waypoint_version";
 
 pub static LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "aptos_safety_rules_latency",
+        "velor_safety_rules_latency",
         "Time to perform an operation",
         &["source", "field"]
     )
@@ -27,7 +27,7 @@ pub static LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
 
 static QUERY_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_safety_rules_queries",
+        "velor_safety_rules_queries",
         "Outcome of calling into LSR",
         &["method", "result"]
     )
@@ -36,7 +36,7 @@ static QUERY_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
 
 static STATE_GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "aptos_safety_rules_state",
+        "velor_safety_rules_state",
         "Current internal state of LSR",
         &["field"]
     )

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -18,8 +18,8 @@ use crate::{
     },
     schema,
 };
-use aptos_api_types::Transaction as APITransaction;
-use aptos_types::{AptosCoinType, CoinType};
+use velor_api_types::Transaction as APITransaction;
+use velor_types::{VelorCoinType, CoinType};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
@@ -77,7 +77,7 @@ fn insert_to_db(
     coin_supply: Vec<CoinSupply>,
     account_transactions: Vec<AccountTransaction>,
 ) -> Result<(), diesel::result::Error> {
-    aptos_logger::trace!(
+    velor_logger::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,
@@ -277,10 +277,10 @@ impl TransactionProcessor for CoinTransactionProcessor {
         end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
         let mut conn = self.get_conn();
-        // get aptos_coin info for supply tracking
+        // get velor_coin info for supply tracking
         // TODO: This only needs to be fetched once. Need to persist somehow
-        let maybe_aptos_coin_info = &CoinInfoQuery::get_by_coin_type(
-            AptosCoinType::type_tag().to_canonical_string(),
+        let maybe_velor_coin_info = &CoinInfoQuery::get_by_coin_type(
+            VelorCoinType::type_tag().to_canonical_string(),
             &mut conn,
         )
         .unwrap();
@@ -301,7 +301,7 @@ impl TransactionProcessor for CoinTransactionProcessor {
                 coin_infos,
                 current_coin_balances,
                 mut coin_supply,
-            ) = CoinActivity::from_transaction(txn, maybe_aptos_coin_info);
+            ) = CoinActivity::from_transaction(txn, maybe_velor_coin_info);
             all_coin_activities.append(&mut coin_activities);
             all_coin_balances.append(&mut coin_balances);
             all_coin_supply.append(&mut coin_supply);

@@ -6,7 +6,7 @@
   "gas_unit_price": "0",
   "expiration_timestamp_secs": "60",
   "payload": {
-    "function": "0x1::aptos_account::create_account",
+    "function": "0x1::velor_account::create_account",
     "type_arguments": [],
     "arguments": [
       "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf"

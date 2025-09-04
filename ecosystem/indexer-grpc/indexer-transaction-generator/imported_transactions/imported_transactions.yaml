@@ -1,7 +1,7 @@
 testnet:
   # Transaction Stream endpoint addresss.
-  transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
-  # (Optional) The key to use with developers.aptoslabs.com
+  transaction_stream_endpoint: https://grpc.testnet.velorlabs.com:443
+  # (Optional) The key to use with developers.velorlabs.com
   api_key: TESTNET_API_KEY
   # A map from versions to dump and their output names.
   versions_to_import:
@@ -30,7 +30,7 @@ testnet:
     6617355090: 6617355090_multi_ed_txn
 
 mainnet:
-  transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
+  transaction_stream_endpoint: https://grpc.mainnet.velorlabs.com:443
   api_key: MAINNET_API_KEY
   versions_to_import:
     # fungible asset processor
@@ -58,7 +58,7 @@ mainnet:
     999930475: 999930475_token_v2_concurrent_mint
     537250181: 537250181_token_v2_fixed_supply_mint
     325355235: 325355235_token_v2_unlimited_supply_mint
-    602320562: 602320562_token_v2_aptos_token_mint
+    602320562: 602320562_token_v2_velor_token_mint
     453498957: 453498957_token_v2_mint_and_transfer_event_v1
     967255533: 967255533_token_v2_mutation_event
     578366445: 578366445_token_v2_burn_event_v2

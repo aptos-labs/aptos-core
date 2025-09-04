@@ -8,7 +8,7 @@ THRESHOLDS = {"1k": 3500, "10k": 4000, "50k": 4200}
 THRESHOLD_NOISE = 0.1
 
 # Run the VM sequential execution with performance optimizations enabled
-target_directory = "aptos-move/aptos-transaction-benchmarks/src/"
+target_directory = "velor-move/velor-transaction-benchmarks/src/"
 output = subprocess.check_output(
     "cargo run --profile performance  param-sweep  --skip-parallel",
     shell=True,

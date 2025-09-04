@@ -1,5 +1,5 @@
 base:
-    data_dir: "/opt/aptos/data"
+    data_dir: "/opt/velor/data"
     role: "full_node"
     waypoint:
         from_storage:

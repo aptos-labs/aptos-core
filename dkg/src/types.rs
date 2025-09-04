@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto_derive::CryptoHasher;
-use aptos_enum_conversion_derive::EnumConversion;
-use aptos_reliable_broadcast::RBMessage;
-pub use aptos_types::dkg::DKGTranscript;
+use velor_crypto_derive::CryptoHasher;
+use velor_enum_conversion_derive::EnumConversion;
+use velor_reliable_broadcast::RBMessage;
+pub use velor_types::dkg::DKGTranscript;
 use serde::{Deserialize, Serialize};
 
 /// Once DKG starts, a validator should send this message to peers in order to collect DKG transcripts from peers.

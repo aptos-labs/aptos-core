@@ -1,6 +1,6 @@
 [package]
-name = "aptos-indexer-grpc-data-service-v2"
-description = "Aptos Indexer gRPC data service to serve the data from in-memory cache and file store."
+name = "velor-indexer-grpc-data-service-v2"
+description = "Velor Indexer gRPC data service to serve the data from in-memory cache and file store."
 version = "1.0.0"
 
 # Workspace inherited keys
@@ -14,11 +14,11 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-indexer-grpc-server-framework = { workspace = true }
-aptos-indexer-grpc-utils = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-protos = { workspace = true }
-aptos-transaction-filter = { workspace = true }
+velor-indexer-grpc-server-framework = { workspace = true }
+velor-indexer-grpc-utils = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-protos = { workspace = true }
+velor-transaction-filter = { workspace = true }
 async-trait = { workspace = true }
 build_html = { workspace = true }
 clap = { workspace = true }

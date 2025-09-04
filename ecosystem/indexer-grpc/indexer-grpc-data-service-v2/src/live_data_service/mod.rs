@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 mod data_client;
@@ -12,8 +12,8 @@ use crate::{
     live_data_service::in_memory_cache::InMemoryCache,
     metrics::{COUNTER, TIMER},
 };
-use aptos_protos::indexer::v1::{GetTransactionsRequest, ProcessedRange, TransactionsResponse};
-use aptos_transaction_filter::BooleanTransactionFilter;
+use velor_protos::indexer::v1::{GetTransactionsRequest, ProcessedRange, TransactionsResponse};
+use velor_transaction_filter::BooleanTransactionFilter;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tonic::{Request, Status};

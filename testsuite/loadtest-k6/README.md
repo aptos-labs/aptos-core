@@ -1,4 +1,4 @@
-# Typescript k6 load test for Aptos services
+# Typescript k6 load test for Velor services
 
 See https://github.com/grafana/k6-template-typescript
 

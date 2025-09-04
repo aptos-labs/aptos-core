@@ -21,7 +21,7 @@ metadata:
     {{- end }}
 spec:
   selector:
-    app.kubernetes.io/part-of: aptos-fullnode
+    app.kubernetes.io/part-of: velor-fullnode
     app.kubernetes.io/name: fullnode
   ports:
   - port: 80

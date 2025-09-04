@@ -8,9 +8,9 @@ Pangu is a testnet creation and management CLI, which deploys on top of existing
 
 ## What is Pangu CLI?
 
-Ever had to wait for the Aptos devnet/testnet releases to test a new feature? Or, create a PR to launch testnets through Forge? Well, these will be a thing of the past with Pangu.
+Ever had to wait for the Velor devnet/testnet releases to test a new feature? Or, create a PR to launch testnets through Forge? Well, these will be a thing of the past with Pangu.
 
-Pangu is a modular, customizable, and next-gen Aptos testnet creation-management CLI tool written in Python. Pangu allows you to create, and manage testnets on demand, and blazingly fast 🚀🚀🚀 
+Pangu is a modular, customizable, and next-gen Velor testnet creation-management CLI tool written in Python. Pangu allows you to create, and manage testnets on demand, and blazingly fast 🚀🚀🚀 
 
 Pangu is inherently faster than its predecessors (Forge testnet creation) because:
 
@@ -69,11 +69,11 @@ CREATE OPTIONS:
 
 1. **`-pangu-node-configs-path`**:
     - The Pangu node configs (yaml)
-    - Default: The default node config in aptos-core/testsuite/pangu_lib/template_testnet_files
+    - Default: The default node config in velor-core/testsuite/pangu_lib/template_testnet_files
     - Example: **`-pangu-node-configs-path /path/to/node/configs.yaml`**
 2. **`-layout-path`**:
     - The path to the layout file (yaml).
-    - Default: The default layout in aptos-core/testsuite/pangu_lib/template_testnet_files
+    - Default: The default layout in velor-core/testsuite/pangu_lib/template_testnet_files
     - Example: **`-layout-path /path/to/layout.yaml`**
 3. **`-framework-path`**:
     - The compiled move framework (head.mrb, or framework.mrb) file. Defaults to the default framework in the pangu_lib.
@@ -90,10 +90,10 @@ CREATE OPTIONS:
     - Pass **`true`** if you would like to run genesis without deploying on Kubernetes (K8S). All Kubernetes YAML files will be dumped to the workspace. If you don’t provide a workspace, all the YAML files will be dumped to a tmp folder.
     - Default: **`False`**
     - Example: **`-dry-run true`**
-1. **`-aptos-cli-path`**:
-    - The path to the Aptos CLI if it is not in your $PATH variable.
-    - Default: **`aptos`**
-    - Example: **`-aptos-cli-path /path/to/aptos`**
+1. **`-velor-cli-path`**:
+    - The path to the Velor CLI if it is not in your $PATH variable.
+    - Default: **`velor`**
+    - Example: **`-velor-cli-path /path/to/velor`**
 2. **`-name`**:
     - Name for the testnet. The default is a randomly generated name. The name will automatically have “pangu-” appended to it.
     - Example: **`-name MyTestnet`**
@@ -101,7 +101,7 @@ CREATE OPTIONS:
 
 ## Pangu Node Config (Customizability)
 
-[Pangu config template](https://github.com/aptos-labs/aptos-core/blob/main/testsuite/pangu_lib/template_testnet_files/pangu_node_config.yaml)
+[Pangu config template](https://github.com/velor-chain/velor-core/blob/main/testsuite/pangu_lib/template_testnet_files/pangu_node_config.yaml)
 
 ```yaml
 blueprints:
@@ -143,7 +143,7 @@ Pangu allows you to use a default template to create n number of nodes without m
 
 To create a testnet with a custom topology, create a new pangu config file and pass it with the option "--pangu-node-configs-path" 
 
-- [**See the default config here**](https://github.com/aptos-labs/aptos-core/blob/main/testsuite/pangu_lib/template_testnet_files/pangu_node_config.yaml)
+- [**See the default config here**](https://github.com/velor-chain/velor-core/blob/main/testsuite/pangu_lib/template_testnet_files/pangu_node_config.yaml)
     - The config yaml should start with “blueprints:”
     - A blueprint describes the validator config, the validator image, the vfn config, the vfn image, stake_amount for the validator, and the number of validator/vfn pairs you would like to create with this specific blueprint.
     - The name of the blueprint will dictate the names of the pods (validators, vfns) created using it.
@@ -153,7 +153,7 @@ To create a testnet with a custom topology, create a new pangu config file and p
 
 ## How to Use Pangu
 
-**1-** Have aptos-core installed locally, and navigate to the testsuite directory. 
+**1-** Have velor-core installed locally, and navigate to the testsuite directory. 
 
 **2-** The entrypoint for all python operations is `[poetry](https://python-poetry.org/)`:
 
@@ -166,28 +166,28 @@ To create a testnet with a custom topology, create a new pangu config file and p
 alias pangu="poetry run python pangu.py"
 ```
 
-**4-** Have a K8s environment set up. For testing purposes, I suggest you use KinD. [Here is a script that can be used to set up KinD.](https://github.com/aptos-labs/internal-ops/blob/main/docker/kind/start-kind.sh)
+**4-** Have a K8s environment set up. For testing purposes, I suggest you use KinD. [Here is a script that can be used to set up KinD.](https://github.com/velor-chain/internal-ops/blob/main/docker/kind/start-kind.sh)
 
 **5-** Use “pangu -h”, “pangu node -h”, and “pangu testnet -h” commands to get more info about the Pangu commands
 
 ## Codebase
 
-Pangu lives in aptos-core/testsuite. Tips for navigating the codebase:
+Pangu lives in velor-core/testsuite. Tips for navigating the codebase:
 
-- [**aptos-core/testsuite/pangu.py**](https://github.com/aptos-labs/aptos-core/blob/main/testsuite/pangu.py)
+- [**velor-core/testsuite/pangu.py**](https://github.com/velor-chain/velor-core/blob/main/testsuite/pangu.py)
     - This is the entry point to the Pangu CLI. Use poetry run python pangu.py to run.
-- [**aptos-core/testsuite/test_framework**](https://github.com/aptos-labs/aptos-core/tree/main/testsuite/test_framework)
+- [**velor-core/testsuite/test_framework**](https://github.com/velor-chain/velor-core/tree/main/testsuite/test_framework)
     - Includes the system abstractions for testing.
     - The Kubernetes abstraction might need to be updated to add new Kubernetes features.
-- [**aptos-core/testsuite/pangu_lib/node_commands**](https://github.com/aptos-labs/aptos-core/tree/main/testsuite/pangu_lib/node_commands)
+- [**velor-core/testsuite/pangu_lib/node_commands**](https://github.com/velor-chain/velor-core/tree/main/testsuite/pangu_lib/node_commands)
     - Includes the commands for the pangu node {COMMAND} commands
     - Each command has its own .py file, which are then aggregated in the commands.py file to be exported to pangu.py
-- [a**ptos-core/testsuite/pangu_lib/testnet_commands**](https://github.com/aptos-labs/aptos-core/tree/main/testsuite/pangu_lib/testnet_commands)
+- [a**ptos-core/testsuite/pangu_lib/testnet_commands**](https://github.com/velor-chain/velor-core/tree/main/testsuite/pangu_lib/testnet_commands)
     - Includes the commands for the pangu testnet {COMMAND} commands
     - Each command has its own .py file, which are then aggregated in the commands.py file to be exported to pangu.py
-- [**aptos-core/testsuite/pangu_lib/tests**](https://github.com/aptos-labs/aptos-core/tree/main/testsuite/pangu_lib/tests)
+- [**velor-core/testsuite/pangu_lib/tests**](https://github.com/velor-chain/velor-core/tree/main/testsuite/pangu_lib/tests)
     - Includes the unit tests
-- [**aptos-core/testsuite/pangu-sdk**](https://github.com/aptos-labs/aptos-core/tree/main/testsuite/pangu-sdk)
+- [**velor-core/testsuite/pangu-sdk**](https://github.com/velor-chain/velor-core/tree/main/testsuite/pangu-sdk)
     - The Pangu Rust SDK is a light Rust wrapper around the Pangu CLI. It allows rust code to be able to run Pangu commands by passing structs, without having to generate the Pangu Config Yaml files. It is not feature complete, but should be a good starting point for the Pangu-Forge integrations.
 
 ## Metrics

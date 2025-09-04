@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -21,17 +21,17 @@ use crate::{
     ApiTags,
 };
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{
+use velor_api_types::{
     transaction::TransactionSummary, verify_function_identifier, verify_module_identifier, Address,
-    AptosError, AptosErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation,
+    VelorError, VelorErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation,
     GasEstimationBcs, HashValue, HexEncodedBytes, LedgerInfo, MoveType, PendingTransaction,
     SubmitTransactionRequest, Transaction, TransactionData, TransactionOnChainData,
     TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult, UserTransaction,
     VerifyInput, VerifyInputWithRecursion, U64,
 };
-use aptos_crypto::{hash::CryptoHash, signing_message};
-use aptos_logger::error;
-use aptos_types::{
+use velor_crypto::{hash::CryptoHash, signing_message};
+use velor_logger::error;
+use velor_types::{
     account_address::AccountAddress,
     mempool_status::MempoolStatusCode,
     transaction::{
@@ -40,9 +40,9 @@ use aptos_types::{
         TransactionPayload, TransactionPayloadInner,
     },
     vm_status::StatusCode,
-    AptosCoinType, CoinType,
+    VelorCoinType, CoinType,
 };
-use aptos_vm::{AptosSimulationVM, AptosVM};
+use velor_vm::{VelorSimulationVM, VelorVM};
 use move_core_types::{ident_str, language_storage::ModuleId, vm_status::VMStatus};
 use poem_openapi::{
     param::{Path, Query},
@@ -91,8 +91,8 @@ pub enum SubmitTransactionPost {
 
     // TODO: Since I don't want to impl all the Poem derives on SignedTransaction,
     // find a way to at least indicate in the spec that it expects a SignedTransaction.
-    // TODO: https://github.com/aptos-labs/aptos-core/issues/2275
-    #[oai(content_type = "application/x.aptos.signed_transaction+bcs")]
+    // TODO: https://github.com/velor-chain/velor-core/issues/2275
+    #[oai(content_type = "application/x.velor.signed_transaction+bcs")]
     Bcs(Bcs),
 }
 
@@ -114,8 +114,8 @@ pub enum SubmitTransactionsBatchPost {
 
     // TODO: Since I don't want to impl all the Poem derives on SignedTransaction,
     // find a way to at least indicate in the spec that it expects a SignedTransaction.
-    // TODO: https://github.com/aptos-labs/aptos-core/issues/2275
-    #[oai(content_type = "application/x.aptos.signed_transaction+bcs")]
+    // TODO: https://github.com/velor-chain/velor-core/issues/2275
+    #[oai(content_type = "application/x.velor.signed_transaction+bcs")]
     Bcs(Bcs),
 }
 
@@ -190,7 +190,7 @@ impl TransactionsApi {
     /// looks the transaction up by hash in the mempool (pending, not yet committed).
     ///
     /// To create a transaction hash by yourself, do the following:
-    ///   1. Hash message bytes: "RawTransaction" bytes + BCS bytes of [Transaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/enum.Transaction.html).
+    ///   1. Hash message bytes: "RawTransaction" bytes + BCS bytes of [Transaction](https://velor-chain.github.io/velor-core/velor_types/transaction/enum.Transaction.html).
     ///   2. Apply hash algorithm `SHA3-256` to the hash message bytes.
     ///   3. Hex-encode the hash bytes with `0x` prefix.
     // TODO: Include a link to an example of how to do this ^
@@ -430,7 +430,7 @@ impl TransactionsApi {
     ///
     /// To submit a transaction as BCS, you must submit a SignedTransaction
     /// encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
-    /// Make sure to use the `application/x.aptos.signed_transaction+bcs` Content-Type.
+    /// Make sure to use the `application/x.velor.signed_transaction+bcs` Content-Type.
     // TODO: Point to examples of both of these flows, in multiple languages.
     #[oai(
         path = "/transactions",
@@ -448,7 +448,7 @@ impl TransactionsApi {
             .map_err(|err| {
                 SubmitTransactionError::bad_request_with_code_no_info(
                     err,
-                    AptosErrorCode::InvalidInput,
+                    VelorErrorCode::InvalidInput,
                 )
             })?;
         fail_point_poem("endpoint_submit_transaction")?;
@@ -484,7 +484,7 @@ impl TransactionsApi {
     ///
     /// To submit a transaction as BCS, you must submit a SignedTransaction
     /// encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
-    /// Make sure to use the `application/x.aptos.signed_transaction+bcs` Content-Type.
+    /// Make sure to use the `application/x.velor.signed_transaction+bcs` Content-Type.
     #[oai(
         path = "/transactions/batch",
         method = "post",
@@ -501,7 +501,7 @@ impl TransactionsApi {
             .map_err(|err| {
                 SubmitTransactionError::bad_request_with_code_no_info(
                     err,
-                    AptosErrorCode::InvalidInput,
+                    VelorErrorCode::InvalidInput,
                 )
             })?;
         fail_point_poem("endpoint_submit_batch_transactions")?;
@@ -519,7 +519,7 @@ impl TransactionsApi {
                     signed_transactions_batch.len(),
                     self.context.max_submit_transaction_batch_size(),
                 ),
-                AptosErrorCode::InvalidInput,
+                VelorErrorCode::InvalidInput,
                 &ledger_info,
             ));
         }
@@ -565,7 +565,7 @@ impl TransactionsApi {
             .map_err(|err| {
                 SubmitTransactionError::bad_request_with_code_no_info(
                     err,
-                    AptosErrorCode::InvalidInput,
+                    VelorErrorCode::InvalidInput,
                 )
             })?;
         fail_point_poem("endpoint_simulate_transaction")?;
@@ -590,7 +590,7 @@ impl TransactionsApi {
             {
                 return Err(SubmitTransactionError::forbidden_with_code(
                     "Transaction not allowed by simulation filter",
-                    AptosErrorCode::InvalidInput,
+                    VelorErrorCode::InvalidInput,
                     &ledger_info,
                 ));
             }
@@ -629,14 +629,14 @@ impl TransactionsApi {
                     .map_err(|err| {
                         SubmitTransactionError::bad_request_with_code_no_info(
                             err,
-                            AptosErrorCode::InvalidInput,
+                            VelorErrorCode::InvalidInput,
                         )
                     })?;
-                let output = AptosVM::execute_view_function(
+                let output = VelorVM::execute_view_function(
                     &state_view,
                     ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
                     ident_str!("balance").into(),
-                    vec![AptosCoinType::type_tag()],
+                    vec![VelorCoinType::type_tag()],
                     vec![signed_transaction.sender().to_vec()],
                     context.node_config.api.max_gas_view_function,
                 );
@@ -645,7 +645,7 @@ impl TransactionsApi {
                         convert_view_function_error(&status, &state_view, &context);
                     SubmitTransactionError::bad_request_with_optional_vm_status_and_ledger_info(
                         anyhow::anyhow!(err_string),
-                        AptosErrorCode::InvalidInput,
+                        VelorErrorCode::InvalidInput,
                         vm_error_code,
                         Some(&ledger_info),
                     )
@@ -653,7 +653,7 @@ impl TransactionsApi {
                 let balance: u64 = bcs::from_bytes(&values[0]).map_err(|err| {
                     SubmitTransactionError::bad_request_with_code_no_info(
                         err,
-                        AptosErrorCode::InvalidInput,
+                        VelorErrorCode::InvalidInput,
                     )
                 })?;
 
@@ -729,7 +729,7 @@ impl TransactionsApi {
             .verify()
             .context("'UserTransactionRequest' invalid")
             .map_err(|err| {
-                BasicError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+                BasicError::bad_request_with_code_no_info(err, VelorErrorCode::InvalidInput)
             })?;
         fail_point_poem("endpoint_encode_submission")?;
         if !self.context.node_config.api.encode_submission_enabled {
@@ -827,7 +827,7 @@ impl TransactionsApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &latest_ledger_info,
                 )
             })?;
@@ -880,7 +880,7 @@ impl TransactionsApi {
                 .map_err(|err| {
                     BasicErrorWith404::internal_with_code(
                         err,
-                        AptosErrorCode::InternalError,
+                        VelorErrorCode::InternalError,
                         &latest_ledger_info,
                     )
                 })?
@@ -926,7 +926,7 @@ impl TransactionsApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &latest_ledger_info,
                 )
             })?
@@ -952,7 +952,7 @@ impl TransactionsApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &ledger_info,
                 )
             })?;
@@ -992,7 +992,7 @@ impl TransactionsApi {
                             .map_err(|err| {
                                 BasicErrorWith404::internal_with_code(
                                     err,
-                                    AptosErrorCode::InternalError,
+                                    VelorErrorCode::InternalError,
                                     ledger_info,
                                 )
                             })?
@@ -1004,7 +1004,7 @@ impl TransactionsApi {
                         .map_err(|err| {
                             BasicErrorWith404::internal_with_code(
                                 err,
-                                AptosErrorCode::InternalError,
+                                VelorErrorCode::InternalError,
                                 ledger_info,
                             )
                         })?,
@@ -1047,7 +1047,7 @@ impl TransactionsApi {
     /// it means the transaction is still pending.
     async fn get_by_hash(
         &self,
-        hash: aptos_crypto::HashValue,
+        hash: velor_crypto::HashValue,
         storage_ledger_version: u64,
         internal_ledger_version: Option<u64>,
     ) -> anyhow::Result<Option<TransactionData>> {
@@ -1155,7 +1155,7 @@ impl TransactionsApi {
         if script.code().is_empty() {
             return Err(SubmitTransactionError::bad_request_with_code(
                 "Script payload bytecode must not be empty",
-                AptosErrorCode::InvalidInput,
+                VelorErrorCode::InvalidInput,
                 ledger_info,
             ));
         }
@@ -1167,7 +1167,7 @@ impl TransactionsApi {
                 .map_err(|err| {
                     SubmitTransactionError::bad_request_with_code(
                         err,
-                        AptosErrorCode::InvalidInput,
+                        VelorErrorCode::InvalidInput,
                         ledger_info,
                     )
                 })?;
@@ -1191,7 +1191,7 @@ impl TransactionsApi {
                         .map_err(|err| {
                             SubmitTransactionError::bad_request_with_code(
                                 err,
-                                AptosErrorCode::InvalidInput,
+                                VelorErrorCode::InvalidInput,
                                 ledger_info,
                             )
                         })?;
@@ -1224,7 +1224,7 @@ impl TransactionsApi {
                     TransactionPayload::ModuleBundle(_) => {
                         return Err(SubmitTransactionError::bad_request_with_code(
                             "Module bundle payload has been removed",
-                            AptosErrorCode::InvalidInput,
+                            VelorErrorCode::InvalidInput,
                             ledger_info,
                         ))
                     },
@@ -1237,7 +1237,7 @@ impl TransactionsApi {
                             if extra_config.is_multisig() {
                                 return Err(SubmitTransactionError::bad_request_with_code(
                                     "Script transaction payload must not be a multisig transaction",
-                                    AptosErrorCode::InvalidInput,
+                                    VelorErrorCode::InvalidInput,
                                     ledger_info,
                                 ));
                             }
@@ -1252,7 +1252,7 @@ impl TransactionsApi {
                             if !extra_config.is_multisig() {
                                 return Err(SubmitTransactionError::bad_request_with_code(
                                     "Empty transaction payload must be a multisig transaction",
-                                    AptosErrorCode::InvalidInput,
+                                    VelorErrorCode::InvalidInput,
                                     ledger_info,
                                 ));
                             }
@@ -1272,7 +1272,7 @@ impl TransactionsApi {
                 .map_err(|err| {
                     SubmitTransactionError::bad_request_with_code(
                         err,
-                        AptosErrorCode::InvalidInput,
+                        VelorErrorCode::InvalidInput,
                         ledger_info,
                     )
                 }),
@@ -1290,7 +1290,7 @@ impl TransactionsApi {
             .map_err(|err| {
                 SubmitTransactionError::bad_request_with_code(
                     err,
-                    AptosErrorCode::InvalidInput,
+                    VelorErrorCode::InvalidInput,
                     ledger_info,
                 )
             })?;
@@ -1300,7 +1300,7 @@ impl TransactionsApi {
             .map_err(|err| {
                 SubmitTransactionError::bad_request_with_code(
                     err,
-                    AptosErrorCode::InvalidInput,
+                    VelorErrorCode::InvalidInput,
                     ledger_info,
                 )
             })?;
@@ -1311,7 +1311,7 @@ impl TransactionsApi {
                 .map_err(|err| {
                     SubmitTransactionError::bad_request_with_code(
                         err,
-                        AptosErrorCode::InvalidInput,
+                        VelorErrorCode::InvalidInput,
                         ledger_info,
                     )
                 })?;
@@ -1332,7 +1332,7 @@ impl TransactionsApi {
                     .map_err(|err| {
                         SubmitTransactionError::bad_request_with_code(
                             err,
-                            AptosErrorCode::InvalidInput,
+                            VelorErrorCode::InvalidInput,
                             ledger_info,
                         )
                     })?;
@@ -1350,7 +1350,7 @@ impl TransactionsApi {
                         .map_err(|err| {
                             SubmitTransactionError::bad_request_with_code(
                                 err,
-                                AptosErrorCode::InvalidInput,
+                                VelorErrorCode::InvalidInput,
                                 ledger_info,
                             )
                         })
@@ -1360,57 +1360,57 @@ impl TransactionsApi {
     }
 
     /// Submits a single transaction, and converts mempool codes to errors
-    async fn create_internal(&self, txn: SignedTransaction) -> Result<(), AptosError> {
+    async fn create_internal(&self, txn: SignedTransaction) -> Result<(), VelorError> {
         let (mempool_status, vm_status_opt) = self
             .context
             .submit_transaction(txn)
             .await
             .context("Mempool failed to initially evaluate submitted transaction")
             .map_err(|err| {
-                aptos_api_types::AptosError::new_with_error_code(err, AptosErrorCode::InternalError)
+                velor_api_types::VelorError::new_with_error_code(err, VelorErrorCode::InternalError)
             })?;
         match mempool_status.code {
             MempoolStatusCode::Accepted => Ok(()),
             MempoolStatusCode::MempoolIsFull | MempoolStatusCode::TooManyTransactions => {
-                Err(AptosError::new_with_error_code(
+                Err(VelorError::new_with_error_code(
                     &mempool_status.message,
-                    AptosErrorCode::MempoolIsFull,
+                    VelorErrorCode::MempoolIsFull,
                 ))
             },
             MempoolStatusCode::VmError => {
                 if let Some(status) = vm_status_opt {
-                    Err(AptosError::new_with_vm_status(
+                    Err(VelorError::new_with_vm_status(
                         format!(
                             "Invalid transaction: Type: {:?} Code: {:?}",
                             status.status_type(),
                             status
                         ),
-                        AptosErrorCode::VmError,
+                        VelorErrorCode::VmError,
                         status,
                     ))
                 } else {
-                    Err(AptosError::new_with_vm_status(
+                    Err(VelorError::new_with_vm_status(
                         "Invalid transaction: unknown",
-                        AptosErrorCode::VmError,
+                        VelorErrorCode::VmError,
                         StatusCode::UNKNOWN_STATUS,
                     ))
                 }
             },
-            MempoolStatusCode::InvalidSeqNumber => Err(AptosError::new_with_error_code(
+            MempoolStatusCode::InvalidSeqNumber => Err(VelorError::new_with_error_code(
                 mempool_status.message,
-                AptosErrorCode::SequenceNumberTooOld,
+                VelorErrorCode::SequenceNumberTooOld,
             )),
-            MempoolStatusCode::InvalidUpdate => Err(AptosError::new_with_error_code(
+            MempoolStatusCode::InvalidUpdate => Err(VelorError::new_with_error_code(
                 mempool_status.message,
-                AptosErrorCode::InvalidTransactionUpdate,
+                VelorErrorCode::InvalidTransactionUpdate,
             )),
-            MempoolStatusCode::UnknownStatus => Err(AptosError::new_with_error_code(
+            MempoolStatusCode::UnknownStatus => Err(VelorError::new_with_error_code(
                 format!("Transaction was rejected with status {}", mempool_status,),
-                AptosErrorCode::InternalError,
+                VelorErrorCode::InternalError,
             )),
-            MempoolStatusCode::RejectedByFilter => Err(AptosError::new_with_error_code(
+            MempoolStatusCode::RejectedByFilter => Err(VelorError::new_with_error_code(
                 mempool_status.message,
-                AptosErrorCode::RejectedByFilter,
+                VelorErrorCode::RejectedByFilter,
             )),
         }
     }
@@ -1432,7 +1432,7 @@ impl TransactionsApi {
                         .map_err(|e| {
                             SubmitTransactionError::internal_with_code(
                                 e,
-                                AptosErrorCode::InternalError,
+                                VelorErrorCode::InternalError,
                                 ledger_info,
                             )
                         })?;
@@ -1444,7 +1444,7 @@ impl TransactionsApi {
                             .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
                             .map_err(|err| SubmitTransactionError::internal_with_code(
                                 err,
-                                AptosErrorCode::InternalError,
+                                VelorErrorCode::InternalError,
                                 ledger_info,
                             ))?;
                     SubmitTransactionResponse::try_from_json((
@@ -1463,21 +1463,21 @@ impl TransactionsApi {
                 )),
             },
             Err(error) => match error.error_code {
-                AptosErrorCode::InternalError => Err(
-                    SubmitTransactionError::internal_from_aptos_error(error, ledger_info),
+                VelorErrorCode::InternalError => Err(
+                    SubmitTransactionError::internal_from_velor_error(error, ledger_info),
                 ),
-                AptosErrorCode::VmError
-                | AptosErrorCode::SequenceNumberTooOld
-                | AptosErrorCode::InvalidTransactionUpdate => Err(
-                    SubmitTransactionError::bad_request_from_aptos_error(error, ledger_info),
+                VelorErrorCode::VmError
+                | VelorErrorCode::SequenceNumberTooOld
+                | VelorErrorCode::InvalidTransactionUpdate => Err(
+                    SubmitTransactionError::bad_request_from_velor_error(error, ledger_info),
                 ),
-                AptosErrorCode::MempoolIsFull => Err(
-                    SubmitTransactionError::insufficient_storage_from_aptos_error(
+                VelorErrorCode::MempoolIsFull => Err(
+                    SubmitTransactionError::insufficient_storage_from_velor_error(
                         error,
                         ledger_info,
                     ),
                 ),
-                _ => Err(SubmitTransactionError::internal_from_aptos_error(
+                _ => Err(SubmitTransactionError::internal_from_velor_error(
                     error,
                     ledger_info,
                 )),
@@ -1521,7 +1521,7 @@ impl TransactionsApi {
         ))
     }
 
-    // TODO: This function leverages a lot of types from aptos_types, use the
+    // TODO: This function leverages a lot of types from velor_types, use the
     // local API types and just return those directly, instead of converting
     // from these types in render_transactions.
     /// Simulate a transaction in the VM
@@ -1539,7 +1539,7 @@ impl TransactionsApi {
         if txn.verify_signature().is_ok() {
             return Err(SubmitTransactionError::bad_request_with_code(
                 "Simulated transactions must not have a valid signature",
-                AptosErrorCode::InvalidInput,
+                VelorErrorCode::InvalidInput,
                 &ledger_info,
             ));
         }
@@ -1547,7 +1547,7 @@ impl TransactionsApi {
         // Simulate transaction
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
         let (vm_status, output) =
-            AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &state_view);
+            VelorSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &state_view);
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
@@ -1610,9 +1610,9 @@ impl TransactionsApi {
 
         // Build up a transaction from the outputs
         // All state hashes are invalid, and will be filled with 0s
-        let txn = aptos_types::transaction::Transaction::UserTransaction(txn);
-        let zero_hash = aptos_crypto::HashValue::zero();
-        let info = aptos_types::transaction::TransactionInfo::new(
+        let txn = velor_types::transaction::Transaction::UserTransaction(txn);
+        let zero_hash = velor_crypto::HashValue::zero();
+        let info = velor_types::transaction::TransactionInfo::new(
             txn.hash(),
             zero_hash,
             zero_hash,
@@ -1665,7 +1665,7 @@ impl TransactionsApi {
                         _ => {
                             return Err(SubmitTransactionError::internal_with_code(
                                 "Simulation transaction resulted in a non-UserTransaction",
-                                AptosErrorCode::InternalError,
+                                VelorErrorCode::InternalError,
                                 &ledger_info,
                             ))
                         },
@@ -1695,7 +1695,7 @@ impl TransactionsApi {
         if accept_type == &AcceptType::Bcs {
             return Err(BasicError::bad_request_with_code_no_info(
                 "BCS is not supported for encode submission",
-                AptosErrorCode::BcsNotSupported,
+                VelorErrorCode::BcsNotSupported,
             ));
         }
 
@@ -1706,7 +1706,7 @@ impl TransactionsApi {
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")
             .map_err(|err| {
-                BasicError::bad_request_with_code(err, AptosErrorCode::InvalidInput, &ledger_info)
+                BasicError::bad_request_with_code(err, VelorErrorCode::InvalidInput, &ledger_info)
             })?;
 
         let raw_message = match request.secondary_signers {
@@ -1721,7 +1721,7 @@ impl TransactionsApi {
             )
             .context("Invalid transaction to generate signing message")
             .map_err(|err| {
-                BasicError::bad_request_with_code(err, AptosErrorCode::InvalidInput, &ledger_info)
+                BasicError::bad_request_with_code(err, VelorErrorCode::InvalidInput, &ledger_info)
             })?,
             None => raw_txn
                 .signing_message()
@@ -1729,7 +1729,7 @@ impl TransactionsApi {
                 .map_err(|err| {
                     BasicError::bad_request_with_code(
                         err,
-                        AptosErrorCode::InvalidInput,
+                        VelorErrorCode::InvalidInput,
                         &ledger_info,
                     )
                 })?,

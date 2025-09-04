@@ -1,5 +1,5 @@
 [package]
-name = "aptos-indexer-grpc-file-checker"
+name = "velor-indexer-grpc-file-checker"
 description = "Indexer gRPC file checker."
 version = "1.0.0"
 
@@ -14,9 +14,9 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-indexer-grpc-server-framework = { workspace = true }
-aptos-indexer-grpc-utils = { workspace = true }
-aptos-metrics-core = { workspace = true }
+velor-indexer-grpc-server-framework = { workspace = true }
+velor-indexer-grpc-utils = { workspace = true }
+velor-metrics-core = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
 cloud-storage = { workspace = true }

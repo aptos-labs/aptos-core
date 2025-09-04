@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
@@ -112,12 +112,12 @@ pub mod fullnode_data_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/aptos.internal.fullnode.v1.FullnodeData/Ping",
+                "/velor.internal.fullnode.v1.FullnodeData/Ping",
             );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(
-                    GrpcMethod::new("aptos.internal.fullnode.v1.FullnodeData", "Ping"),
+                    GrpcMethod::new("velor.internal.fullnode.v1.FullnodeData", "Ping"),
                 );
             self.inner.unary(req, path, codec).await
         }
@@ -141,13 +141,13 @@ pub mod fullnode_data_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/aptos.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode",
+                "/velor.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode",
             );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(
                     GrpcMethod::new(
-                        "aptos.internal.fullnode.v1.FullnodeData",
+                        "velor.internal.fullnode.v1.FullnodeData",
                         "GetTransactionsFromNode",
                     ),
                 );
@@ -271,7 +271,7 @@ pub mod fullnode_data_server {
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             match req.uri().path() {
-                "/aptos.internal.fullnode.v1.FullnodeData/Ping" => {
+                "/velor.internal.fullnode.v1.FullnodeData/Ping" => {
                     #[allow(non_camel_case_types)]
                     struct PingSvc<T: FullnodeData>(pub Arc<T>);
                     impl<
@@ -316,7 +316,7 @@ pub mod fullnode_data_server {
                     };
                     Box::pin(fut)
                 }
-                "/aptos.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode" => {
+                "/velor.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode" => {
                     #[allow(non_camel_case_types)]
                     struct GetTransactionsFromNodeSvc<T: FullnodeData>(pub Arc<T>);
                     impl<
@@ -402,7 +402,7 @@ pub mod fullnode_data_server {
         }
     }
     /// Generated gRPC service name
-    pub const SERVICE_NAME: &str = "aptos.internal.fullnode.v1.FullnodeData";
+    pub const SERVICE_NAME: &str = "velor.internal.fullnode.v1.FullnodeData";
     impl<T> tonic::server::NamedService for FullnodeDataServer<T> {
         const NAME: &'static str = SERVICE_NAME;
     }

@@ -1,7 +1,7 @@
 apiVersion: v1
 data:
-  pfn.yaml: "base:\n  role: \"full_node\"\n  waypoint:\n    from_file: \"/opt/aptos/genesis/waypoint.txt\"\
-    \n\nexecution:\n  genesis_file_location: \"/opt/aptos/genesis/genesis.blob\"\n\
+  pfn.yaml: "base:\n  role: \"full_node\"\n  waypoint:\n    from_file: \"/opt/velor/genesis/waypoint.txt\"\
+    \n\nexecution:\n  genesis_file_location: \"/opt/velor/genesis/genesis.blob\"\n\
     \nfull_node_networks:\n- network_id: \"public\"\n  discovery_method: \"onchain\"\
     \n  listen_address: \"/ip4/0.0.0.0/tcp/6182\"\n\nstorage:\n  backup_service_address:\
     \ \"0.0.0.0:6186\"\n\napi:\n  enabled: true\n  address: \"0.0.0.0:8080\""

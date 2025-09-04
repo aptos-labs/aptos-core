@@ -1,6 +1,6 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
-use aptos_types::{
+use velor_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
         partitioner::{ShardId, SubBlocksForShard},

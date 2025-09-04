@@ -1,0 +1,21 @@
+[package]
+name = "velor-ledger"
+description = "Library for integration with the Velor app on Ledger"
+version = "0.2.0"
+publish = true
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+repository = "https://github.com/velor-chain/velor-core/tree/main/crates/velor-ledger"
+rust-version = { workspace = true }
+
+[dependencies]
+velor-crypto = { workspace = true }
+velor-types = { workspace = true }
+hex = { workspace = true }
+ledger-apdu = "0.10.0"
+ledger-transport-hid = "0.10.0"
+thiserror = { workspace = true }

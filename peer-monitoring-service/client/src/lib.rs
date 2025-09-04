@@ -1,21 +1,21 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
 use crate::logging::{LogEntry, LogEvent, LogSchema};
-use aptos_config::{
+use velor_config::{
     config::{NodeConfig, PeerMonitoringServiceConfig},
     network_id::PeerNetworkId,
 };
-use aptos_id_generator::U64IdGenerator;
-use aptos_infallible::RwLock;
-use aptos_logger::{info, warn};
-use aptos_network::application::{
+use velor_id_generator::U64IdGenerator;
+use velor_infallible::RwLock;
+use velor_logger::{info, warn};
+use velor_network::application::{
     interface::NetworkClient, metadata::PeerMetadata, storage::PeersAndMetadata,
 };
-use aptos_peer_monitoring_service_types::{PeerMonitoringMetadata, PeerMonitoringServiceMessage};
-use aptos_time_service::{TimeService, TimeServiceTrait};
+use velor_peer_monitoring_service_types::{PeerMonitoringMetadata, PeerMonitoringServiceMessage};
+use velor_time_service::{TimeService, TimeServiceTrait};
 use error::Error;
 use futures::StreamExt;
 use network::PeerMonitoringServiceClient;

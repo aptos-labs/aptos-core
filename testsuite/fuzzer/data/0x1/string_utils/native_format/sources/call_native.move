@@ -1,5 +1,5 @@
 module poc::native_format {
-   use aptos_std::string_utils;
+   use velor_std::string_utils;
    use std::vector;
    use std::signer;
 

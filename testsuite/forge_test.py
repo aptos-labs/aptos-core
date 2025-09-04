@@ -187,7 +187,7 @@ class ForgeRunnerTests(unittest.TestCase):
                 "run",
                 "--cargo-arg",
                 "-p",
-                "aptos-forge-cli",
+                "velor-forge-cli",
                 "--",
                 "--suite",
                 "banana",
@@ -360,12 +360,12 @@ class TestFindRecentImage(unittest.TestCase):
             [
                 FakeCommand("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
                 FakeCommand(
-                    "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=potato",
+                    "aws ecr describe-images --repository-name velor/validator-testing --image-ids imageTag=potato",
                     RunResult(1, b""),
                 ),
                 FakeCommand("git rev-parse HEAD~1", RunResult(0, b"lychee\n")),
                 FakeCommand(
-                    "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=lychee",
+                    "aws ecr describe-images --repository-name velor/validator-testing --image-ids imageTag=lychee",
                     RunResult(0, b""),
                 ),
             ]
@@ -404,7 +404,7 @@ class TestFindRecentImage(unittest.TestCase):
             [
                 FakeCommand("git rev-parse HEAD~0", RunResult(0, b"tomato\n")),
                 FakeCommand(
-                    "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=failpoints_tomato",
+                    "aws ecr describe-images --repository-name velor/validator-testing --image-ids imageTag=failpoints_tomato",
                     RunResult(0, b""),
                 ),
             ]
@@ -426,7 +426,7 @@ class TestFindRecentImage(unittest.TestCase):
             [
                 FakeCommand("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
                 FakeCommand(
-                    "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=performance_potato",
+                    "aws ecr describe-images --repository-name velor/validator-testing --image-ids imageTag=performance_potato",
                     RunResult(0, b""),
                 ),
             ]
@@ -460,7 +460,7 @@ class TestFindRecentImage(unittest.TestCase):
             [
                 FakeCommand("git rev-parse HEAD~0", RunResult(0, b"crab\n")),
                 FakeCommand(
-                    "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=crab",
+                    "aws ecr describe-images --repository-name velor/validator-testing --image-ids imageTag=crab",
                     RunResult(1, b""),
                 ),
             ]
@@ -469,7 +469,7 @@ class TestFindRecentImage(unittest.TestCase):
         with self.assertRaises(Exception):
             list(
                 find_recent_images(
-                    shell, git, 1, "aptos/validator-testing", commit_threshold=1
+                    shell, git, 1, "velor/validator-testing", commit_threshold=1
                 )
             )
 
@@ -480,12 +480,12 @@ class TestFindRecentImage(unittest.TestCase):
             [
                 FakeCommand("git rev-parse HEAD~0", RunResult(0, b"crab\n")),
                 FakeCommand(
-                    "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=crab",
+                    "aws ecr describe-images --repository-name velor/validator --image-ids imageTag=crab",
                     RunResult(0, b""),
                 ),
                 FakeCommand("git rev-parse HEAD~1", RunResult(0, b"shrimp\n")),
                 FakeCommand(
-                    "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=shrimp",
+                    "aws ecr describe-images --repository-name velor/validator --image-ids imageTag=shrimp",
                     RunResult(0, b""),
                 ),
             ]
@@ -575,7 +575,7 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         self.assertFixture(
             get_dashboard_link(
                 "forge-pr-2983",
-                # Chain names don't use the "aptos-" prefix.
+                # Chain names don't use the "velor-" prefix.
                 "forge-big-1",
                 True,
             ),
@@ -586,7 +586,7 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         self.assertFixture(
             get_dashboard_link(
                 "forge-pr-2983",
-                # Chain names don't use the "aptos-" prefix.
+                # Chain names don't use the "velor-" prefix.
                 "forge-big-1",
                 (
                     datetime.fromtimestamp(100000, timezone.utc),
@@ -699,32 +699,32 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                 ),
                 FakeCommand(
                     "aws eks list-clusters",
-                    RunResult(0, b'{ "clusters": [ "aptos-forge-big-1" ] }'),
+                    RunResult(0, b'{ "clusters": [ "velor-forge-big-1" ] }'),
                 ),
                 FakeCommand(
                     # NOTE: with multi-cloud support, we set the kubeconfig to ensure auth before continuing
-                    # See changes in: https://github.com/aptos-labs/aptos-core/pull/6166
-                    "aws eks update-kubeconfig --name aptos-forge-big-1 --kubeconfig temp1",
+                    # See changes in: https://github.com/velor-chain/velor-core/pull/6166
+                    "aws eks update-kubeconfig --name velor-forge-big-1 --kubeconfig temp1",
                     RunResult(0, b""),
                 ),
                 FakeCommand("git rev-parse HEAD~0", RunResult(0, b"banana")),
                 FakeCommand(
-                    "aws ecr describe-images --repository-name aptos/validator-testing "
+                    "aws ecr describe-images --repository-name velor/validator-testing "
                     "--image-ids imageTag=banana",
                     RunResult(0, b""),
                 ),
                 FakeCommand(
-                    "aws ecr describe-images --repository-name aptos/validator-testing "
+                    "aws ecr describe-images --repository-name velor/validator-testing "
                     "--image-ids imageTag=banana",
                     RunResult(0, b""),
                 ),
                 FakeCommand(
-                    "aws ecr describe-images --repository-name aptos/validator-testing "
+                    "aws ecr describe-images --repository-name velor/validator-testing "
                     "--image-ids imageTag=banana",
                     RunResult(0, b""),
                 ),
                 FakeCommand(
-                    "aws ecr describe-images --repository-name aptos/forge --image-ids "
+                    "aws ecr describe-images --repository-name velor/forge --image-ids "
                     "imageTag=banana",
                     RunResult(0, b""),
                 ),
@@ -803,8 +803,8 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                     "S3ForgeConfigBackend",
                     lambda *_: FakeConfigBackend(
                         {
-                            "enabled_clusters": ["aptos-forge-big-1"],
-                            "all_clusters": ["aptos-forge-big-1", "banana"],
+                            "enabled_clusters": ["velor-forge-big-1"],
+                            "all_clusters": ["velor-forge-big-1", "banana"],
                             "test_suites": {},
                         }
                     ),
@@ -823,7 +823,7 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                     "--no-log-metadata",
                     "test",
                     "--forge-cluster-name",
-                    "aptos-forge-big-1",
+                    "velor-forge-big-1",
                     "--forge-report",
                     "temp-report",
                     "--forge-pre-comment",
@@ -866,8 +866,8 @@ class TestListClusters(unittest.TestCase):
             AwsListClusterResult(
                 clusters=[
                     "banana-fake-1",
-                    "aptos-forge-banana-1",
-                    "aptos-forge-potato-2",
+                    "velor-forge-banana-1",
+                    "velor-forge-potato-2",
                 ]
             ),
         )
@@ -879,7 +879,7 @@ class TestListClusters(unittest.TestCase):
             ]
         )
         clusters = list(list_eks_clusters(shell).keys())
-        self.assertEqual(clusters, ["aptos-forge-banana-1", "aptos-forge-potato-2"])
+        self.assertEqual(clusters, ["velor-forge-banana-1", "velor-forge-potato-2"])
         shell.assert_commands(self)
 
     def testListClustersFails(self) -> None:
@@ -904,7 +904,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
     maxDiff = None
 
     async def testGetAllForgeJobs(self) -> None:
-        fake_clusters = ["aptos-forge-banana", "aptos-forge-apple-2"]
+        fake_clusters = ["velor-forge-banana", "velor-forge-apple-2"]
 
         # The first set of test runner pods and their test pods
         fake_first_pods = GetPodsResult(
@@ -922,22 +922,22 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
         )
         fake_forge_first_first_cluster_pods = GetPodsResult(
             items=[
-                fake_pod_item("aptos-node-0-validator", "Running"),
-                fake_pod_item("aptos-node-1-validator", "Running"),
+                fake_pod_item("velor-node-0-validator", "Running"),
+                fake_pod_item("velor-node-1-validator", "Running"),
             ]
         )
         fake_forge_first_failed_cluster_pods = GetPodsResult(
             items=[
-                fake_pod_item("aptos-node-0-validator", "Running"),
-                fake_pod_item("aptos-node-1-validator", "Running"),
-                fake_pod_item("aptos-node-0-fullnode", "Running"),
-                fake_pod_item("aptos-node-1-fullnode", "Running"),
+                fake_pod_item("velor-node-0-validator", "Running"),
+                fake_pod_item("velor-node-1-validator", "Running"),
+                fake_pod_item("velor-node-0-fullnode", "Running"),
+                fake_pod_item("velor-node-1-fullnode", "Running"),
             ]
         )
         fake_forge_first_ignore_me_cluster_pods = GetPodsResult(
             items=[
-                fake_pod_item("aptos-node-0-validator", "Failed"),
-                fake_pod_item("aptos-node-1-validator", "Running"),
+                fake_pod_item("velor-node-0-validator", "Failed"),
+                fake_pod_item("velor-node-1-validator", "Running"),
             ]
         )
 
@@ -959,8 +959,8 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
         )
         fake_forge_second_second_cluster_pods = GetPodsResult(
             items=[
-                fake_pod_item("aptos-node-0-validator", "Running"),
-                fake_pod_item("aptos-node-1-fullnode", "Running"),
+                fake_pod_item("velor-node-0-validator", "Running"),
+                fake_pod_item("velor-node-1-fullnode", "Running"),
             ]
         )
         fake_forge_second_succeeded_cluster_pods = GetPodsResult(
@@ -972,7 +972,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
         shell = SpyShell(
             [
                 FakeCommand(
-                    "aws eks update-kubeconfig --name aptos-forge-banana --kubeconfig temp1",
+                    "aws eks update-kubeconfig --name velor-forge-banana --kubeconfig temp1",
                     RunResult(0, b""),
                 ),
                 FakeCommand(
@@ -998,7 +998,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                     ),
                 ),
                 FakeCommand(
-                    "aws eks update-kubeconfig --name aptos-forge-apple-2 --kubeconfig temp2",
+                    "aws eks update-kubeconfig --name velor-forge-apple-2 --kubeconfig temp2",
                     RunResult(0, b""),
                 ),
                 FakeCommand(
@@ -1035,7 +1035,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                 name="forge-first",
                 phase="Running",
                 cluster=ForgeCluster(
-                    name="aptos-forge-banana",
+                    name="velor-forge-banana",
                     kubeconf="temp1",
                 ),
                 num_validators=2,
@@ -1044,7 +1044,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                 name="forge-failed",
                 phase="Failed",
                 cluster=ForgeCluster(
-                    name="aptos-forge-banana",
+                    name="velor-forge-banana",
                     kubeconf="temp1",
                 ),
                 num_validators=2,
@@ -1054,7 +1054,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                 name="forge-second",
                 phase="Running",
                 cluster=ForgeCluster(
-                    name="aptos-forge-apple-2",
+                    name="velor-forge-apple-2",
                     kubeconf="temp2",
                 ),
                 num_validators=1,
@@ -1064,7 +1064,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                 name="forge-succeeded",
                 phase="Succeeded",
                 cluster=ForgeCluster(
-                    name="aptos-forge-apple-2",
+                    name="velor-forge-apple-2",
                     kubeconf="temp2",
                 ),
             ),
@@ -1120,8 +1120,8 @@ class ForgeConfigTests(unittest.TestCase):
                     "enabled_clusters": ["banana"],
                     "all_clusters": ["banana", "apple"],
                     "default_helm_values": {
-                        "aptos-node": {"image": {"tag": "banana"}},
-                        "aptos-genesis": {"image": {"tag": "banana"}},
+                        "velor-node": {"image": {"tag": "banana"}},
+                        "velor-genesis": {"image": {"tag": "banana"}},
                     },
                 }
             ),
@@ -1163,15 +1163,15 @@ class ForgeConfigTests(unittest.TestCase):
             "enabled_clusters": ["banana"],
             "all_clusters": ["banana", "apple"],
             "default_helm_values": {
-                "aptos-node": {"apple": "enabled", "banana": {"enabled": "true"}}
+                "velor-node": {"apple": "enabled", "banana": {"enabled": "true"}}
             },
         }
         helm_after_complete = {
             "enabled_clusters": ["banana"],
             "all_clusters": ["banana", "apple"],
             "default_helm_values": {
-                "aptos-node": {"apple": "enabled", "banana": {"enabled": "true"}},
-                "aptos-genesis": {"apple": "enabled", "banana": {"enabled": "true"}},
+                "velor-node": {"apple": "enabled", "banana": {"enabled": "true"}},
+                "velor-genesis": {"apple": "enabled", "banana": {"enabled": "true"}},
             },
         }
         runner = CliRunner()
@@ -1210,17 +1210,17 @@ class ForgeConfigTests(unittest.TestCase):
             )
             result_helm_config_not_present: Result = runner.invoke(
                 main,
-                ["--no-log-metadata", "config", "helm", "get", "aptos-node"],
+                ["--no-log-metadata", "config", "helm", "get", "velor-node"],
                 catch_exceptions=True,
             )
             result_helm_config_present_missing = runner.invoke(
                 main,
-                ["--no-log-metadata", "config", "helm", "get", "aptos-genesis"],
+                ["--no-log-metadata", "config", "helm", "get", "velor-genesis"],
                 catch_exceptions=True,
             )
             result_helm_config_present_complete = runner.invoke(
                 main,
-                ["--no-log-metadata", "config", "helm", "get", "aptos-node"],
+                ["--no-log-metadata", "config", "helm", "get", "velor-node"],
                 catch_exceptions=True,
             )
             # assert all commands and filesystem calls are correct
@@ -1241,17 +1241,17 @@ class ForgeConfigTests(unittest.TestCase):
             self.assertIsNotNone(result_helm_config_present_missing.exception)
             self.assertEqual(
                 result_helm_config_present_missing.exception.args,  # type: ignore
-                Exception("No helm values found for chart aptos-genesis").args,
+                Exception("No helm values found for chart velor-genesis").args,
             )
 
             # we successfully get the config
             self.assertEqual(result_helm_config_present_complete.exit_code, 0)
             self.assertIsNotNone(helm_after_complete.get("default_helm_values"))
-            self.assertIsNotNone(helm_after_complete.get("default_helm_values").get("aptos-node"))  # type: ignore
+            self.assertIsNotNone(helm_after_complete.get("default_helm_values").get("velor-node"))  # type: ignore
             # the output config is printed with an extra newline
             self.assertEqual(
                 result_helm_config_present_complete.stdout_bytes,
-                f'{json.dumps(helm_after_complete.get("default_helm_values").get("aptos-node"), indent=2)}\n'.encode(),  # type: ignore
+                f'{json.dumps(helm_after_complete.get("default_helm_values").get("velor-node"), indent=2)}\n'.encode(),  # type: ignore
             )
 
     def testHelmSetConfig(self) -> None:
@@ -1274,13 +1274,13 @@ class ForgeConfigTests(unittest.TestCase):
             "enabled_clusters": ["banana"],
             "all_clusters": ["banana", "apple"],
             "default_helm_values": {
-                "aptos-node": {"apple": "enabled", "banana": {"enabled": "false"}}
+                "velor-node": {"apple": "enabled", "banana": {"enabled": "false"}}
             },
         }
         config_after = {
             **config_before,
             "default_helm_values": {
-                "aptos-node": {"apple": "enabled", "banana": {"enabled": "true"}}
+                "velor-node": {"apple": "enabled", "banana": {"enabled": "true"}}
             },
         }
         filesystem = SpyFilesystem(
@@ -1293,7 +1293,7 @@ class ForgeConfigTests(unittest.TestCase):
                 "temp1": json.dumps(config_before).encode(),
                 # read the new *helm* config from disk
                 "temp2": json.dumps(
-                    config_after["default_helm_values"]["aptos-node"]
+                    config_after["default_helm_values"]["velor-node"]
                 ).encode(),
             },
         )
@@ -1304,7 +1304,7 @@ class ForgeConfigTests(unittest.TestCase):
             )
             ret = runner.invoke(
                 main,
-                ["config", "helm", "set", "aptos-node", "--config", "temp2", "-y"],
+                ["config", "helm", "set", "velor-node", "--config", "temp2", "-y"],
                 catch_exceptions=True,
             )
             shell.assert_commands(self)
@@ -1335,7 +1335,7 @@ class ForgeConfigTests(unittest.TestCase):
         config_after = {
             **config_before,
             "default_helm_values": {
-                "aptos-node": {"apple": "enabled", "banana": {"enabled": "true"}}
+                "velor-node": {"apple": "enabled", "banana": {"enabled": "true"}}
             },
         }
         filesystem = SpyFilesystem(
@@ -1348,7 +1348,7 @@ class ForgeConfigTests(unittest.TestCase):
                 "temp1": json.dumps(config_before).encode(),
                 # read the new *helm* config from disk
                 "temp2": json.dumps(
-                    config_after["default_helm_values"]["aptos-node"]
+                    config_after["default_helm_values"]["velor-node"]
                 ).encode(),
             },
         )
@@ -1359,7 +1359,7 @@ class ForgeConfigTests(unittest.TestCase):
             )
             ret = runner.invoke(
                 main,
-                ["config", "helm", "set", "aptos-node", "--config", "temp2", "-y"],
+                ["config", "helm", "set", "velor-node", "--config", "temp2", "-y"],
                 catch_exceptions=True,
             )
             shell.assert_commands(self)
@@ -1390,7 +1390,7 @@ class ForgeConfigTests(unittest.TestCase):
         )
         config_applied = json.loads(config_fixture_after.read_bytes().decode())[
             "default_helm_values"
-        ]["aptos-node"]
+        ]["velor-node"]
         config_fixture_preview = get_fixture_path(
             "forge-default-helm-values-preview.fixture"
         )
@@ -1415,7 +1415,7 @@ class ForgeConfigTests(unittest.TestCase):
                     "config",
                     "helm",
                     "set",
-                    "aptos-node",
+                    "velor-node",
                     "--config",
                     "temp2",
                     "-y",

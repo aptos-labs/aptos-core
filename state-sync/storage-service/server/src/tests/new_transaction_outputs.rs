@@ -1,15 +1,15 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::{mock, mock::MockClient, utils};
-use aptos_config::{
+use velor_config::{
     config::StorageServiceConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_storage_service_types::requests::{
+use velor_storage_service_types::requests::{
     DataRequest, NewTransactionOutputsWithProofRequest, StorageServiceRequest,
 };
-use aptos_types::{epoch_change::EpochChangeProof, PeerId};
+use velor_types::{epoch_change::EpochChangeProof, PeerId};
 use claims::assert_none;
 use futures::channel::oneshot::Receiver;
 
@@ -408,7 +408,7 @@ async fn get_new_outputs_with_proof(
     known_epoch: u64,
     use_request_v2: bool,
     max_response_bytes_v2: u64,
-) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
+) -> Receiver<Result<bytes::Bytes, velor_network::protocols::network::RpcError>> {
     get_new_outputs_with_proof_for_peer(
         mock_client,
         known_version,
@@ -428,7 +428,7 @@ async fn get_new_outputs_with_proof_for_peer(
     peer_network_id: Option<PeerNetworkId>,
     use_request_v2: bool,
     max_response_bytes_v2: u64,
-) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
+) -> Receiver<Result<bytes::Bytes, velor_network::protocols::network::RpcError>> {
     // Create the data request
     let data_request = if use_request_v2 {
         DataRequest::get_new_transaction_output_data_with_proof(

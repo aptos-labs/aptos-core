@@ -1,16 +1,16 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 use anyhow::{anyhow, Result};
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_id_generator::{IdGenerator, U64IdGenerator};
-use aptos_infallible::RwLock;
-use aptos_storage_interface::{
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_id_generator::{IdGenerator, U64IdGenerator};
+use velor_infallible::RwLock;
+use velor_storage_interface::{
     state_store::state_view::db_state_view::DbStateViewAtVersion, DbReader, DbReaderWriter,
 };
-use aptos_types::{
+use velor_types::{
     contract_event::ContractEvent,
     event::EventKey,
     on_chain_config::{
@@ -118,7 +118,7 @@ impl EventSubscriptionService {
         }
 
         let (notification_sender, notification_receiver) =
-            aptos_channel::new(QueueStyle::KLAST, EVENT_NOTIFICATION_CHANNEL_SIZE, None);
+            velor_channel::new(QueueStyle::KLAST, EVENT_NOTIFICATION_CHANNEL_SIZE, None);
 
         // Create a new event subscription
         let subscription_id = self.get_new_subscription_id();
@@ -173,7 +173,7 @@ impl EventSubscriptionService {
         &mut self,
     ) -> Result<ReconfigNotificationListener<DbBackedOnChainConfig>, Error> {
         let (notification_sender, notification_receiver) =
-            aptos_channel::new(QueueStyle::KLAST, RECONFIG_NOTIFICATION_CHANNEL_SIZE, None);
+            velor_channel::new(QueueStyle::KLAST, RECONFIG_NOTIFICATION_CHANNEL_SIZE, None);
 
         // Create a new reconfiguration subscription
         let subscription_id = self.get_new_subscription_id();
@@ -339,7 +339,7 @@ type SubscriptionId = u64;
 #[derive(Debug)]
 struct EventSubscription {
     pub event_buffer: Vec<ContractEvent>,
-    pub notification_sender: aptos_channels::aptos_channel::Sender<(), EventNotification>,
+    pub notification_sender: velor_channels::velor_channel::Sender<(), EventNotification>,
 }
 
 impl EventSubscription {
@@ -363,7 +363,7 @@ impl EventSubscription {
 /// corresponding notifications.
 struct ReconfigSubscription {
     pub notification_sender:
-        aptos_channels::aptos_channel::Sender<(), ReconfigNotification<DbBackedOnChainConfig>>,
+        velor_channels::velor_channel::Sender<(), ReconfigNotification<DbBackedOnChainConfig>>,
 }
 
 impl ReconfigSubscription {
@@ -402,7 +402,7 @@ impl OnChainConfigProvider for DbBackedOnChainConfig {
             .get_state_value_by_version(&StateKey::on_chain_config::<T>()?, self.version)?
             .ok_or_else(|| {
                 anyhow!(
-                    "no config {} found in aptos root account state",
+                    "no config {} found in velor root account state",
                     T::CONFIG_ID
                 )
             })?
@@ -442,7 +442,7 @@ pub type ReconfigNotificationListener<P> = NotificationListener<ReconfigNotifica
 /// The component responsible for listening to subscription notifications.
 #[derive(Debug)]
 pub struct NotificationListener<T> {
-    pub notification_receiver: aptos_channels::aptos_channel::Receiver<(), T>,
+    pub notification_receiver: velor_channels::velor_channel::Receiver<(), T>,
 }
 
 impl<T> Stream for NotificationListener<T> {

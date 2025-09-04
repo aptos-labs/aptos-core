@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -22,19 +22,19 @@ use crate::{
         ReplayConcurrencyLevelOpt, RocksdbOpt, TrustedWaypointOpt,
     },
 };
-use aptos_db::{state_restore::StateSnapshotRestoreMode, AptosDB};
-use aptos_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
-use aptos_executor_types::VerifyExecutionMode;
-use aptos_storage_interface::DbReader;
-use aptos_temppath::TempPath;
-use aptos_types::transaction::Version;
+use velor_db::{state_restore::StateSnapshotRestoreMode, VelorDB};
+use velor_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
+use velor_executor_types::VerifyExecutionMode;
+use velor_storage_interface::DbReader;
+use velor_temppath::TempPath;
+use velor_types::transaction::Version;
 use proptest::{prelude::*, sample::Index};
 use std::{convert::TryInto, sync::Arc};
 use tokio::time::Duration;
 
 #[derive(Debug)]
 struct TestData {
-    db: Arc<AptosDB>,
+    db: Arc<VelorDB>,
     txn_start_ver: Version,
     state_snapshot_epoch: Option<u64>,
     state_snapshot_ver: Option<u64>,
@@ -165,7 +165,7 @@ fn test_end_to_end_impl(d: TestData) {
     .unwrap();
 
     // Check
-    let tgt_db = AptosDB::new_readonly_for_test(&tgt_db_dir);
+    let tgt_db = VelorDB::new_readonly_for_test(&tgt_db_dir);
     assert_eq!(
         d.db.get_transactions(
             d.txn_start_ver,

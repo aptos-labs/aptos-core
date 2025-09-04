@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -13,12 +13,12 @@ use crate::{
     ApiTags, Context,
 };
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{
-    verify_module_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper,
+use velor_api_types::{
+    verify_module_identifier, Address, VelorErrorCode, AsConverter, IdentifierWrapper,
     MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, RawStateValueRequest,
     RawTableItemRequest, TableItemRequest, VerifyInput, VerifyInputWithRecursion, U64,
 };
-use aptos_types::state_store::{state_key::StateKey, table::TableHandle, TStateView};
+use velor_types::state_store::{state_key::StateKey, table::TableHandle, TStateView};
 use move_core_types::language_storage::StructTag;
 use poem_openapi::{
     param::{Path, Query},
@@ -40,7 +40,7 @@ impl StateApi {
     /// Retrieves an individual resource from a given account and at a specific ledger version. If the
     /// ledger version is not specified in the request, the latest ledger version is used.
     ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// The Velor nodes prune account state history, via a configurable time window.
     /// If the requested ledger version has been pruned, the server responds with a 410.
     #[oai(
         path = "/accounts/:address/resource/:resource_type",
@@ -65,7 +65,7 @@ impl StateApi {
             .verify(0)
             .context("'resource_type' invalid")
             .map_err(|err| {
-                BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+                BasicErrorWith404::bad_request_with_code_no_info(err, VelorErrorCode::InvalidInput)
             })?;
         fail_point_poem("endpoint_get_account_resource")?;
         self.context
@@ -88,7 +88,7 @@ impl StateApi {
     /// Retrieves an individual module from a given account and at a specific ledger version. If the
     /// ledger version is not specified in the request, the latest ledger version is used.
     ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// The Velor nodes prune account state history, via a configurable time window.
     /// If the requested ledger version has been pruned, the server responds with a 410.
     #[oai(
         path = "/accounts/:address/module/:module_name",
@@ -111,7 +111,7 @@ impl StateApi {
         verify_module_identifier(module_name.0.as_str())
             .context("'module_name' invalid")
             .map_err(|err| {
-                BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+                BasicErrorWith404::bad_request_with_code_no_info(err, VelorErrorCode::InvalidInput)
             })?;
         fail_point_poem("endpoint_get_account_module")?;
         self.context
@@ -133,7 +133,7 @@ impl StateApi {
     /// fields could themselves be composed of other structs. This makes it
     /// impractical to express using query params, meaning GET isn't an option.
     ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// The Velor nodes prune account state history, via a configurable time window.
     /// If the requested ledger version has been pruned, the server responds with a 410.
     #[oai(
         path = "/tables/:table_handle/item",
@@ -158,7 +158,7 @@ impl StateApi {
             .verify()
             .context("'table_item_request' invalid")
             .map_err(|err| {
-                BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+                BasicErrorWith404::bad_request_with_code_no_info(err, VelorErrorCode::InvalidInput)
             })?;
         fail_point_poem("endpoint_get_table_item")?;
         self.context
@@ -183,7 +183,7 @@ impl StateApi {
     /// The `get_raw_table_item` requires only a serialized key comparing to the full move type information
     /// comparing to the `get_table_item` api, and can only return the query in the bcs format.
     ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// The Velor nodes prune account state history, via a configurable time window.
     /// If the requested ledger version has been pruned, the server responds with a 410.
     #[oai(
         path = "/tables/:table_handle/raw_item",
@@ -231,7 +231,7 @@ impl StateApi {
     /// Get a state value at a specific ledger version, identified by the key provided
     /// in the request body.
     ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// The Velor nodes prune account state history, via a configurable time window.
     /// If the requested ledger version has been pruned, the server responds with a 410.
     #[oai(
         path = "/experimental/state_values/raw",
@@ -282,7 +282,7 @@ impl StateApi {
             .try_into()
             .context("Failed to parse given resource type")
             .map_err(|err| {
-                BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+                BasicErrorWith404::bad_request_with_code_no_info(err, VelorErrorCode::InvalidInput)
             })?;
 
         let (ledger_info, ledger_version, state_view) = self.context.state_view(ledger_version)?;
@@ -297,7 +297,7 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &ledger_info,
                 )
             })?
@@ -312,7 +312,7 @@ impl StateApi {
                     .map_err(|err| {
                         BasicErrorWith404::internal_with_code(
                             err,
-                            AptosErrorCode::InternalError,
+                            VelorErrorCode::InternalError,
                             &ledger_info,
                         )
                     })?;
@@ -348,7 +348,7 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &ledger_info,
                 )
             })?
@@ -362,7 +362,7 @@ impl StateApi {
                     .map_err(|err| {
                         BasicErrorWith404::internal_with_code(
                             err,
-                            AptosErrorCode::InternalError,
+                            VelorErrorCode::InternalError,
                             &ledger_info,
                         )
                     })?;
@@ -390,14 +390,14 @@ impl StateApi {
             .try_into()
             .context("Failed to parse key_type")
             .map_err(|err| {
-                BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+                BasicErrorWith404::bad_request_with_code_no_info(err, VelorErrorCode::InvalidInput)
             })?;
         let key = table_item_request.key;
         let value_type = (&table_item_request.value_type)
             .try_into()
             .context("Failed to parse value_type")
             .map_err(|err| {
-                BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+                BasicErrorWith404::bad_request_with_code_no_info(err, VelorErrorCode::InvalidInput)
             })?;
 
         // Retrieve local state
@@ -414,14 +414,14 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code(
                     err,
-                    AptosErrorCode::InvalidInput,
+                    VelorErrorCode::InvalidInput,
                     &ledger_info,
                 )
             })?;
         let raw_key = vm_key.undecorate().simple_serialize().ok_or_else(|| {
             BasicErrorWith404::bad_request_with_code(
                 "Failed to serialize table key",
-                AptosErrorCode::InvalidInput,
+                VelorErrorCode::InvalidInput,
                 &ledger_info,
             )
         })?;
@@ -437,7 +437,7 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &ledger_info,
                 )
             })?
@@ -453,7 +453,7 @@ impl StateApi {
                     .map_err(|err| {
                         BasicErrorWith404::internal_with_code(
                             err,
-                            AptosErrorCode::InternalError,
+                            VelorErrorCode::InternalError,
                             &ledger_info,
                         )
                     })?;
@@ -492,7 +492,7 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &ledger_info,
                 )
             })?
@@ -503,7 +503,7 @@ impl StateApi {
                         "Table handle({}), Table key({}) and Ledger version({})",
                         table_handle, table_item_request.key, ledger_version
                     ),
-                    AptosErrorCode::TableItemNotFound,
+                    VelorErrorCode::TableItemNotFound,
                     &ledger_info,
                 )
             })?;
@@ -541,7 +541,7 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &ledger_info,
                 )
             })?;
@@ -551,7 +551,7 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &ledger_info,
                 )
             })?
@@ -562,7 +562,7 @@ impl StateApi {
                         "StateKey({}) and Ledger version({})",
                         request.key, ledger_version
                     ),
-                    AptosErrorCode::StateValueNotFound,
+                    VelorErrorCode::StateValueNotFound,
                     &ledger_info,
                 )
             })?;
@@ -574,7 +574,7 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &ledger_info,
                 )
             })?;

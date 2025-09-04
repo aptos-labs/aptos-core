@@ -51,7 +51,7 @@ BUILD_VARIANT_TAG_PREFIX_MAP = {
 VALIDATOR_IMAGE_NAME = "validator"
 VALIDATOR_TESTING_IMAGE_NAME = "validator-testing"
 FORGE_IMAGE_NAME = "forge"
-ECR_REPO_PREFIX = "aptos"
+ECR_REPO_PREFIX = "velor"
 
 DEFAULT_CONFIG = "forge-wrapper-config"
 DEFAULT_CONFIG_KEY = "forge-wrapper-config.json"
@@ -60,7 +60,7 @@ FORGE_TEST_RUNNER_TEMPLATE_PATH = "forge-test-runner-template.yaml"
 
 MULTIREGION_KUBECONFIG_DIR = "/etc/multiregion-kubeconfig"
 MULTIREGION_KUBECONFIG_PATH = f"{MULTIREGION_KUBECONFIG_DIR}/kubeconfig"
-GAR_REPO_NAME = "us-docker.pkg.dev/aptos-registry/docker"
+GAR_REPO_NAME = "us-docker.pkg.dev/velor-registry/docker"
 
 
 @dataclass
@@ -125,10 +125,10 @@ def envoption(name: str, default: Optional[Any] = None) -> Any:
 
 
 # o11y resources
-GRAFANA_BASE_URL = "https://aptoslabs.grafana.net/d/overview/overview?orgId=1&refresh=10s&var-Datasource=VictoriaMetrics%20Global%20%28Non-mainnet%29&var-BigQuery=Google%20BigQuery"
+GRAFANA_BASE_URL = "https://velorlabs.grafana.net/d/overview/overview?orgId=1&refresh=10s&var-Datasource=VictoriaMetrics%20Global%20%28Non-mainnet%29&var-BigQuery=Google%20BigQuery"
 
 # helm chart default override values
-HELM_CHARTS = ["aptos-node", "aptos-genesis"]
+HELM_CHARTS = ["velor-node", "velor-genesis"]
 
 
 class ForgeState(Enum):
@@ -302,7 +302,7 @@ class ForgeContext:
 
     @property
     def forge_chain_name(self) -> str:
-        forge_chain_name = self.forge_cluster.name.lstrip("aptos-")
+        forge_chain_name = self.forge_cluster.name.lstrip("velor-")
         if "forge" not in forge_chain_name:
             forge_chain_name += "net"
         return forge_chain_name
@@ -389,7 +389,7 @@ def get_cpu_profile_link(
     start_time: datetime | None = None,
     end_time: datetime | None = None,
 ) -> str:
-    base_url = "https://grafana.aptoslabs.com/a/grafana-pyroscope-app/profiles-explorer"
+    base_url = "https://grafana.velorlabs.com/a/grafana-pyroscope-app/profiles-explorer"
     start_timestamp = str(int(start_time.timestamp())) if start_time else "now-1h"
     end_timestamp = str(int(end_time.timestamp())) if end_time else "now"
 
@@ -451,7 +451,7 @@ def get_humio_link_for_test_runner_logs(
             "type": "link",
             "openInNewBrowserTab": "***",
             "style": "button",
-            "hrefTemplate": 'https://github.com/aptos-labs/aptos-core/pull/{{fields["github_pr"]}}',
+            "hrefTemplate": 'https://github.com/velor-chain/velor-core/pull/{{fields["github_pr"]}}',
             "textTemplate": '{{fields["github_pr"]}}',
             "header": "Forge PR",
             "width": 79,
@@ -500,7 +500,7 @@ def get_humio_link_for_node_logs(
             "type": "link",
             "openInNewBrowserTab": "***",
             "style": "button",
-            "hrefTemplate": 'https://github.com/aptos-labs/aptos-core/pull/{{fields["github_pr"]}}',
+            "hrefTemplate": 'https://github.com/velor-chain/velor-core/pull/{{fields["github_pr"]}}',
             "textTemplate": '{{fields["github_pr"]}}',
             "header": "Forge PR",
             "width": 79,
@@ -542,7 +542,7 @@ def get_axiom_link_for_test_runner_logs(
         ['k8s.labels.app.kubernetes.io/name'] = "forge" and ['k8s.namespace'] == "{forge_namespace}"
         """
 
-    logs_url = f"https://app.axiom.co/aptoslabs-hghf/explorer?initForm={urlquote(json.dumps({'apl': apl_query, 'queryOptions': apply_axiom_time_filter(time_filter), }))}"
+    logs_url = f"https://app.axiom.co/velorlabs-hghf/explorer?initForm={urlquote(json.dumps({'apl': apl_query, 'queryOptions': apply_axiom_time_filter(time_filter), }))}"
 
     return logs_url
 
@@ -563,7 +563,7 @@ def get_axiom_link_for_node_logs(
             )
         """
 
-    logs_url = f"https://app.axiom.co/aptoslabs-hghf/explorer?initForm={urlquote(json.dumps({'apl': apl_query, 'queryOptions': apply_axiom_time_filter(time_filter), }))}"
+    logs_url = f"https://app.axiom.co/velorlabs-hghf/explorer?initForm={urlquote(json.dumps({'apl': apl_query, 'queryOptions': apply_axiom_time_filter(time_filter), }))}"
 
     return logs_url
 
@@ -1019,7 +1019,7 @@ def get_aws_account_num(shell: Shell) -> str:
 def get_current_cluster_name(shell: Shell) -> str:
     result = shell.run(["kubectl", "config", "current-context"])
     current_context = result.unwrap().decode()
-    matches = re.findall(r"aptos.*", current_context)
+    matches = re.findall(r"velor.*", current_context)
     if len(matches) != 1:
         raise ValueError("Could not determine current cluster name: {current_context}")
     return matches[0]
@@ -1232,7 +1232,7 @@ def create_forge_command(
         forge_args.extend(
             [
                 "-p",
-                "aptos-forge-cli",
+                "velor-forge-cli",
                 "--",
             ]
         )
@@ -1477,7 +1477,7 @@ def test(
         log.setLevel(logging.DEBUG)
 
     ### XXX: hack these arguments to force Forge to run with overrides
-    # forge_cluster_name = "aptos-forge-0"
+    # forge_cluster_name = "velor-forge-0"
     # forge_enable_performance = "true"
 
     log.debug("Initializing backends...")
@@ -1495,7 +1495,7 @@ def test(
     log.debug("Finished sourcing configs")
 
     # XXX: manual override testing in CI
-    # forge_cluster_name = "aptos-forge-0"
+    # forge_cluster_name = "velor-forge-0"
 
     # # for performance
     # forge_enable_performance = "true"

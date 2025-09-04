@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -19,8 +19,8 @@
 pub mod grpc_network_service;
 pub mod network_controller;
 
-use aptos_logger::{info, trace, warn, Schema};
-use aptos_metrics_core::{register_int_counter_vec, IntCounterVec};
+use velor_logger::{info, trace, warn, Schema};
+use velor_metrics_core::{register_int_counter_vec, IntCounterVec};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::{
@@ -82,7 +82,7 @@ impl NetworkMode {
 
 static EVENT_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_secure_net_events",
+        "velor_secure_net_events",
         "Outcome of secure net events",
         &["service", "mode", "method", "result"]
     )
@@ -516,7 +516,7 @@ impl NetworkStream {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_config::utils;
+    use velor_config::utils;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     /// Read, Write, Connect timeout in milliseconds.

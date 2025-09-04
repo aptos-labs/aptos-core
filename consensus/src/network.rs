@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -20,9 +20,9 @@ use crate::{
     },
 };
 use anyhow::{anyhow, bail, ensure};
-use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkId;
-use aptos_consensus_types::{
+use velor_channels::{self, velor_channel, message_queues::QueueStyle};
+use velor_config::network_id::NetworkId;
+use velor_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse},
     common::Author,
     opt_proposal_msg::OptProposalMsg,
@@ -34,14 +34,14 @@ use aptos_consensus_types::{
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
 };
-use aptos_logger::prelude::*;
-use aptos_network::{
+use velor_logger::prelude::*;
+use velor_network::{
     application::interface::{NetworkClient, NetworkServiceEvents},
     protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
 };
-use aptos_reliable_broadcast::{RBMessage, RBNetworkSender};
-use aptos_types::{
+use velor_reliable_broadcast::{RBMessage, RBNetworkSender};
+use velor_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
 };
@@ -177,15 +177,15 @@ impl IncomingRpcRequest {
 /// Will be returned by the NetworkTask upon startup.
 pub struct NetworkReceivers {
     /// Provide a LIFO buffer for each (Author, MessageType) key
-    pub consensus_messages: aptos_channel::Receiver<
+    pub consensus_messages: velor_channel::Receiver<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    pub quorum_store_messages: aptos_channel::Receiver<
+    pub quorum_store_messages: velor_channel::Receiver<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    pub rpc_rx: aptos_channel::Receiver<
+    pub rpc_rx: velor_channel::Receiver<
         (AccountAddress, Discriminant<IncomingRpcRequest>),
         (AccountAddress, IncomingRpcRequest),
     >,
@@ -220,16 +220,16 @@ pub struct NetworkSender {
     pub(crate) consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
-    self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
+    self_sender: velor_channels::UnboundedSender<Event<ConsensusMsg>>,
     validators: Arc<ValidatorVerifier>,
-    time_service: aptos_time_service::TimeService,
+    time_service: velor_time_service::TimeService,
 }
 
 impl NetworkSender {
     pub fn new(
         author: Author,
         consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
-        self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
+        self_sender: velor_channels::UnboundedSender<Event<ConsensusMsg>>,
         validators: Arc<ValidatorVerifier>,
     ) -> Self {
         NetworkSender {
@@ -237,7 +237,7 @@ impl NetworkSender {
             consensus_network_client,
             self_sender,
             validators,
-            time_service: aptos_time_service::TimeService::real(),
+            time_service: velor_time_service::TimeService::real(),
         }
     }
 
@@ -672,15 +672,15 @@ impl ProofNotifier for NetworkSender {
 }
 
 pub struct NetworkTask {
-    consensus_messages_tx: aptos_channel::Sender<
+    consensus_messages_tx: velor_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    quorum_store_messages_tx: aptos_channel::Sender<
+    quorum_store_messages_tx: velor_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    rpc_tx: aptos_channel::Sender<
+    rpc_tx: velor_channel::Sender<
         (AccountAddress, Discriminant<IncomingRpcRequest>),
         (AccountAddress, IncomingRpcRequest),
     >,
@@ -691,21 +691,21 @@ impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
     pub fn new(
         network_service_events: NetworkServiceEvents<ConsensusMsg>,
-        self_receiver: aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
+        self_receiver: velor_channels::UnboundedReceiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
-        let (consensus_messages_tx, consensus_messages) = aptos_channel::new(
+        let (consensus_messages_tx, consensus_messages) = velor_channel::new(
             QueueStyle::FIFO,
             10,
             Some(&counters::CONSENSUS_CHANNEL_MSGS),
         );
-        let (quorum_store_messages_tx, quorum_store_messages) = aptos_channel::new(
+        let (quorum_store_messages_tx, quorum_store_messages) = velor_channel::new(
             QueueStyle::FIFO,
             // TODO: tune this value based on quorum store messages with backpressure
             50,
             Some(&counters::QUORUM_STORE_CHANNEL_MSGS),
         );
         let (rpc_tx, rpc_rx) =
-            aptos_channel::new(QueueStyle::FIFO, 10, Some(&counters::RPC_CHANNEL_MSGS));
+            velor_channel::new(QueueStyle::FIFO, 10, Some(&counters::RPC_CHANNEL_MSGS));
 
         // Verify the network events have been constructed correctly
         let network_and_events = network_service_events.into_network_and_events();
@@ -738,7 +738,7 @@ impl NetworkTask {
     fn push_msg(
         peer_id: AccountAddress,
         msg: ConsensusMsg,
-        tx: &aptos_channel::Sender<
+        tx: &velor_channel::Sender<
             (AccountAddress, Discriminant<ConsensusMsg>),
             (AccountAddress, ConsensusMsg),
         >,
@@ -781,7 +781,7 @@ impl NetworkTask {
                                 (peer_id, discriminant(&req_with_callback)),
                                 (peer_id, req_with_callback),
                             ) {
-                                warn!(error = ?e, "aptos channel closed");
+                                warn!(error = ?e, "velor channel closed");
                             };
                         },
                         ConsensusMsg::CommitDecisionMsg(commit_decision) => {
@@ -796,7 +796,7 @@ impl NetworkTask {
                                 (peer_id, discriminant(&req_with_callback)),
                                 (peer_id, req_with_callback),
                             ) {
-                                warn!(error = ?e, "aptos channel closed");
+                                warn!(error = ?e, "velor channel closed");
                             };
                         },
                         consensus_msg @ (ConsensusMsg::ProposalMsg(_)
@@ -852,7 +852,7 @@ impl NetworkTask {
                                 (peer_id, discriminant(&req_with_callback)),
                                 (peer_id, req_with_callback),
                             ) {
-                                warn!(error = ?e, "aptos channel closed");
+                                warn!(error = ?e, "velor channel closed");
                             };
                         },
                         _ => {
@@ -942,7 +942,7 @@ impl NetworkTask {
                         .rpc_tx
                         .push((peer_id, discriminant(&req)), (peer_id, req))
                     {
-                        warn!(error = ?e, "aptos channel closed");
+                        warn!(error = ?e, "velor channel closed");
                     };
                 },
             });

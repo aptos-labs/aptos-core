@@ -1,14 +1,14 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::{mock, mock::MockClient, utils};
-use aptos_config::config::StorageServiceConfig;
-use aptos_storage_service_types::{
+use velor_config::config::StorageServiceConfig;
+use velor_storage_service_types::{
     requests::{DataRequest, TransactionsOrOutputsWithProofRequest},
     responses::{DataResponse, StorageServiceResponse, TransactionDataResponseType},
     StorageServiceError,
 };
-use aptos_types::transaction::{
+use velor_types::transaction::{
     TransactionListWithProof, TransactionListWithProofV2, TransactionOutputListWithProof,
     TransactionOutputListWithProofV2,
 };

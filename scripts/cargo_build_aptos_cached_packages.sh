@@ -1,15 +1,15 @@
 #!/bin/sh
 
-# This script ensures that aptos-cached-packages has been built correctly.
+# This script ensures that velor-cached-packages has been built correctly.
 #
-# If you want to run this from anywhere in aptos-core, try adding the wrapper
+# If you want to run this from anywhere in velor-core, try adding the wrapper
 # script to your path:
 # https://gist.github.com/banool/e6a2b85e2fff067d3a215cbfaf808032
 
 # Make sure we're in the root of the repo.
 if [ ! -d ".github" ]
 then
-    echo "Please run this from the root of aptos-core!"
+    echo "Please run this from the root of velor-core!"
     exit 1
 fi
 
@@ -23,13 +23,13 @@ fi
 set -e
 set -x
 
-# Ensure that aptos-cached-packages have been built correctly.
+# Ensure that velor-cached-packages have been built correctly.
 unset SKIP_FRAMEWORK_BUILD
-cargo build -p aptos-cached-packages
+cargo build -p velor-cached-packages
 if [ -n "$CHECK_ARG" ]; then
-    if [ -n "$(git status --porcelain -uno aptos-move)" ]; then
+    if [ -n "$(git status --porcelain -uno velor-move)" ]; then
       git diff
-      echo "There are unstaged changes after running 'cargo build -p aptos-cached-packages'! Are you sure aptos-cached-packages is up-to-date?"
+      echo "There are unstaged changes after running 'cargo build -p velor-cached-packages'! Are you sure velor-cached-packages is up-to-date?"
       exit 1
     fi
 fi

@@ -1,7 +1,7 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod aptos_vm_uncoordinated;
+pub mod velor_vm_uncoordinated;
 pub mod native_config;
 pub mod native_transaction;
 pub mod native_vm;

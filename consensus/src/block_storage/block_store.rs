@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -21,9 +21,9 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
-use aptos_bitvec::BitVec;
-use aptos_config::config::BlockTransactionFilterConfig;
-use aptos_consensus_types::{
+use velor_bitvec::BitVec;
+use velor_config::config::BlockTransactionFilterConfig;
+use velor_consensus_types::{
     block::Block,
     common::Round,
     pipelined_block::{ExecutionSummary, OrderedBlockWindow, PipelinedBlock},
@@ -32,11 +32,11 @@ use aptos_consensus_types::{
     timeout_2chain::TwoChainTimeoutCertificate,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
-use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
-use aptos_executor_types::state_compute_result::StateComputeResult;
-use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::prelude::*;
-use aptos_types::{
+use velor_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
+use velor_executor_types::state_compute_result::StateComputeResult;
+use velor_infallible::{Mutex, RwLock};
+use velor_logger::prelude::*;
+use velor_types::{
     ledger_info::LedgerInfoWithSignatures, proof::accumulator::InMemoryTransactionAccumulator,
 };
 use futures::executor::block_on;

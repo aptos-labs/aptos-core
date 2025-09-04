@@ -57,7 +57,7 @@
   "gas_unit_price": "0",
   "expiration_timestamp_secs": "60",
   "payload": {
-    "function": "0x1::aptos_account::transfer",
+    "function": "0x1::velor_account::transfer",
     "type_arguments": [],
     "arguments": [
       "0x1",

@@ -1,16 +1,16 @@
-# Aptos Protos
+# Velor Protos
 
-This repository contains the protobuf definitions for the Aptos tech stack.
+This repository contains the protobuf definitions for the Velor tech stack.
 
 ## Usage
 Import the generated code like this:
 ```typescript
-import { aptos } from "@aptos-labs/aptos-protos";
+import { velor } from "@velor-chain/velor-protos";
 ```
 
 Then use it like this:
 ```typescript
-function parse(transaction: aptos.transaction.v1.Transaction) {
+function parse(transaction: velor.transaction.v1.Transaction) {
   console.log(transaction)
 }
 ```

@@ -1,4 +1,4 @@
-# aptos-fullnode
+# velor-fullnode
 
 ![Version: 1.0.0](https://img.shields.io/badge/Version-1.0.0-informational?style=flat-square) ![AppVersion: 1.0.0](https://img.shields.io/badge/AppVersion-1.0.0-informational?style=flat-square)
 
@@ -7,7 +7,7 @@
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | affinity | object | `{}` |  |
-| aptos_chains | object | `{"devnet":{"genesis_blob_url":"https://devnet.aptoslabs.com/genesis.blob","waypoint_txt_url":"https://devnet.aptoslabs.com/waypoint.txt"},"mainnet":{"genesis_blob_url":"https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/genesis.blob","waypoint_txt_url":"https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt"},"testnet":{"genesis_blob_url":"https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis.blob","waypoint_txt_url":"https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis_waypoint.txt"}}` | For each supported chain, specify the URLs from which to download the genesis.blob and waypoint.txt |
+| velor_chains | object | `{"devnet":{"genesis_blob_url":"https://devnet.velorlabs.com/genesis.blob","waypoint_txt_url":"https://devnet.velorlabs.com/waypoint.txt"},"mainnet":{"genesis_blob_url":"https://raw.githubusercontent.com/velor-chain/velor-networks/main/mainnet/genesis.blob","waypoint_txt_url":"https://raw.githubusercontent.com/velor-chain/velor-networks/main/mainnet/waypoint.txt"},"testnet":{"genesis_blob_url":"https://raw.githubusercontent.com/velor-chain/velor-networks/main/testnet/genesis.blob","waypoint_txt_url":"https://raw.githubusercontent.com/velor-chain/velor-networks/main/testnet/genesis_waypoint.txt"}}` | For each supported chain, specify the URLs from which to download the genesis.blob and waypoint.txt |
 | backup.affinity | object | `{}` |  |
 | backup.config.azure.account | string | `nil` |  |
 | backup.config.azure.container | string | `nil` |  |
@@ -22,7 +22,7 @@
 | backup.config.transaction_batch_size | int | `1000000` | Transaction batch size |
 | backup.enable | bool | `false` | Whether to enable backup |
 | backup.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for backup images |
-| backup.image.repo | string | `"aptoslabs/tools"` | Image repo to use for backup images |
+| backup.image.repo | string | `"velorlabs/tools"` | Image repo to use for backup images |
 | backup.image.tag | string | `nil` | Image tag to use for backup images |
 | backup.nodeSelector | object | `{}` |  |
 | backup.resources.limits.cpu | int | `6` |  |
@@ -51,10 +51,10 @@
 | chain.genesisConfigmap | string | `nil` | Kubernetes Configmap from which to load the genesis.blob and waypoint.txt |
 | chain.genesisSecret | string | `nil` | Kubernetes Secret from which to load the genesis.blob and waypoint.txt |
 | chain.label | string | `nil` | The value of the `chain_name` label. If empty, defaults to `.Values.chain.name` |
-| chain.name | string | `"devnet"` | Name of the testnet to connect to. There must be a corresponding entry in .Values.aptos_chains |
-| fullnode.config | object | `{"full_node_networks":[{"identity":{},"inbound_rate_limit_config":null,"network_id":"public","outbound_rate_limit_config":null}]}` | Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs |
+| chain.name | string | `"devnet"` | Name of the testnet to connect to. There must be a corresponding entry in .Values.velor_chains |
+| fullnode.config | object | `{"full_node_networks":[{"identity":{},"inbound_rate_limit_config":null,"network_id":"public","outbound_rate_limit_config":null}]}` | Fullnode configuration. See NodeConfig https://github.com/velor-chain/velor-core/blob/main/config/src/config/mod.rs |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for fullnode images |
-| image.repo | string | `"aptoslabs/validator"` | Image repo to use for fullnode images. Fullnodes and validators use the same image |
+| image.repo | string | `"velorlabs/validator"` | Image repo to use for fullnode images. Fullnodes and validators use the same image |
 | image.tag | string | `nil` | Image tag to use for fullnode images. If set, overrides `imageTag` |
 | imageTag | string | `"devnet"` | Default image tag to use for all fullnode images |
 | ingress.annotations | object | `{}` |  |
@@ -84,7 +84,7 @@
 | restore.config.trusted_waypoints | list | `[]` | List of trusted waypoints for restore |
 | restore.enabled | bool | `false` |  |
 | restore.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for restore images |
-| restore.image.repo | string | `"aptoslabs/tools"` | Image repo to use for restore images |
+| restore.image.repo | string | `"velorlabs/tools"` | Image repo to use for restore images |
 | restore.image.tag | string | `nil` | Image tag to use for restore images |
 | restore.nodeSelector | object | `{}` |  |
 | restore.resources.limits.cpu | int | `16` |  |
@@ -99,7 +99,7 @@
 | service.exposeMetrics | bool | `false` | Whether to expose the metrics port on fullnodes |
 | service.externalTrafficPolicy | string | `nil` | The externalTrafficPolicy for the fullnode service |
 | service.loadBalancerSourceRanges | list | `[]` | If set and if the ServiceType is LoadBalancer, allow traffic to fullnode from these CIDRs |
-| service.type | string | `"ClusterIP"` | The Kubernetes ServiceType to use for the fullnode. Change this to LoadBalancer expose the REST API, aptosnet endpoint externally |
+| service.type | string | `"ClusterIP"` | The Kubernetes ServiceType to use for the fullnode. Change this to LoadBalancer expose the REST API, velornet endpoint externally |
 | serviceAccount.annotations | object | `{}` |  |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created |
 | serviceAccount.name | string | `nil` | The name of the service account to use. If not set and create is true, a name is generated using the fullname template |
@@ -111,8 +111,8 @@
 Configuration
 -------------
 
-This Helm chart deploys a public fullnode for the Aptos blockchain network. The
-fullnode connects to Aptos validators and synchronises the blockchain state to
+This Helm chart deploys a public fullnode for the Velor blockchain network. The
+fullnode connects to Velor validators and synchronises the blockchain state to
 a persistent volume. It provides a [REST API][] for interacting with
 the blockchain.
 
@@ -121,9 +121,9 @@ See [values.yaml][] for the full list of options you can configure.
 Connecting to Testnet
 -------------
 
-To connect to the Aptos devnet, you must have the correct genesis blob and waypoint. The source of truth for these are hosted here: https://github.com/aptos-labs/aptos-genesis-waypoint
+To connect to the Velor devnet, you must have the correct genesis blob and waypoint. The source of truth for these are hosted here: https://github.com/velor-chain/velor-genesis-waypoint
 
-The waypoint and genesis blobs are download at runtime, and their URLs are specified in `.Values.aptos_chains`.
+The waypoint and genesis blobs are download at runtime, and their URLs are specified in `.Values.velor_chains`.
 
 Deployment
 ----------
@@ -134,6 +134,6 @@ Deployment
 
        $ helm install fullnode --set storage.class=gp2 .
 
-[REST API]: https://github.com/aptos-labs/aptos-core/blob/main/api/doc/spec.yaml
+[REST API]: https://github.com/velor-chain/velor-core/blob/main/api/doc/spec.yaml
 [values.yaml]: values.yaml
-[Aptos dockerhub]: https://hub.docker.com/r/aptoslabs/validator/tags?page=1&ordering=last_updated
+[Velor dockerhub]: https://hub.docker.com/r/velorlabs/validator/tags?page=1&ordering=last_updated

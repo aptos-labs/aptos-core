@@ -10,7 +10,7 @@ runs:
       run: docker context create builders
 
     - name: setup docker buildx
-      uses: aptos-labs/setup-buildx-action@7952e9cf0debaf1f3f3e5dc7d9c5ea6ececb127e # pin v2.4.0
+      uses: velor-chain/setup-buildx-action@7952e9cf0debaf1f3f3e5dc7d9c5ea6ececb127e # pin v2.4.0
       with:
         endpoint: builders
         version: v0.11.0

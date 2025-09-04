@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::vuf::VUF;
 use anyhow::{anyhow, ensure};
-use aptos_crypto::hash::CryptoHash;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_dkg::utils::multi_pairing;
-use aptos_types::keyless::Pepper;
+use velor_crypto::hash::CryptoHash;
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_dkg::utils::multi_pairing;
+use velor_types::keyless::Pepper;
 use ark_bls12_381::{Bls12_381, Fq12, Fr, G1Affine, G2Affine, G2Projective};
 use ark_ec::{
     hashing::HashToCurve, pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup,
@@ -26,11 +26,11 @@ use std::ops::Mul;
 
 pub struct Bls12381G1Bls {}
 
-pub static DST: &[u8] = b"APTOS_PEPPER_BLS12381_VUF_DST";
+pub static DST: &[u8] = b"VELOR_PEPPER_BLS12381_VUF_DST";
 
-pub static PINKAS_DST: &[u8] = b"APTOS_PINKAS_PEPPER_DST";
+pub static PINKAS_DST: &[u8] = b"VELOR_PINKAS_PEPPER_DST";
 
-pub static PINKAS_SECRET_KEY_BASE_SEED: &[u8] = b"APTOS_PINKAS_PEPPER_SECRET_KEY_BASE_SEED";
+pub static PINKAS_SECRET_KEY_BASE_SEED: &[u8] = b"VELOR_PINKAS_PEPPER_SECRET_KEY_BASE_SEED";
 
 pub static PINKAS_SECRET_KEY_BASE_G2: Lazy<blstrs::G2Projective> =
     Lazy::new(|| blstrs::G2Projective::hash_to_curve(PINKAS_SECRET_KEY_BASE_SEED, PINKAS_DST, b""));

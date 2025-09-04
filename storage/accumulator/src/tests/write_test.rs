@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,8 +7,8 @@ use crate::test_helpers::{
     arb_hash_batch, arb_list_of_hash_batches, test_append_empty_impl, test_append_many_impl,
     MockHashStore, TestAccumulator,
 };
-use aptos_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH;
-use aptos_types::proof::definition::LeafCount;
+use velor_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH;
+use velor_types::proof::definition::LeafCount;
 
 #[test]
 fn test_append_empty_on_empty() {

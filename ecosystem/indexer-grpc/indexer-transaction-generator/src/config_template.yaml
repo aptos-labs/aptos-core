@@ -1,23 +1,23 @@
 import_config:
   testnet:
     # Transaction Stream endpoint address.
-    transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
-    # (Optional) The key to use with developers.aptoslabs.com
+    transaction_stream_endpoint: https://grpc.testnet.velorlabs.com:443
+    # (Optional) The key to use with developers.velorlabs.com
     api_key: YOUR_KEY_HERE
     # A map from versions to dump and their output names.
     versions_to_import:
       123: testnet_v1.json
   # mainnet:
   #   # Transaction Stream endpoint address.
-  #   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
-  #   # (Optional) The key to use with developers.aptoslabs.com
+  #   transaction_stream_endpoint: https://grpc.mainnet.velorlabs.com:443
+  #   # (Optional) The key to use with developers.velorlabs.com
   #   api_key: YOUR_KEY_HERE
   #   versions_to_import:
   #     123: mainnetnet_v1.json
   # devnet:
   #   # Transaction Stream endpoint address.
-  #   transaction_stream_endpoint: https://grpc.devnet.aptoslabs.com:443
-  #   # (Optional) The key to use with developers.aptoslabs.com
+  #   transaction_stream_endpoint: https://grpc.devnet.velorlabs.com:443
+  #   # (Optional) The key to use with developers.velorlabs.com
   #   api_key: YOUR_KEY_HERE
   #   versions_to_import:
   #     123: devnet_v1.json

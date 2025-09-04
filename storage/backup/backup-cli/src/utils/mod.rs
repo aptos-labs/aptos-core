@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -11,26 +11,26 @@ pub(crate) mod stream;
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
-use aptos_config::config::{
+use velor_config::config::{
     RocksdbConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
-use aptos_crypto::HashValue;
-use aptos_db::{
+use velor_crypto::HashValue;
+use velor_db::{
     backup::restore_handler::RestoreHandler,
-    db::AptosDB,
+    db::VelorDB,
     get_restore_handler::GetRestoreHandler,
     state_restore::{
         StateSnapshotRestore, StateSnapshotRestoreMode, StateValueBatch, StateValueWriter,
     },
 };
-use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
-use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
-use aptos_infallible::duration_since_epoch;
-use aptos_jellyfish_merkle::{NodeBatch, TreeWriter};
-use aptos_logger::info;
-use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::{
+use velor_db_indexer_schemas::metadata::StateSnapshotProgress;
+use velor_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
+use velor_infallible::duration_since_epoch;
+use velor_jellyfish_merkle::{NodeBatch, TreeWriter};
+use velor_logger::info;
+use velor_storage_interface::{VelorDbError, Result};
+use velor_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
@@ -305,7 +305,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
             } else {
                 None
             };
-            let restore_handler = Arc::new(AptosDB::open_kv_only(
+            let restore_handler = Arc::new(VelorDB::open_kv_only(
                 StorageDirPaths::from_path(db_dir),
                 false,                       /* read_only */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
@@ -355,7 +355,7 @@ impl TrustedWaypointOpt {
             trusted_waypoints
                 .insert(w.version(), w)
                 .map_or(Ok(()), |w| {
-                    Err(AptosDbError::Other(format!(
+                    Err(VelorDbError::Other(format!(
                         "Duplicated waypoints at version {}",
                         w.version()
                     )))
@@ -391,7 +391,7 @@ pub struct ConcurrentDataRequestsOpt {}
 
 #[derive(Clone, Copy, Default, Parser)]
 pub struct ReplayConcurrencyLevelOpt {
-    /// AptosVM::set_concurrency_level_once() is called with this
+    /// VelorVM::set_concurrency_level_once() is called with this
     #[clap(
         long,
         help = "concurrency_level used by the transaction executor, applicable when replaying transactions \
@@ -430,7 +430,7 @@ impl<T: AsRef<Path>> PathToString for T {
             .to_path_buf()
             .into_os_string()
             .into_string()
-            .map_err(|s| AptosDbError::Other(format!("into_string failed for OsString '{:?}'", s)))
+            .map_err(|s| VelorDbError::Other(format!("into_string failed for OsString '{:?}'", s)))
     }
 }
 

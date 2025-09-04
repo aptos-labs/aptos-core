@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,26 +13,26 @@ use crate::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
-use aptos_config::{
+use velor_config::{
     config::{PeerRole, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_netcore::transport::ConnectionOrigin;
-use aptos_types::PeerId;
+use velor_netcore::transport::ConnectionOrigin;
+use velor_types::PeerId;
 use async_trait::async_trait;
 use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 /// A sender to a node to mock an inbound network message from [`PeerManager`]
 pub type InboundMessageSender =
-    aptos_channels::aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>;
+    velor_channels::velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>;
 
 /// A sender to a node to mock an inbound connection from [`PeerManager`]
 pub type ConnectionUpdateSender = crate::peer_manager::conn_notifs_channel::Sender;
 
 /// A receiver to get outbound network messages to [`PeerManager`]
 pub type OutboundMessageReceiver =
-    aptos_channels::aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>;
+    velor_channels::velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>;
 
 /// A connection handle describing the network for a node.
 ///

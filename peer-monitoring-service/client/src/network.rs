@@ -1,17 +1,17 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     logging::{LogEntry, LogEvent, LogSchema},
     metrics, Error,
 };
-use aptos_config::network_id::PeerNetworkId;
-use aptos_logger::{trace, warn};
-use aptos_network::application::{
+use velor_config::network_id::PeerNetworkId;
+use velor_logger::{trace, warn};
+use velor_network::application::{
     interface::{NetworkClient, NetworkClientInterface},
     storage::PeersAndMetadata,
 };
-use aptos_peer_monitoring_service_types::{
+use velor_peer_monitoring_service_types::{
     request::PeerMonitoringServiceRequest, response::PeerMonitoringServiceResponse,
     PeerMonitoringServiceMessage,
 };

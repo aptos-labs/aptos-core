@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_bounded_executor::BoundedExecutor;
-use aptos_consensus_types::common::Author;
-use aptos_logger::{debug, sample, sample::SampleRate, warn};
-use aptos_time_service::{TimeService, TimeServiceTrait};
+use velor_bounded_executor::BoundedExecutor;
+use velor_consensus_types::common::Author;
+use velor_logger::{debug, sample, sample::SampleRate, warn};
+use velor_time_service::{TimeService, TimeServiceTrait};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{

@@ -1,0 +1,91 @@
+module 0xcafe.CallRecrusive {
+    /////////////////////////////////////////////////
+    // INSTRUCTIONS:
+    // * `CALL_BASE`
+    // * `CALL_PER_ARG`
+    // * `CALL_PER_LOCAL`
+    // * `UNPACK_BASE`
+    // * `UNPACK_PER_FIELD`
+
+    f1(n: u64) {
+    label b0:
+        jump_if_false (0 < copy(n)) end;
+        Self.f1(move(n) - 1);
+    label end:
+        return;
+    }
+
+    public entry calibrate_f1() {
+    label b0:
+        Self.f1(100);
+        return;
+    }
+
+    f2(n: u64, a: u64) {
+    label b0:
+        jump_if_false (0 < copy(n)) end;
+        Self.f2(move(n) - 1, move(a));
+    label end:
+        return;
+    }
+
+    public entry calibrate_f2() {
+    label b0:
+        Self.f2(1000, 50);
+        return;
+    }
+
+    f3(n: u64) {
+        let l1: u64;
+        let l2: u64;
+        let l3: u64;
+    label b0:
+        jump_if_false (0 < copy(n)) end;
+        Self.f3(move(n) - 1);
+    label end:
+        return;
+    }
+
+    public entry calibrate_f3() {
+    label b0:
+        Self.f3(200);
+        return;
+    }
+
+    f4() {
+    label b0:
+        return;
+    }
+
+    public entry calibrate_f4_loop() {
+    let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        Self.f4();
+
+        jump loop_start;
+    label loop_end:
+        return;  
+    }
+
+    f5(n: u64) {
+    label b0:
+        jump_if_false (0 < copy(n)) end;
+        Self.f5(move(n) - 1);
+        jump true_end;
+    label end:
+        _ = (1 - 2);
+    label true_end:
+        return;
+    }
+
+    public entry calibrate_f5_should_error() {
+    label b0:
+        Self.f5(100);
+        return;
+    }
+}

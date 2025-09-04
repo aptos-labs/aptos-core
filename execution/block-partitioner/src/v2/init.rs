@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
         state::PartitionState, types::OriginalTxnIdx, PartitionerV2,
     },
 };
-use aptos_metrics_core::TimerHelper;
+use velor_metrics_core::TimerHelper;
 use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
 use std::sync::RwLock;
 

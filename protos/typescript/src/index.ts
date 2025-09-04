@@ -1,3 +1,3 @@
 /* eslint-disable */
 
-export * as aptos from "./index.aptos";
+export * as velor from "./index.velor";

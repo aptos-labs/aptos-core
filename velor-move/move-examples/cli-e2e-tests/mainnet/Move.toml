@@ -1,0 +1,19 @@
+[package]
+name = "cli_e2e_tests"
+version = "0.0.1"
+
+[addresses]
+addr = "_"
+
+[dev-addresses]
+addr = "0x12345"
+
+[dependencies.VelorFramework]
+git = "https://github.com/velor-chain/velor-framework.git"
+rev = "mainnet"
+subdir = "velor-framework"
+
+[dependencies.VelorTokenObjects]
+git = "https://github.com/velor-chain/velor-framework.git"
+rev = "mainnet"
+subdir = "velor-token-objects"

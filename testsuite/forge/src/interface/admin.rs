@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{ChainInfo, CoreContext, Test};
 use crate::{Result, TestReport};
-use aptos_rest_client::Client as RestClient;
-use aptos_sdk::types::LocalAccount;
+use velor_rest_client::Client as RestClient;
+use velor_sdk::types::LocalAccount;
 use reqwest::Url;
 
 /// The testing interface which defines a test written from the perspective of the Admin of the

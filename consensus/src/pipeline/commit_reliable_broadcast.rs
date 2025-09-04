@@ -1,15 +1,15 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{counters, network::NetworkSender, network_interface::ConsensusMsg};
 use anyhow::bail;
-use aptos_consensus_types::{
+use velor_consensus_types::{
     common::Author,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
 };
-use aptos_infallible::Mutex;
-use aptos_reliable_broadcast::{BroadcastStatus, RBMessage, RBNetworkSender};
-use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
+use velor_infallible::Mutex;
+use velor_reliable_broadcast::{BroadcastStatus, RBMessage, RBNetworkSender};
+use velor_types::{validator_verifier::ValidatorVerifier, PeerId};
 use async_trait::async_trait;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,15 +6,15 @@ use crate::{
     peer_states::{key_value::StateValueInterface, request_tracker::RequestTracker},
     Error, LogEntry, LogEvent, LogSchema,
 };
-use aptos_config::{config::NodeMonitoringConfig, network_id::PeerNetworkId};
-use aptos_infallible::RwLock;
-use aptos_logger::warn;
-use aptos_network::application::metadata::PeerMetadata;
-use aptos_peer_monitoring_service_types::{
+use velor_config::{config::NodeMonitoringConfig, network_id::PeerNetworkId};
+use velor_infallible::RwLock;
+use velor_logger::warn;
+use velor_network::application::metadata::PeerMetadata;
+use velor_peer_monitoring_service_types::{
     request::PeerMonitoringServiceRequest,
     response::{NodeInformationResponse, PeerMonitoringServiceResponse},
 };
-use aptos_time_service::TimeService;
+use velor_time_service::TimeService;
 use std::{
     fmt,
     fmt::{Display, Formatter},
@@ -144,22 +144,22 @@ impl Display for NodeInfoState {
 #[cfg(test)]
 mod test {
     use crate::peer_states::{key_value::StateValueInterface, node_info::NodeInfoState};
-    use aptos_config::{
+    use velor_config::{
         config::{NodeMonitoringConfig, PeerRole},
         network_id::PeerNetworkId,
     };
-    use aptos_netcore::transport::ConnectionOrigin;
-    use aptos_network::{
+    use velor_netcore::transport::ConnectionOrigin;
+    use velor_network::{
         application::metadata::PeerMetadata,
         protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
         transport::{ConnectionId, ConnectionMetadata},
     };
-    use aptos_peer_monitoring_service_types::{
+    use velor_peer_monitoring_service_types::{
         request::PeerMonitoringServiceRequest,
         response::{NodeInformationResponse, PeerMonitoringServiceResponse},
     };
-    use aptos_time_service::TimeService;
-    use aptos_types::network_address::NetworkAddress;
+    use velor_time_service::TimeService;
+    use velor_types::network_address::NetworkAddress;
     use std::{str::FromStr, time::Duration};
 
     // Useful test constants
@@ -178,7 +178,7 @@ mod test {
         // Handle several valid node info responses and verify the state
         for i in 0..10 {
             // Generate the test data
-            let build_information = aptos_build_info::get_build_information();
+            let build_information = velor_build_info::get_build_information();
             let highest_synced_epoch = i;
             let highest_synced_version = (i + 1) * 100;
             let ledger_timestamp_usecs = (i + 1) * 200;

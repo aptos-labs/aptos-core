@@ -1,9 +1,9 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use anyhow::ensure;
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use velor_types::{transaction::SignedTransaction, PeerId};
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::{

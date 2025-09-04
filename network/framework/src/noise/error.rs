@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::application;
-use aptos_crypto::noise::NoiseError;
-use aptos_short_hex_str::ShortHexStr;
-use aptos_types::PeerId;
+use velor_crypto::noise::NoiseError;
+use velor_short_hex_str::ShortHexStr;
+use velor_types::PeerId;
 use std::io;
 use thiserror::Error;
 

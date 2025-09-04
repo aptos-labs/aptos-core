@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #[macro_use]
 extern crate criterion;
 
-use aptos_types::keyless::{
+use velor_types::keyless::{
     get_public_inputs_hash,
     test_utils::{get_sample_groth16_sig_and_pk, get_sample_jwk},
     Configuration,

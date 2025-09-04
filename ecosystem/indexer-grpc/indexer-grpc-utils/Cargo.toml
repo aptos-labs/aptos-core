@@ -1,5 +1,5 @@
 [package]
-name = "aptos-indexer-grpc-utils"
+name = "velor-indexer-grpc-utils"
 description = "Indexer gRPC utils."
 version = "1.0.0"
 
@@ -14,9 +14,9 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-protos = { workspace = true }
-aptos-transaction-filter = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-protos = { workspace = true }
+velor-transaction-filter = { workspace = true }
 async-trait = { workspace = true }
 backoff = { workspace = true }
 base64 = { workspace = true }

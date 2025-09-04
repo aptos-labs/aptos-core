@@ -1,6 +1,6 @@
 [package]
-name = "aptos-network-benchmark"
-description = "Aptos network benchmark"
+name = "velor-network-benchmark"
+description = "Velor network benchmark"
 version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -14,12 +14,12 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-config = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-network = { workspace = true }
-aptos-time-service = { workspace = true }
-aptos-types = { workspace = true }
+velor-config = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-network = { workspace = true }
+velor-time-service = { workspace = true }
+velor-types = { workspace = true }
 async-channel = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }

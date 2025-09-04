@@ -6,102 +6,102 @@ members = [
     "api/openapi-spec-generator",
     "api/test-context",
     "api/types",
-    "aptos-move/aptos-abstract-gas-usage",
-    "aptos-move/aptos-aggregator",
-    "aptos-move/aptos-debugger",
-    "aptos-move/aptos-e2e-comparison-testing",
-    "aptos-move/aptos-gas-algebra",
-    "aptos-move/aptos-gas-calibration",
-    "aptos-move/aptos-gas-meter",
-    "aptos-move/aptos-gas-profiling",
-    "aptos-move/aptos-gas-schedule",
-    "aptos-move/aptos-gas-schedule-updator",
-    "aptos-move/aptos-memory-usage-tracker",
-    "aptos-move/aptos-native-interface",
-    "aptos-move/aptos-release-builder",
-    "aptos-move/aptos-resource-viewer",
-    "aptos-move/aptos-sdk-builder",
-    "aptos-move/aptos-transaction-benchmarks",
-    "aptos-move/aptos-transaction-simulation",
-    "aptos-move/aptos-transactional-test-harness",
-    "aptos-move/aptos-validator-interface",
-    "aptos-move/aptos-vm",
-    "aptos-move/aptos-vm-benchmarks",
-    "aptos-move/aptos-vm-environment",
-    "aptos-move/aptos-vm-logging",
-    "aptos-move/aptos-vm-profiling",
-    "aptos-move/aptos-vm-types",
-    "aptos-move/aptos-workspace-server",
-    "aptos-move/block-executor",
-    "aptos-move/e2e-benchmark",
-    "aptos-move/e2e-move-tests",
-    "aptos-move/e2e-tests",
-    "aptos-move/e2e-testsuite",
-    "aptos-move/framework",
-    "aptos-move/framework/cached-packages",
-    "aptos-move/framework/table-natives",
-    "aptos-move/move-examples",
-    "aptos-move/mvhashmap",
-    "aptos-move/package-builder",
-    "aptos-move/replay-benchmark",
-    "aptos-move/script-composer",
-    "aptos-move/vm-genesis",
-    "aptos-node",
+    "velor-move/velor-abstract-gas-usage",
+    "velor-move/velor-aggregator",
+    "velor-move/velor-debugger",
+    "velor-move/velor-e2e-comparison-testing",
+    "velor-move/velor-gas-algebra",
+    "velor-move/velor-gas-calibration",
+    "velor-move/velor-gas-meter",
+    "velor-move/velor-gas-profiling",
+    "velor-move/velor-gas-schedule",
+    "velor-move/velor-gas-schedule-updator",
+    "velor-move/velor-memory-usage-tracker",
+    "velor-move/velor-native-interface",
+    "velor-move/velor-release-builder",
+    "velor-move/velor-resource-viewer",
+    "velor-move/velor-sdk-builder",
+    "velor-move/velor-transaction-benchmarks",
+    "velor-move/velor-transaction-simulation",
+    "velor-move/velor-transactional-test-harness",
+    "velor-move/velor-validator-interface",
+    "velor-move/velor-vm",
+    "velor-move/velor-vm-benchmarks",
+    "velor-move/velor-vm-environment",
+    "velor-move/velor-vm-logging",
+    "velor-move/velor-vm-profiling",
+    "velor-move/velor-vm-types",
+    "velor-move/velor-workspace-server",
+    "velor-move/block-executor",
+    "velor-move/e2e-benchmark",
+    "velor-move/e2e-move-tests",
+    "velor-move/e2e-tests",
+    "velor-move/e2e-testsuite",
+    "velor-move/framework",
+    "velor-move/framework/cached-packages",
+    "velor-move/framework/table-natives",
+    "velor-move/move-examples",
+    "velor-move/mvhashmap",
+    "velor-move/package-builder",
+    "velor-move/replay-benchmark",
+    "velor-move/script-composer",
+    "velor-move/vm-genesis",
+    "velor-node",
     "config",
     "config/global-constants",
     "consensus",
     "consensus/consensus-types",
     "consensus/safety-rules",
-    "crates/aptos",
-    "crates/aptos-admin-service",
-    "crates/aptos-api-tester",
-    "crates/aptos-bcs-utils",
-    "crates/aptos-bitvec",
-    "crates/aptos-build-info",
-    "crates/aptos-collections",
-    "crates/aptos-compression",
-    "crates/aptos-crypto",
-    "crates/aptos-crypto-derive",
-    "crates/aptos-debugger",
-    "crates/aptos-dkg",
-    "crates/aptos-drop-helper",
-    "crates/aptos-enum-conversion-derive",
-    "crates/aptos-faucet/cli",
-    "crates/aptos-faucet/core",
-    "crates/aptos-faucet/metrics-server",
-    "crates/aptos-faucet/service",
-    "crates/aptos-genesis",
-    "crates/aptos-github-client",
-    "crates/aptos-id-generator",
-    "crates/aptos-infallible",
-    "crates/aptos-inspection-service",
-    "crates/aptos-jwk-consensus",
-    "crates/aptos-keygen",
-    "crates/aptos-ledger",
-    "crates/aptos-localnet",
-    "crates/aptos-log-derive",
-    "crates/aptos-logger",
-    "crates/aptos-metrics-core",
-    "crates/aptos-network-checker",
-    "crates/aptos-node-identity",
-    "crates/aptos-openapi",
-    "crates/aptos-profiler",
-    "crates/aptos-proptest-helpers",
-    "crates/aptos-push-metrics",
-    "crates/aptos-rate-limiter",
-    "crates/aptos-rest-client",
-    "crates/aptos-retrier",
-    "crates/aptos-rosetta",
-    "crates/aptos-rosetta-cli",
-    "crates/aptos-runtimes",
-    "crates/aptos-speculative-state-helper",
-    "crates/aptos-system-utils",
-    "crates/aptos-telemetry",
-    "crates/aptos-telemetry-service",
-    "crates/aptos-temppath",
-    "crates/aptos-time-service",
-    "crates/aptos-transaction-filters",
-    "crates/aptos-warp-webserver",
+    "crates/velor",
+    "crates/velor-admin-service",
+    "crates/velor-api-tester",
+    "crates/velor-bcs-utils",
+    "crates/velor-bitvec",
+    "crates/velor-build-info",
+    "crates/velor-collections",
+    "crates/velor-compression",
+    "crates/velor-crypto",
+    "crates/velor-crypto-derive",
+    "crates/velor-debugger",
+    "crates/velor-dkg",
+    "crates/velor-drop-helper",
+    "crates/velor-enum-conversion-derive",
+    "crates/velor-faucet/cli",
+    "crates/velor-faucet/core",
+    "crates/velor-faucet/metrics-server",
+    "crates/velor-faucet/service",
+    "crates/velor-genesis",
+    "crates/velor-github-client",
+    "crates/velor-id-generator",
+    "crates/velor-infallible",
+    "crates/velor-inspection-service",
+    "crates/velor-jwk-consensus",
+    "crates/velor-keygen",
+    "crates/velor-ledger",
+    "crates/velor-localnet",
+    "crates/velor-log-derive",
+    "crates/velor-logger",
+    "crates/velor-metrics-core",
+    "crates/velor-network-checker",
+    "crates/velor-node-identity",
+    "crates/velor-openapi",
+    "crates/velor-profiler",
+    "crates/velor-proptest-helpers",
+    "crates/velor-push-metrics",
+    "crates/velor-rate-limiter",
+    "crates/velor-rest-client",
+    "crates/velor-retrier",
+    "crates/velor-rosetta",
+    "crates/velor-rosetta-cli",
+    "crates/velor-runtimes",
+    "crates/velor-speculative-state-helper",
+    "crates/velor-system-utils",
+    "crates/velor-telemetry",
+    "crates/velor-telemetry-service",
+    "crates/velor-temppath",
+    "crates/velor-time-service",
+    "crates/velor-transaction-filters",
+    "crates/velor-warp-webserver",
     "crates/bounded-executor",
     "crates/channel",
     "crates/crash-handler",
@@ -118,7 +118,7 @@ members = [
     "crates/transaction-generator-lib",
     "crates/transaction-workloads-lib",
     "crates/validator-transaction-pool",
-    "devtools/aptos-cargo-cli",
+    "devtools/velor-cargo-cli",
     "dkg",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
@@ -168,7 +168,7 @@ members = [
     "secure/net",
     "secure/storage",
     "secure/storage/vault",
-    "state-sync/aptos-data-client",
+    "state-sync/velor-data-client",
     "state-sync/data-streaming-service",
     "state-sync/inter-component/consensus-notifications",
     "state-sync/inter-component/event-notifications",
@@ -179,7 +179,7 @@ members = [
     "state-sync/storage-service/server",
     "state-sync/storage-service/types",
     "storage/accumulator",
-    "storage/aptosdb",
+    "storage/velordb",
     "storage/backup/backup-cli",
     "storage/backup/backup-service",
     "storage/db-tool",
@@ -260,22 +260,22 @@ members = [
     "vm-validator",
 ]
 
-# NOTE: default-members is the complete list of binaries that form the "production Aptos codebase". These members should
+# NOTE: default-members is the complete list of binaries that form the "production Velor codebase". These members should
 # never include crates that require fuzzing features or test features. These are the crates we want built with no extra
 # test-only code included.
 #
 # For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
 default-members = [
-    "aptos-node",
+    "velor-node",
     "consensus/safety-rules",
-    "crates/aptos",
-    "crates/aptos-debugger",
-    "crates/aptos-faucet/service",
-    "crates/aptos-keygen",
-    "crates/aptos-rate-limiter",
-    "crates/aptos-rosetta",
+    "crates/velor",
+    "crates/velor-debugger",
+    "crates/velor-faucet/service",
+    "crates/velor-keygen",
+    "crates/velor-rate-limiter",
+    "crates/velor-rosetta",
     "crates/transaction-emitter",
-    "aptos-move/framework",
+    "velor-move/framework",
     "storage/backup/backup-cli",
     "ecosystem/node-checker",
 ]
@@ -283,200 +283,200 @@ default-members = [
 # All workspace members should inherit these keys
 # for package declarations.
 [workspace.package]
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+authors = ["Velor Labs <opensource@velorlabs.com>"]
 edition = "2021"
-homepage = "https://aptoslabs.com"
+homepage = "https://velorlabs.com"
 license = "Apache-2.0"
 publish = false
-repository = "https://github.com/aptos-labs/aptos-core"
+repository = "https://github.com/velor-chain/velor-core"
 rust-version = "1.85"
 
 [workspace.dependencies]
 # Internal crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
-aptos = { path = "crates/aptos" }
-aptos-accumulator = { path = "storage/accumulator" }
-aptos-admin-service = { path = "crates/aptos-admin-service" }
-aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
-aptos-api = { path = "api" }
-aptos-api-test-context = { path = "api/test-context" }
-aptos-api-types = { path = "api/types" }
-aptos-backup-cli = { path = "storage/backup/backup-cli" }
-aptos-backup-service = { path = "storage/backup/backup-service" }
-aptos-bcs-utils = { path = "crates/aptos-bcs-utils" }
-aptos-bounded-executor = { path = "crates/bounded-executor" }
-aptos-block-executor = { path = "aptos-move/block-executor" }
-aptos-bitvec = { path = "crates/aptos-bitvec" }
-aptos-build-info = { path = "crates/aptos-build-info" }
-aptos-cached-packages = { path = "aptos-move/framework/cached-packages" }
-aptos-channels = { path = "crates/channel" }
-aptos-cli-common = { path = "crates/aptos-cli-common" }
-aptos-collections = { path = "crates/aptos-collections" }
-aptos-compression = { path = "crates/aptos-compression" }
-aptos-consensus = { path = "consensus" }
-aptos-consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
-aptos-consensus-types = { path = "consensus/consensus-types" }
-aptos-config = { path = "config" }
-aptos-crash-handler = { path = "crates/crash-handler" }
-aptos-crypto = { path = "crates/aptos-crypto" }
-aptos-crypto-derive = { path = "crates/aptos-crypto-derive" }
-aptos-data-client = { path = "state-sync/aptos-data-client" }
-aptos-data-streaming-service = { path = "state-sync/data-streaming-service" }
-aptos-db = { path = "storage/aptosdb" }
-aptos-db-indexer = { path = "storage/indexer" }
-aptos-db-indexer-schemas = { path = "storage/indexer_schemas" }
-aptos-db-tool = { path = "storage/db-tool" }
-aptos-debugger = { path = "crates/aptos-debugger" }
-aptos-dkg = { path = "crates/aptos-dkg" }
-aptos-dkg-runtime = { path = "dkg" }
-aptos-drop-helper = { path = "crates/aptos-drop-helper" }
-aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
-aptos-executor = { path = "execution/executor" }
-aptos-block-partitioner = { path = "execution/block-partitioner" }
-aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }
-aptos-executor-service = { path = "execution/executor-service" }
-aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
-aptos-executor-types = { path = "execution/executor-types" }
-aptos-experimental-hexy = { path = "experimental/storage/hexy" }
-aptos-experimental-bulk-txn-submit = { path = "experimental/bulk-txn-submit" }
-aptos-experimental-layered-map = { path = "experimental/storage/layered-map" }
-aptos-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
-aptos-experimental-runtimes = { path = "experimental/runtimes" }
-aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
-aptos-faucet-core = { path = "crates/aptos-faucet/core" }
-aptos-faucet-service = { path = "crates/aptos-faucet/service" }
-aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
-aptos-fallible = { path = "crates/fallible" }
-aptos-forge = { path = "testsuite/forge" }
-aptos-framework = { path = "aptos-move/framework" }
+velor = { path = "crates/velor" }
+velor-accumulator = { path = "storage/accumulator" }
+velor-admin-service = { path = "crates/velor-admin-service" }
+velor-aggregator = { path = "velor-move/velor-aggregator" }
+velor-api = { path = "api" }
+velor-api-test-context = { path = "api/test-context" }
+velor-api-types = { path = "api/types" }
+velor-backup-cli = { path = "storage/backup/backup-cli" }
+velor-backup-service = { path = "storage/backup/backup-service" }
+velor-bcs-utils = { path = "crates/velor-bcs-utils" }
+velor-bounded-executor = { path = "crates/bounded-executor" }
+velor-block-executor = { path = "velor-move/block-executor" }
+velor-bitvec = { path = "crates/velor-bitvec" }
+velor-build-info = { path = "crates/velor-build-info" }
+velor-cached-packages = { path = "velor-move/framework/cached-packages" }
+velor-channels = { path = "crates/channel" }
+velor-cli-common = { path = "crates/velor-cli-common" }
+velor-collections = { path = "crates/velor-collections" }
+velor-compression = { path = "crates/velor-compression" }
+velor-consensus = { path = "consensus" }
+velor-consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
+velor-consensus-types = { path = "consensus/consensus-types" }
+velor-config = { path = "config" }
+velor-crash-handler = { path = "crates/crash-handler" }
+velor-crypto = { path = "crates/velor-crypto" }
+velor-crypto-derive = { path = "crates/velor-crypto-derive" }
+velor-data-client = { path = "state-sync/velor-data-client" }
+velor-data-streaming-service = { path = "state-sync/data-streaming-service" }
+velor-db = { path = "storage/velordb" }
+velor-db-indexer = { path = "storage/indexer" }
+velor-db-indexer-schemas = { path = "storage/indexer_schemas" }
+velor-db-tool = { path = "storage/db-tool" }
+velor-debugger = { path = "crates/velor-debugger" }
+velor-dkg = { path = "crates/velor-dkg" }
+velor-dkg-runtime = { path = "dkg" }
+velor-drop-helper = { path = "crates/velor-drop-helper" }
+velor-event-notifications = { path = "state-sync/inter-component/event-notifications" }
+velor-executor = { path = "execution/executor" }
+velor-block-partitioner = { path = "execution/block-partitioner" }
+velor-enum-conversion-derive = { path = "crates/velor-enum-conversion-derive" }
+velor-executor-service = { path = "execution/executor-service" }
+velor-executor-test-helpers = { path = "execution/executor-test-helpers" }
+velor-executor-types = { path = "execution/executor-types" }
+velor-experimental-hexy = { path = "experimental/storage/hexy" }
+velor-experimental-bulk-txn-submit = { path = "experimental/bulk-txn-submit" }
+velor-experimental-layered-map = { path = "experimental/storage/layered-map" }
+velor-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
+velor-experimental-runtimes = { path = "experimental/runtimes" }
+velor-faucet-cli = { path = "crates/velor-faucet/cli" }
+velor-faucet-core = { path = "crates/velor-faucet/core" }
+velor-faucet-service = { path = "crates/velor-faucet/service" }
+velor-faucet-metrics-server = { path = "crates/velor-faucet/metrics-server" }
+velor-fallible = { path = "crates/fallible" }
+velor-forge = { path = "testsuite/forge" }
+velor-framework = { path = "velor-move/framework" }
 fuzzer = { path = "testsuite/fuzzer" }
-aptos-abstract-gas-usage = { path = "aptos-move/aptos-abstract-gas-usage" }
-aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
-aptos-gas-algebra = { path = "aptos-move/aptos-gas-algebra" }
-aptos-gas-calibration = { path = "aptos-move/aptos-gas-calibration" }
-aptos-gas-profiling = { path = "aptos-move/aptos-gas-profiling" }
-aptos-gas-schedule = { path = "aptos-move/aptos-gas-schedule" }
-aptos-gas-schedule-updator = { path = "aptos-move/aptos-gas-schedule-updator" }
-aptos-genesis = { path = "crates/aptos-genesis" }
-aptos-github-client = { path = "crates/aptos-github-client" }
-aptos-global-constants = { path = "config/global-constants" }
-aptos-id-generator = { path = "crates/aptos-id-generator" }
-aptos-indexer = { path = "crates/indexer" }
-aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
-aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
-aptos-indexer-grpc-data-service-v2 = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service-v2" }
-aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
-aptos-indexer-grpc-file-checker = { path = "ecosystem/indexer-grpc/indexer-grpc-file-checker" }
-aptos-indexer-grpc-file-store-backfiller = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store-backfiller" }
-aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
-aptos-indexer-grpc-in-memory-cache-benchmark = { path = "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark" }
-aptos-indexer-grpc-manager = { path = "ecosystem/indexer-grpc/indexer-grpc-manager" }
-aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
-aptos-indexer-test-transactions = { path = "ecosystem/indexer-grpc/indexer-test-transactions" }
-aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
-aptos-indexer-grpc-v2-file-store-backfiller = { path = "ecosystem/indexer-grpc/indexer-grpc-v2-file-store-backfiller" }
-aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
-aptos-indexer-transaction-generator = { path = "ecosystem/indexer-grpc/indexer-transaction-generator" }
-aptos-infallible = { path = "crates/aptos-infallible" }
-aptos-inspection-service = { path = "crates/aptos-inspection-service" }
-aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
-aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
-aptos-jwk-utils = { path = "crates/jwk-utils" }
-aptos-keygen = { path = "crates/aptos-keygen" }
-aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
-aptos-ledger = { path = "crates/aptos-ledger" }
-aptos-localnet = { path = "crates/aptos-localnet" }
-aptos-log-derive = { path = "crates/aptos-log-derive" }
-aptos-logger = { path = "crates/aptos-logger" }
-aptos-memory-usage-tracker = { path = "aptos-move/aptos-memory-usage-tracker" }
-aptos-mempool = { path = "mempool" }
-aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
-aptos-memsocket = { path = "network/memsocket" }
-aptos-metrics-core = { path = "crates/aptos-metrics-core" }
-aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
-aptos-move-examples = { path = "aptos-move/move-examples" }
-aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
-aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
-aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
-aptos-netcore = { path = "network/netcore" }
-aptos-network = { path = "network/framework" }
-aptos-network-benchmark = { path = "network/benchmark" }
-aptos-network-builder = { path = "network/builder" }
-aptos-network-checker = { path = "crates/aptos-network-checker" }
-aptos-network-discovery = { path = "network/discovery" }
-aptos-nft-metadata-crawler = { path = "ecosystem/nft-metadata-crawler" }
-aptos-node = { path = "aptos-node" }
-aptos-node-checker = { path = "ecosystem/node-checker" }
-aptos-node-identity = { path = "crates/aptos-node-identity" }
-aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
-aptos-num-variants = { path = "crates/num-variants" }
-aptos-openapi = { path = "crates/aptos-openapi" }
-aptos-package-builder = { path = "aptos-move/package-builder" }
-aptos-peer-monitoring-service-client = { path = "peer-monitoring-service/client" }
-aptos-peer-monitoring-service-server = { path = "peer-monitoring-service/server" }
-aptos-peer-monitoring-service-types = { path = "peer-monitoring-service/types" }
-aptos-keyless-common = { path = "keyless/common" }
-aptos-keyless-pepper-common = { path = "keyless/pepper/common" }
-aptos-keyless-pepper-service = { path = "keyless/pepper/service" }
-aptos-profiler = { path = "crates/aptos-profiler" }
-aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
-aptos-protos = { path = "protos/rust" }
-aptos-proxy = { path = "crates/proxy" }
-aptos-push-metrics = { path = "crates/aptos-push-metrics" }
-aptos-rate-limiter = { path = "crates/aptos-rate-limiter" }
-aptos-release-builder = { path = "aptos-move/aptos-release-builder" }
-aptos-reliable-broadcast = { path = "crates/reliable-broadcast" }
-aptos-replay-benchmark = { path = "aptos-move/replay-benchmark" }
-aptos-resource-viewer = { path = "aptos-move/aptos-resource-viewer" }
-aptos-rest-client = { path = "crates/aptos-rest-client" }
-aptos-retrier = { path = "crates/aptos-retrier" }
-aptos-rocksdb-options = { path = "storage/rocksdb-options" }
-aptos-rosetta = { path = "crates/aptos-rosetta" }
-aptos-runtimes = { path = "crates/aptos-runtimes" }
-aptos-safety-rules = { path = "consensus/safety-rules" }
-aptos-schemadb = { path = "storage/schemadb" }
-aptos-scratchpad = { path = "storage/scratchpad" }
-aptos-script-composer = { path = "aptos-move/script-composer" }
-aptos-sdk = { path = "sdk" }
-aptos-sdk-builder = { path = "aptos-move/aptos-sdk-builder" }
-aptos-secure-net = { path = "secure/net" }
-aptos-secure-storage = { path = "secure/storage" }
-aptos-short-hex-str = { path = "crates/short-hex-str" }
-aptos-speculative-state-helper = { path = "crates/aptos-speculative-state-helper" }
-aptos-state-sync-driver = { path = "state-sync/state-sync-driver" }
-aptos-storage-interface = { path = "storage/storage-interface" }
-aptos-storage-service-client = { path = "state-sync/storage-service/client" }
-aptos-storage-service-notifications = { path = "state-sync/inter-component/storage-service-notifications" }
-aptos-storage-service-types = { path = "state-sync/storage-service/types" }
-aptos-storage-service-server = { path = "state-sync/storage-service/server" }
-aptos-system-utils = { path = "crates/aptos-system-utils" }
-aptos-transaction-filter = { path = "ecosystem/indexer-grpc/transaction-filter" }
-aptos-transaction-filters = { path = "crates/aptos-transaction-filters" }
-aptos-telemetry = { path = "crates/aptos-telemetry" }
-aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
-aptos-temppath = { path = "crates/aptos-temppath" }
-aptos-testcases = { path = "testsuite/testcases" }
-aptos-time-service = { path = "crates/aptos-time-service", features = [
+velor-abstract-gas-usage = { path = "velor-move/velor-abstract-gas-usage" }
+velor-gas-meter = { path = "velor-move/velor-gas-meter" }
+velor-gas-algebra = { path = "velor-move/velor-gas-algebra" }
+velor-gas-calibration = { path = "velor-move/velor-gas-calibration" }
+velor-gas-profiling = { path = "velor-move/velor-gas-profiling" }
+velor-gas-schedule = { path = "velor-move/velor-gas-schedule" }
+velor-gas-schedule-updator = { path = "velor-move/velor-gas-schedule-updator" }
+velor-genesis = { path = "crates/velor-genesis" }
+velor-github-client = { path = "crates/velor-github-client" }
+velor-global-constants = { path = "config/global-constants" }
+velor-id-generator = { path = "crates/velor-id-generator" }
+velor-indexer = { path = "crates/indexer" }
+velor-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
+velor-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
+velor-indexer-grpc-data-service-v2 = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service-v2" }
+velor-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
+velor-indexer-grpc-file-checker = { path = "ecosystem/indexer-grpc/indexer-grpc-file-checker" }
+velor-indexer-grpc-file-store-backfiller = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store-backfiller" }
+velor-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
+velor-indexer-grpc-in-memory-cache-benchmark = { path = "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark" }
+velor-indexer-grpc-manager = { path = "ecosystem/indexer-grpc/indexer-grpc-manager" }
+velor-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
+velor-indexer-test-transactions = { path = "ecosystem/indexer-grpc/indexer-test-transactions" }
+velor-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
+velor-indexer-grpc-v2-file-store-backfiller = { path = "ecosystem/indexer-grpc/indexer-grpc-v2-file-store-backfiller" }
+velor-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
+velor-indexer-transaction-generator = { path = "ecosystem/indexer-grpc/indexer-transaction-generator" }
+velor-infallible = { path = "crates/velor-infallible" }
+velor-inspection-service = { path = "crates/velor-inspection-service" }
+velor-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
+velor-jwk-consensus = { path = "crates/velor-jwk-consensus" }
+velor-jwk-utils = { path = "crates/jwk-utils" }
+velor-keygen = { path = "crates/velor-keygen" }
+velor-language-e2e-tests = { path = "velor-move/e2e-tests" }
+velor-ledger = { path = "crates/velor-ledger" }
+velor-localnet = { path = "crates/velor-localnet" }
+velor-log-derive = { path = "crates/velor-log-derive" }
+velor-logger = { path = "crates/velor-logger" }
+velor-memory-usage-tracker = { path = "velor-move/velor-memory-usage-tracker" }
+velor-mempool = { path = "mempool" }
+velor-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
+velor-memsocket = { path = "network/memsocket" }
+velor-metrics-core = { path = "crates/velor-metrics-core" }
+velor-move-debugger = { path = "velor-move/velor-debugger" }
+velor-move-examples = { path = "velor-move/move-examples" }
+velor-move-e2e-benchmark = { path = "velor-move/e2e-benchmark" }
+velor-mvhashmap = { path = "velor-move/mvhashmap" }
+velor-native-interface = { path = "velor-move/velor-native-interface" }
+velor-netcore = { path = "network/netcore" }
+velor-network = { path = "network/framework" }
+velor-network-benchmark = { path = "network/benchmark" }
+velor-network-builder = { path = "network/builder" }
+velor-network-checker = { path = "crates/velor-network-checker" }
+velor-network-discovery = { path = "network/discovery" }
+velor-nft-metadata-crawler = { path = "ecosystem/nft-metadata-crawler" }
+velor-node = { path = "velor-node" }
+velor-node-checker = { path = "ecosystem/node-checker" }
+velor-node-identity = { path = "crates/velor-node-identity" }
+velor-node-resource-metrics = { path = "crates/node-resource-metrics" }
+velor-num-variants = { path = "crates/num-variants" }
+velor-openapi = { path = "crates/velor-openapi" }
+velor-package-builder = { path = "velor-move/package-builder" }
+velor-peer-monitoring-service-client = { path = "peer-monitoring-service/client" }
+velor-peer-monitoring-service-server = { path = "peer-monitoring-service/server" }
+velor-peer-monitoring-service-types = { path = "peer-monitoring-service/types" }
+velor-keyless-common = { path = "keyless/common" }
+velor-keyless-pepper-common = { path = "keyless/pepper/common" }
+velor-keyless-pepper-service = { path = "keyless/pepper/service" }
+velor-profiler = { path = "crates/velor-profiler" }
+velor-proptest-helpers = { path = "crates/velor-proptest-helpers" }
+velor-protos = { path = "protos/rust" }
+velor-proxy = { path = "crates/proxy" }
+velor-push-metrics = { path = "crates/velor-push-metrics" }
+velor-rate-limiter = { path = "crates/velor-rate-limiter" }
+velor-release-builder = { path = "velor-move/velor-release-builder" }
+velor-reliable-broadcast = { path = "crates/reliable-broadcast" }
+velor-replay-benchmark = { path = "velor-move/replay-benchmark" }
+velor-resource-viewer = { path = "velor-move/velor-resource-viewer" }
+velor-rest-client = { path = "crates/velor-rest-client" }
+velor-retrier = { path = "crates/velor-retrier" }
+velor-rocksdb-options = { path = "storage/rocksdb-options" }
+velor-rosetta = { path = "crates/velor-rosetta" }
+velor-runtimes = { path = "crates/velor-runtimes" }
+velor-safety-rules = { path = "consensus/safety-rules" }
+velor-schemadb = { path = "storage/schemadb" }
+velor-scratchpad = { path = "storage/scratchpad" }
+velor-script-composer = { path = "velor-move/script-composer" }
+velor-sdk = { path = "sdk" }
+velor-sdk-builder = { path = "velor-move/velor-sdk-builder" }
+velor-secure-net = { path = "secure/net" }
+velor-secure-storage = { path = "secure/storage" }
+velor-short-hex-str = { path = "crates/short-hex-str" }
+velor-speculative-state-helper = { path = "crates/velor-speculative-state-helper" }
+velor-state-sync-driver = { path = "state-sync/state-sync-driver" }
+velor-storage-interface = { path = "storage/storage-interface" }
+velor-storage-service-client = { path = "state-sync/storage-service/client" }
+velor-storage-service-notifications = { path = "state-sync/inter-component/storage-service-notifications" }
+velor-storage-service-types = { path = "state-sync/storage-service/types" }
+velor-storage-service-server = { path = "state-sync/storage-service/server" }
+velor-system-utils = { path = "crates/velor-system-utils" }
+velor-transaction-filter = { path = "ecosystem/indexer-grpc/transaction-filter" }
+velor-transaction-filters = { path = "crates/velor-transaction-filters" }
+velor-telemetry = { path = "crates/velor-telemetry" }
+velor-telemetry-service = { path = "crates/velor-telemetry-service" }
+velor-temppath = { path = "crates/velor-temppath" }
+velor-testcases = { path = "testsuite/testcases" }
+velor-time-service = { path = "crates/velor-time-service", features = [
     "async",
 ] }
-aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
-aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
-aptos-transaction-workloads-lib = { path = "crates/transaction-workloads-lib" }
-aptos-transaction-simulation = { path = "aptos-move/aptos-transaction-simulation" }
-aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
-aptos-types = { path = "types" }
-aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
-aptos-validator-transaction-pool = { path = "crates/validator-transaction-pool" }
-aptos-vault-client = { path = "secure/storage/vault" }
-aptos-vm = { path = "aptos-move/aptos-vm" }
-aptos-vm-environment = { path = "aptos-move/aptos-vm-environment" }
-aptos-vm-logging = { path = "aptos-move/aptos-vm-logging" }
-aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
-aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
-aptos-vm-validator = { path = "vm-validator" }
-aptos-workspace-server = { path = "aptos-move/aptos-workspace-server" }
-aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
-aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
+velor-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
+velor-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
+velor-transaction-workloads-lib = { path = "crates/transaction-workloads-lib" }
+velor-transaction-simulation = { path = "velor-move/velor-transaction-simulation" }
+velor-transactional-test-harness = { path = "velor-move/velor-transactional-test-harness" }
+velor-types = { path = "types" }
+velor-validator-interface = { path = "velor-move/velor-validator-interface" }
+velor-validator-transaction-pool = { path = "crates/validator-transaction-pool" }
+velor-vault-client = { path = "secure/storage/vault" }
+velor-vm = { path = "velor-move/velor-vm" }
+velor-vm-environment = { path = "velor-move/velor-vm-environment" }
+velor-vm-logging = { path = "velor-move/velor-vm-logging" }
+velor-vm-genesis = { path = "velor-move/vm-genesis" }
+velor-vm-types = { path = "velor-move/velor-vm-types" }
+velor-vm-validator = { path = "vm-validator" }
+velor-workspace-server = { path = "velor-move/velor-workspace-server" }
+velor-warp-webserver = { path = "crates/velor-warp-webserver" }
+velor-cargo-cli = { path = "devtools/velor-cargo-cli" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
@@ -501,10 +501,10 @@ ark-groth16 = "0.4.0"
 ark-relations = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
-aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.2", features = [
+velor-indexer-processor-sdk = { git = "https://github.com/velor-chain/velor-indexer-processor-sdk.git", branch = "main", features = [
     "postgres_partial",
 ] }
-aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "62beedc881d1b76632318ceb186ee9065236468e" }
+velor-moving-average = { git = "https://github.com/velor-chain/velor-indexer-processors.git", branch = "main" }
 assert_approx_eq = "1.1.0"
 async-channel = "1.7.1"
 async-mutex = "1.4.0"
@@ -514,7 +514,7 @@ axum = "0.7.5"
 base64 = "0.13.0"
 backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
-bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
+bcs = { git = "https://github.com/velor-chain/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = "0.1.1"
 bigdecimal = { version = "0.4.0", features = ["serde"] }
 version-compare = "0.1.1"
@@ -602,7 +602,7 @@ ff = { version = "0.13", features = ["derive"] }
 field_count = "0.1.1"
 figment = { version = "0.10.19", features = ["yaml", "env"] }
 file_diff = "1.0.0"
-firebase-token = { git = "https://github.com/aptos-labs/firebase-token", rev = "34ea512d3d1fad6c11df3e7d82ff72beccc05836" }
+firebase-token = { git = "https://github.com/velor-chain/firebase-token", rev = "34ea512d3d1fad6c11df3e7d82ff72beccc05836" }
 firestore = "0.43.0"
 fixed = "1.25.1"
 flate2 = "1.0.24"
@@ -707,8 +707,8 @@ pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
 pretty = "0.10.0"
 pretty_assertions = "1.2.1"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
-# https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.1.5", default-features = false }
+# https://github.com/velor-chain/velor-core/pull/12568
+processor = { git = "https://github.com/velor-chain/velor-indexer-processors-v2.git", branch = "main", default-features = false }
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
 project-root = "0.2.2"
@@ -770,8 +770,8 @@ serde_json = { version = "1.0.81", features = [
 serde_repr = "0.1"
 serde_merge = "0.1.3"
 serde-name = "0.1.1"
-serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
+serde-generate = { git = "https://github.com/velor-chain/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
+serde-reflection = { git = "https://github.com/velor-chain/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 serde_with = "3.4.0"
 serde_yaml = "0.8.24"
 set_env = "1.3.4"
@@ -839,7 +839,7 @@ wasm-bindgen-futures = "0.4.50"
 which = "4.2.5"
 whoami = "1.5.0"
 # This allows for zeroize 1.6 to be used. Version 1.2.0 of x25519-dalek locks zeroize to 1.3.
-x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e" }
+x25519-dalek = { git = "https://github.com/velor-chain/x25519-dalek", rev = "b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e" }
 z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
@@ -876,8 +876,8 @@ move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backe
 move-prover-bytecode-pipeline = { path = "third_party/move/move-prover/bytecode-pipeline" }
 move-prover-test-utils = { path = "third_party/move/move-prover/test-utils" }
 move-prover-lab = { path = "third_party/move/move-prover/lab" }
-aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
-aptos-table-natives = { path = "aptos-move/framework/table-natives" }
+velor-move-stdlib = { path = "velor-move/framework/move-stdlib" }
+velor-table-natives = { path = "velor-move/framework/table-natives" }
 move-resource-viewer = { path = "third_party/move/tools/move-resource-viewer" }
 move-stackless-bytecode = { path = "third_party/move/move-model/bytecode" }
 move-stackless-bytecode-test-utils = { path = "third_party/move/move-model/bytecode-test-utils" }
@@ -926,19 +926,19 @@ debug-assertions = true
 debug = true
 
 [patch.crates-io]
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
-merlin = { git = "https://github.com/aptos-labs/merlin" }
-futures = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-channel = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-executor = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-core = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-util = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+serde-reflection = { git = "https://github.com/velor-chain/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
+merlin = { git = "https://github.com/velor-chain/merlin" }
+futures = { git = "https://github.com/velor-chain/futures-rs", branch = "backport" }
+futures-channel = { git = "https://github.com/velor-chain/futures-rs", branch = "backport" }
+futures-executor = { git = "https://github.com/velor-chain/futures-rs", branch = "backport" }
+futures-core = { git = "https://github.com/velor-chain/futures-rs", branch = "backport" }
+futures-util = { git = "https://github.com/velor-chain/futures-rs", branch = "backport" }
+futures-sink = { git = "https://github.com/velor-chain/futures-rs", branch = "backport" }
+futures-io = { git = "https://github.com/velor-chain/futures-rs", branch = "backport" }
+futures-task = { git = "https://github.com/velor-chain/futures-rs", branch = "backport" }
+futures-macro = { git = "https://github.com/velor-chain/futures-rs", branch = "backport" }
 
-# There is a circular dependency between aptos-core, aptos-indexer-processor-sdk, and aptos-indexer-processors-v2,
+# There is a circular dependency between velor-core, velor-indexer-processor-sdk, and velor-indexer-processors-v2,
 # so we cannot simply change the version and package for `jemalloc-sys` in one repo without running into conflicts.
 # We have to keep this shim until everything uses the same jemalloc dependency.
-jemalloc-sys = { git = "https://github.com/aptos-labs/jemalloc-sys-shim", rev = "e0920246dd74303fab9a14b990768c6ac990a59b" }
+jemalloc-sys = { git = "https://github.com/velor-chain/jemalloc-sys-shim", rev = "e0920246dd74303fab9a14b990768c6ac990a59b" }

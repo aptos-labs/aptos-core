@@ -1,15 +1,15 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context_with_orderless_flags;
-use aptos_api_test_context::{current_function_name, TestContext};
-use aptos_crypto::{
+use velor_api_test_context::{current_function_name, TestContext};
+use velor_crypto::{
     bls12381::{PrivateKey, PublicKey},
     test_utils::KeyPair,
     SigningKey, Uniform,
 };
-use aptos_types::{
+use velor_types::{
     function_info::FunctionInfo,
     transaction::{EntryFunction, TransactionStatus},
 };
@@ -46,7 +46,7 @@ async fn test_account_abstraction_single_signer(
     let named_addresses = vec![("aa".to_string(), user_addr)];
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-            .join("../aptos-move/move-examples/account_abstraction/bls12381_single_key");
+            .join("../velor-move/move-examples/account_abstraction/bls12381_single_key");
         TestContext::build_package(path, named_addresses)
     });
     context.publish_package(&mut account, txn).await;
@@ -163,7 +163,7 @@ async fn test_account_abstraction_multi_agent_with_abstracted_sender(
     let named_addresses = vec![("aa".to_string(), a_addr)];
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-            .join("../aptos-move/move-examples/account_abstraction/bls12381_single_key");
+            .join("../velor-move/move-examples/account_abstraction/bls12381_single_key");
         TestContext::build_package(path, named_addresses)
     });
     context.publish_package(&mut a, txn).await;

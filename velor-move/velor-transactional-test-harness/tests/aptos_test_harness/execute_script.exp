@@ -1,0 +1,5 @@
+processed 3 tasks
+task 1 lines 5-13:  run --script --signers Alice  --args @Bob 100 [script {]
+Error: Transaction discarded. VM status code: MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
+task 2 lines 15-15:  view --address Bob  --resource 0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>
+[No Resource Exists]

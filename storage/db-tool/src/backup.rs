@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::utils::parse_maxable_u64;
 use anyhow::Result;
-use aptos_backup_cli::{
+use velor_backup_cli::{
     backup_types::{
         epoch_ending::backup::{EpochEndingBackupController, EpochEndingBackupOpt},
         state_snapshot::backup::{StateSnapshotBackupController, StateSnapshotBackupOpt},
@@ -20,7 +20,7 @@ use aptos_backup_cli::{
         ConcurrentDownloadsOpt, GlobalBackupOpt, TrustedWaypointOpt,
     },
 };
-use aptos_types::transaction::Version;
+use velor_types::transaction::Version;
 use clap::{Parser, Subcommand};
 use std::{path::PathBuf, sync::Arc};
 
@@ -31,7 +31,7 @@ pub enum Command {
     Oneoff(OneoffBackupOpt),
     #[clap(
         about = "Run the backup coordinator which backs up blockchain data continuously off \
-    a Aptos Node."
+    a Velor Node."
     )]
     Continuously(CoordinatorRunOpt),
     #[clap(

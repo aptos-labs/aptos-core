@@ -1,0 +1,17 @@
+---
+server_config:
+  api_path_base: ""
+metrics_server_config:
+  listen_port: 9105
+bypasser_configs: []
+checker_configs: []
+funder_config:
+  type: "MintFunder"
+  node_url: "http://127.0.0.1:8080"
+  chain_id: 4
+  key_file_path: "/tmp/mint.key"
+  do_not_delegate: false
+  mint_account_address: "0xA550C18"
+handler_config:
+  use_helpful_errors: true
+  return_rejections_early: false

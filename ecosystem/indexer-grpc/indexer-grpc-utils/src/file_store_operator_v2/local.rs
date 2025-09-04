@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::file_store_operator_v2::common::{IFileStoreReader, IFileStoreWriter};

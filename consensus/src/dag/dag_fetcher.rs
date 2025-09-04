@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{dag_store::DagStore, errors::DagFetchError, DAGRpcResult};
@@ -10,12 +10,12 @@ use crate::dag::{
     RpcHandler, RpcWithFallback,
 };
 use anyhow::{bail, ensure};
-use aptos_bitvec::BitVec;
-use aptos_config::config::DagFetcherConfig;
-use aptos_consensus_types::common::{Author, Round};
-use aptos_logger::{debug, error, info};
-use aptos_time_service::TimeService;
-use aptos_types::epoch_state::EpochState;
+use velor_bitvec::BitVec;
+use velor_config::config::DagFetcherConfig;
+use velor_consensus_types::common::{Author, Round};
+use velor_logger::{debug, error, info};
+use velor_time_service::TimeService;
+use velor_types::epoch_state::EpochState;
 use async_trait::async_trait;
 use futures::{future::Shared, stream::FuturesUnordered, Future, FutureExt, Stream, StreamExt};
 use std::{

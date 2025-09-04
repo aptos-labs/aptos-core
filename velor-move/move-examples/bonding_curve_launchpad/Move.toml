@@ -1,0 +1,26 @@
+[package]
+name = "bonding_curve_launchpad"
+version = "1.0.0"
+authors = []
+upgrade_policy = "compatible"
+
+[addresses]
+bonding_curve_launchpad = "_"
+deployer = "_"
+swap = "_"
+
+[dev-addresses]
+bonding_curve_launchpad = "0x650"
+deployer = "0xaaa"
+swap = "0xcafe"
+
+
+[dependencies.VelorFramework]
+git = "https://github.com/velor-chain/velor-framework.git"
+rev = "bbf569abd260d94bc30fe96da297d2aecb193644"
+subdir = "velor-framework"
+
+[dependencies.swap]
+git = "https://github.com/velor-chain/velor-framework.git"
+rev = "bbf569abd260d94bc30fe96da297d2aecb193644"
+subdir = "velor-move/move-examples/swap"

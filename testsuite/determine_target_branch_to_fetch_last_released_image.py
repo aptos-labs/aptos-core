@@ -16,24 +16,24 @@ GH_OUTPUT_KEY = "TARGET_BRANCH"
 
 
 def get_all_release_branches():
-    """Get all aptos-release-vX.Y branches"""
-    pattern = "aptos-release-v*"
-    regex = r"refs/heads/(aptos-release-v\d+\.\d+)$"
+    """Get all velor-release-vX.Y branches"""
+    pattern = "velor-release-v*"
+    regex = r"refs/heads/(velor-release-v\d+\.\d+)$"
     branches = git.get_remote_branches_matching_pattern("origin", pattern, regex)
     return sorted(branches, key=lambda x: [int(n) for n in x.split("v")[1].split(".")])
 
 
 def get_all_release_branches_with_times():
-    """Get all aptos-release-vX.Y branches with their creation times"""
+    """Get all velor-release-vX.Y branches with their creation times"""
     branches = get_all_release_branches()
     return [(branch, git.get_branch_creation_time(branch)) for branch in branches]
 
 
 def get_latest_branch_for_previous_major(major):
-    """Get the latest aptos-release-v(previous_major).Y branch"""
+    """Get the latest velor-release-v(previous_major).Y branch"""
     prev_major = int(major) - 1
-    pattern = f"aptos-release-v{prev_major}.*"
-    regex = rf"refs/heads/(aptos-release-v{prev_major}\.\d+)$"
+    pattern = f"velor-release-v{prev_major}.*"
+    regex = rf"refs/heads/(velor-release-v{prev_major}\.\d+)$"
 
     branches = git.get_remote_branches_matching_pattern("origin", pattern, regex)
 
@@ -62,13 +62,13 @@ def determine_target_branch(base_branch):
     )  # Sort by creation time, newest first
 
     # If the base branch is a release branch, find the previous release branch
-    match = re.match(r"^aptos-release-v(\d+)\.(\d+)", base_branch)
+    match = re.match(r"^velor-release-v(\d+)\.(\d+)", base_branch)
     if match:
         major, minor = match.groups()
         if int(minor) == 0:
             return get_latest_branch_for_previous_major(major)
         else:
-            return f"aptos-release-v{major}.{int(minor) - 1}"
+            return f"velor-release-v{major}.{int(minor) - 1}"
 
     # For other personal branches, find the latest release branch earlier than the current branch
     base_branch_time = git.get_branch_creation_time(base_branch)

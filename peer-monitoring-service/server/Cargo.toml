@@ -1,5 +1,5 @@
 [package]
-name = "aptos-peer-monitoring-service-server"
+name = "velor-peer-monitoring-service-server"
 description = "The peer monitoring service (server-side)"
 version = "0.1.0"
 
@@ -13,18 +13,18 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-bounded-executor = { workspace = true }
-aptos-build-info = { workspace = true }
-aptos-channels = { workspace = true }
-aptos-config = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-netcore = { workspace = true }
-aptos-network = { workspace = true }
-aptos-peer-monitoring-service-types = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-time-service = { workspace = true }
-aptos-types = { workspace = true }
+velor-bounded-executor = { workspace = true }
+velor-build-info = { workspace = true }
+velor-channels = { workspace = true }
+velor-config = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-netcore = { workspace = true }
+velor-network = { workspace = true }
+velor-peer-monitoring-service-types = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-time-service = { workspace = true }
+velor-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
@@ -35,9 +35,9 @@ tokio = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-network = { workspace = true, features = ["fuzzing"] }
-aptos-time-service = { workspace = true, features = ["testing"] }
+velor-crypto = { workspace = true }
+velor-network = { workspace = true, features = ["fuzzing"] }
+velor-time-service = { workspace = true, features = ["testing"] }
 claims = { workspace = true }
 maplit = { workspace = true }
 mockall = { workspace = true }

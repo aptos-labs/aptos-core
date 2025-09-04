@@ -3,4 +3,4 @@ name = "simple"
 version = "0.0.0"
 
 [dependencies]
-AptosFramework = { local = "../../../../aptos-move/framework/aptos-framework" }
+VelorFramework = { local = "../../../../velor-move/framework/velor-framework" }

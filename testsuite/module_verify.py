@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright © Aptos Foundation
+# Copyright © Velor Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 import os
@@ -39,8 +39,8 @@ def main():
     os.mkdir("local")
     subprocess.run(
         [
-            "target/release/aptos-debugger",
-            "aptos-db",
+            "target/release/velor-debugger",
+            "velor-db",
             "backup",
             "verify",
             "--validate-modules",

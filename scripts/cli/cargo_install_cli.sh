@@ -13,4 +13,4 @@ if ! echo "$VERSION" | grep -q "^[0-9]\+\.[0-9]\+\.[0-9]\+$"; then
     exit 1
 fi
 
-RUSTFLAGS="--cfg tokio_unstable" cargo install --locked --git https://github.com/aptos-labs/aptos-core.git --profile cli aptos --tag aptos-cli-v$VERSION
+RUSTFLAGS="--cfg tokio_unstable" cargo install --locked --git https://github.com/velor-chain/velor-core.git --profile cli velor --tag velor-cli-v$VERSION

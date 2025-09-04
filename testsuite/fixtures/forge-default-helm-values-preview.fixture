@@ -5,7 +5,7 @@
 @@ -14,7 +14,7 @@
 
      },
-     "aptos-node": {
+     "velor-node": {
        "image": {
 -        "repo": "banana"
 +        "repo": "banana2"

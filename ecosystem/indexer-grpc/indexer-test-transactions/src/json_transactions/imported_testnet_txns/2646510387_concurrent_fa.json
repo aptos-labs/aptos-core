@@ -66,7 +66,7 @@
             "name": "Metadata"
           },
           "typeStr": "0x1::fungible_asset::Metadata",
-          "data": "{\"decimals\":8,\"icon_uri\":\"\",\"name\":\"Aptos Coin\",\"project_uri\":\"\",\"symbol\":\"APT\"}"
+          "data": "{\"decimals\":8,\"icon_uri\":\"\",\"name\":\"Velor Coin\",\"project_uri\":\"\",\"symbol\":\"APT\"}"
         }
       },
       {

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -22,13 +22,13 @@ use crate::{
     },
     ProtocolId,
 };
-use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkContext, PeerNetworkId};
-use aptos_logger::prelude::*;
-use aptos_netcore::transport::{ConnectionOrigin, Transport};
-use aptos_short_hex_str::AsShortHexStr;
-use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use velor_channels::{self, velor_channel, message_queues::QueueStyle};
+use velor_config::network_id::{NetworkContext, PeerNetworkId};
+use velor_logger::prelude::*;
+use velor_netcore::transport::{ConnectionOrigin, Transport};
+use velor_short_hex_str::AsShortHexStr;
+use velor_time_service::{TimeService, TimeServiceTrait};
+use velor_types::{network_address::NetworkAddress, PeerId};
 use futures::{
     channel::oneshot,
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
@@ -58,8 +58,8 @@ use crate::{
     peer_manager::transport::{TransportHandler, TransportRequest},
     protocols::network::{ReceivedMessage, SerializedRequest},
 };
-use aptos_config::config::PeerRole;
-use aptos_types::account_address::AccountAddress;
+use velor_config::config::PeerRole;
+use velor_types::account_address::AccountAddress;
 pub use senders::*;
 pub use types::*;
 
@@ -83,27 +83,27 @@ where
         PeerId,
         (
             ConnectionMetadata,
-            aptos_channel::Sender<ProtocolId, PeerRequest>,
+            velor_channel::Sender<ProtocolId, PeerRequest>,
         ),
     >,
     /// Shared metadata storage about trusted peers and metadata
     peers_and_metadata: Arc<PeersAndMetadata>,
     /// Channel to receive requests from other actors.
-    requests_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+    requests_rx: velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     /// Upstream handlers for RPC and DirectSend protocols. The handlers are promised fair delivery
     /// of messages across (PeerId, ProtocolId).
     upstream_handlers:
-        Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
+        Arc<HashMap<ProtocolId, velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
     /// Channels to send NewPeer/LostPeer notifications to.
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
     /// Channel used to send Dial requests to the ConnectionHandler actor
-    transport_reqs_tx: aptos_channels::Sender<TransportRequest>,
+    transport_reqs_tx: velor_channels::Sender<TransportRequest>,
     /// Sender for connection events.
-    transport_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
+    transport_notifs_tx: velor_channels::Sender<TransportNotification<TSocket>>,
     /// Receiver for connection requests.
-    connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
+    connection_reqs_rx: velor_channel::Receiver<PeerId, ConnectionRequest>,
     /// Receiver for connection events.
-    transport_notifs_rx: aptos_channels::Receiver<TransportNotification<TSocket>>,
+    transport_notifs_rx: velor_channels::Receiver<TransportNotification<TSocket>>,
     /// A map of outstanding disconnect requests.
     outstanding_disconnect_requests:
         HashMap<ConnectionId, oneshot::Sender<Result<(), PeerManagerError>>>,
@@ -133,11 +133,11 @@ where
         network_context: NetworkContext,
         listen_addr: NetworkAddress,
         peers_and_metadata: Arc<PeersAndMetadata>,
-        requests_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
-        connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
+        requests_rx: velor_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+        connection_reqs_rx: velor_channel::Receiver<PeerId, ConnectionRequest>,
         upstream_handlers: HashMap<
             ProtocolId,
-            aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
+            velor_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
         >,
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
         channel_size: usize,
@@ -145,12 +145,12 @@ where
         max_message_size: usize,
         inbound_connection_limit: usize,
     ) -> Self {
-        let (transport_notifs_tx, transport_notifs_rx) = aptos_channels::new(
+        let (transport_notifs_tx, transport_notifs_rx) = velor_channels::new(
             channel_size,
             &counters::PENDING_CONNECTION_HANDLER_NOTIFICATIONS,
         );
         let (transport_reqs_tx, transport_reqs_rx) =
-            aptos_channels::new(channel_size, &counters::PENDING_PEER_MANAGER_DIAL_REQUESTS);
+            velor_channels::new(channel_size, &counters::PENDING_PEER_MANAGER_DIAL_REQUESTS);
         //TODO now that you can only listen on a socket inside of a tokio runtime we'll need to
         // rethink how we init the PeerManager so we don't have to do this funny thing.
         let transport_notifs_tx_clone = transport_notifs_tx.clone();
@@ -274,7 +274,7 @@ where
                 self.handle_new_connection_event(conn);
             },
             TransportNotification::Disconnected(lost_conn_metadata, reason) => {
-                // See: https://github.com/aptos-labs/aptos-core/issues/3128#issuecomment-605351504 for
+                // See: https://github.com/velor-chain/velor-core/issues/3128#issuecomment-605351504 for
                 // detailed reasoning on `Disconnected` events should be handled correctly.
                 info!(
                     NetworkSchema::new(&self.network_context)
@@ -656,7 +656,7 @@ where
         }
 
         // TODO: Add label for peer.
-        let (peer_reqs_tx, peer_reqs_rx) = aptos_channel::new(
+        let (peer_reqs_tx, peer_reqs_rx) = velor_channel::new(
             QueueStyle::FIFO,
             self.channel_size,
             Some(&counters::PENDING_NETWORK_REQUESTS),

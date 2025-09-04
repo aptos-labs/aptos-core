@@ -1,0 +1,10 @@
+[package]
+name = "ConfidentialAssetExample"
+version = "1.0.0"
+
+[dependencies]
+VelorFramework = { local = "../../framework/velor-framework" }
+VelorExperimental = { local = "../../framework/velor-experimental" }
+
+[addresses]
+confidential_asset_example = "_"

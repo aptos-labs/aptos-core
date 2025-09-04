@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::diagnostics::Emitter;
@@ -7,7 +7,7 @@ use codespan_reporting::diagnostic::{Diagnostic, Label};
 use std::io::Write;
 
 /// Shows compiler errors as a structured JSON output.
-/// Exists to support various tools external to the aptos-cli, i.e. IDEs.
+/// Exists to support various tools external to the velor-cli, i.e. IDEs.
 pub struct JsonEmitter<'w, W: Write> {
     writer: &'w mut W,
 }

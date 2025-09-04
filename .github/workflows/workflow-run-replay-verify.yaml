@@ -102,29 +102,29 @@ jobs:
         with:
           ref: ${{ inputs.GIT_SHA }}
 
-      - name: Load cached aptos-debugger binary
-        id: cache-aptos-debugger-binary
+      - name: Load cached velor-debugger binary
+        id: cache-velor-debugger-binary
         uses: actions/cache@v4
         with:
           # copy the binary to the root of the repo and cache it there, because rust-setup calls a cache-rust action
           # which cleans up the target directory in its post action
           path: |
-            aptos-debugger
-          key: aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
+            velor-debugger
+          key: velor-debugger-${{ inputs.GIT_SHA || github.sha }}
 
       - name: Prepare for build if not cached
-        if: steps.cache-aptos-debugger-binary.outputs.cache-hit != 'true'
-        uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        if: steps.cache-velor-debugger-binary.outputs.cache-hit != 'true'
+        uses: velor-chain/velor-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
 
-      - name: Build and strip aptos-debugger binary if not cached
-        if: steps.cache-aptos-debugger-binary.outputs.cache-hit != 'true'
+      - name: Build and strip velor-debugger binary if not cached
+        if: steps.cache-velor-debugger-binary.outputs.cache-hit != 'true'
         shell: bash
         run: |
-          cargo build --release -p aptos-debugger
-          strip -s target/release/aptos-debugger
-          cp target/release/aptos-debugger .
+          cargo build --release -p velor-debugger
+          strip -s target/release/velor-debugger
+          cp target/release/velor-debugger .
 
       - name: Install GCloud SDK
         uses: "google-github-actions/setup-gcloud@v2"
@@ -149,7 +149,7 @@ jobs:
           BUCKET: ${{ inputs.BUCKET }}
           SUB_DIR: ${{ inputs.SUB_DIR }}
         run: |
-          ./aptos-debugger aptos-db gen-replay-verify-jobs  \
+          ./velor-debugger velor-db gen-replay-verify-jobs  \
             --metadata-cache-dir ./metadata_cache \
             --command-adapter-config ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }} \
             --start-version ${{ inputs.HISTORY_START }} \
@@ -184,12 +184,12 @@ jobs:
       matrix:
         job_id: ${{ fromJson(needs.prepare.outputs.job_ids) }}
     steps:
-      - name: Load cached aptos-debugger binary
+      - name: Load cached velor-debugger binary
         uses: actions/cache/restore@v4
         with:
           path: |
-            aptos-debugger
-          key: aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
+            velor-debugger
+          key: velor-debugger-${{ inputs.GIT_SHA || github.sha }}
           fail-on-cache-miss: true
 
       - name: Load cached backup storage metadata cache dir
@@ -245,7 +245,7 @@ jobs:
                 fi
 
                 res=0
-                ./aptos-debugger aptos-db replay-verify \
+                ./velor-debugger velor-db replay-verify \
                   --metadata-cache-dir $MC \
                   --command-adapter-config ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }} \
                   --start-version $begin \

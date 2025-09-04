@@ -1,5 +1,5 @@
 {#
-Copyright © Aptos Foundation
+Copyright © Velor Foundation
 SPDX-License-Identifier: Apache-2.0
 
 Tera templates for supporting Move ASM transactional tests.

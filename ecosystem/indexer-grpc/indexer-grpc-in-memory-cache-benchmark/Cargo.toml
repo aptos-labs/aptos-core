@@ -1,5 +1,5 @@
 [package]
-name = "aptos-indexer-grpc-in-memory-cache-benchmark"
+name = "velor-indexer-grpc-in-memory-cache-benchmark"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,8 +13,8 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-indexer-grpc-utils = { workspace = true }
-aptos-protos = { workspace = true }
+velor-indexer-grpc-utils = { workspace = true }
+velor-protos = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 once_cell = { workspace = true }

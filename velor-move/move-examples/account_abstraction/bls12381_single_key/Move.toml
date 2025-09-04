@@ -1,0 +1,10 @@
+[package]
+name = "AA"
+version = "0.0.0"
+
+[addresses]
+aa = "_"
+
+[dependencies]
+VelorFramework = { local = "../../../framework/velor-framework" }
+VelorStdlib = { local = "../../../framework/velor-stdlib" }

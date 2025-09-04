@@ -1,5 +1,5 @@
 [package]
-name = "aptos-bounded-executor"
+name = "velor-bounded-executor"
 description = "Executor bounded by number of concurrent tasks"
 version = "0.1.0"
 

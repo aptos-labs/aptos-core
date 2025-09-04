@@ -1,0 +1,37 @@
+[package]
+name = "velor-transaction-benchmarks"
+description = "Velor transaction benchmarks"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+velor-bitvec = { workspace = true }
+velor-block-executor = { workspace = true }
+velor-block-partitioner = { workspace = true }
+velor-crypto = { workspace = true }
+velor-language-e2e-tests = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-node-resource-metrics = { workspace = true }
+velor-push-metrics =  { workspace = true }
+velor-transaction-simulation = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true }
+velor-vm-logging = { workspace = true }
+clap = { workspace = true }
+criterion = { workspace = true, features = ["html_reports"] }
+criterion-cpu-time = { workspace = true }
+num_cpus = { workspace = true }
+proptest = { workspace = true }
+
+[[bench]]
+name = "transaction_benches"
+harness = false

@@ -1,24 +1,24 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::new_local_swarm_with_aptos,
+    smoke_test_environment::new_local_swarm_with_velor,
     state_sync_utils::create_fullnode,
     utils::{create_test_accounts, execute_transactions, MAX_HEALTHY_WAIT_SECS},
 };
 use anyhow::bail;
-use aptos_cached_packages::aptos_stdlib;
-use aptos_config::config::{BootstrappingMode, NodeConfig, OverrideNodeConfig};
-use aptos_db_indexer_schemas::{
+use velor_cached_packages::velor_stdlib;
+use velor_config::config::{BootstrappingMode, NodeConfig, OverrideNodeConfig};
+use velor_db_indexer_schemas::{
     metadata::MetadataKey,
     schema::{indexer_metadata::InternalIndexerMetadataSchema, state_keys::StateKeysSchema},
 };
-use aptos_forge::{NodeExt, Result, Swarm, SwarmExt};
-use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
-use aptos_rest_client::Client as RestClient;
-use aptos_schemadb::DB;
-use aptos_types::{account_address::AccountAddress, state_store::state_key::StateKey};
+use velor_forge::{NodeExt, Result, Swarm, SwarmExt};
+use velor_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
+use velor_rest_client::Client as RestClient;
+use velor_schemadb::DB;
+use velor_types::{account_address::AccountAddress, state_store::state_key::StateKey};
 use std::{
     collections::HashSet,
     sync::Arc,
@@ -26,7 +26,7 @@ use std::{
 };
 #[tokio::test]
 async fn test_indexer() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_velor(1).await;
 
     let version = swarm.versions().max().unwrap();
     let fullnode_peer_id = swarm
@@ -53,10 +53,10 @@ async fn test_indexer() {
 
     let client = fullnode.rest_client();
 
-    let account1 = swarm.aptos_public_info().random_account();
-    let account2 = swarm.aptos_public_info().random_account();
+    let account1 = swarm.velor_public_info().random_account();
+    let account2 = swarm.velor_public_info().random_account();
 
-    let mut chain_info = swarm.chain_info().into_aptos_public_info();
+    let mut chain_info = swarm.chain_info().into_velor_public_info();
     let factory = chain_info.transaction_factory();
     chain_info
         .create_user_account(account1.public_key())
@@ -77,7 +77,7 @@ async fn test_indexer() {
         .unwrap();
 
     let txn = account1.sign_with_transaction_builder(
-        factory.payload(aptos_stdlib::aptos_coin_transfer(account2.address(), 10)),
+        factory.payload(velor_stdlib::velor_coin_transfer(account2.address(), 10)),
     );
 
     client.submit_and_wait(&txn).await.unwrap();
@@ -95,7 +95,7 @@ async fn wait_for_account_balance(client: &RestClient, address: AccountAddress) 
     let start = std::time::Instant::now();
     while start.elapsed() < DEFAULT_WAIT_TIMEOUT {
         if client
-            .get_account_balance(address, "0x1::aptos_coin::AptosCoin")
+            .get_account_balance(address, "0x1::velor_coin::VelorCoin")
             .await
             .unwrap()
             .into_inner()
@@ -118,7 +118,7 @@ fn enable_internal_indexer(node_config: &mut NodeConfig) {
 #[tokio::test]
 async fn test_internal_indexer_with_fast_sync() {
     // Create a swarm with 2 validators
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_velor(1).await;
 
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let validator_client = swarm.validator(validator_peer_id).unwrap().rest_client();
@@ -192,10 +192,10 @@ fn check_indexer_db(vfn_config: &NodeConfig) {
 
 fn get_indexer_db_content<T, U>(internal_indexer_db: Arc<DB>) -> HashSet<U>
 where
-    T: aptos_schemadb::schema::Schema,
-    U: aptos_schemadb::schema::KeyCodec<T> + std::cmp::Ord + std::fmt::Debug,
+    T: velor_schemadb::schema::Schema,
+    U: velor_schemadb::schema::KeyCodec<T> + std::cmp::Ord + std::fmt::Debug,
     std::collections::HashSet<U>:
-        std::iter::FromIterator<<T as aptos_schemadb::schema::Schema>::Key>,
+        std::iter::FromIterator<<T as velor_schemadb::schema::Schema>::Key>,
 {
     let mut indexer_db_iter = internal_indexer_db.iter::<T>().unwrap();
     indexer_db_iter.seek_to_first();

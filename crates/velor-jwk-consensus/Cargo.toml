@@ -1,0 +1,51 @@
+[package]
+name = "velor-jwk-consensus"
+description = "Velor JWK consensus"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-bitvec = { workspace = true }
+velor-bounded-executor = { workspace = true }
+velor-channels = { workspace = true }
+velor-config = { workspace = true }
+velor-consensus-types = { workspace = true }
+velor-crypto = { workspace = true }
+velor-enum-conversion-derive = { workspace = true }
+velor-event-notifications = { workspace = true }
+velor-infallible = { workspace = true }
+velor-jwk-utils = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-network = { workspace = true }
+velor-reliable-broadcast = { workspace = true }
+velor-runtimes = { workspace = true }
+velor-safety-rules = { workspace = true }
+velor-time-service = { workspace = true }
+velor-types = { workspace = true }
+velor-validator-transaction-pool = { workspace = true }
+async-trait = { workspace = true }
+bytes = { workspace = true }
+futures = { workspace = true }
+futures-channel = { workspace = true }
+futures-util = { workspace = true }
+move-core-types = { workspace = true }
+once_cell = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+tokio-retry = { workspace = true }
+
+[dev-dependencies]
+velor-types = { workspace = true, features = ["fuzzing"] }
+velor-validator-transaction-pool = { workspace = true, features = ["fuzzing"] }
+[features]
+smoke-test = []

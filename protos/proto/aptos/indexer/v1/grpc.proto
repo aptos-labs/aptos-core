@@ -1,16 +1,16 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
 
-package aptos.indexer.v1;
+package velor.indexer.v1;
 
-import "aptos/indexer/v1/raw_data.proto";
-import "aptos/transaction/v1/transaction.proto";
-import "aptos/util/timestamp/timestamp.proto";
+import "velor/indexer/v1/raw_data.proto";
+import "velor/transaction/v1/transaction.proto";
+import "velor/util/timestamp/timestamp.proto";
 
 message StreamProgressSampleProto {
-  optional aptos.util.timestamp.Timestamp timestamp = 1;
+  optional velor.util.timestamp.Timestamp timestamp = 1;
   uint64 version = 2;
   uint64 size_bytes = 3;
 }
@@ -21,7 +21,7 @@ message StreamProgress {
 
 message ActiveStream {
   string id = 1;
-  optional aptos.util.timestamp.Timestamp start_time = 2;
+  optional velor.util.timestamp.Timestamp start_time = 2;
   uint64 start_version = 3;
   optional uint64 end_version = 4;
 
@@ -34,7 +34,7 @@ message StreamInfo {
 
 message LiveDataServiceInfo {
   uint64 chain_id = 1;
-  optional aptos.util.timestamp.Timestamp timestamp = 2;
+  optional velor.util.timestamp.Timestamp timestamp = 2;
   optional uint64 known_latest_version = 3;
   optional StreamInfo stream_info = 4;
   // If not present, it means the data service is not available to serve anything yet.
@@ -43,20 +43,20 @@ message LiveDataServiceInfo {
 
 message HistoricalDataServiceInfo {
   uint64 chain_id = 1;
-  optional aptos.util.timestamp.Timestamp timestamp = 2;
+  optional velor.util.timestamp.Timestamp timestamp = 2;
   optional uint64 known_latest_version = 3;
   optional StreamInfo stream_info = 4;
 }
 
 message FullnodeInfo {
   uint64 chain_id = 1;
-  optional aptos.util.timestamp.Timestamp timestamp = 2;
+  optional velor.util.timestamp.Timestamp timestamp = 2;
   optional uint64 known_latest_version = 3;
 }
 
 message GrpcManagerInfo {
   uint64 chain_id = 1;
-  optional aptos.util.timestamp.Timestamp timestamp = 2;
+  optional velor.util.timestamp.Timestamp timestamp = 2;
   optional uint64 known_latest_version = 3;
   optional string master_address = 4;
 }

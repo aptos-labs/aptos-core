@@ -1,0 +1,16 @@
+[package]
+name = "empty"
+version = "1.0.0"
+authors = []
+
+[addresses]
+empty = "0xcafe"
+
+[dev-addresses]
+
+[dependencies.VelorFramework]
+git = "https://github.com/velor-chain/velor-framework.git"
+rev = "mainnet"
+subdir = "velor-framework"
+
+[dev-dependencies]

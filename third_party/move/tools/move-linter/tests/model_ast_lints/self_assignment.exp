@@ -7,7 +7,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:16:5
@@ -16,7 +16,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:17:5
@@ -25,7 +25,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:19:5
@@ -34,7 +34,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:24:9
@@ -43,7 +43,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │         ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:26:9
@@ -52,7 +52,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │         ^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:34:5
@@ -61,7 +61,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:35:5
@@ -70,7 +70,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:36:5
@@ -79,7 +79,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:37:5
@@ -88,7 +88,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:44:5
@@ -97,7 +97,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:45:5
@@ -106,7 +106,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:46:5
@@ -115,7 +115,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:51:5
@@ -124,7 +124,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:52:5
@@ -133,7 +133,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:59:5
@@ -142,7 +142,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:70:5
@@ -151,7 +151,7 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.
 
 warning: [lint] This is an unnecessary self assignment. Consider removing it.
    ┌─ tests/model_ast_lints/self_assignment.move:71:5
@@ -160,4 +160,4 @@ warning: [lint] This is an unnecessary self assignment. Consider removing it.
    │     ^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#self_assignment.

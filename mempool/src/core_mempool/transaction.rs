@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{core_mempool::TXN_INDEX_ESTIMATED_BYTES, counters, network::BroadcastPeerPriority};
-use aptos_crypto::HashValue;
-use aptos_types::{
+use velor_crypto::HashValue;
+use velor_types::{
     account_address::AccountAddress,
     transaction::{ReplayProtector, SignedTransaction},
 };
@@ -153,8 +153,8 @@ mod test {
         core_mempool::{MempoolTransaction, TimelineState},
         network::BroadcastPeerPriority,
     };
-    use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
-    use aptos_types::{
+    use velor_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+    use velor_types::{
         account_address::AccountAddress,
         chain_id::ChainId,
         transaction::{

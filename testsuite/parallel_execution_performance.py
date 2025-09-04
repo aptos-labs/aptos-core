@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright © Aptos Foundation
+# Copyright © Velor Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 import subprocess
@@ -38,7 +38,7 @@ SPEEDUPS_NOISE_ABOVE = 2
 
 THREADS = [8, 16, 32]
 BLOCK_SIZES = ["1k", "10k", "50k"]
-target_directory = "aptos-move/aptos-transaction-benchmarks/src/"
+target_directory = "velor-move/velor-transaction-benchmarks/src/"
 
 tps_set = {}
 speedups_set = {}

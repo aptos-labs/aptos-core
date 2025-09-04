@@ -1,5 +1,5 @@
 [package]
-name = "aptos-nft-metadata-crawler"
+name = "velor-nft-metadata-crawler"
 description = "NFT Metadata Crawler related services."
 version = "0.1.0"
 
@@ -15,8 +15,8 @@ rust-version = { workspace = true }
 [dependencies]
 ahash = { workspace = true }
 anyhow = { workspace = true }
-aptos-indexer-grpc-server-framework = { workspace = true }
-aptos-metrics-core = { workspace = true }
+velor-indexer-grpc-server-framework = { workspace = true }
+velor-metrics-core = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true }
 backoff = { workspace = true }

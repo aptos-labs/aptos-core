@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
@@ -8,7 +8,7 @@ use super::{
 };
 use crate::checker::CheckResult;
 use anyhow::{anyhow, Context, Result};
-use aptos_logger::warn;
+use velor_logger::warn;
 use async_trait::async_trait;
 use prometheus_parse::{Scrape, Value};
 use reqwest::Url;

@@ -14,7 +14,7 @@ PackageManifest {
     dependencies: {
         "a": Dependency {
             version: None,
-            location: Aptos {
+            location: Velor {
                 node_url: "mainnet",
                 package_addr: 0000000000000000000000000000000000000000000000000000000000000001,
             },

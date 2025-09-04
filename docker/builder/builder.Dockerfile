@@ -1,7 +1,7 @@
 #syntax=docker/dockerfile:1.4
 
 FROM rust as rust-base
-WORKDIR /aptos
+WORKDIR /velor
 
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
@@ -25,11 +25,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 FROM rust-base as builder-base
 
 # Confirm that this Dockerfile is being invoked from an appropriate builder.
-# See https://github.com/aptos-labs/aptos-core/pull/2471
-# See https://github.com/aptos-labs/aptos-core/pull/2472
+# See https://github.com/velor-chain/velor-core/pull/2471
+# See https://github.com/velor-chain/velor-core/pull/2472
 ARG BUILT_VIA_BUILDKIT
 ENV BUILT_VIA_BUILDKIT $BUILT_VIA_BUILDKIT
-RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\ndocker/docker-bake-rust-all.sh indexer\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg BUILT_VIA_BUILDKIT=true\n\nFor more information, see https://github.com/aptos-labs/aptos-core/pull/2472\n\nThanks!" && false)
+RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\ndocker/docker-bake-rust-all.sh indexer\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg BUILT_VIA_BUILDKIT=true\n\nFor more information, see https://github.com/velor-chain/velor-core/pull/2472\n\nThanks!" && false)
 
 # cargo profile and features
 ARG PROFILE
@@ -48,9 +48,9 @@ RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarc
 RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git_credentials \
     git config --global credential.helper store
 
-COPY --link . /aptos/
+COPY --link . /velor/
 
-FROM builder-base as aptos-node-builder
+FROM builder-base as velor-node-builder
 
 RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=node-builder-cargo-git-cache \

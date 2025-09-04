@@ -2,12 +2,12 @@ locals {
   location = var.zone == "" ? var.region : "${var.region}-${var.zone}"
 }
 
-resource "google_container_cluster" "aptos" {
+resource "google_container_cluster" "velor" {
   provider       = google-beta
-  name           = "aptos-${terraform.workspace}"
+  name           = "velor-${terraform.workspace}"
   location       = local.location
   node_locations = var.node_locations
-  network        = google_compute_network.aptos.id
+  network        = google_compute_network.velor.id
 
   remove_default_node_pool = true
   initial_node_count       = 1
@@ -157,7 +157,7 @@ resource "google_container_node_pool" "core" {
   provider   = google-beta
   name       = "core"
   location   = local.location
-  cluster    = google_container_cluster.aptos.name
+  cluster    = google_container_cluster.velor.name
   node_count = lookup(var.node_pool_sizes, "core", null)
 
   node_config {
@@ -202,7 +202,7 @@ resource "google_container_node_pool" "utilities" {
   provider   = google-beta
   name       = "utilities"
   location   = local.location
-  cluster    = google_container_cluster.aptos.name
+  cluster    = google_container_cluster.velor.name
   node_count = lookup(var.node_pool_sizes, "utilities", null)
 
   node_config {
@@ -237,7 +237,7 @@ resource "google_container_node_pool" "utilities" {
     dynamic "taint" {
       for_each = var.utility_instance_enable_taint ? ["utilities"] : []
       content {
-        key    = "aptos.org/nodepool"
+        key    = "velor.org/nodepool"
         value  = taint.value
         effect = "NO_EXECUTE"
       }
@@ -255,7 +255,7 @@ resource "google_container_node_pool" "fullnodes" {
   provider   = google-beta
   name       = "fullnodes"
   location   = local.location
-  cluster    = google_container_cluster.aptos.name
+  cluster    = google_container_cluster.velor.name
   node_count = lookup(var.node_pool_sizes, "fullnodes", null)
 
   node_config {
@@ -290,7 +290,7 @@ resource "google_container_node_pool" "fullnodes" {
     dynamic "taint" {
       for_each = var.fullnode_instance_enable_taint ? ["fullnodes"] : []
       content {
-        key    = "aptos.org/nodepool"
+        key    = "velor.org/nodepool"
         value  = taint.value
         effect = "NO_EXECUTE"
       }

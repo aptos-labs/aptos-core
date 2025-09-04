@@ -1,6 +1,6 @@
 [package]
-name = "aptos-accumulator"
-description = "Aptos merkle tree accumulator"
+name = "velor-accumulator"
+description = "Velor merkle tree accumulator"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,15 +14,15 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-types = { workspace = true }
+velor-crypto = { workspace = true }
+velor-types = { workspace = true }
 proptest = { workspace = true, optional = true }
 
 [dev-dependencies]
-aptos-crypto = { workspace = true, features = ["fuzzing"] }
+velor-crypto = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 rand = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["proptest", "aptos-crypto/fuzzing", "aptos-types/fuzzing"]
+fuzzing = ["proptest", "velor-crypto/fuzzing", "velor-types/fuzzing"]

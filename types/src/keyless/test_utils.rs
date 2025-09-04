@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{Groth16ProofAndStatement, Pepper, TransactionAndProof};
@@ -21,7 +21,7 @@ use crate::{
     },
     transaction::{authenticator::EphemeralSignature, RawTransaction, SignedTransaction},
 };
-use aptos_crypto::{
+use velor_crypto::{
     ed25519::Ed25519PrivateKey, poseidon_bn254::keyless::fr_to_bytes_le, SigningKey, Uniform,
 };
 use ark_bn254::Bn254;
@@ -407,7 +407,7 @@ mod test {
         },
         transaction::authenticator::EphemeralPublicKey,
     };
-    use aptos_crypto::PrivateKey;
+    use velor_crypto::PrivateKey;
     use ark_ff::PrimeField;
     use reqwest::Client;
     use serde_json::{json, to_string_pretty, Value};
@@ -444,7 +444,7 @@ mod test {
         public_inputs_hash: [u8; 32],
     }
 
-    // Run the prover service locally - https://github.com/aptos-labs/keyless-zk-proofs/tree/main/prover
+    // Run the prover service locally - https://github.com/velor-chain/keyless-zk-proofs/tree/main/prover
     // Follow the README and make sure to use port 8083
     #[ignore]
     #[tokio::test]

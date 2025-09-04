@@ -2,9 +2,9 @@ Your {{ .Chart.Name }} deployment named {{ .Release.Name }} is now deployed.
 
 To check automated genesis ceremony status:
 
-    $ kubectl -n {{ .Release.Namespace }} logs -f job/{{ include "aptos-genesis.fullname" . }}-e{{ .Values.chain.era }}
+    $ kubectl -n {{ .Release.Namespace }} logs -f job/{{ include "velor-genesis.fullname" . }}-e{{ .Values.chain.era }}
 
-The resulting genesis ConfigMaps can be mounted by aptos-node, and will be located at:
+The resulting genesis ConfigMaps can be mounted by velor-node, and will be located at:
 
 {{- range $user := .Values.genesis.users }}
     - {{ $user.name }}-genesis-e{{ $.Values.chain.era }}

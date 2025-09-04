@@ -1,20 +1,20 @@
-/// Copied from aptos-move/move-examples/swap/sources/liquidity_pool.move
+/// Copied from velor-move/move-examples/swap/sources/liquidity_pool.move
 ///
 /// For volatile pairs, the price and reserves can be computed using the constant product formula k = x * y.
 /// For stable pairs, the price is computed using k = x^3 * y + x * y^3.
 module publisher_address::liquidity_pool {
-    use aptos_framework::event;
-    use aptos_framework::fungible_asset::{
+    use velor_framework::event;
+    use velor_framework::fungible_asset::{
         Self, FungibleAsset, FungibleStore, Metadata,
         BurnRef, MintRef, TransferRef,
     };
-    use aptos_framework::object::{Self, ConstructorRef, Object};
-    use aptos_framework::primary_fungible_store;
-    // use aptos_std::comparator;
-    use aptos_std::math128;
-    use aptos_std::math64;
-    use aptos_std::smart_table::{Self, SmartTable};
-    use aptos_std::smart_vector::{Self, SmartVector};
+    use velor_framework::object::{Self, ConstructorRef, Object};
+    use velor_framework::primary_fungible_store;
+    // use velor_std::comparator;
+    use velor_std::math128;
+    use velor_std::math64;
+    use velor_std::smart_table::{Self, SmartTable};
+    use velor_std::smart_vector::{Self, SmartVector};
 
     use std::bcs;
     use std::option;
@@ -60,7 +60,7 @@ module publisher_address::liquidity_pool {
         volatile_fee_bps: u64,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = velor_framework::object::ObjectGroup)]
     struct LiquidityPool has key {
         token_store_1: Object<FungibleStore>,
         token_store_2: Object<FungibleStore>,
@@ -71,7 +71,7 @@ module publisher_address::liquidity_pool {
         is_stable: bool,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = velor_framework::object::ObjectGroup)]
     struct FeesAccounting has key {
         total_fees_1: u128,
         total_fees_2: u128,

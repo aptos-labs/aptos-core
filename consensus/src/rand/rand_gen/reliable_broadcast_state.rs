@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -13,11 +13,11 @@ use crate::{
     },
 };
 use anyhow::ensure;
-use aptos_consensus_types::common::Author;
-use aptos_infallible::Mutex;
-use aptos_logger::info;
-use aptos_reliable_broadcast::BroadcastStatus;
-use aptos_types::{
+use velor_consensus_types::common::Author;
+use velor_infallible::Mutex;
+use velor_logger::info;
+use velor_reliable_broadcast::BroadcastStatus;
+use velor_types::{
     aggregate_signature::PartialSignatures, epoch_state::EpochState, randomness::RandMetadata,
 };
 use std::{collections::HashSet, sync::Arc};

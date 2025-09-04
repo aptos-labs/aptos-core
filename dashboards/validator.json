@@ -102,7 +102,7 @@
       "sparkline": {},
       "targets": [
         {
-          "expr": "quantile(0.67, aptos_consensus_current_epoch_validators)",
+          "expr": "quantile(0.67, velor_consensus_current_epoch_validators)",
           "format": "time_series",
           "instant": true,
           "refId": "A"
@@ -156,7 +156,7 @@
       "sparkline": {},
       "targets": [
         {
-          "expr": "quantile(0.67, aptos_consensus_current_epoch_validators) - (count(rate(aptos_consensus_current_round[10m]) > 0) OR on() vector(0))",
+          "expr": "quantile(0.67, velor_consensus_current_epoch_validators) - (count(rate(velor_consensus_current_round[10m]) > 0) OR on() vector(0))",
           "format": "time_series",
           "instant": true,
           "refId": "A"
@@ -210,7 +210,7 @@
       "sparkline": {},
       "targets": [
         {
-          "expr": "1 - (count(rate(aptos_consensus_current_round[10m]) > 0) OR on() vector(0)) / quantile(0.67, aptos_consensus_current_epoch_validators)",
+          "expr": "1 - (count(rate(velor_consensus_current_round[10m]) > 0) OR on() vector(0)) / quantile(0.67, velor_consensus_current_epoch_validators)",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -249,7 +249,7 @@
       "span": 0,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_current_round{role=\"validator\"}[1m]) == 0",
+          "expr": "rate(velor_consensus_current_round{role=\"validator\"}[1m]) == 0",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -386,7 +386,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name)(aptos_connections{network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
+          "expr": "sum by (kubernetes_pod_name)(velor_connections{network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}",
@@ -449,14 +449,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_state_sync_version{type=\"committed\", role=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "velor_state_sync_version{type=\"committed\", role=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-committed",
           "refId": "A"
         },
         {
-          "expr": "aptos_state_sync_version{type=\"synced\", role=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "velor_state_sync_version{type=\"synced\", role=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-synced",
@@ -519,7 +519,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_current_round{kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+          "expr": "rate(velor_consensus_current_round{kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}",
@@ -582,7 +582,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_last_committed_round{kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+          "expr": "rate(velor_consensus_last_committed_round{kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}",
@@ -645,7 +645,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_last_committed_version{kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+          "expr": "rate(velor_consensus_last_committed_version{kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}",
@@ -727,7 +727,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum without (state) (rate(aptos_consensus_committed_txns_count{state=\"failed\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])) / sum without (state) (rate(aptos_consensus_committed_txns_count{kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]))",
+          "expr": "sum without (state) (rate(velor_consensus_committed_txns_count{state=\"failed\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])) / sum without (state) (rate(velor_consensus_committed_txns_count{kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}",
@@ -806,7 +806,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
+          "expr": "rate(velor_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])/rate(velor_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}",
@@ -885,7 +885,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_core_mempool_index_size{index=\"system_ttl\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "velor_core_mempool_index_size{index=\"system_ttl\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}",
@@ -965,7 +965,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_key_manager_state{state=\"keys_still_fresh\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1h]) > bool 1",
+          "expr": "increase(velor_key_manager_state{state=\"keys_still_fresh\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1h]) > bool 1",
           "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }

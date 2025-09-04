@@ -1,5 +1,5 @@
 # Protos
-This directory contains the protobuf definitions for all Aptos services. For the sake of simplifying release and minimizing potential version conflicts, we include all protos and code generated from those protos in one place.
+This directory contains the protobuf definitions for all Velor services. For the sake of simplifying release and minimizing potential version conflicts, we include all protos and code generated from those protos in one place.
 
 Make sure to install buf, e.g. for Mac:
 ```

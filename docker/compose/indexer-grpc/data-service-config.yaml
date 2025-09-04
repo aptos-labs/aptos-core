@@ -5,11 +5,11 @@ server_config:
       data_service_grpc_listen_address: 0.0.0.0:50052
   data_service_grpc_tls_config:
       data_service_grpc_listen_address: 0.0.0.0:50053
-      cert_path: /opt/aptos/certs/data-service-grpc-server.crt
-      key_path: /opt/aptos/certs/data-service-grpc-server.key
+      cert_path: /opt/velor/certs/data-service-grpc-server.crt
+      key_path: /opt/velor/certs/data-service-grpc-server.key
   disable_auth_check: true
   whitelisted_auth_tokens: []
   file_store_config:
     file_store_type: LocalFileStore
-    local_file_store_path: /opt/aptos/file-store
+    local_file_store_path: /opt/velor/file-store
   redis_read_replica_address: redis://172.16.1.22:6379 # use a the read replica

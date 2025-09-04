@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -23,12 +23,12 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_db::state_restore::StateSnapshotRestoreMode;
-use aptos_infallible::Mutex;
-use aptos_logger::prelude::*;
-use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::StateSnapshotReceiver;
-use aptos_types::{
+use velor_db::state_restore::StateSnapshotRestoreMode;
+use velor_infallible::Mutex;
+use velor_logger::prelude::*;
+use velor_metrics_core::TimerHelper;
+use velor_storage_interface::StateSnapshotReceiver;
+use velor_types::{
     access_path::Path,
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::Features,
@@ -39,7 +39,7 @@ use aptos_types::{
     },
     transaction::Version,
 };
-use aptos_vm_environment::prod_configs::{aptos_prod_verifier_config, LATEST_GAS_FEATURE_VERSION};
+use velor_vm_environment::prod_configs::{velor_prod_verifier_config, LATEST_GAS_FEATURE_VERSION};
 use clap::Parser;
 use futures::{stream, TryStreamExt};
 use move_binary_format::CompiledModule;
@@ -235,7 +235,7 @@ impl StateSnapshotRestoreController {
         // TODO: Instead of using default features, fetch them from the the state.
         let features = Features::default();
 
-        let config = aptos_prod_verifier_config(LATEST_GAS_FEATURE_VERSION, &features);
+        let config = velor_prod_verifier_config(LATEST_GAS_FEATURE_VERSION, &features);
         for (key, value) in blob {
             if let StateKeyInner::AccessPath(p) = key.inner() {
                 if let Path::Code(module_id) = p.get_path() {

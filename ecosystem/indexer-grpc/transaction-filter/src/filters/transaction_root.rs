@@ -1,14 +1,14 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{errors::FilterError, traits::Filterable};
 use anyhow::Error;
-use aptos_protos::transaction::v1::{transaction::TransactionType, Transaction};
+use velor_protos::transaction::v1::{transaction::TransactionType, Transaction};
 use serde::{Deserialize, Serialize};
 
 /// Example:
 /// ```
-/// use aptos_transaction_filter::TransactionRootFilterBuilder;
+/// use velor_transaction_filter::TransactionRootFilterBuilder;
 ///
 /// let filter = TransactionRootFilterBuilder::default()
 ///   .success(true)
@@ -26,8 +26,8 @@ pub struct TransactionRootFilter {
     pub txn_type: Option<TransactionType>,
 }
 
-impl From<aptos_protos::indexer::v1::TransactionRootFilter> for TransactionRootFilter {
-    fn from(proto_filter: aptos_protos::indexer::v1::TransactionRootFilter) -> Self {
+impl From<velor_protos::indexer::v1::TransactionRootFilter> for TransactionRootFilter {
+    fn from(proto_filter: velor_protos::indexer::v1::TransactionRootFilter) -> Self {
         Self {
             success: proto_filter.success,
             txn_type: proto_filter
@@ -37,7 +37,7 @@ impl From<aptos_protos::indexer::v1::TransactionRootFilter> for TransactionRootF
     }
 }
 
-impl From<TransactionRootFilter> for aptos_protos::indexer::v1::TransactionRootFilter {
+impl From<TransactionRootFilter> for velor_protos::indexer::v1::TransactionRootFilter {
     fn from(transaction_root_filter: TransactionRootFilter) -> Self {
         Self {
             success: transaction_root_filter.success,

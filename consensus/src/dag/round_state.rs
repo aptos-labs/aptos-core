@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::{
@@ -6,9 +6,9 @@ use crate::dag::{
     types::NodeCertificate,
 };
 use anyhow::ensure;
-use aptos_consensus_types::common::Round;
-use aptos_infallible::{duration_since_epoch, Mutex};
-use aptos_types::epoch_state::EpochState;
+use velor_consensus_types::common::Round;
+use velor_infallible::{duration_since_epoch, Mutex};
+use velor_types::epoch_state::EpochState;
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
 

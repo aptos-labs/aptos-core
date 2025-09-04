@@ -1,5 +1,5 @@
 [package]
-name = "aptos-block-partitioner"
+name = "velor-block-partitioner"
 description = "A tool to partition a block store into smaller chunks based on graph partitioning."
 
 version = "0.1.0"
@@ -14,10 +14,10 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-crypto = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-types = { workspace = true }
+velor-crypto = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-types = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 dashmap = { workspace = true }

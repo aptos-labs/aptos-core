@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pipeline::hashable::Hashable;
-use aptos_crypto::HashValue;
+use velor_crypto::HashValue;
 use std::collections::HashMap;
 
 pub struct LinkedItem<T: Hashable> {
@@ -151,7 +151,7 @@ impl<T: Hashable> Buffer<T> {
 mod test {
     use super::Buffer;
     use crate::pipeline::hashable::Hashable;
-    use aptos_crypto::HashValue;
+    use velor_crypto::HashValue;
     use std::fmt::{Debug, Formatter};
 
     #[derive(PartialEq, Eq)]

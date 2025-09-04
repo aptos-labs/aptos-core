@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::block_storage::{
@@ -6,7 +6,7 @@ use crate::block_storage::{
     execution_pool::common_test::create_block_tree_with_forks_unordered_parents, BlockReader,
     BlockStore,
 };
-use aptos_consensus_types::{
+use velor_consensus_types::{
     block_retrieval::{
         BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalRequestV2,
         BlockRetrievalResponse, BlockRetrievalStatus,

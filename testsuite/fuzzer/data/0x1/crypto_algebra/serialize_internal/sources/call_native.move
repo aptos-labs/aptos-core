@@ -1,6 +1,6 @@
 module poc::serialize_internal {
-    use aptos_std::crypto_algebra::{Self, Element};
-    use aptos_std::bls12381_algebra::{G1, FormatG1Compr};
+    use velor_std::crypto_algebra::{Self, Element};
+    use velor_std::bls12381_algebra::{G1, FormatG1Compr};
     use std::vector;
 
     public entry fun main(_owner: &signer) {

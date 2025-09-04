@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,8 +6,8 @@ use crate::{
     metrics::{CONNECTED_INSTANCES, COUNTER, KNOWN_LATEST_VERSION, TIMER},
 };
 use anyhow::{bail, Result};
-use aptos_indexer_grpc_utils::timestamp_now_proto;
-use aptos_protos::{
+use velor_indexer_grpc_utils::timestamp_now_proto;
+use velor_protos::{
     indexer::v1::{
         data_service_client::DataServiceClient, grpc_manager_client::GrpcManagerClient,
         service_info::Info, FullnodeInfo, GrpcManagerInfo, HeartbeatRequest,
@@ -447,7 +447,7 @@ impl MetadataManager {
         let response = client.ping(request).await?;
         if let Some(info) = response.into_inner().info {
             match info {
-                aptos_protos::indexer::v1::ping_data_service_response::Info::LiveDataServiceInfo(info) => {
+                velor_protos::indexer::v1::ping_data_service_response::Info::LiveDataServiceInfo(info) => {
                     self.handle_live_data_service_info(address, info)
                 },
                 _ => bail!("Bad response."),
@@ -469,7 +469,7 @@ impl MetadataManager {
         let response = client.ping(request).await?;
         if let Some(info) = response.into_inner().info {
             match info {
-                aptos_protos::indexer::v1::ping_data_service_response::Info::HistoricalDataServiceInfo(info) => {
+                velor_protos::indexer::v1::ping_data_service_response::Info::HistoricalDataServiceInfo(info) => {
                     self.handle_historical_data_service_info(address, info)
                 },
                 _ => bail!("Bad response."),

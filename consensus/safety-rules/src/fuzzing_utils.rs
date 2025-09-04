@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,8 +6,8 @@
 
 use crate::serializer::SafetyRulesInput;
 #[cfg(any(test, feature = "fuzzing"))]
-use aptos_consensus_types::block::Block;
-use aptos_consensus_types::{
+use velor_consensus_types::block::Block;
+use velor_consensus_types::{
     block_data::{BlockData, BlockType},
     common::Payload,
     order_vote_proposal::OrderVoteProposal,
@@ -16,13 +16,13 @@ use aptos_consensus_types::{
     vote_data::VoteData,
     vote_proposal::VoteProposal,
 };
-use aptos_crypto::{
+use velor_crypto::{
     bls12381,
     hash::{HashValue, TransactionAccumulatorHasher},
     test_utils::TEST_SEED,
     traits::{SigningKey, Uniform},
 };
-use aptos_types::{
+use velor_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -269,12 +269,12 @@ pub fn arb_safety_rules_input() -> impl Strategy<Value = SafetyRulesInput> {
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod fuzzing {
     use crate::{error::Error, serializer::SafetyRulesInput, test_utils, TSafetyRules};
-    use aptos_consensus_types::{
+    use velor_consensus_types::{
         block_data::BlockData, order_vote::OrderVote, order_vote_proposal::OrderVoteProposal,
         timeout_2chain::TwoChainTimeout, vote::Vote, vote_proposal::VoteProposal,
     };
-    use aptos_crypto::bls12381;
-    use aptos_types::epoch_change::EpochChangeProof;
+    use velor_crypto::bls12381;
+    use velor_types::epoch_change::EpochChangeProof;
 
     pub fn fuzz_initialize(proof: EpochChangeProof) -> Result<(), Error> {
         let mut safety_rules = test_utils::test_safety_rules_uninitialized();

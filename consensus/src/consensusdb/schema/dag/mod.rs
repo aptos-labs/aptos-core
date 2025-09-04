@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines physical storage schemas for DAG.
@@ -10,8 +10,8 @@ use crate::{
     define_schema,
 };
 use anyhow::Result;
-use aptos_crypto::HashValue;
-use aptos_schemadb::{
+use velor_crypto::HashValue;
+use velor_schemadb::{
     schema::{KeyCodec, ValueCodec},
     ColumnFamilyName,
 };

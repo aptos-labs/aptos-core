@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_transaction_emitter_lib::emitter::stats::TxnStats;
+use velor_transaction_emitter_lib::emitter::stats::TxnStats;
 use log::info;
 use serde::Serialize;
 use std::fmt;

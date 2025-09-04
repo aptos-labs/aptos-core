@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transport::Transport;
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use velor_types::{network_address::NetworkAddress, PeerId};
 use futures::{
     future::{Future, FutureExt},
     stream::{Stream, StreamExt},

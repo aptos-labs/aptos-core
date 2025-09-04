@@ -1,0 +1,18 @@
+processed 3 tasks
+task 1 lines 4-17:  publish --private-key alice [module alice::randomness_user {]
+task 2 lines 19-43:  publish --private-key alice [module alice::randomness_test {]
+Error: extended checks failed:
+
+error: public function exposes functionality of the `randomness` module which can be unsafe. Consult the randomness documentation for an explanation of this error. To skip this check, add attribute `#[lint::allow_unsafe_randomness]`.
+   ┌─ TEMPFILE1:23:16
+   │
+23 │     public fun randomness_error(): u8 {
+   │                ^^^^^^^^^^^^^^^^
+
+error: entry function calling randomness features must use the `#[randomness]` attribute.
+   ┌─ TEMPFILE1:36:30
+   │
+36 │     public(friend) entry fun missing_randomness_attribute(_s: &signer) {
+   │                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+

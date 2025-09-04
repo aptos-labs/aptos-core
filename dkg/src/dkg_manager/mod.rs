@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,11 +8,11 @@ use crate::{
     DKGMessage,
 };
 use anyhow::{anyhow, bail, ensure, Result};
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_crypto::Uniform;
-use aptos_infallible::duration_since_epoch;
-use aptos_logger::{debug, error, info, warn};
-use aptos_types::{
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_crypto::Uniform;
+use velor_infallible::duration_since_epoch;
+use velor_logger::{debug, error, info, warn};
+use velor_types::{
     dkg::{
         DKGSessionMetadata, DKGSessionState, DKGStartEvent, DKGTrait, DKGTranscript,
         DKGTranscriptMetadata, MayHaveRoundingSummary,
@@ -20,7 +20,7 @@ use aptos_types::{
     epoch_state::EpochState,
     validator_txn::{Topic, ValidatorTransaction},
 };
-use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
+use velor_validator_transaction_pool::{TxnGuard, VTxnPoolState};
 use fail::fail_point;
 use futures_channel::oneshot;
 use futures_util::{future::AbortHandle, FutureExt, StreamExt};
@@ -58,11 +58,11 @@ pub struct DKGManager<DKG: DKGTrait> {
 
     vtxn_pool: VTxnPoolState,
     agg_trx_producer: Arc<dyn TAggTranscriptProducer<DKG>>,
-    agg_trx_tx: Option<aptos_channel::Sender<(), DKG::Transcript>>,
+    agg_trx_tx: Option<velor_channel::Sender<(), DKG::Transcript>>,
 
     // When we put vtxn in the pool, we also put a copy of this so later pool can notify us.
-    pull_notification_tx: aptos_channel::Sender<(), Arc<ValidatorTransaction>>,
-    pull_notification_rx: aptos_channel::Receiver<(), Arc<ValidatorTransaction>>,
+    pull_notification_tx: velor_channel::Sender<(), Arc<ValidatorTransaction>>,
+    pull_notification_rx: velor_channel::Receiver<(), Arc<ValidatorTransaction>>,
 
     // Control states.
     stopped: bool,
@@ -98,7 +98,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         vtxn_pool: VTxnPoolState,
     ) -> Self {
         let (pull_notification_tx, pull_notification_rx) =
-            aptos_channel::new(QueueStyle::KLAST, 1, None);
+            velor_channel::new(QueueStyle::KLAST, 1, None);
         Self {
             dealer_sk,
             my_addr,
@@ -117,8 +117,8 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     pub async fn run(
         mut self,
         in_progress_session: Option<DKGSessionState>,
-        mut dkg_start_event_rx: aptos_channel::Receiver<(), DKGStartEvent>,
-        mut rpc_msg_rx: aptos_channel::Receiver<
+        mut dkg_start_event_rx: velor_channel::Receiver<(), DKGStartEvent>,
+        mut rpc_msg_rx: velor_channel::Receiver<
             AccountAddress,
             (AccountAddress, IncomingRpcRequest),
         >,
@@ -131,7 +131,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         );
         let mut interval = tokio::time::interval(Duration::from_millis(5000));
 
-        let (agg_trx_tx, mut agg_trx_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
+        let (agg_trx_tx, mut agg_trx_rx) = velor_channel::new(QueueStyle::KLAST, 1, None);
         self.agg_trx_tx = Some(agg_trx_tx);
 
         if let Some(session_state) = in_progress_session {

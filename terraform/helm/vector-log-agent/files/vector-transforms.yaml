@@ -35,7 +35,7 @@ transforms:
       #   del(.k8s.annotations)
       # }
 
-      .min_log_level_to_retain = .k8s.annotations."aptos.dev/min-log-level-to-retain"
+      .min_log_level_to_retain = .k8s.annotations."velor.dev/min-log-level-to-retain"
 
       del(.k8s.annotations)
 
@@ -87,16 +87,16 @@ transforms:
 
   # This stage filters forge logs based off of node index and log level.
   # It retains all logs for nodes 0-4 and only error logs for nodes 5+.
-  # The `aptos.dev/min-log-level-to-retain` pod annotation overrides the default behavior.
+  # The `velor.dev/min-log-level-to-retain` pod annotation overrides the default behavior.
   filter_forge_logs:
     type: filter
     inputs:
       - normalized_logs
     condition: |
-      aptos_node_index = to_int(parse_regex(.k8s.pod_name, r'^aptos-node-(?P<node_index>\d+)-.*').node_index ?? 0) ?? 0
+      velor_node_index = to_int(parse_regex(.k8s.pod_name, r'^velor-node-(?P<node_index>\d+)-.*').node_index ?? 0) ?? 0
 
       is_forge_log = contains(to_string!(.k8s.cluster), "forge") && exists(.k8s.labels."forge-namespace")
-      is_low_index_forge_node = aptos_node_index < 5
+      is_low_index_forge_node = velor_node_index < 5
       is_error_log = (.level == "error")
 
       log_level_values = {
@@ -131,8 +131,8 @@ transforms:
     type: filter
     inputs:
       - delete_temp_fields
-    # temporarily filter out noisy logs in vector until https://github.com/aptos-labs/aptos-core/pull/13965 lands in mainnet release
-    # temporarily filter out noisy logs from https://aptos-org.slack.com/archives/C06TH3DH7SB/p1721328005384169?thread_ts=1720695143.603089&cid=C06TH3DH7SB until lands in mainnet release
+    # temporarily filter out noisy logs in vector until https://github.com/velor-chain/velor-core/pull/13965 lands in mainnet release
+    # temporarily filter out noisy logs from https://velor-org.slack.com/archives/C06TH3DH7SB/p1721328005384169?thread_ts=1720695143.603089&cid=C06TH3DH7SB until lands in mainnet release
     condition: |
       if is_string(.message) {
         message = to_string!(.message)

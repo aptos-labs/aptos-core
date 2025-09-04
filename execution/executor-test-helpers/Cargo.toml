@@ -1,6 +1,6 @@
 [package]
-name = "aptos-executor-test-helpers"
-description = "Aptos executor test helpers"
+name = "velor-executor-test-helpers"
+description = "Velor executor test helpers"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,18 +14,18 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-cached-packages = { workspace = true }
-aptos-config = { workspace = true }
-aptos-consensus-types = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-db = { workspace = true, features = ["fuzzing"] }
-aptos-executor = { workspace = true }
-aptos-executor-types = { workspace = true }
-aptos-sdk = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-temppath = { workspace = true }
-aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
-aptos-vm-genesis = { workspace = true }
+velor-cached-packages = { workspace = true }
+velor-config = { workspace = true }
+velor-consensus-types = { workspace = true }
+velor-crypto = { workspace = true }
+velor-db = { workspace = true, features = ["fuzzing"] }
+velor-executor = { workspace = true }
+velor-executor-types = { workspace = true }
+velor-sdk = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-temppath = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true }
+velor-vm-genesis = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 rand = { workspace = true }

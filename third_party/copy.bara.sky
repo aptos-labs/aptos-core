@@ -1,7 +1,7 @@
-moveUrl = "https://github.com/move-language/move-on-aptos.git"
-aptosUrl = "https://github.com/aptos-labs/aptos-core.git"
+moveUrl = "https://github.com/move-language/move-on-velor.git"
+velorUrl = "https://github.com/velor-chain/velor-core.git"
 
-# Workflow to pull from Move to Aptos. This creates a draft PR at the fixed branch `from_move`
+# Workflow to pull from Move to Velor. This creates a draft PR at the fixed branch `from_move`
 # which should be further massaged before sending out.
 core.workflow(
     name = "pull_move",
@@ -18,17 +18,17 @@ core.workflow(
     mode = "ITERATIVE",
     origin_files = glob(["language/**"]),
     destination_files = glob(["third_party/move/**"]),
-    authoring = authoring.pass_thru("Wolfgang <wg@aptoslabs.com>"),
+    authoring = authoring.pass_thru("Wolfgang <wg@velorlabs.com>"),
     transformations = [
         core.move("language", "third_party/move"),
     ],
 )
 
-# Workflow to push from Aptos to Move. This creates a PR.
+# Workflow to push from Velor to Move. This creates a PR.
 core.workflow(
     name = "push_move",
     origin = git.github_origin(
-        url = aptosUrl,
+        url = velorUrl,
         ref = "main",
     ),
     destination = git.destination(
@@ -40,17 +40,17 @@ core.workflow(
     mode = "ITERATIVE",
     origin_files = glob(["third_party/move/**"]),
     destination_files = glob(["language/**"]),
-    authoring = authoring.pass_thru("Wolfgang <wg@aptoslabs.com>"),
+    authoring = authoring.pass_thru("Wolfgang <wg@velorlabs.com>"),
     transformations = [
         core.move("third_party/move", "language"),
     ],
 )
 
-# Workflow to push from Aptos to Move. This directly pushes without PR.
+# Workflow to push from Velor to Move. This directly pushes without PR.
 core.workflow(
     name = "push_move_direct",
     origin = git.github_origin(
-        url = aptosUrl,
+        url = velorUrl,
         ref = "main",
     ),
     destination = git.github_destination(
@@ -60,7 +60,7 @@ core.workflow(
     mode = "ITERATIVE",
     origin_files = glob(["third_party/move/**"]),
     destination_files = glob(["language/**"]),
-    authoring = authoring.pass_thru("Wolfgang <wg@aptoslabs.com>"),
+    authoring = authoring.pass_thru("Wolfgang <wg@velorlabs.com>"),
     transformations = [
         core.move("third_party/move", "language"),
     ],

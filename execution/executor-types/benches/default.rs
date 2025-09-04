@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_executor_types::should_forward_to_subscription_service;
+use velor_executor_types::should_forward_to_subscription_service;
 #[cfg(feature = "bench")]
-use aptos_executor_types::should_forward_to_subscription_service_old;
-use aptos_types::contract_event::ContractEvent;
+use velor_executor_types::should_forward_to_subscription_service_old;
+use velor_types::contract_event::ContractEvent;
 use criterion::{criterion_group, criterion_main, Criterion};
 
 fn default_targets(c: &mut Criterion) {

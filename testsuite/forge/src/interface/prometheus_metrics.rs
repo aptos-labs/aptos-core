@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::Swarm;
@@ -95,7 +95,7 @@ async fn fetch_metric_counter(
 pub async fn fetch_validator_error_metrics(
     swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
 ) -> anyhow::Result<i64> {
-    let error_query = r#"aptos_error_log_count{role=~"validator"}"#;
+    let error_query = r#"velor_error_log_count{role=~"validator"}"#;
     fetch_metric_counter(swarm, error_query).await
 }
 
@@ -167,16 +167,16 @@ pub async fn fetch_latency_breakdown(
 ) -> anyhow::Result<LatencyBreakdown> {
     // Averaging over 1m, and skipping data points at the start that would take averages outside of the interval.
     let start_time_adjusted = start_time + 60;
-    let consensus_proposal_to_ordered_query = r#"quantile(0.67, rate(aptos_consensus_block_tracing_sum{role=~"validator", stage="ordered"}[1m]) / rate(aptos_consensus_block_tracing_count{role=~"validator", stage="ordered"}[1m]))"#;
-    let consensus_proposal_to_commit_query = r#"quantile(0.67, rate(aptos_consensus_block_tracing_sum{role=~"validator", stage="committed"}[1m]) / rate(aptos_consensus_block_tracing_count{role=~"validator", stage="committed"}[1m]))"#;
+    let consensus_proposal_to_ordered_query = r#"quantile(0.67, rate(velor_consensus_block_tracing_sum{role=~"validator", stage="ordered"}[1m]) / rate(velor_consensus_block_tracing_count{role=~"validator", stage="ordered"}[1m]))"#;
+    let consensus_proposal_to_commit_query = r#"quantile(0.67, rate(velor_consensus_block_tracing_sum{role=~"validator", stage="committed"}[1m]) / rate(velor_consensus_block_tracing_count{role=~"validator", stage="committed"}[1m]))"#;
 
     let mempool_to_block_creation_query = r#"sum(
-        rate(aptos_core_mempool_txn_commit_latency_sum{
+        rate(velor_core_mempool_txn_commit_latency_sum{
             role=~"validator",
             stage="commit_accepted_block"
         }[1m])
     ) / sum(
-        rate(aptos_core_mempool_txn_commit_latency_count{
+        rate(velor_core_mempool_txn_commit_latency_count{
             role=~"validator",
             stage="commit_accepted_block"
         }[1m])
@@ -249,12 +249,12 @@ pub async fn fetch_latency_breakdown(
         let indexer_data_service_all_chunks_sent_query =
             r#"max(indexer_grpc_duration_in_secs{step="4", service_type="data_service"})"#;
 
-        // These are processor latencies for both original core processors and those written with the processor SDK: https://github.com/aptos-labs/aptos-indexer-processor-sdk
+        // These are processor latencies for both original core processors and those written with the processor SDK: https://github.com/velor-chain/velor-indexer-processor-sdk
         // Note the use of empty {}, where additional test-specific labels will be added by Forge
         let indexer_processor_latency_query =
             r#"max(indexer_processor_data_processed_latency_in_secs{})"#;
         let indexer_sdk_processor_latency_query =
-            "max(aptos_procsdk_step__processed_transaction_latency_secs{})";
+            "max(velor_procsdk_step__processed_transaction_latency_secs{})";
 
         let indexer_fullnode_processed_batch_samples = swarm
             .query_range_metrics(

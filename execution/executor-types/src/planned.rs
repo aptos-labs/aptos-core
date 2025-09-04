@@ -1,9 +1,9 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::TIMER;
-use aptos_infallible::Mutex;
-use aptos_metrics_core::TimerHelper;
+use velor_infallible::Mutex;
+use velor_metrics_core::TimerHelper;
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
 use std::{ops::Deref, sync::mpsc::Receiver};

@@ -1,0 +1,102 @@
+[package]
+name = "velor-framework"
+description = "Velor stdlib"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-aggregator = { workspace = true }
+velor-crypto = { workspace = true }
+velor-gas-algebra = { workspace = true }
+velor-gas-schedule = { workspace = true }
+velor-move-stdlib = { workspace = true }
+velor-native-interface = { workspace = true }
+velor-sdk-builder = { workspace = true }
+velor-types = { workspace = true }
+velor-vm-types = { workspace = true }
+ark-bls12-381 = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-ec = { workspace = true }
+ark-ff = { workspace = true }
+ark-serialize = { workspace = true }
+ark-std = { workspace = true }
+bcs = { workspace = true }
+better_any = { workspace = true }
+blake2-rfc = { workspace = true }
+bulletproofs = { workspace = true }
+byteorder = { workspace = true }
+clap = { workspace = true }
+codespan-reporting = { workspace = true }
+# We need `zkcrypto/curve25519-dalek-ng` here instead of the normal `dalek-cryptography/curve25519-dalek` package. This
+# is because the `dalek-cryptography/bulletproofs` works with version 2 of `dalek-cryptography/curve25519-dalek` and
+# we work with version 3. Instead, we use `zkcrypto/bulleproofs` which relies on `zkcrypto/curve25519-dalek-ng`.
+curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
+either = { workspace = true }
+flate2 = { workspace = true }
+hex = { workspace = true }
+itertools = { workspace = true }
+legacy-move-compiler = { workspace = true }
+libsecp256k1 = { workspace = true }
+log = { workspace = true }
+merlin = { workspace = true }
+move-binary-format = { workspace = true }
+move-cli = { workspace = true }
+move-command-line-common = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-core-types = { workspace = true }
+move-docgen = { workspace = true }
+move-model = { workspace = true }
+move-package = { workspace = true }
+move-prover = { workspace = true }
+move-prover-boogie-backend = { workspace = true }
+move-prover-bytecode-pipeline = { workspace = true }
+move-prover-lab = { workspace = true }
+move-stackless-bytecode = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
+num-traits = { workspace = true }
+once_cell = { workspace = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+ripemd = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+sha2 = { workspace = true }
+sha2_0_10_6 = { workspace = true }
+sha3 = { workspace = true }
+siphasher = { workspace = true }
+smallvec = { workspace = true }
+tempfile = { workspace = true }
+tiny-keccak = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+velor-aggregator = { workspace = true, features = ["testing"] }
+velor-crypto = { workspace = true, features = ["fuzzing"] }
+velor-gas-meter = { workspace = true }
+velor-vm = { workspace = true, features = ["testing"] }
+claims = { workspace = true }
+move-cli = { workspace = true }
+move-prover = { workspace = true }
+move-unit-test = { workspace = true }
+move-vm-types = { workspace = true, features = ["testing"] }
+
+[features]
+default = []
+fuzzing = ["velor-types/fuzzing"]
+testing = ["velor-move-stdlib/testing", "velor-crypto/fuzzing"]
+
+[lib]
+doctest = false
+
+[package.metadata.cargo-machete]
+ignored = ["velor-move-stdlib", "serde_bytes"]

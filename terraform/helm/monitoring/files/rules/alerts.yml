@@ -1,24 +1,24 @@
 groups:
-- name: "Aptos alerts"
+- name: "Velor alerts"
   rules:
 {{- if .Values.validator.name }}
   # consensus
   - alert: Zero Block Commit Rate
-    expr: rate(aptos_consensus_last_committed_round{role="validator"}[1m]) == 0 OR absent(aptos_consensus_last_committed_round{role="validator"})
+    expr: rate(velor_consensus_last_committed_round{role="validator"}[1m]) == 0 OR absent(velor_consensus_last_committed_round{role="validator"})
     for: 20m
     labels:
       severity: error
       summary: "The block commit rate is low"
     annotations:
   - alert: High local timeout rate
-    expr: rate(aptos_consensus_timeout_count{role="validator"}[1m]) > 0.5
+    expr: rate(velor_consensus_timeout_count{role="validator"}[1m]) > 0.5
     for: 20m
     labels:
       severity: warning
       summary: "Consensus timeout rate is high"
     annotations:
   - alert: High consensus error rate
-    expr: rate(aptos_consensus_error_count{role="validator"}[1m]) / on (role) rate(consensus_duration_count{op='main_loop', role="validator"}[1m]) > 0.25
+    expr: rate(velor_consensus_error_count{role="validator"}[1m]) / on (role) rate(consensus_duration_count{op='main_loop', role="validator"}[1m]) > 0.25
     for: 20m
     labels:
       severity: warning
@@ -27,14 +27,14 @@ groups:
 {{- end }}
     # State sync alerts
   - alert: State sync is not making progress
-    expr: rate(aptos_state_sync_version{type="synced"}[5m]) == 0 OR absent(aptos_state_sync_version{type="synced"})
+    expr: rate(velor_state_sync_version{type="synced"}[5m]) == 0 OR absent(velor_state_sync_version{type="synced"})
     for: 5m
     labels:
       severity: error
       summary: "State sync is not making progress (i.e., the synced version is not increasing!)"
     annotations:
   - alert: State sync is lagging significantly
-    expr: (aptos_data_client_highest_advertised_data{data_type="transactions"} - on(kubernetes_pod_name, role) aptos_state_sync_version{type="synced"}) > 1000000
+    expr: (velor_data_client_highest_advertised_data{data_type="transactions"} - on(kubernetes_pod_name, role) velor_state_sync_version{type="synced"}) > 1000000
     for: 5m
     labels:
       severity: error
@@ -43,35 +43,35 @@ groups:
 
     # Mempool alerts
   - alert: Mempool has no active upstream peers
-    expr: (sum by (kubernetes_pod_name) (aptos_mempool_active_upstream_peers_count)) == 0
+    expr: (sum by (kubernetes_pod_name) (velor_mempool_active_upstream_peers_count)) == 0
     for: 3m
     labels:
       severity: error
       summary: "Mempool has no active upstream peers (unable to forward transactions to anyone!)"
     annotations:
   - alert: Mempool is at >80% capacity (count)
-    expr: aptos_core_mempool_index_size{index="system_ttl"} > 1600000 # assumes default mempool size 2_000_000
+    expr: velor_core_mempool_index_size{index="system_ttl"} > 1600000 # assumes default mempool size 2_000_000
     for: 5m
     labels:
       severity: warning
       summary: "Mempool count is at >80% capacity (it may soon become full!)"
     annotations:
   - alert: Mempool is at >80% capacity (bytes)
-    expr: aptos_core_mempool_index_size{index="size_bytes"} > 1717986918 # assumes default mempool size 2 * 1024 * 1024 * 1024
+    expr: velor_core_mempool_index_size{index="size_bytes"} > 1717986918 # assumes default mempool size 2 * 1024 * 1024 * 1024
     for: 5m
     labels:
       severity: warning
       summary: "Mempool bytes is at >80% capacity (it may soon become full!)"
     annotations:
   - alert: Mempool is growing at a significant rate (count)
-    expr: rate(aptos_core_mempool_index_size{index="system_ttl"}[1m]) > 60000 # 3% growth per minute - assumes default mempool size 2_000_000
+    expr: rate(velor_core_mempool_index_size{index="system_ttl"}[1m]) > 60000 # 3% growth per minute - assumes default mempool size 2_000_000
     for: 10m
     labels:
       severity: warning
       summary: "Mempool count is growing at a significant rate (it may soon become full!)"
     annotations:
   - alert: Mempool is growing at a significant rate (bytes)
-    expr: rate(aptos_core_mempool_index_size{index="size_bytes"}[1m]) > 64424509 # 3% growth per minute - assumes default mempool size 2 * 1024 * 1024 * 1024
+    expr: rate(velor_core_mempool_index_size{index="size_bytes"}[1m]) > 64424509 # 3% growth per minute - assumes default mempool size 2 * 1024 * 1024 * 1024
     for: 10m
     labels:
       severity: warning
@@ -80,7 +80,7 @@ groups:
 
   # Networking alerts
   - alert: Validator Connected Peers
-    expr: 0 == min(aptos_network_peers{state="connected", role_type="validator", role="validator"})
+    expr: 0 == min(velor_network_peers{state="connected", role_type="validator", role="validator"})
     for: 15m
     labels:
       severity: error
@@ -93,15 +93,15 @@ groups:
     for: 1h
     labels:
       severity: warning
-      summary: "Less than 200 GB of free space on Aptos Node."
+      summary: "Less than 200 GB of free space on Velor Node."
     annotations:
       description: "(This is a warning, deal with it in working hours.) A validator or fullnode pod has less than 200 GB of disk space. Take these steps:
         1. If only a few nodes have this issue, it might be that they are not typically spec'd or customized differently, \
           it's most likely a expansion of the volume is needed soon. Talk to the PE team. Otherwise, it's a bigger issue.
         2. Pass this issue on to the storage team. If you are the storage team, read on.
         3. Go to the dashboard and look for the stacked up column family sizes. \
-          If the total size on that chart can't justify low free disk space, we need to log in to a node to see if something other than the AptosDB is eating up disk. \
-          Start from things under /opt/aptos/data.
+          If the total size on that chart can't justify low free disk space, we need to log in to a node to see if something other than the VelorDB is eating up disk. \
+          Start from things under /opt/velor/data.
         3 Otherwise, if the total size on that chart is the majority of the disk consumption, zoom out and look for anomalies -- sudden increases overall or on a few \
           specific Column Families, etc. Also check average size of each type of data. Reason about the anomaly with changes in recent releases in mind.
         4 If everything made sense, it's a bigger issue, somehow our gas schedule didn't stop state explosion before an alert is triggered. Our recommended disk \
@@ -112,25 +112,25 @@ groups:
     for: 5m
     labels:
       severity: critical
-      summary: "Less than 50 GB of free space on Aptos Node."
+      summary: "Less than 50 GB of free space on Velor Node."
     annotations:
       description: "A validator or fullnode pod has less than 50 GB of disk space -- that's dangerously low. \
         1. A warning level alert of disk space less than 200GB should've fired a few days ago at least, search on slack and understand why it's not dealt with.
         2. Search in the code for the runbook of the warning alert, quickly go through that too determine if it's a bug. Involve the storage team and other team accordingly.
       If no useful information is found, evaluate the trend of disk usage increasing, how long can we run further? If it can't last the night, you have these options to mitigate this:
         1. Expand the disk if it's a cloud volume.
-        2. Shorten the pruner windows. Before that, find the latest version of these https://github.com/aptos-labs/aptos-core/blob/48cc64df8a64f2d13012c10d8bd5bf25d94f19dc/config/src/config/storage_config.rs#L166-L218 \
+        2. Shorten the pruner windows. Before that, find the latest version of these https://github.com/velor-chain/velor-core/blob/48cc64df8a64f2d13012c10d8bd5bf25d94f19dc/config/src/config/storage_config.rs#L166-L218 \
           and read carefully the comments on the prune window config entries -- set safe values.
         3. If you believe this is happening on nodes that are not run by us, involve the PE / Community / Ecosystem teams to coordinate efforts needed on those nodes.
       "
-  - alert: AptosDB API Success Rate
-    expr: sum by(kubernetes_pod_name) (rate(aptos_storage_api_latency_seconds_count{result="Ok"}[1m])) / sum by(kubernetes_pod_name) (rate(aptos_storage_api_latency_seconds_count[1m])) < 0.99  # 99%
+  - alert: VelorDB API Success Rate
+    expr: sum by(kubernetes_pod_name) (rate(velor_storage_api_latency_seconds_count{result="Ok"}[1m])) / sum by(kubernetes_pod_name) (rate(velor_storage_api_latency_seconds_count[1m])) < 0.99  # 99%
     for: 5m
     labels:
       severity: error
-      summary: "AptosDB API success rate dropped."
+      summary: "VelorDB API success rate dropped."
     annotations:
-      description: "AptosDB APIs started to return Error.
+      description: "VelorDB APIs started to return Error.
       This must be looked at together with alerts / dashboards of upper level components -- it unfortunately can be either the cause or victim of issues over there. Things you can do:
         1. Go to the storage dashboard and see if the errors are on specific APIs.
         2. Look at logs and see storage related errors, understand if it's hardware / dependency errors or logical errors in our code.
@@ -138,7 +138,7 @@ groups:
         4. See if changes in recent releases can cause this issue.
       "
   - alert: RocksDB Read Latency
-    expr: sum by (kubernetes_pod_name) (rate(aptos_schemadb_get_latency_seconds_sum[1m])) / sum by (kubernetes_pod_name) (rate(aptos_schemadb_get_latency_seconds_count[1m])) > 0.001  # 1 millisecond
+    expr: sum by (kubernetes_pod_name) (rate(velor_schemadb_get_latency_seconds_sum[1m])) / sum by (kubernetes_pod_name) (rate(velor_schemadb_get_latency_seconds_count[1m])) > 0.001  # 1 millisecond
     for: 5m
     labels:
       severity: warning
@@ -154,7 +154,7 @@ groups:
       "
   # Logging alerts
   - alert: Logs Being Dropped
-    expr: 1 < (rate(aptos_struct_log_queue_error[1m]) + rate(aptos_struct_log_send_error[1m]))
+    expr: 1 < (rate(velor_struct_log_queue_error[1m]) + rate(velor_struct_log_send_error[1m]))
     for: 5m
     labels:
       severity: warning

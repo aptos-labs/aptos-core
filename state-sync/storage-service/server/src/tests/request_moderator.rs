@@ -1,27 +1,27 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     moderator::UnhealthyPeerState,
     tests::{mock::MockClient, utils},
 };
-use aptos_config::{
+use velor_config::{
     config::{PeerRole, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::{
+use velor_netcore::transport::ConnectionOrigin;
+use velor_network::{
     application::metadata::ConnectionState,
     protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
     transport::{ConnectionId, ConnectionMetadata},
 };
-use aptos_storage_service_types::{
+use velor_storage_service_types::{
     requests::{DataRequest, StorageServiceRequest, TransactionsWithProofRequest},
     responses::StorageServiceResponse,
     StorageServiceError,
 };
-use aptos_time_service::MockTimeService;
-use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress, PeerId};
+use velor_time_service::MockTimeService;
+use velor_types::{account_address::AccountAddress, network_address::NetworkAddress, PeerId};
 use claims::assert_matches;
 use dashmap::DashMap;
 use std::{str::FromStr, sync::Arc, time::Duration};

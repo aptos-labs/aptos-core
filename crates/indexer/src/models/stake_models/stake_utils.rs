@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::models::{move_resources::MoveResource, token_models::token_utils::Table};
 use anyhow::{Context, Result};
-use aptos_api_types::{deserialize_from_string, WriteResource};
+use velor_api_types::{deserialize_from_string, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 
@@ -187,7 +187,7 @@ impl StakeEvent {
         txn_version: i64,
     ) -> Result<Option<Self>> {
         match data_type {
-            "0x1::aptos_governance::VoteEvent" => serde_json::from_value(data.clone())
+            "0x1::velor_governance::VoteEvent" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeEvent::GovernanceVoteEvent(inner))),
             "0x1::stake::DistributeRewardsEvent" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeEvent::DistributeRewardsEvent(inner))),

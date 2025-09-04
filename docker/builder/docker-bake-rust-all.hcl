@@ -3,7 +3,7 @@
 # Check https://crazymax.dev/docker-allhands2-buildx-bake and https://docs.docker.com/engine/reference/commandline/buildx_bake/#file-definition for an intro.
 
 variable "CI" {
-  # whether this build runs in aptos-labs' CI environment which makes certain assumptions about certain registries being available to push to cache layers.
+  # whether this build runs in velor-chain' CI environment which makes certain assumptions about certain registries being available to push to cache layers.
   # for local builds we simply default to relying on dockers local caching.
   default = "false"
 }
@@ -30,7 +30,7 @@ variable "TARGET_REGISTRY" {
 }
 
 variable "ecr_base" {
-  default = "${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.us-west-2.amazonaws.com/aptos"
+  default = "${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.us-west-2.amazonaws.com/velor"
 }
 
 variable "NORMALIZED_GIT_BRANCH_OR_PR" {}
@@ -92,9 +92,9 @@ target "builder-base" {
   ]
 }
 
-target "aptos-node-builder" {
+target "velor-node-builder" {
   dockerfile = "docker/builder/builder.Dockerfile"
-  target     = "aptos-node-builder"
+  target     = "velor-node-builder"
   contexts = {
     builder-base = "target:builder-base"
   }
@@ -128,7 +128,7 @@ target "indexer-builder" {
 target "_common" {
   contexts = {
     debian-base     = "target:debian-base"
-    node-builder    = "target:aptos-node-builder"
+    node-builder    = "target:velor-node-builder"
     tools-builder   = "target:tools-builder"
     indexer-builder = "target:indexer-builder"
   }
@@ -237,8 +237,8 @@ function "generate_tags" {
       "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
       "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
       ] : [ // "local" or any other value
-      "aptos-core/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}-from-local",
-      "aptos-core/${target}:${IMAGE_TAG_PREFIX}from-local",
+      "velor-core/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}-from-local",
+      "velor-core/${target}:${IMAGE_TAG_PREFIX}from-local",
     ]
   )
 }

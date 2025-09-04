@@ -1,14 +1,14 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::proposer_election::ProposerElection;
-use aptos_consensus_types::{
+use velor_consensus_types::{
     block::Block,
     common::{Author, Round},
 };
-use aptos_crypto::HashValue;
-use aptos_infallible::Mutex;
-use aptos_logger::{error, warn, SecurityEvent};
+use velor_crypto::HashValue;
+use velor_infallible::Mutex;
+use velor_logger::{error, warn, SecurityEvent};
 use std::{cmp::Ordering, sync::Arc};
 
 // Wrapper around ProposerElection.

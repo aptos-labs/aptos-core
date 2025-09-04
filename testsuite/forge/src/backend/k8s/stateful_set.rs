@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{create_k8s_client, k8s_wait_nodes_strategy, K8sApi, ReadWrite, Result, KUBECTL_BIN};
@@ -253,7 +253,7 @@ pub async fn set_identity(
     let kube_client = create_k8s_client().await?;
     let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
     let patch_op = PatchOperation::Replace(ReplaceOperation {
-        // The json path below should match `terraform/helm/aptos-node/templates/validator.yaml`.
+        // The json path below should match `terraform/helm/velor-node/templates/validator.yaml`.
         path: "/spec/template/spec/volumes/1/secret/secretName".to_string(),
         value: json!(k8s_secret_name),
     });
@@ -267,7 +267,7 @@ pub async fn get_identity(sts_name: &str, kube_namespace: &str) -> Result<String
     let kube_client = create_k8s_client().await?;
     let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
     let sts = stateful_set_api.get(sts_name).await?;
-    // The json path below should match `terraform/helm/aptos-node/templates/validator.yaml`.
+    // The json path below should match `terraform/helm/velor-node/templates/validator.yaml`.
     let secret_name = sts.spec.unwrap().template.spec.unwrap().volumes.unwrap()[1]
         .secret
         .clone()
@@ -282,7 +282,7 @@ pub async fn check_for_container_restart(
     kube_namespace: &str,
     sts_name: &str,
 ) -> Result<()> {
-    aptos_retrier::retry_async(k8s_wait_nodes_strategy(), || {
+    velor_retrier::retry_async(k8s_wait_nodes_strategy(), || {
         let pod_api: Api<Pod> = Api::namespaced(kube_client.clone(), kube_namespace);
         Box::pin(async move {
             // Get the StatefulSet's Pod status

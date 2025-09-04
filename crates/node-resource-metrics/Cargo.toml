@@ -1,5 +1,5 @@
 [package]
-name = "aptos-node-resource-metrics"
+name = "velor-node-resource-metrics"
 description = "System resource metrics collector"
 version = "0.1.0"
 
@@ -13,10 +13,10 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-build-info = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
+velor-build-info = { workspace = true }
+velor-infallible = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
 cfg-if = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }

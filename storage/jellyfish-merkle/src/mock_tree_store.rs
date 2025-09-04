@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,9 +6,9 @@ use crate::{
     node_type::{LeafNode, Node, NodeKey},
     NodeBatch, Result, StaleNodeIndex, TreeReader, TreeUpdateBatch, TreeWriter,
 };
-use aptos_infallible::RwLock;
-use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError};
-use aptos_types::transaction::Version;
+use velor_infallible::RwLock;
+use velor_storage_interface::{db_ensure as ensure, db_other_bail, VelorDbError};
+use velor_types::transaction::Version;
 use std::collections::{hash_map::Entry, BTreeSet, HashMap};
 pub struct MockTreeStore<K> {
     data: RwLock<(HashMap<NodeKey, Node<K>>, BTreeSet<StaleNodeIndex>)>,

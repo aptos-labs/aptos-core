@@ -1,0 +1,29 @@
+processed 2 tasks
+task 1 lines 4-10:  publish --private-key Alice [module Alice::M {]
+Error: extended checks failed:
+
+error: `init_module` function can only take a single parameter of type `signer` or `&signer`
+  ┌─ TEMPFILE:6:16
+  │
+6 │     public fun init_module(value: u64): u64 { value }
+  │                ^^^^^^^^^^^
+
+error: `init_module` function cannot return values
+  ┌─ TEMPFILE:6:16
+  │
+6 │     public fun init_module(value: u64): u64 { value }
+  │                ^^^^^^^^^^^
+
+error: `init_module` function must be private
+  ┌─ TEMPFILE:6:16
+  │
+6 │     public fun init_module(value: u64): u64 { value }
+  │                ^^^^^^^^^^^
+
+error: type `&mut signer` is not supported as a transaction parameter type
+  ┌─ TEMPFILE:8:14
+  │
+8 │     fun view(_:&mut signer,value: u64): u64 { value }
+  │              ^
+
+

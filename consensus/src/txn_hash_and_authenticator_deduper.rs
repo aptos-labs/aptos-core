@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     counters::{TXN_DEDUP_FILTERED, TXN_DEDUP_SECONDS},
     transaction_deduper::TransactionDeduper,
 };
-use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_types::transaction::SignedTransaction;
+use velor_experimental_runtimes::thread_manager::optimal_min_len;
+use velor_types::transaction::SignedTransaction;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
@@ -107,15 +107,15 @@ mod tests {
         transaction_deduper::TransactionDeduper,
         txn_hash_and_authenticator_deduper::TxnHashAndAuthenticatorDeduper,
     };
-    use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
-    use aptos_keygen::KeyGen;
-    use aptos_types::{
+    use velor_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
+    use velor_keygen::KeyGen;
+    use velor_types::{
         chain_id::ChainId,
         transaction::{
             EntryFunction, RawTransaction, ReplayProtector, Script, SignedTransaction,
             TransactionExecutable,
         },
-        utility_coin::AptosCoinType,
+        utility_coin::VelorCoinType,
         CoinType,
     };
     use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
@@ -136,7 +136,7 @@ mod tests {
         }
 
         pub fn with_keypair(privkey: Ed25519PrivateKey, pubkey: Ed25519PublicKey) -> Self {
-            let addr = aptos_types::account_address::from_public_key(&pubkey);
+            let addr = velor_types::account_address::from_public_key(&pubkey);
             Account {
                 addr,
                 privkey,
@@ -182,7 +182,7 @@ mod tests {
         let entry_func = EntryFunction::new(
             ModuleId::new(AccountAddress::ONE, ident_str!("coin").to_owned()),
             ident_str!("transfer").to_owned(),
-            vec![AptosCoinType::type_tag()],
+            vec![VelorCoinType::type_tag()],
             vec![
                 bcs::to_bytes(&receiver).unwrap(),
                 bcs::to_bytes(&1).unwrap(),

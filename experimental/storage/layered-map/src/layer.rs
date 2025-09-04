@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -7,10 +7,10 @@ use crate::{
     map::{DefaultHashBuilder, LayeredMap},
     metrics::LAYER,
 };
-use aptos_crypto::HashValue;
-use aptos_drop_helper::ArcAsyncDrop;
-use aptos_infallible::Mutex;
-use aptos_metrics_core::IntGaugeVecHelper;
+use velor_crypto::HashValue;
+use velor_drop_helper::ArcAsyncDrop;
+use velor_infallible::Mutex;
+use velor_metrics_core::IntGaugeVecHelper;
 use std::{marker::PhantomData, sync::Arc};
 
 #[derive(Debug)]

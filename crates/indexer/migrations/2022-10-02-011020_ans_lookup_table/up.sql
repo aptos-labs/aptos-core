@@ -11,7 +11,7 @@ CREATE INDEX curr_to_oa_tt_ltv_index ON current_token_ownerships (
   table_type,
   last_transaction_version DESC
 );
--- allows quick lookup for aptos name services registered address
+-- allows quick lookup for velor name services registered address
 CREATE TABLE current_ans_lookup (
   domain VARCHAR(64) NOT NULL,
   -- if subdomain is null set to empty string

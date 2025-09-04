@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,7 +7,7 @@ use crate::{
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use anyhow::{ensure, Context};
-use aptos_types::{block_info::BlockInfo, validator_verifier::ValidatorVerifier};
+use velor_types::{block_info::BlockInfo, validator_verifier::ValidatorVerifier};
 use fail::fail_point;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};

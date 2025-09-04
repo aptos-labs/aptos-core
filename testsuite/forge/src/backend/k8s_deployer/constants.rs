@@ -1,13 +1,13 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub const FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO: &str =
-    "us-docker.pkg.dev/aptos-registry/docker/forge-indexer-deployer";
+    "us-docker.pkg.dev/velor-registry/docker/forge-indexer-deployer";
 pub const FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO: &str =
-    "us-docker.pkg.dev/aptos-registry/docker/forge-testnet-deployer";
-pub const VALIDATOR_DOCKER_IMAGE_REPO: &str = "us-docker.pkg.dev/aptos-registry/docker/validator";
+    "us-docker.pkg.dev/velor-registry/docker/forge-testnet-deployer";
+pub const VALIDATOR_DOCKER_IMAGE_REPO: &str = "us-docker.pkg.dev/velor-registry/docker/validator";
 pub const INDEXER_GRPC_DOCKER_IMAGE_REPO: &str =
-    "us-docker.pkg.dev/aptos-registry/docker/indexer-grpc";
+    "us-docker.pkg.dev/velor-registry/docker/indexer-grpc";
 
 /// The version of the forge deployer image to use.
 pub const DEFAULT_FORGE_DEPLOYER_IMAGE_TAG: &str = "0769f1eb0c17e101e6e9d852cfe1c22e2ca82190"; // default to the latest stable build from the main branch (2025-08-02)

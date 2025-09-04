@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -16,20 +16,20 @@ use crate::{
         },
     },
 };
-use aptos_config::{
+use velor_config::{
     config::{MempoolConfig, NodeType},
     network_id::PeerNetworkId,
 };
-use aptos_infallible::RwLock;
-use aptos_logger::prelude::*;
-use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::{
+use velor_infallible::RwLock;
+use velor_logger::prelude::*;
+use velor_netcore::transport::ConnectionOrigin;
+use velor_network::{
     application::{error::Error, interface::NetworkClientInterface, metadata::PeerMetadata},
     transport::ConnectionMetadata,
 };
-use aptos_time_service::TimeService;
-use aptos_types::transaction::SignedTransaction;
-use aptos_vm_validator::vm_validator::TransactionValidation;
+use velor_time_service::TimeService;
+use velor_types::transaction::SignedTransaction;
+use velor_vm_validator::vm_validator::TransactionValidation;
 use fail::fail_point;
 use serde::{Deserialize, Serialize};
 use std::{

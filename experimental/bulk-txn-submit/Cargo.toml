@@ -1,5 +1,5 @@
 [package]
-name = "aptos-experimental-bulk-txn-submit"
+name = "velor-experimental-bulk-txn-submit"
 description = ""
 version = "0.0.0"
 
@@ -14,11 +14,11 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-config = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-sdk = { workspace = true }
-aptos-transaction-emitter-lib = { workspace = true }
-aptos-transaction-generator-lib = { workspace = true }
+velor-config = { workspace = true }
+velor-logger = { workspace = true }
+velor-sdk = { workspace = true }
+velor-transaction-emitter-lib = { workspace = true }
+velor-transaction-generator-lib = { workspace = true }
 bcs = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }

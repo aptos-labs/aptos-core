@@ -1,8 +1,8 @@
 apiVersion: v2
-name: aptos-genesis
+name: velor-genesis
 version: 0.1.0
 appVersion: 0.1.0
-description: Aptos blockchain automated genesis ceremony for testnets
-home: https://aptoslabs.com/
+description: Velor blockchain automated genesis ceremony for testnets
+home: https://velorlabs.com/
 sources:
-- https://github.com/aptos-labs/aptos-core
+- https://github.com/velor-chain/velor-core

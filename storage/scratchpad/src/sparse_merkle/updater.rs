@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,15 +10,15 @@ use crate::{
     },
     ProofRead,
 };
-use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_types::proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt};
-use aptos_vm::AptosVM;
+use velor_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use velor_types::proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt};
+use velor_vm::VelorVM;
 use once_cell::sync::Lazy;
 use std::cmp::Ordering;
 
 static POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
-        .num_threads(AptosVM::get_num_proof_reading_threads())
+        .num_threads(VelorVM::get_num_proof_reading_threads())
         .thread_name(|index| format!("smt_update_{}", index))
         .build()
         .unwrap()

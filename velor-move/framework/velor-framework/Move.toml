@@ -1,0 +1,16 @@
+[package]
+name = "VelorFramework"
+version = "1.0.0"
+
+[addresses]
+std = "0x1"
+velor_std = "0x1"
+velor_framework = "0x1"
+velor_fungible_asset = "0xA"
+velor_token = "0x3"
+core_resources = "0xA550C18"
+vm_reserved = "0x0"
+
+[dependencies]
+VelorStdlib = { local = "../velor-stdlib" }
+MoveStdlib = { local = "../move-stdlib" }

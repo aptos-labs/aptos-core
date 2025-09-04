@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{RemoteKVRequest, RemoteKVResponse};
-use aptos_secure_net::network_controller::{Message, NetworkController};
-use aptos_types::state_store::state_key::StateKey;
-use aptos_vm::sharded_block_executor::remote_state_value::RemoteStateValue;
+use velor_secure_net::network_controller::{Message, NetworkController};
+use velor_types::state_store::state_key::StateKey;
+use velor_vm::sharded_block_executor::remote_state_value::RemoteStateValue;
 use crossbeam_channel::{Receiver, Sender};
 use std::{
     net::SocketAddr,
@@ -13,8 +13,8 @@ use std::{
 
 extern crate itertools;
 use crate::metrics::{REMOTE_EXECUTOR_REMOTE_KV_COUNT, REMOTE_EXECUTOR_TIMER};
-use aptos_logger::trace;
-use aptos_types::{
+use velor_logger::trace;
+use velor_types::{
     block_executor::partitioner::ShardId,
     state_store::{
         state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewResult,

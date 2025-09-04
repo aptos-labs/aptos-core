@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{payload::TDataInfo, utils::PayloadTxnsSize};
 use anyhow::{bail, ensure, Context};
-use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::{
+use velor_crypto::{bls12381, CryptoMaterialError, HashValue};
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_types::{
     aggregate_signature::AggregateSignature, ledger_info::SignatureWithStatus,
     quorum_store::BatchId, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier, PeerId,
@@ -219,13 +219,13 @@ impl SignedBatchInfo {
         }
 
         if self.expiration()
-            > aptos_infallible::duration_since_epoch().as_micros() as u64
+            > velor_infallible::duration_since_epoch().as_micros() as u64
                 + max_batch_expiry_gap_usecs
         {
             bail!(
                 "Batch expiration too far in future: {} > {}",
                 self.expiration(),
-                aptos_infallible::duration_since_epoch().as_micros() as u64
+                velor_infallible::duration_since_epoch().as_micros() as u64
                     + max_batch_expiry_gap_usecs
             );
         }

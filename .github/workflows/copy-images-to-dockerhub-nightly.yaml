@@ -7,20 +7,20 @@ on:
 permissions:
   contents: read
   id-token: write #required for GCP Workload Identity federation
-  actions: write #required for workflow cancellation via check-aptos-core
+  actions: write #required for workflow cancellation via check-velor-core
 
 jobs:
   check-repo:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
+      - uses: velor-chain/velor-core/.github/actions/check-velor-core@main
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
   copy-images-to-dockerhub:
     needs: check-repo
-    if: github.repository == 'aptos-labs/aptos-core'
+    if: github.repository == 'velor-chain/velor-core'
     uses: ./.github/workflows/copy-images-to-dockerhub.yaml
     with:
       image_tag_prefix: nightly

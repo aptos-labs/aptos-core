@@ -1,0 +1,10 @@
+[package]
+name = "transaction_context_test"
+version = "0.0.0"
+
+[addresses]
+admin = "0x1"
+
+[dependencies]
+VelorFramework = { local = "../../../../../framework/velor-framework" }
+VelorStdlib = { local = "../../../../../framework/velor-stdlib" }

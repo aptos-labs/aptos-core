@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction_shuffler::use_case_aware::{
@@ -6,7 +6,7 @@ use crate::transaction_shuffler::use_case_aware::{
     types::{InputIdx, OutputIdx},
     Config,
 };
-use aptos_types::transaction::use_case::UseCaseAwareTransaction;
+use velor_types::transaction::use_case::UseCaseAwareTransaction;
 use std::{collections::VecDeque, fmt::Debug};
 
 #[derive(Debug)]

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,7 +9,7 @@ use crate::{
     },
     transaction::Version,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use velor_crypto::{hash::CryptoHash, HashValue};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
 use StateSlot::*;

@@ -1,0 +1,44 @@
+//# init --addresses Alice=0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+//#      --private-keys Alice=56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
+
+//# publish --private-key Alice
+module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6.m {
+
+struct S has copy, drop { f: u64 }
+public foo() {
+    let x: Self.S;
+    let y: Self.S;
+    let z: u64;
+    let r: &Self.S;
+    let f: &u64;
+    label l0:
+        x = S { f: 0 };
+        z = 0;
+        r = &x;
+        f = &z;
+    label l1:
+        y = S { f: 1 };
+        _ = *copy(r);
+        r = &y;
+        f = &copy(r).S::f;
+        jump l1;
+}
+}
+
+//# run --signers Alice -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::m::foo 
+
+//# run --signers Alice
+main() {
+    let x: u64;
+    let y: u64;
+    let z: u64;
+    let r: &u64;
+    label l0:
+        x = 0;
+        r = &x;
+    label l1:
+        y = 0;
+        z = *copy(r);
+        r = &y;
+        jump l1;
+}

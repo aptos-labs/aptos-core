@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! Convenience Network API for Aptos
+//! Convenience Network API for Velor
 
 pub use crate::protocols::rpc::error::RpcError;
 use crate::{
@@ -12,11 +12,11 @@ use crate::{
     protocols::wire::messaging::v1::{IncomingRequest, NetworkMessage},
     ProtocolId,
 };
-use aptos_channels::aptos_channel;
-use aptos_config::network_id::PeerNetworkId;
-use aptos_logger::prelude::*;
-use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use velor_channels::velor_channel;
+use velor_config::network_id::PeerNetworkId;
+use velor_logger::prelude::*;
+use velor_short_hex_str::AsShortHexStr;
+use velor_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{
     channel::oneshot,
@@ -67,7 +67,7 @@ impl<TMessage: PartialEq> PartialEq for Event<TMessage> {
     }
 }
 
-/// Configuration needed for the client side of AptosNet applications
+/// Configuration needed for the client side of VelorNet applications
 #[derive(Clone)]
 pub struct NetworkClientConfig {
     /// Direct send protocols for the application (sorted by preference, highest to lowest)
@@ -88,7 +88,7 @@ impl NetworkClientConfig {
     }
 }
 
-/// Configuration needed for the service side of AptosNet applications
+/// Configuration needed for the service side of VelorNet applications
 #[derive(Clone)]
 pub struct NetworkServiceConfig {
     /// Direct send protocols for the application (sorted by preference, highest to lowest)
@@ -96,14 +96,14 @@ pub struct NetworkServiceConfig {
     /// RPC protocols for the application (sorted by preference, highest to lowest)
     pub rpc_protocols_and_preferences: Vec<ProtocolId>,
     /// The inbound queue config (from the network to the application)
-    pub inbound_queue_config: aptos_channel::Config,
+    pub inbound_queue_config: velor_channel::Config,
 }
 
 impl NetworkServiceConfig {
     pub fn new(
         direct_send_protocols_and_preferences: Vec<ProtocolId>,
         rpc_protocols_and_preferences: Vec<ProtocolId>,
-        inbound_queue_config: aptos_channel::Config,
+        inbound_queue_config: velor_channel::Config,
     ) -> Self {
         Self {
             direct_send_protocols_and_preferences,
@@ -113,7 +113,7 @@ impl NetworkServiceConfig {
     }
 }
 
-/// Configuration needed for AptosNet applications to register with the network
+/// Configuration needed for VelorNet applications to register with the network
 /// builder. Supports client and service side.
 #[derive(Clone)]
 pub struct NetworkApplicationConfig {
@@ -200,7 +200,7 @@ pub struct NetworkEvents<TMessage> {
 /// Trait specifying the signature for `new()` `NetworkEvents`
 pub trait NewNetworkEvents {
     fn new(
-        peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage>,
+        peer_mgr_notifs_rx: velor_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage>,
         max_parallel_deserialization_tasks: Option<usize>,
         allow_out_of_order_delivery: bool,
     ) -> Self;
@@ -208,7 +208,7 @@ pub trait NewNetworkEvents {
 
 impl<TMessage: Message + Send + Sync + 'static> NewNetworkEvents for NetworkEvents<TMessage> {
     fn new(
-        peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage>,
+        peer_mgr_notifs_rx: velor_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage>,
         max_parallel_deserialization_tasks: Option<usize>,
         allow_out_of_order_delivery: bool,
     ) -> Self {
@@ -334,7 +334,7 @@ impl<TMessage> FusedStream for NetworkEvents<TMessage> {
 /// keys.
 ///
 /// `NetworkSender` is in fact a thin wrapper around a `PeerManagerRequestSender`, which in turn is
-/// a thin wrapper on `aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>`,
+/// a thin wrapper on `velor_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>`,
 /// mostly focused on providing a more ergonomic API. However, network applications will usually
 /// provide their own thin wrapper around `NetworkSender` that narrows the API to the specific
 /// interface they need.

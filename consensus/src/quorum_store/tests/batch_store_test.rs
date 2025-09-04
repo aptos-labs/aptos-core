@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::{
@@ -6,10 +6,10 @@ use crate::quorum_store::{
     quorum_store_db::QuorumStoreDB,
     types::{PersistedValue, StorageMode},
 };
-use aptos_consensus_types::proof_of_store::BatchInfo;
-use aptos_crypto::HashValue;
-use aptos_temppath::TempPath;
-use aptos_types::{
+use velor_consensus_types::proof_of_store::BatchInfo;
+use velor_crypto::HashValue;
+use velor_temppath::TempPath;
+use velor_types::{
     account_address::AccountAddress, quorum_store::BatchId, transaction::SignedTransaction,
     validator_verifier::random_validator_verifier,
 };

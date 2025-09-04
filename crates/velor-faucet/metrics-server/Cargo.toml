@@ -1,0 +1,22 @@
+[package]
+name = "velor-faucet-metrics-server"
+description = "Metrics server for the Velor faucet"
+version = "2.0.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core  = { workspace = true }
+once_cell = { workspace = true }
+poem = { workspace = true }
+prometheus = { workspace = true }
+serde = { workspace = true }

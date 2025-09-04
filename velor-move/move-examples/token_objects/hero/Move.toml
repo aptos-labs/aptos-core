@@ -1,0 +1,10 @@
+[package]
+name = "Hero"
+version = "0.0.0"
+
+[addresses]
+hero = "_"
+
+[dependencies]
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-framework", rev = "mainnet" }
+VelorTokenObjects = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-token-objects", rev = "mainnet" }

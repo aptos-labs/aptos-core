@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,10 +8,10 @@ use crate::{
     quorum_cert::QuorumCert,
 };
 use anyhow::ensure;
-use aptos_crypto::HashValue;
-use aptos_crypto_derive::CryptoHasher;
-use aptos_infallible::duration_since_epoch;
-use aptos_types::{block_info::BlockInfo, validator_txn::ValidatorTransaction};
+use velor_crypto::HashValue;
+use velor_crypto_derive::CryptoHasher;
+use velor_infallible::duration_since_epoch;
+use velor_types::{block_info::BlockInfo, validator_txn::ValidatorTransaction};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},

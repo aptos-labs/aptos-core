@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -18,11 +18,11 @@ use crate::{
     monitor,
     network::{IncomingDAGRequest, RpcResponder},
 };
-use aptos_bounded_executor::{concurrent_map, BoundedExecutor};
-use aptos_channels::aptos_channel;
-use aptos_consensus_types::common::{Author, Round};
-use aptos_logger::{debug, error, warn};
-use aptos_types::epoch_state::EpochState;
+use velor_bounded_executor::{concurrent_map, BoundedExecutor};
+use velor_channels::velor_channel;
+use velor_consensus_types::common::{Author, Round};
+use velor_logger::{debug, error, warn};
+use velor_types::epoch_state::EpochState;
 use futures::{stream::FuturesUnordered, StreamExt};
 use std::sync::Arc;
 use tokio::{runtime::Handle, select};
@@ -69,7 +69,7 @@ impl NetworkHandler {
 
     pub async fn run(
         self,
-        dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
+        dag_rpc_rx: &mut velor_channel::Receiver<Author, IncomingDAGRequest>,
         executor: BoundedExecutor,
         _buffer: Vec<DAGMessage>,
     ) -> SyncOutcome {

@@ -23,9 +23,9 @@ spec:
     spec:
       containers:
       - command:
-        - /usr/local/bin/aptos-node
+        - /usr/local/bin/velor-node
         - -f
-        - /opt/aptos/etc/pfn.yaml
+        - /opt/velor/etc/pfn.yaml
         image: pfn-image
         name: pfn-name-pfn
         ports:
@@ -38,19 +38,19 @@ spec:
             cpu: pfn-cpu
             memory: pfn-memory
         volumeMounts:
-        - mountPath: /opt/aptos/etc
-          name: aptos-config
-        - mountPath: /opt/aptos/genesis
+        - mountPath: /opt/velor/etc
+          name: velor-config
+        - mountPath: /opt/velor/genesis
           name: genesis-config
-        - mountPath: /opt/aptos/data
-          name: aptos-data
+        - mountPath: /opt/velor/data
+          name: velor-data
       volumes:
       - configMap:
           name: pfn-name-pfn-configmap
-        name: aptos-config
+        name: velor-config
       - configMap:
           name: genesis-artifiact-configmap-pangu
         name: genesis-config
-      - name: aptos-data
+      - name: velor-data
         persistentVolumeClaim:
           claimName: pfn-name-pfn-pvc

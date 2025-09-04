@@ -6,7 +6,7 @@ spec:
   deletionPolicy: Retain
   driver: pd.csi.storage.gke.io
   source:
-    snapshotHandle: projects/aptos-devinfra-0/global/snapshots/testnet-archive
+    snapshotHandle: projects/velor-devinfra-0/global/snapshots/testnet-archive
   volumeSnapshotRef:
     kind: VolumeSnapshot
     name: testnet-archive

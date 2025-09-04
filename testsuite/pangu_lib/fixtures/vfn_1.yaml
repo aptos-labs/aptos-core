@@ -5,10 +5,10 @@
 base:
   role: "full_node"
   waypoint:
-    from_file: "/opt/aptos/genesis/waypoint.txt"
+    from_file: "/opt/velor/genesis/waypoint.txt"
 
 execution:
-  genesis_file_location: "/opt/aptos/genesis/genesis.blob"
+  genesis_file_location: "/opt/velor/genesis/genesis.blob"
 
 storage:
   backup_service_address: "0.0.0.0:6186"
@@ -20,14 +20,14 @@ full_node_networks:
   listen_address: "/ip4/0.0.0.0/tcp/6182"
   identity:
     type: "from_file"
-    path: "/opt/aptos/identites/validator-full-node-identity.yaml"
+    path: "/opt/velor/identites/validator-full-node-identity.yaml"
 - network_id:
     private: "vfn"
   listen_address: "/ip4/0.0.0.0/tcp/6181"
   seeds:
     00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237:
       addresses:
-      - '/dns4/{{ include "aptos-validator.fullname" $ }}-{{$.Values.i}}-validator/tcp/6181/noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/handshake/0' #TODO needs to be changed during runtime
+      - '/dns4/{{ include "velor-validator.fullname" $ }}-{{$.Values.i}}-validator/tcp/6181/noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/handshake/0' #TODO needs to be changed during runtime
       role: "Validator"
 
 api:

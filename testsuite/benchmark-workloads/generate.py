@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright © Aptos Foundation
+# Copyright © Velor Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 import subprocess
@@ -9,15 +9,15 @@ import pathlib
 ROOT = pathlib.Path(__file__).absolute().parents[2]
 
 # Specifies directories for regular packages.
-# Paths are relative to the root of the aptos-core repository.
+# Paths are relative to the root of the velor-core repository.
 PACKAGES = [
     "testsuite/benchmark-workloads/packages",
-    "aptos-move/move-examples/token_objects/ambassador",
-    "aptos-move/move-examples/aggregator_examples",
-    "aptos-move/move-examples/bcs-stream"
+    "velor-move/move-examples/token_objects/ambassador",
+    "velor-move/move-examples/aggregator_examples",
+    "velor-move/move-examples/bcs-stream"
 ]
 # Specifies directories for experimental packages (will be compiled with latest, possibly unstable) language version.
-# Paths are relative to the root of the aptos-core repository.
+# Paths are relative to the root of the velor-core repository.
 EXPERIMENTAL_PACKAGES = [
     "testsuite/benchmark-workloads/packages-experimental/experimental_usecases",
 ]

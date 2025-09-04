@@ -1,6 +1,6 @@
 [package]
-name = "aptos-sdk"
-description = "The Official Aptos SDK"
+name = "velor-sdk"
+description = "The Official Velor SDK"
 version = "0.0.3"
 
 # Workspace inherited keys
@@ -14,12 +14,12 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-cached-packages = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-global-constants = { workspace = true }
-aptos-ledger = { workspace = true }
-aptos-rest-client = { workspace = true }
-aptos-types = { workspace = true }
+velor-cached-packages = { workspace = true }
+velor-crypto = { workspace = true }
+velor-global-constants = { workspace = true }
+velor-ledger = { workspace = true }
+velor-rest-client = { workspace = true }
+velor-types = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
 ed25519-dalek-bip32 = { workspace = true }

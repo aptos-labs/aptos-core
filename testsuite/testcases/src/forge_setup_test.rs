@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::generate_traffic;
 use anyhow::Context;
-use aptos_config::config::OverrideNodeConfig;
-use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, Test};
+use velor_config::config::OverrideNodeConfig;
+use velor_forge::{NetworkContextSynchronizer, NetworkTest, Result, Test};
 use async_trait::async_trait;
 use log::info;
 use rand::{
@@ -14,7 +14,7 @@ use rand::{
 };
 use std::{ops::DerefMut, thread, time::Duration};
 
-const STATE_SYNC_VERSION_COUNTER_NAME: &str = "aptos_state_sync_version";
+const STATE_SYNC_VERSION_COUNTER_NAME: &str = "velor_state_sync_version";
 
 pub struct ForgeSetupTest;
 

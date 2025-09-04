@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
@@ -6,7 +6,7 @@
 
 use super::stake_utils::StakeResource;
 use crate::{schema::current_staking_pool_voter, util::standardize_address};
-use aptos_api_types::{Transaction as APITransaction, WriteSetChange as APIWriteSetChange};
+use velor_api_types::{Transaction as APITransaction, WriteSetChange as APIWriteSetChange};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

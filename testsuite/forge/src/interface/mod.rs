@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod admin;
 pub use admin::*;
-mod aptos;
-pub use self::aptos::*;
+mod velor;
+pub use self::velor::*;
 mod network;
 pub use network::*;
 mod test;
@@ -21,7 +21,7 @@ pub use node::*;
 mod chain_info;
 pub mod prometheus_metrics;
 
-use aptos_framework::ReleaseBundle;
+use velor_framework::ReleaseBundle;
 pub use chain_info::*;
 
 /// A wrapper around a usize in order to represent an opaque version of a Node.

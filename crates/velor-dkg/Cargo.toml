@@ -1,0 +1,58 @@
+[package]
+name = "velor-dkg"
+version = "0.1.0"
+edition = "2021"
+license = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-crypto = { workspace = true }
+velor-crypto-derive = { workspace = true }
+velor-runtimes = { workspace = true }
+bcs =  { workspace = true }
+blst = { workspace = true }
+blstrs = { workspace = true }
+criterion = { workspace = true }
+ff = { workspace = true }
+group = { workspace = true }
+hex = { workspace = true }
+merlin = { workspace = true }
+more-asserts = { workspace = true }
+num-bigint = { workspace = true }
+num-integer = { workspace = true }
+num-traits = { workspace = true }
+once_cell = { workspace = true }
+pairing = { workspace = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+sha3 = { workspace = true }
+static_assertions = { workspace = true }
+
+[dev-dependencies]
+num_cpus = { workspace = true }
+
+[features]
+assert-private-keys-not-cloneable = []
+fuzzing = []
+
+[[bench]]
+name = "crypto"
+harness = false
+
+[[bench]]
+name = "lagrange"
+harness = false
+
+[[bench]]
+name = "pvss"
+harness = false
+
+[[bench]]
+name = "weighted_vuf"
+harness = false
+
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]

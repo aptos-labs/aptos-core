@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{
+use velor_crypto::{
     bls12381,
     ed25519::Ed25519PrivateKey,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
@@ -10,8 +10,8 @@ use aptos_crypto::{
     traits::{SigningKey, Uniform},
     PrivateKey,
 };
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::{
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_types::{
     block_metadata_ext::BlockMetadataExt,
     contract_event, event,
     state_store::{state_key::StateKey, state_value::PersistedStateValueMetadata},
@@ -32,11 +32,11 @@ pub fn output_file() -> Option<&'static str> {
 
 /// This aims at signing canonically serializable BCS data
 #[derive(CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
-struct TestAptosCrypto(String);
+struct TestVelorCrypto(String);
 
 /// Record sample values for crypto types used by consensus.
 fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()> {
-    let message = TestAptosCrypto("Hello, World".to_string());
+    let message = TestVelorCrypto("Hello, World".to_string());
 
     let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
 
@@ -56,7 +56,7 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     tracer.trace_value::<MultiEd25519Signature>(samples, &signature.clone().into())?;
 
     let secp256k1_private_key = secp256k1_ecdsa::PrivateKey::generate(&mut rng);
-    let secp256k1_public_key = aptos_crypto::PrivateKey::public_key(&secp256k1_private_key);
+    let secp256k1_public_key = velor_crypto::PrivateKey::public_key(&secp256k1_private_key);
     let secp256k1_signature = secp256k1_private_key.sign(&message).unwrap();
     tracer.trace_value(samples, &secp256k1_private_key)?;
     tracer.trace_value(samples, &secp256k1_public_key)?;
@@ -83,7 +83,7 @@ pub fn get_registry() -> Result<Registry> {
     trace_crypto_values(&mut tracer, &mut samples)?;
     tracer.trace_value(
         &mut samples,
-        &aptos_consensus_types::block::Block::make_genesis_block(),
+        &velor_consensus_types::block::Block::make_genesis_block(),
     )?;
     tracer.trace_value(&mut samples, &event::EventKey::random())?;
     tracer.trace_value(&mut samples, &write_set::WriteOp::legacy_deletion())?;
@@ -109,20 +109,20 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
     tracer.trace_type::<transaction::webauthn::AssertionSignature>(&samples)?;
-    tracer.trace_type::<aptos_types::keyless::EphemeralCertificate>(&samples)?;
+    tracer.trace_type::<velor_types::keyless::EphemeralCertificate>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
     tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
 
     tracer.trace_type::<StateKey>(&samples)?;
-    tracer.trace_type::<aptos_consensus::quorum_store::types::BatchResponse>(&samples)?;
-    tracer.trace_type::<aptos_consensus_types::round_timeout::RoundTimeoutReason>(&samples)?;
-    tracer.trace_type::<aptos_consensus::network_interface::ConsensusMsg>(&samples)?;
-    tracer.trace_type::<aptos_consensus::network_interface::CommitMessage>(&samples)?;
-    tracer.trace_type::<aptos_consensus_types::block_data::BlockType>(&samples)?;
-    tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalStatus>(&samples)?;
-    tracer.trace_type::<aptos_consensus_types::payload::PayloadExecutionLimit>(&samples)?;
-    tracer.trace_type::<aptos_consensus_types::common::Payload>(&samples)?;
-    tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalRequest>(&samples)?;
+    tracer.trace_type::<velor_consensus::quorum_store::types::BatchResponse>(&samples)?;
+    tracer.trace_type::<velor_consensus_types::round_timeout::RoundTimeoutReason>(&samples)?;
+    tracer.trace_type::<velor_consensus::network_interface::ConsensusMsg>(&samples)?;
+    tracer.trace_type::<velor_consensus::network_interface::CommitMessage>(&samples)?;
+    tracer.trace_type::<velor_consensus_types::block_data::BlockType>(&samples)?;
+    tracer.trace_type::<velor_consensus_types::block_retrieval::BlockRetrievalStatus>(&samples)?;
+    tracer.trace_type::<velor_consensus_types::payload::PayloadExecutionLimit>(&samples)?;
+    tracer.trace_type::<velor_consensus_types::common::Payload>(&samples)?;
+    tracer.trace_type::<velor_consensus_types::block_retrieval::BlockRetrievalRequest>(&samples)?;
 
     // aliases within StructTag
     tracer.ignore_aliases("StructTag", &["type_params"])?;

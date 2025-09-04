@@ -1,0 +1,4 @@
+processed 3 tasks
+task 1 lines 5-22:  publish --private-key Alice [module Alice::StringFmt {]
+task 2 lines 24-24:  run --signers Alice --show-events -- Alice::StringFmt::test
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(EXECUTION_LIMIT_REACHED))

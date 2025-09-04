@@ -1,0 +1,20 @@
+---
+remote_endpoint: https://fullnode.mainnet.velorlabs.com
+# replace with below for actual release, compat test needs concrete URL above:
+# remote_endpoint: ~
+name: "vX.YY.Z"
+proposals:
+  - name: proposal_1_upgrade_framework
+    metadata:
+      title: "Multi-step proposal to upgrade mainnet framework, version vX.YY.Z"
+      description: "This includes changes in https://github.com/velor-chain/velor-core/releases/tag/velor-node-vX.YY.Z"
+    execution_mode: MultiStep
+    update_sequence:
+      - Gas:
+          new: current
+          # replace with below for actual release, above "current" is needed for compat tests:
+          # old: https://raw.githubusercontent.com/velor-chain/velor-networks/main/gas/vX.WW.Z.json
+          # new: https://raw.githubusercontent.com/velor-chain/velor-networks/main/gas/vX.YY.Z.json
+      - Framework:
+          bytecode_version: 7
+          git_hash: ~

@@ -41,13 +41,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x584b50b999c78ade62f8359c91b5165ff390338d45f8e55969a04e65d76258c9::token_offer::CoinOffer<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x584b50b999c78ade62f8359c91b5165ff390338d45f8e55969a04e65d76258c9::token_offer::CoinOffer<0x1::velor_coin::VelorCoin>",
           "data": "{\"coins\":{\"value\":\"25000000\"}}"
         }
       },
@@ -76,7 +76,7 @@
             "name": "TokenOfferTokenV1"
           },
           "typeStr": "0x584b50b999c78ade62f8359c91b5165ff390338d45f8e55969a04e65d76258c9::token_offer::TokenOfferTokenV1",
-          "data": "{\"collection_name\":\"Aptos Dogs\",\"creator_address\":\"0xee814d743d2c3b4b1b8b30f3e0c84c7017df3154bda84c31958785f1d5b70e61\",\"property_version\":\"0\",\"token_name\":\"AptosDogs #1596\"}"
+          "data": "{\"collection_name\":\"Velor Dogs\",\"creator_address\":\"0xee814d743d2c3b4b1b8b30f3e0c84c7017df3154bda84c31958785f1d5b70e61\",\"property_version\":\"0\",\"token_name\":\"VelorDogs #1596\"}"
         }
       },
       {
@@ -93,13 +93,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"43287672469\"},\"deposit_events\":{\"counter\":\"2500630\",\"guid\":{\"id\":{\"addr\":\"0x584b50b999c78ade62f8359c91b5165ff390338d45f8e55969a04e65d76258c9\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"26\",\"guid\":{\"id\":{\"addr\":\"0x584b50b999c78ade62f8359c91b5165ff390338d45f8e55969a04e65d76258c9\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -117,13 +117,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"785074663\"},\"deposit_events\":{\"counter\":\"130\",\"guid\":{\"id\":{\"addr\":\"0x62928b3712d452190346090807d5cfb40dabb54740cf1d2acfc5b4d3d9e0b370\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"198\",\"guid\":{\"id\":{\"addr\":\"0x62928b3712d452190346090807d5cfb40dabb54740cf1d2acfc5b4d3d9e0b370\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -355,15 +355,15 @@
               "type": "MOVE_TYPES_STRUCT",
               "struct": {
                 "address": "0x1",
-                "module": "aptos_coin",
-                "name": "AptosCoin"
+                "module": "velor_coin",
+                "name": "VelorCoin"
               }
             }
           ],
           "arguments": [
             "\"0xee814d743d2c3b4b1b8b30f3e0c84c7017df3154bda84c31958785f1d5b70e61\"",
-            "\"Aptos Dogs\"",
-            "\"AptosDogs #1596\"",
+            "\"Velor Dogs\"",
+            "\"VelorDogs #1596\"",
             "\"0\"",
             "{\"inner\":\"0x71f7c94805c33d32a7f9560c95f02e9d3b5bc49884a883916f03abe6da11ac08\"}",
             "\"25000000\"",
@@ -446,7 +446,7 @@
           }
         },
         "typeStr": "0x584b50b999c78ade62f8359c91b5165ff390338d45f8e55969a04e65d76258c9::events::TokenOfferPlacedEvent",
-        "data": "{\"price\":\"25000000\",\"purchaser\":\"0x62928b3712d452190346090807d5cfb40dabb54740cf1d2acfc5b4d3d9e0b370\",\"token_metadata\":{\"collection\":{\"vec\":[]},\"collection_name\":\"Aptos Dogs\",\"creator_address\":\"0xee814d743d2c3b4b1b8b30f3e0c84c7017df3154bda84c31958785f1d5b70e61\",\"property_version\":{\"vec\":[\"0\"]},\"token\":{\"vec\":[]},\"token_name\":\"AptosDogs #1596\"},\"token_offer\":\"0xdd69203952afa9962f3277f2be027fad3d21d57b986a61d674279d5e395323e\"}"
+        "data": "{\"price\":\"25000000\",\"purchaser\":\"0x62928b3712d452190346090807d5cfb40dabb54740cf1d2acfc5b4d3d9e0b370\",\"token_metadata\":{\"collection\":{\"vec\":[]},\"collection_name\":\"Velor Dogs\",\"creator_address\":\"0xee814d743d2c3b4b1b8b30f3e0c84c7017df3154bda84c31958785f1d5b70e61\",\"property_version\":{\"vec\":[\"0\"]},\"token\":{\"vec\":[]},\"token_name\":\"VelorDogs #1596\"},\"token_offer\":\"0xdd69203952afa9962f3277f2be027fad3d21d57b986a61d674279d5e395323e\"}"
       },
       {
         "key": {

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,7 +6,7 @@ use crate::{
     counters::BUFFER_MANAGER_PHASE_PROCESS_SECONDS,
     pipeline::buffer_manager::{Receiver, Sender},
 };
-use aptos_logger::debug;
+use velor_logger::debug;
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use std::sync::{

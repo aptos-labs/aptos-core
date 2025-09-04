@@ -1,9 +1,9 @@
 apiVersion: v2
 name: chaos
-description: Chaos Mesh for Aptos
-version: 2.5.2+aptos0
+description: Chaos Mesh for Velor
+version: 2.5.2+velor0
 
 dependencies:
   - name: chaos-mesh
-    version: 2.5.2+aptos0
+    version: 2.5.2+velor0
     repository: "https://charts.chaos-mesh.org"

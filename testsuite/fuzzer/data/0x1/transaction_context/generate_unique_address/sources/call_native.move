@@ -1,5 +1,5 @@
 module poc::generate_unique_address {
-    use aptos_framework::transaction_context;
+    use velor_framework::transaction_context;
 
     public entry fun main(_owner: &signer) {
         let _addr1 = transaction_context::generate_auid_address();

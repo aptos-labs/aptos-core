@@ -1,0 +1,101 @@
+[package]
+name = "velor-node"
+description = "Velor node"
+version = "0.0.0-main"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-admin-service = { workspace = true }
+velor-api = { workspace = true }
+velor-backup-service = { workspace = true }
+velor-build-info = { workspace = true }
+velor-cached-packages = { workspace = true }
+velor-channels = { workspace = true }
+velor-config = { workspace = true }
+velor-consensus = { workspace = true }
+velor-consensus-notifications = { workspace = true }
+velor-crash-handler = { workspace = true }
+velor-crypto = { workspace = true }
+velor-data-client = { workspace = true }
+velor-data-streaming-service = { workspace = true }
+velor-db = { workspace = true }
+velor-db-indexer = { workspace = true }
+velor-dkg-runtime = { workspace = true }
+velor-event-notifications = { workspace = true }
+velor-executor = { workspace = true }
+velor-framework = { workspace = true }
+velor-genesis = { workspace = true }
+velor-indexer = { workspace = true, optional = true }
+velor-indexer-grpc-fullnode = { workspace = true }
+velor-indexer-grpc-table-info = { workspace = true }
+velor-infallible = { workspace = true }
+velor-inspection-service = { workspace = true }
+velor-jwk-consensus = { workspace = true }
+velor-logger = { workspace = true, features = ["node-identity"] }
+velor-mempool = { workspace = true }
+velor-mempool-notifications = { workspace = true }
+velor-network = { workspace = true }
+velor-network-benchmark = { workspace = true }
+velor-network-builder = { workspace = true }
+velor-node-identity = { workspace = true }
+velor-peer-monitoring-service-client = { workspace = true }
+velor-peer-monitoring-service-server = { workspace = true }
+velor-peer-monitoring-service-types = { workspace = true }
+velor-runtimes = { workspace = true }
+velor-state-sync-driver = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-storage-service-client = { workspace = true }
+velor-storage-service-notifications = { workspace = true }
+velor-storage-service-server = { workspace = true }
+velor-storage-service-types = { workspace = true }
+velor-telemetry = { workspace = true }
+velor-temppath = { workspace = true }
+velor-time-service = { workspace = true }
+velor-types = { workspace = true }
+velor-validator-transaction-pool = { workspace = true }
+velor-vm = { workspace = true }
+velor-vm-environment = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }
+either = { workspace = true }
+fail = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+num_cpus = { workspace = true }
+rand = { workspace = true }
+rayon = { workspace = true }
+rlimit = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tokio = { workspace = true }
+ureq = { workspace = true }
+url = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rstack-self = { workspace = true }
+
+[features]
+assert-private-keys-not-cloneable = ["velor-crypto/assert-private-keys-not-cloneable"]
+check-vm-features = []
+consensus-only-perf-test = ["velor-executor/consensus-only-perf-test", "velor-mempool/consensus-only-perf-test", "velor-db/consensus-only-perf-test"]
+default = []
+failpoints = ["fail/failpoints", "velor-consensus/failpoints", "velor-executor/failpoints", "velor-mempool/failpoints", "velor-api/failpoints", "velor-config/failpoints"]
+indexer = ["velor-indexer"]
+tokio-console = ["velor-logger/tokio-console", "velor-config/tokio-console"]
+smoke-test = ["velor-jwk-consensus/smoke-test", "velor-dkg-runtime/smoke-test"]
+
+[package.metadata.cargo-machete]
+ignored = ["velor-crypto"]

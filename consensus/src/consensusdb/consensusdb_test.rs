@@ -1,17 +1,17 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use self::schema::dag::NodeSchema;
 use super::*;
 use crate::dag::{CertifiedNode, Extensions, Node, Vote};
-use aptos_consensus_types::{
+use velor_consensus_types::{
     block::block_test_utils::certificate_for_genesis,
     common::{Author, Payload},
 };
-use aptos_crypto::bls12381::Signature;
-use aptos_temppath::TempPath;
-use aptos_types::aggregate_signature::AggregateSignature;
+use velor_crypto::bls12381::Signature;
+use velor_temppath::TempPath;
+use velor_types::aggregate_signature::AggregateSignature;
 use std::{collections::HashMap, hash::Hash};
 
 #[test]

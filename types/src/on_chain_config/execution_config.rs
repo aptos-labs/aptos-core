@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -161,7 +161,7 @@ impl OnChainConfig for OnChainExecutionConfig {
 
     /// The Move resource is
     /// ```ignore
-    /// struct AptosExecutionConfig has copy, drop, store {
+    /// struct VelorExecutionConfig has copy, drop, store {
     ///    config: vector<u8>,
     /// }
     /// ```

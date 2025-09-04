@@ -1,22 +1,22 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::driver::DriverConfiguration;
-use aptos_config::config::{ConsensusObserverConfig, RoleType, StateSyncDriverConfig};
-use aptos_crypto::{
+use velor_config::config::{ConsensusObserverConfig, RoleType, StateSyncDriverConfig};
+use velor_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     HashValue, PrivateKey, Uniform,
 };
-use aptos_data_client::global_summary::GlobalDataSummary;
-use aptos_data_streaming_service::{
+use velor_data_client::global_summary::GlobalDataSummary;
+use velor_data_streaming_service::{
     data_notification::DataNotification, data_stream::DataStreamListener, streaming_client::Epoch,
 };
-use aptos_event_notifications::EventNotificationListener;
-use aptos_mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
-use aptos_storage_service_notifications::StorageServiceNotificationListener;
-use aptos_storage_service_types::responses::CompleteDataRange;
-use aptos_types::{
+use velor_event_notifications::EventNotificationListener;
+use velor_mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
+use velor_storage_service_notifications::StorageServiceNotificationListener;
+use velor_storage_service_types::responses::CompleteDataRange;
+use velor_types::{
     account_address::AccountAddress,
     account_config::NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     aggregate_signature::AggregateSignature,

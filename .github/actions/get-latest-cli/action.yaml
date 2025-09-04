@@ -1,6 +1,6 @@
-name: "Get latest Aptos CLI"
+name: "Get latest Velor CLI"
 description: |
-  Fetches the latest released Aptos CLI.
+  Fetches the latest released Velor CLI.
 inputs:
   destination_directory:
     description: "Directory to install the CLI in"
@@ -14,7 +14,7 @@ runs:
     - name: Get installation script
       shell: bash
       run: |
-        curl -fsSL "https://aptos.dev/scripts/install_cli.py" > install_cli.py
+        curl -fsSL "https://velor.dev/scripts/install_cli.py" > install_cli.py
     - name: Run installation script
       shell: bash
       run: |

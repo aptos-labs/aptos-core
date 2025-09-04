@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "aptos-genesis.fullname" . }}-layout-e{{ .Values.chain.era }}
+  name: {{ include "velor-genesis.fullname" . }}-layout-e{{ .Values.chain.era }}
   labels:
-    {{- include "aptos-genesis.labels" . | nindent 4 }}
+    {{- include "velor-genesis.labels" . | nindent 4 }}
 data:
   layout.yaml: |-
     ---
@@ -39,9 +39,9 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "aptos-genesis.fullname" . }}-script
+  name: {{ include "velor-genesis.fullname" . }}-script
   labels:
-    {{- include "aptos-genesis.labels" . | nindent 4 }}
+    {{- include "velor-genesis.labels" . | nindent 4 }}
 data:
   genesis.sh: |-
 {{ .Files.Get "files/genesis.sh" | indent 4 }}
@@ -51,9 +51,9 @@ data:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "aptos-genesis.fullname" . }}
+  name: {{ include "velor-genesis.fullname" . }}
   labels:
-    {{- include "aptos-genesis.labels" . | nindent 4 }}
+    {{- include "velor-genesis.labels" . | nindent 4 }}
 rules:
 - apiGroups: [""]
   verbs: ["list", "create", "delete"]
@@ -64,16 +64,16 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "aptos-genesis.fullname" . }}
+  name: {{ include "velor-genesis.fullname" . }}
   labels:
-    {{- include "aptos-genesis.labels" . | nindent 4 }}
+    {{- include "velor-genesis.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "aptos-genesis.fullname" . }}
+  name: {{ include "velor-genesis.fullname" . }}
 subjects:
 - kind: ServiceAccount
-  name: {{ include "aptos-genesis.serviceAccountName" . }}
+  name: {{ include "velor-genesis.serviceAccountName" . }}
 
 ---
 
@@ -81,15 +81,15 @@ subjects:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "aptos-genesis.fullname" . }}-e{{ .Values.chain.era }}
+  name: {{ include "velor-genesis.fullname" . }}-e{{ .Values.chain.era }}
   labels:
-    {{- include "aptos-genesis.labels" . | nindent 4 }}
+    {{- include "velor-genesis.labels" . | nindent 4 }}
     app.kubernetes.io/name: genesis
 spec:
   template:
     metadata:
       labels:
-        {{- include "aptos-genesis.selectorLabels" . | nindent 8 }}
+        {{- include "velor-genesis.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: genesis
     spec:
       restartPolicy: Never
@@ -186,13 +186,13 @@ spec:
       volumes:
       - name: layout
         configMap:
-          name: {{ include "aptos-genesis.fullname" . }}-layout-e{{ .Values.chain.era }}
+          name: {{ include "velor-genesis.fullname" . }}-layout-e{{ .Values.chain.era }}
       - name: script
         configMap:
-          name: {{ include "aptos-genesis.fullname" . }}-script
+          name: {{ include "velor-genesis.fullname" . }}-script
       - name: tmp
         emptyDir: {}
-      serviceAccountName: {{ include "aptos-genesis.serviceAccountName" . }}
+      serviceAccountName: {{ include "velor-genesis.serviceAccountName" . }}
       {{- if .Values.imagePullSecret }}
       imagePullSecrets:
       - name: {{.Values.imagePullSecret}}

@@ -1,10 +1,10 @@
 # Third Party Crates
 
-This directory contains synchronized copies of selected external repositories. Those repos are mirrored in the aptos-core repo because they are core to the security of Aptos -- and control over the source should therefore be isolated. They are also mirrored to allow atomic changes across system boundaries. For example, the [Move repository](https://github.com/move-language/move) has a copy in this tree, so we can apply changes simultaneously to Move and Aptos.
+This directory contains synchronized copies of selected external repositories. Those repos are mirrored in the velor-core repo because they are core to the security of Velor -- and control over the source should therefore be isolated. They are also mirrored to allow atomic changes across system boundaries. For example, the [Move repository](https://github.com/move-language/move) has a copy in this tree, so we can apply changes simultaneously to Move and Velor.
 
 In general:
 
-- Code can be submitted in this directory using an aptos-core wide PR. 
+- Code can be submitted in this directory using an velor-core wide PR. 
 - (_For admins only_) Periodically, changes in this directory are pushed upstream or pulled from upstream, using the [copybara](https://github.com/google/copybara) tool. Those pushes will preserve the commit metadata (author, description) and copy it from one repo to another. 
 
 ## Guidelines for Developers
@@ -29,7 +29,7 @@ It is recommended to take a look at the [copybara tutorial](https://blog.kubesim
 
 ### Pushing
 
-Pushing to [the `aptos-main` branch in the Move repo](https://github.com/move-language/move/tree/aptos-main) should be only be performed if this branch is not ahead of `third_party/move`, that are no outstanding changes which have not been pulled into aptos-core. This generally simplifies pushing, and will eventually allow us to fully automate it via a nightly job. 
+Pushing to [the `velor-main` branch in the Move repo](https://github.com/move-language/move/tree/velor-main) should be only be performed if this branch is not ahead of `third_party/move`, that are no outstanding changes which have not been pulled into velor-core. This generally simplifies pushing, and will eventually allow us to fully automate it via a nightly job. 
 
 Currently, pushing has to be done manually. Below, substitute `/Users/wrwg/move` by your path to a local git repo of the Move language:
 
@@ -41,10 +41,10 @@ This will create a branch `to_move` which can then be submitted to the upstream 
 
 ### Pulling
 
-Code which is pulled from the Move repo might be derived from an older version than the current `main` of aptos-core.
+Code which is pulled from the Move repo might be derived from an older version than the current `main` of velor-core.
 
 ```
-        aptos-main
+        velor-main
        /          \
       / pull       \
       |             \ external contribution
@@ -54,14 +54,14 @@ Code which is pulled from the Move repo might be derived from an older version t
 
 For this reason, pulling is a bit more complex right now and requires some extra work. 
 
-1. Checkout aptos-core to the commit of the last pull from the Move repo, into a branch `from_move` 
+1. Checkout velor-core to the commit of the last pull from the Move repo, into a branch `from_move` 
    ```shell
    git checkout <hash>
    git switch -c from_move
    ```
-2. Run the following command, where `/Users/wrwg/aptos-core` is replaced by our path to the aptos-core repo:
+2. Run the following command, where `/Users/wrwg/velor-core` is replaced by our path to the velor-core repo:
    ```shell
-   copybara copy.bara.sky pull_move --output-root=/tmp --git-destination-url=file:///Users/wrwg/aptos-core
+   copybara copy.bara.sky pull_move --output-root=/tmp --git-destination-url=file:///Users/wrwg/velor-core
    ```
    This will add a series of commits to the branch `from_move`
 3. Rebase `from_move` onto the current `main branch`

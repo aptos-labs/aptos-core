@@ -1,6 +1,6 @@
 [package]
-name = "aptos-forge"
-description = "Aptos end to end test framework"
+name = "velor-forge"
+description = "Velor end to end test framework"
 version = "0.0.0"
 
 # Workspace inherited keys
@@ -15,26 +15,26 @@ rust-version = { workspace = true }
 [dependencies]
 again = { workspace = true }
 anyhow = { workspace = true, features = ["backtrace"] }
-aptos = { workspace = true }
-aptos-cached-packages = { workspace = true }
-aptos-cli-common = { workspace = true }
-aptos-config = { workspace = true }
-aptos-db = { workspace = true }
-aptos-framework = { workspace = true }
-aptos-genesis = { workspace = true }
-aptos-global-constants = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-inspection-service = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-rest-client = { workspace = true }
-aptos-retrier = { workspace = true }
-aptos-runtimes = { workspace = true }
-aptos-sdk = { workspace = true }
-aptos-short-hex-str = { workspace = true }
-aptos-state-sync-driver = { workspace = true }
-aptos-transaction-emitter-lib = { workspace = true }
-aptos-transaction-generator-lib = { workspace = true }
-aptos-transaction-workloads-lib = { workspace = true }
+velor = { workspace = true }
+velor-cached-packages = { workspace = true }
+velor-cli-common = { workspace = true }
+velor-config = { workspace = true }
+velor-db = { workspace = true }
+velor-framework = { workspace = true }
+velor-genesis = { workspace = true }
+velor-global-constants = { workspace = true }
+velor-infallible = { workspace = true }
+velor-inspection-service = { workspace = true }
+velor-logger = { workspace = true }
+velor-rest-client = { workspace = true }
+velor-retrier = { workspace = true }
+velor-runtimes = { workspace = true }
+velor-sdk = { workspace = true }
+velor-short-hex-str = { workspace = true }
+velor-state-sync-driver = { workspace = true }
+velor-transaction-emitter-lib = { workspace = true }
+velor-transaction-generator-lib = { workspace = true }
+velor-transaction-workloads-lib = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["env", "unstable-styles"] }
@@ -72,4 +72,4 @@ serde_merge = { workspace = true }
 
 [features]
 default = []
-testing = ["aptos-global-constants/testing"]
+testing = ["velor-global-constants/testing"]

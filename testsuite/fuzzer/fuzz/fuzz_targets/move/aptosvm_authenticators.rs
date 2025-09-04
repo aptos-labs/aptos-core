@@ -1,16 +1,16 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 #![no_main]
 #![allow(unused_imports)]
 
-use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{
+use velor_cached_packages::velor_stdlib;
+use velor_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey, SigningKey, Uniform,
 };
-use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
-use aptos_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
-use aptos_types::{
+use velor_language_e2e_tests::{account::Account, executor::FakeExecutor};
+use velor_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
+use velor_types::{
     chain_id::ChainId,
     jwks::{secure_test_rsa_jwk, AllProvidersJWKs, PatchedJWKs, ProviderJWKs},
     keyless::{
@@ -29,7 +29,7 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use aptos_vm::AptosVM;
+use velor_vm::VelorVM;
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_core_types::{
     account_address::AccountAddress,
@@ -64,7 +64,7 @@ static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 fn run_case(input: TransactionState) -> Result<(), Corpus> {
     tdbg!(&input);
 
-    AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
+    VelorVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
     let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(
         &VM,
         ChainId::mainnet(),
@@ -86,7 +86,7 @@ fn run_case(input: TransactionState) -> Result<(), Corpus> {
     // build tx
     let tx = sender_acc
         .transaction()
-        .payload(aptos_stdlib::aptos_coin_transfer(*receiver.address(), 1))
+        .payload(velor_stdlib::velor_coin_transfer(*receiver.address(), 1))
         .sequence_number(0)
         .gas_unit_price(100)
         .max_gas_amount(1000);

@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_channels::aptos_channel;
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_infallible::Mutex;
-use aptos_types::validator_txn::{Topic, ValidatorTransaction};
+use velor_channels::velor_channel;
+use velor_crypto::{hash::CryptoHash, HashValue};
+use velor_infallible::Mutex;
+use velor_types::validator_txn::{Topic, ValidatorTransaction};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt::{Debug, Formatter},
@@ -59,7 +59,7 @@ impl VTxnPoolState {
         &self,
         topic: Topic,
         txn: Arc<ValidatorTransaction>,
-        pull_notification_tx: Option<aptos_channel::Sender<(), Arc<ValidatorTransaction>>>,
+        pull_notification_tx: Option<velor_channel::Sender<(), Arc<ValidatorTransaction>>>,
     ) -> TxnGuard {
         let mut pool = self.inner.lock();
         let seq_num = pool.next_seq_num;
@@ -105,7 +105,7 @@ impl VTxnPoolState {
 struct PoolItem {
     topic: Topic,
     txn: Arc<ValidatorTransaction>,
-    pull_notification_tx: Option<aptos_channel::Sender<(), Arc<ValidatorTransaction>>>,
+    pull_notification_tx: Option<velor_channel::Sender<(), Arc<ValidatorTransaction>>>,
 }
 
 /// PoolState invariants.

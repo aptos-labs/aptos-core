@@ -1,27 +1,27 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{bootstrap_genesis, gen_block_id, gen_ledger_info_with_sigs};
 use anyhow::{ensure, Result};
-use aptos_cached_packages::aptos_stdlib;
-use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
-use aptos_consensus_types::block::Block;
-use aptos_db::AptosDB;
-use aptos_executor::block_executor::BlockExecutor;
-use aptos_executor_types::BlockExecutorTrait;
-use aptos_sdk::{
+use velor_cached_packages::velor_stdlib;
+use velor_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
+use velor_consensus_types::block::Block;
+use velor_db::VelorDB;
+use velor_executor::block_executor::BlockExecutor;
+use velor_executor_types::BlockExecutorTrait;
+use velor_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::TransactionFactory,
     types::{AccountKey, LocalAccount},
 };
-use aptos_storage_interface::{
+use velor_storage_interface::{
     state_store::state_view::db_state_view::{DbStateViewAtVersion, VerifiedStateViewAtVersion},
     DbReaderWriter,
 };
-use aptos_types::{
+use velor_types::{
     account_config::{
-        aptos_test_root_address, primary_apt_store, AccountResource, FungibleStoreResource,
+        velor_test_root_address, primary_apt_store, AccountResource, FungibleStoreResource,
         ObjectGroupResource,
     },
     block_metadata::BlockMetadata,
@@ -40,13 +40,13 @@ use aptos_types::{
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
 };
-use aptos_vm::aptos_vm::AptosVMBlockExecutor;
+use velor_vm::velor_vm::VelorVMBlockExecutor;
 use move_core_types::move_resource::MoveStructType;
 use rand::SeedableRng;
 use std::{path::Path, sync::Arc};
 
-pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
-    let path = aptos_temppath::TempPath::new();
+pub fn test_execution_with_storage_impl() -> Arc<VelorDB> {
+    let path = velor_temppath::TempPath::new();
     path.create_as_dir().unwrap();
     test_execution_with_storage_impl_inner(false, path.path())
 }
@@ -54,23 +54,23 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 pub fn test_execution_with_storage_impl_inner(
     force_sharding: bool,
     db_path: &Path,
-) -> Arc<AptosDB> {
+) -> Arc<VelorDB> {
     const B: u64 = 1_000_000_000;
 
-    let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let (genesis, validators) = velor_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
 
     let core_resources_account: LocalAccount = LocalAccount::new(
-        aptos_test_root_address(),
-        AccountKey::from_private_key(aptos_vm_genesis::GENESIS_KEYPAIR.0.clone()),
+        velor_test_root_address(),
+        AccountKey::from_private_key(velor_vm_genesis::GENESIS_KEYPAIR.0.clone()),
         0,
     );
 
-    let (aptos_db, db, executor, waypoint) =
+    let (velor_db, db, executor, waypoint) =
         create_db_and_executor(db_path, &genesis_txn, force_sharding);
 
     let parent_block_id = executor.committed_block_id();
-    let signer = aptos_types::validator_signer::ValidatorSigner::new(
+    let signer = velor_types::validator_signer::ValidatorSigner::new(
         validators[0].data.owner_address,
         Arc::new(validators[0].consensus_key.clone()),
     );
@@ -134,7 +134,7 @@ pub fn test_execution_with_storage_impl_inner(
         account1.sign_with_transaction_builder(txn_factory.transfer(account3.address(), 70 * B));
 
     let reconfig1 = core_resources_account.sign_with_transaction_builder(
-        txn_factory.payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
+        txn_factory.payload(velor_stdlib::velor_governance_force_end_epoch_test_only()),
     );
 
     let block1: Vec<_> = into_signature_verified_block(vec![
@@ -162,7 +162,7 @@ pub fn test_execution_with_storage_impl_inner(
         2,
     ));
     let reconfig2 = core_resources_account.sign_with_transaction_builder(
-        txn_factory.payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
+        txn_factory.payload(velor_stdlib::velor_governance_force_end_epoch_test_only()),
     );
     let block2 = into_signature_verified_block(vec![block2_meta, UserTransaction(reconfig2)]);
 
@@ -386,7 +386,7 @@ pub fn test_execution_with_storage_impl_inner(
     let expected_txns: Vec<Transaction> = block3.iter().map(|t| t.expect_valid().clone()).collect();
     verify_transactions(&transaction_list_with_proof, &expected_txns).unwrap();
 
-    aptos_db
+    velor_db
 }
 
 fn approx_eq(a: u64, b: u64) -> bool {
@@ -399,20 +399,20 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
     genesis: &Transaction,
     force_sharding: bool, // if true force sharding db otherwise using default db
 ) -> (
-    Arc<AptosDB>,
+    Arc<VelorDB>,
     DbReaderWriter,
-    BlockExecutor<AptosVMBlockExecutor>,
+    BlockExecutor<VelorVMBlockExecutor>,
     Waypoint,
 ) {
     let (db, dbrw) = force_sharding
         .then(|| {
-            DbReaderWriter::wrap(AptosDB::new_for_test_with_sharding(
+            DbReaderWriter::wrap(VelorDB::new_for_test_with_sharding(
                 &path,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             ))
         })
-        .unwrap_or_else(|| DbReaderWriter::wrap(AptosDB::new_for_test(&path)));
-    let waypoint = bootstrap_genesis::<AptosVMBlockExecutor>(&dbrw, genesis).unwrap();
+        .unwrap_or_else(|| DbReaderWriter::wrap(VelorDB::new_for_test(&path)));
+    let waypoint = bootstrap_genesis::<VelorVMBlockExecutor>(&dbrw, genesis).unwrap();
     let executor = BlockExecutor::new(dbrw.clone());
 
     (db, dbrw, executor, waypoint)

@@ -10,42 +10,42 @@ class SpyTests(unittest.TestCase):
             [
                 FakeCommand(
                     "git remote get-url origin",
-                    RunResult(0, b"git@github.com:banana-corp/aptos-core.git"),
+                    RunResult(0, b"git@github.com:banana-corp/velor-core.git"),
                 )
             ]
         )
         git: Git = Git(shell)
-        self.assertEqual(git.get_repo_from_remote("origin"), "banana-corp/aptos-core")
+        self.assertEqual(git.get_repo_from_remote("origin"), "banana-corp/velor-core")
 
     def test_get_repo_from_remote_http(self):
         shell: Shell = SpyShell(
             [
                 FakeCommand(
                     "git remote get-url origin",
-                    RunResult(0, b"https://github.com/kiwi-corp/aptos-core.git"),
+                    RunResult(0, b"https://github.com/kiwi-corp/velor-core.git"),
                 )
             ]
         )
         git: Git = Git(shell)
-        self.assertEqual(git.get_repo_from_remote("origin"), "kiwi-corp/aptos-core")
+        self.assertEqual(git.get_repo_from_remote("origin"), "kiwi-corp/velor-core")
 
     def test_get_remote_branches_matching_pattern(self):
         shell: Shell = SpyShell(
             [
                 FakeCommand(
-                    "git ls-remote --heads origin aptos-release-v*",
+                    "git ls-remote --heads origin velor-release-v*",
                     RunResult(
                         0,
-                        b"ref1 refs/heads/aptos-release-v1.0\nref2 refs/heads/aptos-release-v1.1",
+                        b"ref1 refs/heads/velor-release-v1.0\nref2 refs/heads/velor-release-v1.1",
                     ),
                 )
             ]
         )
         git: Git = Git(shell)
         branches = git.get_remote_branches_matching_pattern(
-            "origin", "aptos-release-v*", r"refs/heads/(aptos-release-v\d+\.\d+)"
+            "origin", "velor-release-v*", r"refs/heads/(velor-release-v\d+\.\d+)"
         )
-        self.assertEqual(branches, ["aptos-release-v1.0", "aptos-release-v1.1"])
+        self.assertEqual(branches, ["velor-release-v1.0", "velor-release-v1.1"])
 
     def test_get_commit_hashes(self):
         shell: Shell = SpyShell(

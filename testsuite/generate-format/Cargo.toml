@@ -1,6 +1,6 @@
 [package]
 name = "generate-format"
-description = "Aptos core type checker to ensure compatibility"
+description = "Velor core type checker to ensure compatibility"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,14 +13,14 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-api-types = { workspace = true }
-aptos-config = { workspace = true }
-aptos-consensus = { workspace = true, features = ["fuzzing"] }
-aptos-consensus-types = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-crypto-derive = { workspace = true }
-aptos-network = { workspace = true }
-aptos-types = { workspace = true, features = ["fuzzing"] }
+velor-api-types = { workspace = true }
+velor-config = { workspace = true }
+velor-consensus = { workspace = true, features = ["fuzzing"] }
+velor-consensus-types = { workspace = true }
+velor-crypto = { workspace = true }
+velor-crypto-derive = { workspace = true }
+velor-network = { workspace = true }
+velor-types = { workspace = true, features = ["fuzzing"] }
 bcs = { workspace = true }
 clap = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }

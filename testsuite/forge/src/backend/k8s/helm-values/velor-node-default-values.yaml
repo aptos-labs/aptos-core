@@ -1,0 +1,56 @@
+validator:
+  enableNetworkPolicy: false
+  # Add debug here to enable debug logs
+  # rust_log: debug,hyper=off
+  rust_log: info,hyper=off
+  # force enable the telemetry service to try to send telemetry
+  force_enable_telemetry: true
+  config:
+    storage:
+      rocksdb_configs:
+        enable_storage_sharding: true
+    indexer_db_config:
+      enable_event: true
+  podAnnotations:
+    "cluster-autoscaler.kubernetes.io/safe-to-evict": "false"
+
+fullnode:
+  # at most one VFN per validator, depending on numFullnodeGroups
+  groups:
+    - name: fullnode
+      replicas: 1
+  # Add debug herer to enable debug logs
+  # rust_log: debug,hyper=off
+  rust_log: info,hyper=off
+  # force enable the telemetry service to try to send telemetry
+  force_enable_telemetry: true
+  config:
+    storage:
+      rocksdb_configs:
+        enable_storage_sharding: true
+    indexer_db_config:
+      enable_event: true
+  podAnnotations:
+    "cluster-autoscaler.kubernetes.io/safe-to-evict": "false"
+
+service:
+  validator:
+    external:
+      type: "ClusterIP"
+    internal:
+      type: "ClusterIP"
+    enableRestApi: true
+    enableMetricsPort: true
+
+  fullnode:
+    external:
+      type: "ClusterIP"
+    internal:
+      type: "ClusterIP"
+    enableRestApi: true
+    enableMetricsPort: true
+
+# always assume we're spinning up a testnet and doing genesis rather than using the single validator test mode
+loadTestGenesis: false
+# always run forge in privileged mode for extra testing capability
+enablePrivilegedMode: true

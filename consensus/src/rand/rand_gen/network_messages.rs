@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::types::FastShare;
@@ -11,11 +11,11 @@ use crate::{
     },
 };
 use anyhow::{bail, ensure};
-use aptos_consensus_types::common::Author;
-use aptos_enum_conversion_derive::EnumConversion;
-use aptos_network::{protocols::network::RpcError, ProtocolId};
-use aptos_reliable_broadcast::RBMessage;
-use aptos_types::epoch_state::EpochState;
+use velor_consensus_types::common::Author;
+use velor_enum_conversion_derive::EnumConversion;
+use velor_network::{protocols::network::RpcError, ProtocolId};
+use velor_reliable_broadcast::RBMessage;
+use velor_types::epoch_state::EpochState;
 use bytes::Bytes;
 use futures_channel::oneshot;
 use serde::{Deserialize, Serialize};

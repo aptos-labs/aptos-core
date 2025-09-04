@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,14 +8,14 @@ use crate::{
     },
     Error,
 };
-use aptos_config::{config::NodeConfig, network_id::PeerNetworkId};
-use aptos_infallible::RwLock;
-use aptos_network::application::metadata::PeerMetadata;
-use aptos_peer_monitoring_service_types::{
+use velor_config::{config::NodeConfig, network_id::PeerNetworkId};
+use velor_infallible::RwLock;
+use velor_network::application::metadata::PeerMetadata;
+use velor_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::PeerMonitoringServiceResponse,
 };
-use aptos_time_service::TimeService;
+use velor_time_service::TimeService;
 use enum_dispatch::enum_dispatch;
 use std::{fmt::Display, sync::Arc};
 

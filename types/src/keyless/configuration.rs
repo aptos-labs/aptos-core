@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -18,7 +18,7 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 
-/// Reflection of aptos_framework::keyless_account::Configuration
+/// Reflection of velor_framework::keyless_account::Configuration
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct Configuration {
     pub override_aud_vals: Vec<String>,

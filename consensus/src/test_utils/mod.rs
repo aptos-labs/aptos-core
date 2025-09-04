@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -11,7 +11,7 @@ use crate::{
     },
     payload_manager::DirectMempoolPayloadManager,
 };
-use aptos_consensus_types::{
+use velor_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::{Author, Round},
     payload_pull_params::OptQSPayloadPullParams,
@@ -19,9 +19,9 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
 };
-use aptos_crypto::{HashValue, PrivateKey, Uniform};
-use aptos_logger::Level;
-use aptos_types::{ledger_info::LedgerInfo, validator_signer::ValidatorSigner};
+use velor_crypto::{HashValue, PrivateKey, Uniform};
+use velor_logger::Level;
+use velor_types::{ledger_info::LedgerInfo, validator_signer::ValidatorSigner};
 use std::{future::Future, sync::Arc, time::Duration};
 use tokio::{runtime, time::timeout};
 
@@ -38,10 +38,10 @@ use crate::{
     pipeline::{execution_client::DummyExecutionClient, pipeline_builder::PipelineBuilder},
     util::mock_time_service::SimulatedTimeService,
 };
-use aptos_consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
-use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
-use aptos_infallible::Mutex;
-use aptos_types::{
+use velor_consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
+use velor_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
+use velor_infallible::Mutex;
+use velor_types::{
     block_info::BlockInfo,
     chain_id::ChainId,
     on_chain_config::DEFAULT_ENABLED_WINDOW_SIZE,
@@ -295,10 +295,10 @@ fn nocapture() -> bool {
 
 pub fn consensus_runtime() -> runtime::Runtime {
     if nocapture() {
-        ::aptos_logger::Logger::new().level(Level::Debug).init();
+        ::velor_logger::Logger::new().level(Level::Debug).init();
     }
 
-    aptos_runtimes::spawn_named_runtime("consensus".into(), None)
+    velor_runtimes::spawn_named_runtime("consensus".into(), None)
 }
 
 pub fn timed_block_on<F>(runtime: &runtime::Runtime, f: F) -> <F as Future>::Output

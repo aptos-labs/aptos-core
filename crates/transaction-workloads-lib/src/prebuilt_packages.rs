@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This file was generated. Do not modify!
 //
 // To update this code, run `testsuite/benchmark-workloads/generate.py`.
 
-use aptos_sdk::bcs;
-use aptos_transaction_generator_lib::{
+use velor_sdk::bcs;
+use velor_transaction_generator_lib::{
     entry_point_trait::PreBuiltPackages, publishing::prebuild_packages::PrebuiltPackagesBundle,
 };
 use once_cell::sync::Lazy;

@@ -23,7 +23,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
       
-      # Authenticate to Google Cloud the project is aptos-ci
+      # Authenticate to Google Cloud the project is velor-ci
       - name: Authenticate to Google Cloud
         id: auth
         uses: "google-github-actions/auth@v2"
@@ -33,7 +33,7 @@ jobs:
           export_environment_variables: false
           create_credentials_file: true
 
-      # This is required since we need to switch from aptos-ci to aptos-devinfra-0
+      # This is required since we need to switch from velor-ci to velor-devinfra-0
       - name: Setup Credentials  
         run: |
           echo "GOOGLE_APPLICATION_CREDENTIALS=${{ steps.auth.outputs.credentials_file_path }}" >> $GITHUB_ENV
@@ -48,7 +48,7 @@ jobs:
       
       - name: "Setup GCloud Project"
         shell: bash
-        run: gcloud config set project aptos-devinfra-0
+        run: gcloud config set project velor-devinfra-0
       
       - uses: ./.github/actions/python-setup
         with:
@@ -56,6 +56,6 @@ jobs:
 
       - name: "Provision Storage"
         env:
-          GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
+          GOOGLE_CLOUD_PROJECT: velor-devinfra-0
         run: cd testsuite/replay-verify && poetry run python archive_disk_utils.py --network ${{ inputs.NETWORK }}
         

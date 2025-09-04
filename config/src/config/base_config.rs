@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
     SecureBackend,
 };
-use aptos_secure_storage::{KVStorage, Storage};
-use aptos_types::{chain_id::ChainId, waypoint::Waypoint};
+use velor_secure_storage::{KVStorage, Storage};
+use velor_types::{chain_id::ChainId, waypoint::Waypoint};
 use poem_openapi::Enum as PoemEnum;
 use serde::{Deserialize, Serialize};
 use std::{fmt, fs, path::PathBuf, str::FromStr};
@@ -24,7 +24,7 @@ pub struct BaseConfig {
 impl Default for BaseConfig {
     fn default() -> BaseConfig {
         BaseConfig {
-            data_dir: PathBuf::from("/opt/aptos/data"),
+            data_dir: PathBuf::from("/opt/velor/data"),
             working_dir: None,
             role: RoleType::Validator,
             waypoint: WaypointConfig::None,
@@ -99,7 +99,7 @@ impl WaypointConfig {
             WaypointConfig::FromStorage(backend) => {
                 let storage: Storage = backend.into();
                 let waypoint = storage
-                    .get::<Waypoint>(aptos_global_constants::WAYPOINT)
+                    .get::<Waypoint>(velor_global_constants::WAYPOINT)
                     .expect("Unable to read waypoint")
                     .value;
                 Some(waypoint)
@@ -114,7 +114,7 @@ impl WaypointConfig {
             WaypointConfig::FromStorage(backend) => {
                 let storage: Storage = backend.into();
                 storage
-                    .get::<Waypoint>(aptos_global_constants::GENESIS_WAYPOINT)
+                    .get::<Waypoint>(velor_global_constants::GENESIS_WAYPOINT)
                     .expect("Unable to read waypoint")
                     .value
             },

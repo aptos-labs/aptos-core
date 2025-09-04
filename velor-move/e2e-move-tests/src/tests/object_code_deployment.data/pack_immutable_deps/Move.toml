@@ -1,0 +1,7 @@
+[package]
+name = "test_immutable_deps"
+version = "0.0.0"
+upgrade_policy = "compatible"
+
+[dependencies]
+test_package = { local = "../pack_initial_immutable" }

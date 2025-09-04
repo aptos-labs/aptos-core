@@ -1,7 +1,7 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::info;
+use velor_logger::info;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::{
@@ -27,7 +27,7 @@ use std::{
 /// ACCOUNT_MANAGER_2B_ISSUER=https://accounts.facebook.com \
 /// ACCOUNT_MANAGER_2B_AUD=9876543210 \
 /// VUF_KEY_SEED_HEX=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff \
-/// cargo run -p aptos-keyless-pepper-service
+/// cargo run -p velor-keyless-pepper-service
 /// ```
 pub static ACCOUNT_MANAGERS: Lazy<HashSet<(String, String)>> = Lazy::new(|| {
     let re_issuer = Regex::new(r"ACCOUNT_MANAGER_(\w+)_ISSUER").unwrap();

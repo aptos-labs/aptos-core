@@ -1,18 +1,18 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::NodeConfig;
-use aptos_crypto::{hash::HashValue, SigningKey};
-use aptos_mempool::mocks::MockSharedMempool;
-use aptos_protos::extractor::v1::Transaction as TransactionPB;
-use aptos_sdk::{
+use velor_config::config::NodeConfig;
+use velor_crypto::{hash::HashValue, SigningKey};
+use velor_mempool::mocks::MockSharedMempool;
+use velor_protos::extractor::v1::Transaction as TransactionPB;
+use velor_sdk::{
     transaction_builder::TransactionFactory,
     types::{
-        account_config::aptos_test_root_address, transaction::SignedTransaction, LocalAccount,
+        account_config::velor_test_root_address, transaction::SignedTransaction, LocalAccount,
     },
 };
-use aptos_temppath::TempPath;
-use aptos_types::{
+use velor_temppath::TempPath;
+use velor_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
@@ -20,19 +20,19 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{Transaction, TransactionStatus},
 };
-use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
+use velor_vm::VelorVM;
+use velordb::VelorDB;
 use executor::{block_executor::BlockExecutor, db_bootstrapper};
 use executor_types::BlockExecutorTrait;
 use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
 use crate::tests::{golden_output::GoldenOutputs, pretty};
-use aptos_api::{context::Context, index};
-use aptos_api_types::HexEncodedBytes;
-use aptos_config::keys::ConfigKey;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_types::aggregated_signature::AggregatedSignature;
+use velor_api::{context::Context, index};
+use velor_api_types::HexEncodedBytes;
+use velor_config::keys::ConfigKey;
+use velor_crypto::ed25519::Ed25519PrivateKey;
+use velor_types::aggregated_signature::AggregatedSignature;
 use bytes::Bytes;
 use hyper::Response;
 use rand::SeedableRng;
@@ -45,7 +45,7 @@ pub fn new_test_context(test_name: &str, fake_start_time_usecs: u64) -> TestCont
     tmp_dir.create_as_dir().unwrap();
 
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
-    let builder = aptos_genesis::builder::Builder::new(
+    let builder = velor_genesis::builder::Builder::new(
         tmp_dir.path(),
         framework::head_release_bundle().clone(),
     )
@@ -59,9 +59,9 @@ pub fn new_test_context(test_name: &str, fake_start_time_usecs: u64) -> TestCont
     let (validator_identity, _, _) = validators[0].get_key_objects(None).unwrap();
     let validator_owner = validator_identity.account_address.unwrap();
 
-    let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test_with_indexer(&tmp_dir));
+    let (db, db_rw) = DbReaderWriter::wrap(VelorDB::new_for_test_with_indexer(&tmp_dir));
     let ret =
-        db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
+        db_bootstrapper::maybe_bootstrap::<VelorVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
     assert!(ret);
 
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
@@ -76,7 +76,7 @@ pub fn new_test_context(test_name: &str, fake_start_time_usecs: u64) -> TestCont
         rng,
         root_key,
         validator_owner,
-        Box::new(BlockExecutor::<AptosVM>::new(db_rw)),
+        Box::new(BlockExecutor::<VelorVM>::new(db_rw)),
         mempool,
         db,
         test_name.to_string(),
@@ -90,7 +90,7 @@ pub struct TestContext {
     pub context: Context,
     pub validator_owner: AccountAddress,
     pub mempool: Arc<MockSharedMempool>,
-    pub db: Arc<AptosDB>,
+    pub db: Arc<VelorDB>,
     rng: rand::rngs::StdRng,
     root_key: ConfigKey<Ed25519PrivateKey>,
     executor: Arc<dyn BlockExecutorTrait>,
@@ -110,7 +110,7 @@ impl TestContext {
         validator_owner: AccountAddress,
         executor: Box<dyn BlockExecutorTrait>,
         mempool: MockSharedMempool,
-        db: Arc<AptosDB>,
+        db: Arc<VelorDB>,
         test_name: String,
         fake_time_usecs: u64,
     ) -> Self {
@@ -137,7 +137,7 @@ impl TestContext {
     }
 
     pub fn root_account(&self) -> LocalAccount {
-        LocalAccount::new(aptos_test_root_address(), self.root_key.private_key(), 0)
+        LocalAccount::new(velor_test_root_address(), self.root_key.private_key(), 0)
     }
 
     pub fn gen_account(&mut self) -> LocalAccount {
@@ -346,7 +346,7 @@ impl TestContext {
     }
 
     // Currently we still run our tests with warp.
-    // https://github.com/aptos-labs/aptos-core/issues/2966
+    // https://github.com/velor-chain/velor-core/issues/2966
     pub fn get_routes_with_poem(
         &self,
         poem_address: SocketAddr,

@@ -1,4 +1,4 @@
-# Copyright © Aptos Foundation
+# Copyright © Velor Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 import os
@@ -45,8 +45,8 @@ def warm_cache_and_get_latest_backup_version(
     """query latest version in backup, at the same time, pre-heat metadata cache"""
     db_backup_result = subprocess.Popen(
         [
-            "target/release/aptos-debugger",
-            "aptos-db",
+            "target/release/velor-debugger",
+            "velor-db",
             "backup",
             "query",
             "backup-storage-state",
@@ -58,7 +58,7 @@ def warm_cache_and_get_latest_backup_version(
         stdout=subprocess.PIPE,
     )
     if db_backup_result.stdout is None:
-        raise Exception("Failed to run aptos db tool backup. Cannot get stdout.")
+        raise Exception("Failed to run velor db tool backup. Cannot get stdout.")
     latest_version = find_latest_version_from_db_backup_output(db_backup_result.stdout)
     if latest_version < 0:
         raise Exception("Failed to find latest version")

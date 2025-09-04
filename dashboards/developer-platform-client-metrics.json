@@ -80,7 +80,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
           "editorMode": "code",
-          "expr": "sum(increase(aptos_api_request_source_client{chain_name=\"$chain_name\", request_source_client=~\"^unknown.*\"}[$__range]))",
+          "expr": "sum(increase(velor_api_request_source_client{chain_name=\"$chain_name\", request_source_client=~\"^unknown.*\"}[$__range]))",
           "hide": true,
           "instant": false,
           "range": true,
@@ -89,7 +89,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
           "editorMode": "code",
-          "expr": "sum(increase(aptos_api_request_source_client{chain_name=\"$chain_name\"}[$__range]))",
+          "expr": "sum(increase(velor_api_request_source_client{chain_name=\"$chain_name\"}[$__range]))",
           "hide": true,
           "instant": false,
           "range": true,
@@ -103,7 +103,7 @@
           "type": "math"
         }
       ],
-      "title": "Percentage of node API requests the with x-aptos-client header set",
+      "title": "Percentage of node API requests the with x-velor-client header set",
       "type": "stat"
     },
     {
@@ -130,7 +130,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "editorMode": "code",
-          "expr": "sum by(request_source_client) (increase(label_replace(aptos_api_request_source_client{chain_name=\"$chain_name\", request_source_client != \"unknown\"}, \"request_source_client\", \"$1\", \"request_source_client\", \"(.*)/.*\")[$__range])) != 0",
+          "expr": "sum by(request_source_client) (increase(label_replace(velor_api_request_source_client{chain_name=\"$chain_name\", request_source_client != \"unknown\"}, \"request_source_client\", \"$1\", \"request_source_client\", \"(.*)/.*\")[$__range])) != 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -162,7 +162,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "editorMode": "code",
-          "expr": "sum by(request_source_client) (increase(aptos_api_request_source_client{chain_name=\"$chain_name\", request_source_client!~\"^unknown.*\"}[$__range])) != 0",
+          "expr": "sum by(request_source_client) (increase(velor_api_request_source_client{chain_name=\"$chain_name\", request_source_client!~\"^unknown.*\"}[$__range])) != 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -218,7 +218,7 @@
       "targets": [
         {
           "datasource": { "type": "grafana-falconlogscale-datasource", "uid": "b4f0e2cd-2eea-4ada-a4c0-261e41369ed5" },
-          "lsql": "| #resource.type=cloud_run_revision\n| resource.labels.service_name=indexer-$chain_name \n| jsonPayload.method=* logName=*stdout\n| case {jsonPayload.aptos_client!=* | jsonPayload.aptos_client:=\"unknown\"; *}\n| top(jsonPayload.aptos_client)",
+          "lsql": "| #resource.type=cloud_run_revision\n| resource.labels.service_name=indexer-$chain_name \n| jsonPayload.method=* logName=*stdout\n| case {jsonPayload.velor_client!=* | jsonPayload.velor_client:=\"unknown\"; *}\n| top(jsonPayload.velor_client)",
           "refId": "A",
           "repository": "gcp"
         }
@@ -268,7 +268,7 @@
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "topk(5, sum by(operation_id) (increase(aptos_api_request_source_client{request_source_client=\"$source_client\", chain_name=\"$chain_name\"}[$__range])))",
+              "expr": "topk(5, sum by(operation_id) (increase(velor_api_request_source_client{request_source_client=\"$source_client\", chain_name=\"$chain_name\"}[$__range])))",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -293,14 +293,14 @@
       {
         "current": { "selected": false, "text": "unknown", "value": "unknown" },
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "definition": "label_values(aptos_api_request_source_client,request_source_client)",
+        "definition": "label_values(velor_api_request_source_client,request_source_client)",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "source_client",
         "options": [],
         "query": {
-          "query": "label_values(aptos_api_request_source_client,request_source_client)",
+          "query": "label_values(velor_api_request_source_client,request_source_client)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -330,7 +330,7 @@
       {
         "current": { "selected": false, "text": "testnet", "value": "testnet" },
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "definition": "label_values(aptos_api_request_source_client,chain_name)",
+        "definition": "label_values(velor_api_request_source_client,chain_name)",
         "description": "When looking at non-mainnet, use this to select the network.",
         "hide": 0,
         "includeAll": false,
@@ -338,7 +338,7 @@
         "name": "chain_name",
         "options": [],
         "query": {
-          "query": "label_values(aptos_api_request_source_client,chain_name)",
+          "query": "label_values(velor_api_request_source_client,chain_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,

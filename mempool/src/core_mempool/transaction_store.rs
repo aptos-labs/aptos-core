@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -18,10 +18,10 @@ use crate::{
         MempoolSenderBucket, MultiBucketTimelineIndexIds, TimelineIndexIdentifier,
     },
 };
-use aptos_config::config::MempoolConfig;
-use aptos_crypto::HashValue;
-use aptos_logger::{prelude::*, Level};
-use aptos_types::{
+use velor_config::config::MempoolConfig;
+use velor_crypto::HashValue;
+use velor_logger::{prelude::*, Level};
+use velor_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::{ReplayProtector, SignedTransaction},
@@ -648,7 +648,7 @@ impl TransactionStore {
             txns.clear();
             txns.append(&mut active);
 
-            let mut rm_txns = match aptos_logger::enabled!(Level::Trace) {
+            let mut rm_txns = match velor_logger::enabled!(Level::Trace) {
                 true => TxnsLog::new(),
                 false => TxnsLog::new_with_max(10),
             };
@@ -725,7 +725,7 @@ impl TransactionStore {
             }
             self.index_remove(&txn_to_remove);
 
-            if aptos_logger::enabled!(Level::Trace) {
+            if velor_logger::enabled!(Level::Trace) {
                 let mut txns_log = TxnsLog::new();
                 txns_log.add(
                     txn_to_remove.get_sender(),
@@ -808,7 +808,7 @@ impl TransactionStore {
                     } else {
                         batch.push((
                             txn.txn.clone(),
-                            aptos_infallible::duration_since_epoch_at(
+                            velor_infallible::duration_since_epoch_at(
                                 &txn.insertion_info.ready_time,
                             )
                             .as_millis() as u64,
@@ -860,7 +860,7 @@ impl TransactionStore {
                     .map(|txn| {
                         (
                             txn.txn.clone(),
-                            aptos_infallible::duration_since_epoch_at(
+                            velor_infallible::duration_since_epoch_at(
                                 &txn.insertion_info.ready_time,
                             )
                             .as_millis() as u64,
@@ -934,7 +934,7 @@ impl TransactionStore {
         gc_txns.sort_by_key(|key| (key.address, key.replay_protector));
         let mut gc_iter = gc_txns.iter().peekable();
 
-        let mut gc_txns_log = match aptos_logger::enabled!(Level::Trace) {
+        let mut gc_txns_log = match velor_logger::enabled!(Level::Trace) {
             true => TxnsLog::new(),
             false => TxnsLog::new_with_max(10),
         };

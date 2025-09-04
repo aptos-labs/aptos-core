@@ -1313,7 +1313,7 @@ impl CommonSerializer {
     fn serialize_header(&mut self, binary: &mut BinaryData) -> Result<()> {
         serialize_magic(binary)?;
         let version = if self.major_version >= VERSION_7 {
-            APTOS_BYTECODE_VERSION_MASK | self.major_version
+            VELOR_BYTECODE_VERSION_MASK | self.major_version
         } else {
             self.major_version
         };

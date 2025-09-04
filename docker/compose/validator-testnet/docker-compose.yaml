@@ -6,11 +6,11 @@
 # * The faucet can be accessed at 127.0.0.1:8000
 
 # Additional information:
-# * If you use this compose for different Aptos Networks, you will need remove the db volume first.
-# * If you would like to use the current Aptos version within this repository, execute the
-#     `build.sh` in `docker/validator` and change the image tag below to aptos_e2e:latest
-# * Validator images can be found at https://hub.docker.com/repository/docker/aptoslabs/validator/tags
-# * Faucet images can be found at https://hub.docker.com/repository/docker/aptoslabs/faucet/tags
+# * If you use this compose for different Velor Networks, you will need remove the db volume first.
+# * If you would like to use the current Velor version within this repository, execute the
+#     `build.sh` in `docker/validator` and change the image tag below to velor_e2e:latest
+# * Validator images can be found at https://hub.docker.com/repository/docker/velorlabs/validator/tags
+# * Faucet images can be found at https://hub.docker.com/repository/docker/velorlabs/faucet/tags
 
 # Monitoring:
 # If you want to install the monitoring components for your validator-testnet
@@ -26,18 +26,18 @@ services:
   validator:
     # Note this image currently does not support this, will update to the appropriate minimum
     # version shortly
-    image: "${VALIDATOR_IMAGE_REPO:-aptoslabs/validator}:${IMAGE_TAG:-devnet}"
+    image: "${VALIDATOR_IMAGE_REPO:-velorlabs/validator}:${IMAGE_TAG:-devnet}"
     networks:
       shared:
         ipv4_address:  172.16.1.10
     volumes:
       - type: volume
-        source: aptos-shared
-        target: /opt/aptos/var
+        source: velor-shared
+        target: /opt/velor/var
       - type: bind
         source: ./validator_node_template.yaml
-        target: /opt/aptos/config.yaml
-    command: ["/usr/local/bin/aptos-node", "--test", "--test-dir", "/opt/aptos/var/", "--test-config-override", "/opt/aptos/config.yaml"]
+        target: /opt/velor/config.yaml
+    command: ["/usr/local/bin/velor-node", "--test", "--test-dir", "/opt/velor/var/", "--test-config-override", "/opt/velor/config.yaml"]
     ports:
       - "8080:8080" # REST API
       - "50051:50051" # Indexer GRPC, if enabled
@@ -45,7 +45,7 @@ services:
       - 9101
 
   faucet:
-    image: "${FAUCET_IMAGE_REPO:-aptoslabs/faucet}:${IMAGE_TAG:-devnet}"
+    image: "${FAUCET_IMAGE_REPO:-velorlabs/faucet}:${IMAGE_TAG:-devnet}"
     depends_on:
       - validator
     networks:
@@ -53,19 +53,19 @@ services:
         ipv4_address:  172.16.1.11
     volumes:
       - type: volume
-        source: aptos-shared
-        target: /opt/aptos/var
+        source: velor-shared
+        target: /opt/velor/var
     command: >
       /bin/bash -c "
         for i in {1..10}; do
-          if [[ ! -s /opt/aptos/var/mint.key ]]; then
+          if [[ ! -s /opt/velor/var/mint.key ]]; then
             echo 'Validator has not populated mint.key yet. Is it running?'
             sleep 1
           else
             sleep 1
-            /usr/local/bin/aptos-faucet-service \\
+            /usr/local/bin/velor-faucet-service \\
               run-simple \\
-              --key-file-path /opt/aptos/var/mint.key \\
+              --key-file-path /opt/velor/var/mint.key \\
               --chain-id TESTING \\
               --node-url http://172.16.1.10:8080
             echo 'Faucet failed to run likely due to the Validator still starting. Will try again.'
@@ -78,11 +78,11 @@ services:
 
 networks:
   shared:
-    name: "aptos-docker-compose-shared"
+    name: "velor-docker-compose-shared"
     ipam:
       config:
         - subnet: 172.16.1.0/24
 
 volumes:
-  aptos-shared:
-    name: aptos-shared
+  velor-shared:
+    name: velor-shared

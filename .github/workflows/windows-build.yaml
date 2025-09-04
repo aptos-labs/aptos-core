@@ -1,4 +1,4 @@
-# This workflow tests that the Aptos CLI can be compiled on Windows
+# This workflow tests that the Velor CLI can be compiled on Windows
 name: "Windows CLI Build"
 
 on:
@@ -63,7 +63,7 @@ jobs:
         run: cargo x affected-packages -vv
         shell: bash
 
-      # Build and test the Aptos CLI (if it has changed)
+      # Build and test the Velor CLI (if it has changed)
       - name: Build and test the CLI
         run: cargo x targeted-cli-tests -vv
         shell: bash

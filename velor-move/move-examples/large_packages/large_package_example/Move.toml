@@ -1,0 +1,10 @@
+[package]
+name = "LargePackageExample"
+version = "1.0.0"
+upgrade_policy = "compatible"
+
+[dependencies]
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-framework", rev = "mainnet" }
+
+[addresses]
+large_package_example = "_"

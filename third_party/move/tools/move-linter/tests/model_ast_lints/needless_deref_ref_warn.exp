@@ -7,7 +7,7 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
    │         ^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&` operators: consider removing them
    ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:27:9
@@ -16,7 +16,7 @@ warning: [lint] Needless pair of `*` and `&` operators: consider removing them
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
    ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:35:9
@@ -25,7 +25,7 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
    ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:60:9
@@ -34,7 +34,7 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
    │         ^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
    ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:68:9
@@ -43,7 +43,7 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
    │         ^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
    ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:82:9
@@ -52,7 +52,7 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&` operators: consider removing them
    ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:99:9
@@ -61,7 +61,7 @@ warning: [lint] Needless pair of `*` and `&` operators: consider removing them
    │         ^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
     ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:109:9
@@ -70,7 +70,7 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
     │         ^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+    = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
     ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:114:9
@@ -79,7 +79,7 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
     │         ^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+    = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&` operators: consider removing them
     ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:119:9
@@ -88,7 +88,7 @@ warning: [lint] Needless pair of `*` and `&` operators: consider removing them
     │         ^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+    = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&` operators: consider removing them
     ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:129:9
@@ -97,7 +97,7 @@ warning: [lint] Needless pair of `*` and `&` operators: consider removing them
     │         ^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+    = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
     ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:139:9
@@ -106,7 +106,7 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
     │         ^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+    = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
     ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:144:9
@@ -115,7 +115,7 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
     │         ^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+    = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
     ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:148:9
@@ -124,7 +124,7 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
     │         ^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+    = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
     ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:153:9
@@ -133,7 +133,7 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
     │         ^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+    = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&` operators: consider removing them
     ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:170:26
@@ -142,7 +142,7 @@ warning: [lint] Needless pair of `*` and `&` operators: consider removing them
     │                          ^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+    = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
    ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:35:15
@@ -151,4 +151,4 @@ warning: [lint] Needless mutable reference or borrow: consider using immutable r
    │               ^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#needless_mutable_reference.

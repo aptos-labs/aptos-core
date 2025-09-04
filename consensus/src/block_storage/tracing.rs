@@ -1,9 +1,9 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::counters;
-use aptos_infallible::duration_since_epoch;
+use velor_infallible::duration_since_epoch;
 use std::time::Duration;
 
 pub struct BlockStage;

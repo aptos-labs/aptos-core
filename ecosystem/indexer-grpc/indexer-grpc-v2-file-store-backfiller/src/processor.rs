@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{ensure, Context, Result};
-use aptos_indexer_grpc_utils::{
+use velor_indexer_grpc_utils::{
     compression_util::{FileEntry, StorageFormat},
     config::IndexerGrpcFileStoreConfig,
     create_grpc_client,
@@ -12,7 +12,7 @@ use aptos_indexer_grpc_utils::{
         file_store_reader::FileStoreReader,
     },
 };
-use aptos_protos::{
+use velor_protos::{
     internal::fullnode::v1::{
         transactions_from_node_response::Response, GetTransactionsFromNodeRequest,
     },

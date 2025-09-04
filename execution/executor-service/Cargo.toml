@@ -1,6 +1,6 @@
 [package]
-name = "aptos-executor-service"
-description = "Aptos executor service"
+name = "velor-executor-service"
+description = "Velor executor service"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,19 +13,19 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-block-executor = { workspace = true }
-aptos-block-partitioner = { workspace = true }
-aptos-config = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-keygen = { workspace = true }
-aptos-logger = { workspace = true }
-aptos-metrics-core = { workspace = true }
-aptos-node-resource-metrics = { workspace = true }
-aptos-push-metrics =  { workspace = true }
-aptos-secure-net = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
+velor-block-executor = { workspace = true }
+velor-block-partitioner = { workspace = true }
+velor-config = { workspace = true }
+velor-infallible = { workspace = true }
+velor-keygen = { workspace = true }
+velor-logger = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-node-resource-metrics = { workspace = true }
+velor-push-metrics =  { workspace = true }
+velor-secure-net = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 crossbeam-channel = { workspace = true }
@@ -39,6 +39,6 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-aptos-language-e2e-tests = { workspace = true }
-aptos-transaction-simulation = { workspace = true }
-aptos-vm = { workspace = true }
+velor-language-e2e-tests = { workspace = true }
+velor-transaction-simulation = { workspace = true }
+velor-vm = { workspace = true }

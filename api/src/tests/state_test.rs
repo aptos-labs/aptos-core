@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{new_test_context, new_test_context_with_orderless_flags};
-use aptos_api_test_context::{current_function_name, TestContext};
-use aptos_sdk::{transaction_builder::aptos_stdlib::aptos_token_stdlib, types::LocalAccount};
-use aptos_storage_interface::DbReader;
+use velor_api_test_context::{current_function_name, TestContext};
+use velor_sdk::{transaction_builder::velor_stdlib::velor_token_stdlib, types::LocalAccount};
+use velor_storage_interface::DbReader;
 use move_core_types::account_address::AccountAddress;
 use rstest::rstest;
 use serde::Serialize;
@@ -152,7 +152,7 @@ async fn test_merkle_leaves_with_nft_transfer(
     let token_name = "token name".to_owned().into_bytes();
     let collection_builder = ctx
         .transaction_factory()
-        .payload(aptos_token_stdlib::token_create_collection_script(
+        .payload(velor_token_stdlib::token_create_collection_script(
             collection_name.clone(),
             "description".to_owned().into_bytes(),
             "uri".to_owned().into_bytes(),
@@ -169,7 +169,7 @@ async fn test_merkle_leaves_with_nft_transfer(
     let collection_txn = creator.sign_with_transaction_builder(collection_builder);
     let token_builder = ctx
         .transaction_factory()
-        .payload(aptos_token_stdlib::token_create_token_script(
+        .payload(velor_token_stdlib::token_create_token_script(
             collection_name.clone(),
             token_name.clone(),
             "collection description".to_owned().into_bytes(),
@@ -204,7 +204,7 @@ async fn test_merkle_leaves_with_nft_transfer(
     let transfer_to_owner_txn = creator.sign_multi_agent_with_transaction_builder(
         vec![owner],
         ctx.transaction_factory()
-            .payload(aptos_token_stdlib::token_direct_transfer_script(
+            .payload(velor_token_stdlib::token_direct_transfer_script(
                 creator.address(),
                 collection_name.clone(),
                 token_name.clone(),
@@ -231,7 +231,7 @@ async fn test_merkle_leaves_with_nft_transfer(
     let transfer_to_creator_txn = owner.sign_multi_agent_with_transaction_builder(
         vec![creator],
         ctx.transaction_factory()
-            .payload(aptos_token_stdlib::token_direct_transfer_script(
+            .payload(velor_token_stdlib::token_direct_transfer_script(
                 creator.address(),
                 collection_name.clone(),
                 token_name.clone(),

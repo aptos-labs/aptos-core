@@ -1,16 +1,16 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::{mock, mock::MockClient, utils};
-use aptos_bitvec::BitVec;
-use aptos_config::config::StorageServiceConfig;
-use aptos_crypto::HashValue;
-use aptos_storage_service_types::{
+use velor_bitvec::BitVec;
+use velor_config::config::StorageServiceConfig;
+use velor_crypto::HashValue;
+use velor_storage_service_types::{
     requests::{DataRequest, EpochEndingLedgerInfoRequest, StorageServiceRequest},
     responses::DataResponse,
     Epoch, StorageServiceError,
 };
-use aptos_types::{
+use velor_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,

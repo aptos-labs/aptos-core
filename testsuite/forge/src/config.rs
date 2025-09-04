@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -6,17 +6,17 @@ use crate::{
     success_criteria::{MetricsThreshold, SuccessCriteria, SystemMetricsThreshold},
     *,
 };
-use aptos_config::config::{
+use velor_config::config::{
     ExecutionBackpressureGasLimitConfig, ExecutionBackpressureTxnLimitConfig, NodeConfig,
     OverrideNodeConfig,
 };
-use aptos_framework::ReleaseBundle;
+use velor_framework::ReleaseBundle;
 use std::{num::NonZeroUsize, sync::Arc};
 
 pub struct ForgeConfig {
     suite_name: Option<String>,
 
-    pub aptos_tests: Vec<Box<dyn AptosTest>>,
+    pub velor_tests: Vec<Box<dyn VelorTest>>,
     pub admin_tests: Vec<Box<dyn AdminTest>>,
     pub network_tests: Vec<Box<dyn NetworkTest>>,
 
@@ -65,8 +65,8 @@ impl ForgeConfig {
         Self::default()
     }
 
-    pub fn add_aptos_test<T: AptosTest + 'static>(mut self, aptos_test: T) -> Self {
-        self.aptos_tests.push(Box::new(aptos_test));
+    pub fn add_velor_test<T: VelorTest + 'static>(mut self, velor_test: T) -> Self {
+        self.velor_tests.push(Box::new(velor_test));
         self
     }
 
@@ -79,8 +79,8 @@ impl ForgeConfig {
         self
     }
 
-    pub fn with_aptos_tests(mut self, aptos_tests: Vec<Box<dyn AptosTest>>) -> Self {
-        self.aptos_tests = aptos_tests;
+    pub fn with_velor_tests(mut self, velor_tests: Vec<Box<dyn VelorTest>>) -> Self {
+        self.velor_tests = velor_tests;
         self
     }
 
@@ -159,7 +159,7 @@ impl ForgeConfig {
 
     /// Builds a function that can be used to override the default helm values for the validator and fullnode.
     /// If a configuration is intended to be set for all nodes, set the value in the default helm values file:
-    /// testsuite/forge/src/backend/k8s/helm-values/aptos-node-default-values.yaml
+    /// testsuite/forge/src/backend/k8s/helm-values/velor-node-default-values.yaml
     pub fn build_node_helm_config_fn(&self, retain_debug_logs: bool) -> Option<NodeConfigFn> {
         let validator_override_node_config = self
             .validator_override_node_config_fn
@@ -174,7 +174,7 @@ impl ForgeConfig {
         let validator_resource_override = self.validator_resource_override;
         let fullnode_resource_override = self.fullnode_resource_override;
 
-        // Override specific helm values. See reference: terraform/helm/aptos-node/values.yaml
+        // Override specific helm values. See reference: terraform/helm/velor-node/values.yaml
         Some(Arc::new(move |helm_values: &mut serde_yaml::Value| {
             if let Some(override_config) = &validator_override_node_config {
                 helm_values["validator"]["config"] = override_config.get_yaml().unwrap();
@@ -228,9 +228,9 @@ impl ForgeConfig {
             }
 
             if retain_debug_logs {
-                helm_values["validator"]["podAnnotations"]["aptos.dev/min-log-level-to-retain"] =
+                helm_values["validator"]["podAnnotations"]["velor.dev/min-log-level-to-retain"] =
                     serde_yaml::Value::String("debug".to_owned());
-                helm_values["fullnode"]["podAnnotations"]["aptos.dev/min-log-level-to-retain"] =
+                helm_values["fullnode"]["podAnnotations"]["velor.dev/min-log-level-to-retain"] =
                     serde_yaml::Value::String("debug".to_owned());
                 helm_values["validator"]["rust_log"] = "debug,hyper=off".into();
                 helm_values["fullnode"]["rust_log"] = "debug,hyper=off".into();
@@ -300,7 +300,7 @@ impl ForgeConfig {
     }
 
     pub fn number_of_tests(&self) -> usize {
-        self.admin_tests.len() + self.network_tests.len() + self.aptos_tests.len()
+        self.admin_tests.len() + self.network_tests.len() + self.velor_tests.len()
     }
 
     pub fn all_tests(&self) -> Vec<Box<AnyTestRef<'_>>> {
@@ -313,9 +313,9 @@ impl ForgeConfig {
                     .map(|t| Box::new(AnyTestRef::Network(t.as_ref()))),
             )
             .chain(
-                self.aptos_tests
+                self.velor_tests
                     .iter()
-                    .map(|t| Box::new(AnyTestRef::Aptos(t.as_ref()))),
+                    .map(|t| Box::new(AnyTestRef::Velor(t.as_ref()))),
             )
             .collect()
     }
@@ -338,7 +338,7 @@ impl Default for ForgeConfig {
         };
         Self {
             suite_name: None,
-            aptos_tests: vec![],
+            velor_tests: vec![],
             admin_tests: vec![],
             network_tests: vec![],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),

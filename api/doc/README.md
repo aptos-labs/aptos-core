@@ -1,7 +1,7 @@
-# Aptos Node API v1
+# Velor Node API v1
 
 ## Overview
-Aptos Node API v1 provides a RESTful interface for interacting with Aptos blockchain nodes. The API enables users to retrieve blockchain information, submit transactions, and query account states.
+Velor Node API v1 provides a RESTful interface for interacting with Velor blockchain nodes. The API enables users to retrieve blockchain information, submit transactions, and query account states.
 
 ## Key Features
 - Account state and resources querying
@@ -11,7 +11,7 @@ Aptos Node API v1 provides a RESTful interface for interacting with Aptos blockc
 - Smart contract interaction
 
 ## Getting Started
-1. Ensure you have an Aptos node running
+1. Ensure you have an Velor node running
 2. API is available by default on port 8080
 3. Use any REST client to send requests
 
@@ -35,9 +35,9 @@ The API follows semantic versioning. Current v1 version ensures backward compati
 Complete OpenAPI specification is available at `/api/v1/spec`
 
 ## Support
-- [GitHub Issues](https://github.com/aptos-labs/aptos-core/issues)
-- [Discord](https://discord.gg/aptosnetwork)
-- [Aptos Documentation](https://aptos.dev)
+- [GitHub Issues](https://github.com/velor-chain/velor-core/issues)
+- [Discord](https://discord.gg/velornetwork)
+- [Velor Documentation](https://velor.dev)
 
 ## Contributing
 We welcome community contributions! Please review our [contribution guidelines](../CONTRIBUTING.md) before submitting a pull request.

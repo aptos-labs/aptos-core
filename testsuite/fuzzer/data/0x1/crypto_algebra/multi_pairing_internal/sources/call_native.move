@@ -1,10 +1,10 @@
 module poc::multi_pairing_internal {
     use std::vector;
-    use aptos_std::crypto_algebra::{
+    use velor_std::crypto_algebra::{
         Element,
         one, from_u64, scalar_mul, pairing, multi_pairing, add, eq, zero
     };
-    use aptos_std::bls12381_algebra::{G1, G2, Gt, Fr};
+    use velor_std::bls12381_algebra::{G1, G2, Gt, Fr};
 
     public entry fun main(_owner: &signer) {
         let p = one<G1>();

@@ -1,6 +1,6 @@
 module poc::neg_internal {
-    use aptos_std::crypto_algebra::{from_u64, neg, add, eq, zero};
-    use aptos_std::bls12381_algebra::{Fr};
+    use velor_std::crypto_algebra::{from_u64, neg, add, eq, zero};
+    use velor_std::bls12381_algebra::{Fr};
 
     public entry fun main(_owner:&signer) {
         let z = zero<Fr>();

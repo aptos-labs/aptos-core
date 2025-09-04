@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
@@ -16,11 +16,11 @@ use crate::{
     },
 };
 use anyhow::{Context, Result};
-use aptos_crypto::{ed25519::Ed25519Signature, secp256r1_ecdsa, HashValue, PrivateKey, SigningKey};
-use aptos_ledger::AptosLedgerError;
-use aptos_rest_client::{aptos_api_types::MoveStructTag, Client, PepperRequest, ProverRequest};
-pub use aptos_types::*;
-use aptos_types::{
+use velor_crypto::{ed25519::Ed25519Signature, secp256r1_ecdsa, HashValue, PrivateKey, SigningKey};
+use velor_ledger::VelorLedgerError;
+use velor_rest_client::{velor_api_types::MoveStructTag, Client, PepperRequest, ProverRequest};
+pub use velor_types::*;
+use velor_types::{
     event::EventKey,
     function_info::FunctionInfo,
     keyless::{
@@ -48,7 +48,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
+pub const VELOR_COIN_TYPE_STR: &str = "0x1::velor_coin::VelorCoin";
 lazy_static! {
     pub static ref APT_METADATA_ADDRESS: AccountAddress = {
         let mut addr = [0u8; 32];
@@ -119,7 +119,7 @@ impl<T: Into<AccountKey>> From<T> for LocalAccountAuthenticator {
     }
 }
 
-/// LocalAccount represents an account on the Aptos blockchain. Internally it
+/// LocalAccount represents an account on the Velor blockchain. Internally it
 /// holds the private / public key pair and the address of the account. You can
 /// use this struct to help transact with the blockchain, e.g. by generating a
 /// new account and signing transactions.
@@ -144,12 +144,12 @@ pub fn get_paired_fa_primary_store_address(
     let mut bytes = address.to_vec();
     bytes.append(&mut fa_metadata_address.to_vec());
     bytes.push(0xFC);
-    AccountAddress::from_bytes(aptos_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
+    AccountAddress::from_bytes(velor_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
 }
 
 pub fn get_paired_fa_metadata_address(coin_type_name: &MoveStructTag) -> AccountAddress {
     let coin_type_name = coin_type_name.to_string();
-    if coin_type_name == APTOS_COIN_TYPE_STR {
+    if coin_type_name == VELOR_COIN_TYPE_STR {
         *APT_METADATA_ADDRESS
     } else {
         let mut preimage = APT_METADATA_ADDRESS.to_vec();
@@ -161,7 +161,7 @@ pub fn get_paired_fa_metadata_address(coin_type_name: &MoveStructTag) -> Account
 
 impl LocalAccount {
     /// Create a new representation of an account locally. Note: This function
-    /// does not actually create an account on the Aptos blockchain, just a
+    /// does not actually create an account on the Velor blockchain, just a
     /// local representation.
     pub fn new<T: Into<AccountKey>>(address: AccountAddress, key: T, sequence_number: u64) -> Self {
         Self {
@@ -336,7 +336,7 @@ impl LocalAccount {
     }
 
     /// Generate a new account locally. Note: This function does not actually
-    /// create an account on the Aptos blockchain, it just generates a new
+    /// create an account on the Velor blockchain, it just generates a new
     /// account locally.
     pub fn generate<R>(rng: &mut R) -> Self
     where
@@ -662,12 +662,12 @@ impl HardwareWalletAccount {
     }
 
     /// Create a new account from a Ledger device.
-    /// This requires the Ledger device to be connected, unlocked and the Aptos app to be opened
+    /// This requires the Ledger device to be connected, unlocked and the Velor app to be opened
     pub fn from_ledger(
         derivation_path: String,
         sequence_number: u64,
-    ) -> Result<Self, AptosLedgerError> {
-        let public_key = aptos_ledger::get_public_key(&derivation_path, false)?;
+    ) -> Result<Self, VelorLedgerError> {
+        let public_key = velor_ledger::get_public_key(&derivation_path, false)?;
         let authentication_key = AuthenticationKey::ed25519(&public_key);
         let address = authentication_key.account_address();
 
@@ -707,8 +707,8 @@ impl HardwareWalletAccount {
     pub fn sign_arbitrary_message(
         &self,
         message: &[u8],
-    ) -> Result<Ed25519Signature, AptosLedgerError> {
-        aptos_ledger::sign_message(&self.derivation_path, message)
+    ) -> Result<Ed25519Signature, VelorLedgerError> {
+        velor_ledger::sign_message(&self.derivation_path, message)
     }
 }
 
@@ -1228,14 +1228,14 @@ async fn get_pepper_from_jwt(
 mod tests {
     use super::*;
     use crate::coin_client::CoinClient;
-    use aptos_crypto::ed25519::Ed25519PrivateKey;
-    use aptos_rest_client::{AptosBaseUrl, FaucetClient};
+    use velor_crypto::ed25519::Ed25519PrivateKey;
+    use velor_rest_client::{VelorBaseUrl, FaucetClient};
     use reqwest::Url;
 
     #[test]
     fn test_recover_account_from_derive_path() {
         // Same constants in test cases of TypeScript
-        // https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/aptos_account.test.ts
+        // https://github.com/velor-chain/velor-core/blob/main/ecosystem/typescript/sdk/src/velor_account.test.ts
         let derive_path = "m/44'/637'/0'/0'/0'";
         let mnemonic_phrase =
             "shoot island position soft burden budget tooth cruel issue economy destroy above";
@@ -1276,8 +1276,8 @@ mod tests {
     #[ignore]
     #[tokio::test]
     async fn test_derive_keyless_account() {
-        let aptos_rest_client = Client::builder(AptosBaseUrl::Devnet).build();
-        // This JWT is taken from https://github.com/aptos-labs/aptos-ts-sdk/blob/f644e61beb70e69dfd489e75287c67b527385135/tests/e2e/api/keyless.test.ts#L11
+        let velor_rest_client = Client::builder(VelorBaseUrl::Devnet).build();
+        // This JWT is taken from https://github.com/velor-chain/velor-ts-sdk/blob/f644e61beb70e69dfd489e75287c67b527385135/tests/e2e/api/keyless.test.ts#L11
         // As is the ephemeralKeyPair
         // This ephemeralKeyPair expires December 29, 2024.
         let jwt = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3QtcnNhIn0.eyJpc3MiOiJ0ZXN0Lm9pZGMucHJvdmlkZXIiLCJhdWQiOiJ0ZXN0LWtleWxlc3MtZGFwcCIsInN1YiI6InRlc3QtdXNlci0wIiwiZW1haWwiOiJ0ZXN0QGFwdG9zbGFicy5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiaWF0IjoxNzI1NDc1MTEyLCJleHAiOjI3MDAwMDAwMDAsIm5vbmNlIjoiNzA5NTI0MjMzMzk2NDQ1NzI2NzkzNDcyMzc2ODA4MDMwMzMyNDQ2MjgyMTE5MTc1NjQwOTQ1MDA5OTUxOTc4MTA1MTkxMDE4NzExOCJ9.eHqJLdje0FRD3UPmSw8sFHRYe9lwqSydAMcfHcpxkFwew2OTy6bWFsLQTdJp-eCZPhNzlfBXwNxaAJZksCWFWkzCz2913a5b88XRT9Im7JBDtA1e1IBXrnfXG0MDpsVRAuRNzLWqDi_4Fl1OELvoEOK-Tl4cmIwOhBr943S-b14PRVhrQ1XBD5MXaHWcJyxMaEtZfu_xxCQ-jjR---iguD243Ze98JlcOIV8VmEBg3YiSyVdMDZ8cgRia0DI8DwFn7rIxaV2H5FXb9JcehLgNP82-gsfEGV0iAXuBk7ZvRzMVA-srE9JvxVOyq5UkYu0Ss9LjKzX0KVojl7Au_OxGA";
@@ -1287,11 +1287,11 @@ mod tests {
         let esk = Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
         let ephemeral_key_pair =
             EphemeralKeyPair::new_ed25519(esk, 1735475012, vec![0; 31]).unwrap();
-        let mut account = derive_keyless_account(&aptos_rest_client, jwt, ephemeral_key_pair, None)
+        let mut account = derive_keyless_account(&velor_rest_client, jwt, ephemeral_key_pair, None)
             .await
             .unwrap();
         println!("Address: {}", account.address().to_hex_literal());
-        let balance = aptos_rest_client
+        let balance = velor_rest_client
             .view_apt_account_balance(account.address())
             .await
             .unwrap()
@@ -1299,8 +1299,8 @@ mod tests {
         if balance < 10000000 {
             println!("Funding account");
             let faucet_client = FaucetClient::new_from_rest_client(
-                Url::from_str("https://faucet.devnet.aptoslabs.com").unwrap(),
-                aptos_rest_client.clone(),
+                Url::from_str("https://faucet.devnet.velorlabs.com").unwrap(),
+                velor_rest_client.clone(),
             );
             faucet_client
                 .fund(account.address(), 10000000)
@@ -1309,13 +1309,13 @@ mod tests {
         }
         println!(
             "Balance: {}",
-            aptos_rest_client
+            velor_rest_client
                 .view_apt_account_balance(account.address())
                 .await
                 .unwrap()
                 .into_inner()
         );
-        let coin_client = CoinClient::new(&aptos_rest_client);
+        let coin_client = CoinClient::new(&velor_rest_client);
         let signed_txn = coin_client
             .get_signed_transfer_txn(
                 &mut account,
@@ -1331,7 +1331,7 @@ mod tests {
         println!(
             "Sent 1111111 to 0x7968dab936c1bad187c60ce4082f307d030d780e91e694ae03aef16aba73f30"
         );
-        aptos_rest_client
+        velor_rest_client
             .submit_without_deserializing_response(&signed_txn)
             .await
             .unwrap();

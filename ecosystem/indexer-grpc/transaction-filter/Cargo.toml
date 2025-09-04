@@ -1,5 +1,5 @@
 [package]
-name = "aptos-transaction-filter"
+name = "velor-transaction-filter"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,7 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-protos = { workspace = true }
+velor-protos = { workspace = true }
 derivative = { workspace = true }
 derive_builder = { workspace = true }
 memchr = { workspace = true }

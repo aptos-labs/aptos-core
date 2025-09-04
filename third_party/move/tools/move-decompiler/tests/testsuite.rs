@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Test framework for the Move decompiler, allowing different compilation, decompilation, and testing configurations.
@@ -129,10 +129,10 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
     compiler_opts.testing = true;
     compiler_opts.named_address_mapping = vec![
         "std=0x1".to_string(),
-        "aptos_std=0x1".to_string(),
-        "aptos_framework=0x1".to_string(),
-        "aptos_fungible_asset=0xA".to_string(),
-        "aptos_token=0x3".to_string(),
+        "velor_std=0x1".to_string(),
+        "velor_framework=0x1".to_string(),
+        "velor_fungible_asset=0xA".to_string(),
+        "velor_token=0x3".to_string(),
         "core_resources=0xA550C18".to_string(),
         "vm_reserved=0x0".to_string(),
         "vm=0x0".to_string(),

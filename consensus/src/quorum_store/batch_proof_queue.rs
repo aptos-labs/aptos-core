@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
@@ -6,16 +6,16 @@ use super::{
     utils::{BatchKey, BatchSortKey, TimeExpirations},
 };
 use crate::quorum_store::counters;
-use aptos_consensus_types::{
+use velor_consensus_types::{
     common::{Author, TxnSummaryWithExpiration},
     payload::TDataInfo,
     proof_of_store::{BatchInfo, ProofOfStore},
     utils::PayloadTxnsSize,
 };
-use aptos_logger::{info, sample, sample::SampleRate, warn};
-use aptos_metrics_core::TimerHelper;
-use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use velor_logger::{info, sample, sample::SampleRate, warn};
+use velor_metrics_core::TimerHelper;
+use velor_short_hex_str::AsShortHexStr;
+use velor_types::{transaction::SignedTransaction, PeerId};
 use rand::{prelude::SliceRandom, thread_rng};
 use std::{
     cmp::Reverse,
@@ -323,7 +323,7 @@ impl BatchProofQueue {
     // If the validator receives the batch from batch coordinator, but doesn't receive the corresponding
     // proof before the batch expires, the batch summary will be garbage collected.
     fn gc_expired_batch_summaries_without_proofs(&mut self) {
-        let timestamp = aptos_infallible::duration_since_epoch().as_micros() as u64;
+        let timestamp = velor_infallible::duration_since_epoch().as_micros() as u64;
         self.items.retain(|_, item| {
             if item.is_committed() || item.proof.is_some() || item.info.expiration() > timestamp {
                 true
@@ -592,7 +592,7 @@ impl BatchProofQueue {
         }
 
         let max_batch_creation_ts_usecs = min_batch_age_usecs
-            .map(|min_age| aptos_infallible::duration_since_epoch().as_micros() as u64 - min_age);
+            .map(|min_age| velor_infallible::duration_since_epoch().as_micros() as u64 - min_age);
         let mut iters = vec![];
         for (_, batches) in self
             .author_to_batches
@@ -721,7 +721,7 @@ impl BatchProofQueue {
         }
         let start = Instant::now();
         self.latest_block_timestamp = block_timestamp;
-        if let Some(time_lag) = aptos_infallible::duration_since_epoch()
+        if let Some(time_lag) = velor_infallible::duration_since_epoch()
             .checked_sub(Duration::from_micros(block_timestamp))
         {
             counters::TIME_LAG_IN_BATCH_PROOF_QUEUE.observe_duration(time_lag);

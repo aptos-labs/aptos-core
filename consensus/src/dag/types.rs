@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::errors::DAGRpcError;
@@ -11,19 +11,19 @@ use crate::{
     network_interface::ConsensusMsg,
 };
 use anyhow::{bail, ensure};
-use aptos_bitvec::BitVec;
-use aptos_consensus_types::common::{Author, Payload, Round};
-use aptos_crypto::{
+use velor_bitvec::BitVec;
+use velor_consensus_types::common::{Author, Payload, Round};
+use velor_crypto::{
     bls12381::Signature,
     hash::{CryptoHash, CryptoHasher},
     CryptoMaterialError, HashValue,
 };
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_enum_conversion_derive::EnumConversion;
-use aptos_infallible::Mutex;
-use aptos_logger::debug;
-use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
-use aptos_types::{
+use velor_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use velor_enum_conversion_derive::EnumConversion;
+use velor_infallible::Mutex;
+use velor_logger::debug;
+use velor_reliable_broadcast::{BroadcastStatus, RBMessage};
+use velor_types::{
     aggregate_signature::{AggregateSignature, PartialSignatures},
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,

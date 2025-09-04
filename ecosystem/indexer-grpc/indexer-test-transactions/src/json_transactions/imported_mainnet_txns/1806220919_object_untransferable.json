@@ -69,13 +69,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"186521510104405\"},\"deposit_events\":{\"counter\":\"88\",\"guid\":{\"id\":{\"addr\":\"0x7c8e9b0f2ec5621dc150afbd5cb6cb9d0f61ca91921041b5fdfe063e524b851\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"44\",\"guid\":{\"id\":{\"addr\":\"0x7c8e9b0f2ec5621dc150afbd5cb6cb9d0f61ca91921041b5fdfe063e524b851\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -93,13 +93,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"498999545100\"},\"deposit_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x121ed48962169f2d0670380fc8768bfa0d713dea51c176496274808c4b6a75ab\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"3\",\"guid\":{\"id\":{\"addr\":\"0x121ed48962169f2d0670380fc8768bfa0d713dea51c176496274808c4b6a75ab\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -282,7 +282,7 @@
             "name": "Metadata"
           },
           "typeStr": "0x1::fungible_asset::Metadata",
-          "data": "{\"decimals\":8,\"icon_uri\":\"https://aptoscan.com/images/empty-coin.svg\",\"name\":\"Apt\",\"project_uri\":\"https://aptoscan.com\",\"symbol\":\"APT\"}"
+          "data": "{\"decimals\":8,\"icon_uri\":\"https://velorcan.com/images/empty-coin.svg\",\"name\":\"Apt\",\"project_uri\":\"https://velorcan.com\",\"symbol\":\"APT\"}"
         }
       },
       {
@@ -515,8 +515,8 @@
               "type": "MOVE_TYPES_STRUCT",
               "struct": {
                 "address": "0x1",
-                "module": "aptos_coin",
-                "name": "AptosCoin"
+                "module": "velor_coin",
+                "name": "VelorCoin"
               }
             }
           ],

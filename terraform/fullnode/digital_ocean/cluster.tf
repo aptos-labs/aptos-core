@@ -1,5 +1,5 @@
-resource "digitalocean_kubernetes_cluster" "aptos" {
-  name    = "aptos-${terraform.workspace}"
+resource "digitalocean_kubernetes_cluster" "velor" {
+  name    = "velor-${terraform.workspace}"
   region  = var.region
   version = "1.22.8-do.1"
 

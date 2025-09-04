@@ -1,7 +1,7 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_network::protocols::network::RpcError;
+use velor_network::protocols::network::RpcError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -18,7 +18,7 @@ pub enum Error {
     #[error("Consensus observer progress stopped: {0}")]
     ObserverProgressStopped(String),
 
-    #[error("Aptos network rpc error: {0}")]
+    #[error("Velor network rpc error: {0}")]
     RpcError(#[from] RpcError),
 
     #[error("Subscription disconnected: {0}")]
@@ -59,8 +59,8 @@ impl Error {
     }
 }
 
-impl From<aptos_network::application::error::Error> for Error {
-    fn from(error: aptos_network::application::error::Error) -> Self {
+impl From<velor_network::application::error::Error> for Error {
+    fn from(error: velor_network::application::error::Error) -> Self {
         Error::NetworkError(error.to_string())
     }
 }

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 mod agg_trx_producer;
@@ -13,12 +13,12 @@ pub mod types;
 use crate::{
     epoch_manager::EpochManager, network::NetworkTask, network_interface::DKGNetworkClient,
 };
-use aptos_config::config::{ReliableBroadcastConfig, SafetyRulesConfig};
-use aptos_event_notifications::{
+use velor_config::config::{ReliableBroadcastConfig, SafetyRulesConfig};
+use velor_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
-use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
-use aptos_validator_transaction_pool::VTxnPoolState;
+use velor_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use velor_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
 use tokio::runtime::Runtime;
 pub use types::DKGMessage;
@@ -34,8 +34,8 @@ pub fn start_dkg_runtime(
     rb_config: ReliableBroadcastConfig,
     randomness_override_seq_num: u64,
 ) -> Runtime {
-    let runtime = aptos_runtimes::spawn_named_runtime("dkg".into(), Some(4));
-    let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
+    let runtime = velor_runtimes::spawn_named_runtime("dkg".into(), Some(4));
+    let (self_sender, self_receiver) = velor_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
     let dkg_network_client = DKGNetworkClient::new(network_client);
 
     let dkg_epoch_manager = EpochManager::new(

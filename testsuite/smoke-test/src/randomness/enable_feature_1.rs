@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,9 +9,9 @@ use crate::{
     smoke_test_environment::SwarmBuilder,
     utils::{get_current_consensus_config, get_on_chain_resource},
 };
-use aptos_forge::{Node, Swarm, SwarmExt};
-use aptos_logger::{debug, info};
-use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
+use velor_forge::{Node, Swarm, SwarmExt};
+use velor_logger::{debug, info};
+use velor_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
 use std::{sync::Arc, time::Duration};
 
 /// Enable on-chain randomness in the following steps.
@@ -24,7 +24,7 @@ async fn enable_feature_1() {
 
     let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_num_fullnodes(1)
-        .with_aptos()
+        .with_velor()
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
             conf.allow_new_validators = true;
@@ -42,7 +42,7 @@ async fn enable_feature_1() {
     let decrypt_key_map = decrypt_key_map(&swarm);
 
     let client_endpoint = swarm.validators().nth(1).unwrap().rest_api_endpoint();
-    let client = aptos_rest_client::Client::new(client_endpoint.clone());
+    let client = velor_rest_client::Client::new(client_endpoint.clone());
 
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(3, Duration::from_secs(epoch_duration_secs * 2))

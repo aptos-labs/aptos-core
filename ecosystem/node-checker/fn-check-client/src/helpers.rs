@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{Context, Result};
-use aptos_sdk::types::network_address::NetworkAddress;
+use velor_sdk::types::network_address::NetworkAddress;
 use reqwest::Url;
 use std::net::{SocketAddr, ToSocketAddrs};
 

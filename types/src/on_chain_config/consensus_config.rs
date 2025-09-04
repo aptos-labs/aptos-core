@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -401,7 +401,7 @@ impl OnChainConfig for OnChainConsensusConfig {
 
     /// The Move resource is
     /// ```ignore
-    /// struct AptosConsensusConfig has copy, drop, store {
+    /// struct VelorConsensusConfig has copy, drop, store {
     ///    config: vector<u8>,
     /// }
     /// ```

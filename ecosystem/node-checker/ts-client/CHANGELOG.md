@@ -1,4 +1,4 @@
-# Aptos Node Health Checker TS client changelog
+# Velor Node Health Checker TS client changelog
 
 All notable changes to the client will be captured in this file. This changelog is written by hand for now. It adheres to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
@@ -11,7 +11,7 @@ All notable changes to the client will be captured in this file. This changelog 
 - Rename fields in `ConfigurationDescriptor`.
 
 ## 0.0.3 (2022-12-12)
-- Adapted to new API structure introduced in https://github.com/aptos-labs/aptos-core/pull/5784.
+- Adapted to new API structure introduced in https://github.com/velor-chain/velor-core/pull/5784.
 
 ## 0.0.2 (2022-09-01)
 - Added `public_key` as an optional field to `check_node`. If an evaluator that needs it, e.g. the `HandshakeEvaluator`, is configured as part of the baseline config, it will return an error indicating as such if it is not provided.

@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     account_config::{AccountResource, ObjectGroupResource},
     state_store::state_key::StateKey,
 };
-use aptos_crypto::hash::CryptoHash;
+use velor_crypto::hash::CryptoHash;
 use move_core_types::{account_address::AccountAddress, ident_str, move_resource::MoveStructType};
 use proptest::prelude::*;
 

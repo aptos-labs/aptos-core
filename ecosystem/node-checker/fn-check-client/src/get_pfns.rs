@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This file contains logic for reading the node information from the input
@@ -6,7 +6,7 @@
 
 use crate::check::{IncompleteNetworkAddress, NodeInfo, SingleCheck, SingleCheckResult};
 use anyhow::{Context, Result};
-use aptos_sdk::{
+use velor_sdk::{
     crypto::{x25519, ValidCryptoMaterialStringExt},
     types::account_address::AccountAddress,
 };

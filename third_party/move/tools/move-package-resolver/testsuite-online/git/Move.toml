@@ -3,5 +3,5 @@ name = "Pack"
 version = "0.1.2"
 
 [dependencies]
-AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework", rev = "main", subdir = "aptos-framework" }
-MoveStdlib = { git = "https://github.com/aptos-labs/aptos-framework", rev = "main", subdir = "move-stdlib" }
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework", rev = "main", subdir = "velor-framework" }
+MoveStdlib = { git = "https://github.com/velor-chain/velor-framework", rev = "main", subdir = "move-stdlib" }

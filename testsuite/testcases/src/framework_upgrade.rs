@@ -1,17 +1,17 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{batch_update, generate_traffic};
 use anyhow::bail;
-use aptos_forge::{
+use velor_forge::{
     NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test, DEFAULT_ROOT_PRIV_KEY,
     FORGE_KEY_SEED,
 };
-use aptos_keygen::KeyGen;
-use aptos_release_builder::ReleaseConfig;
-use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
-use aptos_temppath::TempPath;
-use aptos_types::transaction::authenticator::AuthenticationKey;
+use velor_keygen::KeyGen;
+use velor_release_builder::ReleaseConfig;
+use velor_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
+use velor_temppath::TempPath;
+use velor_types::transaction::authenticator::AuthenticationKey;
 use async_trait::async_trait;
 use log::info;
 use std::{ops::DerefMut, path::Path};
@@ -29,7 +29,7 @@ impl Test for FrameworkUpgrade {
     }
 }
 
-const RELEASE_YAML_PATH: &str = "aptos-move/aptos-release-builder/data";
+const RELEASE_YAML_PATH: &str = "velor-move/velor-release-builder/data";
 const IGNORED_YAMLS: [&str; 2] = ["release.yaml", "example.yaml"];
 
 fn is_release_yaml(path: &Path) -> bool {
@@ -118,7 +118,7 @@ impl NetworkTest for FrameworkUpgrade {
         let validator_account =
             AuthenticationKey::ed25519(&validator_key.public_key()).account_address();
 
-        let network_info = aptos_release_builder::validate::NetworkConfig {
+        let network_info = velor_release_builder::validate::NetworkConfig {
             endpoint: ctx
                 .swarm
                 .read()
@@ -135,9 +135,9 @@ impl NetworkTest for FrameworkUpgrade {
 
         network_info.mint_to_validator(None).await?;
 
-        let release_config = aptos_release_builder::current_release_config();
+        let release_config = velor_release_builder::current_release_config();
 
-        aptos_release_builder::validate::validate_config(
+        velor_release_builder::validate::validate_config(
             release_config.clone(),
             network_info.clone(),
             None,
@@ -151,7 +151,7 @@ impl NetworkTest for FrameworkUpgrade {
             if is_release_yaml(&path) {
                 let release_config = ReleaseConfig::parse(&fs::read_to_string(&path).await?)?;
                 info!("Executing release yaml: {}", path.to_string_lossy());
-                aptos_release_builder::validate::validate_config(
+                velor_release_builder::validate::validate_config(
                     release_config.clone(),
                     network_info.clone(),
                     None,

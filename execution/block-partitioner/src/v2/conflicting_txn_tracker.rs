@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::v2::types::{PrePartitionedTxnIdx, ShardedTxnIndexV2};
 #[cfg(test)]
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::{
+use velor_types::state_store::state_key::StateKey;
+use velor_types::{
     block_executor::partitioner::{RoundId, ShardId},
     transaction::analyzed_transaction::StorageLocation,
 };

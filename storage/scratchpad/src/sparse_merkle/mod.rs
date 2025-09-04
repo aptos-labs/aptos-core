@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -87,10 +87,10 @@ use crate::sparse_merkle::{
     updater::SubTreeUpdater,
     utils::get_state_shard_id,
 };
-use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_infallible::Mutex;
-use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
-use aptos_types::{
+use velor_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use velor_infallible::Mutex;
+use velor_metrics_core::{IntGaugeVecHelper, TimerHelper};
+use velor_types::{
     nibble::{nibble_path::NibblePath, Nibble},
     proof::SparseMerkleProofExt,
     state_store::state_key::StateKey,

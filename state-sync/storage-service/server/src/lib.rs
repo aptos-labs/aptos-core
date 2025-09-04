@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,19 +9,19 @@ use crate::{
     network::StorageServiceNetworkEvents,
     subscription::SubscriptionStreamRequests,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::{
+use velor_channels::{velor_channel, message_queues::QueueStyle};
+use velor_config::{
     config::{StateSyncConfig, StorageServiceConfig},
     network_id::PeerNetworkId,
 };
-use aptos_logger::prelude::*;
-use aptos_network::application::storage::PeersAndMetadata;
-use aptos_storage_service_notifications::StorageServiceNotificationListener;
-use aptos_storage_service_types::{
+use velor_logger::prelude::*;
+use velor_network::application::storage::PeersAndMetadata;
+use velor_storage_service_notifications::StorageServiceNotificationListener;
+use velor_storage_service_types::{
     requests::StorageServiceRequest,
     responses::{ProtocolMetadata, StorageServerSummary, StorageServiceResponse},
 };
-use aptos_time_service::{TimeService, TimeServiceTrait};
+use velor_time_service::{TimeService, TimeServiceTrait};
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use error::Error;
@@ -99,7 +99,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         storage_service_listener: StorageServiceNotificationListener,
     ) -> Self {
         // Extract the individual component configs
-        let aptos_data_client_config = config.aptos_data_client;
+        let velor_data_client_config = config.velor_data_client;
         let storage_service_config = config.storage_service;
 
         // Create the required components
@@ -109,7 +109,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         let lru_response_cache = Cache::new(storage_service_config.max_lru_cache_size);
         let subscriptions = Arc::new(DashMap::new());
         let request_moderator = Arc::new(RequestModerator::new(
-            aptos_data_client_config,
+            velor_data_client_config,
             cached_storage_server_summary.clone(),
             peers_and_metadata,
             storage_service_config,
@@ -137,9 +137,9 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         // Create channels to notify the optimistic fetch and subscription
         // handlers about updates to the cached storage summary.
         let (cache_update_notifier_optimistic_fetch, cache_update_listener_optimistic_fetch) =
-            aptos_channel::new(QueueStyle::LIFO, CACHED_SUMMARY_UPDATE_CHANNEL_SIZE, None);
+            velor_channel::new(QueueStyle::LIFO, CACHED_SUMMARY_UPDATE_CHANNEL_SIZE, None);
         let (cache_update_notifier_subscription, cache_update_listener_subscription) =
-            aptos_channel::new(QueueStyle::LIFO, CACHED_SUMMARY_UPDATE_CHANNEL_SIZE, None);
+            velor_channel::new(QueueStyle::LIFO, CACHED_SUMMARY_UPDATE_CHANNEL_SIZE, None);
 
         // Spawn the refresher for the storage summary cache
         let cache_update_notifiers = vec![
@@ -164,7 +164,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     /// Spawns a non-terminating task that refreshes the cached storage server summary
     async fn spawn_storage_summary_refresher(
         &mut self,
-        cache_update_notifiers: Vec<aptos_channel::Sender<(), CachedSummaryUpdateNotification>>,
+        cache_update_notifiers: Vec<velor_channel::Sender<(), CachedSummaryUpdateNotification>>,
     ) {
         // Clone all required components for the task
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
@@ -221,7 +221,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     /// Spawns a non-terminating task that handles optimistic fetches
     async fn spawn_optimistic_fetch_handler(
         &mut self,
-        mut cached_summary_update_listener: aptos_channel::Receiver<
+        mut cached_summary_update_listener: velor_channel::Receiver<
             (),
             CachedSummaryUpdateNotification,
         >,
@@ -288,7 +288,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     /// Spawns a non-terminating task that handles subscriptions
     async fn spawn_subscription_handler(
         &mut self,
-        mut cached_summary_update_listener: aptos_channel::Receiver<
+        mut cached_summary_update_listener: velor_channel::Receiver<
             (),
             CachedSummaryUpdateNotification,
         >,
@@ -514,7 +514,7 @@ pub(crate) fn refresh_cached_storage_summary<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     storage: T,
     storage_config: StorageServiceConfig,
-    cache_update_notifiers: Vec<aptos_channel::Sender<(), CachedSummaryUpdateNotification>>,
+    cache_update_notifiers: Vec<velor_channel::Sender<(), CachedSummaryUpdateNotification>>,
 ) {
     // Fetch the new data summary from storage
     let new_data_summary = match storage.get_data_summary() {

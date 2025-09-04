@@ -1,14 +1,14 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    metrics::{APTOS_SCHEMADB_DELETES_SAMPLED, APTOS_SCHEMADB_PUT_BYTES_SAMPLED, TIMER},
+    metrics::{VELOR_SCHEMADB_DELETES_SAMPLED, VELOR_SCHEMADB_PUT_BYTES_SAMPLED, TIMER},
     schema::{KeyCodec, Schema, ValueCodec},
     ColumnFamilyName, DB,
 };
-use aptos_drop_helper::DropHelper;
-use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
-use aptos_storage_interface::Result as DbResult;
+use velor_drop_helper::DropHelper;
+use velor_metrics_core::{IntCounterVecHelper, TimerHelper};
+use velor_storage_interface::Result as DbResult;
 use std::{
     collections::HashMap,
     fmt::{Debug, Formatter},
@@ -32,11 +32,11 @@ impl BatchStats {
     fn commit(&self) {
         for (cf_name, put_sizes) in &self.put_sizes {
             for put_size in put_sizes {
-                APTOS_SCHEMADB_PUT_BYTES_SAMPLED.observe_with(&[cf_name], *put_size as f64);
+                VELOR_SCHEMADB_PUT_BYTES_SAMPLED.observe_with(&[cf_name], *put_size as f64);
             }
         }
         for (cf_name, num_deletes) in &self.num_deletes {
-            APTOS_SCHEMADB_DELETES_SAMPLED.inc_with_by(&[cf_name], *num_deletes as u64);
+            VELOR_SCHEMADB_DELETES_SAMPLED.inc_with_by(&[cf_name], *num_deletes as u64);
         }
     }
 }

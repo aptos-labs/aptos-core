@@ -4,5 +4,5 @@ server_config:
   redis_main_instance_address: redis://172.16.1.12:6379
   file_store_config:
     file_store_type: LocalFileStore
-    local_file_store_path: /opt/aptos/file-store
+    local_file_store_path: /opt/velor/file-store
   chain_id: 4

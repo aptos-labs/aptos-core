@@ -1,5 +1,5 @@
 resource "google_service_account" "gke" {
-  account_id = "aptos-${terraform.workspace}-gke"
+  account_id = "velor-${terraform.workspace}-gke"
 }
 
 resource "google_project_iam_member" "gke-logging" {

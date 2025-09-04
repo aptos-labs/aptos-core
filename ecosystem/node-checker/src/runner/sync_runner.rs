@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::Runner;
@@ -12,7 +12,7 @@ use crate::{
     CheckSummary,
 };
 use anyhow::Result;
-use aptos_logger::{error, info, warn};
+use velor_logger::{error, info, warn};
 use async_trait::async_trait;
 use futures::future::try_join_all;
 use serde::{Deserialize, Serialize};

@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides mock dbreader for tests.
 
-use crate::{errors::AptosDbError, DbReader, DbWriter, Result};
-use aptos_crypto::HashValue;
-use aptos_types::{
+use crate::{errors::VelorDbError, DbReader, DbWriter, Result};
+use velor_crypto::HashValue;
+use velor_types::{
     proof::SparseMerkleProofExt,
     state_store::{
         state_key::{inner::StateKeyInner, StateKey},
@@ -41,7 +41,7 @@ impl DbReader for MockDbReaderWriter {
         match state_key.inner() {
             StateKeyInner::AccessPath(..) => Ok(None),
             StateKeyInner::Raw(raw_key) => Ok(Some(StateValue::from(raw_key.to_owned()))),
-            _ => Err(AptosDbError::Other(format!(
+            _ => Err(VelorDbError::Other(format!(
                 "Not supported state key type {:?}",
                 state_key
             ))),

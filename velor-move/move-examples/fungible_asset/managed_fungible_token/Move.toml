@@ -1,0 +1,13 @@
+[package]
+name = "ManagedFungibleToken"
+version = "0.0.0"
+
+[addresses]
+velor_framework = "0x1"
+velor_token_objects = "0x4"
+example_addr = "_"
+
+[dependencies]
+VelorFramework = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-framework", rev = "mainnet" }
+VelorTokenObjects = { git = "https://github.com/velor-chain/velor-framework.git", subdir = "velor-token-objects", rev = "mainnet" }
+ManagedFungibleAsset = { local = "../managed_fungible_asset" }

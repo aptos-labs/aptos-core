@@ -4,11 +4,11 @@ import { sleep } from "k6";
 import grpc from "k6/experimental/grpc";
 
 const GRPC_ADDR = __ENV.GRPC_ADDR || "127.0.0.1:50052";
-const GRPC_METHOD = "aptos.indexer.v1.RawData/GetTransactions";
+const GRPC_METHOD = "velor.indexer.v1.RawData/GetTransactions";
 
 // relative path from this directory to the proto files
-const GRPC_IMPORT_PATHS = ["../../../crates/aptos-protos/proto"];
-const GRPC_PROTOS = ["aptos/indexer/v1/raw_data.proto"];
+const GRPC_IMPORT_PATHS = ["../../../crates/velor-protos/proto"];
+const GRPC_PROTOS = ["velor/indexer/v1/raw_data.proto"];
 
 const client = new grpc.Client();
 client.load(GRPC_IMPORT_PATHS, ...GRPC_PROTOS);
@@ -25,7 +25,7 @@ export const options = {
 };
 
 // GetTransactions from raw data stream
-// Inspiration from: https://github.com/aptos-labs/aptos-indexer-processors/blob/main/typescript/processors/example-write-set-change-processor/processor.ts
+// Inspiration from: https://github.com/velor-chain/velor-indexer-processors/blob/main/typescript/processors/example-write-set-change-processor/processor.ts
 export default () => {
   if (__ITER == 0) {
     client.connect(GRPC_ADDR, { plaintext: true });
@@ -36,7 +36,7 @@ export default () => {
   };
 
   const metadata = {
-    "x-aptos-data-authorization": "dummy_token",
+    "x-velor-data-authorization": "dummy_token",
   };
 
   const params = {

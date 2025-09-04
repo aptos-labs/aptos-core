@@ -1,6 +1,6 @@
 [package]
-name = "aptos-openapi-spec-generator"
-description = "Aptos API OpenAPI Spec Generator"
+name = "velor-openapi-spec-generator"
+description = "Velor API OpenAPI Spec Generator"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,9 +14,9 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-api = { workspace = true }
-aptos-config = { workspace = true }
-aptos-mempool = { workspace = true, features = ["fuzzing"] }
-aptos-storage-interface = { workspace = true }
-aptos-types = { workspace = true }
+velor-api = { workspace = true }
+velor-config = { workspace = true }
+velor-mempool = { workspace = true, features = ["fuzzing"] }
+velor-storage-interface = { workspace = true }
+velor-types = { workspace = true }
 clap = { workspace = true }

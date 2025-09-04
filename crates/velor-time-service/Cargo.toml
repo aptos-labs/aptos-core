@@ -1,0 +1,32 @@
+[package]
+name = "velor-time-service"
+description = "Time Service for mocking time with tokio"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+velor-infallible = { workspace = true }
+enum_dispatch = { workspace = true }
+futures = { workspace = true, optional = true }
+pin-project = { workspace = true, optional = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
+
+[dev-dependencies]
+futures = { workspace = true }
+pin-project = { workspace = true }
+tokio = { workspace = true }
+tokio-test = { workspace = true }
+
+[features]
+default = []
+async = ["futures", "pin-project", "tokio"]
+testing = ["async"]

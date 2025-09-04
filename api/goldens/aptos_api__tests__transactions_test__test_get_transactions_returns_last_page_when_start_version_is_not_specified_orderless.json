@@ -227,7 +227,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "66",
     "payload": {
-      "function": "0x1::aptos_account::create_account",
+      "function": "0x1::velor_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x3054c2b469c941d36fc9eb2f2eaeaa8bc930dd016139363bc00d5218f29b6e49"
@@ -488,7 +488,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "66",
     "payload": {
-      "function": "0x1::aptos_account::create_account",
+      "function": "0x1::velor_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x7ca017f77d59c03ff6ed49667c2f1c975faba10e9a740e144a8751e513cb402e"
@@ -749,7 +749,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "67",
     "payload": {
-      "function": "0x1::aptos_account::create_account",
+      "function": "0x1::velor_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x8f93dcfdcc2a8174fe9f75f6694c526e2b4d2a302fe4e50a374dc3640372bd19"
@@ -1010,7 +1010,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "67",
     "payload": {
-      "function": "0x1::aptos_account::create_account",
+      "function": "0x1::velor_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0xf4eaa4a8e7e3679b5b3e951c4ff5ffe3b1fcaa8124c48364f92841ce8fab0925"
@@ -1271,7 +1271,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "68",
     "payload": {
-      "function": "0x1::aptos_account::create_account",
+      "function": "0x1::velor_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x19c02925b669c8a41ed35f90de405aaa00b17022318dfb20f2d8be840fd1da6f"
@@ -1532,7 +1532,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "68",
     "payload": {
-      "function": "0x1::aptos_account::create_account",
+      "function": "0x1::velor_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x7c1263324d545a1a6391f5a7d942803c6e0e774935f2461e2fc72b6476294a74"
@@ -1793,7 +1793,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "69",
     "payload": {
-      "function": "0x1::aptos_account::create_account",
+      "function": "0x1::velor_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0xc865b12b1a24eca5eb06c33344f19dc1b9559389718c228ae7b58d29385667e1"
@@ -2054,7 +2054,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "69",
     "payload": {
-      "function": "0x1::aptos_account::create_account",
+      "function": "0x1::velor_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0xc1dd38dc3c46578e98fb9aeb7b3119736c1eef281e203ed5514935304ea0a715"

@@ -4,8 +4,8 @@ from typing import Mapping as _Mapping
 from typing import Optional as _Optional
 from typing import Union as _Union
 
-from aptos.indexer.v1 import filter_pb2 as _filter_pb2
-from aptos.transaction.v1 import transaction_pb2 as _transaction_pb2
+from velor.indexer.v1 import filter_pb2 as _filter_pb2
+from velor.transaction.v1 import transaction_pb2 as _transaction_pb2
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf.internal import containers as _containers

@@ -1,7 +1,7 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_infallible::RwLock;
+use velor_infallible::RwLock;
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,

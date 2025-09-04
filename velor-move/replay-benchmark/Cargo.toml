@@ -1,0 +1,40 @@
+[package]
+name = "velor-replay-benchmark"
+version = "0.1.0"
+description = "A tool to replay and locally benchmark on-chain transactions."
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-block-executor = { workspace = true }
+velor-framework = { workspace = true }
+velor-gas-schedule = { workspace = true }
+velor-logger = { workspace = true }
+velor-move-debugger = { workspace = true }
+velor-push-metrics = { workspace = true }
+velor-rest-client = { workspace = true }
+velor-types = { workspace = true }
+velor-vm = { workspace = true }
+velor-vm-environment = { workspace = true }
+bcs = { workspace = true }
+claims = { workspace = true }
+clap = { workspace = true }
+colored = { workspace = true }
+move-core-types = { workspace = true }
+parking_lot = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+velor-crypto = { workspace = true }
+velor-types = { workspace = true, features = ["testing"] }
+rand = { workspace = true }

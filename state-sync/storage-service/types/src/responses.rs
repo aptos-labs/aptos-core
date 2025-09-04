@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -18,12 +18,12 @@ use crate::{
     responses::Error::DegenerateRangeError,
     Epoch, StorageServiceRequest, COMPRESSION_SUFFIX_LABEL,
 };
-use aptos_compression::{client::CompressionClient, CompressedData};
-use aptos_config::config::{
-    AptosDataClientConfig, StorageServiceConfig, MAX_APPLICATION_MESSAGE_SIZE,
+use velor_compression::{client::CompressionClient, CompressedData};
+use velor_config::config::{
+    VelorDataClientConfig, StorageServiceConfig, MAX_APPLICATION_MESSAGE_SIZE,
 };
-use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::{
+use velor_time_service::{TimeService, TimeServiceTrait};
+use velor_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
@@ -55,8 +55,8 @@ pub enum Error {
     UnexpectedResponseError(String),
 }
 
-impl From<aptos_compression::Error> for Error {
-    fn from(error: aptos_compression::Error) -> Self {
+impl From<velor_compression::Error> for Error {
+    fn from(error: velor_compression::Error) -> Self {
         Error::UnexpectedErrorEncountered(error.to_string())
     }
 }
@@ -76,7 +76,7 @@ impl StorageServiceResponse {
             // Serialize and compress the raw data
             let raw_data = bcs::to_bytes(&data_response)
                 .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
-            let compressed_data = aptos_compression::compress(
+            let compressed_data = velor_compression::compress(
                 raw_data,
                 CompressionClient::StateSync,
                 MAX_APPLICATION_MESSAGE_SIZE,
@@ -97,7 +97,7 @@ impl StorageServiceResponse {
     pub fn get_data_response(&self) -> Result<DataResponse, Error> {
         match self {
             StorageServiceResponse::CompressedResponse(_, compressed_data) => {
-                let raw_data = aptos_compression::decompress(
+                let raw_data = velor_compression::decompress(
                     compressed_data,
                     CompressionClient::StateSync,
                     MAX_APPLICATION_MESSAGE_SIZE,
@@ -535,14 +535,14 @@ pub struct StorageServerSummary {
 impl StorageServerSummary {
     pub fn can_service(
         &self,
-        aptos_data_client_config: &AptosDataClientConfig,
+        velor_data_client_config: &VelorDataClientConfig,
         time_service: TimeService,
         request: &StorageServiceRequest,
     ) -> bool {
         self.protocol_metadata.can_service(request)
             && self
                 .data_summary
-                .can_service(aptos_data_client_config, time_service, request)
+                .can_service(velor_data_client_config, time_service, request)
     }
 }
 
@@ -604,7 +604,7 @@ impl DataSummary {
     /// Returns true iff the request can be serviced
     pub fn can_service(
         &self,
-        aptos_data_client_config: &AptosDataClientConfig,
+        velor_data_client_config: &VelorDataClientConfig,
         time_service: TimeService,
         request: &StorageServiceRequest,
     ) -> bool {
@@ -621,17 +621,17 @@ impl DataSummary {
                     .unwrap_or(false)
             },
             GetNewTransactionOutputsWithProof(_) => can_service_optimistic_request(
-                aptos_data_client_config,
+                velor_data_client_config,
                 time_service,
                 self.synced_ledger_info.as_ref(),
             ),
             GetNewTransactionsWithProof(_) => can_service_optimistic_request(
-                aptos_data_client_config,
+                velor_data_client_config,
                 time_service,
                 self.synced_ledger_info.as_ref(),
             ),
             GetNewTransactionsOrOutputsWithProof(_) => can_service_optimistic_request(
-                aptos_data_client_config,
+                velor_data_client_config,
                 time_service,
                 self.synced_ledger_info.as_ref(),
             ),
@@ -673,17 +673,17 @@ impl DataSummary {
                     request.proof_version,
                 ),
             SubscribeTransactionOutputsWithProof(_) => can_service_subscription_request(
-                aptos_data_client_config,
+                velor_data_client_config,
                 time_service,
                 self.synced_ledger_info.as_ref(),
             ),
             SubscribeTransactionsOrOutputsWithProof(_) => can_service_subscription_request(
-                aptos_data_client_config,
+                velor_data_client_config,
                 time_service,
                 self.synced_ledger_info.as_ref(),
             ),
             SubscribeTransactionsWithProof(_) => can_service_subscription_request(
-                aptos_data_client_config,
+                velor_data_client_config,
                 time_service,
                 self.synced_ledger_info.as_ref(),
             ),
@@ -710,12 +710,12 @@ impl DataSummary {
                     ),
             },
             GetNewTransactionDataWithProof(_) => can_service_optimistic_request(
-                aptos_data_client_config,
+                velor_data_client_config,
                 time_service,
                 self.synced_ledger_info.as_ref(),
             ),
             SubscribeTransactionDataWithProof(_) => can_service_subscription_request(
-                aptos_data_client_config,
+                velor_data_client_config,
                 time_service,
                 self.synced_ledger_info.as_ref(),
             ),
@@ -807,22 +807,22 @@ impl DataSummary {
 /// Returns true iff an optimistic data request can be serviced
 /// by the peer with the given synced ledger info.
 fn can_service_optimistic_request(
-    aptos_data_client_config: &AptosDataClientConfig,
+    velor_data_client_config: &VelorDataClientConfig,
     time_service: TimeService,
     synced_ledger_info: Option<&LedgerInfoWithSignatures>,
 ) -> bool {
-    let max_lag_secs = aptos_data_client_config.max_optimistic_fetch_lag_secs;
+    let max_lag_secs = velor_data_client_config.max_optimistic_fetch_lag_secs;
     check_synced_ledger_lag(synced_ledger_info, time_service, max_lag_secs)
 }
 
 /// Returns true iff a subscription data request can be serviced
 /// by the peer with the given synced ledger info.
 fn can_service_subscription_request(
-    aptos_data_client_config: &AptosDataClientConfig,
+    velor_data_client_config: &VelorDataClientConfig,
     time_service: TimeService,
     synced_ledger_info: Option<&LedgerInfoWithSignatures>,
 ) -> bool {
-    let max_lag_secs = aptos_data_client_config.max_subscription_lag_secs;
+    let max_lag_secs = velor_data_client_config.max_subscription_lag_secs;
     check_synced_ledger_lag(synced_ledger_info, time_service, max_lag_secs)
 }
 

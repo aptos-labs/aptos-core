@@ -1,6 +1,6 @@
 /// Module for testing monotonically increasing counter native function throughput
 module 0xABCD::transaction_context_example {
-    use aptos_framework::transaction_context;
+    use velor_framework::transaction_context;
 
     /// Test single call to monotonic counter per transaction
     public entry fun test_monotonic_counter_single() {

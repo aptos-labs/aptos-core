@@ -1,10 +1,10 @@
 module poc::scalar_from_sha512_internal {
-    use aptos_std::ristretto255;
-    use aptos_std::aptos_hash;
+    use velor_std::ristretto255;
+    use velor_std::velor_hash;
 
     public entry fun main(_owner:&signer) {
         let input = b"hello world";
-        let hash_digest = aptos_hash::sha2_512(input);
+        let hash_digest = velor_hash::sha2_512(input);
         let _scalar = ristretto255::new_scalar_from_sha512(hash_digest);
     }
 

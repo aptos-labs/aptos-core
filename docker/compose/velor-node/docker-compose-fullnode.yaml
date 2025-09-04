@@ -1,0 +1,71 @@
+# This compose file defines an Velor Fullnode deployment.
+# Read the README.md files for instruction on how to install velor-node
+
+services:
+  haproxy:
+    image: haproxy:3.0.2
+    volumes:
+      - type: bind
+        source: ./haproxy-fullnode.cfg
+        target: /usr/local/etc/haproxy/haproxy.cfg
+      - type: bind
+        source: ./blocked.ips
+        target: /usr/local/etc/haproxy/blocked.ips
+    networks:
+      - shared
+    expose:
+      # Public fullnode access
+      - 6182
+      # REST API
+      - 8080
+      # Fullnode metrics
+      - 9101
+      # Haproxy stats page
+      - 9102
+    ports:
+      - "6182:6182"
+      - "8080:8080"
+      # Only expose these internally
+      - "127.0.0.1:9101:9101"
+      - "127.0.0.1:9102:9102"
+
+  fullnode:
+    image: "${VALIDATOR_IMAGE_REPO:-velorlabs/validator}:${IMAGE_TAG:-testnet}"
+    networks:
+      shared:
+    volumes:
+      - type: volume
+        source: velor-fullnode
+        target: /opt/velor/data
+      - type: bind
+        source: ./fullnode.yaml
+        target: /opt/velor/etc/fullnode.yaml
+      - type: bind
+        source: ./genesis.blob
+        target: /opt/velor/genesis/genesis.blob
+      - type: bind
+        source: ./waypoint.txt
+        target: /opt/velor/genesis/waypoint.txt
+      - type: bind
+        source: ./keys/validator-full-node-identity.yaml
+        target: /opt/velor/genesis/validator-full-node-identity.yaml
+    command: ["/usr/local/bin/velor-node", "-f", "/opt/velor/etc/fullnode.yaml"]
+    restart: unless-stopped
+    expose:
+      # Public fullnode access
+      - 6182
+      # REST API
+      - 8080
+      # Validator metrics
+      - 9101
+
+networks:
+  shared:
+    name: "velor-docker-compose-shared"
+    ipam:
+      config:
+        - subnet: 172.16.1.0/24
+
+volumes:
+  velor-fullnode:
+    name: velor-fullnode

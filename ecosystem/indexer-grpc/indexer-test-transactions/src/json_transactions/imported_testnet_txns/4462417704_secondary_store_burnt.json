@@ -209,13 +209,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"214146650\"},\"deposit_events\":{\"counter\":\"215\",\"guid\":{\"id\":{\"addr\":\"0x47952259cb5b4ac64816d881a27155d1a3309f1041c8124b81b947e04e06d728\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"223\",\"guid\":{\"id\":{\"addr\":\"0x47952259cb5b4ac64816d881a27155d1a3309f1041c8124b81b947e04e06d728\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -316,13 +316,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"2982812\"},\"deposit_events\":{\"counter\":\"663454\",\"guid\":{\"id\":{\"addr\":\"0x7e783b349d3e89cf5931af376ebeadbfab855b3fa239b7ada8f5a92fbea6b387\",\"creation_num\":\"3\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x7e783b349d3e89cf5931af376ebeadbfab855b3fa239b7ada8f5a92fbea6b387\",\"creation_num\":\"4\"}}}}"
         }
       },
@@ -368,13 +368,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"2814041\"},\"deposit_events\":{\"counter\":\"14\",\"guid\":{\"id\":{\"addr\":\"0xc180ff5ec54082970cc70f6fa91033ede1489e534d723f24ffd2bb5b56432478\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"3\",\"guid\":{\"id\":{\"addr\":\"0xc180ff5ec54082970cc70f6fa91033ede1489e534d723f24ffd2bb5b56432478\",\"creation_num\":\"3\"}}}}"
         }
       },

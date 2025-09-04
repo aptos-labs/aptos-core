@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
@@ -109,13 +109,13 @@ pub mod network_message_service_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/aptos.remote_executor.v1.NetworkMessageService/SimpleMsgExchange",
+                "/velor.remote_executor.v1.NetworkMessageService/SimpleMsgExchange",
             );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(
                     GrpcMethod::new(
-                        "aptos.remote_executor.v1.NetworkMessageService",
+                        "velor.remote_executor.v1.NetworkMessageService",
                         "SimpleMsgExchange",
                     ),
                 );
@@ -220,7 +220,7 @@ pub mod network_message_service_server {
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             match req.uri().path() {
-                "/aptos.remote_executor.v1.NetworkMessageService/SimpleMsgExchange" => {
+                "/velor.remote_executor.v1.NetworkMessageService/SimpleMsgExchange" => {
                     #[allow(non_camel_case_types)]
                     struct SimpleMsgExchangeSvc<T: NetworkMessageService>(pub Arc<T>);
                     impl<
@@ -302,7 +302,7 @@ pub mod network_message_service_server {
         }
     }
     /// Generated gRPC service name
-    pub const SERVICE_NAME: &str = "aptos.remote_executor.v1.NetworkMessageService";
+    pub const SERVICE_NAME: &str = "velor.remote_executor.v1.NetworkMessageService";
     impl<T> tonic::server::NamedService for NetworkMessageServiceServer<T> {
         const NAME: &'static str = SERVICE_NAME;
     }

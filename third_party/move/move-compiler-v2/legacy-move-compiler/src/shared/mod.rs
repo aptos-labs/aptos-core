@@ -322,9 +322,9 @@ pub fn move_compiler_warn_of_deprecation_use_env_var() -> bool {
     *WARN_OF_DEPRECATION
 }
 
-pub fn warn_of_deprecation_use_in_aptos_libs_env_var() -> bool {
+pub fn warn_of_deprecation_use_in_velor_libs_env_var() -> bool {
     static WARN_OF_DEPRECATION: Lazy<bool> =
-        Lazy::new(|| read_bool_env_var(cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS));
+        Lazy::new(|| read_bool_env_var(cli::WARN_OF_DEPRECATION_USE_IN_VELOR_LIBS));
     *WARN_OF_DEPRECATION
 }
 
@@ -374,11 +374,11 @@ pub struct Flags {
            default_value=bool_to_str(move_compiler_warn_of_deprecation_use_env_var()))]
     warn_of_deprecation_use: bool,
 
-    /// Show warnings about use of deprecated usage in the Aptos libraries,
+    /// Show warnings about use of deprecated usage in the Velor libraries,
     /// which we should generally not bother users with.
-    /// Note that current value of this constant is "Wdeprecation-aptos"
-    #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG, default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
-    warn_of_deprecation_use_in_aptos_libs: bool,
+    /// Note that current value of this constant is "Wdeprecation-velor"
+    #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_VELOR_LIBS_FLAG, default_value=bool_to_str(warn_of_deprecation_use_in_velor_libs_env_var()))]
+    warn_of_deprecation_use_in_velor_libs: bool,
 
     /// Show warnings about unused functions, fields, constants, etc.
     /// Note that the current value of this constant is "Wunused"
@@ -404,7 +404,7 @@ impl Flags {
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
-            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
+            warn_of_deprecation_use_in_velor_libs: warn_of_deprecation_use_in_velor_libs_env_var(),
             warn_unused: false,
             lang_v2: false,
             language_version: LanguageVersion::V1,
@@ -509,13 +509,13 @@ impl Flags {
         }
     }
 
-    pub fn warn_of_deprecation_use_in_aptos_libs(&self) -> bool {
-        self.warn_of_deprecation_use_in_aptos_libs
+    pub fn warn_of_deprecation_use_in_velor_libs(&self) -> bool {
+        self.warn_of_deprecation_use_in_velor_libs
     }
 
-    pub fn set_warn_of_deprecation_use_in_aptos_libs(self, new_value: bool) -> Self {
+    pub fn set_warn_of_deprecation_use_in_velor_libs(self, new_value: bool) -> Self {
         Self {
-            warn_of_deprecation_use_in_aptos_libs: new_value,
+            warn_of_deprecation_use_in_velor_libs: new_value,
             ..self
         }
     }

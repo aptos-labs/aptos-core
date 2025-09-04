@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -110,7 +110,7 @@ impl<T: std::fmt::Debug + NonPanic> From<T> for PanicOr<T> {
 }
 
 ///
-/// Error codes that follow the Move error convention of the Aptos Framework.
+/// Error codes that follow the Move error convention of the Velor Framework.
 ///
 
 /// Caller specified an invalid argument (http: 400)

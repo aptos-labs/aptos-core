@@ -1,7 +1,7 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::info;
+use velor_logger::info;
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicUsize},

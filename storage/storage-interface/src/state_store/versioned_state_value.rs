@@ -1,8 +1,8 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::{
+use velor_crypto::{hash::CryptoHash, HashValue};
+use velor_types::{
     state_store::{hot_state::LRUEntry, state_slot::StateSlot},
     transaction::Version,
     write_set::BaseStateOp,

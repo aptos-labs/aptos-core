@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod account_minter;
@@ -18,19 +18,19 @@ use crate::emitter::{
 };
 use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
-use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_logger::{sample, sample::SampleRate};
-use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
-use aptos_sdk::{
+use velor_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
+use velor_crypto::ed25519::Ed25519PrivateKey;
+use velor_logger::{sample, sample::SampleRate};
+use velor_rest_client::{velor_api_types::VelorErrorCode, error::RestError, Client as RestClient};
+use velor_sdk::{
     move_types::account_address::AccountAddress,
-    transaction_builder::{aptos_stdlib, TransactionFactory},
+    transaction_builder::{velor_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, AccountKey, LocalAccount},
 };
-use aptos_transaction_generator_lib::{
+use velor_transaction_generator_lib::{
     create_txn_generator_creator, AccountType, TransactionType, SEND_AMOUNT,
 };
-use aptos_types::account_config::aptos_test_root_address;
+use velor_types::account_config::velor_test_root_address;
 use futures::future::{try_join_all, FutureExt};
 use log::{error, info, warn};
 use once_cell::sync::Lazy;
@@ -212,8 +212,8 @@ impl Default for EmitJobRequest {
                 mempool_backlog: 3000,
             },
             transaction_mix_per_phase: vec![vec![(TransactionType::default(), 1)]],
-            max_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
-            gas_price: aptos_global_constants::GAS_UNIT_PRICE,
+            max_gas_per_txn: velor_global_constants::MAX_GAS_AMOUNT,
+            gas_price: velor_global_constants::GAS_UNIT_PRICE,
             init_max_gas_per_txn: None,
             init_gas_price_multiplier: 2,
             mint_to_root: false,
@@ -1064,7 +1064,7 @@ async fn wait_for_accounts_sequence(
             },
         }
 
-        if aptos_infallible::duration_since_epoch().as_secs() >= txn_expiration_ts_secs + 240 {
+        if velor_infallible::duration_since_epoch().as_secs() >= txn_expiration_ts_secs + 240 {
             sample!(
                 SampleRate::Duration(Duration::from_secs(15)),
                 error!(
@@ -1131,7 +1131,7 @@ pub async fn get_account_seq_num(
         Err(e) => {
             // if account is not present, that is equivalent to sequence_number = 0
             if let RestError::Api(api_error) = e {
-                if let AptosErrorCode::AccountNotFound = api_error.error.error_code {
+                if let VelorErrorCode::AccountNotFound = api_error.error.error_code {
                     return Ok((
                         0,
                         Duration::from_micros(api_error.state.as_ref().unwrap().timestamp_usecs)
@@ -1151,7 +1151,7 @@ pub async fn load_specific_account(
     client: &RestClient,
 ) -> Result<LocalAccount> {
     let address = if is_root {
-        aptos_test_root_address()
+        velor_test_root_address()
     } else {
         account_key.authentication_key().account_address()
     };
@@ -1174,7 +1174,7 @@ pub fn gen_transfer_txn_request(
     txn_factory: &TransactionFactory,
 ) -> SignedTransaction {
     sender.sign_with_transaction_builder(
-        txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*receiver, num_coins)),
+        txn_factory.payload(velor_stdlib::velor_coin_transfer(*receiver, num_coins)),
     )
 }
 

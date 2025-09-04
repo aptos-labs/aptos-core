@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics_core::{
+use velor_metrics_core::{
     exponential_buckets, histogram_opts, register_histogram_vec, register_int_counter,
     register_int_counter_vec, register_int_gauge, HistogramTimer, HistogramVec, IntCounter,
     IntCounterVec, IntGauge,
@@ -29,7 +29,7 @@ const NETWORK_LATENCY_BUCKETS: [f64; 14] = [
 /// Counter for the number of active data streams
 pub static ACTIVE_DATA_STREAMS: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_data_streaming_service_active_data_streams",
+        "velor_data_streaming_service_active_data_streams",
         "Counters related to the number of active data streams",
     )
     .unwrap()
@@ -38,7 +38,7 @@ pub static ACTIVE_DATA_STREAMS: Lazy<IntGauge> = Lazy::new(|| {
 /// Counter for the number of times there was a send failure
 pub static DATA_STREAM_SEND_FAILURE: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "aptos_data_streaming_service_stream_send_failure",
+        "velor_data_streaming_service_stream_send_failure",
         "Counters related to send failures along the data stream",
     )
     .unwrap()
@@ -47,7 +47,7 @@ pub static DATA_STREAM_SEND_FAILURE: Lazy<IntCounter> = Lazy::new(|| {
 /// Counter for the creation of new data streams
 pub static CREATE_DATA_STREAM: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_data_streaming_service_create_data_stream",
+        "velor_data_streaming_service_create_data_stream",
         "Counters related to the creation of new data streams",
         &["request_type"]
     )
@@ -57,7 +57,7 @@ pub static CREATE_DATA_STREAM: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter for the creation of new subscription streams
 pub static CREATE_SUBSCRIPTION_STREAM: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "aptos_data_streaming_service_create_subscription_stream",
+        "velor_data_streaming_service_create_subscription_stream",
         "Counters related to the creation of new subscription streams",
     )
     .unwrap()
@@ -66,7 +66,7 @@ pub static CREATE_SUBSCRIPTION_STREAM: Lazy<IntCounter> = Lazy::new(|| {
 /// Counter for the termination of existing data streams
 pub static TERMINATE_DATA_STREAM: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_data_streaming_service_terminate_data_stream",
+        "velor_data_streaming_service_terminate_data_stream",
         "Counters related to the termination of existing data streams",
         &["feedback_type"]
     )
@@ -76,7 +76,7 @@ pub static TERMINATE_DATA_STREAM: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter for the termination of existing subscription streams
 pub static TERMINATE_SUBSCRIPTION_STREAM: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_data_streaming_service_terminate_subscription_stream",
+        "velor_data_streaming_service_terminate_subscription_stream",
         "Counters related to the termination of existing subscription streams",
         &["termination_reason"]
     )
@@ -86,7 +86,7 @@ pub static TERMINATE_SUBSCRIPTION_STREAM: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter for stream progress check errors
 pub static CHECK_STREAM_PROGRESS_ERROR: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_data_streaming_service_check_progress_error",
+        "velor_data_streaming_service_check_progress_error",
         "Counters related to stream progress check errors",
         &["error_type"]
     )
@@ -96,7 +96,7 @@ pub static CHECK_STREAM_PROGRESS_ERROR: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter for global data summary errors
 pub static GLOBAL_DATA_SUMMARY_ERROR: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_data_streaming_service_global_summary_error",
+        "velor_data_streaming_service_global_summary_error",
         "Counters related to global data summary errors",
         &["error_type"]
     )
@@ -106,7 +106,7 @@ pub static GLOBAL_DATA_SUMMARY_ERROR: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter for tracking sent data requests
 pub static SENT_DATA_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_data_streaming_service_sent_data_requests",
+        "velor_data_streaming_service_sent_data_requests",
         "Counters related to sent data requests",
         &["request_type"]
     )
@@ -116,7 +116,7 @@ pub static SENT_DATA_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter for tracking sent data requests for missing data
 pub static SENT_DATA_REQUESTS_FOR_MISSING_DATA: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_data_streaming_service_sent_data_requests_for_missing_data",
+        "velor_data_streaming_service_sent_data_requests_for_missing_data",
         "Counters related to sent data requests for missing data",
         &["request_type"]
     )
@@ -127,7 +127,7 @@ pub static SENT_DATA_REQUESTS_FOR_MISSING_DATA: Lazy<IntCounterVec> = Lazy::new(
 /// the new timeouts).
 pub static RETRIED_DATA_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_data_streaming_service_retried_data_requests",
+        "velor_data_streaming_service_retried_data_requests",
         "Counters related to retried data requests",
         &["request_type", "request_timeout"]
     )
@@ -137,7 +137,7 @@ pub static RETRIED_DATA_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter for the number of max concurrent prefetching requests
 pub static MAX_CONCURRENT_PREFETCHING_REQUESTS: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_data_streaming_service_max_concurrent_prefetching_requests",
+        "velor_data_streaming_service_max_concurrent_prefetching_requests",
         "The number of max concurrent prefetching requests",
     )
     .unwrap()
@@ -146,7 +146,7 @@ pub static MAX_CONCURRENT_PREFETCHING_REQUESTS: Lazy<IntGauge> = Lazy::new(|| {
 /// Counter for the number of pending data responses
 pub static PENDING_DATA_RESPONSES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_data_streaming_service_pending_data_responses",
+        "velor_data_streaming_service_pending_data_responses",
         "Counters related to the number of pending data responses",
     )
     .unwrap()
@@ -155,7 +155,7 @@ pub static PENDING_DATA_RESPONSES: Lazy<IntGauge> = Lazy::new(|| {
 /// Counter for the number of complete pending data responses
 pub static COMPLETE_PENDING_DATA_RESPONSES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_data_streaming_service_complete_pending_data_responses",
+        "velor_data_streaming_service_complete_pending_data_responses",
         "Counters related to the number of complete pending data responses",
     )
     .unwrap()
@@ -164,7 +164,7 @@ pub static COMPLETE_PENDING_DATA_RESPONSES: Lazy<IntGauge> = Lazy::new(|| {
 /// Counter for tracking received data responses
 pub static RECEIVED_DATA_RESPONSE: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_data_streaming_service_received_data_response",
+        "velor_data_streaming_service_received_data_response",
         "Counters related to received data responses",
         &["response_type"]
     )
@@ -174,7 +174,7 @@ pub static RECEIVED_DATA_RESPONSE: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter for tracking the sizes of received data chunks
 pub static RECEIVED_DATA_RESPONSE_CHUNK_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
     let histogram_opts = histogram_opts!(
-        "aptos_data_streaming_service_received_data_chunk_sizes",
+        "velor_data_streaming_service_received_data_chunk_sizes",
         "Counter for tracking sizes of data chunks received by the data stream",
         DATA_RESPONSE_CHUNK_SIZE_BUCKETS.to_vec()
     );
@@ -184,7 +184,7 @@ pub static RECEIVED_DATA_RESPONSE_CHUNK_SIZE: Lazy<HistogramVec> = Lazy::new(|| 
 /// Counter for tracking received data responses
 pub static RECEIVED_RESPONSE_ERROR: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_data_streaming_service_received_response_error",
+        "velor_data_streaming_service_received_response_error",
         "Counters related to received response errors",
         &["error_type"]
     )
@@ -194,7 +194,7 @@ pub static RECEIVED_RESPONSE_ERROR: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter that keeps track of the subscription stream lag (versions)
 pub static SUBSCRIPTION_STREAM_LAG: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_data_streaming_service_subscription_stream_lag",
+        "velor_data_streaming_service_subscription_stream_lag",
         "Counters related to the subscription stream lag",
     )
     .unwrap()
@@ -203,7 +203,7 @@ pub static SUBSCRIPTION_STREAM_LAG: Lazy<IntGauge> = Lazy::new(|| {
 /// Time it takes to process a data request
 pub static DATA_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     let histogram_opts = histogram_opts!(
-        "aptos_data_streaming_service_data_request_processing_latency",
+        "velor_data_streaming_service_data_request_processing_latency",
         "Counters related to data request processing latencies",
         NETWORK_LATENCY_BUCKETS.to_vec()
     );
@@ -213,7 +213,7 @@ pub static DATA_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
 /// Time it takes to send a data notification after a successful data response
 pub static DATA_NOTIFICATION_SEND_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "aptos_data_streaming_service_data_notification_send_latency",
+        "velor_data_streaming_service_data_notification_send_latency",
         "Counters related to the data notification send latency",
         &["label"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),

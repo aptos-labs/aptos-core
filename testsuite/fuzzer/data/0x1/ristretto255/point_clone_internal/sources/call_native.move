@@ -1,5 +1,5 @@
 module poc::point_clone_internal {
-    use aptos_std::ristretto255;
+    use velor_std::ristretto255;
 
     public entry fun main(_owner:&signer) {
         let p = ristretto255::point_identity();

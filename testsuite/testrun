@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# A simple test harness for all Aptos python test utilities
+# A simple test harness for all Velor python test utilities
 # By default, just run a test file with poetry
 
 import argparse

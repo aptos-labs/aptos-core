@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::BlockGasLimitType;
@@ -10,7 +10,7 @@ const DEFAULT_GAS_PRICE_TO_BURN: u64 = 90;
 /// block executions, these configurations allow to specify cache sizes, etc.
 #[derive(Clone, Debug)]
 pub struct BlockExecutorModuleCacheLocalConfig {
-    /// If true, when global caches are empty, Aptos framework is prefetched into module cache.
+    /// If true, when global caches are empty, Velor framework is prefetched into module cache.
     pub prefetch_framework_code: bool,
     /// The maximum size of module cache (the sum of serialized sizes of all cached modules in
     /// bytes).

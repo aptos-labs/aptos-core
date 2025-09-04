@@ -8,9 +8,9 @@ named_addr = "0xFED"
 
 [dev-addresses]
 
-[dependencies.AptosFramework]
-git = "https://github.com/aptos-labs/aptos-core.git"
+[dependencies.VelorFramework]
+git = "https://github.com/velor-chain/velor-core.git"
 rev = "mainnet"
-subdir = "aptos-move/framework/aptos-framework"
+subdir = "velor-move/framework/velor-framework"
 
 [dev-dependencies]

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,7 +10,7 @@ use crate::storage::{
         test_write_and_read_impl,
     },
 };
-use aptos_temppath::TempPath;
+use velor_temppath::TempPath;
 use futures::Future;
 use proptest::prelude::*;
 use std::str::FromStr;

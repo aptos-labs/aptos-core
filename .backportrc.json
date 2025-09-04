@@ -1,9 +1,9 @@
 {
-    "repoOwner": "aptos-labs",
-    "repoName": "aptos-core",
+    "repoOwner": "velor-chain",
+    "repoName": "velor-core",
 
     "branchLabelMapping": {
-        "^v(\\d+).(\\d+)$": "aptos-release-v$1.$2"
+        "^v(\\d+).(\\d+)$": "velor-release-v$1.$2"
     },
     "commitConflicts": true,
     "prTitle": "[cp][{{targetBranch}}] {{sourcePullRequest.title}}",

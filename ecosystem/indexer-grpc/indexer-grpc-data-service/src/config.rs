@@ -1,19 +1,19 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::service::RawDataServerWrapper;
 use anyhow::{bail, Result};
-use aptos_indexer_grpc_server_framework::RunnableConfig;
-use aptos_indexer_grpc_utils::{
+use velor_indexer_grpc_server_framework::RunnableConfig;
+use velor_indexer_grpc_utils::{
     compression_util::StorageFormat, config::IndexerGrpcFileStoreConfig,
     in_memory_cache::InMemoryCacheConfig, types::RedisUrl,
 };
-use aptos_protos::{
+use velor_protos::{
     indexer::v1::FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,
     transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
-use aptos_transaction_filter::BooleanTransactionFilter;
+use velor_transaction_filter::BooleanTransactionFilter;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tonic::{codec::CompressionEncoding, transport::Server};
@@ -76,7 +76,7 @@ pub struct IndexerGrpcDataServiceConfig {
     /// related to a certain module are too large and are causing issues for the data
     /// service. Learn more here:
     ///
-    /// https://www.notion.so/aptoslabs/Runbook-c006a37259394ac2ba904d6b54d180fa?pvs=4#171c210964ec42a89574fc80154f9e85
+    /// https://www.notion.so/velorlabs/Runbook-c006a37259394ac2ba904d6b54d180fa?pvs=4#171c210964ec42a89574fc80154f9e85
     ///
     /// Generally you will want to start with this with an OR, and then list out
     /// separate filters that describe each type of txn we want to strip.
@@ -169,7 +169,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         println!(">>>> Redis connection established");
         // InMemoryCache.
         let in_memory_cache =
-            aptos_indexer_grpc_utils::in_memory_cache::InMemoryCache::new_with_redis_connection(
+            velor_indexer_grpc_utils::in_memory_cache::InMemoryCache::new_with_redis_connection(
                 self.in_memory_cache_config.clone(),
                 redis_conn,
                 cache_storage_format,
@@ -185,7 +185,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             cache_storage_format,
             Arc::new(in_memory_cache),
         )?;
-        let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
+        let svc = velor_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Zstd)
             .accept_compressed(CompressionEncoding::Zstd)
             .accept_compressed(CompressionEncoding::Gzip);

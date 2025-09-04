@@ -1,5 +1,5 @@
 module poc::public_key_validate_internal {
-    use aptos_std::multi_ed25519::{Self, ValidatedPublicKey};
+    use velor_std::multi_ed25519::{Self, ValidatedPublicKey};
     use std::option::Option;
 
     public entry fun main(_owner: &signer) {

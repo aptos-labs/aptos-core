@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Struct `ConstantFolder` implements `ExpRewriterFunctions` to try constant-folding on an

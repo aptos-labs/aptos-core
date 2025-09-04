@@ -1,8 +1,8 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Deserialize, Serialize};
-use aptos_crypto::compat::Sha3_256;
+use velor_crypto::compat::Sha3_256;
 use ed25519_dalek::Digest;
 
 /// The schema used in the account recovery DB.

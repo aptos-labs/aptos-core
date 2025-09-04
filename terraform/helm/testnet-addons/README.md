@@ -2,23 +2,23 @@
 
 ![Version: 0.1](https://img.shields.io/badge/Version-0.1-informational?style=flat-square) ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
-Additional components for aptos-nodes testnet
+Additional components for velor-nodes testnet
 
-**Homepage:** <https://aptoslabs.com/>
+**Homepage:** <https://velorlabs.com/>
 
 ## Source Code
 
-* <https://github.com/aptos-labs/aptos-core>
+* <https://github.com/velor-chain/velor-core>
 
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | cloud | string | `"EKS"` |  |
-| genesis.chain_id | string | `nil` | Aptos Chain ID |
+| genesis.chain_id | string | `nil` | Velor Chain ID |
 | genesis.numValidators | string | `nil` | Number of validators deployed in this testnet |
-| genesis.username_prefix | string | `"aptos-node"` | Validator username prefix, used to get genesis secrets. This should be the fullname for the aptos-node helm release |
-| imageTag | string | `"devnet"` | Default image tag to use for all aptos images |
+| genesis.username_prefix | string | `"velor-node"` | Validator username prefix, used to get genesis secrets. This should be the fullname for the velor-node helm release |
+| imageTag | string | `"devnet"` | Default image tag to use for all velor images |
 | ingress.acm_certificate | string | `nil` | The ACM certificate to install on the ingress |
 | ingress.cookieDurationSeconds | int | `86400` | If stickiness is enabled, how long the session cookie should last |
 | ingress.enableStickyness | bool | `true` | Whether to enable session stickiness on the underlying load balancer |

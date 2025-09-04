@@ -1,24 +1,24 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics_safety_rules::MetricsSafetyRules, test_utils::MockStorage};
-use aptos_consensus_types::{
+use velor_consensus_types::{
     block::block_test_utils::certificate_for_genesis,
     common::{Payload, Round},
     pipelined_block::PipelinedBlock,
     quorum_cert::QuorumCert,
     vote_proposal::VoteProposal,
 };
-use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
-use aptos_executor_types::state_compute_result::StateComputeResult;
-use aptos_infallible::Mutex;
-use aptos_safety_rules::{
+use velor_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
+use velor_executor_types::state_compute_result::StateComputeResult;
+use velor_infallible::Mutex;
+use velor_safety_rules::{
     test_utils::{make_proposal_with_parent, make_proposal_with_qc},
     PersistentSafetyStorage, SafetyRulesManager,
 };
-use aptos_secure_storage::Storage;
-use aptos_types::{
+use velor_secure_storage::Storage;
+use velor_types::{
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
     validator_verifier::random_validator_verifier,
@@ -38,7 +38,7 @@ pub fn prepare_safety_rules() -> (Arc<Mutex<MetricsSafetyRules>>, Vec<ValidatorS
         Waypoint::new_epoch_boundary(&LedgerInfo::mock_genesis(Some(validator_set))).unwrap();
 
     let safety_storage = PersistentSafetyStorage::initialize(
-        Storage::from(aptos_secure_storage::InMemoryStorage::new()),
+        Storage::from(velor_secure_storage::InMemoryStorage::new()),
         signer.author(),
         signer.private_key().clone(),
         waypoint,

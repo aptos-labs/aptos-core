@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::COMPRESSION_SUFFIX_LABEL;
-use aptos_types::transaction::Version;
+use velor_types::transaction::Version;
 use serde::{Deserialize, Serialize};
 
 /// A storage service request.

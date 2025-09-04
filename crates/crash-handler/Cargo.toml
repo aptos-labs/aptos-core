@@ -1,6 +1,6 @@
 [package]
-name = "aptos-crash-handler"
-description = "Aptos crash handler"
+name = "velor-crash-handler"
+description = "Velor crash handler"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -13,7 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-logger = { workspace = true }
+velor-logger = { workspace = true }
 backtrace = { workspace = true }
 move-core-types = { workspace = true }
 serde = { workspace = true }

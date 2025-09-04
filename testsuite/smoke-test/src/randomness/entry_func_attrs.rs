@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -10,13 +10,13 @@ use crate::{
     },
     smoke_test_environment::SwarmBuilder,
 };
-use aptos::{
+use velor::{
     common::types::{CliError, CliTypedResult, GasOptions, TransactionSummary},
     move_tool::MemberId,
 };
-use aptos_forge::{Swarm, SwarmExt};
-use aptos_logger::info;
-use aptos_types::on_chain_config::OnChainRandomnessConfig;
+use velor_forge::{Swarm, SwarmExt};
+use velor_logger::info;
+use velor_types::on_chain_config::OnChainRandomnessConfig;
 use std::{str::FromStr, sync::Arc, time::Duration};
 
 #[derive(Clone, Copy, Debug)]
@@ -147,7 +147,7 @@ async fn common(params: TestParams) {
     let estimated_dkg_latency_secs = 30;
 
     let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
 
@@ -177,17 +177,17 @@ async fn common(params: TestParams) {
     let script = format!(
         r#"
 script {{
-    use aptos_framework::aptos_governance;
-    use aptos_framework::randomness_api_v0_config;
+    use velor_framework::velor_governance;
+    use velor_framework::randomness_api_v0_config;
     use std::option;
 
     fun main(core_resources: &signer) {{
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let framework_signer = velor_governance::get_signer_testnet_only(core_resources, @0x1);
         let required_gas = if ({}) {{ option::some(10000) }} else {{ option::none() }};
         randomness_api_v0_config::set_for_next_epoch(&framework_signer, required_gas);
         let allow_custom_max_gas = {};
         randomness_api_v0_config::set_allow_max_gas_flag_for_next_epoch(&framework_signer, allow_custom_max_gas);
-        aptos_governance::reconfigure(&framework_signer);
+        velor_governance::reconfigure(&framework_signer);
     }}
 }}
 "#,

@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
 use anyhow::{ensure, Result};
-use aptos_crypto::HashValue;
-use aptos_drop_helper::DropHelper;
-use aptos_types::{
+use velor_crypto::HashValue;
+use velor_drop_helper::DropHelper;
+use velor_types::{
     proof::accumulator::InMemoryTransactionAccumulator,
     transaction::{TransactionInfo, Version},
 };

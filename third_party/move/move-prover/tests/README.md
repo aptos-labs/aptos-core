@@ -30,7 +30,7 @@ The file at the path to `<my_config.toml>` should contain (at least) the followi
 ```toml
 language_version = "2.2"  # Or any other options
 move_deps = [
-  "/Users/<you>/aptos-core/third_party/move/move-stdlib/sources"
+  "/Users/<you>/velor-core/third_party/move/move-stdlib/sources"
 ]
 move_named_address_values = [
   "std=0x1",

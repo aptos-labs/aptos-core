@@ -214,14 +214,14 @@ def _create_pfn_statefulset_object(
     )
 
     volume3: client.V1Volume = client.V1Volume(
-        name=util.APTOS_DATA_NAME,
+        name=util.VELOR_DATA_NAME,
         persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
             claim_name=util.type_specific_name(pfn_name, util.NodeType.PFN, "pvc")
         ),
     )
 
     volume_mount3: client.V1VolumeMount = client.V1VolumeMount(
-        name=util.APTOS_DATA_NAME, mount_path=util.APTOS_DATA_DIR
+        name=util.VELOR_DATA_NAME, mount_path=util.VELOR_DATA_DIR
     )
 
     #
@@ -230,9 +230,9 @@ def _create_pfn_statefulset_object(
         name=f"{util.type_specific_name(pfn_name, util.NodeType.PFN)}",
         image=pfn_image,
         command=[
-            "/usr/local/bin/aptos-node",
+            "/usr/local/bin/velor-node",
             "-f",
-            f"/opt/aptos/etc/{util.NodeType.PFN.value}.yaml",
+            f"/opt/velor/etc/{util.NodeType.PFN.value}.yaml",
         ],
         volume_mounts=[volume_mount1, volume_mount2, volume_mount3],
         ports=[
@@ -296,7 +296,7 @@ def _create_pfn_service_object(pfn_name: str) -> client.V1Service:
 
     service_port2: client.V1ServicePort = client.V1ServicePort(
         protocol="TCP",
-        name="aptosnet",
+        name="velornet",
         port=util.FULLNODE_HOST_PORT,
     )
 

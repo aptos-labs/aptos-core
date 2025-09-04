@@ -2,7 +2,7 @@
 
 # PAT_TOKEN and TARGET_BRANCH are passed in as environment variables.
 
-TARGET_REPO="aptos-labs/aptos-indexer-processors"
+TARGET_REPO="velor-chain/velor-indexer-processors"
 WORKFLOW_NAME="lint.yaml"
 MAX_RETRIES=30
 RETRY_INTERVAL=60 # seconds

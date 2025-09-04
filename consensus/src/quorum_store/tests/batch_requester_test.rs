@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,13 +9,13 @@ use crate::{
     },
     test_utils::create_vec_signed_transactions,
 };
-use aptos_consensus_types::{
+use velor_consensus_types::{
     common::Author,
     proof_of_store::{ProofOfStore, SignedBatchInfo},
 };
-use aptos_crypto::HashValue;
-use aptos_infallible::Mutex;
-use aptos_types::{
+use velor_crypto::HashValue;
+use velor_infallible::Mutex;
+use velor_types::{
     aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},

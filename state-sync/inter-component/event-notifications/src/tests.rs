@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,11 +8,11 @@ use crate::{
     DbBackedOnChainConfig, Error, EventNotificationListener, EventNotificationSender,
     EventSubscriptionService, ReconfigNotificationListener,
 };
-use aptos_db::AptosDB;
-use aptos_executor_test_helpers::bootstrap_genesis;
-use aptos_infallible::RwLock;
-use aptos_storage_interface::DbReaderWriter;
-use aptos_types::{
+use velor_db::VelorDB;
+use velor_executor_test_helpers::bootstrap_genesis;
+use velor_infallible::RwLock;
+use velor_storage_interface::DbReaderWriter;
+use velor_types::{
     account_address::AccountAddress,
     account_config::NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     contract_event::ContractEvent,
@@ -21,7 +21,7 @@ use aptos_types::{
     on_chain_config::OnChainConfig,
     transaction::{Transaction, Version, WriteSetPayload},
 };
-use aptos_vm::aptos_vm::AptosVMBlockExecutor;
+use velor_vm::velor_vm::VelorVMBlockExecutor;
 use claims::{assert_lt, assert_matches, assert_ok};
 use futures::{FutureExt, StreamExt};
 use move_core_types::language_storage::TypeTag;
@@ -555,16 +555,16 @@ fn create_event_subscription_service() -> EventSubscriptionService {
 
 fn create_database() -> Arc<RwLock<DbReaderWriter>> {
     // Generate a genesis change set
-    let (genesis, _) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let (genesis, _) = velor_vm_genesis::test_genesis_change_set_and_validators(Some(1));
 
-    // Create test aptos database
-    let db_path = aptos_temppath::TempPath::new();
+    // Create test velor database
+    let db_path = velor_temppath::TempPath::new();
     assert_ok!(db_path.create_as_dir());
-    let (_, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
+    let (_, db_rw) = DbReaderWriter::wrap(VelorDB::new_for_test(db_path.path()));
 
     // Bootstrap the genesis transaction
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-    assert_ok!(bootstrap_genesis::<AptosVMBlockExecutor>(
+    assert_ok!(bootstrap_genesis::<VelorVMBlockExecutor>(
         &db_rw,
         &genesis_txn
     ));

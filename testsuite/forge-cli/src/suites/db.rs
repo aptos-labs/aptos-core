@@ -1,13 +1,13 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::ungrouped::PROGRESS_THRESHOLD_20_6;
-use aptos_forge::{
+use velor_forge::{
     args::TransactionTypeArg, success_criteria::SuccessCriteria, EmitJobMode, EmitJobRequest,
     ForgeConfig,
 };
-use aptos_testcases::performance_test::PerformanceBenchmark;
+use velor_testcases::performance_test::PerformanceBenchmark;
 use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
 
 pub(crate) fn large_db_simple_test() -> ForgeConfig {
@@ -27,10 +27,10 @@ pub(crate) fn large_db_test(
         .add_network_test(PerformanceBenchmark)
         .with_existing_db(existing_db_tag.clone())
         .with_validator_override_node_config_fn(Arc::new(move |config, _| {
-            config.base.working_dir = Some(PathBuf::from("/opt/aptos/data/checkpoint"));
+            config.base.working_dir = Some(PathBuf::from("/opt/velor/data/checkpoint"));
         }))
         .with_fullnode_override_node_config_fn(Arc::new(move |config, _| {
-            config.base.working_dir = Some(PathBuf::from("/opt/aptos/data/checkpoint"));
+            config.base.working_dir = Some(PathBuf::from("/opt/velor/data/checkpoint"));
         }))
         .with_emit_job(
             EmitJobRequest::default()

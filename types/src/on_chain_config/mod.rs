@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -21,8 +21,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt, fmt::Debug, str::FromStr, sync::Arc};
 
 mod approved_execution_hashes;
-mod aptos_features;
-mod aptos_version;
+mod velor_features;
+mod velor_version;
 mod chain_id;
 mod commit_history;
 mod consensus_config;
@@ -38,9 +38,9 @@ mod validator_set;
 
 pub use self::{
     approved_execution_hashes::ApprovedExecutionHashes,
-    aptos_features::*,
-    aptos_version::{
-        AptosVersion, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
+    velor_features::*,
+    velor_version::{
+        VelorVersion, VELOR_MAX_KNOWN_VERSION, VELOR_VERSION_2, VELOR_VERSION_3, VELOR_VERSION_4,
     },
     commit_history::CommitHistoryResource,
     consensus_config::{

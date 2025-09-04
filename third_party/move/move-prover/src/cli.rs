@@ -160,10 +160,10 @@ impl Options {
                     .help("prints the effective toml configuration, then exits")
             )
             .arg(
-                Arg::new("aptos")
-                    .long("aptos")
+                Arg::new("velor")
+                    .long("velor")
                     .action(SetTrue)
-                    .help("configures the prover to use Aptos natives")
+                    .help("configures the prover to use Velor natives")
             )
             .arg(
                 Arg::new("compiler-v2")
@@ -716,10 +716,10 @@ impl Options {
             options.backend.z3_trace_file = Some(format!("{}.z3log", fun_name));
         }
 
-        if matches.get_flag("aptos") {
+        if matches.get_flag("velor") {
             options.backend.custom_natives = Some(CustomNativeOptions {
                 template_bytes: include_bytes!(
-                    "../../../../aptos-move/framework/src/aptos-natives.bpl"
+                    "../../../../velor-move/framework/src/velor-natives.bpl"
                 )
                 .to_vec(),
                 module_instance_names: options::custom_native_options(),

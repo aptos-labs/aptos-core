@@ -7,12 +7,12 @@
     "apple"
   ],
   "default_helm_values": {
-    "aptos-genesis": {
+    "velor-genesis": {
       "image": {
         "repo": "apple"
       }
     },
-    "aptos-node": {
+    "velor-node": {
       "image": {
         "repo": "banana"
       }

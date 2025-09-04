@@ -1,5 +1,5 @@
 [package]
-name = "aptos-peer-monitoring-service-types"
+name = "velor-peer-monitoring-service-types"
 description = "Common types offered by the peer monitoring service"
 version = "0.1.0"
 
@@ -13,8 +13,8 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-config = { workspace = true }
-aptos-types = { workspace = true }
+velor-config = { workspace = true }
+velor-types = { workspace = true }
 bcs = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

@@ -1,5 +1,5 @@
 [package]
-name = "aptos-event-notifications"
+name = "velor-event-notifications"
 description = "The notification service offered by state sync for on-chain events"
 version = "0.1.0"
 
@@ -14,22 +14,22 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-channels = { workspace = true }
-aptos-id-generator = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-storage-interface = { workspace = true }
-aptos-types = { workspace = true }
+velor-channels = { workspace = true }
+velor-id-generator = { workspace = true }
+velor-infallible = { workspace = true }
+velor-storage-interface = { workspace = true }
+velor-types = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-aptos-crypto = { workspace = true }
-aptos-db = { workspace = true }
-aptos-executor-test-helpers = { workspace = true }
-aptos-temppath = { workspace = true }
-aptos-vm = { workspace = true }
-aptos-vm-genesis = { workspace = true }
+velor-crypto = { workspace = true }
+velor-db = { workspace = true }
+velor-executor-test-helpers = { workspace = true }
+velor-temppath = { workspace = true }
+velor-vm = { workspace = true }
+velor-vm-genesis = { workspace = true }
 bcs = { workspace = true }
 claims = { workspace = true }
 move-binary-format = { workspace = true }

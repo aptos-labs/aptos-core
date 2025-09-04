@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod json_transactions;
@@ -6,7 +6,7 @@ pub mod json_transactions;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aptos_protos::transaction::v1::Transaction;
+    use velor_protos::transaction::v1::Transaction;
     use json_transactions::generated_transactions::IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER;
     #[test]
     fn test_generate_transactions() {

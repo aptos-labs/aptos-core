@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,11 +12,11 @@
 
 use crate::schema::EVENT_SEQUENCE_NUMBER_CF_NAME;
 use anyhow::Result;
-use aptos_schemadb::{
+use velor_schemadb::{
     define_pub_schema,
     schema::{KeyCodec, ValueCodec},
 };
-use aptos_types::event::EventKey;
+use velor_types::event::EventKey;
 
 define_pub_schema!(
     EventSequenceNumberSchema,

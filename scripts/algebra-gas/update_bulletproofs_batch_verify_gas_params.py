@@ -13,7 +13,7 @@ from time import time
 import math
 
 # Typically you are making a new version of gas schedule,
-# so this should be larger than `LATEST_GAS_FEATURE_VERSION` in `aptos-move/aptos-gas/src/gas_meter.rs`.
+# so this should be larger than `LATEST_GAS_FEATURE_VERSION` in `velor-move/velor-gas/src/gas_meter.rs`.
 TARGET_GAS_VERSION = 'RELEASE_V1_28'
 
 def prettify_number(x:int) -> str:
@@ -44,7 +44,7 @@ def get_bulletproofs_lines(gas_per_ns):
     return lines
 
 def main(gas_per_ns):
-    path = Path('aptos-move/aptos-gas-schedule/src/gas_schedule/aptos_framework.rs')
+    path = Path('velor-move/velor-gas-schedule/src/gas_schedule/velor_framework.rs')
     lines = path.read_text().split('\n')
     line_id_begin = lines.index('        // Bulletproofs batch verify gas parameters begin.')
     line_id_end = lines.index('        // Bulletproofs batch verify gas parameters end.')
@@ -54,7 +54,7 @@ def main(gas_per_ns):
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(
-        description='Generate gas parameters for bulletproofs batch verification in `aptos-move/aptos-gas-schedule/src/gas_schedule/aptos_framework.rs`.')
+        description='Generate gas parameters for bulletproofs batch verification in `velor-move/velor-gas-schedule/src/gas_schedule/velor_framework.rs`.')
     parser.add_argument('--gas_per_ns', required=True, type=float)
     args = parser.parse_args()
     main(args.gas_per_ns)

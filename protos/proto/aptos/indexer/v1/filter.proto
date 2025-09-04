@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
 
-package aptos.indexer.v1;
+package velor.indexer.v1;
 
-import "aptos/transaction/v1/transaction.proto";
+import "velor/transaction/v1/transaction.proto";
 
 message LogicalAndFilters {
   repeated BooleanTransactionFilter filters = 1;
@@ -17,7 +17,7 @@ message LogicalOrFilters {
 
 message TransactionRootFilter {
   optional bool success = 1;
-  optional aptos.transaction.v1.Transaction.TransactionType transaction_type = 2;
+  optional velor.transaction.v1.Transaction.TransactionType transaction_type = 2;
 }
 
 message EntryFunctionFilter {

@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_infallible::Mutex;
+use velor_infallible::Mutex;
 use bytes::{Buf, Bytes};
 use futures::{
     channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -53,7 +53,7 @@ impl SwitchBoard {
 /// ```rust,no_run
 /// use std::io::Result;
 ///
-/// use aptos_memsocket::{MemoryListener, MemorySocket};
+/// use velor_memsocket::{MemoryListener, MemorySocket};
 /// use futures::prelude::*;
 ///
 /// async fn write_stormlight(mut stream: MemorySocket) -> Result<()> {
@@ -102,7 +102,7 @@ impl MemoryListener {
     /// Create a MemoryListener bound to port 16:
     ///
     /// ```rust,no_run
-    /// use aptos_memsocket::MemoryListener;
+    /// use velor_memsocket::MemoryListener;
     ///
     /// # fn main () -> ::std::io::Result<()> {
     /// let listener = MemoryListener::bind(16)?;
@@ -162,7 +162,7 @@ impl MemoryListener {
     /// # Examples
     ///
     /// ```rust
-    /// use aptos_memsocket::MemoryListener;
+    /// use velor_memsocket::MemoryListener;
     ///
     /// # fn main () -> ::std::io::Result<()> {
     /// let listener = MemoryListener::bind(16)?;
@@ -184,7 +184,7 @@ impl MemoryListener {
     ///
     /// ```rust,no_run
     /// use futures::prelude::*;
-    /// use aptos_memsocket::MemoryListener;
+    /// use velor_memsocket::MemoryListener;
     ///
     /// # async fn work () -> ::std::io::Result<()> {
     /// let mut listener = MemoryListener::bind(16)?;
@@ -245,7 +245,7 @@ impl Stream for Incoming<'_> {
 ///
 /// ```rust, no_run
 /// use futures::prelude::*;
-/// use aptos_memsocket::MemorySocket;
+/// use velor_memsocket::MemorySocket;
 ///
 /// # async fn run() -> ::std::io::Result<()> {
 /// let (mut socket_a, mut socket_b) = MemorySocket::new_pair();
@@ -277,7 +277,7 @@ impl MemorySocket {
     /// # Examples
     ///
     /// ```rust
-    /// use aptos_memsocket::MemorySocket;
+    /// use velor_memsocket::MemorySocket;
     ///
     /// let (socket_a, socket_b) = MemorySocket::new_pair();
     /// ```
@@ -308,7 +308,7 @@ impl MemorySocket {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use aptos_memsocket::MemorySocket;
+    /// use velor_memsocket::MemorySocket;
     ///
     /// # fn main () -> ::std::io::Result<()> {
     /// let socket = MemorySocket::connect(16)?;

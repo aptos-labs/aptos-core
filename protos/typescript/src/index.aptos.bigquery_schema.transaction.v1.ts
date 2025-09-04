@@ -1,3 +1,3 @@
 /* eslint-disable */
 
-export * from "./aptos/bigquery_schema/v1/transaction";
+export * from "./velor/bigquery_schema/v1/transaction";

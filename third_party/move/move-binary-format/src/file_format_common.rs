@@ -489,10 +489,10 @@ pub fn read_uleb128_as_u64(cursor: &mut Cursor<&[u8]>) -> Result<u64> {
 // Bytecode evolution
 //
 
-/// From bytecode version 7 onwards, Aptos distinguishes from
+/// From bytecode version 7 onwards, Velor distinguishes from
 /// other Move flavors by masking the version with the highest
 /// byte 0xA.
-pub const APTOS_BYTECODE_VERSION_MASK: u32 = 0x0A000000;
+pub const VELOR_BYTECODE_VERSION_MASK: u32 = 0x0A000000;
 
 /// Version 1: the initial version
 pub const VERSION_1: u32 = 1;
@@ -578,7 +578,7 @@ pub(crate) mod versioned_data {
                     .with_message("Bad binary header".to_string()));
             }
             let version = match read_u32(&mut cursor) {
-                Ok(v) => v & !APTOS_BYTECODE_VERSION_MASK,
+                Ok(v) => v & !VELOR_BYTECODE_VERSION_MASK,
                 Err(_) => {
                     return Err(PartialVMError::new(StatusCode::MALFORMED)
                         .with_message("Bad binary header".to_string()));

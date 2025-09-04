@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -50,7 +50,7 @@ impl GitHub {
         })?;
         let request = self.client.get(url);
         let response = request
-            .header(USER_AGENT, "aptos-forge")
+            .header(USER_AGENT, "velor-forge")
             .send()
             .map_err(|e| format_err!("Failed to query github: {:?}", e))?;
         let response: Vec<CommitInfo> = response

@@ -30,7 +30,7 @@ from test_framework.git import Git
 from test_framework.logging import log, init_logging
 from forge import image_exists
 
-UPSTREAM_APTOS_CORE_REPO = "aptos-labs/aptos-core"
+UPSTREAM_VELOR_CORE_REPO = "velor-chain/velor-core"
 DOCKER_RUST_BUILD_WORKFLOW_NAME = "workflow-run-docker-rust-build.yaml"
 FORGE_WORKFLOW_NAME = "adhoc-forge.yaml"
 EXP_GIT_BRANCH_PREFIX = "exp/"
@@ -40,7 +40,7 @@ WORKFLOW_WATCH_TIMEOUT_SECS = 30 * 60  # 30 min build timeout
 VALIDATOR_TESTING_IMAGE_NAME = "validator-testing"
 
 FORGE_DEFAULT_TEST_SUITE = "land_blocking"
-FORGE_DEFAULT_CLUSTER_NAME = "aptos-forge-exp-0"
+FORGE_DEFAULT_CLUSTER_NAME = "velor-forge-exp-0"
 
 
 def cleanup_and_exit(git: Git, exit_code: int, cleanup_branch: str = None) -> None:
@@ -257,8 +257,8 @@ def ensure_git_status(
 ) -> Tuple[str, str]:
     """Ensure that the git status is clean and return the git SHA and branch name of the experimental branch"""
 
-    aptos_core_repo = git.get_repo_from_remote("origin")
-    aptos_core_repo_url = f"https://github.com/{aptos_core_repo}.git"
+    velor_core_repo = git.get_repo_from_remote("origin")
+    velor_core_repo_url = f"https://github.com/{velor_core_repo}.git"
 
     # ensure that the current git workspace is clean
     if not git.status():
@@ -277,12 +277,12 @@ def ensure_git_status(
         log.info("ERROR: Failed to create exp branch %s: %s", new_exp_git_branch, e)
         cleanup_and_exit(git, 1, cleanup_branch=new_exp_git_branch)
 
-    if not git.branch_matches_remote(aptos_core_repo_url, current_git_branch):
+    if not git.branch_matches_remote(velor_core_repo_url, current_git_branch):
         log.info("ERROR: Not synced with remote. Please push to a remote branch")
         log.info(
             "%s (local) != %s (remote)",
             git.get_commit_hash(current_git_branch),
-            git.resolve_remote_ref(aptos_core_repo_url, current_git_branch),
+            git.resolve_remote_ref(velor_core_repo_url, current_git_branch),
         )
         cleanup_and_exit(git, 1, cleanup_branch=new_exp_git_branch)
 
@@ -299,7 +299,7 @@ def main(log_metadata: bool) -> None:
     init_logging(logger=log, print_metadata=log_metadata)
 
 
-@main.command(help="Run a workflow on the upstream aptos-core git repo")
+@main.command(help="Run a workflow on the upstream velor-core git repo")
 @click.option(
     "--features",
     multiple=True,
@@ -313,7 +313,7 @@ def main(log_metadata: bool) -> None:
 )
 @click.option(
     "--repo",
-    default=UPSTREAM_APTOS_CORE_REPO,
+    default=UPSTREAM_VELOR_CORE_REPO,
     help="Repo to run the workflow on",
 )
 @click.option(
@@ -371,7 +371,7 @@ def run(
         EXP_GIT_BRANCH_PREFIX + current_git_branch
     )  # the temporary branch to push to
     is_fork = False
-    if get_repo_from_remote_ret != repo and repo == UPSTREAM_APTOS_CORE_REPO:
+    if get_repo_from_remote_ret != repo and repo == UPSTREAM_VELOR_CORE_REPO:
         print(f"WARNING: You are running this script from a fork of {repo}.")
         print("WARNING: This script will push a new branch to your fork.")
         print(
@@ -382,7 +382,7 @@ def run(
         )
         is_fork = True
 
-    if repo != UPSTREAM_APTOS_CORE_REPO:
+    if repo != UPSTREAM_VELOR_CORE_REPO:
         print(
             f"WARNING: You are running this script on a repo ({repo}) other than the upstream"
         )
@@ -445,7 +445,7 @@ def run(
 @main.command("list", help="List all authored workflows")
 @click.option(
     "--repo",
-    default=UPSTREAM_APTOS_CORE_REPO,
+    default=UPSTREAM_VELOR_CORE_REPO,
     help="Repo to run the workflow on",
 )
 def list_exp(repo: str):

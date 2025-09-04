@@ -1,0 +1,79 @@
+[package]
+name = "velor-vm"
+description = "Velor VM runtime"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+velor-aggregator = { workspace = true }
+velor-block-executor = { workspace = true }
+velor-block-partitioner = { workspace = true }
+velor-crypto = { workspace = true }
+velor-crypto-derive = { workspace = true }
+velor-experimental-runtimes = { workspace = true }
+velor-framework =  { workspace = true }
+velor-gas-algebra = { workspace = true }
+velor-gas-meter = { workspace = true }
+velor-gas-schedule = { workspace = true }
+velor-logger = { workspace = true }
+velor-memory-usage-tracker = { workspace = true }
+velor-metrics-core = { workspace = true }
+velor-mvhashmap = { workspace = true }
+velor-native-interface = { workspace = true }
+velor-table-natives = { workspace = true }
+velor-types = { workspace = true }
+velor-vm-environment = { workspace = true }
+velor-vm-logging = { workspace = true }
+velor-vm-types = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-groth16 = { workspace = true }
+bcs = { workspace = true }
+bytes = { workspace = true }
+claims = { workspace = true }
+crossbeam-channel = { workspace = true }
+derive_more = { workspace = true }
+fail = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+itertools = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-unit-test = { workspace = true, optional = true }
+move-vm-metrics = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
+num_cpus = { workspace = true }
+once_cell = { workspace = true }
+ouroboros = { workspace = true }
+parking_lot = { workspace = true }
+rand = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+velor-aggregator = { workspace = true, features = ["testing"] }
+velor-block-executor = { workspace = true, features = ["testing"] }
+velor-keygen = { workspace = true }
+velor-language-e2e-tests = { workspace = true }
+velor-transaction-simulation = { workspace = true }
+velor-types = { workspace = true, features = ["fuzzing", "testing"] }
+claims = { workspace = true }
+move-vm-types = { workspace = true, features = ["testing"] }
+proptest = { workspace = true }
+rand_core = { workspace = true }
+test-case = { workspace = true }
+
+[features]
+default = []
+fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "velor-framework/fuzzing", "velor-types/fuzzing"]
+failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
+testing = ["move-unit-test", "velor-framework/testing"]

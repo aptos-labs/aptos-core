@@ -1,5 +1,5 @@
 [package]
-name = "aptos-indexer-grpc-server-framework"
+name = "velor-indexer-grpc-server-framework"
 description = "Indexer gRPC server framework library."
 version = "1.0.0"
 
@@ -14,7 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-metrics-core = { workspace = true }
+velor-metrics-core = { workspace = true }
 async-trait = { workspace = true }
 backtrace = { workspace = true }
 clap = { workspace = true }
@@ -29,4 +29,4 @@ tracing-subscriber = { workspace = true }
 warp = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-aptos-system-utils = { workspace = true }
+velor-system-utils = { workspace = true }

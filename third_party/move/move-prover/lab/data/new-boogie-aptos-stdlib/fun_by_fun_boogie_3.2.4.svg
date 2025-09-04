@@ -1267,7 +1267,7 @@ comparator::compare_u8_vector
 2.202
 </text>
 <text x="0" y="5147" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_hash::ripemd160
+velor_hash::ripemd160
 </text>
 <rect x="0" y="5162" width="102" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="111" y="5163" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -1456,7 +1456,7 @@ bls12381::verify_aggregate_signature
 2.031
 </text>
 <text x="0" y="5915" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_hash::sha3_512
+velor_hash::sha3_512
 </text>
 <rect x="0" y="5930" width="101" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="110" y="5932" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -1861,7 +1861,7 @@ pool_u64_unbound::transfer_shares
 2.069
 </text>
 <text x="0" y="7562" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_hash::blake2b_256
+velor_hash::blake2b_256
 </text>
 <rect x="0" y="7577" width="100" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="109" y="7579" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -2428,7 +2428,7 @@ ed25519::public_key_into_unvalidated
 2.086
 </text>
 <text x="0" y="9868" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_hash::sha2_512
+velor_hash::sha2_512
 </text>
 <rect x="0" y="9883" width="99" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="108" y="9885" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -2455,7 +2455,7 @@ aptos_hash::sha2_512
 1.909
 </text>
 <text x="0" y="9978" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_hash::sip_hash_from_value
+velor_hash::sip_hash_from_value
 </text>
 <rect x="0" y="9993" width="99" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="108" y="9994" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -9421,7 +9421,7 @@ table::destroy_empty_box
 1.290
 </text>
 <text x="0" y="38308" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_hash::ripemd160_internal
+velor_hash::ripemd160_internal
 </text>
 <rect x="0" y="38323" width="67" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="76" y="38324" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -9799,7 +9799,7 @@ table_with_length::borrow_mut_with_default
 1.266
 </text>
 <text x="0" y="39845" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_hash::sip_hash
+velor_hash::sip_hash
 </text>
 <rect x="0" y="39860" width="64" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="73" y="39861" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -9907,7 +9907,7 @@ table::borrow_box_mut
 1.342
 </text>
 <text x="0" y="40284" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_hash::keccak256
+velor_hash::keccak256
 </text>
 <rect x="0" y="40299" width="64" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="73" y="40301" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -10096,7 +10096,7 @@ table::upsert
 1.230
 </text>
 <text x="0" y="41053" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_hash::sha3_512_internal
+velor_hash::sha3_512_internal
 </text>
 <rect x="0" y="41068" width="64" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="73" y="41069" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -10123,7 +10123,7 @@ aptos_hash::sha3_512_internal
 1.201
 </text>
 <text x="0" y="41163" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_hash::blake2b_256_internal
+velor_hash::blake2b_256_internal
 </text>
 <rect x="0" y="41178" width="64" height="9" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="73" y="41179" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
@@ -10150,7 +10150,7 @@ aptos_hash::blake2b_256_internal
 1.228
 </text>
 <text x="0" y="41272" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
-aptos_hash::sha2_512_internal
+velor_hash::sha2_512_internal
 </text>
 <rect x="0" y="41287" width="64" height="10" opacity="1" fill="#B4B4B4" stroke="none"/>
 <text x="73" y="41289" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">

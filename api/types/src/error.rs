@@ -1,36 +1,36 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::vm_status::StatusCode;
+use velor_types::vm_status::StatusCode;
 use poem_openapi::{Enum, Object};
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 
 /// This is the generic struct we use for all API errors, it contains a string
-/// message and an Aptos API specific error code.
+/// message and an Velor API specific error code.
 #[derive(Debug, Clone, Serialize, Deserialize, Object)]
-pub struct AptosError {
+pub struct VelorError {
     /// A message describing the error
     pub message: String,
-    pub error_code: AptosErrorCode,
+    pub error_code: VelorErrorCode,
     /// A code providing VM error details when submitting transactions to the VM
     pub vm_error_code: Option<u64>,
 }
 
-impl std::fmt::Display for AptosError {
+impl std::fmt::Display for VelorError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Error({:?}): {:#}", self.error_code, self.message)
     }
 }
 
-impl std::error::Error for AptosError {}
+impl std::error::Error for VelorError {}
 
-impl AptosError {
+impl VelorError {
     pub fn new_with_error_code<ErrorType: std::fmt::Display>(
         error: ErrorType,
-        error_code: AptosErrorCode,
-    ) -> AptosError {
+        error_code: VelorErrorCode,
+    ) -> VelorError {
         Self {
             message: format!("{:#}", error),
             error_code,
@@ -40,9 +40,9 @@ impl AptosError {
 
     pub fn new_with_vm_status<ErrorType: std::fmt::Display>(
         error: ErrorType,
-        error_code: AptosErrorCode,
+        error_code: VelorErrorCode,
         vm_error_code: StatusCode,
-    ) -> AptosError {
+    ) -> VelorError {
         Self {
             message: format!("{:#}", error),
             error_code,
@@ -57,7 +57,7 @@ impl AptosError {
 #[oai(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 #[repr(u32)]
-pub enum AptosErrorCode {
+pub enum VelorErrorCode {
     /// Account not found at the requested version
     AccountNotFound = 101,
     /// Resource not found at the requested version
@@ -114,7 +114,7 @@ pub enum AptosErrorCode {
     ApiDisabled = 603,
 }
 
-impl AptosErrorCode {
+impl VelorErrorCode {
     pub fn as_u32(&self) -> u32 {
         *self as u32
     }
@@ -122,17 +122,17 @@ impl AptosErrorCode {
 
 #[test]
 fn test_serialize_deserialize() {
-    let with_code = AptosError::new_with_vm_status(
+    let with_code = VelorError::new_with_vm_status(
         "Invalid transaction",
-        AptosErrorCode::VmError,
-        aptos_types::vm_status::StatusCode::UNKNOWN_MODULE,
+        VelorErrorCode::VmError,
+        velor_types::vm_status::StatusCode::UNKNOWN_MODULE,
     );
-    let _: AptosError = bcs::from_bytes(&bcs::to_bytes(&with_code).unwrap()).unwrap();
-    let _: AptosError = serde_json::from_str(&serde_json::to_string(&with_code).unwrap()).unwrap();
+    let _: VelorError = bcs::from_bytes(&bcs::to_bytes(&with_code).unwrap()).unwrap();
+    let _: VelorError = serde_json::from_str(&serde_json::to_string(&with_code).unwrap()).unwrap();
 
     let without_code =
-        AptosError::new_with_error_code("some message", AptosErrorCode::MempoolIsFull);
-    let _: AptosError = bcs::from_bytes(&bcs::to_bytes(&without_code).unwrap()).unwrap();
-    let _: AptosError =
+        VelorError::new_with_error_code("some message", VelorErrorCode::MempoolIsFull);
+    let _: VelorError = bcs::from_bytes(&bcs::to_bytes(&without_code).unwrap()).unwrap();
+    let _: VelorError =
         serde_json::from_str(&serde_json::to_string(&without_code).unwrap()).unwrap();
 }

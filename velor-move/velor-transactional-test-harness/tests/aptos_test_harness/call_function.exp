@@ -1,0 +1,23 @@
+processed 5 tasks
+task 1 lines 4-30:  publish --private-key Alice [module Alice::hello_world {]
+task 2 lines 32-32:  run --signers Alice --show-events -- Alice::hello_world::initialize
+Events:
+{
+    type:    0x1::transaction_fee::FeeStatement
+    data:    "620000000000000004000000000000000100000000000000386c0100000000000000000000000000"
+}mutable inputs after call: local#0: 0
+return values: 0
+task 3 lines 34-34:  run --signers Alice --args x"68656C6C6F20776F726C64" --show-events -- Alice::hello_world::hi
+Events:
+{
+    type:    0x1::transaction_fee::FeeStatement
+    data:    "05000000000000000300000000000000020000000000000018010000000000000000000000000000"
+}mutable inputs after call: local#0: 0
+return values: 0
+task 4 lines 36-36:  view --address Alice --resource Alice::hello_world::ModuleData
+store key 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::hello_world::ModuleData {
+    global_counter: 0
+    state: copy drop store 0x1::string::String {
+        bytes: 68656c6c6f20776f726c64
+    }
+}

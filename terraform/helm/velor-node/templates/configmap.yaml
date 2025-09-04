@@ -1,0 +1,24 @@
+{{- if not .Values.overrideNodeConfig }}
+{{- range $i, $e := until (int .Values.numValidators) }}
+---
+# make the validator index available in tpl using $.Values.i 
+{{ $_ := set $.Values "i" $i }}
+# these are the base NodeConfigs that ensure the node is configured correctly for this helm chart
+{{ $validatorBaseConfig := tpl ($.Files.Get "files/configs/validator-base.yaml") $ | fromYaml }}
+{{ $fullnodeBaseConfig := tpl ($.Files.Get "files/configs/fullnode-base.yaml") $ | fromYaml }}
+# merge with user-provided helm values using precedence: base config > helm values
+{{ $validatorMergedConfig := mustMergeOverwrite $.Values.validator.config $validatorBaseConfig }}
+{{ $fullnodeMergedConfig := mustMergeOverwrite $.Values.fullnode.config $fullnodeBaseConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "velor-validator.fullname" $ }}-{{$i}}
+  labels:
+    {{- include "velor-validator.labels" $ | nindent 4 }}
+data:
+  validator.yaml: |-
+{{ $validatorMergedConfig | toYaml | indent 4 }}
+  fullnode.yaml: |-
+{{ $fullnodeMergedConfig | toYaml | indent 4 }}
+{{- end }}
+{{- end }}

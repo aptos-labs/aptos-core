@@ -1,5 +1,5 @@
 module poc::double_scalar_mul_internal {
-    use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar};
+    use velor_std::ristretto255::{Self, RistrettoPoint, Scalar};
 
     public entry fun main(_owner: &signer) {
         let scalar1: Scalar = ristretto255::new_scalar_from_u64(2u64);

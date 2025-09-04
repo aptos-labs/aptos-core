@@ -69,13 +69,13 @@
                 "type": "MOVE_TYPES_STRUCT",
                 "struct": {
                   "address": "0x1",
-                  "module": "aptos_coin",
-                  "name": "AptosCoin"
+                  "module": "velor_coin",
+                  "name": "VelorCoin"
                 }
               }
             ]
           },
-          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "typeStr": "0x1::coin::CoinStore<0x1::velor_coin::VelorCoin>",
           "data": "{\"coin\":{\"value\":\"27944206\"},\"deposit_events\":{\"counter\":\"43\",\"guid\":{\"id\":{\"addr\":\"0xc50d395a79199699f061f49b2c06d31affd08bb53a380d3cfce5f693fb82a0a2\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"58\",\"guid\":{\"id\":{\"addr\":\"0xc50d395a79199699f061f49b2c06d31affd08bb53a380d3cfce5f693fb82a0a2\",\"creation_num\":\"3\"}}}}"
         }
       },
@@ -128,9 +128,9 @@
           "handle": "0x28418760527ca583ca1dea9807b21574952f9eac6f2cbef9369f0c87f1940497",
           "key": "0x092d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f80947616c7865204f4154194170746f73204349532078204a6f756c652046696e616e6365",
           "data": {
-            "key": "{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Aptos CIS x Joule Finance\"}",
+            "key": "{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Velor CIS x Joule Finance\"}",
             "keyType": "0x3::token::TokenDataId",
-            "value": "{\"default_properties\":{\"map\":{\"data\":[{\"key\":\"Galxe Campaign\",\"value\":{\"type\":\"0x1::string::String\",\"value\":\"0x0a47436f7162746b704164\"}}]}},\"description\":\"\",\"largest_property_version\":\"0\",\"maximum\":\"10000000000\",\"mutability_config\":{\"description\":false,\"maximum\":true,\"properties\":false,\"royalty\":true,\"uri\":true},\"name\":\"Aptos CIS x Joule Finance\",\"royalty\":{\"payee_address\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"royalty_points_denominator\":\"0\",\"royalty_points_numerator\":\"0\"},\"supply\":\"2893\",\"uri\":\"https://graphigo.prd.galaxy.eco/metadata/aptos/0x092d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8/GCoqbtkpAd.json\"}",
+            "value": "{\"default_properties\":{\"map\":{\"data\":[{\"key\":\"Galxe Campaign\",\"value\":{\"type\":\"0x1::string::String\",\"value\":\"0x0a47436f7162746b704164\"}}]}},\"description\":\"\",\"largest_property_version\":\"0\",\"maximum\":\"10000000000\",\"mutability_config\":{\"description\":false,\"maximum\":true,\"properties\":false,\"royalty\":true,\"uri\":true},\"name\":\"Velor CIS x Joule Finance\",\"royalty\":{\"payee_address\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"royalty_points_denominator\":\"0\",\"royalty_points_numerator\":\"0\"},\"supply\":\"2893\",\"uri\":\"https://graphigo.prd.galaxy.eco/metadata/velor/0x092d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8/GCoqbtkpAd.json\"}",
             "valueType": "0x3::token::TokenData"
           }
         }
@@ -156,9 +156,9 @@
           "handle": "0xe2d4df48ee30234ecfd2e53216b000e485a304809099f77af060fb4a31153e77",
           "key": "0x092d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f80947616c7865204f4154194170746f73204349532078204a6f756c652046696e616e63650000000000000000",
           "data": {
-            "key": "{\"property_version\":\"0\",\"token_data_id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Aptos CIS x Joule Finance\"}}",
+            "key": "{\"property_version\":\"0\",\"token_data_id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Velor CIS x Joule Finance\"}}",
             "keyType": "0x3::token::TokenId",
-            "value": "{\"amount\":\"1\",\"id\":{\"property_version\":\"0\",\"token_data_id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Aptos CIS x Joule Finance\"}},\"token_properties\":{\"map\":{\"data\":[]}}}",
+            "value": "{\"amount\":\"1\",\"id\":{\"property_version\":\"0\",\"token_data_id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Velor CIS x Joule Finance\"}},\"token_properties\":{\"map\":{\"data\":[]}}}",
             "valueType": "0x3::token::Token"
           }
         }
@@ -262,7 +262,7 @@
             "\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\"",
             "\"899675077\"",
             "\"0\"",
-            "\"Aptos CIS x Joule Finance\"",
+            "\"Velor CIS x Joule Finance\"",
             "\"1\"",
             "\"1722275553\"",
             "\"0x26470f4768e39cd8d3dea5bbdb0687bfca77fecdfe1c07e30035064b9441cba7bceec2916c69c654a27942459a883a160b5eccaf65cfc986dc95f671032b0f0e\""
@@ -294,7 +294,7 @@
           }
         },
         "typeStr": "0x3::token::MintTokenEvent",
-        "data": "{\"amount\":\"1\",\"id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Aptos CIS x Joule Finance\"}}"
+        "data": "{\"amount\":\"1\",\"id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Velor CIS x Joule Finance\"}}"
       },
       {
         "key": {
@@ -311,7 +311,7 @@
           }
         },
         "typeStr": "0x3::token::DepositEvent",
-        "data": "{\"amount\":\"1\",\"id\":{\"property_version\":\"0\",\"token_data_id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Aptos CIS x Joule Finance\"}}}"
+        "data": "{\"amount\":\"1\",\"id\":{\"property_version\":\"0\",\"token_data_id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Velor CIS x Joule Finance\"}}}"
       },
       {
         "key": {
@@ -328,7 +328,7 @@
           }
         },
         "typeStr": "0x3::token::WithdrawEvent",
-        "data": "{\"amount\":\"1\",\"id\":{\"property_version\":\"0\",\"token_data_id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Aptos CIS x Joule Finance\"}}}"
+        "data": "{\"amount\":\"1\",\"id\":{\"property_version\":\"0\",\"token_data_id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Velor CIS x Joule Finance\"}}}"
       },
       {
         "key": {
@@ -345,7 +345,7 @@
           }
         },
         "typeStr": "0x3::token::DepositEvent",
-        "data": "{\"amount\":\"1\",\"id\":{\"property_version\":\"0\",\"token_data_id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Aptos CIS x Joule Finance\"}}}"
+        "data": "{\"amount\":\"1\",\"id\":{\"property_version\":\"0\",\"token_data_id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Velor CIS x Joule Finance\"}}}"
       },
       {
         "key": {
@@ -362,7 +362,7 @@
           }
         },
         "typeStr": "0xe7c7bb0e53fc6fb86aa7464645fbac96b96716463b4e2269c62945c135aa26fd::oat::ClaimEvent",
-        "data": "{\"amount\":\"1\",\"pubkey_id\":\"0\",\"receiver_addr\":\"0xc50d395a79199699f061f49b2c06d31affd08bb53a380d3cfce5f693fb82a0a2\",\"sig_id\":\"899675077\",\"token_data_id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Aptos CIS x Joule Finance\"}}"
+        "data": "{\"amount\":\"1\",\"pubkey_id\":\"0\",\"receiver_addr\":\"0xc50d395a79199699f061f49b2c06d31affd08bb53a380d3cfce5f693fb82a0a2\",\"sig_id\":\"899675077\",\"token_data_id\":{\"collection\":\"Galxe OAT\",\"creator\":\"0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8\",\"name\":\"Velor CIS x Joule Finance\"}}"
       },
       {
         "key": {

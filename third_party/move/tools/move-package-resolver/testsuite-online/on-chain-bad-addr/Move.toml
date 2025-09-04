@@ -3,4 +3,4 @@ name = "Pack"
 version = "0.1.2"
 
 [dependencies]
-MoveStdlib = { aptos = "https://fullnode.mainnet.aptoslabs.com", address = "0x10" }
+MoveStdlib = { velor = "https://fullnode.mainnet.velorlabs.com", address = "0x10" }

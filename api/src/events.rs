@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -15,11 +15,11 @@ use crate::{
     ApiTags,
 };
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{
-    verify_field_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper, LedgerInfo,
+use velor_api_types::{
+    verify_field_identifier, Address, VelorErrorCode, AsConverter, IdentifierWrapper, LedgerInfo,
     MoveStructTag, VerifyInputWithRecursion, VersionedEvent, U64,
 };
-use aptos_types::event::EventKey;
+use velor_types::event::EventKey;
 use poem_openapi::{
     param::{Path, Query},
     OpenApi,
@@ -48,7 +48,7 @@ impl EventsApi {
     async fn get_events_by_creation_number(
         &self,
         accept_type: AcceptType,
-        /// Hex-encoded 32 byte Aptos account, with or without a `0x` prefix, for
+        /// Hex-encoded 32 byte Velor account, with or without a `0x` prefix, for
         /// which events are queried. This refers to the account that events were
         /// emitted to, not the account hosting the move module that emits that
         /// event type.
@@ -102,7 +102,7 @@ impl EventsApi {
     async fn get_events_by_event_handle(
         &self,
         accept_type: AcceptType,
-        /// Hex-encoded 32 byte Aptos account, with or without a `0x` prefix, for
+        /// Hex-encoded 32 byte Velor account, with or without a `0x` prefix, for
         /// which events are queried. This refers to the account that events were
         /// emitted to, not the account hosting the move module that emits that
         /// event type.
@@ -125,12 +125,12 @@ impl EventsApi {
             .verify(0)
             .context("'event_handle' invalid")
             .map_err(|err| {
-                BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+                BasicErrorWith404::bad_request_with_code_no_info(err, VelorErrorCode::InvalidInput)
             })?;
         verify_field_identifier(field_name.as_str())
             .context("'field_name' invalid")
             .map_err(|err| {
-                BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+                BasicErrorWith404::bad_request_with_code_no_info(err, VelorErrorCode::InvalidInput)
             })?;
         fail_point_poem("endpoint_get_events_by_event_handle")?;
         self.context
@@ -173,7 +173,7 @@ impl EventsApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    VelorErrorCode::InternalError,
                     &latest_ledger_info,
                 )
             })?;
@@ -189,7 +189,7 @@ impl EventsApi {
                     .map_err(|err| {
                         BasicErrorWith404::internal_with_code(
                             err,
-                            AptosErrorCode::InternalError,
+                            VelorErrorCode::InternalError,
                             &latest_ledger_info,
                         )
                     })?;

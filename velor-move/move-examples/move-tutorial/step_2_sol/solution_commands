@@ -1,0 +1,11 @@
+# Exercise 1
+velor move test --dump
+
+# Exercise 2
+velor move test --coverage
+
+Followed by:
+
+velor move coverage summary
+velor move coverage summary --summarize-functions
+velor move coverage source --module basic_coin

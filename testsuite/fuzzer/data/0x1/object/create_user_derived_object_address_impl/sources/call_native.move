@@ -1,5 +1,5 @@
 module poc::create_user_derived_object_address_impl {
-    use aptos_framework::object;
+    use velor_framework::object;
     use std::signer;
 
     public entry fun main(owner: &signer) {

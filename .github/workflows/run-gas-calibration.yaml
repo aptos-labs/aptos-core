@@ -25,15 +25,15 @@ concurrency:
 jobs:
   run-gas-calibration:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=velor-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - uses: velor-chain/velor-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: install Valgrind
         shell: bash
         run: sudo apt-get -y install valgrind
-      - run: cargo run -p aptos-vm-profiling -- -r
+      - run: cargo run -p velor-vm-profiling -- -r

@@ -1,4 +1,4 @@
-# aptos-prometheus-node-exporter
+# velor-prometheus-node-exporter
 
 ![Version: 4.17.5](https://img.shields.io/badge/Version-4.17.5-informational?style=flat-square)
 

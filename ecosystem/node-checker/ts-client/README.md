@@ -1,4 +1,4 @@
-# Generated TS client for Aptos Node Health Checker
+# Generated TS client for Velor Node Health Checker
 
 [![Discord][discord-image]][discord-url]
 [![NPM Package Version][npm-image-version]][npm-url]
@@ -6,7 +6,7 @@
 
 ## Quickstart
 ```bash
-pnpm add aptos-node-checker-client
+pnpm add velor-node-checker-client
 ```
 
 You can also use `yarn` or `npm`.
@@ -48,12 +48,12 @@ pnpm generate-client
 ### Running tests
 Run a local node (run from the root of the repo):
 ```
-cargo run -p aptos -- node run-local-testnet --faucet-port 8081 --force-restart --assume-yes
+cargo run -p velor -- node run-local-testnet --faucet-port 8081 --force-restart --assume-yes
 ```
 
 Run a local Node Health Checker:
 ```
-cargo run -p aptos-node-checker -- server run --baseline-node-config-paths ecosystem/node-checker/configuration_examples/local_testnet.yaml --listen-address 0.0.0.0
+cargo run -p velor-node-checker -- server run --baseline-node-config-paths ecosystem/node-checker/configuration_examples/local_testnet.yaml --listen-address 0.0.0.0
 ```
 
 Run the tests:
@@ -88,9 +88,9 @@ pnpm test
 
 ## References
 
-[repo]: https://github.com/aptos-labs/aptos-core
-[npm-image-version]: https://img.shields.io/npm/v/aptos.svg
-[npm-image-downloads]: https://img.shields.io/npm/dm/aptos.svg
-[npm-url]: https://npmjs.org/package/aptos-node-checker-client
+[repo]: https://github.com/velor-chain/velor-core
+[npm-image-version]: https://img.shields.io/npm/v/velor.svg
+[npm-image-downloads]: https://img.shields.io/npm/dm/velor.svg
+[npm-url]: https://npmjs.org/package/velor-node-checker-client
 [discord-image]: https://img.shields.io/discord/945856774056083548?label=Discord&logo=discord&style=flat~~~~
-[discord-url]: https://discord.gg/aptosnetwork
+[discord-url]: https://discord.gg/velornetwork

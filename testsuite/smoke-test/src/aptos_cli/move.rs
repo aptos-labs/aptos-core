@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::test::CliTestFramework;
-use aptos_framework::{BuildOptions, BuiltPackage};
-use aptos_logger::info;
-use aptos_types::move_utils::MemberId;
+use velor::test::CliTestFramework;
+use velor_framework::{BuildOptions, BuiltPackage};
+use velor_logger::info;
+use velor_types::move_utils::MemberId;
 use move_core_types::account_address::AccountAddress;
 use move_package::source_package::manifest_parser::parse_move_manifest_from_file;
 use std::{collections::BTreeMap, path::PathBuf, str::FromStr};
@@ -13,13 +13,13 @@ use std::{collections::BTreeMap, path::PathBuf, str::FromStr};
 const PACKAGE_NAME: &str = "AwesomePackage";
 const HELLO_BLOCKCHAIN: &str = "hello_blockchain";
 
-fn aptos_framework_dir() -> PathBuf {
+fn velor_framework_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("..")
-        .join("aptos-move")
+        .join("velor-move")
         .join("framework")
-        .join("aptos-framework")
+        .join("velor-framework")
 }
 
 #[tokio::test]
@@ -36,7 +36,7 @@ async fn test_move_compile_flow() {
     cli.init_package(
         PACKAGE_NAME.to_string(),
         package_addresses,
-        Some(aptos_framework_dir()),
+        Some(velor_framework_dir()),
     )
     .await
     .expect("Should succeed");
@@ -67,7 +67,7 @@ async fn test_move_compile_flow() {
     assert_eq!(manifest.dependencies.len(), 1);
 
     let dependency = manifest.dependencies.iter().next().unwrap();
-    assert_eq!("AptosFramework", dependency.0.to_string());
+    assert_eq!("VelorFramework", dependency.0.to_string());
 
     // Now try to compile real code
     cli.add_move_files();
@@ -87,7 +87,7 @@ async fn test_move_compile_flow() {
 #[tokio::test]
 async fn test_move_publish_flow() {
     let (_swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .build_with_cli(2)
         .await;
 
@@ -99,7 +99,7 @@ async fn test_move_publish_flow() {
     cli.init_package(
         PACKAGE_NAME.to_string(),
         package_addresses,
-        Some(aptos_framework_dir()),
+        Some(velor_framework_dir()),
     )
     .await
     .expect("Should succeed");

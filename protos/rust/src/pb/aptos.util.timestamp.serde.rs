@@ -1,4 +1,4 @@
-// Copyright (c) Aptos Foundation
+// Copyright (c) Velor Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
@@ -16,7 +16,7 @@ impl serde::Serialize for Timestamp {
         if self.nanos != 0 {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.util.timestamp.Timestamp", len)?;
+        let mut struct_ser = serializer.serialize_struct("velor.util.timestamp.Timestamp", len)?;
         if self.seconds != 0 {
             struct_ser.serialize_field("seconds", ToString::to_string(&self.seconds).as_str())?;
         }
@@ -76,7 +76,7 @@ impl<'de> serde::Deserialize<'de> for Timestamp {
             type Value = Timestamp;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.util.timestamp.Timestamp")
+                formatter.write_str("struct velor.util.timestamp.Timestamp")
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<Timestamp, V::Error>
@@ -111,6 +111,6 @@ impl<'de> serde::Deserialize<'de> for Timestamp {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.util.timestamp.Timestamp", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("velor.util.timestamp.Timestamp", FIELDS, GeneratedVisitor)
     }
 }

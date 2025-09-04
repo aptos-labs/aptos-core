@@ -1,0 +1,134 @@
+module 0xcafe.MutBorrowGlobal {
+	struct S1 has key, drop { x: u64 }
+	struct S2 has key, drop { x: u64 }
+	struct S3 has key, drop { x: u64 }
+	struct S4 has key, drop { x: u64 }
+	struct S5 has key, drop { x: u64 }
+	struct S6 has key, drop { x: u64 }
+	struct S7 has key, drop { x: u64 }
+	struct S8 has key, drop { x: u64 }
+	struct S9 has key, drop { x: u64 }
+	struct S10 has key, drop { x: u64 }
+	struct S11 has key, drop { x: u64 }
+	struct S12 has key, drop { x: u64 }
+	struct S13 has key, drop { x: u64 }
+	struct S14 has key, drop { x: u64 }
+	struct S15 has key, drop { x: u64 }
+	struct S16 has key, drop { x: u64 }
+	struct S17 has key, drop { x: u64 }
+	struct S18 has key, drop { x: u64 }
+	struct S19 has key, drop { x: u64 }
+	struct S20 has key, drop { x: u64 }
+	struct S21 has key, drop { x: u64 }
+	struct S22 has key, drop { x: u64 }
+	struct S23 has key, drop { x: u64 }
+	struct S24 has key, drop { x: u64 }
+	struct S25 has key, drop { x: u64 }
+	struct S26 has key, drop { x: u64 }
+	struct S27 has key, drop { x: u64 }
+	struct S28 has key, drop { x: u64 }
+	struct S29 has key, drop { x: u64 }
+	struct S30 has key, drop { x: u64 }
+
+    public entry calibrate_mut_borrow_global_x100(s: signer) acquires S1, S2, S3, S4, S5, S6, S7, S8, S9, S10 {
+        let i: u64;
+    label entry:
+        i = 0;
+		move_to<S1>(&s, S1{ x: 0 });
+		move_to<S2>(&s, S2{ x: 0 });
+		move_to<S3>(&s, S3{ x: 0 });
+		move_to<S4>(&s, S4{ x: 0 });
+		move_to<S5>(&s, S5{ x: 0 });
+		move_to<S6>(&s, S6{ x: 0 });
+		move_to<S7>(&s, S7{ x: 0 });
+		move_to<S8>(&s, S8{ x: 0 });
+		move_to<S9>(&s, S9{ x: 0 });
+		move_to<S10>(&s, S10{ x: 0 });
+    label loop_start:
+        jump_if_false (copy(i) < 100) loop_end;
+        i = move(i) + 1;
+
+        _ = borrow_global_mut<S1>(0xcafe);
+        _ = borrow_global_mut<S2>(0xcafe);
+        _ = borrow_global_mut<S3>(0xcafe);
+        _ = borrow_global_mut<S4>(0xcafe);
+        _ = borrow_global_mut<S5>(0xcafe);
+        _ = borrow_global_mut<S6>(0xcafe);
+        _ = borrow_global_mut<S7>(0xcafe);
+        _ = borrow_global_mut<S8>(0xcafe);
+        _ = borrow_global_mut<S9>(0xcafe);
+        _ = borrow_global_mut<S10>(0xcafe);
+
+        jump loop_start;
+    label loop_end:
+        return;            
+    } 
+
+    public entry calibrate_mut_borrow_global_x500(s: signer) acquires S11, S12, S13, S14, S15, S16, S17, S18, S19, S20 {
+        let i: u64;
+    label entry:
+        i = 0;
+		move_to<S11>(&s, S11{ x: 0 });
+		move_to<S12>(&s, S12{ x: 0 });
+		move_to<S13>(&s, S13{ x: 0 });
+		move_to<S14>(&s, S14{ x: 0 });
+		move_to<S15>(&s, S15{ x: 0 });
+		move_to<S16>(&s, S16{ x: 0 });
+		move_to<S17>(&s, S17{ x: 0 });
+		move_to<S18>(&s, S18{ x: 0 });
+		move_to<S19>(&s, S19{ x: 0 });
+		move_to<S20>(&s, S20{ x: 0 });
+    label loop_start:
+        jump_if_false (copy(i) < 500) loop_end;
+        i = move(i) + 1;
+
+        _ = borrow_global_mut<S11>(0xcafe);
+        _ = borrow_global_mut<S12>(0xcafe);
+        _ = borrow_global_mut<S13>(0xcafe);
+        _ = borrow_global_mut<S14>(0xcafe);
+        _ = borrow_global_mut<S15>(0xcafe);
+        _ = borrow_global_mut<S16>(0xcafe);
+        _ = borrow_global_mut<S17>(0xcafe);
+        _ = borrow_global_mut<S18>(0xcafe);
+        _ = borrow_global_mut<S19>(0xcafe);
+        _ = borrow_global_mut<S20>(0xcafe);
+
+        jump loop_start;
+    label loop_end:
+        return;            
+    }
+
+    public entry calibrate_mut_borrow_global_x1500(s: signer) acquires S21, S22, S23, S24, S25, S26, S27, S28, S29, S30 {
+        let i: u64;
+    label entry:
+        i = 0;
+		move_to<S21>(&s, S21{ x: 0 });
+		move_to<S22>(&s, S22{ x: 0 });
+		move_to<S23>(&s, S23{ x: 0 });
+		move_to<S24>(&s, S24{ x: 0 });
+		move_to<S25>(&s, S25{ x: 0 });
+		move_to<S26>(&s, S26{ x: 0 });
+		move_to<S27>(&s, S27{ x: 0 });
+		move_to<S28>(&s, S28{ x: 0 });
+		move_to<S29>(&s, S29{ x: 0 });
+		move_to<S30>(&s, S30{ x: 0 });
+    label loop_start:
+        jump_if_false (copy(i) < 1500) loop_end;
+        i = move(i) + 1;
+
+        _ = borrow_global_mut<S21>(0xcafe);
+        _ = borrow_global_mut<S22>(0xcafe);
+        _ = borrow_global_mut<S23>(0xcafe);
+        _ = borrow_global_mut<S24>(0xcafe);
+        _ = borrow_global_mut<S25>(0xcafe);
+        _ = borrow_global_mut<S26>(0xcafe);
+        _ = borrow_global_mut<S27>(0xcafe);
+        _ = borrow_global_mut<S28>(0xcafe);
+        _ = borrow_global_mut<S29>(0xcafe);
+        _ = borrow_global_mut<S30>(0xcafe);
+
+        jump loop_start;
+    label loop_end:
+        return;            
+    }              
+}

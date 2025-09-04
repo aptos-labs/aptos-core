@@ -1,11 +1,11 @@
-# Aptos Protos
+# Velor Protos
 
-This repository contains the protobuf definitions for Aptos.
+This repository contains the protobuf definitions for Velor.
 
 ## Usage
 Import generated classes like this:
 ```python
-from aptos_protos.aptos.transaction.v1.transaction_pb2 import Transaction
+from velor_protos.velor.transaction.v1.transaction_pb2 import Transaction
 ```
 
 Then use them like this:

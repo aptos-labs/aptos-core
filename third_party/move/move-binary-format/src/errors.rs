@@ -33,7 +33,7 @@ pub fn is_stable_test_display() -> bool {
 }
 
 /// This macro is used to panic while debugging fuzzing crashes obtaining the right stack trace.
-/// e.g. DEBUG_VM_STATUS=ABORTED,UNKNOWN_INVARIANT_VIOLATION_ERROR ./fuzz.sh run move_aptosvm_publish_and_run <testcase>
+/// e.g. DEBUG_VM_STATUS=ABORTED,UNKNOWN_INVARIANT_VIOLATION_ERROR ./fuzz.sh run move_velorvm_publish_and_run <testcase>
 /// third_party/move/move-core/types/src/vm_status.rs:506 for the list of status codes.
 #[cfg(feature = "fuzzing")]
 macro_rules! fuzzing_maybe_panic {

@@ -9,6 +9,6 @@ authors = []
 
 [dependencies]
 Dep = { local = "../dep" }
-MoveStdlib = { local = "../../../../../../../aptos-move/framework/move-stdlib" }
+MoveStdlib = { local = "../../../../../../../velor-move/framework/move-stdlib" }
 
 [dev-dependencies]

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,8 +13,8 @@ use crate::{
     noise::{stream::NoiseStream, AntiReplayTimestamps, HandshakeAuthMode, NoiseUpgrader},
     testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
 };
-use aptos_config::network_id::NetworkContext;
-use aptos_crypto::{noise::NoiseSession, test_utils::TEST_SEED, x25519, Uniform as _};
+use velor_config::network_id::NetworkContext;
+use velor_crypto::{noise::NoiseSession, test_utils::TEST_SEED, x25519, Uniform as _};
 use futures::{executor::block_on, future::join};
 use futures_util::io::AsyncReadExt;
 use once_cell::sync::Lazy;
@@ -39,13 +39,13 @@ pub static KEYPAIRS: Lazy<(
     let initiator_private_key = x25519::PrivateKey::generate(&mut rng);
     let initiator_public_key = initiator_private_key.public_key();
     let initiator_peer_id =
-        aptos_types::account_address::from_identity_public_key(initiator_public_key);
+        velor_types::account_address::from_identity_public_key(initiator_public_key);
     let initiator_network_context = NetworkContext::mock_with_peer_id(initiator_peer_id);
 
     let responder_private_key = x25519::PrivateKey::generate(&mut rng);
     let responder_public_key = responder_private_key.public_key();
     let responder_peer_id =
-        aptos_types::account_address::from_identity_public_key(responder_public_key);
+        velor_types::account_address::from_identity_public_key(responder_public_key);
     let responder_network_context = NetworkContext::mock_with_peer_id(responder_peer_id);
     assert_eq!(
         initiator_network_context.network_id(),
@@ -113,7 +113,7 @@ fn generate_first_two_messages() -> (Vec<u8>, Vec<u8>) {
     (init_msg, resp_msg)
 }
 
-pub fn generate_corpus(gen: &mut aptos_proptest_helpers::ValueGenerator) -> Vec<u8> {
+pub fn generate_corpus(gen: &mut velor_proptest_helpers::ValueGenerator) -> Vec<u8> {
     let (init_msg, resp_msg) = generate_first_two_messages();
     // choose a random one
     let strategy = proptest::arbitrary::any::<bool>();

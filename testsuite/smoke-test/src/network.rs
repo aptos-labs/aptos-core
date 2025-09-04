@@ -1,25 +1,25 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
+    smoke_test_environment::{new_local_swarm_with_velor, SwarmBuilder},
     state_sync::test_all_validator_failures,
     utils::{MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS},
 };
-use aptos::test::CliTestFramework;
-use aptos_config::{
+use velor::test::CliTestFramework;
+use velor_config::{
     config::{
         DiscoveryMethod, FileDiscovery, Identity, NetworkConfig, NodeConfig, OverrideNodeConfig,
         Peer, PeerSet, RestDiscovery,
     },
     network_id::NetworkId,
 };
-use aptos_crypto::{encoding_type::EncodingType, x25519, x25519::PrivateKey};
-use aptos_forge::{FullNode, Node, NodeExt, Swarm};
-use aptos_genesis::config::HostAndPort;
-use aptos_sdk::move_types::account_address::AccountAddress;
-use aptos_temppath::TempPath;
+use velor_crypto::{encoding_type::EncodingType, x25519, x25519::PrivateKey};
+use velor_forge::{FullNode, Node, NodeExt, Swarm};
+use velor_genesis::config::HostAndPort;
+use velor_sdk::move_types::account_address::AccountAddress;
+use velor_temppath::TempPath;
 use std::{
     collections::HashMap,
     path::Path,
@@ -29,7 +29,7 @@ use std::{
 
 #[tokio::test]
 async fn test_connection_limiting() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_velor(1).await;
     let version = swarm.versions().max().unwrap();
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
 
@@ -145,7 +145,7 @@ async fn test_connection_limiting() {
 
 #[tokio::test]
 async fn test_rest_discovery() {
-    let mut swarm = SwarmBuilder::new_local(1).with_aptos().build().await;
+    let mut swarm = SwarmBuilder::new_local(1).with_velor().build().await;
 
     // Point to an already existing node
     let (version, rest_endpoint) = {
@@ -170,7 +170,7 @@ async fn test_rest_discovery() {
         .unwrap();
 }
 
-// Currently this test seems flaky: https://github.com/aptos-labs/aptos-core/issues/670
+// Currently this test seems flaky: https://github.com/velor-chain/velor-core/issues/670
 #[ignore]
 #[tokio::test]
 async fn test_file_discovery() {
@@ -181,7 +181,7 @@ async fn test_file_discovery() {
     let discovery_file = Arc::new(create_discovery_file(peer_set));
     let discovery_file_for_closure = discovery_file.clone();
     let swarm = SwarmBuilder::new_local(1)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(move |_, config, _| {
             let discovery_file_for_closure2 = discovery_file_for_closure.clone();
             modify_network_config(config, &NetworkId::Validator, move |network| {
@@ -216,7 +216,7 @@ async fn test_file_discovery() {
 async fn test_peer_monitoring_service_enabled() {
     // Create a swarm of 4 validators with peer monitoring enabled
     let swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+        .with_velor()
         .with_init_config(Arc::new(|_, config, _| {
             config.peer_monitoring_service.enable_peer_monitoring_client = true;
         }))

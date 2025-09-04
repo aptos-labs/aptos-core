@@ -7,7 +7,7 @@ warning: [lint] This expression can be simplified to just `0`
   │         ^^^^^^^
   │
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+  = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This expression can be simplified to just `0`
   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:7:9
@@ -16,7 +16,7 @@ warning: [lint] This expression can be simplified to just `0`
   │         ^^^^^^^
   │
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+  = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This expression can be simplified to just `0`
   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:7:9
@@ -25,7 +25,7 @@ warning: [lint] This expression can be simplified to just `0`
   │         ^^^^^^^^^^^
   │
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+  = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This expression can be simplified to just `0`
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:11:10
@@ -34,7 +34,7 @@ warning: [lint] This expression can be simplified to just `0`
    │          ^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This expression can be simplified to just `0`
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:11:9
@@ -43,7 +43,7 @@ warning: [lint] This expression can be simplified to just `0`
    │         ^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This binary operation can be simplified to just the left-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:11:9
@@ -52,7 +52,7 @@ warning: [lint] This binary operation can be simplified to just the left-hand si
    │         ^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This binary operation can be simplified to just the left-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:15:9
@@ -61,7 +61,7 @@ warning: [lint] This binary operation can be simplified to just the left-hand si
    │         ^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This binary operation can be simplified to just the left-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:15:9
@@ -70,7 +70,7 @@ warning: [lint] This binary operation can be simplified to just the left-hand si
    │         ^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This binary operation can be simplified to just the left-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:15:23
@@ -79,7 +79,7 @@ warning: [lint] This binary operation can be simplified to just the left-hand si
    │                       ^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This binary operation can be simplified to just the left-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:15:34
@@ -88,7 +88,7 @@ warning: [lint] This binary operation can be simplified to just the left-hand si
    │                                  ^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This binary operation can be simplified to just the left-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:15:9
@@ -97,7 +97,7 @@ warning: [lint] This binary operation can be simplified to just the left-hand si
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This binary operation can be simplified to just the left-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:19:9
@@ -106,7 +106,7 @@ warning: [lint] This binary operation can be simplified to just the left-hand si
    │         ^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This binary operation can be simplified to just the left-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:19:9
@@ -115,7 +115,7 @@ warning: [lint] This binary operation can be simplified to just the left-hand si
    │         ^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This binary operation can be simplified to just the right-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:23:13
@@ -124,7 +124,7 @@ warning: [lint] This binary operation can be simplified to just the right-hand s
    │             ^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This binary operation can be simplified to just the right-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:23:9
@@ -133,7 +133,7 @@ warning: [lint] This binary operation can be simplified to just the right-hand s
    │         ^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This binary operation can be simplified to just the right-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:23:23
@@ -142,7 +142,7 @@ warning: [lint] This binary operation can be simplified to just the right-hand s
    │                       ^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This binary operation can be simplified to just the right-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:27:9
@@ -151,7 +151,7 @@ warning: [lint] This binary operation can be simplified to just the right-hand s
    │         ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This binary operation can be simplified to just the left-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:31:14
@@ -160,7 +160,7 @@ warning: [lint] This binary operation can be simplified to just the left-hand si
    │              ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
 warning: [lint] This expression can be simplified to just `0`
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:31:9
@@ -169,4 +169,4 @@ warning: [lint] This expression can be simplified to just `0`
    │         ^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
-   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+   = For more information, see https://velor.dev/en/build/smart-contracts/linter#simpler_numeric_expression.

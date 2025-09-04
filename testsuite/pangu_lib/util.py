@@ -45,12 +45,12 @@ GENESIS_ARTIFACTS_CONFIGMAP_NAME: str = "genesis-artifiact-configmap-pangu"
 PANGU_WORKSPACE_NAME: str = "pangu_artifacts"
 # TEMPLATE_DIRECTORY: str = "./pangu_lib/template_testnet_files"
 TEMPLATE_DIRECTORY: str = os.path.join(script_dir, "template_testnet_files")
-NODE_CONFIG_MOUNT_NAME: str = "aptos-config"
-NODE_CONFIG_MOUNT_PATH: str = "/opt/aptos/etc"
+NODE_CONFIG_MOUNT_NAME: str = "velor-config"
+NODE_CONFIG_MOUNT_PATH: str = "/opt/velor/etc"
 GENESIS_ARTIFACTS_MOUNT_NAME: str = "genesis-config"
-GENESIS_ARTIFACTS_MOUNT_PATH: str = "/opt/aptos/genesis"
-NODE_IDENTITY_MOUNT_NAME: str = "aptos-secret"
-NODE_IDENTITY_MOUNT_PATH: str = "/opt/aptos/identites"
+GENESIS_ARTIFACTS_MOUNT_PATH: str = "/opt/velor/genesis"
+NODE_IDENTITY_MOUNT_NAME: str = "velor-secret"
+NODE_IDENTITY_MOUNT_PATH: str = "/opt/velor/identites"
 VALIDATOR_PORT: int = 6180
 FULLNODE_HOST_PORT: int = 6182
 API_PORT: int = 8080
@@ -66,15 +66,15 @@ PLACEHOLDER_VFN_SEED: str = (
 PLACEHOLDER_VFN_DNS4_VALUE: str = (
     "f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237"
 )
-DEFAULT_IMAGE: str = "aptoslabs/validator:devnet@sha256:f0c62463b0e86acc9ad081c54be2d1823f143f780c73828b876caebc978c8947"
-APTOS_DATA_NAME: str = "aptos-data"
-APTOS_DATA_DIR: str = "/opt/aptos/data"
+DEFAULT_IMAGE: str = "velorlabs/validator:devnet@sha256:f0c62463b0e86acc9ad081c54be2d1823f143f780c73828b876caebc978c8947"
+VELOR_DATA_NAME: str = "velor-data"
+VELOR_DATA_DIR: str = "/opt/velor/data"
 LEDGER_DB_NAME: str = "ledger_db"
 STATE_MERKLE_DB_NAME: str = "state_merkle_db"
 STATE_SYNC_DB_NAME: str = "state_sync_db"
 
 DEFAULT_PERSISTENT_VOLUME_CLAIM_SIZE: str = "10Gi"
-DEFAULT_TRANSACTION_EMITTER_IMAGE: str = "aptoslabs/tools:devnet"
+DEFAULT_TRANSACTION_EMITTER_IMAGE: str = "velorlabs/tools:devnet"
 TX_EMITTER_TYPE: str = "tx_emitter"
 
 

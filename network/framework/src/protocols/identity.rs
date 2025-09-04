@@ -1,11 +1,11 @@
-// Copyright © Aptos Foundation
+// Copyright © Velor Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Protocol used to exchange supported protocol information with a remote.
 
 use crate::protocols::wire::handshake::v1::HandshakeMsg;
-use aptos_netcore::framing::{read_u16frame, write_u16frame};
+use velor_netcore::framing::{read_u16frame, write_u16frame};
 use bytes::BytesMut;
 use futures::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use std::io;
@@ -49,9 +49,9 @@ mod tests {
         },
         ProtocolId,
     };
-    use aptos_config::network_id::NetworkId;
-    use aptos_memsocket::MemorySocket;
-    use aptos_types::chain_id::ChainId;
+    use velor_config::network_id::NetworkId;
+    use velor_memsocket::MemorySocket;
+    use velor_types::chain_id::ChainId;
     use futures::{executor::block_on, future::join};
     use std::{collections::BTreeMap, iter::FromIterator};
 

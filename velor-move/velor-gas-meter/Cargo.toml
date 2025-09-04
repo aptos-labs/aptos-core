@@ -1,0 +1,23 @@
+[package]
+name = "velor-gas-meter"
+description = "Gas meter implementation for the Velor blockchain"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+velor-gas-algebra = { workspace = true }
+velor-gas-schedule = { workspace = true }
+velor-logger = { workspace = true }
+velor-types = { workspace = true }
+velor-vm-types = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-types = { workspace = true }
