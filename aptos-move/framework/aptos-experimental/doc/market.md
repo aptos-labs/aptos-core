@@ -570,20 +570,20 @@ TimeBased(time): The order is triggered when the current time is greater than or
 ## Constants
 
 
-<a id="0x7_market_ENOT_ADMIN"></a>
-
-
-
-<pre><code><b>const</b> <a href="market.md#0x7_market_ENOT_ADMIN">ENOT_ADMIN</a>: u64 = 4;
-</code></pre>
-
-
-
 <a id="0x7_market_U64_MAX"></a>
 
 
 
 <pre><code><b>const</b> <a href="market.md#0x7_market_U64_MAX">U64_MAX</a>: u64 = 18446744073709551615;
+</code></pre>
+
+
+
+<a id="0x7_market_ENOT_ADMIN"></a>
+
+
+
+<pre><code><b>const</b> <a href="market.md#0x7_market_ENOT_ADMIN">ENOT_ADMIN</a>: u64 = 4;
 </code></pre>
 
 

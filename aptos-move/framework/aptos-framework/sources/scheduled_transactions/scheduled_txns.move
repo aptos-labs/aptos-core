@@ -582,6 +582,8 @@ module aptos_framework::scheduled_txns {
             authorization_seqno: payload_scheduled_txn_config_auth_seqno(&scheduled_config)
         };
 
+        get_sender_seqno(sender_addr); // Lazy initialization if needed
+
         // Validate the auth token
         validate_auth_token(sender_addr, scheduled_time_ms, &auth_token);
 
@@ -606,7 +608,7 @@ module aptos_framework::scheduled_txns {
         let sender_addr = signer::address_of(sender);
 
         // Validate the auth token (same checks as new_auth_token)
-       validate_auth_token(sender_addr, scheduled_time_ms, &auth_token);
+        validate_auth_token(sender_addr, scheduled_time_ms, &auth_token);
 
         ScheduledTransaction {
             sender_addr,

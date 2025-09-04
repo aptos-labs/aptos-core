@@ -263,6 +263,7 @@ impl EntryFunctionCall {
                     "ModuleId", "TypeTag",
                 ]),
                 ("move_core_types", vec!["ident_str"]),
+                ("move_core_types::u256", vec!["U256"]),
                 ("aptos_types::transaction", vec![
                     "TransactionPayload",
                     "EntryFunction",
@@ -279,6 +280,7 @@ impl EntryFunctionCall {
                 "TransactionPayload",
                 "ModuleId",
                 "Identifier",
+                "U256",
             ])]
         };
 

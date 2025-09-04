@@ -318,6 +318,7 @@ impl RawTransaction {
                     extra_config: TransactionExtraConfig::V1 {
                         multisig_address,
                         replay_protection_nonce: None,
+                        scheduled_txn_auth_token: None,
                     },
                 }),
                 max_gas_amount,
@@ -333,6 +334,7 @@ impl RawTransaction {
                     extra_config: TransactionExtraConfig::V1 {
                         multisig_address,
                         replay_protection_nonce: Some(nonce),
+                        scheduled_txn_auth_token: None,
                     },
                 }),
                 max_gas_amount,
@@ -740,12 +742,23 @@ impl TransactionExecutableRef<'_> {
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct ScheduledTxnConfig {
+    pub allow_rescheduling: bool,
+    pub expiration_time: u64,
+    pub authorization_seqno: u64,
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TransactionExtraConfig {
     V1 {
         multisig_address: Option<AccountAddress>,
         // None for regular transactions
         // Some(nonce) for orderless transactions
         replay_protection_nonce: Option<u64>,
+        // None for regular transactions
+        // Some(config) for scheduled transactions with auth token
+        scheduled_txn_auth_token: Option<ScheduledTxnConfig>,
     },
 }
 
@@ -817,10 +830,12 @@ impl TransactionPayload {
             | TransactionPayload::ModuleBundle(_) => TransactionExtraConfig::V1 {
                 multisig_address: None,
                 replay_protection_nonce: None,
+                scheduled_txn_auth_token: None,
             },
             TransactionPayload::Multisig(multisig) => TransactionExtraConfig::V1 {
                 multisig_address: Some(multisig.multisig_address),
                 replay_protection_nonce: None,
+                scheduled_txn_auth_token: None,
             },
             TransactionPayload::Payload(TransactionPayloadInner::V1 { extra_config, .. }) => {
                 extra_config.clone()
@@ -863,10 +878,12 @@ impl TransactionPayload {
                     TransactionExtraConfig::V1 {
                         multisig_address,
                         replay_protection_nonce,
+                        scheduled_txn_auth_token,
                     } => TransactionExtraConfig::V1 {
                         multisig_address,
                         replay_protection_nonce: replay_protection_nonce
                             .or_else(|| Some(rng.gen())),
+                        scheduled_txn_auth_token,
                     },
                 }
             }
@@ -903,7 +920,17 @@ impl TransactionExtraConfig {
             Self::V1 {
                 multisig_address,
                 replay_protection_nonce: _,
+                scheduled_txn_auth_token: _,
             } => *multisig_address,
+        }
+    }
+
+    pub fn scheduled_txn_auth_token(&self) -> Option<ScheduledTxnConfig> {
+        match self {
+            Self::V1 {
+                scheduled_txn_auth_token,
+                ..
+            } => scheduled_txn_auth_token.clone(),
         }
     }
 }

@@ -1,11 +1,12 @@
 module 0xCAFE::scheduled_txns_usage {
     use std::signer;
-    use std::option::Option;
     use aptos_std::debug;
     use std::string;
     use std::vector;
-    use aptos_framework::scheduled_txns;
+    use aptos_framework::scheduled_txns::{ScheduledTxnAuthToken, ScheduleMapKey, new_scheduled_transaction_no_signer,
+        cancel_with_key, insert, new_scheduled_transaction_gen_auth_token, new_scheduled_transaction_reuse_auth_token};
     use aptos_std::big_ordered_map::{Self, BigOrderedMap};
+    use aptos_framework::timestamp;
 
     struct State has copy, store, drop {
         value: u64
@@ -13,7 +14,7 @@ module 0xCAFE::scheduled_txns_usage {
 
     /// Resource to store the scheduled transaction keys
     struct StoredScheduledTxns has key {
-        txns: BigOrderedMap<scheduled_txns::ScheduleMapKey, ScheduledTransactionInfo>
+        txns: BigOrderedMap<ScheduleMapKey, ScheduledTransactionInfo>
     }
 
     struct ScheduledTransactionInfo has copy, drop, store {
@@ -26,11 +27,12 @@ module 0xCAFE::scheduled_txns_usage {
         sender_addr: address,
         max_gas_amount: u64,
         gas_unit_price: u64,
-        key: scheduled_txns::ScheduleMapKey
+        block_timestamp_ms: u64,
+        key: ScheduleMapKey
     }
 
     #[persistent]
-    fun step(state: State, _s: Option<signer>) {
+    fun step(state: State) {
         debug::print(&string::utf8(b"Move: in the func step with val"));
         debug::print(&state.value);
         if (state.value < 10) {
@@ -39,19 +41,16 @@ module 0xCAFE::scheduled_txns_usage {
     }
 
     #[persistent]
-    fun user_func_abort(_s: Option<signer>) {
+    fun user_func_abort() {
         debug::print(&string::utf8(b"Move: in the user_func_abort"));
         assert!(false, 0x1);
     }
 
     #[persistent]
-    fun user_func_mod_publish(s: Option<signer>) {
+    fun user_func_mod_publish(s: &signer, _auth_token: ScheduledTxnAuthToken) {
         use aptos_framework::code;
 
         debug::print(&string::utf8(b"Move: in the user_func_mod_publish"));
-
-        // Extract the signer from Option<signer> - this will panic if None, which is expected behavior
-        let signer_ref = std::option::extract(&mut s);
 
         // First call to publish_package_txn - this should succeed
         let metadata: vector<u8> = vector[
@@ -76,13 +75,39 @@ module 0xCAFE::scheduled_txns_usage {
             ]
         ];
 
-        code::publish_package_txn(&signer_ref, metadata, code);
+        code::publish_package_txn(s, metadata, code);
 
         debug::print(
             &string::utf8(
                 b"Move: publish_package_txn succeeded - this should not be reached"
             )
         );
+    }
+
+    #[persistent]
+    fun user_func_to_reschedule(
+        sender: &signer,
+        auth_token: ScheduledTxnAuthToken
+    ) {
+        debug::print(&string::utf8(b"Trying to reschedule txn"));
+        let next_schedule_time = timestamp::now_microseconds() / 1000 + 1000; // schedule 1 second later
+
+        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| user_func_to_reschedule(signer, auth_token);
+
+        let txn = new_scheduled_transaction_reuse_auth_token(
+            sender,
+            auth_token,
+            next_schedule_time,
+            1000,
+            200,
+            foo
+        );
+
+        debug::print(&string::utf8(b"Trying to reschedule txn 2"));
+
+        insert(sender, txn);
+
+        debug::print(&string::utf8(b"Trying to reschedule txn 3"));
     }
 
     public entry fun create_and_add_transactions(
@@ -99,32 +124,31 @@ module 0xCAFE::scheduled_txns_usage {
         assert!(gas_prices.length() == num_txns, 0x2);
 
         let txn_map =
-            big_ordered_map::new<scheduled_txns::ScheduleMapKey, ScheduledTransactionInfo>();
+            big_ordered_map::new<ScheduleMapKey, ScheduledTransactionInfo>();
 
         let i = 0;
         while (i < num_txns) {
             let state = State { value: values[i] };
-            let foo = |s: Option<signer>| step(state, s);
+            let foo = || step(state);
             let txn_time = current_time_ms + 1500 * (i + 1);
-            let gas_unit_price = *vector::borrow(&gas_prices, i);
+            let gas_unit_price = gas_prices[i];
             let txn =
-                scheduled_txns::new_scheduled_transaction(
+                new_scheduled_transaction_no_signer(
                     user_addr,
                     txn_time,
-                    *vector::borrow(&gas_amounts, i),
+                    gas_amounts[i],
                     gas_unit_price,
-                    false,
                     foo
                 );
 
-            let key = scheduled_txns::insert(user, txn);
+            let key = insert(user, txn);
 
             let txn_info = ScheduledTransactionInfo {
                 sender_addr: user_addr,
-                max_gas_amount: *vector::borrow(&gas_amounts, i),
-                gas_unit_price: *vector::borrow(&gas_prices, i)
+                max_gas_amount: gas_amounts[i],
+                gas_unit_price: gas_prices[i]
             };
-            big_ordered_map::add(&mut txn_map, key, txn_info);
+            txn_map.add(key, txn_info);
 
             i = i + 1;
         };
@@ -140,32 +164,31 @@ module 0xCAFE::scheduled_txns_usage {
         let gas_unit_price = 200;
         let user_addr = signer::address_of(user);
 
-        let foo_abort = |s: Option<signer>| user_func_abort(s);
+        let foo_abort = || user_func_abort();
         let txn_time = current_time_ms + 1500;
 
         let txn =
-            scheduled_txns::new_scheduled_transaction(
+            new_scheduled_transaction_no_signer(
                 user_addr,
                 txn_time,
                 gas_amount,
                 gas_unit_price,
-                false,
                 foo_abort
             );
 
-        let key = scheduled_txns::insert(user, txn);
+        let key = insert(user, txn);
 
         // Create a ScheduledTransactionInfo and store it
         let txn_info = ScheduledTransactionInfo {
             sender_addr: user_addr,
             max_gas_amount: gas_amount,
-            gas_unit_price: gas_unit_price
+            gas_unit_price
         };
 
         // Store the transaction info in StoredScheduledTxns
         let txn_map =
-            big_ordered_map::new<scheduled_txns::ScheduleMapKey, ScheduledTransactionInfo>();
-        big_ordered_map::add(&mut txn_map, key, txn_info);
+            big_ordered_map::new<ScheduleMapKey, ScheduledTransactionInfo>();
+        txn_map.add(key, txn_info);
         move_to(user, StoredScheduledTxns { txns: txn_map });
     }
 
@@ -176,7 +199,7 @@ module 0xCAFE::scheduled_txns_usage {
         let (first_key, _value) = stored_txns.txns.borrow_front();
 
         // Cancel the scheduled transaction using the first key
-        scheduled_txns::cancel(user, first_key);
+        cancel_with_key(user, first_key);
     }
 
     public entry fun create_and_add_module_pub_txn(
@@ -187,18 +210,17 @@ module 0xCAFE::scheduled_txns_usage {
         let schedule_time = current_time_ms + 1000; // Schedule 1 second later
         let gas_amount = 1000;
         let gas_unit_price = 100;
-        let foo_module_pub = |s: Option<signer>| user_func_mod_publish(s);
+        let foo_module_pub = |s: &signer, auth_token: ScheduledTxnAuthToken| user_func_mod_publish(s, auth_token);
 
         let txn =
-            scheduled_txns::new_scheduled_transaction(
-                user_addr,
+            new_scheduled_transaction_gen_auth_token(
+                user,
                 schedule_time,
                 gas_amount,
                 gas_unit_price,
-                true,
                 foo_module_pub
             );
-        let key = scheduled_txns::insert(user, txn);
+        let key = insert(user, txn);
 
         let txn_info = ScheduledTransactionInfo {
             sender_addr: user_addr,
@@ -206,14 +228,71 @@ module 0xCAFE::scheduled_txns_usage {
             gas_unit_price: gas_unit_price
         };
         let txn_map =
-            big_ordered_map::new<scheduled_txns::ScheduleMapKey, ScheduledTransactionInfo>();
+            big_ordered_map::new<ScheduleMapKey, ScheduledTransactionInfo>();
         big_ordered_map::add(&mut txn_map, key, txn_info);
         move_to(user, StoredScheduledTxns { txns: txn_map });
     }
 
+    /// Generic function to create and add scheduled transactions with custom scheduling functions
+    /// Uses idx to select from predefined array of functions
+    ///
+    /// Function index mapping:
+    /// - 0: user_func_mod_publish (module publish)
+    /// - 1: user_func_xyz (placeholder - define this later)
+    /// - 2: custom_function_2 (placeholder - define this later)
+    /// - 3: custom_function_3 (placeholder - define this later)
+    /// - default: user_func_mod_publish
+    public entry fun create_and_add_custom_txn_template(
+        user: &signer,
+        current_time_ms: u64,
+        delay_ms: u64,
+        gas_amount: u64,
+        gas_unit_price: u64,
+        idx: u64  // Index to select which function to use
+    ) {
+        let user_addr = signer::address_of(user);
+        let schedule_time = current_time_ms + delay_ms;
+
+        // Create the appropriate lambda based on index
+        let txn = if (idx == 1) {
+            // Placeholder for user_func_xyz - you can define this later
+            let user_function = |s: &signer, auth_token: ScheduledTxnAuthToken| user_func_to_reschedule(s, auth_token);  // Replace with actual function
+            new_scheduled_transaction_gen_auth_token(
+                user,
+                schedule_time,
+                gas_amount,
+                gas_unit_price,
+                user_function
+            )
+        } else {
+            // Placeholder for another custom function
+            let user_function = |s: &signer, auth_token: ScheduledTxnAuthToken| user_func_mod_publish(s, auth_token);  // Replace with actual function
+            new_scheduled_transaction_gen_auth_token(
+                user,
+                schedule_time,
+                gas_amount,
+                gas_unit_price,
+                user_function
+            )
+        };
+
+        let key = insert(user, txn);
+
+        let txn_info = ScheduledTransactionInfo {
+            sender_addr: user_addr,
+            max_gas_amount: gas_amount,
+            gas_unit_price
+        };
+        let txn_map =
+            big_ordered_map::new<ScheduleMapKey, ScheduledTransactionInfo>();
+        txn_map.add(key, txn_info);
+        move_to(user, StoredScheduledTxns { txns: txn_map });
+    }
+
+
     #[view]
     public fun get_stored_sched_txns(
-        addr: address
+        addr: address, block_timestamp_ms: u64
     ): vector<ScheduledTransactionInfoWithKey> acquires StoredScheduledTxns {
         let stored_txns = borrow_global<StoredScheduledTxns>(addr);
         let result = vector::empty<ScheduledTransactionInfoWithKey>();
@@ -225,6 +304,7 @@ module 0xCAFE::scheduled_txns_usage {
                         sender_addr: value.sender_addr,
                         max_gas_amount: value.max_gas_amount,
                         gas_unit_price: value.gas_unit_price,
+                        block_timestamp_ms,
                         key: *key
                     };
                 result.push_back(txn_info_with_key);

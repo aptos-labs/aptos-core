@@ -42,6 +42,8 @@ pub struct ScheduledTransactionInfoWithKey {
     pub max_gas_amount: u64,
     /// Unit price of gas for this transaction
     pub gas_unit_price: u64,
+    /// Timestamp when the transaction is executed
+    pub block_timestamp_ms: u64,
     /// Key to the scheduled txn in the Schedule queue
     pub key: ScheduleMapKey,
 }

@@ -2967,10 +2967,10 @@ impl AptosVM {
             false,
         )?;
 
-        // no need of scheduled txn prologue for now.
         let args = vec![
             MoveValue::Signer(txn.sender_handle),
             txn.key.as_move_value(),
+            MoveValue::U64(txn.block_timestamp_ms),
         ];
 
         let mut session = ScheduledTxnSession::spawn(
@@ -2984,6 +2984,7 @@ impl AptosVM {
         let user_func_status = session.session.execute(|session| {
             // Run the user function for the scheduled transaction.
             // The user function is expected to be defined in the scheduled transactions module.
+            info!("Going to execute the sched txn wrapper ....");
             session.execute_function_bypass_visibility(
                 &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
                 &SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_name,
@@ -2994,6 +2995,7 @@ impl AptosVM {
                 code_storage,
             )
         });
+        info!("Executed the sched txn wrapper, got status {:?}", user_func_status);
         let txn_status = match user_func_status {
             Ok(success_status) => {
                 let user_func_executed =
