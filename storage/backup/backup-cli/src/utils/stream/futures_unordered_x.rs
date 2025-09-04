@@ -78,13 +78,13 @@ impl<Fut: Future> Stream for FuturesUnorderedX<Fut> {
             }
         }
 
-        if let Some(output) = self.queued_outputs.pop_front() {
+        match self.queued_outputs.pop_front() { Some(output) => {
             Poll::Ready(Some(output))
-        } else if self.in_progress.is_empty() {
+        } _ => if self.in_progress.is_empty() {
             Poll::Ready(None)
         } else {
             Poll::Pending
-        }
+        }}
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
