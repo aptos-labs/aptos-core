@@ -14,7 +14,9 @@ use aptos_types::{
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{account_address::AccountAddress, gas_algebra::NumBytes};
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{
+    native_extensions::NativeExtensionSession, native_functions::NativeFunction,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
@@ -170,6 +172,22 @@ pub struct NativeCodeContext {
     /// using the native code defined in this context. It is later extracted by the VM for further
     /// checks and processing the actual publish.
     requested_module_bundle: Option<PublishRequest>,
+}
+
+impl NativeExtensionSession for NativeCodeContext {
+    fn abort(&mut self) {
+        // No state changes to abort. Context will be reset on new session's start.
+    }
+
+    fn finish(&mut self) {
+        // No state changes to save.
+    }
+
+    fn start(&mut self, _txn_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        // TODO(sessions): consider not enabling context for prologue.
+        self.enabled = true;
+        self.requested_module_bundle = None;
+    }
 }
 
 impl NativeCodeContext {

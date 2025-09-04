@@ -21,6 +21,7 @@ use curve25519_dalek::{
     traits::{Identity, VartimeMultiscalarMul},
 };
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
+use move_vm_runtime::native_extensions::NativeExtensionSession;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Reference, StructRef, Value, VectorRef},
@@ -34,7 +35,6 @@ use std::{
     fmt::Display,
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
-
 //
 // Public Data Structures and Constants
 //
@@ -80,6 +80,20 @@ const HANDLE_FIELD_INDEX: usize = 0;
 //
 // Implementation of Native RistrettoPoint Context
 //
+
+impl NativeExtensionSession for NativeRistrettoPointContext {
+    fn abort(&mut self) {
+        // No state changes to abort. Context will be reset on new session's start.
+    }
+
+    fn finish(&mut self) {
+        // No state changes to save.
+    }
+
+    fn start(&mut self, _txn_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        self.point_data.borrow_mut().points.clear();
+    }
+}
 
 impl NativeRistrettoPointContext {
     /// Create a new instance of a native RistrettoPoint context. This must be passed in via an
@@ -677,5 +691,23 @@ fn compressed_point_from_bytes(bytes: Vec<u8>) -> Option<CompressedRistretto> {
     match <[u8; COMPRESSED_POINT_NUM_BYTES]>::try_from(bytes) {
         Ok(slice) => Some(CompressedRistretto(slice)),
         Err(_) => None,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_extension_update() {
+        let mut ctx = NativeRistrettoPointContext::new();
+        ctx.point_data
+            .borrow_mut()
+            .points
+            .push(RistrettoPoint::identity());
+        ctx.start(&[0; 32], &[], 0);
+
+        let NativeRistrettoPointContext { point_data } = ctx;
+        assert!(point_data.into_inner().points.is_empty());
     }
 }

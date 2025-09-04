@@ -13,6 +13,7 @@ use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetad
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::MoveTypeLayout;
+use move_vm_runtime::native_extensions::NativeExtensionSession;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     cell::RefCell,
@@ -53,6 +54,21 @@ pub struct NativeAggregatorContext<'a> {
     pub(crate) delayed_field_optimization_enabled: bool,
     pub(crate) delayed_field_resolver: &'a dyn DelayedFieldResolver,
     pub(crate) delayed_field_data: RefCell<DelayedFieldData>,
+}
+
+impl<'a> NativeExtensionSession for NativeAggregatorContext<'a> {
+    fn abort(&mut self) {
+        // TODO(sessions): implement
+    }
+
+    fn finish(&mut self) {
+        // TODO(sessions): implement
+    }
+
+    fn start(&mut self, txn_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        self.txn_hash = *txn_hash;
+        // TODO(sessions): implement
+    }
 }
 
 impl<'a> NativeAggregatorContext<'a> {

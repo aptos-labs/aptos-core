@@ -140,7 +140,6 @@ pub enum FeatureFlag {
     ORDERLESS_TRANSACTIONS = 94,
     // TODO(lazy-loading): Add link to AIP and its number + brief description.
     ENABLE_LAZY_LOADING = 95,
-
     CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
     DISTRIBUTE_TRANSACTION_FEE = 97,
     MONOTONICALLY_INCREASING_COUNTER = 98,
@@ -148,6 +147,7 @@ pub enum FeatureFlag {
     /// Whether to allow trusted code optimizations.
     ENABLE_TRUSTED_CODE = 100,
     ENABLE_ENUM_OPTION = 101,
+    APTOS_VM_V2 = 102,
 }
 
 impl FeatureFlag {
@@ -450,6 +450,10 @@ impl Features {
 
     pub fn is_enum_option_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION)
+    }
+
+    pub fn is_aptos_vm_v2_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::APTOS_VM_V2)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
