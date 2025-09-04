@@ -115,9 +115,9 @@ impl FrameTypeCache {
         let ((field_ty, field_ty_count), (struct_ty, struct_ty_count)) =
             Self::get_or(&mut self.field_instantiation, idx, |idx| {
                 let struct_type = frame.field_instantiation_to_struct(idx)?;
-                let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
+                let struct_ty_count = NumTypeNodes::new(0);
                 let field_ty = frame.get_generic_field_ty(idx)?;
-                let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
+                let field_ty_count = NumTypeNodes::new(0);
                 Ok(((field_ty, field_ty_count), (struct_type, struct_ty_count)))
             })?;
         Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
@@ -135,10 +135,10 @@ impl FrameTypeCache {
                     &info.definition_struct_type,
                     &info.instantiation,
                 )?;
-                let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
+                let struct_ty_count = NumTypeNodes::new(0);
                 let field_ty =
                     frame.instantiate_ty(&info.uninstantiated_field_ty, &info.instantiation)?;
-                let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
+                let field_ty_count = NumTypeNodes::new(0);
                 Ok(((field_ty, field_ty_count), (struct_type, struct_ty_count)))
             })?;
         Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
@@ -152,7 +152,7 @@ impl FrameTypeCache {
     ) -> PartialVMResult<(&Type, NumTypeNodes)> {
         let (ty, ty_count) = Self::get_or(&mut self.struct_def_instantiation_type, idx, |idx| {
             let ty = frame.get_generic_struct_ty(idx)?;
-            let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
+            let ty_count = NumTypeNodes::new(0);
             Ok((ty, ty_count))
         })?;
         Ok((ty, *ty_count))
@@ -171,7 +171,7 @@ impl FrameTypeCache {
                     &info.definition_struct_type,
                     &info.instantiation,
                 )?;
-                let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
+                let ty_count = NumTypeNodes::new(0);
                 Ok((ty, ty_count))
             })?;
         Ok((ty, *ty_count))
@@ -191,7 +191,7 @@ impl FrameTypeCache {
                     .instantiate_generic_struct_fields(idx)?
                     .into_iter()
                     .map(|ty| {
-                        let num_nodes = NumTypeNodes::new(ty.num_nodes() as u64);
+                        let num_nodes = NumTypeNodes::new(0);
                         (ty, num_nodes)
                     })
                     .collect::<Vec<_>>())
@@ -213,7 +213,7 @@ impl FrameTypeCache {
                     .instantiate_generic_struct_variant_fields(idx)?
                     .into_iter()
                     .map(|ty| {
-                        let num_nodes = NumTypeNodes::new(ty.num_nodes() as u64);
+                        let num_nodes = NumTypeNodes::new(0);
                         (ty, num_nodes)
                     })
                     .collect::<Vec<_>>())
@@ -229,7 +229,7 @@ impl FrameTypeCache {
     ) -> PartialVMResult<(&Type, NumTypeNodes)> {
         let (ty, ty_count) = Self::get_or(&mut self.single_sig_token_type, idx, |idx| {
             let ty = frame.instantiate_single_type(idx)?;
-            let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
+            let ty_count = NumTypeNodes::new(0);
             Ok((ty, ty_count))
         })?;
         Ok((ty, *ty_count))
