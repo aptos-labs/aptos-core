@@ -66,6 +66,7 @@ pub fn handle_request<'a, F, R, Req, Resp>(
     RosettaContext,
 ) -> BoxFuture<'static, Result<warp::reply::WithStatus<warp::reply::Json>, Infallible>>
        + Clone
+       + use<F, R, Req, Resp>
 where
     F: FnOnce(Req, RosettaContext) -> R + Clone + Copy + Send + 'static,
     R: Future<Output = Result<Resp, ApiError>> + Send,
