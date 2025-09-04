@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::TIMER;
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::state_update_refs::StateUpdateRefs;
 use aptos_types::transaction::{PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version};

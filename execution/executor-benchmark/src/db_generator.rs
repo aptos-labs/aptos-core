@@ -2,11 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{add_accounts_impl, PipelineConfig};
+use crate::{PipelineConfig, add_accounts_impl};
 use aptos_config::{
     config::{
-        PrunerConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
-        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+        BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        NO_OP_STORAGE_PRUNER_CONFIG, PrunerConfig, RocksdbConfigs, StorageDirPaths,
     },
     utils::get_genesis_txn,
 };
@@ -16,13 +16,13 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     jwks::{jwk::JWK, patch::IssuerJWK},
     keyless::{
+        Groth16VerificationKey,
         circuit_constants::TEST_GROTH16_SETUP,
         test_utils::{get_sample_iss, get_sample_jwk},
-        Groth16VerificationKey,
     },
     on_chain_config::Features,
 };
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
+use aptos_vm::{VMBlockExecutor, aptos_vm::AptosVMBlockExecutor};
 use std::{fs, path::Path, sync::Arc};
 
 pub fn create_db_with_accounts<V>(

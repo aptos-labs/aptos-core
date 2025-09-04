@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    pruner::state_merkle_pruner::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
+    pruner::state_merkle_pruner::{StateMerklePruner, generics::StaleNodeIndexSchemaTrait},
     schema::{
         db_metadata::{DbMetadataSchema, DbMetadataValue},
         jellyfish_merkle_node::JellyfishMerkleNodeSchema,
@@ -11,12 +11,12 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_jellyfish_merkle::StaleNodeIndex;
-use aptos_schemadb::{batch::SchemaBatch, schema::KeyCodec, DB};
+use aptos_schemadb::{DB, batch::SchemaBatch, schema::KeyCodec};
 use aptos_types::transaction::{AtomicVersion, Version};
 use std::{
     cmp::max,
     marker::PhantomData,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
 };
 
 pub(in crate::pruner) struct StateMerkleMetadataPruner<S> {

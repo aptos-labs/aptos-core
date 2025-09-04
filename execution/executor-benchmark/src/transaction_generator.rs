@@ -10,15 +10,15 @@ use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
 use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_sdk::{
-    transaction_builder::{aptos_stdlib, TransactionFactory},
+    transaction_builder::{TransactionFactory, aptos_stdlib},
     types::LocalAccount,
 };
 use aptos_storage_interface::{
-    state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter,
+    DbReader, DbReaderWriter, state_store::state_view::db_state_view::LatestDbStateCheckpointView,
 };
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{aptos_test_root_address, AccountResource},
+    account_config::{AccountResource, aptos_test_root_address},
     chain_id::ChainId,
     state_store::MoveResourceExt,
     transaction::{EntryFunction, Transaction, TransactionPayload},
@@ -29,10 +29,10 @@ use itertools::Itertools;
 use move_core_types::{ident_str, language_storage::ModuleId};
 #[cfg(test)]
 use rand::SeedableRng;
-use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng};
+use rand::{Rng, rngs::StdRng, seq::SliceRandom, thread_rng};
 use rayon::{
-    iter::{IntoParallelRefIterator, ParallelIterator},
     ThreadPool, ThreadPoolBuilder,
+    iter::{IntoParallelRefIterator, ParallelIterator},
 };
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
@@ -44,8 +44,9 @@ use std::{
     io::{Read, Write},
     path::Path,
     sync::{
+        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
-        mpsc, Arc, Mutex,
+        mpsc,
     },
 };
 use thread_local::ThreadLocal;
@@ -583,7 +584,8 @@ impl TransactionGenerator {
         if 2 * conflicting_tx_grps >= num_signer_accounts {
             panic!(
                 "For the desired workload we want num_signer_accounts ({}) > 2 * num_txns_per_grp ({})",
-                num_signer_accounts, num_txns_per_grp);
+                num_signer_accounts, num_txns_per_grp
+            );
         } else if conflicting_tx_grps > block_size {
             panic!(
                 "connected_tx_grps ({}) > block_size ({}) cannot guarantee at least 1 txn per grp",
@@ -605,7 +607,7 @@ impl TransactionGenerator {
                 let conflicting_indices: Vec<_> = (0..num_txns_per_grp)
                     .map(|_| {
                         let index2 = accounts_pool[rng.gen_range(0, accounts_pool.len())];
-                        if rng.gen::<bool>() {
+                        if rng.r#gen::<bool>() {
                             (index1, index2)
                         } else {
                             (index2, index1)

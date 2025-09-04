@@ -3,16 +3,16 @@
 
 use anyhow::Result;
 use aptos_types::{
+    AptosCoinType, CoinType,
     account_address::AccountAddress,
     account_config::{
-        primary_apt_store, AccountResource, CoinInfoResource, CoinStoreResource,
-        ConcurrentSupplyResource, FungibleStoreResource, ObjectCoreResource, ObjectGroupResource,
-        TypeInfoResource,
+        AccountResource, CoinInfoResource, CoinStoreResource, ConcurrentSupplyResource,
+        FungibleStoreResource, ObjectCoreResource, ObjectGroupResource, TypeInfoResource,
+        primary_apt_store,
     },
     event::{EventHandle, EventKey},
-    state_store::{state_key::StateKey, StateView},
+    state_store::{StateView, state_key::StateKey},
     write_set::TOTAL_SUPPLY_STATE_KEY,
-    AptosCoinType, CoinType,
 };
 use itertools::Itertools;
 use move_core_types::{

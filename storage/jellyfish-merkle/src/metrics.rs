@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_int_counter, register_int_counter_vec, register_int_gauge, IntCounter, IntCounterVec,
-    IntGauge,
+    IntCounter, IntCounterVec, IntGauge, register_int_counter, register_int_counter_vec,
+    register_int_gauge,
 };
 use once_cell::sync::Lazy;
 

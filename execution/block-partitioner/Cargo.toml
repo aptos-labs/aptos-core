@@ -1,12 +1,11 @@
 [package]
 name = "aptos-block-partitioner"
 description = "A tool to partition a block store into smaller chunks based on graph partitioning."
-
 version = "0.1.0"
+edition = "2024"
 
 # Workspace inherited keys
 authors = { workspace = true }
-edition = { workspace = true }
 homepage = { workspace = true }
 license = { workspace = true }
 publish = { workspace = true }

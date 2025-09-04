@@ -5,14 +5,14 @@ use crate::{
     metrics,
     metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
 };
-use anyhow::{anyhow, ensure, Result};
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
+use anyhow::{Result, anyhow, ensure};
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_block_executor::txn_provider::TxnProvider;
+use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_crypto::HashValue;
 use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
-    remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
+    remote_executor_client::{REMOTE_SHARDED_BLOCK_EXECUTOR, get_remote_addresses},
 };
 use aptos_executor_types::{
     execution_output::ExecutionOutput,
@@ -38,13 +38,13 @@ use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        TStateView,
+        TStateView, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
     },
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
-        AuxiliaryInfoTrait, BlockOutput, PersistedAuxiliaryInfo, Transaction, TransactionOutput,
-        TransactionStatus, Version,
+        AuxiliaryInfo, AuxiliaryInfoTrait, BlockOutput, PersistedAuxiliaryInfo, Transaction,
+        TransactionOutput, TransactionStatus, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction,
     },
     write_set::{HotStateOp, TransactionWrite, WriteSet},
 };

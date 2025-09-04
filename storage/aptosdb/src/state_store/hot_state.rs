@@ -10,16 +10,16 @@ use aptos_storage_interface::state_store::{
     state::State, state_view::hot_state_view::HotStateView,
 };
 use aptos_types::state_store::{
-    hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS,
+    NUM_STATE_SHARDS, hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
 };
 use arr_macro::arr;
 use dashmap::{
-    mapref::one::{Ref, RefMut},
     DashMap,
+    mapref::one::{Ref, RefMut},
 };
 use std::sync::{
-    mpsc::{Receiver, SyncSender, TryRecvError},
     Arc,
+    mpsc::{Receiver, SyncSender, TryRecvError},
 };
 
 const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;

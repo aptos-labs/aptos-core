@@ -22,16 +22,16 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
+use aptos_jellyfish_merkle::{StaleNodeIndex, node_type::NodeKey};
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{schema::KeyCodec, DB};
+use aptos_schemadb::{DB, schema::KeyCodec};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
 use rayon::prelude::*;
 use std::{
     marker::PhantomData,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
 };
 
 /// Responsible for pruning the state tree.

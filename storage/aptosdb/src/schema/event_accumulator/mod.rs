@@ -11,7 +11,7 @@
 //! | version | position |  hash   |
 //! ```
 
-use crate::schema::{ensure_slice_len_eq, EVENT_ACCUMULATOR_CF_NAME};
+use crate::schema::{EVENT_ACCUMULATOR_CF_NAME, ensure_slice_len_eq};
 use anyhow::Result;
 use aptos_crypto::hash::HashValue;
 use aptos_schemadb::{

@@ -7,15 +7,15 @@ use crate::{
     metrics::{LATEST_SNAPSHOT_VERSION, OTHER_TIMERS_SECONDS},
     pruner::PrunerManager,
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    state_store::{buffered_state::CommitMessage, persisted_state::PersistedState, StateDb},
+    state_store::{StateDb, buffered_state::CommitMessage, persisted_state::PersistedState},
 };
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{Result, anyhow, ensure};
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_logger::{info, trace};
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::RawBatch;
 use aptos_storage_interface::state_store::{state::State, state_with_summary::StateWithSummary};
-use std::sync::{mpsc::Receiver, Arc};
+use std::sync::{Arc, mpsc::Receiver};
 
 pub struct StateMerkleBatch {
     pub top_levels_batch: RawBatch,

@@ -3,10 +3,11 @@
 
 use crate::{db::test_helper::arb_key_universe, state_store::persisted_state::PersistedState};
 use aptos_block_executor::hot_state_op_accumulator::BlockHotStateOpAccumulator;
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{HashValue, hash::CryptoHash};
 use aptos_infallible::Mutex;
 use aptos_scratchpad::test_utils::naive_smt::NaiveSmt;
 use aptos_storage_interface::{
+    DbReader, Result as DbResult,
     state_store::{
         state::{LedgerState, State},
         state_summary::{LedgerStateSummary, ProvableStateSummary, StateSummary},
@@ -14,17 +15,16 @@ use aptos_storage_interface::{
         state_view::cached_state_view::CachedStateView,
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
     },
-    DbReader, Result as DbResult,
 };
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
+        StateViewId, StateViewResult, TStateView,
         hot_state::LRUEntry,
         state_key::StateKey,
         state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, ARB_STATE_VALUE_MAX_SIZE},
-        StateViewId, StateViewResult, TStateView,
+        state_value::{ARB_STATE_VALUE_MAX_SIZE, StateValue},
     },
     transaction::Version,
     write_set::{BaseStateOp, HotStateOp, WriteOp},
@@ -39,8 +39,8 @@ use std::{
     num::NonZeroUsize,
     ops::Deref,
     sync::{
-        mpsc::{channel, Receiver, Sender},
         Arc,
+        mpsc::{Receiver, Sender, channel},
     },
     thread::spawn,
 };

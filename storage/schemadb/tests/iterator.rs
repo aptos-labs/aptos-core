@@ -4,14 +4,13 @@
 
 use anyhow::Result;
 use aptos_schemadb::{
-    define_schema,
+    DB, define_schema,
     iterator::SchemaIterator,
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
-    DB,
 };
 use aptos_storage_interface::AptosDbError;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use rocksdb::{ColumnFamilyDescriptor, SliceTransform, DEFAULT_COLUMN_FAMILY_NAME};
+use rocksdb::{ColumnFamilyDescriptor, DEFAULT_COLUMN_FAMILY_NAME, SliceTransform};
 
 define_schema!(TestSchema, TestKey, TestValue, "TestCF");
 

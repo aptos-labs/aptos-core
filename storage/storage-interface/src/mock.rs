@@ -4,12 +4,12 @@
 
 //! This module provides mock dbreader for tests.
 
-use crate::{errors::AptosDbError, DbReader, DbWriter, Result};
+use crate::{DbReader, DbWriter, Result, errors::AptosDbError};
 use aptos_crypto::HashValue;
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
-        state_key::{inner::StateKeyInner, StateKey},
+        state_key::{StateKey, inner::StateKeyInner},
         state_value::StateValue,
     },
     transaction::Version,

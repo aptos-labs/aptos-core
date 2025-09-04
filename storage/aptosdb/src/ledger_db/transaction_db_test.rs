@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ledger_db::transaction_db::TransactionDb, AptosDB};
+use crate::{AptosDB, ledger_db::transaction_db::TransactionDb};
 use aptos_crypto::hash::CryptoHash;
 use aptos_proptest_helpers::Index;
 use aptos_schemadb::batch::SchemaBatch;
@@ -137,8 +137,8 @@ pub(crate) fn init_db(
 ) -> Vec<Transaction> {
     let txns = gens
         .into_iter()
-        .map(|(index, gen)| {
-            Transaction::UserTransaction(gen.materialize(*index, &mut universe).into_inner())
+        .map(|(index, txn_gen)| {
+            Transaction::UserTransaction(txn_gen.materialize(*index, &mut universe).into_inner())
         })
         .collect::<Vec<_>>();
 

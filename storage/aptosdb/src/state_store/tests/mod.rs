@@ -6,23 +6,23 @@ mod speculative_state_workflow;
 
 use super::*;
 use crate::{
+    AptosDB,
     db::test_helper::{arb_state_kv_sets_with_genesis, update_store},
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     state_restore::StateSnapshotRestore,
-    AptosDB,
 };
 use aptos_jellyfish_merkle::{
-    node_type::{Node, NodeKey},
     TreeReader,
+    node_type::{Node, NodeKey},
 };
 use aptos_storage_interface::{DbReader, DbWriter, StateSnapshotReceiver};
 use aptos_temppath::TempPath;
 use aptos_types::{
+    AptosCoinType,
     account_address::AccountAddress,
     account_config::{AccountResource, ChainIdResource, CoinInfoResource, CoinStoreResource},
     nibble::nibble_path::NibblePath,
     state_store::state_key::inner::StateKeyTag,
-    AptosCoinType,
 };
 use proptest::{collection::hash_map, prelude::*};
 use std::collections::{BTreeMap, HashMap};
@@ -76,9 +76,11 @@ fn test_empty_store() {
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
     let key = StateKey::raw(b"test_key");
-    assert!(store
-        .get_state_value_with_proof_by_version(&key, 0)
-        .is_err());
+    assert!(
+        store
+            .get_state_value_with_proof_by_version(&key, 0)
+            .is_err()
+    );
 }
 
 #[test]

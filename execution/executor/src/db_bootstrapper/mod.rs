@@ -6,14 +6,14 @@
 
 use crate::{
     types::executed_chunk::ExecutedChunk,
-    workflow::{do_get_execution_output::DoGetExecutionOutput, ApplyExecutionOutput},
+    workflow::{ApplyExecutionOutput, do_get_execution_output::DoGetExecutionOutput},
 };
-use anyhow::{anyhow, ensure, format_err, Result};
+use anyhow::{Result, anyhow, ensure, format_err};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
-    state_store::state_view::cached_state_view::CachedStateView, DbReaderWriter, DbWriter,
-    LedgerSummary,
+    DbReaderWriter, DbWriter, LedgerSummary,
+    state_store::state_view::cached_state_view::CachedStateView,
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
@@ -25,7 +25,7 @@ use aptos_types::{
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ConfigurationResource,
-    state_store::{state_key::StateKey, StateViewId, TStateView},
+    state_store::{StateViewId, TStateView, state_key::StateKey},
     timestamp::TimestampResource,
     transaction::{AuxiliaryInfo, AuxiliaryInfoTrait, Transaction},
     waypoint::Waypoint,

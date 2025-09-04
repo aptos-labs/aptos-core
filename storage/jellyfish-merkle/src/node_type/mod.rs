@@ -14,18 +14,17 @@
 mod node_type_test;
 
 use crate::{
-    get_hash,
+    Key, TreeReader, get_hash,
     metrics::{APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES},
-    Key, TreeReader,
 };
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, ensure};
 use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
 };
 use aptos_types::{
-    nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
-    proof::{definition::NodeInProof, SparseMerkleInternalNode, SparseMerkleLeafNode},
+    nibble::{Nibble, ROOT_NIBBLE_HEIGHT, nibble_path::NibblePath},
+    proof::{SparseMerkleInternalNode, SparseMerkleLeafNode, definition::NodeInProof},
     transaction::Version,
 };
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
@@ -38,7 +37,7 @@ use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    io::{prelude::*, Cursor, Read, SeekFrom, Write},
+    io::{Cursor, Read, SeekFrom, Write, prelude::*},
     mem::size_of,
     sync::Arc,
 };
@@ -400,7 +399,7 @@ impl InternalNode {
                     existing: existence_bitmap,
                     leaves: leaf_bitmap,
                 }
-                .into())
+                .into());
             },
             _ => (),
         }

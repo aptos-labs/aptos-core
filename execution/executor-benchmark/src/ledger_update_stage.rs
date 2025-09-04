@@ -10,7 +10,7 @@ use aptos_vm::VMBlockExecutor;
 use move_core_types::language_storage::StructTag;
 use std::{
     collections::BTreeMap,
-    sync::{mpsc, Arc},
+    sync::{Arc, mpsc},
 };
 
 pub enum CommitProcessing {

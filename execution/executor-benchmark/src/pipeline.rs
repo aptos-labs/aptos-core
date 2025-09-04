@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    OverallMeasurement, TransactionCommitter, TransactionExecutor,
     block_preparation::BlockPreparationStage,
     ledger_update_stage::{CommitProcessing, LedgerUpdateStage},
     measurements::{EventMeasurements, OverallMeasuring},
     metrics::NUM_TXNS,
-    OverallMeasurement, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
 use aptos_executor::block_executor::BlockExecutor;
-use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
+use aptos_executor_types::{BlockExecutorTrait, state_compute_result::StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_metrics_core::IntCounterVecHelper;
@@ -26,8 +26,8 @@ use std::{
     collections::{BTreeMap, HashMap},
     marker::PhantomData,
     sync::{
-        mpsc::{self, SyncSender},
         Arc,
+        mpsc::{self, SyncSender},
     },
     thread::JoinHandle,
     time::{Duration, Instant},

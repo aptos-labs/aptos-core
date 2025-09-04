@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    BlockPartitioner, PartitionerConfig,
     pre_partition::{
-        connected_component::config::ConnectedComponentPartitionerConfig, PrePartitionerConfig,
+        PrePartitionerConfig, connected_component::config::ConnectedComponentPartitionerConfig,
     },
     v2::PartitionerV2,
-    BlockPartitioner, PartitionerConfig,
 };
 
 #[derive(Debug)]

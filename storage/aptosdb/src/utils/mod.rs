@@ -5,7 +5,7 @@ pub mod iterators;
 pub(crate) mod truncation_helper;
 
 use crate::schema::db_metadata::{DbMetadataKey, DbMetadataSchema};
-use aptos_schemadb::{batch::NativeBatch, DB};
+use aptos_schemadb::{DB, batch::NativeBatch};
 use aptos_storage_interface::Result;
 use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
 

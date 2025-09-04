@@ -9,10 +9,10 @@ use aptos_backup_cli::{
     utils::{ConcurrentDownloadsOpt, ReplayConcurrencyLevelOpt, RocksdbOpt, TrustedWaypointOpt},
 };
 use aptos_config::config::{
-    StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-    NO_OP_STORAGE_PRUNER_CONFIG,
+    BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    NO_OP_STORAGE_PRUNER_CONFIG, StorageDirPaths,
 };
-use aptos_db::{get_restore_handler::GetRestoreHandler, AptosDB};
+use aptos_db::{AptosDB, get_restore_handler::GetRestoreHandler};
 use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::info;
 use aptos_types::transaction::Version;

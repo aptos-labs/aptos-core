@@ -5,8 +5,8 @@
 use crate::{
     db_access::DbAccessUtil,
     native::{
-        native_config::{NativeConfig, NATIVE_EXECUTOR_POOL},
-        native_transaction::{compute_deltas_for_batch, NativeTransaction},
+        native_config::{NATIVE_EXECUTOR_POOL, NativeConfig},
+        native_transaction::{NativeTransaction, compute_deltas_for_batch},
     },
 };
 use aptos_aggregator::{
@@ -24,11 +24,12 @@ use aptos_block_executor::{
 use aptos_logger::error;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
+    AptosCoinType,
     account_address::AccountAddress,
     account_config::{
-        primary_apt_store, AccountResource, CoinInfoResource, CoinRegister, CoinStoreResource,
+        AccountResource, CoinInfoResource, CoinRegister, CoinStoreResource,
         ConcurrentSupplyResource, DepositEvent, DepositFAEvent, FungibleStoreResource,
-        WithdrawEvent, WithdrawFAEvent,
+        WithdrawEvent, WithdrawFAEvent, primary_apt_store,
     },
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
@@ -38,17 +39,16 @@ use aptos_types::{
     fee_statement::FeeStatement,
     move_utils::{move_event_v1::MoveEventV1Type, move_event_v2::MoveEventV2Type},
     on_chain_config::FeatureFlag,
-    state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
+    state_store::{StateView, state_key::StateKey, state_value::StateValueMetadata},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
-        Transaction, TransactionOutput, TransactionStatus, WriteSetPayload,
+        AuxiliaryInfo, BlockOutput, Transaction, TransactionOutput, TransactionStatus,
+        WriteSetPayload, signature_verified_transaction::SignatureVerifiedTransaction,
     },
     write_set::WriteOp,
-    AptosCoinType,
 };
 use aptos_vm::{
-    block_executor::{AptosBlockExecutorWrapper, AptosTransactionOutput},
     VMBlockExecutor,
+    block_executor::{AptosBlockExecutorWrapper, AptosTransactionOutput},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
@@ -68,7 +68,7 @@ use move_core_types::{
     vm_status::VMStatus,
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
 pub struct NativeVMBlockExecutor;
@@ -699,7 +699,7 @@ impl NativeVMExecutorTask {
                     gas,
                     resource_write_set,
                     events,
-                )
+                );
             },
             Some((sender_coin_store, metadata)) => (sender_coin_store, metadata),
         };

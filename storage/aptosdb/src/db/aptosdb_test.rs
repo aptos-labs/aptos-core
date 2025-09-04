@@ -3,22 +3,22 @@
 
 use crate::{
     db::{
+        AptosDB,
         aptosdb_internal::get_first_seq_num_and_limit,
         test_helper::{
             arb_blocks_to_commit, put_transaction_auxiliary_data, test_save_blocks_impl,
             test_sync_transactions_impl,
         },
-        AptosDB,
     },
     pruner::{LedgerPrunerManager, PrunerManager, StateMerklePrunerManager},
     schema::stale_node_index::StaleNodeIndexSchema,
 };
 use aptos_config::config::{
+    BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
-    StateMerklePrunerConfig, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
-    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    StateMerklePrunerConfig, StorageDirPaths,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{HashValue, hash::CryptoHash};
 use aptos_storage_interface::{DbReader, Order};
 use aptos_temppath::TempPath;
 use aptos_types::{

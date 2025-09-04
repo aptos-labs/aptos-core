@@ -4,11 +4,11 @@
 
 use crate::sparse_merkle::utils::partition;
 use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
 };
 use aptos_types::proof::{
-    definition::NodeInProof, SparseMerkleInternalNode, SparseMerkleLeafNode, SparseMerkleProofExt,
+    SparseMerkleInternalNode, SparseMerkleLeafNode, SparseMerkleProofExt, definition::NodeInProof,
 };
 use bitvec::prelude::*;
 use dashmap::DashMap;

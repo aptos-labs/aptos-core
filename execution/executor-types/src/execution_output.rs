@@ -16,7 +16,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     transaction::{
-        block_epilogue::BlockEndInfo, ExecutionStatus, Transaction, TransactionStatus, Version,
+        ExecutionStatus, Transaction, TransactionStatus, Version, block_epilogue::BlockEndInfo,
     },
 };
 use derive_more::Deref;
@@ -205,15 +205,15 @@ impl Inner {
 
         if !aborts.is_empty() || !discards_3.is_empty() || !retries_3.is_empty() {
             println!(
-                 "Some transactions were not successful: {} aborts, {} discards and {} retries out of {}, examples: aborts: {:?}, discards: {:?}, retries: {:?}",
-                 aborts.len(),
-                 self.to_discard.len(),
-                 self.to_retry.len(),
-                 self.statuses_for_input_txns.len(),
-                 &aborts[..aborts.len().min(3)],
-                 discards_3,
-                 retries_3,
-             )
+                "Some transactions were not successful: {} aborts, {} discards and {} retries out of {}, examples: aborts: {:?}, discards: {:?}, retries: {:?}",
+                aborts.len(),
+                self.to_discard.len(),
+                self.to_retry.len(),
+                self.statuses_for_input_txns.len(),
+                &aborts[..aborts.len().min(3)],
+                discards_3,
+                retries_3,
+            )
         }
 
         assert!(

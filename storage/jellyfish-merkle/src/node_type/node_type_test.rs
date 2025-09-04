@@ -3,18 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    deserialize_u64_varint, serialize_u64_varint, Child, Children, InternalNode, NodeDecodeError,
-    NodeKey,
+    Child, Children, InternalNode, NodeDecodeError, NodeKey, deserialize_u64_varint,
+    serialize_u64_varint,
 };
-use crate::{node_type::NodeType, test_helper::ValueBlob, LeafNode, StateKey, TreeReader};
+use crate::{LeafNode, StateKey, TreeReader, node_type::NodeType, test_helper::ValueBlob};
 use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
 };
 use aptos_storage_interface::Result;
 use aptos_types::{
-    nibble::{nibble_path::NibblePath, Nibble},
-    proof::{definition::NodeInProof, SparseMerkleInternalNode, SparseMerkleLeafNode},
+    nibble::{Nibble, nibble_path::NibblePath},
+    proof::{SparseMerkleInternalNode, SparseMerkleLeafNode, definition::NodeInProof},
     transaction::Version,
 };
 use proptest::prelude::*;
@@ -969,7 +969,7 @@ impl NaiveInternalNode {
                     return (
                         Some(node_key.gen_child_node_key(node.version, node.index.into())),
                         siblings,
-                    )
+                    );
                 },
                 BinaryTreeNode::Null => return (None, siblings),
             }

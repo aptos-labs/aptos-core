@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    AptosDB,
     db_debugger::ShardingConfig,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema},
@@ -16,10 +17,9 @@ use crate::{
         get_current_version_in_state_merkle_db, get_state_kv_commit_progress,
         get_state_merkle_commit_progress,
     },
-    AptosDB,
 };
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
-use aptos_schemadb::{schema::Schema, DB};
+use aptos_schemadb::{DB, schema::Schema};
 use aptos_storage_interface::Result;
 use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
 use clap::Parser;

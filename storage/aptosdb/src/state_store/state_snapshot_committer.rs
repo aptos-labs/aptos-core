@@ -6,10 +6,10 @@
 use crate::{
     metrics::OTHER_TIMERS_SECONDS,
     state_store::{
+        StateDb,
         buffered_state::CommitMessage,
         persisted_state::PersistedState,
         state_merkle_batch_committer::{StateMerkleBatch, StateMerkleBatchCommitter},
-        StateDb,
     },
     versioned_node_cache::VersionedNodeCache,
 };
@@ -17,16 +17,15 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
-    jmt_update_refs, state_store::state_with_summary::StateWithSummary, Result,
+    Result, jmt_update_refs, state_store::state_with_summary::StateWithSummary,
 };
 use itertools::Itertools;
 use rayon::prelude::*;
 use static_assertions::const_assert;
 use std::{
     sync::{
-        mpsc,
+        Arc, mpsc,
         mpsc::{Receiver, SyncSender},
-        Arc,
     },
     thread::JoinHandle,
 };

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ledger_db::{write_set_db::WriteSetDb, LedgerDb},
+    ledger_db::{LedgerDb, write_set_db::WriteSetDb},
     pruner::{db_sub_pruner::DBSubPruner, pruner_utils::get_or_initialize_subpruner_progress},
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
 };

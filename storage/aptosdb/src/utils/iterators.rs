@@ -9,16 +9,16 @@ use crate::{
     state_kv_db::StateKvDb,
 };
 use aptos_schemadb::{
-    iterator::{ScanDirection, SchemaIterator},
     ReadOptions,
+    iterator::{ScanDirection, SchemaIterator},
 };
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{AptosDbError, Result, db_ensure as ensure};
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     state_store::{
-        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_key::{StateKey, prefix::StateKeyPrefix},
         state_value::StateValue,
     },
     transaction::{IndexedTransactionSummary, Version},

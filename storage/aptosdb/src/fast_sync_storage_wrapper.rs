@@ -8,7 +8,7 @@ use aptos_crypto::HashValue;
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, DbReader, DbWriter, Result, StateSnapshotReceiver,
+    DbReader, DbWriter, Result, StateSnapshotReceiver, chunk_to_commit::ChunkToCommit,
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,

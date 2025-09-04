@@ -20,12 +20,12 @@ use aptos_types::{
     account_config::aptos_test_root_address,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    state_store::state_key::{prefix::StateKeyPrefix, StateKey},
+    state_store::state_key::{StateKey, prefix::StateKeyPrefix},
     test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
-        signature_verified_transaction::into_signature_verified_block,
         Transaction::{self, UserTransaction},
         WriteSetPayload,
+        signature_verified_transaction::into_signature_verified_block,
     },
 };
 use move_core_types::{ident_str, language_storage::StructTag};

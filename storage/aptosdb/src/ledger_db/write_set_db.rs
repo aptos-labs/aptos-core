@@ -11,10 +11,10 @@ use crate::{
 };
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{
-    batch::{SchemaBatch, WriteBatch},
     DB,
+    batch::{SchemaBatch, WriteBatch},
 };
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{AptosDbError, Result, db_ensure as ensure};
 use aptos_types::{
     transaction::{TransactionOutput, Version},
     write_set::WriteSet,

@@ -77,7 +77,7 @@ mod dbtool_tests {
         coordinators::backup::BackupCompactor,
         metadata,
         metadata::{cache::MetadataCacheOpt, view::MetadataView},
-        storage::{local_fs::LocalFs, BackupStorage},
+        storage::{BackupStorage, local_fs::LocalFs},
         utils::test_utils::start_local_backup_service,
     };
     use aptos_db::AptosDB;
@@ -287,8 +287,8 @@ mod dbtool_tests {
         new_db_dir: PathBuf,
     ) -> (Runtime, String) {
         use aptos_config::config::{
-            RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
-            NO_OP_STORAGE_PRUNER_CONFIG,
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, NO_OP_STORAGE_PRUNER_CONFIG, RocksdbConfigs,
+            StorageDirPaths,
         };
         use aptos_db_indexer::utils::PrefixedStateValueIterator as IndexerPrefixedStateValueIterator;
         use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;

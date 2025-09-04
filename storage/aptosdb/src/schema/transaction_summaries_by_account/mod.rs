@@ -11,7 +11,7 @@
 //! | address | version | txn_summary |
 //! ```
 
-use crate::schema::{ensure_slice_len_eq, TRANSACTION_SUMMARIES_BY_ACCOUNT_CF_NAME};
+use crate::schema::{TRANSACTION_SUMMARIES_BY_ACCOUNT_CF_NAME, ensure_slice_len_eq};
 use anyhow::Result;
 use aptos_schemadb::{
     define_pub_schema,

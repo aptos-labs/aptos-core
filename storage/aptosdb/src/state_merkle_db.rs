@@ -18,22 +18,22 @@ use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_jellyfish_merkle::{
-    node_type::NodeKey, JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
+    JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter, node_type::NodeKey,
 };
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{
-    batch::{IntoRawBatch, RawBatch, SchemaBatch, WriteBatch},
     Cache, DB,
+    batch::{IntoRawBatch, RawBatch, SchemaBatch, WriteBatch},
 };
 #[cfg(test)]
 use aptos_scratchpad::get_state_shard_id;
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{AptosDbError, Result, db_ensure as ensure};
 use aptos_types::{
-    nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
+    nibble::{ROOT_NIBBLE_HEIGHT, nibble_path::NibblePath},
     proof::{SparseMerkleProofExt, SparseMerkleRangeProof},
-    state_store::{state_key::StateKey, NUM_STATE_SHARDS},
+    state_store::{NUM_STATE_SHARDS, state_key::StateKey},
     transaction::Version,
 };
 use arr_macro::arr;

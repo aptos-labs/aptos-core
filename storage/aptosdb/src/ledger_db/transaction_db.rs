@@ -15,8 +15,8 @@ use aptos_crypto::hash::{CryptoHash, HashValue};
 use aptos_db_indexer_schemas::schema::ordered_transaction_by_account::OrderedTransactionByAccountSchema;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{
-    batch::{NativeBatch, SchemaBatch, WriteBatch},
     DB,
+    batch::{NativeBatch, SchemaBatch, WriteBatch},
 };
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::transaction::{IndexedTransactionSummary, ReplayProtector, Transaction, Version};

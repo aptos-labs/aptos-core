@@ -11,13 +11,13 @@
 mod iterator_test;
 
 use crate::{
-    node_type::{Child, InternalNode, Node, NodeKey},
     TreeReader,
+    node_type::{Child, InternalNode, Node, NodeKey},
 };
 use aptos_crypto::HashValue;
-use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError, Result};
+use aptos_storage_interface::{AptosDbError, Result, db_ensure as ensure, db_other_bail};
 use aptos_types::{
-    nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
+    nibble::{Nibble, ROOT_NIBBLE_HEIGHT, nibble_path::NibblePath},
     transaction::Version,
 };
 use std::{marker::PhantomData, sync::Arc};

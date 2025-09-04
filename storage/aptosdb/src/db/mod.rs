@@ -9,10 +9,10 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use aptos_config::config::{PrunerConfig, RocksdbConfigs, StorageDirPaths};
-use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
+use aptos_db_indexer::{Indexer, db_indexer::InternalIndexerDB};
 use aptos_logger::prelude::*;
 use aptos_schemadb::batch::SchemaBatch;
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{AptosDbError, Result, db_ensure as ensure};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use std::{path::Path, sync::Arc, time::Instant};
 use tokio::sync::watch::Sender;

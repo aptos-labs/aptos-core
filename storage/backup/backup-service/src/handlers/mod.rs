@@ -6,14 +6,14 @@ mod bytes_sender;
 mod utils;
 
 use crate::handlers::utils::{
-    handle_rejection, reply_with_bcs_bytes, reply_with_bytes_sender, unwrap_or_500,
-    LATENCY_HISTOGRAM,
+    LATENCY_HISTOGRAM, handle_rejection, reply_with_bcs_bytes, reply_with_bytes_sender,
+    unwrap_or_500,
 };
 use aptos_crypto::hash::HashValue;
 use aptos_db::backup::backup_handler::BackupHandler;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::transaction::Version;
-use warp::{filters::BoxedFilter, reply::Reply, Filter};
+use warp::{Filter, filters::BoxedFilter, reply::Reply};
 
 static DB_STATE: &str = "db_state";
 static STATE_RANGE_PROOF: &str = "state_range_proof";

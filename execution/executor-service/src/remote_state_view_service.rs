@@ -114,8 +114,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         drop(bcs_ser_timer);
         trace!(
             "remote state view service - sending response for shard {} with {} keys",
-            shard_id,
-            len
+            shard_id, len
         );
         let message = Message::new(resp);
         kv_tx[shard_id].send(message).unwrap();

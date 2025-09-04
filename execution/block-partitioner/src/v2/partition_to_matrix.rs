@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::v2::{
+    PartitionerV2,
     counters::MISC_TIMERS_SECONDS,
     extract_and_sort,
     state::PartitionState,
     types::{PrePartitionedTxnIdx, SenderIdx},
-    PartitionerV2,
 };
 use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
@@ -19,8 +19,8 @@ use rayon::{
 use std::{
     mem,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         RwLock,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 

@@ -11,7 +11,7 @@
 //! |  state key hash | version  |  state value  |
 //! ```
 
-use crate::schema::{ensure_slice_len_eq, HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME};
+use crate::schema::{HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME, ensure_slice_len_eq};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_schemadb::{

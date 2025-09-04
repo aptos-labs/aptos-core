@@ -4,36 +4,36 @@
 use crate::{
     common::MAX_NUM_EPOCH_ENDING_LEDGER_INFO,
     db::{
-        aptosdb_internal::{error_if_too_many_requested, gauged_api, get_first_seq_num_and_limit},
         AptosDB,
+        aptosdb_internal::{error_if_too_many_requested, gauged_api, get_first_seq_num_and_limit},
     },
     pruner::PrunerManager,
     schema::block_info::BlockInfoSchema,
 };
 use aptos_crypto::HashValue;
 use aptos_storage_interface::{
+    AptosDbError, BlockHeight, DbReader, LedgerSummary, MAX_REQUEST_LIMIT, Order, Result,
     db_ensure as ensure, db_other_bail as bail,
     state_store::{
         state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
     },
-    AptosDbError, BlockHeight, DbReader, LedgerSummary, Order, Result, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{new_block_event_key, NewBlockEvent},
+    account_config::{NewBlockEvent, new_block_event_key},
     contract_event::{ContractEvent, EventWithVersion},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
-        accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
-        TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
-        TransactionInfoListWithProof,
+        AccumulatorConsistencyProof, SparseMerkleProofExt, TransactionAccumulatorRangeProof,
+        TransactionAccumulatorSummary, TransactionInfoListWithProof,
+        accumulator::InMemoryAccumulator,
     },
     state_proof::StateProof,
     state_store::{
-        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_key::{StateKey, prefix::StateKeyPrefix},
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
@@ -949,7 +949,7 @@ impl AptosDB {
             end_epoch <= latest_epoch,
             "Unable to provide epoch change ledger info for still open epoch. asked upper bound: {}, last sealed epoch: {}",
             end_epoch,
-            latest_epoch - 1,  // okay to -1 because genesis LedgerInfo has .next_block_epoch() == 1
+            latest_epoch - 1, // okay to -1 because genesis LedgerInfo has .next_block_epoch() == 1
         );
 
         let (paging_epoch, more) = if end_epoch - start_epoch > limit as u64 {

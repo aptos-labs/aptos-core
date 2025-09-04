@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    schema::state_value_by_key_hash::StateValueByKeyHashSchema, state_kv_db::StateKvDb, AptosDB,
+    AptosDB, schema::state_value_by_key_hash::StateValueByKeyHashSchema, state_kv_db::StateKvDb,
 };
 use aptos_config::config::{RocksdbConfig, StorageDirPaths};
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{HashValue, hash::CryptoHash};
 use aptos_db_indexer::db_ops::open_internal_indexer_db;
 use aptos_db_indexer_schemas::schema::{
     event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
     ordered_transaction_by_account::OrderedTransactionByAccountSchema, state_keys::StateKeysSchema,
 };
-use aptos_schemadb::{ReadOptions, DB};
+use aptos_schemadb::{DB, ReadOptions};
 use aptos_storage_interface::{DbReader, Result};
 use aptos_types::{
     contract_event::ContractEvent,
@@ -19,8 +19,8 @@ use aptos_types::{
     transaction::{Transaction::UserTransaction, TransactionListWithProofV2},
 };
 use rayon::{
-    iter::{IntoParallelIterator, ParallelIterator},
     ThreadPoolBuilder,
+    iter::{IntoParallelIterator, ParallelIterator},
 };
 use std::{cmp, collections::HashSet, path::Path};
 const SAMPLE_RATE: usize = 500_000;

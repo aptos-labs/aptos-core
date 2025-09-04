@@ -3,11 +3,11 @@
 
 use crate::{
     backup::restore_utils,
-    db::{aptosdb_internal::gauged_api, AptosDB},
+    db::{AptosDB, aptosdb_internal::gauged_api},
     ledger_db::{
-        ledger_metadata_db::LedgerMetadataDb,
+        LedgerDbSchemaBatches, ledger_metadata_db::LedgerMetadataDb,
         transaction_auxiliary_data_db::TransactionAuxiliaryDataDb,
-        transaction_info_db::TransactionInfoDb, LedgerDbSchemaBatches,
+        transaction_info_db::TransactionInfoDb,
     },
     metrics::{
         COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH, OTHER_TIMERS_SECONDS,
@@ -23,8 +23,8 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, db_ensure as ensure, AptosDbError, DbReader, DbWriter, Result,
-    StateSnapshotReceiver,
+    AptosDbError, DbReader, DbWriter, Result, StateSnapshotReceiver,
+    chunk_to_commit::ChunkToCommit, db_ensure as ensure,
 };
 use aptos_types::{
     account_config::new_block_event_key,

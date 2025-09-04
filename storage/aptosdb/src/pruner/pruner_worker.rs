@@ -4,15 +4,15 @@
 use crate::pruner::db_pruner::DBPruner;
 use aptos_logger::{
     error,
-    prelude::{sample, SampleRate},
+    prelude::{SampleRate, sample},
 };
 use aptos_types::transaction::Version;
 use std::{
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
-    thread::{sleep, JoinHandle},
+    thread::{JoinHandle, sleep},
     time::Duration,
 };
 

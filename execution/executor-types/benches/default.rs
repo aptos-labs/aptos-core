@@ -5,7 +5,7 @@ use aptos_executor_types::should_forward_to_subscription_service;
 #[cfg(feature = "bench")]
 use aptos_executor_types::should_forward_to_subscription_service_old;
 use aptos_types::contract_event::ContractEvent;
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 fn default_targets(c: &mut Criterion) {
     let mut group = c.benchmark_group("should_forward_to_subscription_service");

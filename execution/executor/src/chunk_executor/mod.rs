@@ -15,7 +15,7 @@ use crate::{
         do_state_checkpoint::DoStateCheckpoint,
     },
 };
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{Result, anyhow, ensure};
 use aptos_executor_types::{
     ChunkCommitNotification, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
@@ -24,11 +24,11 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
+    DbReaderWriter,
     state_store::{
         state::State, state_summary::ProvableStateSummary,
         state_view::cached_state_view::CachedStateView,
     },
-    DbReaderWriter,
 };
 use aptos_types::{
     block_executor::{
@@ -39,11 +39,10 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
-        PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData, TransactionInfo,
-        TransactionListWithProof, TransactionListWithProofV2, TransactionOutput,
+        AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
+        TransactionInfo, TransactionListWithProof, TransactionListWithProofV2, TransactionOutput,
         TransactionOutputListWithProof, TransactionOutputListWithProofV2, TransactionStatus,
-        Version,
+        Version, signature_verified_transaction::SignatureVerifiedTransaction,
     },
     write_set::WriteSet,
 };
@@ -51,13 +50,13 @@ use aptos_vm::VMBlockExecutor;
 use chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger};
 use chunk_result_verifier::{ChunkResultVerifier, ReplayChunkVerifier, StateSyncChunkVerifier};
 use fail::fail_point;
-use itertools::{multizip, Itertools};
+use itertools::{Itertools, multizip};
 use std::{
     iter::once,
     marker::PhantomData,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     time::Instant,
 };

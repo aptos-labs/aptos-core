@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    metrics::REMOTE_EXECUTOR_TIMER, remote_state_view::RemoteStateViewClient, ExecuteBlockCommand,
-    RemoteExecutionRequest, RemoteExecutionResult,
+    ExecuteBlockCommand, RemoteExecutionRequest, RemoteExecutionResult,
+    metrics::REMOTE_EXECUTOR_TIMER, remote_state_view::RemoteStateViewClient,
 };
 use aptos_secure_net::network_controller::{Message, NetworkController};
 use aptos_types::{
@@ -10,7 +10,7 @@ use aptos_types::{
     transaction::TransactionOutput, vm_status::VMStatus,
 };
 use aptos_vm::sharded_block_executor::{
-    coordinator_client::CoordinatorClient, ExecutorShardCommand,
+    ExecutorShardCommand, coordinator_client::CoordinatorClient,
 };
 use crossbeam_channel::{Receiver, Sender};
 use rayon::prelude::*;

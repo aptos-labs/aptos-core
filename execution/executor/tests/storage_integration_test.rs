@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{hash::CryptoHash, PrivateKey};
+use aptos_crypto::{PrivateKey, hash::CryptoHash};
 use aptos_executor_test_helpers::{
     gen_block_id, gen_ledger_info_with_sigs, get_test_signed_transaction,
     integration_test_impl::{
@@ -13,13 +13,13 @@ use aptos_executor_test_helpers::{
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_storage_interface::state_store::state_view::db_state_view::DbStateViewAtVersion;
 use aptos_types::{
-    account_config::{aptos_test_root_address, AccountResource, CORE_CODE_ADDRESS},
+    account_config::{AccountResource, CORE_CODE_ADDRESS, aptos_test_root_address},
     block_metadata::BlockMetadata,
     on_chain_config::{AptosVersion, OnChainConfig, ValidatorSet},
-    state_store::{state_key::StateKey, MoveResourceExt},
+    state_store::{MoveResourceExt, state_key::StateKey},
     test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
-        signature_verified_transaction::into_signature_verified_block, Transaction, WriteSetPayload,
+        Transaction, WriteSetPayload, signature_verified_transaction::into_signature_verified_block,
     },
     trusted_state::TrustedState,
     validator_config::ValidatorConfig,

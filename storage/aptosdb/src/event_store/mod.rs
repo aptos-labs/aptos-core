@@ -10,15 +10,15 @@ use super::AptosDB;
 use crate::schema::{event::EventSchema, event_accumulator::EventAccumulatorSchema};
 use anyhow::anyhow;
 use aptos_accumulator::HashReader;
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{HashValue, hash::CryptoHash};
 use aptos_db_indexer_schemas::schema::{
     event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
 };
-use aptos_schemadb::{batch::SchemaBatch, schema::ValueCodec, DB};
-use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError, Result};
+use aptos_schemadb::{DB, batch::SchemaBatch, schema::ValueCodec};
+use aptos_storage_interface::{AptosDbError, Result, db_ensure as ensure, db_other_bail};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{new_block_event_key, NewBlockEvent},
+    account_config::{NewBlockEvent, new_block_event_key},
     contract_event::ContractEvent,
     event::EventKey,
     proof::position::Position,

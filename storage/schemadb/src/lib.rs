@@ -36,8 +36,8 @@ use batch::{IntoRawBatch, NativeBatch, WriteBatch};
 use iterator::{ScanDirection, SchemaIterator};
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
 pub use rocksdb::{
-    BlockBasedOptions, Cache, ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions,
-    SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
+    BlockBasedOptions, Cache, ColumnFamilyDescriptor, DBCompressionType,
+    DEFAULT_COLUMN_FAMILY_NAME, Options, ReadOptions, SliceTransform,
 };
 use rocksdb::{ErrorKind, WriteOptions};
 use std::{collections::HashSet, fmt::Debug, iter::Iterator, path::Path};
@@ -147,8 +147,8 @@ impl DB {
             .chain(unrecognized_cfs.map(Self::cfd_for_unrecognized_cf));
 
         let inner = {
-            use rocksdb::DB;
             use OpenMode::*;
+            use rocksdb::DB;
 
             match open_mode {
                 ReadWrite => DB::open_cf_descriptors(db_opts, path.de_unc(), all_cfds),

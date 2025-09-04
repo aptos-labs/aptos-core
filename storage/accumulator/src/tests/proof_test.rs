@@ -4,8 +4,8 @@
 
 use super::*;
 use crate::test_helpers::{
-    arb_three_hash_batches, arb_two_hash_batches, test_consistency_proof_impl, test_proof_impl,
-    test_range_proof_impl, verify, MockHashStore, TestAccumulator,
+    MockHashStore, TestAccumulator, arb_three_hash_batches, arb_two_hash_batches,
+    test_consistency_proof_impl, test_proof_impl, test_range_proof_impl, verify,
 };
 
 #[test]

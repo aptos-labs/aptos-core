@@ -10,7 +10,7 @@ use crate::{
         pruner_manager::PrunerManager,
         pruner_utils,
         pruner_worker::PrunerWorker,
-        state_merkle_pruner::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
+        state_merkle_pruner::{StateMerklePruner, generics::StaleNodeIndexSchemaTrait},
     },
     state_merkle_db::StateMerkleDb,
 };
@@ -21,7 +21,7 @@ use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
 use std::{
     marker::PhantomData,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
 };
 
 /// The `Pruner` is meant to be part of a `AptosDB` instance and runs in the background to prune old

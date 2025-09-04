@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{db::test_helper::put_transaction_auxiliary_data, AptosDB};
+use crate::{AptosDB, db::test_helper::put_transaction_auxiliary_data};
 use aptos_temppath::TempPath;
 use aptos_types::transaction::TransactionAuxiliaryData;
 use proptest::{collection::vec, prelude::*};

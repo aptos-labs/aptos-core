@@ -11,18 +11,18 @@ use aptos_db_indexer_schemas::{
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
-use aptos_schemadb::{batch::SchemaBatch, DB};
+use aptos_schemadb::{DB, batch::SchemaBatch};
 use aptos_storage_interface::{
-    db_other_bail as bail, state_store::state_view::db_state_view::DbStateViewAtVersion,
-    AptosDbError, DbReader, Result,
+    AptosDbError, DbReader, Result, db_other_bail as bail,
+    state_store::state_view::db_state_view::DbStateViewAtVersion,
 };
 use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
     state_store::{
-        state_key::{inner::StateKeyInner, StateKey},
-        table::{TableHandle, TableInfo},
         StateView,
+        state_key::{StateKey, inner::StateKeyInner},
+        table::{TableHandle, TableInfo},
     },
     transaction::Version,
     write_set::{WriteOp, WriteSet},
@@ -38,8 +38,8 @@ use std::{
     fs,
     path::PathBuf,
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU64, Ordering},
     },
     time::Duration,
 };

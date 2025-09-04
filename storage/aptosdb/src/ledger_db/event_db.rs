@@ -12,15 +12,15 @@ use crate::{
 };
 use aptos_accumulator::MerkleAccumulator;
 use aptos_crypto::{
-    hash::{CryptoHash, EventAccumulatorHasher},
     HashValue,
+    hash::{CryptoHash, EventAccumulatorHasher},
 };
 use aptos_db_indexer_schemas::schema::{
     event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
 };
 use aptos_schemadb::{
-    batch::{SchemaBatch, WriteBatch},
     DB,
+    batch::{SchemaBatch, WriteBatch},
 };
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{

@@ -6,8 +6,8 @@
 mod mock_vm_test;
 
 use anyhow::Result;
-use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_block_executor::txn_provider::{TxnProvider, default::DefaultTxnProvider};
+use aptos_crypto::{PrivateKey, Uniform, ed25519::Ed25519PrivateKey};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
@@ -20,19 +20,19 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     on_chain_config::{ConfigurationResource, ValidatorSet},
-    state_store::{state_key::StateKey, StateView},
+    state_store::{StateView, state_key::StateKey},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockEndInfo,
-        BlockOutput, ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction,
-        Transaction, TransactionArgument, TransactionAuxiliaryData, TransactionExecutableRef,
-        TransactionOutput, TransactionStatus, WriteSetPayload,
+        AuxiliaryInfo, BlockEndInfo, BlockOutput, ChangeSet, ExecutionStatus, RawTransaction,
+        Script, SignedTransaction, Transaction, TransactionArgument, TransactionAuxiliaryData,
+        TransactionExecutableRef, TransactionOutput, TransactionStatus, WriteSetPayload,
+        signature_verified_transaction::SignatureVerifiedTransaction,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_vm::{
-    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     VMBlockExecutor,
+    sharded_block_executor::{ShardedBlockExecutor, executor_client::ExecutorClient},
 };
 use move_core_types::language_storage::TypeTag;
 use once_cell::sync::Lazy;
@@ -119,11 +119,13 @@ impl VMBlockExecutor for MockVM {
                     // WriteSet cannot be empty so use genesis writeset only for testing.
                     gen_genesis_writeset(),
                     // mock the validator set event
-                    vec![ContractEvent::new_v2(
-                        NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
-                        bcs::to_bytes(&0).unwrap(),
-                    )
-                    .unwrap()],
+                    vec![
+                        ContractEvent::new_v2(
+                            NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
+                            bcs::to_bytes(&0).unwrap(),
+                        )
+                        .unwrap(),
+                    ],
                     0,
                     KEEP_STATUS.clone(),
                     TransactionAuxiliaryData::default(),
@@ -350,13 +352,15 @@ fn gen_payment_writeset(
 }
 
 fn gen_events(sender: AccountAddress) -> Vec<ContractEvent> {
-    vec![ContractEvent::new_v1(
-        EventKey::new(111, sender),
-        0,
-        TypeTag::Vector(Box::new(TypeTag::U8)),
-        b"event_data".to_vec(),
-    )
-    .unwrap()]
+    vec![
+        ContractEvent::new_v1(
+            EventKey::new(111, sender),
+            0,
+            TypeTag::Vector(Box::new(TypeTag::U8)),
+            b"event_data".to_vec(),
+        )
+        .unwrap(),
+    ]
 }
 
 pub fn encode_mint_program(amount: u64) -> Script {

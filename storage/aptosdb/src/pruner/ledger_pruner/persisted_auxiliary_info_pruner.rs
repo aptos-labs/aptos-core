@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ledger_db::{persisted_auxiliary_info_db::PersistedAuxiliaryInfoDb, LedgerDb},
+    ledger_db::{LedgerDb, persisted_auxiliary_info_db::PersistedAuxiliaryInfoDb},
     pruner::{db_sub_pruner::DBSubPruner, pruner_utils::get_or_initialize_subpruner_progress},
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
 };

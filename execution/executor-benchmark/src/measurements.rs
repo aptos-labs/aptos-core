@@ -3,7 +3,7 @@
 
 use crate::metrics::TIMER;
 use aptos_block_executor::counters::{
-    self as block_executor_counters, GasType, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK,
+    self as block_executor_counters, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, GasType,
 };
 use aptos_executor::metrics::{
     COMMIT_BLOCKS, GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING, OTHER_TIMERS,
@@ -364,7 +364,8 @@ impl OverallMeasurement {
         info!(
             "{} fraction of execution {:.4} in get execution output by executing (component TPS: {:.1})",
             self.prefix,
-            self.delta_execution.block_executor_total_time / self.delta_execution.execution_total_time,
+            self.delta_execution.block_executor_total_time
+                / self.delta_execution.execution_total_time,
             num_txns / self.delta_execution.block_executor_total_time
         );
         info!(

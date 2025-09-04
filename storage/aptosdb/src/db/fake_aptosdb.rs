@@ -1,27 +1,26 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{gauged_api, Result};
+use super::{Result, gauged_api};
 use crate::{
-    metrics::{LATEST_CHECKPOINT_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH},
     AptosDB,
+    metrics::{LATEST_CHECKPOINT_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH},
 };
 use anyhow::format_err;
 use aptos_accumulator::{HashReader, MerkleAccumulator};
 use aptos_crypto::{
-    hash::{CryptoHash, TransactionAccumulatorHasher, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH, TransactionAccumulatorHasher},
 };
 use aptos_infallible::Mutex;
 use aptos_logger::debug;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    db_ensure as ensure,
+    AptosDbError, DbReader, DbWriter, LedgerSummary, MAX_REQUEST_LIMIT, db_ensure as ensure,
     state_store::{
         state_delta::StateDelta, state_update_refs::BatchedStateUpdateRefs,
         state_view::cached_state_view::ShardedStateCache,
     },
-    AptosDbError, DbReader, DbWriter, LedgerSummary, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     access_path::AccessPath,
@@ -34,15 +33,15 @@ use aptos_types::{
     indexer::indexer_db_reader::IndexedTransactionSummary,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
-        accumulator::InMemoryAccumulator, position::Position, AccumulatorConsistencyProof,
-        AccumulatorRangeProof, SparseMerkleProofExt, TransactionAccumulatorProof,
-        TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
-        TransactionInfoListWithProof, TransactionInfoWithProof,
+        AccumulatorConsistencyProof, AccumulatorRangeProof, SparseMerkleProofExt,
+        TransactionAccumulatorProof, TransactionAccumulatorRangeProof,
+        TransactionAccumulatorSummary, TransactionInfoListWithProof, TransactionInfoWithProof,
+        accumulator::InMemoryAccumulator, position::Position,
     },
     state_proof::StateProof,
     state_store::{
         combine_sharded_state_updates,
-        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_key::{StateKey, prefix::StateKeyPrefix},
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table,
@@ -60,8 +59,8 @@ use move_core_types::move_resource::MoveStructType;
 use std::{
     borrow::Borrow,
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU64, Ordering},
     },
 };
 
@@ -241,7 +240,9 @@ impl FakeAptosDB {
             .map(|version| version + 1)
             .unwrap_or(0);
         let num_transactions_in_db = self.get_synced_version()?.map_or(0, |v| v + 1);
-        ensure!(num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
+        ensure!(
+            num_transactions_in_db == first_version
+                && num_transactions_in_db == next_version_in_buffered_state,
             "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
             first_version,
             next_version_in_buffered_state,
@@ -261,7 +262,7 @@ impl FakeAptosDB {
         if let Some(x) = ledger_info_with_sigs {
             let claimed_last_version = x.ledger_info().version();
             ensure!(
-                claimed_last_version  == last_version,
+                claimed_last_version == last_version,
                 "Transaction batch not applicable: first_version {}, num_txns {}, last_version_in_ledger_info {}",
                 first_version,
                 num_txns,
@@ -990,13 +991,13 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
 mod tests {
     use super::FakeAptosDB;
     use crate::{
-        db::test_helper::{arb_blocks_to_commit, update_in_memory_state},
         AptosDB,
+        db::test_helper::{arb_blocks_to_commit, update_in_memory_state},
     };
-    use anyhow::{anyhow, ensure, Result};
-    use aptos_crypto::{hash::CryptoHash, HashValue};
+    use anyhow::{Result, anyhow, ensure};
+    use aptos_crypto::{HashValue, hash::CryptoHash};
     use aptos_storage_interface::{
-        state_store::state_view::cached_state_view::ShardedStateCache, DbReader, DbWriter,
+        DbReader, DbWriter, state_store::state_view::cached_state_view::ShardedStateCache,
     };
     use aptos_temppath::TempPath;
     use aptos_types::{

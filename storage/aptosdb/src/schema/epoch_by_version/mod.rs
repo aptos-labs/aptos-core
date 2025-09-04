@@ -15,7 +15,7 @@
 //! `version` is serialized in big endian so that records in RocksDB will be in order of their
 //! numeric value.
 
-use crate::schema::{ensure_slice_len_eq, EPOCH_BY_VERSION_CF_NAME};
+use crate::schema::{EPOCH_BY_VERSION_CF_NAME, ensure_slice_len_eq};
 use anyhow::Result;
 use aptos_schemadb::{
     define_schema,

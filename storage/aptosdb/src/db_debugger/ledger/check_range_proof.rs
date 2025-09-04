@@ -3,7 +3,7 @@
 
 use crate::db_debugger::common::DbDir;
 use aptos_crypto::hash::CryptoHash;
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{AptosDbError, Result, db_ensure as ensure};
 use aptos_types::transaction::Version;
 use clap::Parser;
 use std::sync::Arc;

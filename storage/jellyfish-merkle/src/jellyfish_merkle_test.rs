@@ -6,16 +6,16 @@ use super::*;
 use crate::{
     node_type::NodeType,
     test_helper::{
-        arb_existent_kvs_and_nonexistent_keys, arb_kv_pair_with_distinct_last_nibble,
+        ValueBlob, arb_existent_kvs_and_nonexistent_keys, arb_kv_pair_with_distinct_last_nibble,
         arb_tree_with_index, gen_value, test_get_leaf_count, test_get_range_proof,
-        test_get_with_proof, test_get_with_proof_with_distinct_last_nibble, ValueBlob,
+        test_get_with_proof, test_get_with_proof_with_distinct_last_nibble,
     },
 };
-use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_crypto::{HashValue, hash::SPARSE_MERKLE_PLACEHOLDER_HASH};
 use aptos_types::nibble::Nibble;
 use mock_tree_store::MockTreeStore;
 use proptest::{collection::hash_set, prelude::*};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 
 fn update_nibble(original_key: &HashValue, n: usize, nibble: u8) -> HashValue {
     assert!(nibble < 16);
@@ -50,12 +50,14 @@ fn test_insert_to_empty_tree() {
             0, /* version */
         )
         .unwrap();
-    assert!(batch
-        .stale_node_index_batch
-        .iter()
-        .flatten()
-        .next()
-        .is_none());
+    assert!(
+        batch
+            .stale_node_index_batch
+            .iter()
+            .flatten()
+            .next()
+            .is_none()
+    );
 
     db.write_tree_update_batch(batch).unwrap();
     assert_eq!(tree.get(key, 0).unwrap().unwrap(), value_hash);
@@ -80,12 +82,14 @@ fn test_insert_at_leaf_with_internal_created() {
         .put_value_set_test(vec![(key1, Some(&value1))], 0 /* version */)
         .unwrap();
 
-    assert!(batch
-        .stale_node_index_batch
-        .iter()
-        .flatten()
-        .next()
-        .is_none());
+    assert!(
+        batch
+            .stale_node_index_batch
+            .iter()
+            .flatten()
+            .next()
+            .is_none()
+    );
     db.write_tree_update_batch(batch).unwrap();
     assert_eq!(tree.get(key1, 0).unwrap().unwrap(), value1.0);
 
@@ -644,7 +648,7 @@ fn many_keys_get_proof_and_verify_tree_root(seed: &[u8], num_keys: usize) {
     for (k, v) in &kvs {
         let (value, proof) = tree.get_with_proof(*k, 0).unwrap();
         assert_eq!(value.as_ref().unwrap().0, v.unwrap().0);
-        assert_eq!(value.as_ref().unwrap().1 .0, v.unwrap().1);
+        assert_eq!(value.as_ref().unwrap().1.0, v.unwrap().1);
         assert!(proof.verify_by_hash(root, *k, v.map(|x| x.0)).is_ok());
     }
 }
@@ -693,7 +697,7 @@ fn many_keys_deletion(seed: &[u8], num_keys: usize) {
     {
         let (value, proof) = tree.get_with_proof(*k, 1).unwrap();
         assert_eq!(value.as_ref().unwrap().0, v.unwrap().0);
-        assert_eq!(value.as_ref().unwrap().1 .0, v.unwrap().1);
+        assert_eq!(value.as_ref().unwrap().1.0, v.unwrap().1);
         assert!(proof.verify_by_hash(root, *k, v.map(|x| x.0)).is_ok());
     }
 
@@ -759,20 +763,24 @@ fn many_versions_get_proof_and_verify_tree_root(seed: &[u8], num_versions: usize
         let random_version = rng.gen_range(i, i + num_versions);
         let (value, proof) = tree.get_with_proof(*k, random_version as Version).unwrap();
         assert_eq!(value.as_ref().unwrap().0, v.unwrap().0);
-        assert_eq!(value.as_ref().unwrap().1 .0, v.unwrap().1);
-        assert!(proof
-            .verify_by_hash(roots[random_version], *k, v.map(|x| x.0))
-            .is_ok());
+        assert_eq!(value.as_ref().unwrap().1.0, v.unwrap().1);
+        assert!(
+            proof
+                .verify_by_hash(roots[random_version], *k, v.map(|x| x.0))
+                .is_ok()
+        );
     }
 
     for (i, (k, _, v)) in kvs.iter().enumerate() {
         let random_version = rng.gen_range(i + num_versions, 2 * num_versions);
         let (value, proof) = tree.get_with_proof(*k, random_version as Version).unwrap();
         assert_eq!(value.as_ref().unwrap().0, v.unwrap().0);
-        assert_eq!(value.as_ref().unwrap().1 .0, v.unwrap().1);
-        assert!(proof
-            .verify_by_hash(roots[random_version], *k, v.map(|x| x.0))
-            .is_ok());
+        assert_eq!(value.as_ref().unwrap().1.0, v.unwrap().1);
+        assert!(
+            proof
+                .verify_by_hash(roots[random_version], *k, v.map(|x| x.0))
+                .is_ok()
+        );
     }
 }
 

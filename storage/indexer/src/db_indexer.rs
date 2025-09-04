@@ -16,15 +16,15 @@ use aptos_db_indexer_schemas::{
         state_keys::StateKeysSchema, translated_v1_event::TranslatedV1EventSchema,
     },
     utils::{
-        error_if_too_many_requested, get_first_seq_num_and_limit, AccountOrderedTransactionsIter,
-        MAX_REQUEST_LIMIT,
+        AccountOrderedTransactionsIter, MAX_REQUEST_LIMIT, error_if_too_many_requested,
+        get_first_seq_num_and_limit,
     },
 };
 use aptos_logger::warn;
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{batch::SchemaBatch, DB};
+use aptos_schemadb::{DB, batch::SchemaBatch};
 use aptos_storage_interface::{
-    db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader, Result,
+    AptosDbError, DbReader, Result, db_ensure as ensure, db_other_bail as bail,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -33,7 +33,7 @@ use aptos_types::{
     event::EventKey,
     indexer::indexer_db_reader::Order,
     state_store::{
-        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_key::{StateKey, prefix::StateKeyPrefix},
         state_value::StateValue,
     },
     transaction::{AccountOrderedTransactionsWithProof, ReplayProtector, Transaction, Version},
@@ -43,8 +43,8 @@ use std::{
     cmp::min,
     collections::HashSet,
     sync::{
-        mpsc::{self, Receiver, Sender},
         Arc,
+        mpsc::{self, Receiver, Sender},
     },
     thread,
 };

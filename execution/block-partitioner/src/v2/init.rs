@@ -4,8 +4,8 @@
 use crate::{
     get_anchor_shard_id,
     v2::{
-        conflicting_txn_tracker::ConflictingTxnTracker, counters::MISC_TIMERS_SECONDS,
-        state::PartitionState, types::OriginalTxnIdx, PartitionerV2,
+        PartitionerV2, conflicting_txn_tracker::ConflictingTxnTracker,
+        counters::MISC_TIMERS_SECONDS, state::PartitionState, types::OriginalTxnIdx,
     },
 };
 use aptos_metrics_core::TimerHelper;

@@ -5,8 +5,8 @@
 extern crate criterion;
 
 use aptos_block_partitioner::{
-    pre_partition::connected_component::ConnectedComponentPartitioner,
-    test_utils::P2PBlockGenerator, v2::PartitionerV2, BlockPartitioner,
+    BlockPartitioner, pre_partition::connected_component::ConnectedComponentPartitioner,
+    test_utils::P2PBlockGenerator, v2::PartitionerV2,
 };
 use criterion::Criterion;
 use rand::thread_rng;

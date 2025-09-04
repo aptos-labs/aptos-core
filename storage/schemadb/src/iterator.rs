@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    IntoDbResult, KeyCodec, Schema, SeekKeyCodec, ValueCodec, APTOS_SCHEMADB_ITER_BYTES,
-    APTOS_SCHEMADB_ITER_LATENCY_SECONDS, APTOS_SCHEMADB_SEEK_LATENCY_SECONDS,
+    APTOS_SCHEMADB_ITER_BYTES, APTOS_SCHEMADB_ITER_LATENCY_SECONDS,
+    APTOS_SCHEMADB_SEEK_LATENCY_SECONDS, IntoDbResult, KeyCodec, Schema, SeekKeyCodec, ValueCodec,
 };
 use aptos_metrics_core::TimerHelper;
 use std::marker::PhantomData;

@@ -3,8 +3,8 @@
 
 use crate::{
     db::{
-        test_helper::{arb_state_kv_sets_with_genesis, update_store},
         AptosDB,
+        test_helper::{arb_state_kv_sets_with_genesis, update_store},
     },
     pruner::{PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
@@ -16,14 +16,14 @@ use crate::{
     state_store::StateStore,
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{HashValue, hash::CryptoHash};
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::{
     state_store::{
+        NUM_STATE_SHARDS,
         state_key::StateKey,
         state_value::{StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue},
-        NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
@@ -109,9 +109,11 @@ fn test_state_store_pruner() {
             .wake_and_wait_pruner(prune_batch_size as u64 /* latest_version */)
             .unwrap();
         for i in 0..prune_batch_size {
-            assert!(state_store
-                .get_state_value_with_proof_by_version(&key, i as u64)
-                .is_err());
+            assert!(
+                state_store
+                    .get_state_value_with_proof_by_version(&key, i as u64)
+                    .is_err()
+            );
         }
         for i in prune_batch_size..num_versions as usize {
             verify_state_in_store(
@@ -193,9 +195,11 @@ fn test_state_store_pruner_partial_version() {
         let pruner =
             create_state_merkle_pruner_manager(&aptos_db.state_merkle_db(), prune_batch_size);
         assert!(pruner.wake_and_wait_pruner(1 /* latest_version */,).is_ok());
-        assert!(state_store
-            .get_state_value_with_proof_by_version(&key1, 0_u64)
-            .is_err());
+        assert!(
+            state_store
+                .get_state_value_with_proof_by_version(&key1, 0_u64)
+                .is_err()
+        );
         // root1 is still there.
         verify_state_in_store(state_store, key1.clone(), Some(&value1), 1);
         verify_state_in_store(state_store, key2.clone(), Some(&value2_update), 1);
@@ -210,12 +214,16 @@ fn test_state_store_pruner_partial_version() {
         assert!(pruner.wake_and_wait_pruner(2 /* latest_version */,).is_ok());
 
         assert!(pruner.wake_and_wait_pruner(2 /* latest_version */,).is_ok());
-        assert!(state_store
-            .get_state_value_with_proof_by_version(&key1, 0_u64)
-            .is_err());
-        assert!(state_store
-            .get_state_value_with_proof_by_version(&key2, 1_u64)
-            .is_err());
+        assert!(
+            state_store
+                .get_state_value_with_proof_by_version(&key1, 0_u64)
+                .is_err()
+        );
+        assert!(
+            state_store
+                .get_state_value_with_proof_by_version(&key2, 1_u64)
+                .is_err()
+        );
         // root2 is still there.
         verify_state_in_store(state_store, key1, Some(&value1), 2);
         verify_state_in_store(state_store, key2, Some(&value2_update), 2);
@@ -286,9 +294,11 @@ fn test_state_store_pruner_disabled() {
     // we expect versions 0 to 9 to be pruned.
     {
         for i in 0..prune_batch_size {
-            assert!(state_store
-                .get_state_value_with_proof_by_version(&key, i as u64)
-                .is_ok());
+            assert!(
+                state_store
+                    .get_state_value_with_proof_by_version(&key, i as u64)
+                    .is_ok()
+            );
         }
         for i in 0..num_versions as usize {
             verify_state_in_store(
@@ -361,27 +371,33 @@ fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a (Version, Option
         let enable_sharding = state_store.state_kv_db.enabled_sharding();
         if pruned {
             if !enable_sharding {
-                assert!(state_store
-                    .state_kv_db
-                    .db_shard(k.get_shard_id())
-                    .get::<StaleStateValueIndexSchema>(&StaleStateValueIndex {
-                        stale_since_version: version,
-                        version: *old_version,
-                        state_key: k.clone()
-                    })
-                    .unwrap()
-                    .is_none());
+                assert!(
+                    state_store
+                        .state_kv_db
+                        .db_shard(k.get_shard_id())
+                        .get::<StaleStateValueIndexSchema>(&StaleStateValueIndex {
+                            stale_since_version: version,
+                            version: *old_version,
+                            state_key: k.clone()
+                        })
+                        .unwrap()
+                        .is_none()
+                );
             } else {
-                assert!(state_store
-                    .state_kv_db
-                    .db_shard(k.get_shard_id())
-                    .get::<StaleStateValueIndexByKeyHashSchema>(&StaleStateValueByKeyHashIndex {
-                        stale_since_version: version,
-                        version: *old_version,
-                        state_key_hash: k.hash()
-                    })
-                    .unwrap()
-                    .is_none());
+                assert!(
+                    state_store
+                        .state_kv_db
+                        .db_shard(k.get_shard_id())
+                        .get::<StaleStateValueIndexByKeyHashSchema>(
+                            &StaleStateValueByKeyHashIndex {
+                                stale_since_version: version,
+                                version: *old_version,
+                                state_key_hash: k.hash()
+                            }
+                        )
+                        .unwrap()
+                        .is_none()
+                );
             }
         }
     }

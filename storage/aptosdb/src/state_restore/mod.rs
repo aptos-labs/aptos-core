@@ -3,10 +3,10 @@
 
 use crate::metrics::OTHER_TIMERS_SECONDS;
 use anyhow::anyhow;
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{HashValue, hash::CryptoHash};
 use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
 use aptos_infallible::Mutex;
-use aptos_jellyfish_merkle::{restore::JellyfishMerkleRestore, Key, TreeReader, TreeWriter, Value};
+use aptos_jellyfish_merkle::{Key, TreeReader, TreeWriter, Value, restore::JellyfishMerkleRestore};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{Result, StateSnapshotReceiver};
 use aptos_types::{

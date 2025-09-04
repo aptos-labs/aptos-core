@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{db_debugger::ShardingConfig, AptosDB};
+use crate::{AptosDB, db_debugger::ShardingConfig};
 use aptos_config::config::StorageConfig;
 use aptos_storage_interface::Result;
 use clap::Parser;

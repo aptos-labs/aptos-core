@@ -24,7 +24,7 @@ use aptos_types::state_store::NUM_STATE_SHARDS;
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
-    sync::{mpsc, Arc},
+    sync::{Arc, mpsc},
     thread,
     thread::JoinHandle,
     time::Duration,
@@ -176,20 +176,24 @@ impl RocksdbPropertyReporter {
         state_kv_db: Arc<StateKvDb>,
     ) -> Self {
         let (send, recv) = mpsc::channel();
-        let join_handle = Some(thread::spawn(move || loop {
-            if let Err(e) = update_rocksdb_properties(&ledger_db, &state_merkle_db, &state_kv_db) {
-                warn!(
-                    error = ?e,
-                    "Updating rocksdb property failed."
-                );
-            }
-            // report rocksdb properties each 10 seconds
-            const TIMEOUT_MS: u64 = if cfg!(test) { 10 } else { 10000 };
+        let join_handle = Some(thread::spawn(move || {
+            loop {
+                if let Err(e) =
+                    update_rocksdb_properties(&ledger_db, &state_merkle_db, &state_kv_db)
+                {
+                    warn!(
+                        error = ?e,
+                        "Updating rocksdb property failed."
+                    );
+                }
+                // report rocksdb properties each 10 seconds
+                const TIMEOUT_MS: u64 = if cfg!(test) { 10 } else { 10000 };
 
-            match recv.recv_timeout(Duration::from_millis(TIMEOUT_MS)) {
-                Ok(_) => break,
-                Err(mpsc::RecvTimeoutError::Timeout) => (),
-                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                match recv.recv_timeout(Duration::from_millis(TIMEOUT_MS)) {
+                    Ok(_) => break,
+                    Err(mpsc::RecvTimeoutError::Timeout) => (),
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                }
             }
         }));
         Self {

@@ -11,7 +11,7 @@
 //! | position in post order |   hash  |
 //! ```
 
-use crate::schema::{ensure_slice_len_eq, TRANSACTION_ACCUMULATOR_CF_NAME};
+use crate::schema::{TRANSACTION_ACCUMULATOR_CF_NAME, ensure_slice_len_eq};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_schemadb::{

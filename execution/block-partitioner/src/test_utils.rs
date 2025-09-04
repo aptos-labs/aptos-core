@@ -4,12 +4,16 @@
 #[cfg(test)]
 use crate::{BlockPartitioner, Sender};
 #[cfg(test)]
+use aptos_crypto::HashValue;
+#[cfg(test)]
 use aptos_crypto::hash::CryptoHash;
 #[cfg(test)]
 use aptos_crypto::hash::TestOnlyHash;
+use aptos_crypto::{PrivateKey, SigningKey, Uniform, ed25519::ed25519_keys::Ed25519PrivateKey};
 #[cfg(test)]
-use aptos_crypto::HashValue;
-use aptos_crypto::{ed25519::ed25519_keys::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+use aptos_types::block_executor::partitioner::GLOBAL_ROUND_ID;
+#[cfg(test)]
+use aptos_types::block_executor::partitioner::GLOBAL_SHARD_ID;
 #[cfg(test)]
 use aptos_types::block_executor::partitioner::PartitionedTransactions;
 #[cfg(test)]
@@ -19,25 +23,21 @@ use aptos_types::block_executor::partitioner::ShardId;
 #[cfg(test)]
 use aptos_types::block_executor::partitioner::TransactionWithDependencies;
 #[cfg(test)]
-use aptos_types::block_executor::partitioner::GLOBAL_ROUND_ID;
-#[cfg(test)]
-use aptos_types::block_executor::partitioner::GLOBAL_SHARD_ID;
-#[cfg(test)]
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::{
+    AptosCoinType, CoinType,
     chain_id::ChainId,
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, EntryFunction, RawTransaction,
-        SignedTransaction, Transaction, TransactionPayload,
+        EntryFunction, RawTransaction, SignedTransaction, Transaction, TransactionPayload,
+        analyzed_transaction::AnalyzedTransaction,
     },
-    AptosCoinType, CoinType,
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
 };
+use rand::Rng;
 #[cfg(test)]
 use rand::thread_rng;
-use rand::Rng;
 use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
 #[cfg(test)]
 use std::collections::HashMap;
@@ -216,7 +216,14 @@ pub fn verify_partitioner_output(input: &[AnalyzedTransaction], output: &Partiti
                     let key_str = CryptoHash::hash(&key).to_hex();
                     println!(
                         "MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, wait for key={} from round={}, shard={}, new_tid={}",
-                        round_id, shard_id, old_txn_idx, new_txn_idx, key_str, src_txn_idx.round_id, src_txn_idx.shard_id, src_txn_idx.txn_index
+                        round_id,
+                        shard_id,
+                        old_txn_idx,
+                        new_txn_idx,
+                        key_str,
+                        src_txn_idx.round_id,
+                        src_txn_idx.shard_id,
+                        src_txn_idx.txn_index
                     );
 
                     if round_id != num_rounds - 1 {
@@ -248,7 +255,14 @@ pub fn verify_partitioner_output(input: &[AnalyzedTransaction], output: &Partiti
                     let key_str = CryptoHash::hash(&key).to_hex();
                     println!(
                         "MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, send key={} to round={}, shard={}, new_tid={}",
-                        round_id, shard_id, old_txn_idx, new_txn_idx, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index
+                        round_id,
+                        shard_id,
+                        old_txn_idx,
+                        new_txn_idx,
+                        key_str,
+                        dst_tid.round_id,
+                        dst_tid.shard_id,
+                        dst_tid.txn_index
                     );
 
                     if round_id != num_rounds - 1 {
@@ -273,7 +287,14 @@ pub fn verify_partitioner_output(input: &[AnalyzedTransaction], output: &Partiti
         }
         let inbound_cost: u64 = cur_sub_block_inbound_costs.values().copied().sum();
         let outbound_cost: u64 = cur_sub_block_outbound_costs.values().copied().sum();
-        println!("MATRIX_REPORT: round={}, shard={}, sub_block_size={}, inbound_cost={}, outbound_cost={}", round_id, shard_id, sub_block_txns.len(), inbound_cost, outbound_cost);
+        println!(
+            "MATRIX_REPORT: round={}, shard={}, sub_block_size={}, inbound_cost={}, outbound_cost={}",
+            round_id,
+            shard_id,
+            sub_block_txns.len(),
+            inbound_cost,
+            outbound_cost
+        );
         if round_id == 0 {
             assert_eq!(0, inbound_cost);
         }

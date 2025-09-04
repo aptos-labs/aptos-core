@@ -10,7 +10,7 @@ use crate::{
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     tests::{
         self, create_blocks_and_chunks, create_transaction_chunks,
-        mock_vm::{encode_mint_transaction, MockVM},
+        mock_vm::{MockVM, encode_mint_transaction},
     },
 };
 use aptos_crypto::HashValue;
@@ -19,7 +19,7 @@ use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
+    test_helpers::transaction_test_helpers::{TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG, block},
     transaction::{TransactionListWithProofV2, Version},
 };
 use rand::Rng;
@@ -236,7 +236,7 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
 
         let mut rng = rand::thread_rng();
         let txns = (0..5)
-            .map(|_| encode_mint_transaction(tests::gen_address(rng.gen::<u64>()), 100))
+            .map(|_| encode_mint_transaction(tests::gen_address(rng.r#gen::<u64>()), 100))
             .collect::<Vec<_>>();
         let output = executor
             .execute_block(
@@ -253,9 +253,11 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
     chunk_manager.finish();
     chunk_manager.reset().unwrap();
 
-    assert!(chunk_manager
-        .execute_chunk(chunks[1].clone(), &ledger_info, None)
-        .is_err());
+    assert!(
+        chunk_manager
+            .execute_chunk(chunks[1].clone(), &ledger_info, None)
+            .is_err()
+    );
 }
 
 #[cfg(feature = "consensus-only-perf-test")]
@@ -289,7 +291,7 @@ fn test_executor_execute_and_commit_chunk_without_verify() {
 
         let mut rng = rand::thread_rng();
         let txns = (0..5)
-            .map(|_| encode_mint_transaction(tests::gen_address(rng.gen::<u64>()), 100))
+            .map(|_| encode_mint_transaction(tests::gen_address(rng.r#gen::<u64>()), 100))
             .collect::<Vec<_>>();
         let output = executor
             .execute_block(
@@ -306,9 +308,11 @@ fn test_executor_execute_and_commit_chunk_without_verify() {
     chunk_manager.finish();
     chunk_manager.reset().unwrap();
 
-    assert!(chunk_manager
-        .execute_chunk(chunks[1].clone(), &ledger_info, None)
-        .is_ok());
+    assert!(
+        chunk_manager
+            .execute_chunk(chunks[1].clone(), &ledger_info, None)
+            .is_ok()
+    );
 }
 
 const PRE_COMMIT_TESTS_LATEST_VERSION: Version = 10;
@@ -395,7 +399,9 @@ fn test_continue_from_pre_committed() {
         .unwrap();
     chunk_executor.commit_chunk().unwrap();
     // once pre-committed range is committed, don't panic on errors
-    assert!(chunk_executor
-        .execute_chunk(bad_chunk, &bad_ledger_info, None)
-        .is_err());
+    assert!(
+        chunk_executor
+            .execute_chunk(bad_chunk, &bad_ledger_info, None)
+            .is_err()
+    );
 }

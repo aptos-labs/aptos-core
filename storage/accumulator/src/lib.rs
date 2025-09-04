@@ -107,12 +107,12 @@
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helpers;
 
-use anyhow::{ensure, format_err, Result};
-use aptos_crypto::hash::{CryptoHash, CryptoHasher, HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
+use anyhow::{Result, ensure, format_err};
+use aptos_crypto::hash::{ACCUMULATOR_PLACEHOLDER_HASH, CryptoHash, CryptoHasher, HashValue};
 use aptos_types::proof::{
+    AccumulatorConsistencyProof, AccumulatorProof, AccumulatorRangeProof, MerkleTreeInternalNode,
     definition::{LeafCount, MAX_ACCUMULATOR_PROOF_DEPTH},
     position::{FrozenSubTreeIterator, FrozenSubtreeSiblingIterator, Position},
-    AccumulatorConsistencyProof, AccumulatorProof, AccumulatorRangeProof, MerkleTreeInternalNode,
 };
 use std::marker::PhantomData;
 

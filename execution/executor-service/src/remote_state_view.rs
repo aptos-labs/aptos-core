@@ -17,8 +17,8 @@ use aptos_logger::trace;
 use aptos_types::{
     block_executor::partitioner::ShardId,
     state_store::{
-        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewResult,
-        TStateView,
+        StateViewResult, TStateView, state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
     },
 };
 use dashmap::DashMap;

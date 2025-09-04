@@ -6,21 +6,20 @@
 use crate::{
     metrics::{LATEST_CHECKPOINT_VERSION, OTHER_TIMERS_SECONDS},
     state_store::{
-        persisted_state::PersistedState, state_snapshot_committer::StateSnapshotCommitter, StateDb,
+        StateDb, persisted_state::PersistedState, state_snapshot_committer::StateSnapshotCommitter,
     },
 };
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
-    state_store::state_with_summary::{LedgerStateWithSummary, StateWithSummary},
     Result,
+    state_store::state_with_summary::{LedgerStateWithSummary, StateWithSummary},
 };
 use aptos_types::transaction::Version;
 use std::{
     sync::{
-        mpsc,
+        Arc, MutexGuard, mpsc,
         mpsc::{Sender, SyncSender},
-        Arc, MutexGuard,
     },
     thread::JoinHandle,
 };

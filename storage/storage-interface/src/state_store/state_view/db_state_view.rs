@@ -6,8 +6,8 @@ use aptos_crypto::HashValue;
 use aptos_types::{
     ledger_info::LedgerInfo,
     state_store::{
-        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateViewResult, TStateView,
+        StateViewResult, TStateView, errors::StateViewError, state_key::StateKey,
+        state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::Version,
 };

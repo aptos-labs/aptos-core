@@ -4,8 +4,8 @@
 #![forbid(unsafe_code)]
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec,
-    IntCounterVec,
+    HistogramVec, IntCounterVec, exponential_buckets, register_histogram_vec,
+    register_int_counter_vec,
 };
 use once_cell::sync::Lazy;
 
@@ -14,7 +14,10 @@ pub(crate) static TIMER: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_storage_interface_timer_seconds",
         "Various timers for performance analysis.",
         &["name"],
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22
+        )
+        .unwrap(),
     )
     .unwrap()
 });

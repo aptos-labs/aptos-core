@@ -84,12 +84,12 @@ pub mod restore;
 pub mod test_helper;
 
 use crate::metrics::{APTOS_JELLYFISH_LEAF_COUNT, APTOS_JELLYFISH_LEAF_DELETION_COUNT, COUNTER};
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{HashValue, hash::CryptoHash};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_metrics_core::IntCounterVecHelper;
-use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError, Result};
+use aptos_storage_interface::{AptosDbError, Result, db_ensure as ensure, db_other_bail};
 use aptos_types::{
-    nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
+    nibble::{Nibble, ROOT_NIBBLE_HEIGHT, nibble_path::NibblePath},
     proof::{SparseMerkleProof, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
@@ -102,7 +102,7 @@ use proptest::arbitrary::Arbitrary;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rayon::prelude::*;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
@@ -812,11 +812,7 @@ where
             .zip(rightmost_key_to_prove.iter_bits())
             .filter_map(|(sibling, bit)| {
                 // We only need to keep the siblings on the right.
-                if !bit {
-                    Some(*sibling)
-                } else {
-                    None
-                }
+                if !bit { Some(*sibling) } else { None }
             })
             .rev()
             .collect();

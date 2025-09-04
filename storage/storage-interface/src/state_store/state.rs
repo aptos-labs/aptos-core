@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    DbReader,
     metrics::TIMER,
     state_store::{
         state_delta::StateDelta,
@@ -12,15 +13,14 @@ use crate::{
         },
         versioned_state_value::StateUpdateRef,
     },
-    DbReader,
 };
 use anyhow::Result;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
-        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        StateViewId, NUM_STATE_SHARDS,
+        NUM_STATE_SHARDS, StateViewId, state_key::StateKey, state_slot::StateSlot,
+        state_storage_usage::StateStorageUsage,
     },
     transaction::Version,
 };

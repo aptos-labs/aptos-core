@@ -2,10 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{mock_tree_store::MockTreeStore, node_type::LeafNode, JellyfishMerkleTree, TestKey};
+use crate::{JellyfishMerkleTree, TestKey, mock_tree_store::MockTreeStore, node_type::LeafNode};
 use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_storage_interface::jmt_update_refs;
@@ -137,8 +137,8 @@ pub fn test_get_with_proof<V: TestKey>(
     test_nonexistent_keys_impl(&tree, version, &nonexistent_keys);
 }
 
-pub fn arb_kv_pair_with_distinct_last_nibble<V: TestKey>(
-) -> impl Strategy<Value = ((HashValue, (HashValue, V)), (HashValue, (HashValue, V)))> {
+pub fn arb_kv_pair_with_distinct_last_nibble<V: TestKey>()
+-> impl Strategy<Value = ((HashValue, (HashValue, V)), (HashValue, (HashValue, V)))> {
     (
         any::<HashValue>().prop_filter("Can't be 0xffffff...", |key| {
             *key != HashValue::new([0xFF; HashValue::LENGTH])
@@ -200,10 +200,12 @@ fn test_existent_keys_impl<V: TestKey>(
 
     for (key, value) in existent_kvs {
         let (account, proof) = tree.get_with_proof(*key, version).unwrap();
-        assert!(proof
-            .verify_by_hash(root_hash, *key, account.as_ref().map(|v| v.0))
-            .is_ok());
-        assert_eq!((account.as_ref().unwrap().0, account.unwrap().1 .0), *value);
+        assert!(
+            proof
+                .verify_by_hash(root_hash, *key, account.as_ref().map(|v| v.0))
+                .is_ok()
+        );
+        assert_eq!((account.as_ref().unwrap().0, account.unwrap().1.0), *value);
     }
 }
 

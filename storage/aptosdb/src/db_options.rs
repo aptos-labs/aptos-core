@@ -4,8 +4,8 @@
 use crate::schema::*;
 use aptos_config::config::RocksdbConfig;
 use aptos_schemadb::{
-    BlockBasedOptions, Cache, ColumnFamilyDescriptor, ColumnFamilyName, DBCompressionType, Options,
-    SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
+    BlockBasedOptions, Cache, ColumnFamilyDescriptor, ColumnFamilyName, DBCompressionType,
+    DEFAULT_COLUMN_FAMILY_NAME, Options, SliceTransform,
 };
 use aptos_types::transaction::Version;
 

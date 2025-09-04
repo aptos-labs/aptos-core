@@ -25,7 +25,7 @@ use aptos_types::transaction::{AtomicVersion, Version};
 use rayon::prelude::*;
 use std::{
     cmp::min,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
 };
 
 pub const STATE_KV_PRUNER_NAME: &str = "state_kv_pruner";

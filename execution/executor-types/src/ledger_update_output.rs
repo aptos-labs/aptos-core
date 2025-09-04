@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
 use aptos_types::{

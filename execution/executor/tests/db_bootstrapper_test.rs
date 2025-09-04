@@ -5,7 +5,7 @@
 #![forbid(unsafe_code)]
 
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
+use aptos_crypto::{HashValue, PrivateKey, Uniform, ed25519::Ed25519PrivateKey};
 use aptos_db::AptosDB;
 use aptos_executor::{
     block_executor::BlockExecutor,
@@ -16,20 +16,20 @@ use aptos_executor_test_helpers::{
 };
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_storage_interface::{
-    state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReaderWriter,
+    DbReaderWriter, state_store::state_view::db_state_view::LatestDbStateCheckpointView,
 };
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{
-        aptos_test_root_address, new_block_event_key, primary_apt_store, FungibleStoreResource,
-        NewBlockEvent, ObjectGroupResource, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
+        FungibleStoreResource, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG, NewBlockEvent,
+        ObjectGroupResource, aptos_test_root_address, new_block_event_key, primary_apt_store,
     },
     contract_event::ContractEvent,
     on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
-    state_store::{state_key::StateKey, MoveResourceExt},
-    test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
-    transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
+    state_store::{MoveResourceExt, state_key::StateKey},
+    test_helpers::transaction_test_helpers::{TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG, block},
+    transaction::{ChangeSet, Transaction, WriteSetPayload, authenticator::AuthenticationKey},
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
     waypoint::Waypoint,
@@ -47,11 +47,13 @@ fn test_empty_db() {
     let tmp_dir = TempPath::new();
     let db_rw = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
 
-    assert!(db_rw
-        .reader
-        .get_latest_ledger_info_option()
-        .unwrap()
-        .is_none());
+    assert!(
+        db_rw
+            .reader
+            .get_latest_ledger_info_option()
+            .unwrap()
+            .is_none()
+    );
 
     // Bootstrap empty DB.
     let waypoint =

@@ -2,8 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{db::test_helper::put_transaction_infos, AptosDB};
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use crate::{AptosDB, db::test_helper::put_transaction_infos};
+use aptos_crypto::{HashValue, hash::CryptoHash};
 use aptos_temppath::TempPath;
 use aptos_types::transaction::{TransactionInfo, Version};
 use proptest::{collection::vec, prelude::*};

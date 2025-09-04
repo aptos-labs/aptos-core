@@ -6,7 +6,7 @@ use aptos_types::{
         partitioner::{ShardId, SubBlocksForShard},
     },
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
+    transaction::{TransactionOutput, analyzed_transaction::AnalyzedTransaction},
     vm_status::VMStatus,
 };
 use serde::{Deserialize, Serialize};

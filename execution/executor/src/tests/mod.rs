@@ -5,16 +5,16 @@
 use crate::{
     block_executor::BlockExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-    workflow::{do_get_execution_output::DoGetExecutionOutput, ApplyExecutionOutput},
+    workflow::{ApplyExecutionOutput, do_get_execution_output::DoGetExecutionOutput},
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+use aptos_crypto::{HashValue, PrivateKey, SigningKey, Uniform, ed25519::Ed25519PrivateKey};
 use aptos_db::AptosDB;
 use aptos_executor_types::{
     BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_storage_interface::{
-    state_store::state_view::cached_state_view::CachedStateView, DbReaderWriter, LedgerSummary,
-    Result,
+    DbReaderWriter, LedgerSummary, Result,
+    state_store::state_view::cached_state_view::CachedStateView,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -23,22 +23,22 @@ use aptos_types::{
     bytes::NumToBytes,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    state_store::{state_key::StateKey, state_value::StateValue, StateViewId},
-    test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
+    state_store::{StateViewId, state_key::StateKey, state_value::StateValue},
+    test_helpers::transaction_test_helpers::{TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG, block},
     transaction::{
-        signature_verified_transaction::{
-            into_signature_verified_block, SignatureVerifiedTransaction,
-        },
         AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, RawTransaction, Script,
         SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionListWithProofV2,
         TransactionOutput, TransactionPayload, TransactionStatus, Version,
+        signature_verified_transaction::{
+            SignatureVerifiedTransaction, into_signature_verified_block,
+        },
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use itertools::Itertools;
 use mock_vm::{
-    encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
-    MockVM, DISCARD_STATUS, KEEP_STATUS,
+    DISCARD_STATUS, KEEP_STATUS, MockVM, encode_mint_transaction,
+    encode_reconfiguration_transaction, encode_transfer_transaction,
 };
 use proptest::prelude::*;
 use std::iter::once;
@@ -597,12 +597,13 @@ fn test_deleted_key_from_state_store() {
     apply_transaction_by_writeset(db, vec![(transaction3, write_set3)]);
 
     // Ensure the latest version of the value in DB is None (which implies its deleted)
-    assert!(db
-        .reader
-        .get_state_value_with_proof_by_version(&dummy_state_key1, 5)
-        .unwrap()
-        .0
-        .is_none());
+    assert!(
+        db.reader
+            .get_state_value_with_proof_by_version(&dummy_state_key1, 5)
+            .unwrap()
+            .0
+            .is_none()
+    );
 
     // Ensure the key that was not touched by the transaction is not accidentally deleted
     let state_value_from_db2 = db

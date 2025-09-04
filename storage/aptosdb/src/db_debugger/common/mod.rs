@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_storage_interface::Result;
-use aptos_types::nibble::{nibble_path::NibblePath, Nibble};
+use aptos_types::nibble::{Nibble, nibble_path::NibblePath};
 use clap::Parser;
 use core::default::Default;
 use std::path::{Path, PathBuf};

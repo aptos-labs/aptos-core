@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{bootstrap_genesis, gen_block_id, gen_ledger_info_with_sigs};
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
 use aptos_consensus_types::block::Block;
@@ -16,26 +16,26 @@ use aptos_sdk::{
     types::{AccountKey, LocalAccount},
 };
 use aptos_storage_interface::{
-    state_store::state_view::db_state_view::{DbStateViewAtVersion, VerifiedStateViewAtVersion},
     DbReaderWriter,
+    state_store::state_view::db_state_view::{DbStateViewAtVersion, VerifiedStateViewAtVersion},
 };
 use aptos_types::{
     account_config::{
-        aptos_test_root_address, primary_apt_store, AccountResource, FungibleStoreResource,
-        ObjectGroupResource,
+        AccountResource, FungibleStoreResource, ObjectGroupResource, aptos_test_root_address,
+        primary_apt_store,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     ledger_info::LedgerInfo,
     state_store::{MoveResourceExt, StateView},
-    test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
+    test_helpers::transaction_test_helpers::{TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG, block},
     transaction::{
-        signature_verified_transaction::{
-            into_signature_verified_block, SignatureVerifiedTransaction,
-        },
         AuxiliaryInfo, AuxiliaryInfoTrait, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo,
         Transaction::{self, UserTransaction},
         TransactionListWithProofV2, TransactionWithProof, WriteSetPayload,
+        signature_verified_transaction::{
+            SignatureVerifiedTransaction, into_signature_verified_block,
+        },
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,

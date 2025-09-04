@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_executor::block_tree::{epoch_genesis_block_id, BlockLookup, BlockTree},
+    block_executor::block_tree::{BlockLookup, BlockTree, epoch_genesis_block_id},
     types::partial_state_compute_result::PartialStateComputeResult,
 };
-use aptos_crypto::{hash::PRE_GENESIS_BLOCK_ID, HashValue};
+use aptos_crypto::{HashValue, hash::PRE_GENESIS_BLOCK_ID};
 use aptos_infallible::Mutex;
 use aptos_storage_interface::LedgerSummary;
 use aptos_types::{block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo};
@@ -137,7 +137,9 @@ fn test_add_duplicate_block() {
 #[test]
 fn test_add_block_missing_parent() {
     let block_tree = create_tree();
-    assert!(block_tree
-        .add_block(id(99), id(100), empty_block())
-        .is_err());
+    assert!(
+        block_tree
+            .add_block(id(99), id(100), empty_block())
+            .is_err()
+    );
 }

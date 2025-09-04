@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec,
-    IntCounterVec,
+    HistogramVec, IntCounterVec, exponential_buckets, register_histogram_vec,
+    register_int_counter_vec,
 };
 use once_cell::sync::Lazy;
 
@@ -16,7 +16,10 @@ pub static APTOS_SCHEMADB_SEEK_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|
         "Aptos schemadb seek latency in seconds",
         // metric labels (dimensions)
         &["cf_name", "tag"],
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22
+        )
+        .unwrap(),
     )
     .unwrap()
 });
@@ -29,7 +32,10 @@ pub static APTOS_SCHEMADB_ITER_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|
         "Aptos schemadb iter latency in seconds",
         // metric labels (dimensions)
         &["cf_name"],
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22
+        )
+        .unwrap(),
     )
     .unwrap()
 });
@@ -54,7 +60,10 @@ pub static APTOS_SCHEMADB_GET_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(||
         "Aptos schemadb get latency in seconds",
         // metric labels (dimensions)
         &["cf_name"],
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22
+        )
+        .unwrap(),
     )
     .unwrap()
 });
@@ -79,7 +88,10 @@ pub static APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS: Lazy<HistogramVec> = Laz
         "Aptos schemadb schema batch commit latency in seconds",
         // metric labels (dimensions)
         &["db_name"],
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20
+        )
+        .unwrap(),
     )
     .unwrap()
 });
@@ -122,7 +134,10 @@ pub static TIMER: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_schema_db_timer_seconds",
         "Various timers for performance analysis.",
         &["name", "sub_name"],
-        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32
+        )
+        .unwrap(),
     )
     .unwrap()
 });

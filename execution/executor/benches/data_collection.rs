@@ -5,12 +5,12 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
     event::{EventHandle, EventKey},
-    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
+    state_store::{NUM_STATE_SHARDS, state_key::StateKey, state_value::StateValue},
     transaction::Version,
     write_set::{WriteOp, WriteSet},
 };
 use arr_macro::arr;
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::collections::HashMap;

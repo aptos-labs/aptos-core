@@ -13,7 +13,7 @@ use aptos_types::block_executor::{
 };
 use aptos_vm::VMBlockExecutor;
 use std::{
-    sync::{mpsc, Arc},
+    sync::{Arc, mpsc},
     time::{Duration, Instant},
 };
 

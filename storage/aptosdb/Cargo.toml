@@ -2,10 +2,10 @@
 name = "aptos-db"
 description = "Aptos database"
 version = "0.1.0"
+edition = "2024"
 
 # Workspace inherited keys
 authors = { workspace = true }
-edition = { workspace = true }
 homepage = { workspace = true }
 license = { workspace = true }
 publish = { workspace = true }

@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    DbReader,
     metrics::TIMER,
     state_store::{
         state::LedgerState,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
     },
-    DbReader,
 };
 use anyhow::Result;
-use aptos_crypto::{hash::CORRUPTION_SENTINEL, HashValue};
+use aptos_crypto::{HashValue, hash::CORRUPTION_SENTINEL};
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};

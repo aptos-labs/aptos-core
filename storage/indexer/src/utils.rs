@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_db_indexer_schemas::schema::state_keys::StateKeysSchema;
-use aptos_schemadb::{iterator::SchemaIterator, ReadOptions, DB};
+use aptos_schemadb::{DB, ReadOptions, iterator::SchemaIterator};
 use aptos_storage_interface::{DbReader, Result};
 use aptos_types::{
     state_store::{
-        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_key::{StateKey, prefix::StateKeyPrefix},
         state_value::StateValue,
     },
     transaction::Version,

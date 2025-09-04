@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram, register_histogram_vec, Histogram, HistogramVec,
+    Histogram, HistogramVec, exponential_buckets, register_histogram, register_histogram_vec,
 };
 use once_cell::sync::Lazy;
 
-pub static BLOCK_PARTITIONING_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
+pub static BLOCK_PARTITIONING_SECONDS: Lazy<Histogram> =
+    Lazy::new(|| {
+        register_histogram!(
         // metric name
         "aptos_block_partitioning_seconds",
         // metric description
@@ -15,7 +16,7 @@ pub static BLOCK_PARTITIONING_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()
-});
+    });
 
 pub static MISC_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
@@ -24,7 +25,10 @@ pub static MISC_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
         // metric description
         "The time spent in seconds of miscellaneous phases of block partitioner v2.",
         &["name"],
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20
+        )
+        .unwrap(),
     )
     .unwrap()
 });

@@ -22,18 +22,18 @@ use aptos_db_indexer_schemas::{
 use aptos_logger::warn;
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{batch::SchemaBatch, DB};
+use aptos_schemadb::{DB, batch::SchemaBatch};
 use aptos_storage_interface::{
-    db_ensure, db_other_bail, state_store::state_view::db_state_view::DbStateViewAtVersion,
-    AptosDbError, DbReader, Result,
+    AptosDbError, DbReader, Result, db_ensure, db_other_bail,
+    state_store::state_view::db_state_view::DbStateViewAtVersion,
 };
 use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
     state_store::{
-        state_key::{inner::StateKeyInner, StateKey},
-        table::{TableHandle, TableInfo},
         StateView,
+        state_key::{StateKey, inner::StateKeyInner},
+        table::{TableHandle, TableInfo},
     },
     transaction::{AtomicVersion, Version},
     write_set::{WriteOp, WriteSet},
@@ -46,7 +46,7 @@ use move_core_types::{
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryInto,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
 };
 
 #[derive(Debug)]

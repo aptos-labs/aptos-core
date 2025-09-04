@@ -2,34 +2,34 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Error, Ok, Result};
+use anyhow::{Error, Ok, Result, bail};
 use aptos_backup_cli::utils::{ReplayConcurrencyLevelOpt, RocksdbOpt};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_config::config::{
-    StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-    NO_OP_STORAGE_PRUNER_CONFIG,
+    BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    NO_OP_STORAGE_PRUNER_CONFIG, StorageDirPaths,
 };
-use aptos_db::{backup::backup_handler::BackupHandler, AptosDB};
+use aptos_db::{AptosDB, backup::backup_handler::BackupHandler};
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
-    state_store::state_view::db_state_view::DbStateViewAtVersion, AptosDbError, DbReader,
+    AptosDbError, DbReader, state_store::state_view::db_state_view::DbStateViewAtVersion,
 };
 use aptos_types::{
     contract_event::ContractEvent,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
-        PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version,
+        AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction,
     },
     write_set::WriteSet,
 };
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
+use aptos_vm::{AptosVM, VMBlockExecutor, aptos_vm::AptosVMBlockExecutor};
 use clap::Parser;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     panic,
     path::PathBuf,
     process,
-    sync::{atomic::AtomicU64, Arc},
+    sync::{Arc, atomic::AtomicU64},
     time::Instant,
 };
 

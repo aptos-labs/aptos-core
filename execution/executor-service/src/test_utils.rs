@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
-use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
+use aptos_block_partitioner::{PartitionerConfig, v2::config::PartitionerV2Config};
 use aptos_keygen::KeyGen;
 use aptos_language_e2e_tests::common_transactions::peer_to_peer_txn;
 use aptos_transaction_simulation::{
@@ -15,15 +15,14 @@ use aptos_types::{
     },
     state_store::state_key::inner::StateKeyInner,
     transaction::{
-        analyzed_transaction::AnalyzedTransaction,
-        signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
-        TransactionOutput,
+        Transaction, TransactionOutput, analyzed_transaction::AnalyzedTransaction,
+        signature_verified_transaction::SignatureVerifiedTransaction,
     },
 };
 use aptos_vm::{
-    aptos_vm::AptosVMBlockExecutor,
-    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     VMBlockExecutor,
+    aptos_vm::AptosVMBlockExecutor,
+    sharded_block_executor::{ShardedBlockExecutor, executor_client::ExecutorClient},
 };
 use std::{
     collections::HashMap,

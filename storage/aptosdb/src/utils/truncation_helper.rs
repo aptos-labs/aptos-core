@@ -5,8 +5,8 @@
 
 use crate::{
     ledger_db::{
-        ledger_metadata_db::LedgerMetadataDb, transaction_db::TransactionDb, LedgerDb,
-        LedgerDbSchemaBatches,
+        LedgerDb, LedgerDbSchemaBatches, ledger_metadata_db::LedgerMetadataDb,
+        transaction_db::TransactionDb,
     },
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -34,12 +34,12 @@ use crate::{
     utils::get_progress,
 };
 use aptos_crypto::hash::CryptoHash;
-use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
+use aptos_jellyfish_merkle::{StaleNodeIndex, node_type::NodeKey};
 use aptos_logger::info;
 use aptos_schemadb::{
+    DB,
     batch::SchemaBatch,
     schema::{Schema, SeekKeyCodec},
-    DB,
 };
 use aptos_storage_interface::Result;
 use aptos_types::{proof::position::Position, transaction::Version};
@@ -49,8 +49,8 @@ use status_line::StatusLine;
 use std::{
     fmt::{Display, Formatter},
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU64, Ordering},
     },
 };
 

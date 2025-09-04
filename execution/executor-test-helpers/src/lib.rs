@@ -6,8 +6,8 @@ pub mod integration_test_impl;
 
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue,
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
 };
 use aptos_executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
 use aptos_executor_types::state_compute_result::StateComputeResult;
@@ -15,7 +15,7 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
-    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures, generate_ledger_info_with_sig},
     test_helpers::transaction_test_helpers::get_test_signed_txn,
     transaction::{Transaction, TransactionPayload},
     validator_signer::ValidatorSigner,

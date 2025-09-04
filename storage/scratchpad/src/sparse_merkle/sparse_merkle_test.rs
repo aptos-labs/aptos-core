@@ -8,11 +8,11 @@ use crate::test_utils::{
     proptest_helpers::{arb_smt_correctness_case, test_smt_correctness_impl},
 };
 use aptos_crypto::{
-    hash::{CryptoHash, TestOnlyHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH, TestOnlyHash},
 };
 use aptos_types::{
-    proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt},
+    proof::{SparseMerkleLeafNode, SparseMerkleProofExt, definition::NodeInProof},
     state_store::state_value::StateValue,
 };
 use once_cell::sync::Lazy;
@@ -221,9 +221,11 @@ fn test_update_256_siblings_in_proof() {
         .fold(leaf1.hash(), |previous_hash, node_in_proof| {
             hash_internal(previous_hash, node_in_proof.hash())
         });
-    assert!(proof_of_key1
-        .verify(old_root_hash, key1, Some(&value1))
-        .is_ok());
+    assert!(
+        proof_of_key1
+            .verify(old_root_hash, key1, Some(&value1))
+            .is_ok()
+    );
 
     let new_value1 = StateValue::from(String::from("test_val1111").into_bytes());
     let proof_reader = ProofReader::new(vec![(key1, proof_of_key1)]);
@@ -306,9 +308,11 @@ fn test_update() {
         NodeInProof::Leaf(leaf3),
         NodeInProof::Other(x_hash),
     ]);
-    assert!(proof
-        .verify::<StateValue>(old_root_hash, key4, None)
-        .is_ok());
+    assert!(
+        proof
+            .verify::<StateValue>(old_root_hash, key4, None)
+            .is_ok()
+    );
 
     // Create the old tree and update the tree with new value and proof.
     let proof_reader = ProofReader::new(vec![(key4, proof)]);

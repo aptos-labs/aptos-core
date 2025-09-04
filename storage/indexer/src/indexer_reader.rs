@@ -9,7 +9,7 @@ use aptos_types::{
     event::EventKey,
     indexer::indexer_db_reader::{IndexerReader, Order},
     state_store::{
-        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_key::{StateKey, prefix::StateKeyPrefix},
         state_value::StateValue,
         table::{TableHandle, TableInfo},
     },

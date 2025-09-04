@@ -3,13 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    node_type::{LeafNode, Node, NodeKey},
     NodeBatch, Result, StaleNodeIndex, TreeReader, TreeUpdateBatch, TreeWriter,
+    node_type::{LeafNode, Node, NodeKey},
 };
 use aptos_infallible::RwLock;
-use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError};
+use aptos_storage_interface::{AptosDbError, db_ensure as ensure, db_other_bail};
 use aptos_types::transaction::Version;
-use std::collections::{hash_map::Entry, BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, hash_map::Entry};
 pub struct MockTreeStore<K> {
     data: RwLock<(HashMap<NodeKey, Node<K>>, BTreeSet<StaleNodeIndex>)>,
     allow_overwrite: bool,

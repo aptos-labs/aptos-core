@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ledger_db::WriteSetDb, AptosDB};
+use crate::{AptosDB, ledger_db::WriteSetDb};
 use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::Result;
 use aptos_temppath::TempPath;

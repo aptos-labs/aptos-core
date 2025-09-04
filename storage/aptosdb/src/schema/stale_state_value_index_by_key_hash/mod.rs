@@ -18,7 +18,7 @@
 //! `stale_since_version` is serialized in big endian so that records in RocksDB will be in order of
 //! its numeric value.
 
-use crate::schema::{ensure_slice_len_eq, STALE_STATE_VALUE_INDEX_BY_KEY_HASH_CF_NAME};
+use crate::schema::{STALE_STATE_VALUE_INDEX_BY_KEY_HASH_CF_NAME, ensure_slice_len_eq};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_schemadb::{

@@ -12,8 +12,8 @@ use aptos_types::{
     },
     state_store::StateView,
     transaction::{
-        block_epilogue::BlockEndInfo, signature_verified_transaction::SignatureVerifiedTransaction,
-        AuxiliaryInfo, BlockOutput, Transaction, TransactionOutput,
+        AuxiliaryInfo, BlockOutput, Transaction, TransactionOutput, block_epilogue::BlockEndInfo,
+        signature_verified_transaction::SignatureVerifiedTransaction,
     },
     vm_status::VMStatus,
 };

@@ -14,7 +14,7 @@ use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_infallible::Mutex;
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
-use std::sync::{atomic::Ordering, Arc};
+use std::sync::{Arc, atomic::Ordering};
 
 /// The `PrunerManager` for `LedgerPruner`.
 pub(crate) struct LedgerPrunerManager {

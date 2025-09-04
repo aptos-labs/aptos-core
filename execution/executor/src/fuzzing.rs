@@ -5,9 +5,9 @@
 use crate::block_executor::BlockExecutor;
 use anyhow::Result;
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
-use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_crypto::{HashValue, hash::SPARSE_MERKLE_PLACEHOLDER_HASH};
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_storage_interface::{chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter, DbWriter};
+use aptos_storage_interface::{DbReader, DbReaderWriter, DbWriter, chunk_to_commit::ChunkToCommit};
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
@@ -17,16 +17,16 @@ use aptos_types::{
     state_store::StateView,
     test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
-        signature_verified_transaction::{
-            into_signature_verified_block, SignatureVerifiedTransaction,
-        },
         AuxiliaryInfo, BlockOutput, Transaction, TransactionOutput, Version,
+        signature_verified_transaction::{
+            SignatureVerifiedTransaction, into_signature_verified_block,
+        },
     },
     vm_status::VMStatus,
 };
 use aptos_vm::{
-    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     VMBlockExecutor,
+    sharded_block_executor::{ShardedBlockExecutor, executor_client::ExecutorClient},
 };
 use std::sync::Arc;
 

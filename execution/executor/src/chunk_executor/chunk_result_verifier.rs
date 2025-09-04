@@ -1,13 +1,13 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use aptos_executor_types::LedgerUpdateOutput;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    proof::{accumulator::InMemoryTransactionAccumulator, TransactionInfoListWithProof},
+    proof::{TransactionInfoListWithProof, accumulator::InMemoryTransactionAccumulator},
     transaction::TransactionInfo,
 };
 

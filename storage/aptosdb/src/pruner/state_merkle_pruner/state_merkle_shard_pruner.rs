@@ -4,7 +4,7 @@
 use crate::{
     pruner::{
         pruner_utils::get_or_initialize_subpruner_progress,
-        state_merkle_pruner::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
+        state_merkle_pruner::{StateMerklePruner, generics::StaleNodeIndexSchemaTrait},
     },
     schema::{
         db_metadata::{DbMetadataSchema, DbMetadataValue},
@@ -14,7 +14,7 @@ use crate::{
 use anyhow::Result;
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_logger::info;
-use aptos_schemadb::{batch::SchemaBatch, schema::KeyCodec, DB};
+use aptos_schemadb::{DB, batch::SchemaBatch, schema::KeyCodec};
 use aptos_types::transaction::Version;
 use std::{marker::PhantomData, sync::Arc};
 

@@ -27,8 +27,8 @@ use std::{
     collections::BTreeSet,
     ops::Deref,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 

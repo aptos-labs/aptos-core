@@ -12,7 +12,7 @@ use crate::{
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
-use std::sync::{atomic::Ordering, Arc};
+use std::sync::{Arc, atomic::Ordering};
 
 /// The `PrunerManager` for `StateKvPruner`.
 pub(crate) struct StateKvPrunerManager {

@@ -14,7 +14,7 @@ use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use owo_colors::OwoColorize;
 use std::{
-    sync::{mpsc, Arc},
+    sync::{Arc, mpsc},
     thread,
     time::Instant,
 };

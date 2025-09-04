@@ -6,10 +6,9 @@
 //! state sync v2.
 use crate::{
     ledger_db::{
-        ledger_metadata_db::LedgerMetadataDb,
+        LedgerDb, LedgerDbSchemaBatches, ledger_metadata_db::LedgerMetadataDb,
         persisted_auxiliary_info_db::PersistedAuxiliaryInfoDb,
-        transaction_info_db::TransactionInfoDb, write_set_db::WriteSetDb, LedgerDb,
-        LedgerDbSchemaBatches,
+        transaction_info_db::TransactionInfoDb, write_set_db::WriteSetDb,
     },
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -19,9 +18,9 @@ use crate::{
     utils::ShardedStateKvSchemaBatch,
 };
 use aptos_crypto::HashValue;
-use aptos_schemadb::{batch::SchemaBatch, DB};
+use aptos_schemadb::{DB, batch::SchemaBatch};
 use aptos_storage_interface::{
-    db_ensure as ensure, state_store::state_update_refs::StateUpdateRefs, AptosDbError, Result,
+    AptosDbError, Result, db_ensure as ensure, state_store::state_update_refs::StateUpdateRefs,
 };
 use aptos_types::{
     account_config::new_block_event_key,

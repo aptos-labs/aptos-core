@@ -3,15 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    ProofRead,
     sparse_merkle::{
+        HashValueRef, UpdateError,
         node::{InternalNode, Node, NodeHandle, NodeInner},
         utils::{partition, swap_if},
-        HashValueRef, UpdateError,
     },
-    ProofRead,
 };
-use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_types::proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt};
+use aptos_crypto::{HashValue, hash::SPARSE_MERKLE_PLACEHOLDER_HASH};
+use aptos_types::proof::{SparseMerkleLeafNode, SparseMerkleProofExt, definition::NodeInProof};
 use aptos_vm::AptosVM;
 use once_cell::sync::Lazy;
 use std::cmp::Ordering;

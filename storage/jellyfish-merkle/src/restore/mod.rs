@@ -6,22 +6,22 @@
 //! of states.
 
 use crate::{
+    NibbleExt, ROOT_NIBBLE_HEIGHT, TreeReader, TreeWriter,
     node_type::{
-        get_child_and_sibling_half_start, Child, Children, InternalNode, LeafNode, Node, NodeKey,
-        NodeType,
+        Child, Children, InternalNode, LeafNode, Node, NodeKey, NodeType,
+        get_child_and_sibling_half_start,
     },
-    NibbleExt, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
 };
 use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
 };
 use aptos_logger::info;
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{AptosDbError, Result, db_ensure as ensure};
 use aptos_types::{
     nibble::{
-        nibble_path::{NibbleIterator, NibblePath},
         ExpectNibble, Nibble,
+        nibble_path::{NibbleIterator, NibblePath},
     },
     proof::{SparseMerkleInternalNode, SparseMerkleLeafNode, SparseMerkleRangeProof},
     transaction::Version,
@@ -32,8 +32,8 @@ use std::{
     cmp::Eq,
     collections::HashMap,
     sync::{
-        mpsc::{channel, Receiver},
         Arc,
+        mpsc::{Receiver, channel},
     },
 };
 

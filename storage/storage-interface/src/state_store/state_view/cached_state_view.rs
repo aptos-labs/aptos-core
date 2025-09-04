@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    DbReader,
     metrics::{COUNTER, TIMER},
     state_store::{
         state::State,
@@ -12,20 +13,19 @@ use crate::{
             hot_state_view::{EmptyHotState, HotStateView},
         },
     },
-    DbReader,
 };
 use anyhow::Result;
 use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_types::{
     state_store::{
-        hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
-        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewId,
-        StateViewResult, TStateView, NUM_STATE_SHARDS,
+        NUM_STATE_SHARDS, StateViewId, StateViewResult, TStateView, hot_state::THotStateSlot,
+        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
     },
     transaction::Version,
 };
 use core::fmt;
-use dashmap::{mapref::entry::Entry, DashMap};
+use dashmap::{DashMap, mapref::entry::Entry};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use rayon::prelude::*;

@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
-    ChunkCommitNotification, LedgerUpdateOutput,
+    ChunkCommitNotification, LedgerUpdateOutput, execution_output::ExecutionOutput,
+    state_checkpoint_output::StateCheckpointOutput,
 };
 use aptos_crypto::{
-    hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
+    hash::{ACCUMULATOR_PLACEHOLDER_HASH, TransactionAccumulatorHasher},
 };
 use aptos_storage_interface::chunk_to_commit::ChunkToCommit;
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
-    proof::{accumulator::InMemoryTransactionAccumulator, AccumulatorExtensionProof},
+    proof::{AccumulatorExtensionProof, accumulator::InMemoryTransactionAccumulator},
     transaction::{Transaction, TransactionStatus, Version},
 };
 use std::sync::Arc;

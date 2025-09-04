@@ -87,11 +87,11 @@ use crate::sparse_merkle::{
     updater::SubTreeUpdater,
     utils::get_state_shard_id,
 };
-use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_crypto::{HashValue, hash::SPARSE_MERKLE_PLACEHOLDER_HASH};
 use aptos_infallible::Mutex;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_types::{
-    nibble::{nibble_path::NibblePath, Nibble},
+    nibble::{Nibble, nibble_path::NibblePath},
     proof::SparseMerkleProofExt,
     state_store::state_key::StateKey,
 };
@@ -543,7 +543,7 @@ impl FrozenSparseMerkleTree {
                             return StateStoreStatus::UnknownSubtreeRoot {
                                 hash,
                                 depth: next_depth - 1,
-                            }
+                            };
                         },
                         Some(node) => match node.inner() {
                             NodeInner::Internal(internal_node) => {

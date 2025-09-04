@@ -13,8 +13,8 @@ use crate::{
     utils::{get_progress, iterators::EpochEndingLedgerInfoIter},
 };
 use anyhow::anyhow;
-use aptos_schemadb::{batch::SchemaBatch, DB};
-use aptos_storage_interface::{block_info::BlockInfo, db_ensure as ensure, AptosDbError, Result};
+use aptos_schemadb::{DB, batch::SchemaBatch};
+use aptos_storage_interface::{AptosDbError, Result, block_info::BlockInfo, db_ensure as ensure};
 use aptos_types::{
     account_config::NewBlockEvent, block_info::BlockHeight, contract_event::ContractEvent,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,

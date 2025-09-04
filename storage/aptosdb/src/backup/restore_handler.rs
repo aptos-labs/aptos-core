@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    AptosDB,
     backup::restore_utils,
     ledger_db::LedgerDb,
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode},
     state_store::StateStore,
-    AptosDB,
 };
 use aptos_crypto::HashValue;
 use aptos_storage_interface::{DbReader, Result};

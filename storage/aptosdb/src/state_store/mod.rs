@@ -23,17 +23,17 @@ use crate::{
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter},
     state_store::{buffered_state::BufferedState, persisted_state::PersistedState},
     utils::{
+        ShardedStateKvSchemaBatch,
         iterators::PrefixedStateValueIterator,
         truncation_helper::{
             find_tree_root_at_or_before, get_max_version_in_state_merkle_db, truncate_ledger_db,
             truncate_state_kv_db, truncate_state_merkle_db,
         },
-        ShardedStateKvSchemaBatch,
     },
 };
 use aptos_crypto::{
-    hash::{CryptoHash, CORRUPTION_SENTINEL, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
+    hash::{CORRUPTION_SENTINEL, CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
 };
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_db_indexer_schemas::{
@@ -47,7 +47,8 @@ use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::{NativeBatch, SchemaBatch, WriteBatch};
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    db_ensure as ensure, db_other_bail as bail,
+    AptosDbError, DbReader, Result, StateSnapshotReceiver, db_ensure as ensure,
+    db_other_bail as bail,
     state_store::{
         state::{LedgerState, State},
         state_summary::{ProvableStateSummary, StateSummary},
@@ -59,19 +60,18 @@ use aptos_storage_interface::{
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
         versioned_state_value::StateUpdateRef,
     },
-    AptosDbError, DbReader, Result, StateSnapshotReceiver,
 };
 use aptos_types::{
-    proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
+    proof::{SparseMerkleProofExt, SparseMerkleRangeProof, definition::LeafCount},
     state_store::{
-        state_key::{prefix::StateKeyPrefix, StateKey},
+        NUM_STATE_SHARDS,
+        state_key::{StateKey, prefix::StateKeyPrefix},
         state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
         state_value::{
             StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue,
             StateValueChunkWithProof,
         },
-        NUM_STATE_SHARDS,
     },
     transaction::Version,
 };

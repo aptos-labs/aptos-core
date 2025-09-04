@@ -3,15 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    JellyfishMerkleTree,
     iterator::JellyfishMerkleIterator,
     mock_tree_store::MockTreeStore,
     test_helper::{gen_value, plus_one},
-    JellyfishMerkleTree,
 };
 use aptos_crypto::HashValue;
 use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{SeedableRng, rngs::StdRng};
 use std::{collections::BTreeMap, sync::Arc};
 
 #[test]
@@ -112,12 +112,12 @@ fn run_tests<K>(
             iter.collect::<Result<Vec<_>>>()
                 .unwrap()
                 .into_iter()
-                .map(|x| (x.0, x.1 .0))
+                .map(|x| (x.0, x.1.0))
                 .collect::<Vec<_>>(),
             btree
                 .clone()
                 .into_iter()
-                .map(|x| (x.0, x.1 .1))
+                .map(|x| (x.0, x.1.1))
                 .collect::<Vec<_>>(),
         );
     }
@@ -129,13 +129,13 @@ fn run_tests<K>(
                 iter.collect::<Result<Vec<_>>>()
                     .unwrap()
                     .into_iter()
-                    .map(|x| (x.0, x.1 .0))
+                    .map(|x| (x.0, x.1.0))
                     .collect::<Vec<_>>(),
                 btree
                     .clone()
                     .into_iter()
                     .skip(i)
-                    .map(|x| (x.0, x.1 .1))
+                    .map(|x| (x.0, x.1.1))
                     .collect::<Vec<_>>(),
             );
         }
@@ -148,13 +148,13 @@ fn run_tests<K>(
                 iter.collect::<Result<Vec<_>>>()
                     .unwrap()
                     .into_iter()
-                    .map(|x| (x.0, x.1 .0))
+                    .map(|x| (x.0, x.1.0))
                     .collect::<Vec<_>>(),
                 btree
                     .clone()
                     .into_iter()
                     .skip(i)
-                    .map(|x| (x.0, x.1 .1))
+                    .map(|x| (x.0, x.1.1))
                     .collect::<Vec<_>>(),
             );
         }
@@ -167,13 +167,13 @@ fn run_tests<K>(
                 iter.collect::<Result<Vec<_>>>()
                     .unwrap()
                     .into_iter()
-                    .map(|x| (x.0, x.1 .0))
+                    .map(|x| (x.0, x.1.0))
                     .collect::<Vec<_>>(),
                 btree
                     .clone()
                     .into_iter()
                     .skip(i + 1)
-                    .map(|x| (x.0, x.1 .1))
+                    .map(|x| (x.0, x.1.1))
                     .collect::<Vec<_>>(),
             );
         }
@@ -186,7 +186,7 @@ fn run_tests<K>(
             iter.collect::<Result<Vec<_>>>()
                 .unwrap()
                 .into_iter()
-                .map(|x| (x.0, x.1 .0))
+                .map(|x| (x.0, x.1.0))
                 .collect::<Vec<_>>(),
             vec![]
         );
@@ -203,7 +203,7 @@ fn run_tests<K>(
             iter.collect::<Result<Vec<_>>>()
                 .unwrap()
                 .into_iter()
-                .map(|x| (x.0, x.1 .0))
+                .map(|x| (x.0, x.1.0))
                 .collect::<Vec<_>>(),
             vec![]
         );

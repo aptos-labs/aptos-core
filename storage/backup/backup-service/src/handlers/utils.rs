@@ -6,14 +6,14 @@ use crate::handlers::bytes_sender;
 use aptos_db::{backup::backup_handler::BackupHandler, metrics::BACKUP_TIMER};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec, TimerHelper,
+    HistogramVec, IntCounterVec, TimerHelper, register_histogram_vec, register_int_counter_vec,
 };
 use aptos_storage_interface::Result as DbResult;
 use hyper::Body;
 use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::convert::Infallible;
-use warp::{reply::Response, Rejection, Reply};
+use warp::{Rejection, Reply, reply::Response};
 
 pub(super) static LATENCY_HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(

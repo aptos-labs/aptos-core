@@ -20,17 +20,17 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorError, ExecutorResult,
+    BlockExecutorTrait, ExecutorError, ExecutorResult, state_compute_result::StateComputeResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
+    DbReaderWriter,
     state_store::{
         state_summary::ProvableStateSummary, state_view::cached_state_view::CachedStateView,
     },
-    DbReaderWriter,
 };
 use aptos_types::{
     block_executor::{

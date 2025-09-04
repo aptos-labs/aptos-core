@@ -4,9 +4,8 @@
 
 use aptos_block_partitioner::{
     pre_partition::{
-        connected_component::config::ConnectedComponentPartitionerConfig,
+        PrePartitionerConfig, connected_component::config::ConnectedComponentPartitionerConfig,
         default_pre_partitioner_config, uniform_partitioner::config::UniformPartitionerConfig,
-        PrePartitionerConfig,
     },
     v2::config::PartitionerV2Config,
 };
@@ -14,7 +13,7 @@ use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
 use aptos_executor_benchmark::{
-    default_benchmark_features,
+    BenchmarkWorkload, default_benchmark_features,
     native::{
         aptos_vm_uncoordinated::AptosVMParallelUncoordinatedBlockExecutor,
         native_config::NativeConfig,
@@ -25,19 +24,18 @@ use aptos_executor_benchmark::{
         },
     },
     pipeline::PipelineConfig,
-    BenchmarkWorkload,
 };
 use aptos_executor_service::remote_executor_client;
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
 #[cfg(target_os = "linux")]
 use aptos_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadManagerBuilder};
-use aptos_metrics_core::{register_int_gauge, IntGauge};
+use aptos_metrics_core::{IntGauge, register_int_gauge};
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::WorkflowProgress;
 use aptos_transaction_workloads_lib::args::TransactionTypeArg;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
+use aptos_vm::{AptosVM, VMBlockExecutor, aptos_vm::AptosVMBlockExecutor};
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use clap::{Parser, Subcommand, ValueEnum};
 use once_cell::sync::Lazy;

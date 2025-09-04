@@ -5,7 +5,7 @@ use crate::{metrics::TIMER, state_store::versioned_state_value::StateUpdateRef};
 use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
-    state_store::{state_key::StateKey, NUM_STATE_SHARDS},
+    state_store::{NUM_STATE_SHARDS, state_key::StateKey},
     transaction::Version,
     write_set::{BaseStateOp, WriteSet},
 };
@@ -13,7 +13,7 @@ use arr_macro::arr;
 use itertools::Itertools;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     time::Duration,
 };
 

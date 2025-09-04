@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    ColumnFamilyName, DB,
     metrics::{APTOS_SCHEMADB_DELETES_SAMPLED, APTOS_SCHEMADB_PUT_BYTES_SAMPLED, TIMER},
     schema::{KeyCodec, Schema, ValueCodec},
-    ColumnFamilyName, DB,
 };
 use aptos_drop_helper::DropHelper;
 use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};

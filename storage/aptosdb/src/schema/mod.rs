@@ -32,7 +32,7 @@ pub(crate) mod transaction_summaries_by_account;
 pub(crate) mod version_data;
 pub(crate) mod write_set;
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use aptos_schemadb::ColumnFamilyName;
 
 pub const BLOCK_BY_VERSION_CF_NAME: ColumnFamilyName = "block_by_version";

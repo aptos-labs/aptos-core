@@ -14,7 +14,7 @@
 //! |  state key  | version |  state value  |
 //! ```
 
-use crate::schema::{ensure_slice_len_gt, STATE_VALUE_CF_NAME};
+use crate::schema::{STATE_VALUE_CF_NAME, ensure_slice_len_gt};
 use anyhow::Result;
 use aptos_schemadb::{
     define_schema,
@@ -22,7 +22,7 @@ use aptos_schemadb::{
 };
 use aptos_types::{
     state_store::{
-        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_key::{StateKey, prefix::StateKeyPrefix},
         state_value::StateValue,
     },
     transaction::Version,

@@ -12,7 +12,7 @@ use aptos_logger::info;
 use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_types::{
     block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
-    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
+    transaction::{Transaction, signature_verified_transaction::SignatureVerifiedTransaction},
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::time::Instant;

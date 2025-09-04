@@ -84,7 +84,7 @@ proptest! {
             .into_iter()
             .map(|gens| {
                 gens.into_iter()
-                    .map(|(index, gen)| gen.materialize(*index, &mut universe))
+                    .map(|(index, event_gen)| event_gen.materialize(*index, &mut universe))
                     .collect()
             })
             .collect();
@@ -252,12 +252,16 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
     let (first_block_version, first_event) = new_block_events.first().unwrap();
     let first_new_block_event: NewBlockEvent = first_event.try_into().unwrap();
     let first_block_ts = first_new_block_event.proposed_time();
-    assert!(store
-        .get_last_version_before_timestamp(1000, *first_block_version)
-        .is_err());
-    assert!(store
-        .get_last_version_before_timestamp(first_block_ts, Version::MAX)
-        .is_err());
+    assert!(
+        store
+            .get_last_version_before_timestamp(1000, *first_block_version)
+            .is_err()
+    );
+    assert!(
+        store
+            .get_last_version_before_timestamp(first_block_ts, Version::MAX)
+            .is_err()
+    );
 
     let mut last_block_ts = first_block_ts;
     let mut last_block_version = *first_block_version;
@@ -286,9 +290,11 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
     }
 
     // error on no block after required ts
-    assert!(store
-        .get_last_version_before_timestamp(last_block_ts + 1, ledger_version)
-        .is_err());
+    assert!(
+        store
+            .get_last_version_before_timestamp(last_block_ts + 1, ledger_version)
+            .is_err()
+    );
 }
 
 proptest! {

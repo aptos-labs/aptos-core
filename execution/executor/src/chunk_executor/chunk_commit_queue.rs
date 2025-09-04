@@ -11,11 +11,11 @@ use crate::{
         executed_chunk::ExecutedChunk, partial_state_compute_result::PartialStateComputeResult,
     },
 };
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{Result, anyhow, ensure};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
-    state_store::{state::LedgerState, state_summary::LedgerStateSummary},
     DbReader, LedgerSummary,
+    state_store::{state::LedgerState, state_summary::LedgerStateSummary},
 };
 use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};
 use std::{collections::VecDeque, sync::Arc};

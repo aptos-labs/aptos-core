@@ -28,7 +28,7 @@ use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{batch::SchemaBatch, Cache, ColumnFamilyDescriptor, ColumnFamilyName, DB};
+use aptos_schemadb::{Cache, ColumnFamilyDescriptor, ColumnFamilyName, DB, batch::SchemaBatch};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::{

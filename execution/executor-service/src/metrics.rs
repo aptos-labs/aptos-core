@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec,
-    IntCounterVec,
+    HistogramVec, IntCounterVec, exponential_buckets, register_histogram_vec,
+    register_int_counter_vec,
 };
 use once_cell::sync::Lazy;
 
@@ -25,7 +25,10 @@ pub static REMOTE_EXECUTOR_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
          10. kv_resp_ser: serializing the remote key value responses;",
         // metric labels (dimensions)
         &["shard_id", "name"],
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20
+        )
+        .unwrap(),
     )
     .unwrap()
 });

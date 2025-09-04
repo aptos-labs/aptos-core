@@ -11,7 +11,7 @@
 //! | version | index | event bytes |
 //! ```
 
-use crate::schema::{ensure_slice_len_eq, EVENT_CF_NAME};
+use crate::schema::{EVENT_CF_NAME, ensure_slice_len_eq};
 use anyhow::Result;
 use aptos_schemadb::{
     define_schema,

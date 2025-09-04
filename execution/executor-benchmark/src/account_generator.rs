@@ -3,7 +3,7 @@
 
 use crate::transaction_generator::get_progress_bar;
 use aptos_sdk::types::LocalAccount;
-use rand::{rngs::StdRng, RngCore, SeedableRng};
+use rand::{RngCore, SeedableRng, rngs::StdRng};
 use std::{collections::VecDeque, sync::mpsc};
 
 type Seed = [u8; 32];

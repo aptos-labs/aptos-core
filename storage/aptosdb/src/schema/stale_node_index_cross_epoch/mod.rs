@@ -13,10 +13,10 @@
 //! its numeric value.
 
 use crate::schema::{
-    ensure_slice_len_eq, ensure_slice_len_gt, STALE_NODE_INDEX_CROSS_EPOCH_CF_NAME,
+    STALE_NODE_INDEX_CROSS_EPOCH_CF_NAME, ensure_slice_len_eq, ensure_slice_len_gt,
 };
 use anyhow::Result;
-use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
+use aptos_jellyfish_merkle::{StaleNodeIndex, node_type::NodeKey};
 use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, SeekKeyCodec, ValueCodec},

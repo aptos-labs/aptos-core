@@ -4,14 +4,14 @@
 #![allow(clippy::arc_with_non_send_sync)]
 
 use crate::{
+    BlockPartitioner,
     pre_partition::{
         connected_component::ConnectedComponentPartitioner, uniform_partitioner::UniformPartitioner,
     },
-    test_utils::{assert_deterministic_result, P2PBlockGenerator},
+    test_utils::{P2PBlockGenerator, assert_deterministic_result},
     v2::PartitionerV2,
-    BlockPartitioner,
 };
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 use std::sync::Arc;
 
 #[test]

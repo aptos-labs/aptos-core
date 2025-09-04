@@ -16,8 +16,8 @@ use aptos_backup_cli::{
     metadata::{cache, cache::MetadataCacheOpt},
     storage::DBToolStorageOpt,
     utils::{
-        backup_service_client::{BackupServiceClient, BackupServiceClientOpt},
         ConcurrentDownloadsOpt, GlobalBackupOpt, TrustedWaypointOpt,
+        backup_service_client::{BackupServiceClient, BackupServiceClientOpt},
     },
 };
 use aptos_types::transaction::Version;
@@ -50,9 +50,7 @@ pub enum OneShotQueryType {
         node, via the backup service within it."
     )]
     NodeState(OneShotQueryNodeStateOpt),
-    #[clap(
-        about = "Queries the latest epoch and versions of the existing backups in the storage."
-    )]
+    #[clap(about = "Queries the latest epoch and versions of the existing backups in the storage.")]
     BackupStorageState(OneShotQueryBackupStorageStateOpt),
 }
 

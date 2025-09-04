@@ -12,8 +12,8 @@ use crate::{
         state_value_by_key_hash::StateValueByKeyHashSchema,
     },
     utils::{
-        truncation_helper::{get_state_kv_commit_progress, truncate_state_kv_db_shards},
         ShardedStateKvSchemaBatch,
+        truncation_helper::{get_state_kv_commit_progress, truncate_state_kv_db_shards},
     },
 };
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
@@ -23,12 +23,12 @@ use aptos_logger::prelude::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{
+    Cache, DB, ReadOptions,
     batch::{SchemaBatch, WriteBatch},
-    Cache, ReadOptions, DB,
 };
 use aptos_storage_interface::Result;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
+    state_store::{NUM_STATE_SHARDS, state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
 use arr_macro::arr;

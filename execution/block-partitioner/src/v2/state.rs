@@ -4,6 +4,7 @@
 #![allow(unused_variables)]
 
 use crate::{
+    Sender,
     v2::{
         conflicting_txn_tracker::ConflictingTxnTracker,
         counters::MISC_TIMERS_SECONDS,
@@ -12,7 +13,6 @@ use crate::{
             StorageKeyIdx, SubBlockIdx,
         },
     },
-    Sender,
 };
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
@@ -25,14 +25,14 @@ use aptos_types::{
 };
 use dashmap::DashMap;
 use rayon::{
-    iter::{IntoParallelIterator, ParallelIterator},
     ThreadPool,
+    iter::{IntoParallelIterator, ParallelIterator},
 };
 use std::{
     collections::HashSet,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc, Mutex, RwLock,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 

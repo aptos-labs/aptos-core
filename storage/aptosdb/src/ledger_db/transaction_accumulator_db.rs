@@ -9,15 +9,15 @@ use crate::schema::{
 use anyhow::anyhow;
 use aptos_accumulator::{HashReader, MerkleAccumulator};
 use aptos_crypto::{
-    hash::{CryptoHash, TransactionAccumulatorHasher},
     HashValue,
+    hash::{CryptoHash, TransactionAccumulatorHasher},
 };
-use aptos_schemadb::{batch::SchemaBatch, DB};
+use aptos_schemadb::{DB, batch::SchemaBatch};
 use aptos_storage_interface::Result;
 use aptos_types::{
     proof::{
-        definition::LeafCount, position::Position, AccumulatorConsistencyProof,
-        TransactionAccumulatorProof, TransactionAccumulatorRangeProof,
+        AccumulatorConsistencyProof, TransactionAccumulatorProof, TransactionAccumulatorRangeProof,
+        definition::LeafCount, position::Position,
     },
     transaction::{TransactionInfo, Version},
 };

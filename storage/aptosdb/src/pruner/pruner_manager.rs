@@ -47,7 +47,7 @@ pub trait PrunerManager: Sync {
 
     #[cfg(test)]
     fn wait_for_pruner(&self) -> Result<()> {
-        use aptos_storage_interface::{db_other_bail, AptosDbError};
+        use aptos_storage_interface::{AptosDbError, db_other_bail};
         use std::{
             thread::sleep,
             time::{Duration, Instant},

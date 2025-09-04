@@ -3,10 +3,11 @@
 
 use crate::metrics::OTHER_TIMERS;
 use anyhow::Result;
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{HashValue, hash::CryptoHash};
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
-    transactions_with_output::TransactionsWithOutput, LedgerUpdateOutput,
+    LedgerUpdateOutput, execution_output::ExecutionOutput,
+    state_checkpoint_output::StateCheckpointOutput,
+    transactions_with_output::TransactionsWithOutput,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
@@ -14,7 +15,7 @@ use aptos_types::{
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     transaction::{PersistedAuxiliaryInfo, TransactionInfo, TransactionOutput},
 };
-use itertools::{izip, Itertools};
+use itertools::{Itertools, izip};
 use rayon::prelude::*;
 use std::sync::Arc;
 

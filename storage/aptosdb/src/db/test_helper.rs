@@ -6,8 +6,8 @@
 
 use crate::AptosDB;
 use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
 };
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{DbReader, Order, Result};
@@ -16,7 +16,7 @@ use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
     event::EventKey,
-    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures, generate_ledger_info_with_sig},
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     proptest_types::{AccountInfoUniverse, BlockGen},
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -200,8 +200,8 @@ prop_compose! {
     }
 }
 
-pub fn arb_blocks_to_commit(
-) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
+pub fn arb_blocks_to_commit()
+-> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
     arb_blocks_to_commit_impl(
         5,  /* num_accounts */
         2,  /* max_user_txn_per_block */

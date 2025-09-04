@@ -3,8 +3,8 @@
 
 use aptos_backup_cli::{
     metadata::{
-        cache::{sync_and_load, MetadataCacheOpt},
         StateSnapshotBackupMeta,
+        cache::{MetadataCacheOpt, sync_and_load},
     },
     storage::DBToolStorageOpt,
     utils::ConcurrentDownloadsOpt,

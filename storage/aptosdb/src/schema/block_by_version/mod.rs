@@ -9,7 +9,7 @@
 //! | block_start_version | block_height |
 //! ```
 
-use crate::schema::{ensure_slice_len_eq, BLOCK_BY_VERSION_CF_NAME};
+use crate::schema::{BLOCK_BY_VERSION_CF_NAME, ensure_slice_len_eq};
 use anyhow::Result;
 use aptos_schemadb::{
     define_schema,

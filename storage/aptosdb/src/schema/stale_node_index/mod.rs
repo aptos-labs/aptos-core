@@ -18,9 +18,9 @@
 //! `stale_since_version` is serialized in big endian so that records in RocksDB will be in order of
 //! its numeric value.
 
-use crate::schema::{ensure_slice_len_eq, ensure_slice_len_gt, STALE_NODE_INDEX_CF_NAME};
+use crate::schema::{STALE_NODE_INDEX_CF_NAME, ensure_slice_len_eq, ensure_slice_len_gt};
 use anyhow::Result;
-use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
+use aptos_jellyfish_merkle::{StaleNodeIndex, node_type::NodeKey};
 use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, SeekKeyCodec, ValueCodec},

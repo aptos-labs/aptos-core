@@ -11,7 +11,7 @@ use crate::{
     state_store::StateStore,
 };
 use aptos_crypto::hash::HashValue;
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{AptosDbError, Result, db_ensure as ensure};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -45,14 +45,14 @@ impl BackupHandler {
         num_transactions: usize,
     ) -> Result<
         impl Iterator<
-                Item = Result<(
-                    Transaction,
-                    PersistedAuxiliaryInfo,
-                    TransactionInfo,
-                    Vec<ContractEvent>,
-                    WriteSet,
-                )>,
-            > + '_,
+            Item = Result<(
+                Transaction,
+                PersistedAuxiliaryInfo,
+                TransactionInfo,
+                Vec<ContractEvent>,
+                WriteSet,
+            )>,
+        > + '_,
     > {
         let txn_iter = self
             .ledger_db

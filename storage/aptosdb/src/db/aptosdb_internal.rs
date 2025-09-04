@@ -14,18 +14,18 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use aptos_config::config::{
-    PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
+    NO_OP_STORAGE_PRUNER_CONFIG, PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths,
 };
-use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
+use aptos_db_indexer::{Indexer, db_indexer::InternalIndexerDB};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_storage_interface::{
-    block_info::BlockInfo, db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader,
-    Order, Result,
+    AptosDbError, DbReader, Order, Result, block_info::BlockInfo, db_ensure as ensure,
+    db_other_bail as bail,
 };
 use aptos_types::{
-    account_config::{new_block_event_key, NewBlockEvent},
+    account_config::{NewBlockEvent, new_block_event_key},
     transaction::Version,
 };
 use std::{

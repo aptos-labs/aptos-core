@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pre_partition::{
-    uniform_partitioner::UniformPartitioner, PrePartitioner, PrePartitionerConfig,
+    PrePartitioner, PrePartitionerConfig, uniform_partitioner::UniformPartitioner,
 };
 
 #[derive(Clone, Debug)]

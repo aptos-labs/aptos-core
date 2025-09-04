@@ -37,7 +37,7 @@ use aptos_types::transaction::{AtomicVersion, Version};
 use rayon::prelude::*;
 use std::{
     cmp::min,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
 };
 
 pub const LEDGER_PRUNER_NAME: &str = "ledger_pruner";

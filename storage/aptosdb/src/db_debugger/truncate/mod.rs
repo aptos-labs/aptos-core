@@ -12,7 +12,7 @@ use crate::{
 };
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_schemadb::batch::SchemaBatch;
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{AptosDbError, Result, db_ensure as ensure};
 use claims::assert_le;
 use clap::Parser;
 use std::{fs, path::PathBuf, sync::Arc};
@@ -101,7 +101,11 @@ impl Cmd {
 
         println!(
             "overall_version: {}, ledger_db_version: {}, state_kv_db_version: {}, state_merkle_db_version: {}, target_version: {}",
-            overall_version, ledger_db_version, state_kv_db_version, state_merkle_db_version, target_version,
+            overall_version,
+            ledger_db_version,
+            state_kv_db_version,
+            state_merkle_db_version,
+            target_version,
         );
 
         if ledger_db.metadata_db().get_usage(target_version).is_err() {
@@ -159,7 +163,7 @@ impl Cmd {
 mod test {
     use super::*;
     use crate::{
-        db::{test_helper::arb_blocks_to_commit_with_block_nums, AptosDB},
+        db::{AptosDB, test_helper::arb_blocks_to_commit_with_block_nums},
         schema::{
             epoch_by_version::EpochByVersionSchema,
             jellyfish_merkle_node::JellyfishMerkleNodeSchema, ledger_info::LedgerInfoSchema,

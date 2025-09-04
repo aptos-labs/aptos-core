@@ -7,17 +7,18 @@ use crate::{
     metrics::TIMER,
     native::{native_config::NATIVE_EXECUTOR_POOL, native_transaction::NativeTransaction},
 };
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use aptos_block_executor::{
     counters::BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, txn_provider::default::DefaultTxnProvider,
 };
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
+    AptosCoinType,
     account_address::AccountAddress,
     account_config::{
-        primary_apt_store, AccountResource, CoinInfoResource, CoinRegister, CoinStoreResource,
+        AccountResource, CoinInfoResource, CoinRegister, CoinStoreResource,
         ConcurrentSupplyResource, DepositEvent, DepositFAEvent, FungibleStoreResource,
-        WithdrawEvent, WithdrawFAEvent,
+        WithdrawEvent, WithdrawFAEvent, primary_apt_store,
     },
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
@@ -27,20 +28,19 @@ use aptos_types::{
     fee_statement::FeeStatement,
     move_utils::{move_event_v1::MoveEventV1Type, move_event_v2::MoveEventV2Type},
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
-    state_store::{state_key::StateKey, StateView},
+    state_store::{StateView, state_key::StateKey},
     transaction::{
-        block_epilogue::BlockEndInfo, signature_verified_transaction::SignatureVerifiedTransaction,
         AuxiliaryInfo, BlockOutput, ExecutionStatus, Transaction, TransactionAuxiliaryData,
-        TransactionOutput, TransactionStatus,
+        TransactionOutput, TransactionStatus, block_epilogue::BlockEndInfo,
+        signature_verified_transaction::SignatureVerifiedTransaction,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSetMut},
-    AptosCoinType,
 };
 use aptos_vm::VMBlockExecutor;
 use dashmap::{
-    mapref::one::{Ref, RefMut},
     DashMap,
+    mapref::one::{Ref, RefMut},
 };
 use once_cell::sync::OnceCell;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -599,7 +599,7 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
                     gas,
                     state_view,
                     output,
-                )
+                );
             },
             Some(sender_coin_store) => sender_coin_store,
         };

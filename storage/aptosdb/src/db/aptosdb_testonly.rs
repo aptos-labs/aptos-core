@@ -5,14 +5,14 @@ use crate::db::AptosDB;
 #[cfg(test)]
 use crate::state_merkle_db::StateMerkleDb;
 use aptos_config::config::{
-    RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
-    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+    BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    NO_OP_STORAGE_PRUNER_CONFIG, RocksdbConfigs, StorageDirPaths,
 };
 use aptos_crypto::hash::CryptoHash;
 use aptos_executor_types::transactions_with_output::TransactionsToKeep;
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, state_store::state_summary::ProvableStateSummary, DbReader,
-    DbWriter, Result,
+    DbReader, DbWriter, Result, chunk_to_commit::ChunkToCommit,
+    state_store::state_summary::ProvableStateSummary,
 };
 use aptos_types::{
     contract_event::ContractEvent,

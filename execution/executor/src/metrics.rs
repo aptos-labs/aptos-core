@@ -4,16 +4,16 @@
 
 use aptos_logger::{prelude::*, sample, warn};
 use aptos_metrics_core::{
+    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGaugeVec, TimerHelper,
     exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
-    register_int_counter_vec, register_int_gauge_vec, Histogram, HistogramVec, IntCounter,
-    IntCounterVec, IntGaugeVec, TimerHelper,
+    register_int_counter_vec, register_int_gauge_vec,
 };
 use aptos_types::{
     contract_event::ContractEvent,
     transaction::{
-        authenticator::AccountAuthenticator, signature_verified_transaction::TransactionProvider,
         ExecutionStatus, Transaction, TransactionExecutableRef, TransactionOutput,
-        TransactionStatus,
+        TransactionStatus, authenticator::AccountAuthenticator,
+        signature_verified_transaction::TransactionProvider,
     },
 };
 use aptos_vm::AptosVM;
@@ -27,7 +27,10 @@ pub static EXECUTE_CHUNK: Lazy<Histogram> = Lazy::new(|| {
         "aptos_executor_execute_chunk_seconds",
         // metric description
         "The time spent in seconds of chunk execution in Aptos executor",
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20
+        )
+        .unwrap(),
     )
     .unwrap()
 });
@@ -38,7 +41,10 @@ pub static APPLY_CHUNK: Lazy<Histogram> = Lazy::new(|| {
         "aptos_executor_apply_chunk_seconds",
         // metric description
         "The time spent in seconds of applying txn output chunk in Aptos executor",
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20
+        )
+        .unwrap(),
     )
     .unwrap()
 });
@@ -49,7 +55,10 @@ pub static COMMIT_CHUNK: Lazy<Histogram> = Lazy::new(|| {
         "aptos_executor_commit_chunk_seconds",
         // metric description
         "The time spent in seconds of committing chunk in Aptos executor",
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20
+        )
+        .unwrap(),
     )
     .unwrap()
 });
@@ -72,7 +81,10 @@ pub static OTHER_TIMERS: Lazy<HistogramVec> = Lazy::new(|| {
         // metric description
         "The time spent in seconds of others in Aptos executor",
         &["name"],
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20
+        )
+        .unwrap(),
     )
     .unwrap()
 });
@@ -98,7 +110,10 @@ pub static UPDATE_LEDGER: Lazy<Histogram> = Lazy::new(|| {
         "aptos_executor_ledger_update_seconds",
         // metric description
         "The total time spent in ledger update in the block executor.",
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20
+        )
+        .unwrap(),
     )
     .unwrap()
 });
@@ -110,7 +125,10 @@ pub static CHUNK_OTHER_TIMERS: Lazy<HistogramVec> = Lazy::new(|| {
         // metric description
         "The time spent in seconds of others in chunk executor.",
         &["name"],
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20
+        )
+        .unwrap(),
     )
     .unwrap()
 });
@@ -121,7 +139,10 @@ pub static VM_EXECUTE_CHUNK: Lazy<Histogram> = Lazy::new(|| {
         "aptos_executor_vm_execute_chunk_seconds",
         // metric description
         "The total time spent in seconds of chunk execution in the chunk executor.",
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20
+        )
+        .unwrap(),
     )
     .unwrap()
 });
@@ -132,7 +153,10 @@ pub static COMMIT_BLOCKS: Lazy<Histogram> = Lazy::new(|| {
         "aptos_executor_commit_blocks_seconds",
         // metric description
         "The total time spent in seconds of commiting blocks in Aptos executor ",
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20
+        )
+        .unwrap(),
     )
     .unwrap()
 });
@@ -143,7 +167,10 @@ pub static SAVE_TRANSACTIONS: Lazy<Histogram> = Lazy::new(|| {
         "aptos_executor_save_transactions_seconds",
         // metric description
         "The time spent in seconds of calling save_transactions to storage in Aptos executor",
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+        exponential_buckets(
+            /*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20
+        )
+        .unwrap(),
     )
     .unwrap()
 });
@@ -228,7 +255,10 @@ pub static PROCESSED_TXNS_OUTPUT_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_processed_txns_output_size",
         "Histogram of transaction output sizes",
         &["process"],
-        exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 25).unwrap()
+        exponential_buckets(
+            /*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 25
+        )
+        .unwrap()
     )
     .unwrap()
 });

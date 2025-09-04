@@ -10,7 +10,7 @@ use crate::{
     utils::iterators::ExpectContinuousVersions,
 };
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{batch::SchemaBatch, DB};
+use aptos_schemadb::{DB, batch::SchemaBatch};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{PersistedAuxiliaryInfo, Version};
 use std::{path::Path, sync::Arc};

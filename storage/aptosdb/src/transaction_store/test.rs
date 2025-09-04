@@ -5,7 +5,7 @@
 #![allow(clippy::redundant_clone)] // Required to work around prop_assert_eq! limitations
 
 use super::*;
-use crate::{ledger_db::transaction_db_test::init_db, AptosDB};
+use crate::{AptosDB, ledger_db::transaction_db_test::init_db};
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
 use aptos_types::proptest_types::{AccountInfoUniverse, SignatureCheckedTransactionGen};

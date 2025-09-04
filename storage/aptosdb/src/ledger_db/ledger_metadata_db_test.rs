@@ -1,13 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ledger_db::ledger_metadata_db::LedgerMetadataDb, AptosDB};
+use crate::{AptosDB, ledger_db::ledger_metadata_db::LedgerMetadataDb};
 use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::AptosDbError;
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::events::new_block::{new_block_event_key, NewBlockEvent},
+    account_config::events::new_block::{NewBlockEvent, new_block_event_key},
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},

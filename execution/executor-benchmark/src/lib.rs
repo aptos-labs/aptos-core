@@ -20,7 +20,7 @@ use crate::{
     db_access::DbAccessUtil, pipeline::Pipeline, transaction_committer::TransactionCommitter,
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
-use aptos_config::config::{NodeConfig, PrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{NO_OP_STORAGE_PRUNER_CONFIG, NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_jellyfish_merkle::metrics::{
@@ -29,14 +29,15 @@ use aptos_jellyfish_merkle::metrics::{
 use aptos_logger::{info, warn};
 use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::{
-    state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter,
+    DbReader, DbReaderWriter, state_store::state_view::db_state_view::LatestDbStateCheckpointView,
 };
 use aptos_transaction_generator_lib::{
-    create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
+    AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
     TransactionType::{self, CoinTransfer},
+    create_txn_generator_creator,
 };
 use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
+use aptos_vm::{AptosVM, VMBlockExecutor, aptos_vm::AptosVMBlockExecutor};
 use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use measurements::{EventMeasurements, OverallMeasurement, OverallMeasuring};
@@ -44,7 +45,7 @@ use pipeline::PipelineConfig;
 use std::{
     fs,
     path::Path,
-    sync::{atomic::AtomicUsize, Arc},
+    sync::{Arc, atomic::AtomicUsize},
     time::Instant,
 };
 use tokio::runtime::Runtime;
@@ -160,8 +161,8 @@ where
                 num_accounts_to_load = block_size;
                 if transactions_per_sender > 1 {
                     warn!(
-                    "Overriding transactions_per_sender to 1 for non_conflicting_txns_per_block workload"
-                );
+                        "Overriding transactions_per_sender to 1 for non_conflicting_txns_per_block workload"
+                    );
                     transactions_per_sender = 1;
                 }
             }
@@ -186,7 +187,9 @@ where
                     // `3*block_size` addresses is required:
                     // `block_size` number of signers, and 2 groups of burn-n-recycle recipients used alternatively.
                     if num_accounts_to_be_loaded < block_size * 3 {
-                        panic!("Cannot guarantee random non-conflicting coin transfer using `P2PTransactionGenerator`.");
+                        panic!(
+                            "Cannot guarantee random non-conflicting coin transfer using `P2PTransactionGenerator`."
+                        );
                     }
                     num_accounts_to_skip = block_size;
                 }
@@ -664,6 +667,7 @@ pub fn run_single_with_default_params(
 #[cfg(test)]
 mod tests {
     use crate::{
+        BenchmarkWorkload,
         db_generator::bootstrap_with_genesis,
         default_benchmark_features, init_db,
         native::{
@@ -678,7 +682,6 @@ mod tests {
         pipeline::PipelineConfig,
         transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         transaction_generator::TransactionGenerator,
-        BenchmarkWorkload,
     };
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_crypto::HashValue;
@@ -694,11 +697,11 @@ mod tests {
         on_chain_config::{FeatureFlag, Features},
         state_store::state_key::inner::StateKeyInner,
         transaction::{
-            signature_verified_transaction::into_signature_verified_block, Transaction,
-            TransactionOutput, TransactionPayload,
+            Transaction, TransactionOutput, TransactionPayload,
+            signature_verified_transaction::into_signature_verified_block,
         },
     };
-    use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
+    use aptos_vm::{AptosVM, VMBlockExecutor, aptos_vm::AptosVMBlockExecutor};
     use itertools::Itertools;
     use move_core_types::language_storage::StructTag;
     use rand::thread_rng;

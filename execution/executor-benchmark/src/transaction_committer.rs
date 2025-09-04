@@ -22,7 +22,7 @@ use aptos_types::{
 };
 use aptos_vm::VMBlockExecutor;
 use std::{
-    sync::{mpsc, Arc},
+    sync::{Arc, mpsc},
     time::{Duration, Instant},
 };
 
@@ -123,33 +123,45 @@ fn report_block(
     info!(
         "Version: {}. latency: {} ms, partition time: {} ms, execute time: {} ms. commit time: {} ms. TPS: {:.0} (partition: {:.0}, execution: {:.0}, commit: {:.0}). Accumulative TPS: {:.0}",
         version,
-        Instant::now().duration_since(current_block_start_time).as_millis(),
+        Instant::now()
+            .duration_since(current_block_start_time)
+            .as_millis(),
         partition_time.as_millis(),
         execution_time.as_millis(),
         commit_time.as_millis(),
-        block_size as f64 / (std::cmp::max(std::cmp::max(partition_time, execution_time), commit_time)).as_secs_f64(),
+        block_size as f64
+            / (std::cmp::max(std::cmp::max(partition_time, execution_time), commit_time))
+                .as_secs_f64(),
         block_size as f64 / partition_time.as_secs_f64(),
         block_size as f64 / execution_time.as_secs_f64(),
         block_size as f64 / commit_time.as_secs_f64(),
         total_versions / first_block_start_time.elapsed().as_secs_f64(),
     );
     info!(
-            "Accumulative total: BlockSTM+VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",
-            GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
-            BLOCK_EXECUTION_WORKFLOW_WHOLE.get_sample_sum() - GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
-            COMMIT_BLOCKS.get_sample_sum(),
-            API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum(),
-        );
+        "Accumulative total: BlockSTM+VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",
+        GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
+        BLOCK_EXECUTION_WORKFLOW_WHOLE.get_sample_sum()
+            - GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
+        COMMIT_BLOCKS.get_sample_sum(),
+        API_LATENCY_SECONDS
+            .get_metric_with_label_values(&["save_transactions", "Ok"])
+            .expect("must exist.")
+            .get_sample_sum(),
+    );
     const NANOS_PER_SEC: f64 = 1_000_000_000.0;
     info!(
-            "Accumulative per transaction: BlockSTM+VM time: {:.0} ns, executor time: {:.0} ns, commit time: {:.0} ns, DB commit time: {:.0} ns",
-            GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum() * NANOS_PER_SEC
-                / total_versions,
-            (BLOCK_EXECUTION_WORKFLOW_WHOLE.get_sample_sum() - GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum()) * NANOS_PER_SEC
-                / total_versions,
-            COMMIT_BLOCKS.get_sample_sum() * NANOS_PER_SEC
-                / total_versions,
-            API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum() * NANOS_PER_SEC
-                / total_versions,
-        );
+        "Accumulative per transaction: BlockSTM+VM time: {:.0} ns, executor time: {:.0} ns, commit time: {:.0} ns, DB commit time: {:.0} ns",
+        GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum() * NANOS_PER_SEC / total_versions,
+        (BLOCK_EXECUTION_WORKFLOW_WHOLE.get_sample_sum()
+            - GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum())
+            * NANOS_PER_SEC
+            / total_versions,
+        COMMIT_BLOCKS.get_sample_sum() * NANOS_PER_SEC / total_versions,
+        API_LATENCY_SECONDS
+            .get_metric_with_label_values(&["save_transactions", "Ok"])
+            .expect("must exist.")
+            .get_sample_sum()
+            * NANOS_PER_SEC
+            / total_versions,
+    );
 }

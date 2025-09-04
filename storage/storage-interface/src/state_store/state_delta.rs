@@ -5,8 +5,8 @@ use crate::state_store::state::State;
 use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::{
     state_store::{
-        hot_state::HOT_STATE_MAX_ITEMS_PER_SHARD, state_key::StateKey, state_slot::StateSlot,
-        NUM_STATE_SHARDS,
+        NUM_STATE_SHARDS, hot_state::HOT_STATE_MAX_ITEMS_PER_SHARD, state_key::StateKey,
+        state_slot::StateSlot,
     },
     transaction::Version,
 };

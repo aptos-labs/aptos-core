@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    PartitionerConfig,
     test_utils::{
         create_non_conflicting_p2p_transaction, create_signed_p2p_transaction,
         generate_test_account, verify_partitioner_output,
     },
     v2::config::PartitionerV2Config,
-    PartitionerConfig,
 };
 use aptos_types::{block_executor::partitioner::SubBlocksForShard, transaction::Transaction};
 use move_core_types::account_address::AccountAddress;
-use rand::{rngs::OsRng, Rng};
+use rand::{Rng, rngs::OsRng};
 use std::{collections::HashMap, sync::Mutex};
 
 #[test]

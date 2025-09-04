@@ -3,13 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    SparseMerkleTree,
     sparse_merkle::node::{NodeHandle, NodeInner, SubTree},
     test_utils::{naive_smt::NaiveSmt, proof_reader::ProofReader},
-    SparseMerkleTree,
 };
 use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
 };
 use aptos_types::state_store::state_value::StateValue;
 use proptest::{
