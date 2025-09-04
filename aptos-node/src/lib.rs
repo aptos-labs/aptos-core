@@ -323,13 +323,13 @@ where
             framework,
             rng,
         )?;
-        if let Some(ref test_config_override_path) = test_config_override_path {
+        if let Some(test_config_override_path) = test_config_override_path {
             println!(
                 "\tMerged default config with override from path: {:?}",
                 test_config_override_path
             );
         }
-        if let Some(ref config_path) = config_path {
+        if let Some(config_path) = config_path {
             println!("\tUsed user-provided config from path: {:?}", config_path);
         }
         config
