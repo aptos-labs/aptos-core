@@ -28,7 +28,6 @@ use std::{
     collections::{btree_map, BTreeMap},
     fmt,
     fmt::Debug,
-    sync::Arc,
 };
 use triomphe::Arc as TriompheArc;
 
@@ -1043,7 +1042,7 @@ impl TypeBuilder {
     /// Creates a fully-instantiated type from its storage representation.
     pub fn create_ty<F>(&self, ty_tag: &TypeTag, mut resolver: F) -> PartialVMResult<Type>
     where
-        F: FnMut(&StructTag) -> PartialVMResult<Arc<StructType>>,
+        F: FnMut(&StructTag) -> PartialVMResult<triomphe::Arc<StructType>>,
     {
         let mut count = 0;
         self.create_ty_impl(ty_tag, &mut resolver, &mut count, 1)
@@ -1276,7 +1275,7 @@ impl TypeBuilder {
         depth: u64,
     ) -> PartialVMResult<Type>
     where
-        F: FnMut(&StructTag) -> PartialVMResult<Arc<StructType>>,
+        F: FnMut(&StructTag) -> PartialVMResult<triomphe::Arc<StructType>>,
     {
         use Type::*;
         use TypeTag as T;

@@ -18,7 +18,8 @@ use move_vm_types::{
     },
 };
 use smallbitvec::SmallBitVec;
-use std::{cell::RefCell, collections::HashMap, str::FromStr, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, str::FromStr};
+use triomphe::Arc;
 
 /// Creates a dummy struct definition.
 pub(crate) fn struct_definition(

@@ -15,11 +15,9 @@ use move_vm_types::code::{ModuleCache, ModuleCode, WithSize};
 use std::{
     hash::Hash,
     ops::Deref,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicBool, Ordering},
 };
+use triomphe::Arc;
 
 /// Entry stored in [GlobalModuleCache]. Can be invalidated by module publishing.
 struct Entry<Deserialized, Verified, Extension> {

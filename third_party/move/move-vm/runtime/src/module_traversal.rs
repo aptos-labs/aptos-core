@@ -10,7 +10,8 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     vm_status::StatusCode,
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
+use triomphe::Arc;
 use typed_arena::Arena;
 
 pub struct TraversalStorage {

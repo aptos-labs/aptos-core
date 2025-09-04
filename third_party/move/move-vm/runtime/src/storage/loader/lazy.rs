@@ -30,7 +30,7 @@ use move_vm_types::{
     },
     sha3_256,
 };
-use std::sync::Arc;
+use triomphe::Arc;
 
 /// Loader implementation used after lazy loading is enabled. Every module access is metered
 /// dynamically (if it is first access to a module with the current [TraversalContext], then gas is

@@ -6,7 +6,8 @@ use ambassador::delegatable_trait;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use hashbrown::HashMap;
-use std::{cell::RefCell, hash::Hash, ops::Deref, sync::Arc};
+use std::{cell::RefCell, hash::Hash, ops::Deref};
+use triomphe::Arc;
 
 /// Interface used by any script cache implementation.
 #[delegatable_trait]

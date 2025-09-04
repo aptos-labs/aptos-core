@@ -39,17 +39,15 @@ use move_vm_types::{
     resolver::ResourceResolver,
     values::{AbstractFunction, Value},
 };
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-};
+use std::collections::{HashMap, VecDeque};
+use triomphe::Arc;
 
 pub type UnboxedNativeFunction = dyn Fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>
     + Send
     + Sync
     + 'static;
 
-pub type NativeFunction = Arc<UnboxedNativeFunction>;
+pub type NativeFunction = std::sync::Arc<UnboxedNativeFunction>;
 
 pub type NativeFunctionTable = Vec<(AccountAddress, Identifier, Identifier, NativeFunction)>;
 

@@ -5,7 +5,8 @@ use bytes::Bytes;
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
 };
-use std::{ops::Deref, sync::Arc};
+use std::ops::Deref;
+use triomphe::Arc;
 
 pub trait WithBytes {
     fn bytes(&self) -> &Bytes;

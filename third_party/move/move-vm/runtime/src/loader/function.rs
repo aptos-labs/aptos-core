@@ -34,7 +34,8 @@ use move_vm_types::{
     },
     values::{AbstractFunction, SerializedFunctionData},
 };
-use std::{cell::RefCell, cmp::Ordering, fmt::Debug, mem, rc::Rc, sync::Arc};
+use std::{cell::RefCell, cmp::Ordering, fmt::Debug, mem, rc::Rc};
+use triomphe::Arc;
 
 /// A runtime function definition representation.
 pub struct Function {

@@ -32,7 +32,7 @@ use move_vm_types::code::{
     ambassador_impl_ScriptCache, Code, ModuleCache, ModuleCode, ModuleCodeBuilder, ScriptCache,
     WithBytes,
 };
-use std::sync::Arc;
+use triomphe::Arc;
 
 impl<T: Transaction, S: TStateView<Key = T::Key>> WithRuntimeEnvironment for LatestView<'_, T, S> {
     fn runtime_environment(&self) -> &RuntimeEnvironment {

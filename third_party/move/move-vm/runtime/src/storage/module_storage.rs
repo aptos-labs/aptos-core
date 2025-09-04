@@ -26,7 +26,7 @@ use move_vm_types::{
     value_serde::FunctionValueExtension,
     values::{AbstractFunction, SerializedFunctionData},
 };
-use std::sync::Arc;
+use triomphe::Arc;
 
 /// Represents module storage backend, abstracting away any caching behaviour. The clients can
 /// implement their own module storage to pass to the VM to resolve code.

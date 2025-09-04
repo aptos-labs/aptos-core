@@ -32,7 +32,8 @@ use move_core_types::{
 use move_vm_runtime::{Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::code::WithSize;
 use parking_lot::{Mutex, MutexGuard};
-use std::{hash::Hash, ops::Deref, sync::Arc};
+use std::{hash::Hash, ops::Deref};
+use triomphe::Arc;
 
 /// Raises an alert with the specified message. In case we run in testing mode, instead prints the
 /// message to standard output.
