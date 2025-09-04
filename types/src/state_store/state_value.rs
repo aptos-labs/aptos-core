@@ -10,6 +10,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use bytes::Bytes;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*};
+use rapidhash::rapidhash;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Deserialize, Serialize)]
@@ -178,13 +179,33 @@ impl PersistedStateValue {
     }
 }
 
-#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, BCSCryptoHash, CryptoHasher)]
 pub struct StateValue {
     data: Bytes,
     metadata: StateValueMetadata,
+    maybe_rapid_hash: Option<(u64, usize)>,
 }
 
+impl PartialEq for StateValue {
+    fn eq(&self, other: &Self) -> bool {
+        // Fast path: if both have rapid hashes and they differ, values can't be equal
+        if let (Some(hash1), Some(hash2)) = (&self.maybe_rapid_hash, &other.maybe_rapid_hash) {
+            if hash1 != hash2 {
+                return false;
+            }
+        }
+
+        // Full comparison: data and metadata
+        self.data == other.data && self.metadata == other.metadata
+    }
+}
+
+impl Eq for StateValue {}
+
 pub const ARB_STATE_VALUE_MAX_SIZE: usize = 100;
+
+/// Threshold for computing rapid hash on StateValue data to optimize equality checks
+pub const RAPID_HASH_THRESHOLD: usize = 32;
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for StateValue {
@@ -217,8 +238,17 @@ impl Serialize for StateValue {
 }
 
 impl StateValue {
+    /// Computes rapid hash if data is large enough, otherwise returns None
+    fn compute_rapid_hash(data: &Bytes) -> Option<(u64, usize)> {
+        (data.len() >= RAPID_HASH_THRESHOLD).then(|| (rapidhash(data), data.len()))
+    }
+
     fn to_persistable_form(&self) -> PersistedStateValue {
-        let Self { data, metadata } = self.clone();
+        let Self {
+            data,
+            metadata,
+            maybe_rapid_hash: _,
+        } = self.clone();
         let metadata = metadata.into_persistable();
         match metadata {
             None => PersistedStateValue::V0(data),
@@ -231,7 +261,12 @@ impl StateValue {
     }
 
     pub fn new_with_metadata(data: Bytes, metadata: StateValueMetadata) -> Self {
-        Self { data, metadata }
+        let maybe_rapid_hash = Self::compute_rapid_hash(&data);
+        Self {
+            data,
+            metadata,
+            maybe_rapid_hash,
+        }
     }
 
     pub fn size(&self) -> usize {
@@ -249,6 +284,7 @@ impl StateValue {
         f: F,
     ) -> anyhow::Result<StateValue> {
         self.data = f(self.data)?;
+        self.maybe_rapid_hash = Self::compute_rapid_hash(&self.data);
         Ok(self)
     }
 
@@ -258,6 +294,7 @@ impl StateValue {
 
     pub fn set_bytes(&mut self, data: Bytes) {
         self.data = data;
+        self.maybe_rapid_hash = Self::compute_rapid_hash(&self.data);
     }
 
     pub fn metadata(&self) -> &StateValueMetadata {
@@ -273,7 +310,11 @@ impl StateValue {
     }
 
     pub fn unpack(self) -> (StateValueMetadata, Bytes) {
-        let Self { data, metadata } = self;
+        let Self {
+            data,
+            metadata,
+            maybe_rapid_hash: _,
+        } = self;
 
         (metadata, data)
     }
