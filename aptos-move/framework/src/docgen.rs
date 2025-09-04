@@ -102,7 +102,7 @@ impl DocgenOptions {
             output_format: self.output_format,
             ensure_unix_paths: true,
         };
-        let output = move_docgen::Docgen::new(model, &options).gen();
+        let output = move_docgen::Docgen::new(model, &options).generate();
         if model.diag_count(Severity::Warning) > 0 {
             let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
             model.report_diag(&mut error_writer, Severity::Warning);
