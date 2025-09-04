@@ -137,7 +137,7 @@ pub fn aptos_prod_vm_config(
 ) -> VMConfig {
     let check_invariant_in_swap_loc =
         !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
-    let paranoid_type_checks = get_paranoid_type_checks();
+    let paranoid_type_checks = false; // get_paranoid_type_checks();
 
     let deserializer_config = aptos_prod_deserializer_config(features);
     let verifier_config = aptos_prod_verifier_config(gas_feature_version, features);

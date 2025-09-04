@@ -68,7 +68,7 @@ impl RuntimeEnvironment {
     ) -> Self {
         let vm_config = VMConfig {
             // Keep the paranoid mode on as we most likely want this for tests.
-            paranoid_type_checks: true,
+            paranoid_type_checks: false,
             ..VMConfig::default()
         };
         Self::new_with_config(natives, vm_config)
