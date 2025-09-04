@@ -35,7 +35,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     function::ClosureMask,
-    gas_algebra::{NumArgs, NumBytes},
+    gas_algebra::NumBytes,
     language_storage::TypeTag,
     vm_status::{
         sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode, StatusType,
@@ -2652,70 +2652,70 @@ impl Frame {
                         let value = Vector::pack(ty, elements)?;
                         interpreter.operand_stack.push(value)?;
                     },
-                    Bytecode::VecLen(si) => {
+                    Bytecode::VecLen(_) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
                         // gas_meter.charge_create_ty(ty_count)?;
-                        gas_meter.charge_vec_len(make_ty!(ty))?;
-                        let value = vec_ref.len(ty)?;
+                        // gas_meter.charge_vec_len(make_ty!(ty))?;
+                        let value = vec_ref.len()?;
                         interpreter.operand_stack.push(value)?;
                     },
-                    Bytecode::VecImmBorrow(si) => {
+                    Bytecode::VecImmBorrow(_) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
                         // gas_meter.charge_create_ty(ty_count)?;
-                        let res = vec_ref.borrow_elem(idx, ty);
-                        gas_meter.charge_vec_borrow(false, make_ty!(ty), res.is_ok())?;
+                        let res = vec_ref.borrow_elem(idx);
+                        // gas_meter.charge_vec_borrow(false, make_ty!(ty), res.is_ok())?;
                         interpreter.operand_stack.push(res?)?;
                     },
-                    Bytecode::VecMutBorrow(si) => {
+                    Bytecode::VecMutBorrow(_) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
                         // gas_meter.charge_create_ty(ty_count)?;
-                        let res = vec_ref.borrow_elem(idx, ty);
-                        gas_meter.charge_vec_borrow(true, make_ty!(ty), res.is_ok())?;
+                        let res = vec_ref.borrow_elem(idx);
+                        // gas_meter.charge_vec_borrow(true, make_ty!(ty), res.is_ok())?;
                         interpreter.operand_stack.push(res?)?;
                     },
-                    Bytecode::VecPushBack(si) => {
+                    Bytecode::VecPushBack(_) => {
                         let elem = interpreter.operand_stack.pop()?;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
                         // gas_meter.charge_create_ty(ty_count)?;
-                        gas_meter.charge_vec_push_back(make_ty!(ty), &elem)?;
-                        vec_ref.push_back(elem, ty)?;
+                        // gas_meter.charge_vec_push_back(make_ty!(ty), &elem)?;
+                        vec_ref.push_back(elem)?;
                     },
-                    Bytecode::VecPopBack(si) => {
+                    Bytecode::VecPopBack(_) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
                         // gas_meter.charge_create_ty(ty_count)?;
-                        let res = vec_ref.pop(ty);
-                        gas_meter.charge_vec_pop_back(make_ty!(ty), res.as_ref().ok())?;
+                        let res = vec_ref.pop();
+                        // gas_meter.charge_vec_pop_back(make_ty!(ty), res.as_ref().ok())?;
                         interpreter.operand_stack.push(res?)?;
                     },
-                    Bytecode::VecUnpack(si, num) => {
+                    Bytecode::VecUnpack(_, num) => {
                         let vec_val = interpreter.operand_stack.pop_as::<Vector>()?;
-                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
                         // gas_meter.charge_create_ty(ty_count)?;
-                        gas_meter.charge_vec_unpack(
-                            make_ty!(ty),
-                            NumArgs::new(*num),
-                            vec_val.elem_views(),
-                        )?;
-                        let elements = vec_val.unpack(ty, *num)?;
+                        // gas_meter.charge_vec_unpack(
+                        //     make_ty!(ty),
+                        //     NumArgs::new(*num),
+                        //     vec_val.elem_views(),
+                        // )?;
+                        let elements = vec_val.unpack(*num)?;
                         for value in elements {
                             interpreter.operand_stack.push(value)?;
                         }
                     },
-                    Bytecode::VecSwap(si) => {
+                    Bytecode::VecSwap(_) => {
                         let idx2 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let idx1 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
                         // gas_meter.charge_create_ty(ty_count)?;
-                        gas_meter.charge_vec_swap(make_ty!(ty))?;
-                        vec_ref.swap(idx1, idx2, ty)?;
+                        // gas_meter.charge_vec_swap(make_ty!(ty))?;
+                        vec_ref.swap(idx1, idx2)?;
                     },
                 }
 
