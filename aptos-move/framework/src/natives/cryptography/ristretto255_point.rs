@@ -582,14 +582,14 @@ pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
     safely_assert_eq!(ty_args.len(), 2);
     safely_assert_eq!(args.len(), 2);
 
-    let scalar_type = safely_pop_type_arg!(ty_args);
-    let point_type = safely_pop_type_arg!(ty_args);
+    let _scalar_type = safely_pop_type_arg!(ty_args);
+    let _point_type = safely_pop_type_arg!(ty_args);
 
     let scalars_ref = safely_pop_arg!(args, VectorRef);
     let points_ref = safely_pop_arg!(args, VectorRef);
 
     // Invariant (enforced by caller): num > 0 and # of scalars = # of points
-    let num = scalars_ref.len(&scalar_type)?.value_as::<u64>()? as usize;
+    let num = scalars_ref.len()?.value_as::<u64>()? as usize;
 
     // Invariant: log2_floor(num + 1) > 0. This is because num >= 1, thanks to the invariant we enforce on
     // the caller of this native. Therefore, num + 1 >= 2, which implies log2_floor(num + 1) >= 1.
@@ -603,7 +603,7 @@ pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
     // parse scalars
     let mut scalars = Vec::with_capacity(num);
     for i in 0..num {
-        let move_scalar = scalars_ref.borrow_elem(i, &scalar_type)?;
+        let move_scalar = scalars_ref.borrow_elem(i)?;
         let scalar = scalar_from_struct(move_scalar)?;
 
         scalars.push(scalar);
@@ -619,7 +619,7 @@ pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
         // parse points
         let mut points = Vec::with_capacity(num);
         for i in 0..num {
-            let move_point = points_ref.borrow_elem(i, &point_type)?;
+            let move_point = points_ref.borrow_elem(i)?;
             let point_handle = get_point_handle_from_struct(move_point)?;
 
             points.push(point_data.get_point(&point_handle));
