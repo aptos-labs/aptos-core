@@ -50,86 +50,86 @@ jobs:
           base-ref: ${{ github.event.pull_request.base.ref || 'l1-migration' }}
 
 
-  build-binaries:
-    needs: build-checks
-    if: needs.build-checks.outputs.members_changed == 'true' || needs.build-checks.outputs.docker_changed == 'true'
-    runs-on: k8s-movement-labs
-    name: "Build Binaries with Nix"
-    strategy:
-      matrix:
-        binary:
-          - name: "aptos-node"
-            package: "aptos-node"
-            profile: "dev"
-          - name: "aptos-cli"
-            package: "aptos"
-            profile: "dev"
-          - name: "l1-migration"
-            package: "l1-migration"
-            profile: "dev"
-    env:
-      TARGET_FOLDER: target/debug
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  # build-binaries:
+  #   needs: build-checks
+  #   if: needs.build-checks.outputs.members_changed == 'true' || needs.build-checks.outputs.docker_changed == 'true'
+  #   runs-on: k8s-movement-labs
+  #   name: "Build Binaries with Nix"
+  #   strategy:
+  #     matrix:
+  #       binary:
+  #         - name: "aptos-node"
+  #           package: "aptos-node"
+  #           profile: "dev"
+  #         - name: "aptos-cli"
+  #           package: "aptos"
+  #           profile: "dev"
+  #         - name: "l1-migration"
+  #           package: "l1-migration"
+  #           profile: "dev"
+  #   env:
+  #     TARGET_FOLDER: target/debug
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
 
-      - name: Install packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xz-utils
+  #     - name: Install packages
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y xz-utils
 
-      - name: Install Nix
-        uses: cachix/install-nix-action@v27
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-          nix_path: nixpkgs=channel:nixos-unstable
+  #     - name: Install Nix
+  #       uses: cachix/install-nix-action@v27
+  #       with:
+  #         github_access_token: ${{ secrets.GITHUB_TOKEN }}
+  #         nix_path: nixpkgs=channel:nixos-unstable
 
-      # - name: Cache Rust dependencies
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: |
-      #       ~/.cargo/registry/index/
-      #       ~/.cargo/registry/cache/
-      #       ~/.cargo/git/db/
-      #       target/
-      #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('nix/flake.lock') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
-      #       ${{ runner.os }}-cargo-
+  #     # - name: Cache Rust dependencies
+  #     #   uses: actions/cache@v4
+  #     #   with:
+  #     #     path: |
+  #     #       ~/.cargo/registry/index/
+  #     #       ~/.cargo/registry/cache/
+  #     #       ~/.cargo/git/db/
+  #     #       target/
+  #     #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('nix/flake.lock') }}
+  #     #     restore-keys: |
+  #     #       ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
+  #     #       ${{ runner.os }}-cargo-
 
-      # - name: Cache Nix store
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: /nix/store
-      #     key: ${{ runner.os }}-nix-${{ hashFiles('nix/flake.lock') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-nix-
+  #     # - name: Cache Nix store
+  #     #   uses: actions/cache@v4
+  #     #   with:
+  #     #     path: /nix/store
+  #     #     key: ${{ runner.os }}-nix-${{ hashFiles('nix/flake.lock') }}
+  #     #     restore-keys: |
+  #     #       ${{ runner.os }}-nix-
 
-      - name: Build ${{ matrix.binary.package }}
-        run: |
-          echo "Building ${{ matrix.binary.package }} with Nix development shell..."
-          nix develop -c cargo build -p ${{ matrix.binary.package }} --profile ${{ matrix.binary.profile }} --features "${{ env.FEATURES }}"
-          echo "Binary available at ${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}"
+  #     - name: Build ${{ matrix.binary.package }}
+  #       run: |
+  #         echo "Building ${{ matrix.binary.package }} with Nix development shell..."
+  #         nix develop -c cargo build -p ${{ matrix.binary.package }} --profile ${{ matrix.binary.profile }} --features "${{ env.FEATURES }}"
+  #         echo "Binary available at ${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}"
 
-      - name: Verify binary
-        run: |
-          if [ -f "${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}" ]; then
-            echo "✅ Binary ${{ matrix.binary.package }} built successfully"
-            ls -la "${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}"
-          else
-            echo "❌ Binary ${{ matrix.binary.package }} not found"
-            exit 1
-          fi
+  #     - name: Verify binary
+  #       run: |
+  #         if [ -f "${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}" ]; then
+  #           echo "✅ Binary ${{ matrix.binary.package }} built successfully"
+  #           ls -la "${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}"
+  #         else
+  #           echo "❌ Binary ${{ matrix.binary.package }} not found"
+  #           exit 1
+  #         fi
 
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.binary.package }}-${{ github.sha }}
-          path: ${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}
-          retention-days: 7
+  #     - name: Upload binary artifact
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: ${{ matrix.binary.package }}-${{ github.sha }}
+  #         path: ${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}
+  #         retention-days: 7
 
   build-docker:
-    needs: build-binaries
+    # needs: build-binaries
     runs-on: k8s-movement-labs
     name: "Build Docker Images"
     permissions:
@@ -167,6 +167,19 @@ jobs:
           else
             echo "Docker Buildx is already installed"
             docker buildx version
+          fi
+
+      - name: Check if snap is installed
+        run: |
+          if ! command -v snap &> /dev/null; then
+            echo "Snap could not be found, installing..."
+            sudo apt-get update
+            sudo apt-get install -y snapd
+            sudo systemctl start snapd
+            sudo systemctl enable snapd
+          else
+            echo "Snap is already installed"
+            snap --version
           fi
 
       # Log in to GHCR
