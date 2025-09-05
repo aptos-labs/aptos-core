@@ -187,10 +187,6 @@ jobs:
         run: |
           echo "${{ secrets.INFRA_GH_PAT }}" | docker login ghcr.io -u "${{ vars.INFRA_GH_USER }}" --password-stdin
       
-      # Install just
-      - name: Install just
-        run: sudo snap install just --classic
-      
       # Set build environment variables
       - name: Set build environment
         run: |
