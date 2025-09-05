@@ -135,51 +135,34 @@ jobs:
     permissions:
       contents: read
       packages: write
-    services:
-      docker:
-        image: docker:24-dind
-        options: --privileged
     steps:
       - uses: actions/checkout@v4
       
-      # Download artifacts (existing pattern)
+      # Download artifacts
       - name: Download aptos-node binary
         uses: actions/download-artifact@v4
         with:
           name: aptos-node-${{ github.sha }}
           path: ./downloaded-artifacts/aptos-node
       
-      # Install Docker CLI
-      - name: Install Docker CLI
+      # Check if Docker is available
+      - name: Check Docker availability
         run: |
-          apt-get update
-          apt-get install -y ca-certificates curl
-          install -m 0755 -d /etc/apt/keyrings
-          curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-          chmod a+r /etc/apt/keyrings/docker.asc
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-          apt-get update
-          apt-get install -y docker-ce-cli
+          if command -v docker &> /dev/null; then
+            echo "Docker is available"
+            docker --version
+          else
+            echo "Docker not found, installing..."
+            curl -fsSL https://get.docker.com -o get-docker.sh
+            sudo sh get-docker.sh
+            sudo systemctl start docker
+            sudo usermod -aG docker $USER
+          fi
       
-      # Wait for Docker daemon to be ready
-      - name: Wait for Docker daemon
-        run: |
-          timeout 30 sh -c 'until docker info; do sleep 1; done'
-      
-      # Log in to GitHub Container Registry
+      # Log in to GHCR
       - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ vars.INFRA_GH_USER }}
-          password: ${{ secrets.INFRA_GH_PAT }}
-      
-      # Set up Docker Buildx
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker-container
-          platforms: linux/amd64
+        run: |
+          echo "${{ secrets.INFRA_GH_PAT }}" | docker login ghcr.io -u "${{ vars.INFRA_GH_USER }}" --password-stdin
       
       # Prepare build context
       - name: Prepare Docker build context
@@ -195,28 +178,24 @@ jobs:
         run: |
           echo "GIT_SHA_SHORT=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
           echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
-          echo "IMAGE_TAG=ghcr.io/movementlabsxyz/aptos-node:$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
       
       # Build and push Docker image
       - name: Build and push aptos-node Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./docker-build-context
-          platforms: linux/amd64
-          tags: ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }}
-          labels: |
-            org.label-schema.schema-version=1.0
-            org.label-schema.build-date=${{ env.BUILD_DATE }}
-            org.label-schema.git-sha=${{ github.sha }}
-            org.label-schema.git-branch=${{ github.ref_name }}
-          push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: |
+          docker build \
+            --tag ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }} \
+            --label "org.label-schema.schema-version=1.0" \
+            --label "org.label-schema.build-date=${{ env.BUILD_DATE }}" \
+            --label "org.label-schema.git-sha=${{ github.sha }}" \
+            --label "org.label-schema.git-branch=${{ github.ref_name }}" \
+            ./docker-build-context
+          
+          docker push ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }}
       
       # Output image information
       - name: Output image information
         run: |
           echo "✅ Docker image built and pushed successfully!"
-          echo "📦 Image: ${{ env.IMAGE_TAG }}"
+          echo "📦 Image: ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }}"
           echo "🏷️  Tag: ${{ env.GIT_SHA_SHORT }}"
           echo "🌐 Registry: ghcr.io/movementlabsxyz/aptos-node"
