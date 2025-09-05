@@ -169,19 +169,6 @@ jobs:
             docker buildx version
           fi
 
-      - name: Check if snap is installed
-        run: |
-          if ! command -v snap &> /dev/null; then
-            echo "Snap could not be found, installing..."
-            sudo apt-get update
-            sudo apt-get install -y snapd
-            sudo systemctl start snapd
-            sudo systemctl enable snapd
-          else
-            echo "Snap is already installed"
-            snap --version
-          fi
-
       # Log in to GHCR
       - name: Login to GHCR
         run: |
