@@ -744,25 +744,27 @@ impl AbstractValueSizeGasParameters {
 
     pub fn abstract_value_size_stack_and_heap(
         &self,
-        val: impl ValueView,
-        feature_version: u64,
+        _val: impl ValueView,
+        _feature_version: u64,
     ) -> PartialVMResult<(AbstractValueSize, AbstractValueSize)> {
-        let stack_size = self.abstract_stack_size(&val, feature_version)?;
-        let abs_size = self.abstract_value_size(val, feature_version)?;
-        let heap_size = abs_size.checked_sub(stack_size).unwrap_or_else(|| 0.into());
-
-        Ok((stack_size, heap_size))
+        Ok((0.into(), 0.into()))
+        // let stack_size = self.abstract_stack_size(&val, feature_version)?;
+        // let abs_size = self.abstract_value_size(val, feature_version)?;
+        // let heap_size = abs_size.checked_sub(stack_size).unwrap_or_else(|| 0.into());
+        //
+        // Ok((stack_size, heap_size))
     }
 
     pub fn abstract_heap_size(
         &self,
-        val: impl ValueView,
-        feature_version: u64,
+        _val: impl ValueView,
+        _feature_version: u64,
     ) -> PartialVMResult<AbstractValueSize> {
-        let stack_size = self.abstract_stack_size(&val, feature_version)?;
-        let abs_size = self.abstract_value_size(val, feature_version)?;
-
-        Ok(abs_size.checked_sub(stack_size).unwrap_or_else(|| 0.into()))
+        Ok(0.into())
+        // let stack_size = self.abstract_stack_size(&val, feature_version)?;
+        // let abs_size = self.abstract_value_size(val, feature_version)?;
+        //
+        // Ok(abs_size.checked_sub(stack_size).unwrap_or_else(|| 0.into()))
     }
 }
 
