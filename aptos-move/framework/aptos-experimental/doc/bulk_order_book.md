@@ -624,8 +624,9 @@ effectively allowing them to "reuse" matched liquidity.
 ) {
     <b>assert</b>!(reinsert_order.validate_reinsertion_request(original_order), <a href="bulk_order_book.md#0x7_bulk_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
     <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = reinsert_order.get_account_from_match_details();
-    <b>assert</b>!(self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
-    <b>let</b> order = self.orders.remove(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>let</b> order_option = self.orders.remove_or_none(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>assert</b>!(order_option.is_some(), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    <b>let</b> order = order_option.destroy_some();
     <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &order);
     order.<a href="bulk_order_book.md#0x7_bulk_order_book_reinsert_order">reinsert_order</a>(&reinsert_order);
     <a href="bulk_order_book.md#0x7_bulk_order_book_activate_first_price_levels">activate_first_price_levels</a>(price_time_idx, &order, reinsert_order.get_order_id_from_match_details());
@@ -677,6 +678,7 @@ with the same order ID in the future.
     self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> aptos_experimental::price_time_index::PriceTimeIndex,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>
+<<<<<<< HEAD
 ): BulkOrder&lt;M&gt; {
     <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
         <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
@@ -685,6 +687,17 @@ with the same order ID in the future.
     // This allows us <b>to</b> reuse the order id for the same <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> in the future without creating a new order.
     <b>let</b> order = self.orders.remove(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
     <b>let</b> order_copy = order;
+=======
+): (OrderIdType, u64, u64) {
+    // For cancellation, instead of removing the order, we will just cancel the active orders and set the sizes <b>to</b> 0.
+    // This allows us <b>to</b> reuse the order id for the same <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> in the future without creating a new order.
+    <b>let</b> orders_option = self.orders.remove_or_none(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>assert</b>!(orders_option.is_some(), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    <b>let</b> order = orders_option.destroy_some();
+    <b>let</b> order_id = order.get_order_id();
+    <b>let</b> remaining_bid_size = order.get_total_remaining_size(<b>true</b>);
+    <b>let</b> remaining_ask_size = order.get_total_remaining_size(<b>false</b>);
+>>>>>>> 34792e6d52 (OrderBook use of iterators and utilities)
     <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &order);
     order.set_empty();
     self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order);
@@ -747,11 +760,9 @@ with the same order ID in the future.
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     is_bid: bool
 ): u64 {
-    <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
-        <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
-    };
-
-    self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>).destroy_some().get_total_remaining_size(is_bid)
+    <b>let</b> order_option = self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>assert</b>!(order_option.is_some(), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    order_option.destroy_some().get_total_remaining_size(is_bid)
 }
 </code></pre>
 
@@ -779,11 +790,9 @@ with the same order ID in the future.
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     is_bid: bool
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
-    <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
-        <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
-    };
-
-    self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>).destroy_some().get_all_prices(is_bid)
+    <b>let</b> order_option = self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>assert</b>!(order_option.is_some(), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    order_option.destroy_some().get_all_prices(is_bid)
 }
 </code></pre>
 
@@ -811,11 +820,9 @@ with the same order ID in the future.
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     is_bid: bool
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
-    <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
-        <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
-    };
-
-    self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>).destroy_some().get_all_sizes(is_bid)
+    <b>let</b> order_option = self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>assert</b>!(order_option.is_some(), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    order_option.destroy_some().get_all_sizes(is_bid)
 }
 </code></pre>
 
@@ -866,12 +873,18 @@ The first price levels of both bid and ask sides will be activated in the active
     order_req: BulkOrderRequest&lt;M&gt;
 ) : BulkOrder&lt;M&gt; {
     <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = get_account_from_order_request(&order_req);
+<<<<<<< HEAD
     <b>let</b> new_sequence_number = aptos_experimental::bulk_order_book_types::get_sequence_number_from_order_request(&order_req);
     <b>let</b> existing_order = self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
     <b>let</b> order_id = <b>if</b> (existing_order) {
         <b>let</b> old_order = self.orders.remove(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
         <b>let</b> existing_sequence_number = aptos_experimental::bulk_order_book_types::get_sequence_number_from_bulk_order(&old_order);
         <b>assert</b>!(new_sequence_number &gt; existing_sequence_number, <a href="bulk_order_book.md#0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>);
+=======
+    <b>let</b> order_option = self.orders.remove_or_none(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>let</b> order_id = <b>if</b> (order_option.is_some()) {
+        <b>let</b> old_order = order_option.destroy_some();
+>>>>>>> cb27c31a96 (OrderBook use of iterators and utilities)
         <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &old_order);
         old_order.get_order_id()
     } <b>else</b> {
