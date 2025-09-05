@@ -84,26 +84,26 @@ jobs:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           nix_path: nixpkgs=channel:nixos-unstable
 
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('nix/flake.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
-            ${{ runner.os }}-cargo-
+      # - name: Cache Rust dependencies
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: |
+      #       ~/.cargo/registry/index/
+      #       ~/.cargo/registry/cache/
+      #       ~/.cargo/git/db/
+      #       target/
+      #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('nix/flake.lock') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
+      #       ${{ runner.os }}-cargo-
 
-      - name: Cache Nix store
-        uses: actions/cache@v4
-        with:
-          path: /nix/store
-          key: ${{ runner.os }}-nix-${{ hashFiles('nix/flake.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-nix-
+      # - name: Cache Nix store
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: /nix/store
+      #     key: ${{ runner.os }}-nix-${{ hashFiles('nix/flake.lock') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-nix-
 
       - name: Build ${{ matrix.binary.package }}
         run: |
