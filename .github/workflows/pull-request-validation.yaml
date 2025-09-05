@@ -130,7 +130,7 @@ jobs:
 
   build-docker:
     # needs: build-binaries
-    runs-on: k8s-movement-labs
+    runs-on: ubuntu-latest
     name: "Build Docker Images"
     permissions:
       contents: read
