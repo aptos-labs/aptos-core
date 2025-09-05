@@ -96,7 +96,7 @@ pub struct CachedStateView {
     speculative: StateDelta,
 
     /// Persisted hot state. To be fetched if a key isn't in `speculative`.
-    hot: Arc<dyn HotStateView>,
+    pub hot: Arc<dyn HotStateView>,
 
     /// Persisted base state. To be fetched if a key isn't in either `speculative` or `hot_state`.
     /// `self.speculative.base_version()` is targeted in db fetches.
@@ -296,8 +296,8 @@ impl TStateView for CachedStateView {
         self.hot.get_state_slot(state_key).is_some()
     }
 
-    fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
-        self.speculative.num_free_hot_slots()
+    fn num_hot_items(&self) -> [usize; NUM_STATE_SHARDS] {
+        self.speculative.num_hot_items()
     }
 
     fn get_shard_id(&self, state_key: &StateKey) -> usize {
@@ -318,10 +318,11 @@ impl TStateView for CachedStateView {
         };
 
         if let Some(slot) = self.speculative.get_state_slot(key) {
-            slot.is_hot().then(|| slot.next().cloned())
+            assert!(slot.is_hot());
+            slot.is_hot().then(|| slot.prev().cloned())
         } else if let Some(slot) = self.hot.get_state_slot(key) {
             assert!(slot.is_hot());
-            Some(slot.next().cloned())
+            Some(slot.prev().cloned())
         } else {
             None
         }
