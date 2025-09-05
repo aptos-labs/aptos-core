@@ -4142,6 +4142,7 @@ dependencies = [
  "aptos-types",
  "arr_macro",
  "bcs 0.1.4",
+ "bytes",
  "dashmap 7.0.0-rc2",
  "derive_more 0.99.17",
  "itertools 0.13.0",
