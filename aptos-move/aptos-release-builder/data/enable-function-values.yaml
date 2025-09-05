@@ -1,0 +1,13 @@
+remote_endpoint: https://fullnode.mainnet.aptoslabs.com
+name: "v1.34-enable-function-values"
+proposals:
+  - name: proposal_2_enable_function_values
+    metadata:
+      title: "Proposal to enable AIP 112 (function values) in mainnet"
+      description: "See https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-112.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - v_m_binary_format_v8
+            - enable_function_values
