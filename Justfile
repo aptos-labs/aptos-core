@@ -55,7 +55,7 @@ update:
     nix flake update
 
 # Build Docker image
-docker-build binary="aptos-node" tag="latest" profile="release":
+docker-build container="aptos-node" tag="latest" profile="release":
     #!/usr/bin/env bash
     # Check if Docker is installed
     if ! command -v docker &> /dev/null; then
@@ -71,16 +71,16 @@ docker-build binary="aptos-node" tag="latest" profile="release":
     fi
 
     # Validate the docker folder exists
-    if [ ! -d "docker/{{binary}}" ]; then
-        echo "Error: Docker folder 'docker/{{binary}}' does not exist."
+    if [ ! -d "docker/{{container}}" ]; then
+        echo "Error: Docker folder 'docker/{{container}}' does not exist."
         exit 1
     fi
 
     # Build the binary first
-    echo "Building {{binary}} binary..."
-    just build {{binary}} release
-    just build aptos release
-    just build l1-migration release
+    echo "Building {{container}} binary..."
+    just build aptos-node {{profile}}
+    just build aptos {{profile}}
+    just build l1-migration {{profile}}
 
     # Set binary path based on profile
     if [ "{{profile}}" = "release" ]; then
@@ -91,11 +91,11 @@ docker-build binary="aptos-node" tag="latest" profile="release":
         BINARY_PATH="target/{{profile}}"
     fi
     
-    echo "Building Docker image for '{{binary}}' using binary at $BINARY_PATH..."
+    echo "Building Docker image for '{{container}}' using binary at $BINARY_PATH..."
     docker build \
         --build-arg BINARY_PATH="$BINARY_PATH" \
-        -f docker/{{binary}}/Dockerfile \
-        -t ghcr.io/movementlabsxyz/{{binary}}:{{tag}} .
+        -f docker/{{container}}/Dockerfile \
+        -t ghcr.io/movementlabsxyz/{{container}}:{{tag}} .
     
     # Clean up the copied binary
     rm -f aptos-test

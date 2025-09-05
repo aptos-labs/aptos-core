@@ -11,6 +11,7 @@
 !docker/tools/boto.cfg
 
 !target/release/
+!target/debug/
 
 !.cargo/
 !**/Cargo.toml
