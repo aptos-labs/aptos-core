@@ -3034,6 +3034,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "claims",
+ "once_cell",
+ "paste",
  "prometheus",
 ]
 
@@ -3936,7 +3938,6 @@ dependencies = [
  "aptos-temppath",
  "byteorder",
  "dunce",
- "once_cell",
  "proptest",
  "rand 0.7.3",
  "rocksdb",
