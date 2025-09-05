@@ -6,10 +6,12 @@ on:
     branches:
       - movement
       - l1-migration
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
       - feat/binary-builds
-
+  workflow_dispatch:
+          
 env:
   GIT_SHA: ${{ github.sha }}
   GIT_BRANCH: ${{ github.ref_name }}
@@ -18,6 +20,17 @@ env:
   FEATURES: ""
 
 jobs:
+  check-dynamic-deps:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        if: ${{ !inputs.SKIP_JOB }}
+        with:
+          ref: ${{ inputs.GIT_SHA }}
+
+      # This will exit with failure if any of the banned dynamic deps are found.
+      - run: ./crates/aptos/scripts/check_dynamic_deps.sh
+
   build-checks:
     runs-on: k8s-movement-labs
     outputs:
@@ -119,27 +132,40 @@ jobs:
     needs: build-binaries
     runs-on: k8s-movement-labs
     name: "Build Docker Images"
+    permissions:
+      contents: read
+      packages: write
+    services:
+      docker:
+        image: docker:24-dind
+        options: --privileged
     steps:
       - uses: actions/checkout@v4
-      # Additional steps to build and push Docker images
+      
+      # Download artifacts (existing pattern)
       - name: Download aptos-node binary
         uses: actions/download-artifact@v4
         with:
           name: aptos-node-${{ github.sha }}
           path: ./downloaded-artifacts/aptos-node
-      - name: Download aptos-cli binary
-        uses: actions/download-artifact@v4
-        with:
-          name: aptos-${{ github.sha }}
-          path: ./downloaded-artifacts/aptos-cli
-      - name: Download l1-migration binary
-        uses: actions/download-artifact@v4
-        with:
-          name: l1-migration-${{ github.sha }}
-          path: ./downloaded-artifacts/l1-migration
-      - run: |
-          ls -al ./downloaded-artifacts/
-
+      
+      # Install Docker CLI
+      - name: Install Docker CLI
+        run: |
+          apt-get update
+          apt-get install -y ca-certificates curl
+          install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          chmod a+r /etc/apt/keyrings/docker.asc
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+          apt-get update
+          apt-get install -y docker-ce-cli
+      
+      # Wait for Docker daemon to be ready
+      - name: Wait for Docker daemon
+        run: |
+          timeout 30 sh -c 'until docker info; do sleep 1; done'
+      
       # Log in to GitHub Container Registry
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -147,11 +173,12 @@ jobs:
           registry: ghcr.io
           username: ${{ vars.INFRA_GH_USER }}
           password: ${{ secrets.INFRA_GH_PAT }}
-
+      
       # Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
+          driver: docker-container
           platforms: linux/amd64
       
       # Prepare build context
@@ -175,7 +202,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./docker-build-context
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }}
           labels: |
             org.label-schema.schema-version=1.0
@@ -193,4 +220,3 @@ jobs:
           echo "📦 Image: ${{ env.IMAGE_TAG }}"
           echo "🏷️  Tag: ${{ env.GIT_SHA_SHORT }}"
           echo "🌐 Registry: ghcr.io/movementlabsxyz/aptos-node"
-      
