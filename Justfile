@@ -7,42 +7,20 @@ set shell := ["bash", "-c"]
 default: build
 
 # Build the project or a specific binary using Nix development shell
-build binary="all":
+build binary="all" profile="dev":
     #!/usr/bin/env bash
+    if [ "{{profile}}" != "release" ]; then
+        PROFILE_ARG="--profile {{profile}}"
+    else
+        PROFILE_ARG="--release"
+    fi
+    echo "Using profile: $PROFILE_ARG"
     if [ "{{binary}}" = "all" ]; then
         echo "Building Aptos Core with Nix development shell..."
-        nix develop -c cargo build --release
+        nix --extra-experimental-features "nix-command flakes" develop -c cargo build $PROFILE_ARG
     else
-        case "{{binary}}" in
-            "aptos-node")
-                package="aptos-node"
-                ;;
-            "aptos")
-                package="crates/aptos"
-                ;;
-            "aptos-debugger")
-                package="crates/aptos-debugger"
-                ;;
-            "aptos-backup-cli")
-                package="storage/backup/backup-cli"
-                ;;
-            "aptos-keygen")
-                package="crates/aptos-keygen"
-                ;;
-            "transaction-emitter")
-                package="crates/transaction-emitter"
-                ;;
-            "aptos-node-checker")
-                package="ecosystem/node-checker"
-                ;;
-            *)
-                echo "Error: Unknown binary '{{binary}}'. Use 'just list-binaries' to see available binaries."
-                exit 1
-                ;;
-        esac
-        
         echo "Building {{binary}} with Nix development shell..."
-        nix develop -c cargo build --release -p "$package"
+        nix --extra-experimental-features "nix-command flakes" develop -c cargo build $PROFILE_ARG -p {{binary}}
         echo "Binary available at target/release/{{binary}}"
     fi
 
