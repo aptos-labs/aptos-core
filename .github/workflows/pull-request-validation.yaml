@@ -50,83 +50,83 @@ jobs:
           base-ref: ${{ github.event.pull_request.base.ref || 'l1-migration' }}
 
 
-  # build-binaries:
-  #   needs: build-checks
-  #   if: needs.build-checks.outputs.members_changed == 'true' || needs.build-checks.outputs.docker_changed == 'true'
-  #   runs-on: k8s-movement-labs
-  #   name: "Build Binaries with Nix"
-  #   strategy:
-  #     matrix:
-  #       binary:
-  #         - name: "aptos-node"
-  #           package: "aptos-node"
-  #           profile: "dev"
-  #         - name: "aptos-cli"
-  #           package: "aptos"
-  #           profile: "dev"
-  #         - name: "l1-migration"
-  #           package: "l1-migration"
-  #           profile: "dev"
-  #   env:
-  #     TARGET_FOLDER: target/debug
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
+  build-binaries:
+    needs: build-checks
+    if: needs.build-checks.outputs.members_changed == 'true' || needs.build-checks.outputs.docker_changed == 'true'
+    runs-on: k8s-movement-labs
+    name: "Build Binaries with Nix"
+    strategy:
+      matrix:
+        binary:
+          - name: "aptos-node"
+            package: "aptos-node"
+            profile: "dev"
+          - name: "aptos-cli"
+            package: "aptos"
+            profile: "dev"
+          - name: "l1-migration"
+            package: "l1-migration"
+            profile: "dev"
+    env:
+      TARGET_FOLDER: target/debug
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  #     - name: Install packages
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y xz-utils
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xz-utils
 
-  #     - name: Install Nix
-  #       uses: cachix/install-nix-action@v27
-  #       with:
-  #         github_access_token: ${{ secrets.GITHUB_TOKEN }}
-  #         nix_path: nixpkgs=channel:nixos-unstable
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          nix_path: nixpkgs=channel:nixos-unstable
 
-  #     # - name: Cache Rust dependencies
-  #     #   uses: actions/cache@v4
-  #     #   with:
-  #     #     path: |
-  #     #       ~/.cargo/registry/index/
-  #     #       ~/.cargo/registry/cache/
-  #     #       ~/.cargo/git/db/
-  #     #       target/
-  #     #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('nix/flake.lock') }}
-  #     #     restore-keys: |
-  #     #       ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
-  #     #       ${{ runner.os }}-cargo-
+      # - name: Cache Rust dependencies
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: |
+      #       ~/.cargo/registry/index/
+      #       ~/.cargo/registry/cache/
+      #       ~/.cargo/git/db/
+      #       target/
+      #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('nix/flake.lock') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
+      #       ${{ runner.os }}-cargo-
 
-  #     # - name: Cache Nix store
-  #     #   uses: actions/cache@v4
-  #     #   with:
-  #     #     path: /nix/store
-  #     #     key: ${{ runner.os }}-nix-${{ hashFiles('nix/flake.lock') }}
-  #     #     restore-keys: |
-  #     #       ${{ runner.os }}-nix-
+      # - name: Cache Nix store
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: /nix/store
+      #     key: ${{ runner.os }}-nix-${{ hashFiles('nix/flake.lock') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-nix-
 
-  #     - name: Build ${{ matrix.binary.package }}
-  #       run: |
-  #         echo "Building ${{ matrix.binary.package }} with Nix development shell..."
-  #         nix develop -c cargo build -p ${{ matrix.binary.package }} --profile ${{ matrix.binary.profile }} --features "${{ env.FEATURES }}"
-  #         echo "Binary available at ${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}"
+      - name: Build ${{ matrix.binary.package }}
+        run: |
+          echo "Building ${{ matrix.binary.package }} with Nix development shell..."
+          nix develop -c cargo build -p ${{ matrix.binary.package }} --profile ${{ matrix.binary.profile }} --features "${{ env.FEATURES }}"
+          echo "Binary available at ${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}"
 
-  #     - name: Verify binary
-  #       run: |
-  #         if [ -f "${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}" ]; then
-  #           echo "✅ Binary ${{ matrix.binary.package }} built successfully"
-  #           ls -la "${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}"
-  #         else
-  #           echo "❌ Binary ${{ matrix.binary.package }} not found"
-  #           exit 1
-  #         fi
+      - name: Verify binary
+        run: |
+          if [ -f "${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}" ]; then
+            echo "✅ Binary ${{ matrix.binary.package }} built successfully"
+            ls -la "${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}"
+          else
+            echo "❌ Binary ${{ matrix.binary.package }} not found"
+            exit 1
+          fi
 
-  #     - name: Upload binary artifact
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: ${{ matrix.binary.package }}-${{ github.sha }}
-  #         path: ${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}
-  #         retention-days: 7
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.binary.package }}-${{ github.sha }}
+          path: ${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}
+          retention-days: 7
 
   build-docker:
     # needs: build-binaries
@@ -135,16 +135,29 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      TARGET_FOLDER: target/debug
     steps:
       - uses: actions/checkout@v4
       
-      # # Download artifacts
-      # - name: Download aptos-node binary
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: aptos-node-${{ github.sha }}
-      #     path: docker/aptos-node
-      
+      # Download artifacts
+      - name: Download aptos-node binary
+        uses: actions/download-artifact@v4
+        with:
+          name: aptos-node-${{ github.sha }}
+          path: ${{ env.TARGET_FOLDER }}
+      - name: Download aptos binary
+        uses: actions/download-artifact@v4
+        with:
+          name: aptos-${{ github.sha }}
+          path: ${{ env.TARGET_FOLDER }}
+      - name: Download l1-migration binary
+        uses: actions/download-artifact@v4
+        with:
+          name: l1-migration-${{ github.sha }}
+          path: ${{ env.TARGET_FOLDER }}
+      - name: List binaries
+        run: ls -la ${{ env.TARGET_FOLDER }}
       # Setup Docker Buildx (replaces manual Docker checks)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -168,7 +181,7 @@ jobs:
       # Build and push Docker image
       - name: Build and push aptos-node Docker image
         run: |
-          docker build -f docker/aptos-node/Dockerfile -t ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }} .
+          docker build --build-arg BINARY_PATH=target/debug/ -f docker/aptos-node/Dockerfile -t ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }} .
           docker push ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }}
       
       # Output image information

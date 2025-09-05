@@ -10,6 +10,7 @@
 !docker/builder/*.sh
 !docker/tools/boto.cfg
 
+!target/release/
 
 !.cargo/
 !**/Cargo.toml
