@@ -2503,7 +2503,7 @@ where
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
-            let parallel_result = if self.config.local.blockstm_v2 {
+            let parallel_result = if true || self.config.local.blockstm_v2 {
                 self.execute_transactions_parallel_v2(
                     signature_verified_block,
                     base_view,
