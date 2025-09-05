@@ -91,7 +91,7 @@ pub(crate) fn trace(
 macro_rules! trace {
     ($function_desc:expr, $locals:expr, $pc:expr, $instr:tt, $resolver:expr, $interp:expr) => {
         // Only include this code in debug releases
-        #[cfg(any(debug_assertions, feature = "debugging"))]
+        #[cfg(feature = "debugging")]
         $crate::tracing::trace(&$function_desc, $locals, $pc, &$instr, $resolver, $interp)
     };
 }
