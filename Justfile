@@ -77,9 +77,29 @@ update:
     nix flake update
 
 # Build Docker image
-docker:
-    @echo "Building Docker image..."
-    DOCKER_BUILDKIT=1 docker build -f nix/Dockerfile.nix -t aptos-node .
+docker-build binary="aptos-node" tag="latest":
+    #!/usr/bin/env bash
+    # Check if Docker is installed
+    if ! command -v docker &> /dev/null; then
+        echo "Error: Docker is not installed. Please install Docker to build the image."
+        exit 1
+    fi
+
+    # Check if Docker Buildx is available
+    if ! docker buildx version &> /dev/null; then
+        echo "Error: Docker Buildx is not available. Please install Docker Buildx."
+        echo "You can typically install it by updating Docker Desktop or installing the buildx plugin."
+        exit 1
+    fi
+
+    # Validate the folder exists
+    if [ ! -d "{{binary}}" ]; then
+        echo "Error: Folder '{{binary}}' does not exist."
+        exit 1
+    fi
+
+    echo "Building Docker image from folder '{{binary}}'..."
+    DOCKER_BUILDKIT=1 docker build -f docker/{{binary}}/Dockerfile -t ghcr.io/movementlabsxyz/{{binary}}:{{tag}} .
 
 # Build any binary by package name
 build-bin package:

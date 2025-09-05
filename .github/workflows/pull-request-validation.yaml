@@ -11,7 +11,7 @@ on:
     branches:
       - feat/binary-builds
   workflow_dispatch:
-          
+           
 env:
   GIT_SHA: ${{ github.sha }}
   GIT_BRANCH: ${{ github.ref_name }}
@@ -174,6 +174,13 @@ jobs:
         run: |
           echo "${{ secrets.INFRA_GH_PAT }}" | docker login ghcr.io -u "${{ vars.INFRA_GH_USER }}" --password-stdin
       
+      # Install just
+      - name: Install just
+        run: |
+          mkdir -p ~/bin
+          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/bin
+          export PATH="$PATH:$HOME/bin"
+      
       # Set build environment variables
       - name: Set build environment
         run: |
@@ -183,14 +190,7 @@ jobs:
       # Build and push Docker image
       - name: Build and push aptos-node Docker image
         run: |
-          docker build \
-            --tag ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }} \
-            --label "org.label-schema.schema-version=1.0" \
-            --label "org.label-schema.build-date=${{ env.BUILD_DATE }}" \
-            --label "org.label-schema.git-sha=${{ github.sha }}" \
-            --label "org.label-schema.git-branch=${{ github.ref_name }}" \
-            docker/aptos-node
-          
+          just docker-build aptos-node ${{ env.GIT_SHA_SHORT }}          
           docker push ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }}
       
       # Output image information
