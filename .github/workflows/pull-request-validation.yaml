@@ -129,7 +129,7 @@ jobs:
           retention-days: 7
 
   build-docker:
-    # needs: build-binaries
+    needs: build-binaries
     runs-on: ubuntu-latest
     name: "Build Docker Images"
     permissions:
