@@ -143,35 +143,36 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: aptos-node-${{ github.sha }}
-          path: ./downloaded-artifacts/aptos-node
+          path: docker/aptos-node
       
-      # Check if Docker is available
+      # Check if Docker is installed
       - name: Check Docker availability
         run: |
-          if command -v docker &> /dev/null; then
-            echo "Docker is available"
-            docker --version
+          if ! command -v docker &> /dev/null; then
+            echo "Docker could not be found, installing..."
+            sudo apt-get update
+            sudo apt-get install -y docker
           else
-            echo "Docker not found, installing..."
-            curl -fsSL https://get.docker.com -o get-docker.sh
-            sudo sh get-docker.sh
-            sudo systemctl start docker
-            sudo usermod -aG docker $USER
+            echo "Docker is already installed"
+            docker --version
           fi
-      
+
+      # Check if dockerx is installed
+      - name: Check Docker Buildx availability
+        run: |
+          if ! docker buildx version &> /dev/null; then
+            echo "Docker Buildx could not be found, installing..."
+            sudo apt-get update
+            sudo apt-get install -y docker-buildx-plugin
+          else
+            echo "Docker Buildx is already installed"
+            docker buildx version
+          fi
+
       # Log in to GHCR
       - name: Login to GHCR
         run: |
           echo "${{ secrets.INFRA_GH_PAT }}" | docker login ghcr.io -u "${{ vars.INFRA_GH_USER }}" --password-stdin
-      
-      # Prepare build context
-      - name: Prepare Docker build context
-        run: |
-          mkdir -p ./docker-build-context
-          cp ./downloaded-artifacts/aptos-node/aptos-node ./docker-build-context/
-          cp docker/aptos-node/Dockerfile ./docker-build-context/
-          chmod +x ./docker-build-context/aptos-node
-          ls -la ./docker-build-context/
       
       # Set build environment variables
       - name: Set build environment
@@ -188,7 +189,7 @@ jobs:
             --label "org.label-schema.build-date=${{ env.BUILD_DATE }}" \
             --label "org.label-schema.git-sha=${{ github.sha }}" \
             --label "org.label-schema.git-branch=${{ github.ref_name }}" \
-            ./docker-build-context
+            docker/aptos-node
           
           docker push ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }}
       

@@ -79,7 +79,7 @@ update:
 # Build Docker image
 docker:
     @echo "Building Docker image..."
-    docker build -f nix/Dockerfile.nix -t aptos-node .
+    DOCKER_BUILDKIT=1 docker build -f nix/Dockerfile.nix -t aptos-node .
 
 # Build any binary by package name
 build-bin package:
