@@ -145,34 +145,19 @@ jobs:
       #     name: aptos-node-${{ github.sha }}
       #     path: docker/aptos-node
       
-      # Check if Docker is installed
-      - name: Check Docker availability
-        run: |
-          if ! command -v docker &> /dev/null; then
-            echo "Docker could not be found, installing..."
-            sudo apt-get update
-            sudo apt-get install -y docker
-          else
-            echo "Docker is already installed"
-            docker --version
-          fi
+      # Setup Docker Buildx (replaces manual Docker checks)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: latest
 
-      # Check if dockerx is installed
-      - name: Check Docker Buildx availability
-        run: |
-          if ! docker buildx version &> /dev/null; then
-            echo "Docker Buildx could not be found, installing..."
-            sudo apt-get update
-            sudo apt-get install -y docker-buildx-plugin
-          else
-            echo "Docker Buildx is already installed"
-            docker buildx version
-          fi
-
-      # Log in to GHCR
+      # Log in to GHCR (can also use docker/login-action)
       - name: Login to GHCR
-        run: |
-          echo "${{ secrets.INFRA_GH_PAT }}" | docker login ghcr.io -u "${{ vars.INFRA_GH_USER }}" --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ vars.INFRA_GH_USER }}
+          password: ${{ secrets.INFRA_GH_PAT }}
       
       # Set build environment variables
       - name: Set build environment
