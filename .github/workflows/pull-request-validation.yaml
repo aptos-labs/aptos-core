@@ -30,6 +30,24 @@ jobs:
 
       # This will exit with failure if any of the banned dynamic deps are found.
       - run: ./crates/aptos/scripts/check_dynamic_deps.sh
+  
+  semgrep:
+    name: semgrep/ci
+    runs-on: ubuntu-latest
+
+    container:
+      image: returntocorp/semgrep
+      options: --user root
+
+    # Skip any PR created by dependabot to avoid permission issues:
+    if: (github.actor != 'dependabot[bot]')
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: semgrep ci
+        env:
+           SEMGREP_RULES: >-
+             ./.github/linters/semgrep/pull-request-target-code-checkout.yaml
 
   build-checks:
     runs-on: k8s-movement-labs
