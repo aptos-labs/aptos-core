@@ -138,12 +138,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      # Download artifacts
-      - name: Download aptos-node binary
-        uses: actions/download-artifact@v4
-        with:
-          name: aptos-node-${{ github.sha }}
-          path: docker/aptos-node
+      # # Download artifacts
+      # - name: Download aptos-node binary
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: aptos-node-${{ github.sha }}
+      #     path: docker/aptos-node
       
       # Check if Docker is installed
       - name: Check Docker availability
