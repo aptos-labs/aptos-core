@@ -104,9 +104,7 @@ module 0xCAFE::scheduled_txns_usage {
         );
 
         debug::print(&string::utf8(b"Trying to reschedule txn 2"));
-
         insert(sender, txn);
-
         debug::print(&string::utf8(b"Trying to reschedule txn 3"));
     }
 
@@ -200,37 +198,6 @@ module 0xCAFE::scheduled_txns_usage {
 
         // Cancel the scheduled transaction using the first key
         cancel_with_key(user, first_key);
-    }
-
-    public entry fun create_and_add_module_pub_txn(
-        user: &signer, current_time_ms: u64
-    ) {
-        // Create a scheduled transaction for the double publish test
-        let user_addr = signer::address_of(user);
-        let schedule_time = current_time_ms + 1000; // Schedule 1 second later
-        let gas_amount = 1000;
-        let gas_unit_price = 100;
-        let foo_module_pub = |s: &signer, auth_token: ScheduledTxnAuthToken| user_func_mod_publish(s, auth_token);
-
-        let txn =
-            new_scheduled_transaction_gen_auth_token(
-                user,
-                schedule_time,
-                gas_amount,
-                gas_unit_price,
-                foo_module_pub
-            );
-        let key = insert(user, txn);
-
-        let txn_info = ScheduledTransactionInfo {
-            sender_addr: user_addr,
-            max_gas_amount: gas_amount,
-            gas_unit_price: gas_unit_price
-        };
-        let txn_map =
-            big_ordered_map::new<ScheduleMapKey, ScheduledTransactionInfo>();
-        big_ordered_map::add(&mut txn_map, key, txn_info);
-        move_to(user, StoredScheduledTxns { txns: txn_map });
     }
 
     /// Generic function to create and add scheduled transactions with custom scheduling functions

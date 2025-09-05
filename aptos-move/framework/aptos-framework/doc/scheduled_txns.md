@@ -66,6 +66,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/debug.md#0x1_debug">0x1::debug</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
@@ -75,6 +76,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
@@ -1630,10 +1632,14 @@ Lazy initialization: starts from 1 and stores in map upon first use
 
 <pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno_readonly">get_sender_seqno_readonly</a>(sender_addr: <b>address</b>): u64 <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
     <b>let</b> aux_data = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>&gt;(@aptos_framework);
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"get_sender_seqno_readonly"));
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&sender_addr);
+
     <b>assert</b>!(
         aux_data.sender_seqno_map.contains(&sender_addr),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_ESENDER_SEQNO_NOT_FOUND">ESENDER_SEQNO_NOT_FOUND</a>)
     );
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"get_sender_seqno_readonly: found sender_addr"));
     *aux_data.sender_seqno_map.borrow(&sender_addr)
 }
 </code></pre>
@@ -1801,14 +1807,26 @@ Common validation helper for auth token based scheduled transactions
     scheduled_time_ms: u64,
     auth_token: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>
 ) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"Validating auth token: "));
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&auth_token.authorization_seqno);
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&auth_token.allow_rescheduling);
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&auth_token.expiration_time);
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&sender_addr);
+
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"current_time_ms  --&gt; scheduled_time_ms"));
     // Get current time and validate expiration
     <b>let</b> current_time_ms = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() / 1000;
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&current_time_ms);
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&scheduled_time_ms);
     <b>assert</b>!(current_time_ms &lt;= auth_token.expiration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_EXPIRED">EAUTH_TOKEN_EXPIRED</a>));
     <b>assert</b>!(scheduled_time_ms &lt;= auth_token.expiration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_INSUFFICIENT_DURATION">EAUTH_TOKEN_INSUFFICIENT_DURATION</a>));
 
     // Validate authorization sequence number
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"calling <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno_readonly">get_sender_seqno_readonly</a>()"));
     <b>let</b> sender_seqno = <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno_readonly">get_sender_seqno_readonly</a>(sender_addr);
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&sender_seqno);
     <b>assert</b>!(auth_token.authorization_seqno == sender_seqno, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_SEQNO_MISMATCH">EAUTH_SEQNO_MISMATCH</a>));
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"Success"));
 }
 </code></pre>
 
@@ -1936,7 +1954,7 @@ Constructor
     max_gas_amount: u64,
     gas_unit_price: u64,
     f: |&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>| <b>has</b> <b>copy</b> + store + drop,
-): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a> <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
+): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a> {
     <b>let</b> sender_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
 
     // Validate the auth token (same checks <b>as</b> new_auth_token)
@@ -2570,7 +2588,11 @@ Called by the executor when the scheduled transaction is run
             f();
         },
         ScheduledFunction::V1WithAuthToken(f) =&gt; {
+            <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"ScheduledFunction::V1WithAuthToken"));
             <b>let</b> sender_addr = txn.sender_addr;
+            <b>let</b> temp = <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno_readonly">get_sender_seqno_readonly</a>(sender_addr);
+            <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&sender_addr);
+            <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&temp);
             <b>assert</b>!(txn.auth_token.is_some(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_internal">error::internal</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_NOT_FOUND">EAUTH_TOKEN_NOT_FOUND</a>));
             <b>let</b> auth_token = txn.auth_token.borrow();
 
@@ -2602,6 +2624,7 @@ Called by the executor when the scheduled transaction is run
                 *auth_token
             };
 
+            <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno_readonly">get_sender_seqno_readonly</a>(sender_addr);
             f(&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, updated_auth_token);
         },
     };
@@ -2611,8 +2634,10 @@ Called by the executor when the scheduled transaction is run
     //    of all scheduled transactions in the current <a href="block.md#0x1_block">block</a>
     // 2. From txn_table: Removed immediately after transaction execution in this function <b>to</b> enable
     //    proper refunding of storage gas fees <b>to</b> the user
-    <b>let</b> queue_mut = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
-    queue_mut.txn_table.remove(txn_key.txn_id);
+    {
+        <b>let</b> queue_mut = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
+        queue_mut.txn_table.remove(txn_key.txn_id);
+    };
     <b>true</b>
 }
 </code></pre>

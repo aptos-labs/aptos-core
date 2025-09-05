@@ -4,7 +4,9 @@ module aptos_framework::scheduled_txns {
     use std::hash::sha3_256;
     use std::option::{Option, some, none};
     use std::signer;
+    use std::string;
     use std::vector;
+    use aptos_std::debug;
     use aptos_std::from_bcs;
     use aptos_std::table;
     use aptos_std::table::Table;
@@ -478,10 +480,14 @@ module aptos_framework::scheduled_txns {
 
     fun get_sender_seqno_readonly(sender_addr: address): u64 acquires AuxiliaryData {
         let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
+        debug::print(&string::utf8(b"get_sender_seqno_readonly"));
+        debug::print(&sender_addr);
+
         assert!(
             aux_data.sender_seqno_map.contains(&sender_addr),
             error::invalid_state(ESENDER_SEQNO_NOT_FOUND)
         );
+        debug::print(&string::utf8(b"get_sender_seqno_readonly: found sender_addr"));
         *aux_data.sender_seqno_map.borrow(&sender_addr)
     }
 
@@ -529,14 +535,26 @@ module aptos_framework::scheduled_txns {
         scheduled_time_ms: u64,
         auth_token: &ScheduledTxnAuthToken
     ) acquires AuxiliaryData {
+        debug::print(&string::utf8(b"Validating auth token: "));
+        debug::print(&auth_token.authorization_seqno);
+        debug::print(&auth_token.allow_rescheduling);
+        debug::print(&auth_token.expiration_time);
+        debug::print(&sender_addr);
+
+        debug::print(&string::utf8(b"current_time_ms  --> scheduled_time_ms"));
         // Get current time and validate expiration
         let current_time_ms = timestamp::now_microseconds() / 1000;
+        debug::print(&current_time_ms);
+        debug::print(&scheduled_time_ms);
         assert!(current_time_ms <= auth_token.expiration_time, error::invalid_argument(EAUTH_TOKEN_EXPIRED));
         assert!(scheduled_time_ms <= auth_token.expiration_time, error::invalid_argument(EAUTH_TOKEN_INSUFFICIENT_DURATION));
 
         // Validate authorization sequence number
+        debug::print(&string::utf8(b"calling get_sender_seqno_readonly()"));
         let sender_seqno = get_sender_seqno_readonly(sender_addr);
+        debug::print(&sender_seqno);
         assert!(auth_token.authorization_seqno == sender_seqno, error::invalid_argument(EAUTH_SEQNO_MISMATCH));
+        debug::print(&string::utf8(b"Success"));
     }
 
     /// Constructor
@@ -604,7 +622,7 @@ module aptos_framework::scheduled_txns {
         max_gas_amount: u64,
         gas_unit_price: u64,
         f: |&signer, ScheduledTxnAuthToken| has copy + store + drop,
-    ): ScheduledTransaction acquires AuxiliaryData {
+    ): ScheduledTransaction {
         let sender_addr = signer::address_of(sender);
 
         // Validate the auth token (same checks as new_auth_token)
@@ -981,7 +999,11 @@ module aptos_framework::scheduled_txns {
                 f();
             },
             ScheduledFunction::V1WithAuthToken(f) => {
+                debug::print(&string::utf8(b"ScheduledFunction::V1WithAuthToken"));
                 let sender_addr = txn.sender_addr;
+                let temp = get_sender_seqno_readonly(sender_addr);
+                debug::print(&sender_addr);
+                debug::print(&temp);
                 assert!(txn.auth_token.is_some(), error::internal(EAUTH_TOKEN_NOT_FOUND));
                 let auth_token = txn.auth_token.borrow();
 
@@ -1013,6 +1035,7 @@ module aptos_framework::scheduled_txns {
                     *auth_token
                 };
 
+                get_sender_seqno_readonly(sender_addr);
                 f(&signer, updated_auth_token);
             },
         };
@@ -1022,8 +1045,10 @@ module aptos_framework::scheduled_txns {
         //    of all scheduled transactions in the current block
         // 2. From txn_table: Removed immediately after transaction execution in this function to enable
         //    proper refunding of storage gas fees to the user
-        let queue_mut = borrow_global_mut<ScheduleQueue>(@aptos_framework);
-        queue_mut.txn_table.remove(txn_key.txn_id);
+        {
+            let queue_mut = borrow_global_mut<ScheduleQueue>(@aptos_framework);
+            queue_mut.txn_table.remove(txn_key.txn_id);
+        };
         true
     }
 
