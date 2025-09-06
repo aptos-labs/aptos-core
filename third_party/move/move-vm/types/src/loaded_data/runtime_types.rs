@@ -378,11 +378,12 @@ impl AbilityInfo {
 
 macro_rules! paranoid_failure {
     ($msg:ident) => {
-        Err(
+        panic!("paf: {}", $msg)
+        /*Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message($msg)
                 .with_sub_status(EPARANOID_FAILURE),
-        )
+        )*/
     };
 }
 

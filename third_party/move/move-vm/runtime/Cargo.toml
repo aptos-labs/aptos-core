@@ -30,6 +30,7 @@ parking_lot = { workspace = true }
 serde = { workspace = true }
 triomphe = { workspace = true }
 typed-arena = { workspace = true }
+itertools = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -37,7 +38,7 @@ hex = { workspace = true }
 legacy-move-compiler = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-ir-compiler = { workspace = true }
-move-vm-test-utils ={ workspace = true }
+move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }
 proptest = { workspace = true }
 smallbitvec = { workspace = true }

@@ -16,7 +16,9 @@ pub struct VMConfig {
     pub verifier_config: VerifierConfig,
     pub deserializer_config: DeserializerConfig,
     /// When this flag is set to true, MoveVM will perform type checks at every instruction
-    /// execution to ensure that type safety cannot be violated at runtime.
+    /// execution to ensure that type safety cannot be violated at runtime. Note: these
+    /// are more than type checks, for example, stack balancing, visibility, but the name
+    /// is kept for historical reasons.
     pub paranoid_type_checks: bool,
     pub check_invariant_in_swap_loc: bool,
     /// Maximum value nest depth for structs.
@@ -34,6 +36,9 @@ pub struct VMConfig {
     pub use_call_tree_and_instruction_cache: bool,
     pub enable_lazy_loading: bool,
     pub enable_depth_checks: bool,
+    /// Whether trusted code should be optimized, for example, excluding it from expensive
+    /// paranoid checks.
+    pub optimize_trusted_code: bool,
 }
 
 impl Default for VMConfig {
@@ -54,6 +59,7 @@ impl Default for VMConfig {
             use_call_tree_and_instruction_cache: true,
             enable_lazy_loading: true,
             enable_depth_checks: true,
+            optimize_trusted_code: false,
         }
     }
 }

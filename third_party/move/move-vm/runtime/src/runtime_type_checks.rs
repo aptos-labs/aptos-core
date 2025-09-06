@@ -3,7 +3,7 @@
 
 use crate::{
     frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack,
-    reentrancy_checker::CallType, LoadedFunction,
+    reentrancy_checker::CallType, Function, LoadedFunction,
 };
 use move_binary_format::{errors::*, file_format::Bytecode};
 use move_core_types::{
@@ -31,10 +31,17 @@ pub(crate) trait RuntimeTypeCheck {
     ) -> PartialVMResult<()>;
 
     /// Paranoid check that operand and type stacks have the same size
-    fn check_operand_stack_balance(operand_stack: &Stack) -> PartialVMResult<()>;
+    fn check_operand_stack_balance(
+        for_fun: &Function,
+        operand_stack: &Stack,
+    ) -> PartialVMResult<()>;
 
     /// For any other checks are performed externally
-    fn should_perform_checks() -> bool;
+    fn should_perform_checks(for_fun: &Function) -> bool;
+
+    /// Whethet this is a partial checker, in which some parts of the code are checked and
+    /// others not. This is needed for certain info only valid in full checking.
+    fn is_partial_checker() -> bool;
 
     /// Performs a runtime check of the caller is allowed to call the callee for any type of call,
     /// including native dynamic dispatch or calling a closure.
@@ -212,6 +219,7 @@ fn with_owned_instantiation<R>(
 
 pub(crate) struct NoRuntimeTypeCheck;
 pub(crate) struct FullRuntimeTypeCheck;
+pub(crate) struct UntrustedOnlyRuntimeTypeCheck;
 
 impl RuntimeTypeCheck for NoRuntimeTypeCheck {
     fn pre_execution_type_stack_transition(
@@ -232,12 +240,20 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         Ok(())
     }
 
-    fn check_operand_stack_balance(_operand_stack: &Stack) -> PartialVMResult<()> {
+    fn check_operand_stack_balance(
+        _for_fun: &Function,
+        _operand_stack: &Stack,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 
     #[inline(always)]
-    fn should_perform_checks() -> bool {
+    fn should_perform_checks(_for_fun: &Function) -> bool {
+        false
+    }
+
+    #[inline(always)]
+    fn is_partial_checker() -> bool {
         false
     }
 
@@ -389,8 +405,16 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         instruction: &Bytecode,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
+        /*
+        eprintln!(
+            "at {:?} fun {:?}::{} stack {:?}",
+            instruction,
+            frame.function.owner(),
+            frame.function.name(),
+            operand_stack
+        );
+         */
         let ty_builder = frame.ty_builder();
-
         match instruction {
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),
             Bytecode::Branch(_)
@@ -850,13 +874,21 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         Ok(())
     }
 
-    fn check_operand_stack_balance(operand_stack: &Stack) -> PartialVMResult<()> {
+    fn check_operand_stack_balance(
+        _for_fun: &Function,
+        operand_stack: &Stack,
+    ) -> PartialVMResult<()> {
         operand_stack.check_balance()
     }
 
     #[inline(always)]
-    fn should_perform_checks() -> bool {
+    fn should_perform_checks(_for_fun: &Function) -> bool {
         true
+    }
+
+    #[inline(always)]
+    fn is_partial_checker() -> bool {
+        false
     }
 
     fn check_cross_module_regular_call_visibility(
@@ -895,5 +927,72 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         }
 
         Ok(())
+    }
+}
+
+impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
+    fn pre_execution_type_stack_transition(
+        frame: &Frame,
+        operand_stack: &mut Stack,
+        instruction: &Bytecode,
+        ty_cache: &mut FrameTypeCache,
+    ) -> PartialVMResult<()> {
+        if frame.untrusted_code() {
+            FullRuntimeTypeCheck::pre_execution_type_stack_transition(
+                frame,
+                operand_stack,
+                instruction,
+                ty_cache,
+            )
+        } else {
+            Ok(())
+        }
+    }
+
+    fn post_execution_type_stack_transition(
+        frame: &Frame,
+        operand_stack: &mut Stack,
+        instruction: &Bytecode,
+        ty_cache: &mut FrameTypeCache,
+    ) -> PartialVMResult<()> {
+        if frame.untrusted_code() {
+            FullRuntimeTypeCheck::post_execution_type_stack_transition(
+                frame,
+                operand_stack,
+                instruction,
+                ty_cache,
+            )
+        } else {
+            Ok(())
+        }
+    }
+
+    fn check_operand_stack_balance(
+        _for_fun: &Function,
+        _operand_stack: &Stack,
+    ) -> PartialVMResult<()> {
+        // We cannot have a global stack balancing without traversing the frame stack,
+        // so skip in this mode.
+        Ok(())
+    }
+
+    fn should_perform_checks(for_fun: &Function) -> bool {
+        !for_fun.is_trusted
+    }
+
+    #[inline(always)]
+    fn is_partial_checker() -> bool {
+        true
+    }
+
+    fn check_cross_module_regular_call_visibility(
+        caller: &LoadedFunction,
+        callee: &LoadedFunction,
+    ) -> PartialVMResult<()> {
+        if !caller.function.is_trusted {
+            FullRuntimeTypeCheck::check_cross_module_regular_call_visibility(caller, callee)
+        } else {
+            Ok(())
+        }
     }
 }
