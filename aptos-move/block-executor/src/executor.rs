@@ -76,7 +76,7 @@ use std::{
     },
 };
 
-struct SharedSyncParams<'a, 'b, T, E, S>
+struct SharedSyncParams<'a, T, E, S>
 where
     T: BlockExecutableTransaction,
     E: ExecutorTask<Txn = T>,
@@ -90,7 +90,7 @@ where
         &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
     last_input_output: &'a TxnLastInputOutput<T, E::Output, E::Error>,
     delayed_field_id_counter: &'a AtomicU32,
-    block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<'b, T, S>>,
+    block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
     final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
 }
 
@@ -852,7 +852,7 @@ where
         scheduler: SchedulerWrapper,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
+        block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
@@ -867,6 +867,7 @@ where
         block: &TP,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
+        info!("prepare_and_queue_commit_ready_txn: txn_idx: {txn_idx}");
         let block_limit_processor = &mut block_limit_processor.acquire();
         let mut side_effect_at_commit = false;
 
@@ -1246,7 +1247,7 @@ where
         skip_module_reads_validation: &AtomicBool,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
-        block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
+        block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         block_epilogue_txn: &ExplicitSyncWrapper<Option<T>>,
         num_txns_materialized: &AtomicU32,
@@ -1527,7 +1528,7 @@ where
         environment: &AptosEnvironment,
         worker_id: u32,
         num_workers: u32,
-        shared_sync_params: &SharedSyncParams<'_, '_, T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
         start_delayed_field_id_counter: u32,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let num_txns = block.num_txns() as u32;
@@ -1729,7 +1730,6 @@ where
                 .resize_with(num_txns, E::Output::skip_output);
         }
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
-            base_view,
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
             num_txns,
@@ -1744,7 +1744,7 @@ where
         let versioned_cache = MVHashMap::new();
         let scheduler = SchedulerV2::new(num_txns, num_workers);
 
-        let shared_sync_params: SharedSyncParams<'_, '_, T, E, S> = SharedSyncParams {
+        let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
             base_view,
             scheduler: &scheduler,
             versioned_cache: &versioned_cache,
@@ -1826,7 +1826,6 @@ where
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
-            base_view,
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
             num_txns + 1,
@@ -2093,8 +2092,7 @@ where
         let counter = RefCell::new(start_counter);
         let unsync_map = UnsyncMap::new();
         let mut ret = Vec::with_capacity(num_txns);
-        let mut block_limit_processor = BlockGasLimitProcessor::<T, S>::new(
-            base_view,
+        let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
             num_txns,
@@ -2189,11 +2187,15 @@ where
                             )
                         });
 
-                    block_limit_processor.accumulate_fee_statement(
+                    // FIXME: not sure if sequential execution and parallel execution generate the
+                    // same read set. At least if we take the final output they should have the
+                    // same write set.
+                    let read_only_keys = block_limit_processor.accumulate_fee_statement(
                         fee_statement,
                         read_write_summary,
                         approx_output_size,
                     );
+                    output.set_read_set(read_only_keys);
 
                     output.legacy_sequential_materialize_agg_v1(&latest_view);
                     assert_eq!(
@@ -2422,7 +2424,7 @@ where
     ) -> BlockExecutionResult<BlockOutput<T, E::Output>, E::Error> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
-        if self.config.local.concurrency_level > 1 {
+        if false {
             let parallel_result = if self.config.local.blockstm_v2 {
                 unimplemented!("BlockSTMv2 is not fully implemented");
                 // self.execute_transactions_parallel_v2(

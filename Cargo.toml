@@ -895,8 +895,11 @@ move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = 
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
 [profile.release]
-debug = true
+debug = "line-tables-only"
+debug-assertions = true
+opt-level = 1
 overflow-checks = true
+# panic = "abort"
 
 # The performance build is not currently recommended
 # for production deployments. It has not been widely tested.

@@ -1,15 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    counters, hot_state_op_accumulator::BlockHotStateOpAccumulator, types::ReadWriteSummary,
-};
+use crate::{counters, types::ReadWriteSummary};
 use aptos_logger::{info, warn};
 use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
-    state_store::{state_slot::StateSlot, TStateView},
+    state_store::{state_slot::StateSlot, TStateView, NUM_STATE_SHARDS},
     transaction::{
         block_epilogue::{BlockEndInfo, TBlockEndInfoExt},
         BlockExecutableTransaction as Transaction,
@@ -17,12 +15,16 @@ use aptos_types::{
 };
 use claims::{assert_le, assert_none};
 use once_cell::sync::Lazy;
-use std::{collections::BTreeMap, env, time::Instant};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    env,
+    time::Instant,
+};
 
 pub static PRINT_CONFLICTS_INFO: Lazy<bool> =
     Lazy::new(|| env::var("PRINT_CONFLICTS_INFO").is_ok());
 
-pub struct BlockGasLimitProcessor<'s, T: Transaction, S> {
+pub struct BlockGasLimitProcessor<T: Transaction> {
     block_gas_limit_type: BlockGasLimitType,
     block_gas_limit_override: Option<u64>,
     accumulated_raw_block_gas: u64,
@@ -33,19 +35,14 @@ pub struct BlockGasLimitProcessor<'s, T: Transaction, S> {
     txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
     start_time: Instant,
     print_conflicts_info: bool,
-    hot_state_op_accumulator: Option<BlockHotStateOpAccumulator<'s, T::Key, S>>,
 }
 
-impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s, T, S> {
+impl<T: Transaction> BlockGasLimitProcessor<T> {
     pub fn new(
-        base_view: &'s S,
         block_gas_limit_type: BlockGasLimitType,
         block_gas_limit_override: Option<u64>,
         init_size: usize,
     ) -> Self {
-        let hot_state_op_accumulator = block_gas_limit_type
-            .add_block_limit_outcome_onchain()
-            .then(|| BlockHotStateOpAccumulator::new(base_view));
         Self {
             block_gas_limit_type,
             block_gas_limit_override,
@@ -58,7 +55,6 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             start_time: Instant::now(),
             // TODO: have a configuration for it.
             print_conflicts_info: *PRINT_CONFLICTS_INFO,
-            hot_state_op_accumulator,
         }
     }
 
@@ -67,10 +63,12 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         fee_statement: FeeStatement,
         txn_read_write_summary: Option<ReadWriteSummary<T>>,
         approx_output_size: Option<u64>,
-    ) {
+    ) -> BTreeSet<T::Key> {
         self.accumulated_fee_statement
             .add_fee_statement(&fee_statement);
         self.txn_fee_statements.push(fee_statement);
+
+        let mut keys_read = BTreeSet::new();
 
         let conflict_multiplier = if let Some(conflict_overlap_length) =
             self.block_gas_limit_type.conflict_penalty_window()
@@ -89,9 +87,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             } else {
                 txn_read_write_summary.collapse_resource_group_conflicts()
             };
-            if let Some(x) = &mut self.hot_state_op_accumulator {
-                x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
-            }
+            keys_read.extend(rw_summary.keys_read().cloned());
             self.txn_read_write_summaries.push(rw_summary);
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
         } else {
@@ -116,6 +112,8 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         } else {
             assert_none!(approx_output_size);
         }
+
+        keys_read
     }
 
     fn block_gas_limit(&self) -> Option<u64> {
@@ -289,19 +287,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
 
-        let to_make_hot = self.get_slots_to_make_hot();
-        TBlockEndInfoExt::new(inner, to_make_hot)
-    }
-
-    fn get_slots_to_make_hot(&self) -> BTreeMap<T::Key, StateSlot> {
-        if self.hot_state_op_accumulator.is_none() {
-            warn!("BlockHotStateOpAccumulator is not set.");
-        }
-
-        self.hot_state_op_accumulator
-            .as_ref()
-            .map(|x| x.get_slots_to_make_hot())
-            .unwrap_or_default()
+        TBlockEndInfoExt::new(inner, Default::default(), Default::default())
     }
 }
 

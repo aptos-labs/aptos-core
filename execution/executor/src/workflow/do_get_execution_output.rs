@@ -46,7 +46,7 @@ use aptos_types::{
         AuxiliaryInfoTrait, BlockOutput, PersistedAuxiliaryInfo, Transaction, TransactionOutput,
         TransactionStatus, Version,
     },
-    write_set::{HotStateOp, TransactionWrite, WriteSet},
+    write_set::{TransactionWrite, WriteSet},
 };
 use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
@@ -119,7 +119,7 @@ impl DoGetExecutionOutput {
             onchain_config,
             transaction_slice_metadata,
         )?;
-        let (mut transaction_outputs, block_epilogue_txn) = block_output.into_inner();
+        let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
         let (transactions, mut auxiliary_infos) = txn_provider.into_inner();
         let mut transactions = transactions
             .into_iter()
@@ -155,18 +155,14 @@ impl DoGetExecutionOutput {
         //
         // TODO(HotState): it might be better to do this in AptosVM::execute_single_transaction,
         // but we need to figure out how to properly construct `VMOutput` from block end info.
-        for (transaction, output) in transactions.iter().zip_eq(transaction_outputs.iter_mut()) {
+        for (transaction, output) in transactions.iter().zip_eq(transaction_outputs.iter()) {
             if let Transaction::BlockEpilogue(payload) = transaction {
-                assert!(output.status().is_kept(), "Block epilogue must be kept");
-                output.add_hotness(
-                    payload
-                        .try_get_slots_to_make_hot()
-                        .cloned()
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(|(key, slot)| (key, HotStateOp::make_hot(slot)))
-                        .collect(),
+                info!(
+                    "epilogue payload. #promotions: {}. #evictions: {}",
+                    payload.try_get_slots_to_make_hot().map_or(0, |t| t.len()),
+                    payload.try_get_keys_to_evict().map_or(0, |t| t.len()),
                 );
+                assert!(output.status().is_kept(), "Block epilogue must be kept");
             }
         }
 
@@ -405,6 +401,7 @@ impl Parser {
         }
 
         let result_state = parent_state.update_with_memorized_reads(
+            Arc::clone(&base_state_view.hot),
             base_state_view.persisted_state(),
             to_commit.state_update_refs(),
             base_state_view.memorized_reads(),

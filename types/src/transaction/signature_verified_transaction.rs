@@ -3,7 +3,7 @@
 
 use crate::{
     contract_event::ContractEvent,
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, state_slot::StateSlot},
     transaction::{
         BlockEndInfo, BlockExecutableTransaction, FeeDistribution, SignedTransaction,
         TBlockEndInfoExt, Transaction,
@@ -13,7 +13,7 @@ use crate::{
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{collections::BTreeMap, fmt::Debug};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum SignatureVerifiedTransaction {

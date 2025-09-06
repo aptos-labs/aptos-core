@@ -18,6 +18,8 @@ pub struct StateUpdateRef<'kv> {
 impl StateUpdateRef<'_> {
     /// NOTE: the lru_info in the result is not initialized yet.
     pub fn to_result_slot(&self) -> StateSlot {
+        // TODO(HotState): distinguish uninitialized lru info with a single entry (prev and next
+        // are `None`).
         match self.state_op.clone() {
             BaseStateOp::Creation(value) | BaseStateOp::Modification(value) => {
                 StateSlot::HotOccupied {
@@ -31,44 +33,7 @@ impl StateUpdateRef<'_> {
                 hot_since_version: self.version,
                 lru_info: LRUEntry::uninitialized(),
             },
-            BaseStateOp::MakeHot { prev_slot } => match prev_slot {
-                StateSlot::ColdVacant => StateSlot::HotVacant {
-                    hot_since_version: self.version,
-                    lru_info: LRUEntry::uninitialized(),
-                },
-                StateSlot::HotVacant { .. } => StateSlot::HotVacant {
-                    hot_since_version: self.version,
-                    lru_info: LRUEntry::uninitialized(),
-                },
-                StateSlot::ColdOccupied {
-                    value_version,
-                    value,
-                }
-                | StateSlot::HotOccupied {
-                    value_version,
-                    value,
-                    ..
-                } => StateSlot::HotOccupied {
-                    value_version,
-                    value,
-                    hot_since_version: self.version,
-                    lru_info: LRUEntry::uninitialized(),
-                },
-            },
-            BaseStateOp::Eviction { prev_slot } => match prev_slot {
-                StateSlot::HotVacant { .. } => StateSlot::ColdVacant,
-                StateSlot::HotOccupied {
-                    value_version,
-                    value,
-                    ..
-                } => StateSlot::ColdOccupied {
-                    value_version,
-                    value,
-                },
-                StateSlot::ColdVacant | StateSlot::ColdOccupied { .. } => {
-                    unreachable!("only hot slots can be evicted")
-                },
-            },
+            BaseStateOp::MakeHot => panic!("should not be called"),
         }
     }
 

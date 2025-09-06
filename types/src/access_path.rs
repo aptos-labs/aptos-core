@@ -186,11 +186,14 @@ impl fmt::Debug for AccessPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "AccessPath {{ address: 0x{}, path: {:?} }}",
-            self.address.short_str_lossless(),
-            bcs::from_bytes::<Path>(&self.path)
-                .map_or_else(|_| hex::encode(&self.path), |path| format!("{}", path)),
-        )
+            "AccessPath {{ address: 0x{}, path: ",
+            self.address.short_str_lossless()
+        )?;
+        match bcs::from_bytes::<Path>(&self.path) {
+            Ok(path) => write!(f, "{}", path)?,
+            Err(_) => write!(f, "{}", hex::encode(&self.path))?,
+        };
+        write!(f, " }}")
     }
 }
 
