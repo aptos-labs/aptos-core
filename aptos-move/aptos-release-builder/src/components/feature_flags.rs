@@ -150,6 +150,7 @@ pub enum FeatureFlag {
     CalculateTransactionFeeForDistribution,
     DistributeTransactionFee,
     MonotonicallyIncreasingCounter,
+    AptosVmV2,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -399,6 +400,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::MonotonicallyIncreasingCounter => {
                 AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER
             },
+            FeatureFlag::AptosVmV2 => AptosFeatureFlag::APTOS_VM_V2,
         }
     }
 }
@@ -575,6 +577,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER => {
                 FeatureFlag::MonotonicallyIncreasingCounter
             },
+            AptosFeatureFlag::APTOS_VM_V2 => FeatureFlag::AptosVmV2,
         }
     }
 }

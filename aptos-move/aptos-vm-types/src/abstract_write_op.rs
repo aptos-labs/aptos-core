@@ -126,6 +126,23 @@ impl AbstractResourceWriteOp {
         }
     }
 
+    pub fn metadata(&self) -> &StateValueMetadata {
+        use AbstractResourceWriteOp::*;
+        match self {
+            Write(write_op)
+            | WriteWithDelayedFields(WriteWithDelayedFieldsOp { write_op, .. })
+            | WriteResourceGroup(GroupWrite {
+                metadata_op: write_op,
+                ..
+            }) => write_op.metadata(),
+            InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp { metadata, .. })
+            | ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChangeOp {
+                metadata,
+                ..
+            }) => metadata,
+        }
+    }
+
     pub fn from_resource_write_with_maybe_layout(
         write_op: WriteOp,
         maybe_layout: Option<Arc<MoveTypeLayout>>,
@@ -162,7 +179,7 @@ pub struct GroupWrite {
     /// exist in the group. Note: During parallel block execution, due to speculative
     /// reads, this invariant may be violated (and lead to speculation error if observed)
     /// but guaranteed to fail validation and lead to correct re-execution in that case.
-    pub(crate) inner_ops: BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+    pub inner_ops: BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
     /// Group size as used for gas charging, None if (metadata_)op is Deletion.
     pub(crate) maybe_group_op_size: Option<ResourceGroupSize>,
     // TODO: consider Option<u64> to be able to represent a previously non-existent group,

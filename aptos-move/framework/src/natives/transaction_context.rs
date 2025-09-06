@@ -15,7 +15,9 @@ use aptos_types::{
 };
 use better_any::{Tid, TidAble};
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{
+    native_extensions::VersionControlledNativeExtension, native_functions::NativeFunction,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
@@ -48,6 +50,22 @@ pub struct NativeTransactionContext {
     user_transaction_context_opt: Option<UserTransactionContext>,
     /// A number to represent the sessions inside the execution of a transaction. Used for computing the `monotonically_increasing_counter` method.
     session_counter: u8,
+}
+
+impl VersionControlledNativeExtension for NativeTransactionContext {
+    fn undo(&mut self) {
+        // No-op: nothing to undo.
+    }
+
+    fn save(&mut self) {
+        // No-op: nothing to save.
+    }
+
+    fn update(&mut self, txn_hash: &[u8; 32], script_hash: &[u8]) {
+        self.txn_hash = txn_hash.to_vec();
+        self.script_hash = script_hash.to_vec();
+        self.auid_counter = 0;
+    }
 }
 
 impl NativeTransactionContext {
