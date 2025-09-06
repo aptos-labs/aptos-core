@@ -13,6 +13,7 @@ use aptos_vm_types::{
     storage::{
         io_pricing::IoPricing,
         space_pricing::{ChargeAndRefund, DiskSpacePricing},
+        StorageGasParameters,
     },
 };
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
@@ -26,8 +27,11 @@ pub trait GasAlgebra {
     /// Returns the gas feature version.
     fn feature_version(&self) -> u64;
 
-    /// Returns the struct containing all (regular) gas parameters.
+    /// Returns the struct containing all (non-storage) gas parameters.
     fn vm_gas_params(&self) -> &VMGasParameters;
+
+    /// Returns the struct containing all (storage) gas parameters.
+    fn storage_gas_params(&self) -> &StorageGasParameters;
 
     /// Returns the struct containing the storage-specific gas parameters.
     fn io_pricing(&self) -> &IoPricing;
@@ -214,6 +218,11 @@ pub trait AptosGasMeter: MoveGasMeter {
         self.algebra().vm_gas_params()
     }
 
+    /// Returns the struct that contains all (storage) gas parameters.
+    fn storage_gas_params(&self) -> &StorageGasParameters {
+        self.algebra().storage_gas_params()
+    }
+
     // Returns a reference to the struct containing all storage gas parameters.
     fn io_pricing(&self) -> &IoPricing {
         self.algebra().io_pricing()
@@ -262,5 +271,15 @@ pub trait AptosGasMeter: MoveGasMeter {
         self.algebra_mut()
             .inject_balance(extra_balance)
             .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    /// Checks if the gas meter's internal counters are consistent.
+    fn check_consistency(&self) -> VMResult<()> {
+        if self.feature_version() >= 12 {
+            if let Err(err) = self.algebra().check_consistency() {
+                return Err(err.finish(Location::Undefined));
+            }
+        }
+        Ok(())
     }
 }

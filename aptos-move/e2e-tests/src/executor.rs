@@ -1454,6 +1454,15 @@ pub fn assert_outputs_equal(
     for (idx, (txn_output_1, txn_output_2)) in
         txns_output_1.iter().zip(txns_output_2.iter()).enumerate()
     {
+        assert_eq!(
+            txn_output_1.status(),
+            txn_output_2.status(),
+            "Different statuses for {:?} and {:?} for transaction outputs at index {}",
+            name1,
+            name2,
+            idx,
+        );
+
         // Gas is usually the problem, so check it separately to
         // have a concise error message.
         assert_eq!(

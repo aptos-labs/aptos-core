@@ -47,7 +47,6 @@ pub struct Module {
     id: ModuleId,
 
     // size in bytes
-    #[allow(dead_code)]
     pub(crate) size: usize,
 
     // primitive pools
@@ -487,6 +486,10 @@ impl Module {
         &self.id
     }
 
+    pub fn size_in_bytes(&self) -> u64 {
+        self.size as u64
+    }
+
     pub(crate) fn struct_at(&self, idx: StructDefinitionIndex) -> &Arc<StructType> {
         &self.structs[idx.0 as usize].definition_struct_type
     }
@@ -547,6 +550,10 @@ impl Module {
 
     pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
         self.single_signature_token_map.get(&idx).unwrap()
+    }
+
+    pub fn compiled_module(&self) -> Arc<CompiledModule> {
+        self.module.clone()
     }
 
     pub fn get_function(&self, function_name: &IdentStr) -> VMResult<Arc<Function>> {

@@ -46,7 +46,7 @@ pub use storage::{
         lazy::LazyLoader,
         traits::{
             FunctionDefinitionLoader, InstantiatedFunctionLoader, LegacyLoaderConfig, Loader,
-            ScriptLoader, StructDefinitionLoader,
+            ModuleMetadataLoader, ScriptLoader, StructDefinitionLoader,
         },
     },
     module_storage::{
@@ -54,6 +54,7 @@ pub use storage::{
         ModuleStorage,
     },
     publishing::{StagingModuleStorage, VerifiedModuleBundle},
+    ty_layout_converter::LayoutConverter,
 };
 
 // TODO(lazy-loading): revisit this macro in favour of a callback or an enum.

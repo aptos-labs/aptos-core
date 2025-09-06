@@ -9,7 +9,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{ExecutionStatus, TransactionOutput},
-    write_set::{TransactionWrite, WriteOp, WriteSet, TOTAL_SUPPLY_STATE_KEY},
+    write_set::{WriteOp, WriteSet, TOTAL_SUPPLY_STATE_KEY},
     AptosCoinType,
 };
 use claims::assert_ok;
