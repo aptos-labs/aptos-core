@@ -29,12 +29,16 @@ pub enum Error {
     IntegerOverflow(String),
     #[error("An invalid payload was received: {0}")]
     InvalidPayload(String),
+    #[error(
+        "Received an invalid sync request for version: {0}, but the pre-committed version is: {1}"
+    )]
+    InvalidSyncRequest(Version, Version),
     #[error("Failed to notify mempool of the new commit: {0}")]
     NotifyMempoolError(String),
     #[error("Failed to notify the storage service of the new commit: {0}")]
     NotifyStorageServiceError(String),
-    #[error("Received an old sync request for version {0}, but our committed version is: {1}")]
-    OldSyncRequest(Version, Version),
+    #[error("Received an old sync request for version {0}, but our pre-committed version is: {1} and committed version: {2}")]
+    OldSyncRequest(Version, Version, Version),
     #[error("Received oneshot::canceled. The sender of a channel was dropped: {0}")]
     SenderDroppedError(String),
     #[error("Unexpected storage error: {0}")]
@@ -62,10 +66,11 @@ impl Error {
             Error::EventNotificationError(_) => "event_notification_error",
             Error::FullNodeConsensusNotification(_) => "full_node_consensus_notification",
             Error::IntegerOverflow(_) => "integer_overflow",
+            Error::InvalidSyncRequest(_, _) => "invalid_sync_request",
             Error::InvalidPayload(_) => "invalid_payload",
             Error::NotifyMempoolError(_) => "notify_mempool_error",
             Error::NotifyStorageServiceError(_) => "notify_storage_service_error",
-            Error::OldSyncRequest(_, _) => "old_sync_request",
+            Error::OldSyncRequest(_, _, _) => "old_sync_request",
             Error::SenderDroppedError(_) => "sender_dropped_error",
             Error::StorageError(_) => "storage_error",
             Error::SyncedBeyondTarget(_, _) => "synced_beyond_target",
