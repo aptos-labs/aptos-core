@@ -20,7 +20,7 @@ VALIDATOR_INTERNAL_HOST_SUFFIX=${VALIDATOR_INTERNAL_HOST_SUFFIX:-validator-lb}
 FULLNODE_INTERNAL_HOST_SUFFIX=${FULLNODE_INTERNAL_HOST_SUFFIX:-fullnode-lb}
 MOVE_FRAMEWORK_DIR=${MOVE_FRAMEWORK_DIR:-"/aptos-framework/move"}
 STAKE_AMOUNT=${STAKE_AMOUNT:-1}
-NUM_VALIDATORS_WITH_LARGER_STAKE=${NUM_VALIDATORS_WITH_LARGER_STAKE:0}
+NUM_VALIDATORS_WITH_LARGER_STAKE=${NUM_VALIDATORS_WITH_LARGER_STAKE:-0}
 LARGER_STAKE_AMOUNT=${LARGER_STAKE_AMOUNT:-1}
 # TODO: Fix the usage of this below when not set
 RANDOM_SEED=${RANDOM_SEED:-$RANDOM}
@@ -29,7 +29,7 @@ export APTOS_DISABLE_TELEMETRY=true
 ENABLE_MULTICLUSTER_DOMAIN_SUFFIX=${ENABLE_MULTICLUSTER_DOMAIN_SUFFIX:-false}
 MULTICLUSTER_DOMAIN_SUFFIXES_DEFAULT="forge-multiregion-1,forge-multiregion-2,forge-multiregion-3"
 MULTICLUSTER_DOMAIN_SUFFIXES_STRING=${MULTICLUSTER_DOMAIN_SUFFIXES_STRING:-${MULTICLUSTER_DOMAIN_SUFFIXES_DEFAULT}}
-echo $MULTICLUSTER_DOMAIN_SUFFIXES_STRING
+echo "$MULTICLUSTER_DOMAIN_SUFFIXES_STRING"
 # convert comma separated string to array
 IFS=',' read -r -a MULTICLUSTER_DOMAIN_SUFFIXES <<< "${MULTICLUSTER_DOMAIN_SUFFIXES_STRING}"
 
@@ -39,24 +39,24 @@ if ! [[ $(declare -p MULTICLUSTER_DOMAIN_SUFFIXES) =~ "declare -a" ]]; then
 fi
 
 if [[ "${ENABLE_MULTICLUSTER_DOMAIN_SUFFIX}" == "true" ]]; then
-  if [ -z ${NAMESPACE} ]; then
+  if [ -z "${NAMESPACE}" ]; then
     echo "NAMESPACE must be set"
     exit 1
   fi
 fi
 
-if [ -z ${ERA} ] || [ -z ${NUM_VALIDATORS} ]; then
+if [ -z "${ERA}" ] || [ -z "${NUM_VALIDATORS}" ]; then
   echo "ERA (${ERA:-null}) and NUM_VALIDATORS (${NUM_VALIDATORS:-null}) must be set"
   exit 1
 fi
 
-if [ "${FULLNODE_ENABLE_ONCHAIN_DISCOVERY}" = "true" ] && [ -z ${DOMAIN} ] \
-  || [ "${VALIDATOR_ENABLE_ONCHAIN_DISCOVERY}" = "true" ] && [ -z ${DOMAIN} ]; then
+if [ "${FULLNODE_ENABLE_ONCHAIN_DISCOVERY}" = "true" ] && [ -z "${DOMAIN}" ] \
+  || [ "${VALIDATOR_ENABLE_ONCHAIN_DISCOVERY}" = "true" ] && [ -z "${DOMAIN}" ]; then
   echo "If FULLNODE_ENABLE_ONCHAIN_DISCOVERY or VALIDATOR_ENABLE_ONCHAIN_DISCOVERY is set, DOMAIN must be set"
   exit 1
 fi
 
-if [ -z ${CLUSTER_NAME} ]; then
+if [ -z "${CLUSTER_NAME}" ]; then
   echo "CLUSTER_NAME must be set"
   exit 1
 fi
@@ -72,20 +72,20 @@ echo "NUM_VALIDATORS_WITH_LARGER_STAKE=${NUM_VALIDATORS_WITH_LARGER_STAKE}"
 echo "LARGER_STAKE_AMOUNT=${LARGER_STAKE_AMOUNT}"
 echo "RANDOM_SEED=${RANDOM_SEED}"
 
-RANDOM_SEED_IN_DECIMAL=$(printf "%d" 0x${RANDOM_SEED})
+RANDOM_SEED_IN_DECIMAL=$(printf "%d" "0x${RANDOM_SEED}")
 
 # generate all validator configurations
-for i in $(seq 0 $(($NUM_VALIDATORS - 1))); do
+for i in $(seq 0 $((NUM_VALIDATORS - 1))); do
   username="${USERNAME_PREFIX}-${i}"
   user_dir="${WORKSPACE}/${username}"
 
-  mkdir $user_dir
+  mkdir "$user_dir"
 
   if [[ "${FULLNODE_ENABLE_ONCHAIN_DISCOVERY}" = "true" ]]; then
     fullnode_host="fullnode${i}.${DOMAIN}:6182"
   elif [[ "${ENABLE_MULTICLUSTER_DOMAIN_SUFFIX}" = "true" ]]; then
-    index=$(($i % ${#MULTICLUSTER_DOMAIN_SUFFIXES[@]}))
-    cluster=${MULTICLUSTER_DOMAIN_SUFFIXES[${index}]}
+    index=$((i % ${#MULTICLUSTER_DOMAIN_SUFFIXES[@]}))
+    cluster=${MULTICLUSTER_DOMAIN_SUFFIXES[index]}
     fullnode_host="${username}-${FULLNODE_INTERNAL_HOST_SUFFIX}.${NAMESPACE}.svc.${cluster}:6182"
   else
     fullnode_host="${username}-${FULLNODE_INTERNAL_HOST_SUFFIX}:6182"
@@ -94,61 +94,58 @@ for i in $(seq 0 $(($NUM_VALIDATORS - 1))); do
   if [[ "${VALIDATOR_ENABLE_ONCHAIN_DISCOVERY}" = "true" ]]; then
     validator_host="val${i}.${DOMAIN}:6180"
   elif [[ "${ENABLE_MULTICLUSTER_DOMAIN_SUFFIX}" = "true" ]]; then
-    index=$(($i % ${#MULTICLUSTER_DOMAIN_SUFFIXES[@]}))
-    cluster=${MULTICLUSTER_DOMAIN_SUFFIXES[${index}]}
+    index=$((i % ${#MULTICLUSTER_DOMAIN_SUFFIXES[@]}))
+    cluster=${MULTICLUSTER_DOMAIN_SUFFIXES[index]}
     validator_host="${username}-${VALIDATOR_INTERNAL_HOST_SUFFIX}.${NAMESPACE}.svc.${cluster}:6180"
   else
     validator_host="${username}-${VALIDATOR_INTERNAL_HOST_SUFFIX}:6180"
   fi
 
-  if [ $i -lt $NUM_VALIDATORS_WITH_LARGER_STAKE ]; then
-    CUR_STAKE_AMOUNT=$LARGER_STAKE_AMOUNT
+  if [ "$i" -lt "$NUM_VALIDATORS_WITH_LARGER_STAKE" ]; then
+    CUR_STAKE_AMOUNT="$LARGER_STAKE_AMOUNT"
   else
-    CUR_STAKE_AMOUNT=$STAKE_AMOUNT
+    CUR_STAKE_AMOUNT="$STAKE_AMOUNT"
   fi
 
   echo "CUR_STAKE_AMOUNT=${CUR_STAKE_AMOUNT} for ${i} validator"
 
   if [[ -z "${RANDOM_SEED}" ]]; then
-    aptos genesis generate-keys --output-dir $user_dir
+    aptos genesis generate-keys --output-dir "$user_dir"
   else
-    seed=$(printf "%064x" "$((${RANDOM_SEED_IN_DECIMAL} + i))")
+    seed=$(printf "%064x" "$((RANDOM_SEED_IN_DECIMAL + i))")
     echo "seed=$seed for ${i}th validator"
-    aptos genesis generate-keys --random-seed $seed --output-dir $user_dir
+    aptos genesis generate-keys --random-seed "$seed" --output-dir "$user_dir"
   fi
 
-  aptos genesis set-validator-configuration --owner-public-identity-file $user_dir/public-keys.yaml --local-repository-dir $WORKSPACE \
-    --username $username \
-    --validator-host $validator_host \
-    --full-node-host $fullnode_host \
-    --stake-amount $CUR_STAKE_AMOUNT
+  aptos genesis set-validator-configuration --owner-public-identity-file "$user_dir/public-keys.yaml" --local-repository-dir "$WORKSPACE" \
+    --username "$username" \
+    --validator-host "$validator_host" \
+    --full-node-host "$fullnode_host" \
+    --stake-amount "$CUR_STAKE_AMOUNT"
 done
 
 # get the framework
 # this is the directory the aptos-framework is located in the aptoslabs/tools docker image
-cp $MOVE_FRAMEWORK_DIR/head.mrb ${WORKSPACE}/framework.mrb
+cp "$MOVE_FRAMEWORK_DIR/head.mrb" "${WORKSPACE}/framework.mrb"
 
 # run genesis
-aptos genesis generate-genesis --local-repository-dir ${WORKSPACE} --output-dir ${WORKSPACE}
+aptos genesis generate-genesis --local-repository-dir "${WORKSPACE}" --output-dir "${WORKSPACE}"
 
 # delete all fullnode storage except for those from this era
 kubectl get pvc -o name | grep /fn- | grep -v "e${ERA}-" | xargs -r kubectl delete
 # delete all genesis secrets except for those from this era
 kubectl get secret -o name | grep "genesis-e" | grep -v "e${ERA}-" | xargs -r kubectl delete
 
-upload_genesis_blob() {
-  if [ -z ${GENESIS_BLOB_UPLOAD_URL} ]; then
-    echo "Skipping genesis blob upload, GENESIS_BLOB_UPLOAD_URL is not set"
-    return 1
-  fi
-
+upload_genesis_blob_to_url() {
   local genesis_blob_path="${WORKSPACE}/genesis.blob"
-  local signed_url status_code
+  local signed_url
+  local status_code
   local genesis_blob_upload_url="${GENESIS_BLOB_UPLOAD_URL}"
   genesis_blob_upload_url="$genesis_blob_upload_url&namespace=${NAMESPACE}&method=PUT"
 
   # Set up a trap to remove the temporary file when the script exits
-  local temp_file="$(mktemp)"
+  local temp_file
+  temp_file="$(mktemp)"
   trap 'rm -f "$temp_file"' EXIT
 
   # Get the signed URL for uploading the genesis.blob
@@ -175,8 +172,31 @@ upload_genesis_blob() {
   return 0
 }
 
+upload_genesis_blob_to_bucket() {
+  local bucket_path="${GENESIS_BLOB_UPLOAD_BUCKET}/genesis/${NAMESPACE}"
+  gcloud storage rm "${bucket_path}/current/genesis.blob" || true
+  gcloud storage rm "${bucket_path}/current/waypoint.txt" || true
+  gcloud storage cp \
+    "${WORKSPACE}/genesis.blob" \
+    "${WORKSPACE}/waypoint.txt" \
+    "${bucket_path}/current/"
+  gcloud storage cp \
+    "${WORKSPACE}/genesis.blob" \
+    "${WORKSPACE}/waypoint.txt" \
+    "${bucket_path}/${ERA}/"
+  for i in $(seq 0 $((NUM_VALIDATORS - 1))); do
+    local username="${USERNAME_PREFIX}-${i}"
+    local user_dir="${WORKSPACE}/${username}"
+    gcloud storage cp \
+      "${user_dir}/validator-identity.yaml" \
+      "${user_dir}/validator-full-node-identity.yaml" \
+      "${bucket_path}/${ERA}/${user_dir}/"
+  done
+}
+
 create_secrets() {
-  local include_genesis_blob=$1
+  local include_genesis_blob
+  include_genesis_blob="$1"
 
   for i in $(seq 0 $((NUM_VALIDATORS - 1))); do
     local username="${USERNAME_PREFIX}-${i}"
@@ -197,10 +217,15 @@ create_secrets() {
 }
 
 # Include the genesis blob in the secrets if we can't upload it
-if upload_genesis_blob; then
-  echo "Genesis blob uploaded successfully"
+if [[ -n "${GENESIS_BLOB_UPLOAD_BUCKET}" ]]; then
+  upload_genesis_blob_to_bucket
+  echo "Genesis blob uploaded successfully to bucket"
+  create_secrets false
+elif [[ -n "${GENESIS_BLOB_UPLOAD_URL}" ]]; then
+  upload_genesis_blob_to_url
+  echo "Genesis blob uploaded successfully to URL"
   create_secrets false
 else
-  echo "Genesis blob upload failed, including it in the secrets"
+  echo "Including genesis blob in the secret"
   create_secrets true
 fi

@@ -78,8 +78,12 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         - name: PUSH_METRICS_ENDPOINT
-          value: "{{- include "backup.pushMetricsEndpoint" $ }}/api/v1/import/prometheus?extra_label=role={{- .jobName | default "db_backup" }}&extra_label=kubernetes_pod_name=$(KUBERNETES_POD_NAME)&extra_label=chain_name={{ $.Values.chain.label | default $.Values.chain.name }}"
+          value: "{{- include "backup.pushMetricsEndpoint" $ }}/api/v1/import/prometheus?extra_label=role={{- .jobName | default "db_backup" }}&extra_label=namespace=$(KUBERNETES_NAMESPACE)&extra_label=kubernetes_pod_name=$(KUBERNETES_POD_NAME)&extra_label=chain_name={{ $.Values.chain.label | default $.Values.chain.name }}"
         {{- end }}
         {{- include "backup.backupEnvironment" (dict "config" .config "era" $.Values.chain.era) | nindent 8 }}
         volumeMounts:
