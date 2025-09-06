@@ -53,6 +53,7 @@ impl<T: Transaction> ReadWriteSummary<T> {
         }
     }
 
+    // TODO(HotState): probably remove these.
     pub fn keys_written(&self) -> impl Iterator<Item = &T::Key> {
         Self::keys_except_delayed_fields(self.writes.iter())
     }

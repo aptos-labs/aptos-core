@@ -967,6 +967,7 @@ where
         last_input_output.check_execution_status_during_commit(txn_idx)?;
 
         if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
+            last_input_output.record_storage_keys_read(txn_idx);
             let approx_output_size = block_gas_limit_type.block_output_limit().and_then(|_| {
                 last_input_output
                     .output_approx_size(txn_idx)
@@ -2177,6 +2178,7 @@ where
                         });
 
                     let sequential_reads = latest_view.take_sequential_reads();
+                    output.record_read_set(sequential_reads.get_storage_keys_read());
                     let read_write_summary = self
                         .config
                         .onchain

@@ -39,7 +39,10 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 /// Testcases:
 /// ```text
@@ -328,8 +331,9 @@ fn test_roundtrip_to_storage_change_set() {
             storage_change_set_before.clone(),
         );
 
-    let storage_change_set_after =
-        assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));
+    let storage_change_set_after = assert_ok!(
+        change_set.try_combine_into_storage_change_set(module_write_set, BTreeSet::new())
+    );
     assert_eq!(storage_change_set_before, storage_change_set_after)
 }
 
@@ -343,7 +347,8 @@ fn test_failed_conversion_to_change_set() {
         .build();
 
     // Unchecked conversion ignores deltas.
-    let vm_status = change_set.try_combine_into_storage_change_set(ModuleWriteSet::empty());
+    let vm_status =
+        change_set.try_combine_into_storage_change_set(ModuleWriteSet::empty(), BTreeSet::new());
     assert_matches!(vm_status, Err(PanicError::CodeInvariantError(_)));
 }
 
@@ -358,7 +363,7 @@ fn test_conversion_to_change_set_fails() {
 
     assert_err!(change_set
         .clone()
-        .try_combine_into_storage_change_set(ModuleWriteSet::empty()));
+        .try_combine_into_storage_change_set(ModuleWriteSet::empty(), BTreeSet::new()));
 }
 
 #[test]
