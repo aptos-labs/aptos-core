@@ -45,7 +45,7 @@ use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::{Lazy, OnceCell};
 use parking_lot::{RwLock, RwLockReadGuard};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     marker::PhantomData,
     sync::Arc,
 };
@@ -472,6 +472,36 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         }
 
         writes
+    }
+
+    // `read_keys` include all keys read, not just read-only ones.
+    fn set_read_set(&self, read_keys: BTreeSet<StateKey>) {
+        assert!(self.committed_output.get().is_none());
+
+        self.vm_output
+            .write()
+            .as_mut()
+            .unwrap()
+            .set_read_set(read_keys);
+    }
+
+    fn get_storage_keys_written(&self) -> BTreeSet<StateKey> {
+        if let Some(output) = self.committed_output.get() {
+            return output
+                .write_set()
+                .write_op_iter()
+                .map(|(key, _op)| key.clone())
+                .collect();
+        }
+
+        let locked = self.vm_output.read();
+        let vm_output = locked.as_ref().expect("Output needs to be set");
+
+        let mut keys = BTreeSet::new();
+        keys.extend(vm_output.resource_write_set().keys().cloned());
+        keys.extend(vm_output.aggregator_v1_write_set().keys().cloned());
+        keys.extend(vm_output.module_write_set().keys().cloned());
+        keys
     }
 
     // Legacy interfaces, which means there are alternative, more efficient ways used in
