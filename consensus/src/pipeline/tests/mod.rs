@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+mod auxiliary_info_storage_test;
 mod buffer_manager_tests;
 mod integration_tests;
 mod ordering_state_computer_tests;
