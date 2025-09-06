@@ -38,6 +38,27 @@ impl BlockEpiloguePayload {
             Self::V1 { block_end_info, .. } => Some(&block_end_info.to_make_hot),
         }
     }
+
+    pub fn try_get_keys_to_evict(&self) -> Option<&BTreeMap<StateKey, StateSlot>> {
+        match self {
+            Self::V0 { .. } => None,
+            Self::V1 { block_end_info, .. } => Some(&block_end_info.to_evict),
+        }
+    }
+
+    pub fn set_promotions_and_evictions(
+        &mut self,
+        to_make_hot: BTreeMap<StateKey, StateSlot>,
+        to_evict: BTreeMap<StateKey, StateSlot>,
+    ) {
+        match self {
+            Self::V0 { .. } => panic!("fafafafafafafafafafafafafa"),
+            Self::V1 { block_end_info, .. } => {
+                block_end_info.to_make_hot = to_make_hot;
+                block_end_info.to_evict = to_evict;
+            },
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,6 +127,7 @@ impl BlockEndInfo {
 pub struct TBlockEndInfoExt<Key: Debug + Ord> {
     inner: BlockEndInfo,
     to_make_hot: BTreeMap<Key, StateSlot>,
+    to_evict: BTreeMap<Key, StateSlot>,
 }
 
 pub type BlockEndInfoExt = TBlockEndInfoExt<StateKey>;
@@ -115,11 +137,20 @@ impl<Key: Debug + Ord> TBlockEndInfoExt<Key> {
         Self {
             inner: BlockEndInfo::new_empty(),
             to_make_hot: BTreeMap::new(),
+            to_evict: BTreeMap::new(),
         }
     }
 
-    pub fn new(inner: BlockEndInfo, to_make_hot: BTreeMap<Key, StateSlot>) -> Self {
-        Self { inner, to_make_hot }
+    pub fn new(
+        inner: BlockEndInfo,
+        to_make_hot: BTreeMap<Key, StateSlot>,
+        to_evict: BTreeMap<Key, StateSlot>,
+    ) -> Self {
+        Self {
+            inner,
+            to_make_hot,
+            to_evict,
+        }
     }
 
     pub fn to_persistent(&self) -> BlockEndInfo {
@@ -148,7 +179,7 @@ where
         D: serde::Deserializer<'de>,
     {
         let inner = BlockEndInfo::deserialize(deserializer)?;
-        Ok(Self::new(inner, BTreeMap::new()))
+        Ok(Self::new(inner, BTreeMap::new(), BTreeMap::new()))
     }
 }
 
@@ -161,7 +192,7 @@ impl<Key: Debug + Ord> Arbitrary for TBlockEndInfoExt<Key> {
         // TODO(HotState): it's used in db tests (encode/decode), so we need to make sure that
         // serializing the data and then deserializing it reproduces the original value.
         any::<BlockEndInfo>()
-            .prop_map(|inner| Self::new(inner, BTreeMap::new()))
+            .prop_map(|inner| Self::new(inner, BTreeMap::new(), BTreeMap::new()))
             .boxed()
     }
 }
