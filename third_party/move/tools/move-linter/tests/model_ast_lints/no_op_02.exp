@@ -1,0 +1,172 @@
+
+Diagnostics:
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+  ┌─ tests/model_ast_lints/no_op_02.move:3:9
+  │
+3 │ ╭         {
+4 │ │             let x1 = 1;
+5 │ │             x1 += 1;
+6 │ │             x1
+7 │ │         };
+  │ ╰─────────^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+  ┌─ tests/model_ast_lints/no_op_02.move:2:28
+  │
+2 │       public fun test1_warn(){
+  │ ╭────────────────────────────^
+3 │ │         {
+4 │ │             let x1 = 1;
+5 │ │             x1 += 1;
+6 │ │             x1
+7 │ │         };
+8 │ │     }
+  │ ╰─────^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/no_op_02.move:11:9
+   │
+11 │ ╭         {
+12 │ │             let x2 = 2;
+13 │ │             impure(&mut x2);
+14 │ │             x2
+15 │ │         };
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/no_op_02.move:10:28
+   │
+10 │       public fun test2_warn(){
+   │ ╭────────────────────────────^
+11 │ │         {
+12 │ │             let x2 = 2;
+13 │ │             impure(&mut x2);
+14 │ │             x2
+15 │ │         };
+16 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/no_op_02.move:19:9
+   │
+19 │ ╭         if (x){
+20 │ │             let x2 = 3;
+21 │ │             impure(&mut x2);
+22 │ │             x2
+   · │
+26 │ │             x1
+27 │ │         };
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/no_op_02.move:18:35
+   │
+18 │       public fun test3_warn(x: bool){
+   │ ╭───────────────────────────────────^
+19 │ │         if (x){
+20 │ │             let x2 = 3;
+21 │ │             impure(&mut x2);
+   · │
+27 │ │         };
+28 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/no_op_02.move:33:13
+   │
+33 │ ╭             pure({
+34 │ │                 let x5 = 5;
+35 │ │                 x5
+36 │ │             });
+   │ ╰──────────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/no_op_02.move:32:9
+   │
+32 │ ╭         {
+33 │ │             pure({
+34 │ │                 let x5 = 5;
+35 │ │                 x5
+36 │ │             });
+37 │ │             x4
+38 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/no_op_02.move:42:9
+   │
+42 │ ╭         {
+43 │ │             let x = 6;
+44 │ │             let n2 = n;
+45 │ │             loop{
+   · │
+51 │ │             };
+52 │ │         };
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/no_op_02.move:57:9
+   │
+57 │ ╭         pure({
+58 │ │             let x = 6;
+59 │ │             let n2 = n;
+60 │ │             loop{
+   · │
+67 │ │             x
+68 │ │         });
+   │ ╰──────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/no_op_02.move:56:34
+   │
+56 │       public fun test6_warn(n: u64){
+   │ ╭──────────────────────────────────^
+57 │ │         pure({
+58 │ │             let x = 6;
+59 │ │             let n2 = n;
+   · │
+68 │ │         });
+69 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/no_op_02.move:75:13
+   │
+75 │             x3
+   │             ^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
