@@ -12,6 +12,7 @@ use crate::{
     keyless::{KeylessPublicKey, KeylessSignature},
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
+    state_store::state_slot::StateSlot,
     transaction::authenticator::{
         AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
         TransactionAuthenticator,
@@ -1850,10 +1851,6 @@ impl TransactionOutput {
 
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
         self.write_set.state_update_refs()
-    }
-
-    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
-        self.write_set.add_hotness(hotness);
     }
 }
 
