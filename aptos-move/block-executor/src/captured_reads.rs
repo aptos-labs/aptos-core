@@ -1275,6 +1275,17 @@ where
 
         ret
     }
+
+    pub(crate) fn get_storage_keys_read(&self) -> HashSet<T::Key> {
+        let mut ret = self.resource_reads.clone();
+        ret.extend(self.group_reads.keys().cloned());
+        ret.extend(
+            self.module_reads
+                .iter()
+                .map(|key| T::Key::from_address_and_module_name(key.address(), key.name())),
+        );
+        ret
+    }
 }
 
 #[cfg(test)]

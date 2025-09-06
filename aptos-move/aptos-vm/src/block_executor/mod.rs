@@ -45,7 +45,7 @@ use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::{Lazy, OnceCell};
 use parking_lot::{RwLock, RwLockReadGuard};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     marker::PhantomData,
     sync::Arc,
 };
@@ -472,6 +472,17 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         }
 
         writes
+    }
+
+    // `read_keys` include all keys read, not just read-only ones.
+    fn set_read_set(&self, read_keys: BTreeSet<StateKey>) {
+        assert!(self.committed_output.get().is_none());
+
+        self.vm_output
+            .write()
+            .as_mut()
+            .unwrap()
+            .set_read_set(read_keys);
     }
 
     // Legacy interfaces, which means there are alternative, more efficient ways used in

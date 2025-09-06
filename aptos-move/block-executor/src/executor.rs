@@ -2177,6 +2177,7 @@ where
                         });
 
                     let sequential_reads = latest_view.take_sequential_reads();
+                    output.set_read_set(sequential_reads.get_storage_keys_read());
                     let read_write_summary = self
                         .config
                         .onchain
