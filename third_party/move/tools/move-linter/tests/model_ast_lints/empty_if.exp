@@ -1,0 +1,54 @@
+
+Diagnostics:
+warning: [lint] Empty `if` branch. Consider simplifying this `if-else`.
+  ┌─ tests/model_ast_lints/empty_if.move:4:20
+  │
+4 │           if (x > 0) {
+  │ ╭────────────────────^
+5 │ │         } else {
+  │ ╰─────────^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/empty_if.move:11:20
+   │
+11 │           if (x > 0) {
+   │ ╭────────────────────^
+12 │ │         };
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/empty_if.move:24:13
+   │
+24 │             ()
+   │             ^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/empty_if.move:30:21
+   │
+30 │           if (x > 35) {
+   │ ╭─────────────────────^
+31 │ │         } else { };
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying this `if-else`.
+   ┌─ tests/model_ast_lints/empty_if.move:36:21
+   │
+36 │           if (x > 35) {
+   │ ╭─────────────────────^
+37 │ │         } else {
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
