@@ -20,3 +20,4 @@ move-core-types = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 smallvec = { workspace = true }
+triomphe = { workspace = true }

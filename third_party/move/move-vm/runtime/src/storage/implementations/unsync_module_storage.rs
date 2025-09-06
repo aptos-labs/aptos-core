@@ -23,7 +23,8 @@ use move_vm_types::{
     },
     sha3_256,
 };
-use std::{borrow::Borrow, ops::Deref, sync::Arc};
+use std::{borrow::Borrow, ops::Deref};
+use triomphe::Arc;
 
 /// Represents owned or borrowed types, similar to [std::borrow::Cow] but without enforcing
 /// [ToOwned] trait bound on types it stores. We use it to be able to construct different storages

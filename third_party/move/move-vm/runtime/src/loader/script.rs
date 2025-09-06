@@ -17,7 +17,8 @@ use move_vm_types::loaded_data::{
     runtime_types::{StructIdentifier, Type},
     struct_name_indexing::StructNameIndexMap,
 };
-use std::{collections::BTreeMap, ops::Deref, sync::Arc};
+use std::{collections::BTreeMap, ops::Deref};
+use triomphe::Arc;
 
 // A Script is very similar to a `CompiledScript` but data is "transformed" to a representation
 // more appropriate to execution.

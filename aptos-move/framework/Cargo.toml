@@ -78,6 +78,7 @@ smallvec = { workspace = true }
 tempfile = { workspace = true }
 tiny-keccak = { workspace = true }
 toml = { workspace = true }
+triomphe = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }

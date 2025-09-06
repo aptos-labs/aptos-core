@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::code::{ModuleCode, WithSize};
-use std::{ops::Deref, sync::Arc};
+use std::ops::Deref;
+use triomphe::Arc;
 
 #[derive(Clone, Debug)]
 pub struct MockDeserializedCode(usize);

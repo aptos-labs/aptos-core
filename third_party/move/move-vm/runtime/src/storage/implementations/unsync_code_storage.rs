@@ -23,7 +23,7 @@ use move_core_types::{
 use move_vm_types::code::{
     ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ScriptCache, UnsyncScriptCache,
 };
-use std::sync::Arc;
+use triomphe::Arc;
 
 /// Code storage that stores both modules and scripts (not thread-safe).
 #[derive(Delegate)]

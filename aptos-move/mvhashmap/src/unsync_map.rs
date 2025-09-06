@@ -102,7 +102,7 @@ impl<
     ) -> impl Iterator<
         Item = (
             ModuleId,
-            Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
+            triomphe::Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
         ),
     > {
         self.module_cache.into_modules_iter()

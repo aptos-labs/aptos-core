@@ -749,6 +749,7 @@ dependencies = [
  "rayon",
  "scopeguard",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -1994,6 +1995,7 @@ dependencies = [
  "tempfile",
  "tiny-keccak",
  "toml 0.7.8",
+ "triomphe",
 ]
 
 [[package]]
@@ -3160,6 +3162,7 @@ dependencies = [
  "rayon",
  "serde",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -3174,6 +3177,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-types",
  "smallvec",
+ "triomphe",
 ]
 
 [[package]]
@@ -4814,6 +4818,7 @@ dependencies = [
  "rayon",
  "serde",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -4943,6 +4948,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -4969,6 +4975,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-types",
  "rand 0.7.3",
+ "triomphe",
 ]
 
 [[package]]

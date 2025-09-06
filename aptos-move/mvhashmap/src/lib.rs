@@ -14,7 +14,7 @@ use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, Script};
 use move_vm_types::code::{ModuleCache, ModuleCode, SyncModuleCache, SyncScriptCache};
 use serde::Serialize;
-use std::{fmt::Debug, hash::Hash, sync::Arc};
+use std::{fmt::Debug, hash::Hash};
 
 mod registered_dependencies;
 pub mod types;
@@ -111,7 +111,7 @@ where
     ) -> impl Iterator<
         Item = (
             ModuleId,
-            Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
+            triomphe::Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
         ),
     > {
         self.module_cache.take_modules_iter()

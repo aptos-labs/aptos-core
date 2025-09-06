@@ -31,7 +31,7 @@ use move_vm_types::loaded_data::{
     runtime_types::StructIdentifier, struct_name_indexing::StructNameIndex,
 };
 use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap};
-use std::sync::Arc;
+use triomphe::Arc;
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
 /// the code cache, possibly across multiple threads.

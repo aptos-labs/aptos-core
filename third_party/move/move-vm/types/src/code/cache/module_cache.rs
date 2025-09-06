@@ -7,7 +7,8 @@ use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use move_binary_format::errors::VMResult;
-use std::{cell::RefCell, cmp::Ordering, hash::Hash, mem, ops::Deref, sync::Arc};
+use std::{cell::RefCell, cmp::Ordering, hash::Hash, mem, ops::Deref};
+use triomphe::Arc;
 
 /// Represents module code stored in [ModuleCode].
 pub struct ModuleCode<DC, VC, E> {

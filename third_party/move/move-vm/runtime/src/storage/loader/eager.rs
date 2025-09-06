@@ -35,7 +35,7 @@ use move_vm_types::{
     },
     sha3_256,
 };
-use std::sync::Arc;
+use triomphe::Arc;
 
 /// Eager loader implementation used prior to lazy loading. It uses eager module verification by
 /// loading and verifying the transitive closure of module's dependencies and friends. The gas is

@@ -19,7 +19,8 @@ use move_vm_types::{
         struct_name_indexing::StructNameIndex,
     },
 };
-use std::{rc::Rc, sync::Arc};
+use std::rc::Rc;
+use triomphe::Arc;
 
 /// Provides access to struct definitions.
 pub trait StructDefinitionLoader: WithRuntimeEnvironment {

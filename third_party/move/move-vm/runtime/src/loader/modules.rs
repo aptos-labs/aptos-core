@@ -35,8 +35,8 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     fmt::Debug,
     ops::Deref,
-    sync::Arc,
 };
+use triomphe::Arc;
 
 // A Module is very similar to a binary Module but data is "transformed" to a representation
 // more appropriate to execution.

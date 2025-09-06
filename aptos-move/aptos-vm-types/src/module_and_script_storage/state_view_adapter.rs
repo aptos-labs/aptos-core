@@ -32,7 +32,8 @@ use move_vm_types::{
     code::{ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ModuleCode, ScriptCache},
     module_storage_error,
 };
-use std::{ops::Deref, sync::Arc};
+use std::ops::Deref;
+use triomphe::Arc;
 
 struct StateViewAdapter<'ctx, S, E> {
     environment: &'ctx E,

@@ -521,10 +521,10 @@ impl DelayedFieldRead {
 enum ModuleRead<DC, VC, S> {
     /// Read from the global module cache. Modules in this cache have storage version, but require
     /// different validation - a check that they have not been overridden.
-    GlobalCache(Arc<ModuleCode<DC, VC, S>>),
+    GlobalCache(triomphe::Arc<ModuleCode<DC, VC, S>>),
     /// Read from per-block cache that contains committed (by specified transaction) and newly
     /// loaded from storage (i.e., not yet moved to global module cache) modules.
-    PerBlockCache(Option<(Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>),
+    PerBlockCache(Option<(triomphe::Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>),
 }
 
 /// Represents a result of a read from [CapturedReads] when they are used as the transaction-level
@@ -601,7 +601,7 @@ impl<T, K, DC, VC, S> CapturedReads<T, K, DC, VC, S>
 where
     T: Transaction,
     K: Hash + Eq + Ord + Clone,
-    VC: Deref<Target = Arc<DC>>,
+    VC: Deref<Target = triomphe::Arc<DC>>,
     S: WithSize,
 {
     pub(crate) fn blockstm_v2_incarnation(&self) -> Option<Incarnation> {
@@ -1008,7 +1008,11 @@ where
     }
 
     /// Records the read to global cache that spans across multiple blocks.
-    pub(crate) fn capture_global_cache_read(&mut self, key: K, read: Arc<ModuleCode<DC, VC, S>>) {
+    pub(crate) fn capture_global_cache_read(
+        &mut self,
+        key: K,
+        read: triomphe::Arc<ModuleCode<DC, VC, S>>,
+    ) {
         self.module_reads.insert(key, ModuleRead::GlobalCache(read));
     }
 
@@ -1016,7 +1020,7 @@ where
     pub(crate) fn capture_per_block_cache_read(
         &mut self,
         key: K,
-        read: Option<(Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>,
+        read: Option<(triomphe::Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>,
     ) {
         self.module_reads
             .insert(key, ModuleRead::PerBlockCache(read));
@@ -1026,7 +1030,7 @@ where
     pub(crate) fn get_module_read(
         &self,
         key: &K,
-    ) -> CacheRead<Option<(Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>> {
+    ) -> CacheRead<Option<(triomphe::Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>> {
         match self.module_reads.get(key) {
             Some(ModuleRead::PerBlockCache(read)) => CacheRead::Hit(read.clone()),
             Some(ModuleRead::GlobalCache(read)) => {
@@ -1198,7 +1202,7 @@ impl<T, K, DC, VC, S> CapturedReads<T, K, DC, VC, S>
 where
     T: Transaction,
     K: Hash + Eq + Ord + Clone + WithAddress + WithName,
-    VC: Deref<Target = Arc<DC>>,
+    VC: Deref<Target = triomphe::Arc<DC>>,
 {
     pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
         let mut ret = HashSet::new();

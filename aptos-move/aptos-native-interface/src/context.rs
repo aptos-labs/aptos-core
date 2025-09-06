@@ -20,10 +20,7 @@ use move_vm_runtime::{
     Function,
 };
 use move_vm_types::values::Value;
-use std::{
-    ops::{Deref, DerefMut},
-    sync::Arc,
-};
+use std::ops::{Deref, DerefMut};
 
 /// A proxy between the VM and the native functions, allowing the latter to query VM configurations
 /// or access certain VM functionalities.
@@ -221,7 +218,7 @@ impl<'b, 'c> SafeNativeContext<'_, 'b, 'c, '_> {
         &mut self,
         module_id: &ModuleId,
         function_name: &Identifier,
-    ) -> VMResult<Arc<Function>> {
+    ) -> VMResult<triomphe::Arc<Function>> {
         // INVARIANT:
         //   There is no need to meter module loading due to function access. This is because this
         //   function is only called for native dynamic dispatch, which pre-charges gas before the

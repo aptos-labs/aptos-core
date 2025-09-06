@@ -33,7 +33,8 @@ use move_vm_types::{
     module_storage_error, sha3_256,
 };
 use rand::{thread_rng, Rng};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
+use triomphe::Arc;
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
@@ -230,7 +231,7 @@ impl<S: StateView> ModuleCodeBuilder for ValidationState<S> {
 }
 
 struct VMValidator {
-    db_reader: Arc<dyn DbReader>,
+    db_reader: std::sync::Arc<dyn DbReader>,
     state: ValidationState<CachedDbStateView>,
 }
 
@@ -241,7 +242,7 @@ impl Clone for VMValidator {
 }
 
 impl VMValidator {
-    fn new(db_reader: Arc<dyn DbReader>) -> Self {
+    fn new(db_reader: std::sync::Arc<dyn DbReader>) -> Self {
         let db_state_view = db_reader
             .latest_state_checkpoint_view()
             .expect("Get db view cannot fail");
@@ -293,19 +294,21 @@ pub fn get_account_sequence_number(
 // TODO(loader_v2): Re-implement because VM is thread-safe now.
 #[derive(Clone)]
 pub struct PooledVMValidator {
-    vm_validators: Vec<Arc<Mutex<VMValidator>>>,
+    vm_validators: Vec<std::sync::Arc<Mutex<VMValidator>>>,
 }
 
 impl PooledVMValidator {
-    pub fn new(db_reader: Arc<dyn DbReader>, pool_size: usize) -> Self {
+    pub fn new(db_reader: std::sync::Arc<dyn DbReader>, pool_size: usize) -> Self {
         let mut vm_validators = Vec::new();
         for _ in 0..pool_size {
-            vm_validators.push(Arc::new(Mutex::new(VMValidator::new(db_reader.clone()))));
+            vm_validators.push(std::sync::Arc::new(Mutex::new(VMValidator::new(
+                db_reader.clone(),
+            ))));
         }
         PooledVMValidator { vm_validators }
     }
 
-    fn get_next_vm(&self) -> Arc<Mutex<VMValidator>> {
+    fn get_next_vm(&self) -> std::sync::Arc<Mutex<VMValidator>> {
         let mut rng = thread_rng(); // Create a thread-local random number generator
         let random_index = rng.gen_range(0, self.vm_validators.len()); // Generate random index
         self.vm_validators[random_index].clone() // Return the VM at the random index

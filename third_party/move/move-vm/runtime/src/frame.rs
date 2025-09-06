@@ -34,7 +34,8 @@ use move_vm_types::{
     },
     values::Locals,
 };
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, rc::Rc};
+use triomphe::Arc;
 
 /// Represents the execution context for a function. When calls are made, frames are
 /// pushed and then popped to/from the call stack.

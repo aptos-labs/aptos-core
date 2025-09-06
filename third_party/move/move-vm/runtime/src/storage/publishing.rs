@@ -23,10 +23,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{code::ModuleBytesStorage, module_linker_error, sha3_256};
-use std::{
-    collections::{btree_map, BTreeMap},
-    sync::Arc,
-};
+use std::collections::{btree_map, BTreeMap};
+use triomphe::Arc;
 
 /// Represents a verified module bundle that can be extracted from [StagingModuleStorage].
 pub struct VerifiedModuleBundle<K: Ord, V: Clone> {
