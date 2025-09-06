@@ -37,6 +37,7 @@ pub mod code;
 pub mod delayed_values;
 pub mod gas;
 pub mod loaded_data;
+pub mod module_traversal;
 pub mod natives;
 pub mod resolver;
 pub mod value_serde;

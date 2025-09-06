@@ -12825,6 +12825,7 @@ dependencies = [
  "smallbitvec",
  "smallvec",
  "triomphe",
+ "typed-arena",
 ]
 
 [[package]]
