@@ -3,12 +3,20 @@
 
 use crate::state_store::state_view::hot_state_view::HotStateView;
 use aptos_experimental_layered_map::LayeredMap;
+use aptos_logger::prelude::*;
 use aptos_types::state_store::{
-    hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
+    hot_state::{THotStateSlot, HOT_STATE_MAX_ITEMS_PER_SHARD},
+    state_key::StateKey,
+    state_slot::StateSlot,
 };
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
+/// NOTE: this always operates on a single shard.
 pub(crate) struct HotStateLRU<'a> {
+    shard_id: usize,
     /// The entire committed hot state. While this may contain all the shards, this struct is
     /// supposed to handle a single shard.
     committed: Arc<dyn HotStateView>,
@@ -26,6 +34,7 @@ pub(crate) struct HotStateLRU<'a> {
 
 impl<'a> HotStateLRU<'a> {
     pub fn new(
+        shard_id: usize,
         committed: Arc<dyn HotStateView>,
         overlay: &'a LayeredMap<StateKey, StateSlot>,
         head: Option<StateKey>,
@@ -33,6 +42,7 @@ impl<'a> HotStateLRU<'a> {
         num_items: usize,
     ) -> Self {
         Self {
+            shard_id,
             committed,
             overlay,
             pending: HashMap::new(),
@@ -49,6 +59,7 @@ impl<'a> HotStateLRU<'a> {
         );
         self.delete(&key);
         self.insert_as_head(key, slot);
+        self.maybe_evict();
     }
 
     fn insert_as_head(&mut self, key: StateKey, mut slot: StateSlot) {
@@ -71,12 +82,17 @@ impl<'a> HotStateLRU<'a> {
             },
         }
 
+        info!("self.num_items: {} (before)", self.num_items);
         self.num_items += 1;
     }
 
-    pub fn evict(&mut self, key: &StateKey) {
-        if let Some(slot) = self.delete(key) {
-            self.pending.insert(key.clone(), slot.to_cold());
+    fn maybe_evict(&mut self) {
+        let mut current = self.tail.clone().unwrap();
+        while self.num_items > HOT_STATE_MAX_ITEMS_PER_SHARD {
+            let slot = self.delete(&current).unwrap();
+            let older = slot.prev().cloned().unwrap();
+            self.pending.insert(current, slot.to_cold());
+            current = older;
         }
     }
 
@@ -86,6 +102,7 @@ impl<'a> HotStateLRU<'a> {
             Some(slot) if slot.is_hot() => slot,
             _ => return None,
         };
+        info!("shard_id: {}, old_slot: {:?}", self.shard_id, old_slot);
 
         match old_slot.prev() {
             Some(prev_key) => {
@@ -111,11 +128,12 @@ impl<'a> HotStateLRU<'a> {
             },
         }
 
+        info!("self.num_items: {} (before)", self.num_items);
         self.num_items -= 1;
         Some(old_slot)
     }
 
-    fn get_slot(&self, key: &StateKey) -> Option<StateSlot> {
+    pub(crate) fn get_slot(&self, key: &StateKey) -> Option<StateSlot> {
         if let Some(slot) = self.pending.get(key) {
             return Some(slot.clone());
         }
@@ -141,7 +159,12 @@ impl<'a> HotStateLRU<'a> {
         Option<StateKey>,
         usize,
     ) {
-        (self.pending, self.head, self.tail, self.num_items)
+        (
+            self.pending.into_iter().collect(),
+            self.head,
+            self.tail,
+            self.num_items,
+        )
     }
 
     #[cfg(test)]
