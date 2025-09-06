@@ -5,15 +5,14 @@ use crate::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
     transaction::{
-        BlockEndInfo, BlockExecutableTransaction, FeeDistribution, SignedTransaction,
-        TBlockEndInfoExt, Transaction,
+        BlockEndInfo, BlockExecutableTransaction, FeeDistribution, SignedTransaction, Transaction,
     },
     write_set::WriteOp,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{collections::BTreeMap, fmt::Debug};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum SignatureVerifiedTransaction {
@@ -119,7 +118,7 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
 
     fn block_epilogue_v1(
         block_id: HashValue,
-        block_end_info: TBlockEndInfoExt<Self::Key>,
+        block_end_info: BlockEndInfo,
         fee_distribution: FeeDistribution,
     ) -> Self {
         Transaction::block_epilogue_v1(block_id, block_end_info, fee_distribution).into()

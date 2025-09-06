@@ -12,6 +12,7 @@ use crate::{
     keyless::{KeylessPublicKey, KeylessSignature},
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
+    state_store::state_slot::StateSlot,
     transaction::authenticator::{
         AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
         TransactionAuthenticator,
@@ -54,9 +55,7 @@ pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
 
-pub use self::block_epilogue::{
-    BlockEndInfo, BlockEndInfoExt, BlockEpiloguePayload, FeeDistribution, TBlockEndInfoExt,
-};
+pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload, FeeDistribution};
 use crate::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::TransactionEvent,
@@ -1851,10 +1850,6 @@ impl TransactionOutput {
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
         self.write_set.state_update_refs()
     }
-
-    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
-        self.write_set.add_hotness(hotness);
-    }
 }
 
 /// `TransactionInfo` is the object we store in the transaction accumulator. It consists of the
@@ -2901,7 +2896,7 @@ impl Transaction {
 
     pub fn block_epilogue_v1(
         block_id: HashValue,
-        block_end_info: BlockEndInfoExt,
+        block_end_info: BlockEndInfo,
         fee_distribution: FeeDistribution,
     ) -> Self {
         Self::BlockEpilogue(BlockEpiloguePayload::V1 {
@@ -3029,7 +3024,7 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
 
     fn block_epilogue_v1(
         _block_id: HashValue,
-        _block_end_info: TBlockEndInfoExt<Self::Key>,
+        _block_end_info: BlockEndInfo,
         _fee_distribution: FeeDistribution,
     ) -> Self {
         unimplemented!()
