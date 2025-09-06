@@ -405,7 +405,7 @@ where
                 name,
                 ty_args,
             } => (module_id, name, ty_args),
-            FrameName::Script => unreachable!(),
+            FrameName::Script | FrameName::TransactionBatch => unreachable!(),
         };
 
         // The following line of code is needed for correctness.
@@ -750,6 +750,10 @@ where
         });
         storage.assert_consistency();
 
-        TransactionGasLog { exec_io, storage }
+        TransactionGasLog {
+            exec_io,
+            storage,
+            multi_txn: false,
+        }
     }
 }
