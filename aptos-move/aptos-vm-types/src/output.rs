@@ -9,6 +9,7 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::AggregatorV1Resolver,
 };
+use aptos_logger::info;
 use aptos_types::{
     contract_event::ContractEvent,
     error::{code_invariant_error, PanicError},
@@ -22,7 +23,7 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -32,6 +33,7 @@ use std::collections::BTreeMap;
 pub struct VMOutput {
     change_set: VMChangeSet,
     module_write_set: ModuleWriteSet,
+    read_set: BTreeSet<StateKey>,
     fee_statement: FeeStatement,
     status: TransactionStatus,
 }
@@ -46,6 +48,7 @@ impl VMOutput {
         Self {
             change_set,
             module_write_set,
+            read_set: BTreeSet::new(),
             fee_statement,
             status,
         }
@@ -55,6 +58,7 @@ impl VMOutput {
         Self {
             change_set: VMChangeSet::empty(),
             module_write_set: ModuleWriteSet::empty(),
+            read_set: BTreeSet::new(),
             fee_statement: FeeStatement::zero(),
             status,
         }
@@ -84,6 +88,10 @@ impl VMOutput {
 
     pub fn events(&self) -> &[(ContractEvent, Option<MoveTypeLayout>)] {
         self.change_set.events()
+    }
+
+    pub fn set_read_set(&mut self, read_keys: BTreeSet<StateKey>) {
+        self.read_set = read_keys;
     }
 
     pub fn gas_used(&self) -> u64 {
@@ -171,10 +179,21 @@ impl VMOutput {
             module_write_set,
             fee_statement,
             status,
+            read_set,
         } = self;
-        let (write_set, events) = change_set
+        let (mut write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
             .into_inner();
+        let read_only: BTreeSet<_> = read_set
+            .into_iter()
+            .filter(|key| !write_set.has_value_write(key))
+            .collect();
+        let mut printed = String::new();
+        for key in &read_only {
+            printed.push_str(&format!("\t{:?}\n", key));
+        }
+        info!("read only keys: {}\n{}", read_only.len(), printed);
+        write_set.add_read_only_keys(read_only);
         Ok(TransactionOutput::new(
             write_set,
             events,
