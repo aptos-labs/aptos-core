@@ -6,6 +6,7 @@ use crate::{
     account_managers::ACCOUNT_MANAGERS,
     cached_resources::CachedResources,
     error::PepperServiceError,
+    jwk::JWKCache,
 };
 use aptos_crypto::{
     asymmetric_encryption::{
@@ -58,9 +59,6 @@ pub mod vuf_pub_key;
 #[cfg(test)]
 mod tests;
 
-pub type Issuer = String;
-pub type KeyID = String;
-
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/637'/0'/0'/0'";
 
 #[async_trait]
@@ -74,6 +72,7 @@ pub trait HandlerTrait<TRequest, TResponse>: Send + Sync {
     async fn handle(
         &self,
         vuf_private_key: &ark_bls12_381::Fr,
+        jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: TRequest,
     ) -> Result<TResponse, PepperServiceError>;
@@ -86,6 +85,7 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
     async fn handle(
         &self,
         vuf_private_key: &ark_bls12_381::Fr,
+        jwk_cache: JWKCache,
         _cached_resources: CachedResources,
         request: PepperRequest,
     ) -> Result<PepperResponse, PepperServiceError> {
@@ -101,6 +101,7 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
 
         let (_pepper_base, pepper, address) = process_common(
             vuf_private_key,
+            jwk_cache,
             &session_id,
             jwt,
             epk,
@@ -128,6 +129,7 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
     async fn handle(
         &self,
         vuf_private_key: &ark_bls12_381::Fr,
+        jwk_cache: JWKCache,
         _cached_resources: CachedResources,
         request: PepperRequest,
     ) -> Result<SignatureResponse, PepperServiceError> {
@@ -143,6 +145,7 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
 
         let (pepper_base, _pepper, _address) = process_common(
             vuf_private_key,
+            jwk_cache,
             &session_id,
             jwt,
             epk,
@@ -176,6 +179,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
     async fn handle(
         &self,
         _: &ark_bls12_381::Fr,
+        jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: VerifyRequest,
     ) -> Result<VerifyResponse, PepperServiceError> {
@@ -211,7 +215,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
             let jwt_header = signature.parse_jwt_header().map_err(|e| {
                 PepperServiceError::BadRequest(format!("JWT header decoding error: {e}"))
             })?;
-            let jwk = jwk::cached_decoding_key_as_rsa(iss_val, &jwt_header.kid)
+            let jwk = jwk::get_cached_jwk_as_rsa(iss_val, &jwt_header.kid, jwk_cache)
                 .map_err(|e| PepperServiceError::BadRequest(format!("JWK not found: {e}")))?;
             let config_api_repr = cached_resources
                 .read_on_chain_keyless_configuration()
@@ -333,6 +337,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
 
 async fn process_common(
     vuf_private_key: &ark_bls12_381::Fr,
+    jwk_cache: JWKCache,
     session_id: &Uuid,
     jwt: String,
     epk: EphemeralPublicKey,
@@ -429,7 +434,7 @@ async fn process_common(
         .kid
         .ok_or_else(|| PepperServiceError::BadRequest("missing kid in JWT".to_string()))?;
 
-    let cached_key = jwk::cached_decoding_key_as_rsa(&claims.claims.iss, &key_id);
+    let cached_key = jwk::get_cached_jwk_as_rsa(&claims.claims.iss, &key_id, jwk_cache);
 
     let jwk = match cached_key {
         Ok(key) => key,

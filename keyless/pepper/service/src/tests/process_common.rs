@@ -3,6 +3,7 @@
 
 use crate::{error::PepperServiceError, process_common, tests::utils};
 use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_infallible::Mutex;
 use aptos_types::{
     keyless::{
         circuit_testcases::{
@@ -13,9 +14,8 @@ use aptos_types::{
     },
     transaction::authenticator::EphemeralPublicKey,
 };
-use std::ops::Deref;
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 use uuid::Uuid;
-
 // TODO: clean this up and add missing tests!
 
 #[tokio::test]
@@ -24,6 +24,7 @@ async fn process_common_should_fail_if_max_exp_data_secs_overflowed() {
     let sk = get_sample_esk();
     let pk = Ed25519PublicKey::from(&sk);
 
+    let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
     let jwt_payload = sample_jwt_payload_json_overrides(
         SAMPLE_TEST_ISS_VALUE,
         SAMPLE_UID_VAL,
@@ -39,6 +40,7 @@ async fn process_common_should_fail_if_max_exp_data_secs_overflowed() {
 
     let process_result = process_common(
         vuf_private_key,
+        jwk_cache,
         &session_id,
         jwt,
         EphemeralPublicKey::ed25519(pk),

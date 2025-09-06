@@ -4,13 +4,16 @@
 use crate::{
     cached_resources::CachedResources,
     groth16_vk::OnChainGroth16VerificationKey,
+    jwk::JWKCache,
     keyless_config::OnChainKeylessConfiguration,
     request_handler::{
         handle_request, ABOUT_PATH, DEFAULT_PEPPER_SERVICE_PORT, FETCH_PATH, GROTH16_VK_PATH,
-        KEYLESS_CONFIG_PATH, SIGNATURE_PATH, VERIFY_PATH, VUF_PUB_KEY_PATH,
+        JWK_PATH, KEYLESS_CONFIG_PATH, SIGNATURE_PATH, VERIFY_PATH, VUF_PUB_KEY_PATH,
     },
     tests::utils,
 };
+use aptos_infallible::Mutex;
+use aptos_types::jwks::rsa::SECURE_TEST_RSA_JWK;
 use hyper::{
     header::{
         ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN,
@@ -18,12 +21,13 @@ use hyper::{
     Body, Method, Request, Response, StatusCode,
 };
 use reqwest::header::ACCESS_CONTROL_ALLOW_CREDENTIALS;
-use std::{ops::Deref, sync::Arc};
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 #[tokio::test]
 async fn test_options_request() {
     // Send an options request to the root path
-    let response = send_request_to_path(Method::OPTIONS, "/", Body::empty(), None, None).await;
+    let response =
+        send_request_to_path(Method::OPTIONS, "/", Body::empty(), None, None, None).await;
 
     // Assert that the response status is OK
     assert_eq!(response.status(), StatusCode::OK);
@@ -45,7 +49,8 @@ async fn test_options_request() {
 #[tokio::test]
 async fn test_get_about_request() {
     // Send a GET request to the about endpoint
-    let response = send_request_to_path(Method::GET, ABOUT_PATH, Body::empty(), None, None).await;
+    let response =
+        send_request_to_path(Method::GET, ABOUT_PATH, Body::empty(), None, None, None).await;
 
     // Assert that the response status is OK
     assert_eq!(response.status(), StatusCode::OK);
@@ -62,71 +67,6 @@ async fn test_get_about_request() {
 }
 
 #[tokio::test]
-async fn test_get_keyless_config_request() {
-    // Create a cached resources object with no cached resources
-    let cached_resources = CachedResources::default();
-
-    // Send a GET request to the keyless config endpoint
-    let response = send_request_to_path(
-        Method::GET,
-        KEYLESS_CONFIG_PATH,
-        Body::empty(),
-        None,
-        Some(cached_resources.clone()),
-    )
-    .await;
-
-    // Assert that the response is a 404 (the resource has not been cached yet)
-    assert_eq!(response.status(), StatusCode::NOT_FOUND);
-
-    // Update the keyless config cached resource
-    let mut on_chain_keyless_configuration = OnChainKeylessConfiguration::default();
-    cached_resources.set_on_chain_keyless_configuration(on_chain_keyless_configuration.clone());
-
-    // Send a GET request to the keyless config endpoint
-    let response = send_request_to_path(
-        Method::GET,
-        KEYLESS_CONFIG_PATH,
-        Body::empty(),
-        None,
-        Some(cached_resources.clone()),
-    )
-    .await;
-
-    // Assert that the response is a 200 (the resource has been cached)
-    assert_eq!(response.status(), StatusCode::OK);
-
-    // Verify the keyless config from the response body JSON
-    let body_string = get_response_body_string(response).await;
-    let response_keyless_config: OnChainKeylessConfiguration =
-        serde_json::from_str(&body_string).unwrap();
-    assert_eq!(response_keyless_config, on_chain_keyless_configuration);
-
-    // Update the keyless config cached resource with a new config
-    on_chain_keyless_configuration.data.max_exp_horizon_secs = "Some new value".into();
-    cached_resources.set_on_chain_keyless_configuration(on_chain_keyless_configuration.clone());
-
-    // Send a GET request to the keyless config endpoint
-    let response = send_request_to_path(
-        Method::GET,
-        KEYLESS_CONFIG_PATH,
-        Body::empty(),
-        None,
-        Some(cached_resources.clone()),
-    )
-    .await;
-
-    // Assert that the response is a 200 (the new resource has been cached)
-    assert_eq!(response.status(), StatusCode::OK);
-
-    // Verify the new keyless config from the response body
-    let body_string = get_response_body_string(response).await;
-    let response_keyless_config: OnChainKeylessConfiguration =
-        serde_json::from_str(&body_string).unwrap();
-    assert_eq!(response_keyless_config, on_chain_keyless_configuration);
-}
-
-#[tokio::test]
 async fn test_get_groth16_vk_request() {
     // Create a cached resources object with no cached resources
     let cached_resources = CachedResources::default();
@@ -136,6 +76,7 @@ async fn test_get_groth16_vk_request() {
         Method::GET,
         GROTH16_VK_PATH,
         Body::empty(),
+        None,
         None,
         Some(cached_resources.clone()),
     )
@@ -153,6 +94,7 @@ async fn test_get_groth16_vk_request() {
         Method::GET,
         GROTH16_VK_PATH,
         Body::empty(),
+        None,
         None,
         Some(cached_resources.clone()),
     )
@@ -177,6 +119,7 @@ async fn test_get_groth16_vk_request() {
         GROTH16_VK_PATH,
         Body::empty(),
         None,
+        None,
         Some(cached_resources.clone()),
     )
     .await;
@@ -192,6 +135,147 @@ async fn test_get_groth16_vk_request() {
 }
 
 #[tokio::test]
+async fn test_get_jwk_request() {
+    // Create a JWK cache
+    let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
+
+    // Send a GET request to the JWK endpoint
+    let response = send_request_to_path(
+        Method::GET,
+        JWK_PATH,
+        Body::empty(),
+        None,
+        Some(jwk_cache.clone()),
+        None,
+    )
+    .await;
+
+    // Assert that the response status is OK
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Parse the response body string and verify that it is an empty JSON map
+    let body_string = get_response_body_string(response).await;
+    let json_value: serde_json::Value = serde_json::from_str(&body_string).unwrap();
+    let json_map = json_value.as_object().unwrap();
+    assert!(json_map.is_empty());
+
+    // Insert several test JWKs into the cache
+    for i in 0..3 {
+        // Create the test issuer and key ID
+        let test_issuer = format!("test.issuer.{}", i);
+        let test_key_id = format!("test.key.id.{}", i);
+
+        // Insert the test JWK into the cache
+        let mut jwk_cache = jwk_cache.lock();
+        let issuer_entry = jwk_cache.entry(test_issuer.clone()).or_default();
+        issuer_entry.insert(
+            test_key_id.clone(),
+            Arc::new(SECURE_TEST_RSA_JWK.deref().clone()),
+        );
+    }
+
+    // Send a GET request to the JWK endpoint
+    let response = send_request_to_path(
+        Method::GET,
+        JWK_PATH,
+        Body::empty(),
+        None,
+        Some(jwk_cache.clone()),
+        None,
+    )
+    .await;
+
+    // Assert that the response status is OK
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Parse the response body as a JSON map, and verify the number of entries
+    let body_string = get_response_body_string(response).await;
+    let json_value: serde_json::Value = serde_json::from_str(&body_string).unwrap();
+    let json_map = json_value.as_object().unwrap();
+    assert_eq!(json_map.len(), 3);
+
+    // Verify that the map contains the expected JWKs
+    for i in 0..3 {
+        // Create the test issuer and key ID
+        let test_issuer = format!("test.issuer.{}", i);
+        let test_key_id = format!("test.key.id.{}", i);
+
+        // Verify that the map contains the issuer and key ID
+        let issuer_entry = json_map.get(&test_issuer).unwrap().as_object().unwrap();
+        assert_eq!(issuer_entry.len(), 1);
+        assert!(issuer_entry.contains_key(&test_key_id));
+    }
+}
+
+#[tokio::test]
+async fn test_get_keyless_config_request() {
+    // Create a cached resources object with no cached resources
+    let cached_resources = CachedResources::default();
+
+    // Send a GET request to the keyless config endpoint
+    let response = send_request_to_path(
+        Method::GET,
+        KEYLESS_CONFIG_PATH,
+        Body::empty(),
+        None,
+        None,
+        Some(cached_resources.clone()),
+    )
+    .await;
+
+    // Assert that the response is a 404 (the resource has not been cached yet)
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+    // Update the keyless config cached resource
+    let mut on_chain_keyless_configuration = OnChainKeylessConfiguration::default();
+    cached_resources.set_on_chain_keyless_configuration(on_chain_keyless_configuration.clone());
+
+    // Send a GET request to the keyless config endpoint
+    let response = send_request_to_path(
+        Method::GET,
+        KEYLESS_CONFIG_PATH,
+        Body::empty(),
+        None,
+        None,
+        Some(cached_resources.clone()),
+    )
+    .await;
+
+    // Assert that the response is a 200 (the resource has been cached)
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Verify the keyless config from the response body JSON
+    let body_string = get_response_body_string(response).await;
+    let response_keyless_config: OnChainKeylessConfiguration =
+        serde_json::from_str(&body_string).unwrap();
+    assert_eq!(response_keyless_config, on_chain_keyless_configuration);
+
+    // Update the keyless config cached resource with a new config
+    on_chain_keyless_configuration.data.max_exp_horizon_secs = "Some new value".into();
+    cached_resources.set_on_chain_keyless_configuration(on_chain_keyless_configuration.clone());
+
+    // Send a GET request to the keyless config endpoint
+    let response = send_request_to_path(
+        Method::GET,
+        KEYLESS_CONFIG_PATH,
+        Body::empty(),
+        None,
+        None,
+        Some(cached_resources.clone()),
+    )
+    .await;
+
+    // Assert that the response is a 200 (the new resource has been cached)
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Verify the new keyless config from the response body
+    let body_string = get_response_body_string(response).await;
+    let response_keyless_config: OnChainKeylessConfiguration =
+        serde_json::from_str(&body_string).unwrap();
+    assert_eq!(response_keyless_config, on_chain_keyless_configuration);
+}
+
+#[tokio::test]
 async fn test_get_vuf_pub_key_request() {
     // Generate a test VUF public private keypair
     let vuf_keypair = utils::create_vuf_public_private_keypair();
@@ -202,6 +286,7 @@ async fn test_get_vuf_pub_key_request() {
         VUF_PUB_KEY_PATH,
         Body::empty(),
         Some(vuf_keypair.clone()),
+        None,
         None,
     )
     .await;
@@ -224,16 +309,25 @@ async fn test_get_vuf_pub_key_request() {
 #[tokio::test]
 async fn test_get_invalid_path_or_method_request() {
     // Send a GET request to an unknown endpoint and verify that it returns 404
-    let response =
-        send_request_to_path(Method::GET, "/invalid_path", Body::empty(), None, None).await;
+    let response = send_request_to_path(
+        Method::GET,
+        "/invalid_path",
+        Body::empty(),
+        None,
+        None,
+        None,
+    )
+    .await;
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
     // Send a GET request to an endpoint that only supports POST requests, and verify that it returns 405
-    let response = send_request_to_path(Method::GET, VERIFY_PATH, Body::empty(), None, None).await;
+    let response =
+        send_request_to_path(Method::GET, VERIFY_PATH, Body::empty(), None, None, None).await;
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
 
     // Send a POST request to an endpoint that only supports GET requests, and verify that it returns 405
-    let response = send_request_to_path(Method::POST, ABOUT_PATH, Body::empty(), None, None).await;
+    let response =
+        send_request_to_path(Method::POST, ABOUT_PATH, Body::empty(), None, None, None).await;
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
 }
 
@@ -241,7 +335,8 @@ async fn test_get_invalid_path_or_method_request() {
 #[tokio::test]
 async fn test_post_fetch_request_bad_request() {
     // Send a POST request to the fetch endpoint
-    let response = send_request_to_path(Method::POST, FETCH_PATH, Body::empty(), None, None).await;
+    let response =
+        send_request_to_path(Method::POST, FETCH_PATH, Body::empty(), None, None, None).await;
 
     // Assert that the response is a 400 (bad request, since no body was provided)
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -251,8 +346,15 @@ async fn test_post_fetch_request_bad_request() {
 #[tokio::test]
 async fn test_post_signature_request_bad_request() {
     // Send a POST request to the signature endpoint
-    let response =
-        send_request_to_path(Method::POST, SIGNATURE_PATH, Body::empty(), None, None).await;
+    let response = send_request_to_path(
+        Method::POST,
+        SIGNATURE_PATH,
+        Body::empty(),
+        None,
+        None,
+        None,
+    )
+    .await;
 
     // Assert that the response is a 400 (bad request, since no body was provided)
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -262,7 +364,8 @@ async fn test_post_signature_request_bad_request() {
 #[tokio::test]
 async fn test_post_verify_request_bad_request() {
     // Send a POST request to the verify endpoint
-    let response = send_request_to_path(Method::POST, VERIFY_PATH, Body::empty(), None, None).await;
+    let response =
+        send_request_to_path(Method::POST, VERIFY_PATH, Body::empty(), None, None, None).await;
 
     // Assert that the response is a 400 (bad request, since no body was provided)
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -288,6 +391,7 @@ async fn send_request_to_path(
     endpoint: &str,
     body: Body,
     vuf_keypair: Option<Arc<(String, ark_bls12_381::Fr)>>,
+    jwk_cache: Option<JWKCache>,
     cached_resources: Option<CachedResources>,
 ) -> Response<Body> {
     // Build the URI
@@ -306,11 +410,14 @@ async fn send_request_to_path(
     // Get or create a VUF public private keypair
     let vuf_keypair = vuf_keypair.unwrap_or_else(utils::create_vuf_public_private_keypair);
 
+    // Get or create a JWK cache
+    let jwk_cache = jwk_cache.unwrap_or_else(|| Arc::new(Mutex::new(HashMap::new())));
+
     // Get or create cached resources
     let cached_resources = cached_resources.unwrap_or_default();
 
     // Serve the request
-    handle_request(request, vuf_keypair, cached_resources)
+    handle_request(request, vuf_keypair, jwk_cache, cached_resources)
         .await
         .unwrap()
 }
