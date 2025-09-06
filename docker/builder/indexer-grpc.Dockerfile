@@ -8,6 +8,7 @@ COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-data-service /
 COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-file-checker /usr/local/bin/aptos-indexer-grpc-file-checker
 COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-data-service-v2 /usr/local/bin/aptos-indexer-grpc-data-service-v2
 COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-manager /usr/local/bin/aptos-indexer-grpc-manager
+COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-gateway /usr/local/bin/aptos-indexer-grpc-gateway
 
 # The health check port
 EXPOSE 8080
