@@ -942,6 +942,34 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
+    /// Continues shutdown process. Can only be called when module status is ShutdownInProgress.
+    ScheduledTxnsContinueShutdown {
+        cancel_batch_size: u64,
+    },
+
+    /// Can be called only by the framework
+    ScheduledTxnsInitialize {},
+
+    /// Re-initialize the module after the shutdown is complete
+    /// We need a governance proposal to re-initialize the module.
+    ScheduledTxnsReInitialize {},
+
+    /// Change the expiry delta for scheduled transactions; can be called only by the framework
+    ScheduledTxnsSetExpiryDelta {
+        new_expiry_delta: u64,
+    },
+
+    /// Starts the shutdown process. Can only be called when module status is Active.
+    /// We need a governance proposal to shutdown the module. Possible reasons to shutdown are:
+    ///      (a) the stakeholders decide the feature is no longer needed
+    ///      (b) there is an invariant violation detected, and the only way out is to shutdown and cancel all txns
+    ScheduledTxnsStartShutdown {},
+
+    /// Unpause the scheduled transactions module.
+    /// This can be called by a governace proposal. It is advised that this be called only after ensuring that the
+    /// system invariants won't be violated again.
+    ScheduledTxnsUnpauseScheduledTxns {},
+
     /// Add `amount` of coins from the `account` owning the StakePool.
     StakeAddStake {
         amount: u64,
@@ -1789,6 +1817,16 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             ),
+            ScheduledTxnsContinueShutdown { cancel_batch_size } => {
+                scheduled_txns_continue_shutdown(cancel_batch_size)
+            },
+            ScheduledTxnsInitialize {} => scheduled_txns_initialize(),
+            ScheduledTxnsReInitialize {} => scheduled_txns_re_initialize(),
+            ScheduledTxnsSetExpiryDelta { new_expiry_delta } => {
+                scheduled_txns_set_expiry_delta(new_expiry_delta)
+            },
+            ScheduledTxnsStartShutdown {} => scheduled_txns_start_shutdown(),
+            ScheduledTxnsUnpauseScheduledTxns {} => scheduled_txns_unpause_scheduled_txns(),
             StakeAddStake { amount } => stake_add_stake(amount),
             StakeIncreaseLockup {} => stake_increase_lockup(),
             StakeInitializeStakeOwner {
@@ -4454,6 +4492,108 @@ pub fn resource_account_create_resource_account_and_publish_package(
     ))
 }
 
+/// Continues shutdown process. Can only be called when module status is ShutdownInProgress.
+pub fn scheduled_txns_continue_shutdown(cancel_batch_size: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("scheduled_txns").to_owned(),
+        ),
+        ident_str!("continue_shutdown").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&cancel_batch_size).unwrap()],
+    ))
+}
+
+/// Can be called only by the framework
+pub fn scheduled_txns_initialize() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("scheduled_txns").to_owned(),
+        ),
+        ident_str!("initialize").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Re-initialize the module after the shutdown is complete
+/// We need a governance proposal to re-initialize the module.
+pub fn scheduled_txns_re_initialize() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("scheduled_txns").to_owned(),
+        ),
+        ident_str!("re_initialize").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Change the expiry delta for scheduled transactions; can be called only by the framework
+pub fn scheduled_txns_set_expiry_delta(new_expiry_delta: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("scheduled_txns").to_owned(),
+        ),
+        ident_str!("set_expiry_delta").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_expiry_delta).unwrap()],
+    ))
+}
+
+/// Starts the shutdown process. Can only be called when module status is Active.
+/// We need a governance proposal to shutdown the module. Possible reasons to shutdown are:
+///      (a) the stakeholders decide the feature is no longer needed
+///      (b) there is an invariant violation detected, and the only way out is to shutdown and cancel all txns
+pub fn scheduled_txns_start_shutdown() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("scheduled_txns").to_owned(),
+        ),
+        ident_str!("start_shutdown").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Unpause the scheduled transactions module.
+/// This can be called by a governace proposal. It is advised that this be called only after ensuring that the
+/// system invariants won't be violated again.
+pub fn scheduled_txns_unpause_scheduled_txns() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("scheduled_txns").to_owned(),
+        ),
+        ident_str!("unpause_scheduled_txns").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 /// Add `amount` of coins from the `account` owning the StakePool.
 pub fn stake_add_stake(amount: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -6892,6 +7032,66 @@ mod decoder {
         }
     }
 
+    pub fn scheduled_txns_continue_shutdown(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ScheduledTxnsContinueShutdown {
+                cancel_batch_size: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn scheduled_txns_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::ScheduledTxnsInitialize {})
+        } else {
+            None
+        }
+    }
+
+    pub fn scheduled_txns_re_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::ScheduledTxnsReInitialize {})
+        } else {
+            None
+        }
+    }
+
+    pub fn scheduled_txns_set_expiry_delta(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ScheduledTxnsSetExpiryDelta {
+                new_expiry_delta: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn scheduled_txns_start_shutdown(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::ScheduledTxnsStartShutdown {})
+        } else {
+            None
+        }
+    }
+
+    pub fn scheduled_txns_unpause_scheduled_txns(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::ScheduledTxnsUnpauseScheduledTxns {})
+        } else {
+            None
+        }
+    }
+
     pub fn stake_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeAddStake {
@@ -7959,6 +8159,30 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "resource_account_create_resource_account_and_publish_package".to_string(),
             Box::new(decoder::resource_account_create_resource_account_and_publish_package),
+        );
+        map.insert(
+            "scheduled_txns_continue_shutdown".to_string(),
+            Box::new(decoder::scheduled_txns_continue_shutdown),
+        );
+        map.insert(
+            "scheduled_txns_initialize".to_string(),
+            Box::new(decoder::scheduled_txns_initialize),
+        );
+        map.insert(
+            "scheduled_txns_re_initialize".to_string(),
+            Box::new(decoder::scheduled_txns_re_initialize),
+        );
+        map.insert(
+            "scheduled_txns_set_expiry_delta".to_string(),
+            Box::new(decoder::scheduled_txns_set_expiry_delta),
+        );
+        map.insert(
+            "scheduled_txns_start_shutdown".to_string(),
+            Box::new(decoder::scheduled_txns_start_shutdown),
+        );
+        map.insert(
+            "scheduled_txns_unpause_scheduled_txns".to_string(),
+            Box::new(decoder::scheduled_txns_unpause_scheduled_txns),
         );
         map.insert(
             "stake_add_stake".to_string(),
