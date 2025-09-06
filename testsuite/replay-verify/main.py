@@ -234,6 +234,8 @@ class WorkerPod:
             f"{self.config.timeout_secs}",
             "--block-cache-size",
             "10737418240",
+            "--config-file",
+            "/usr/local/share/replay_verification_config.json",
         ]
         # TODO(ibalajiarun): bump memory limit to 180GiB for heavy ranges
         if (
