@@ -37,13 +37,15 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
+    contract_event::ContractEvent,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
+    proof::{TransactionAccumulatorRangeProof, TransactionInfoListWithProof},
     transaction::{
         ExecutionStatus, PersistedAuxiliaryInfo, RawTransaction, Script, SignedTransaction,
-        Transaction, TransactionAuxiliaryData, TransactionListWithAuxiliaryInfos,
+        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithAuxiliaryInfos,
         TransactionListWithProof, TransactionListWithProofV2, TransactionOutput,
         TransactionOutputListWithAuxiliaryInfos, TransactionOutputListWithProof,
         TransactionOutputListWithProofV2, TransactionPayload, TransactionStatus,
@@ -56,8 +58,12 @@ use bytes::Bytes;
 use claims::assert_none;
 use dashmap::DashMap;
 use futures::channel::oneshot::Receiver;
-use mockall::predicate::eq;
+use mockall::{
+    predicate::{always, eq},
+    Sequence,
+};
 use rand::{prelude::SliceRandom, rngs::OsRng, Rng};
+use serde::Serialize;
 use std::{collections::HashMap, future::Future, sync::Arc, time::Duration};
 use tokio::time::timeout;
 
@@ -201,12 +207,8 @@ pub fn create_persisted_auxiliary_infos(
     end_version: u64,
     use_request_v2: bool,
 ) -> Vec<PersistedAuxiliaryInfo> {
-    // Calculate the number of auxiliary infos
-    let num_auxiliary_infos = end_version - start_version + 1;
-
-    // Create a list of auxiliary infos
     let mut persisted_auxiliary_infos = vec![];
-    for i in 0..num_auxiliary_infos {
+    for i in start_version..=end_version {
         let persisted_auxiliary_info = if use_request_v2 {
             PersistedAuxiliaryInfo::V1 {
                 transaction_index: i as u32,
@@ -230,9 +232,13 @@ pub fn create_shuffled_vector(first_index: u64, last_index: u64) -> Vec<u64> {
 }
 
 /// Creates and returns a storage service config
-pub fn create_storage_config(enable_transaction_data_v2: bool) -> StorageServiceConfig {
+pub fn create_storage_config(
+    enable_transaction_data_v2: bool,
+    enable_size_and_time_aware_chunking: bool,
+) -> StorageServiceConfig {
     StorageServiceConfig {
         enable_transaction_data_v2,
+        enable_size_and_time_aware_chunking,
         ..Default::default()
     }
 }
@@ -287,30 +293,50 @@ pub fn create_transaction_list_using_sizes(
     include_events: bool,
     use_request_v2: bool,
 ) -> TransactionListWithProofV2 {
-    let end_version = start_version + num_transactions - 1;
     // Generate random bytes of the given size
     let mut rng = rand::thread_rng();
     let random_bytes: Vec<u8> = (0..min_bytes_per_transaction)
         .map(|_| rng.gen::<u8>())
         .collect();
 
-    // Include events if required
-    let events = if include_events { Some(vec![]) } else { None };
-
-    // Create the requested transactions
+    // Create the transaction data
     let mut transactions = vec![];
+    let mut transaction_infos = vec![];
+    let mut events = vec![];
+    let end_version = start_version + num_transactions - 1;
     for sequence_number in start_version..=end_version {
+        // Create a transaction info
+        let transaction_info = TransactionInfo::new(
+            HashValue::zero(),
+            HashValue::zero(),
+            HashValue::zero(),
+            None,
+            0,
+            ExecutionStatus::Success,
+            None,
+        );
+
+        // Save the transaction data
         transactions.push(create_test_transaction(
             sequence_number,
             random_bytes.clone(),
         ));
+        transaction_infos.push(transaction_info);
+        events.push(vec![]);
     }
 
-    // Create a transaction list with an empty proof
-    let mut transaction_list_with_proof = TransactionListWithProof::new_empty();
-    transaction_list_with_proof.first_transaction_version = Some(start_version);
-    transaction_list_with_proof.events = events;
-    transaction_list_with_proof.transactions = transactions;
+    // Create a transaction list with proof
+    let events = if include_events { Some(events) } else { None };
+    let transaction_info_list_with_proof = TransactionInfoListWithProof::new(
+        TransactionAccumulatorRangeProof::new_empty(),
+        transaction_infos,
+    );
+    let transaction_list_with_proof = TransactionListWithProof::new(
+        transactions,
+        events,
+        Some(start_version),
+        transaction_info_list_with_proof,
+    );
 
     // Create the auxiliary infos
     let auxiliary_infos =
@@ -330,20 +356,40 @@ pub fn create_transaction_list_with_proof(
     include_events: bool,
     use_request_v2: bool,
 ) -> TransactionListWithProofV2 {
-    // Include events if required
-    let events = if include_events { Some(vec![]) } else { None };
-
-    // Create the requested transactions
+    // Create the transaction data
     let mut transactions = vec![];
+    let mut transaction_infos = vec![];
+    let mut events = vec![];
     for sequence_number in start_version..=end_version {
+        // Create a transaction info
+        let transaction_info = TransactionInfo::new(
+            HashValue::zero(),
+            HashValue::zero(),
+            HashValue::zero(),
+            None,
+            0,
+            ExecutionStatus::Success,
+            None,
+        );
+
+        // Save the transaction data
         transactions.push(create_test_transaction(sequence_number, vec![]));
+        transaction_infos.push(transaction_info);
+        events.push(vec![]);
     }
 
-    // Create a transaction list with an empty proof
-    let mut transaction_list_with_proof = TransactionListWithProof::new_empty();
-    transaction_list_with_proof.first_transaction_version = Some(start_version);
-    transaction_list_with_proof.events = events;
-    transaction_list_with_proof.transactions = transactions;
+    // Create a transaction list with proof
+    let events = if include_events { Some(events) } else { None };
+    let transaction_info_list_with_proof = TransactionInfoListWithProof::new(
+        TransactionAccumulatorRangeProof::new_empty(),
+        transaction_infos,
+    );
+    let transaction_list_with_proof = TransactionListWithProof::new(
+        transactions,
+        events,
+        Some(start_version),
+        transaction_info_list_with_proof,
+    );
 
     // Create the auxiliary infos
     let auxiliary_infos =
@@ -357,11 +403,20 @@ pub fn create_transaction_list_with_proof(
 
 /// Creates a test transaction output
 fn create_test_transaction_output() -> TransactionOutput {
+    // Create the event list
+    let mut events = vec![];
+    for _ in 0..10 {
+        let event =
+            ContractEvent::new_v2_with_type_tag_str("0x1::dkg::DKGStartEvent", b"dkg_2".to_vec());
+        events.push(event);
+    }
+
+    // Create the transaction output
     TransactionOutput::new(
         WriteSet::default(),
-        vec![],
+        events,
         0,
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
+        TransactionStatus::Keep(ExecutionStatus::Success),
         TransactionAuxiliaryData::default(),
     )
 }
@@ -374,17 +429,56 @@ pub fn configure_network_chunk_limit(
     output_list_with_proof: &TransactionOutputListWithProofV2,
     transaction_list_with_proof: &TransactionListWithProofV2,
     enable_transaction_data_v2: bool,
+    enable_size_and_time_aware_chunking: bool,
 ) -> StorageServiceConfig {
+    // Determine the max network chunk bytes
     let max_network_chunk_bytes = if fallback_to_transactions {
-        let response = TransactionDataWithProofResponse {
-            transaction_data_response_type: TransactionDataResponseType::TransactionData,
-            transaction_list_with_proof: Some(transaction_list_with_proof.clone()),
-            transaction_output_list_with_proof: None,
-        };
-        // Network limit is only big enough for the transaction list
-        bcs::serialized_size(&response).unwrap() as u64 + 1
+        if enable_size_and_time_aware_chunking {
+            let (transaction_list, persisted_auxiliary_infos) =
+                transaction_list_with_proof.clone().into_parts();
+
+            // Calculate the serialized size of each component
+            let mut serialized_size = 0;
+            for transaction in transaction_list.transactions {
+                serialized_size += get_num_serialized_bytes(&transaction) + 1;
+            }
+            for transaction_info in transaction_list.proof.transaction_infos {
+                serialized_size += get_num_serialized_bytes(&transaction_info) + 1;
+            }
+            if let Some(events) = transaction_list.events {
+                for events in events {
+                    serialized_size += get_num_serialized_bytes(&events) + 1;
+                }
+            }
+            for auxiliary_info in persisted_auxiliary_infos {
+                serialized_size += get_num_serialized_bytes(&auxiliary_info) + 1;
+            }
+            serialized_size + 1
+        } else {
+            let response = TransactionDataWithProofResponse {
+                transaction_data_response_type: TransactionDataResponseType::TransactionData,
+                transaction_list_with_proof: Some(transaction_list_with_proof.clone()),
+                transaction_output_list_with_proof: None,
+            };
+            bcs::serialized_size(&response).unwrap() as u64 + 1
+        }
+    } else if enable_size_and_time_aware_chunking {
+        let (output_list, persisted_auxiliary_infos) = output_list_with_proof.clone().into_parts();
+
+        // Calculate the serialized size of each component
+        let mut serialized_size = 0;
+        for (transaction, output) in output_list.transactions_and_outputs {
+            serialized_size += get_num_serialized_bytes(&transaction) + 1;
+            serialized_size += get_num_serialized_bytes(&output) + 1;
+        }
+        for transaction_info in output_list.proof.transaction_infos {
+            serialized_size += get_num_serialized_bytes(&transaction_info) + 1;
+        }
+        for auxiliary_info in persisted_auxiliary_infos {
+            serialized_size += get_num_serialized_bytes(&auxiliary_info) + 1;
+        }
+        serialized_size + 1
     } else {
-        // Network limit is big enough for the output list
         let response = TransactionDataWithProofResponse {
             transaction_data_response_type: TransactionDataResponseType::TransactionOutputData,
             transaction_list_with_proof: None,
@@ -392,12 +486,20 @@ pub fn configure_network_chunk_limit(
         };
         bcs::serialized_size(&response).unwrap() as u64 + 1
     };
+
+    // Create the storage service config
     StorageServiceConfig {
         max_network_chunk_bytes,
         enable_transaction_data_v2,
+        enable_size_and_time_aware_chunking,
         max_network_chunk_bytes_v2: max_network_chunk_bytes, // Use the same limit for v2
         ..Default::default()
     }
+}
+
+/// Serializes the given data and returns the number of serialized bytes
+fn get_num_serialized_bytes<T: ?Sized + Serialize>(data: &T) -> u64 {
+    bcs::serialized_size(data).unwrap() as u64
 }
 
 /// Advances the mock time service by the specified number of milliseconds
@@ -415,12 +517,25 @@ pub fn expect_get_epoch_ending_ledger_infos(
     start_epoch: u64,
     expected_end_epoch: u64,
     epoch_change_proof: EpochChangeProof,
+    use_size_and_time_aware_chunking: bool,
 ) {
+    // If size and time-aware chunking are disabled, expect the legacy implementation
+    if !use_size_and_time_aware_chunking {
+        mock_db
+            .expect_get_epoch_ending_ledger_infos()
+            .times(1)
+            .with(eq(start_epoch), eq(expected_end_epoch))
+            .returning(move |_, _| Ok(epoch_change_proof.clone()));
+        return;
+    }
+
+    // Expect a call to get an epoch ending iterator
+    let epoch_ending_iterator = epoch_change_proof.ledger_info_with_sigs.into_iter().map(Ok);
     mock_db
-        .expect_get_epoch_ending_ledger_infos()
+        .expect_get_epoch_ending_ledger_info_iterator()
         .times(1)
         .with(eq(start_epoch), eq(expected_end_epoch))
-        .returning(move |_, _| Ok(epoch_change_proof.clone()));
+        .returning(move |_, _| Ok(Box::new(epoch_ending_iterator.clone())));
 }
 
 /// Sets an expectation on the given mock db for a call to fetch transaction outputs
@@ -430,13 +545,105 @@ pub fn expect_get_transaction_outputs(
     num_items: u64,
     proof_version: u64,
     output_list: TransactionOutputListWithProofV2,
+    use_size_and_time_aware_chunking: bool,
 ) {
-    // Expect a call to get transaction outputs with proof
+    // If size and time-aware chunking are disabled, expect the legacy implementation
+    if !use_size_and_time_aware_chunking {
+        mock_db
+            .expect_get_transaction_outputs()
+            .times(1)
+            .with(eq(start_version), eq(num_items), eq(proof_version))
+            .returning(move |_, _, _| Ok(output_list.clone()));
+        return;
+    }
+
+    // Expect a call to get a transaction iterator
+    let (output_list_with_proof, persisted_auxiliary_infos) = output_list.into_parts();
+    let mut expectation_sequence = Sequence::new();
+    let transaction_iterator = output_list_with_proof
+        .clone()
+        .transactions_and_outputs
+        .into_iter()
+        .map(|(transaction, _)| Ok(transaction));
     mock_db
-        .expect_get_transaction_outputs()
+        .expect_get_transaction_iterator()
         .times(1)
-        .with(eq(start_version), eq(num_items), eq(proof_version))
-        .returning(move |_, _, _| Ok(output_list.clone()));
+        .with(eq(start_version), eq(num_items))
+        .returning(move |_, _| Ok(Box::new(transaction_iterator.clone())))
+        .in_sequence(&mut expectation_sequence);
+
+    // Expect a call to get a transaction info iterator
+    let transaction_info_iterator = output_list_with_proof
+        .clone()
+        .proof
+        .transaction_infos
+        .into_iter()
+        .map(Ok);
+    mock_db
+        .expect_get_transaction_info_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items))
+        .returning(move |_, _| Ok(Box::new(transaction_info_iterator.clone())))
+        .in_sequence(&mut expectation_sequence);
+
+    // Expect a call to get a write set iterator
+    let write_set_iterator = output_list_with_proof
+        .clone()
+        .transactions_and_outputs
+        .into_iter()
+        .map(|(_, output)| Ok(output.write_set().clone()));
+    mock_db
+        .expect_get_write_set_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items))
+        .returning(move |_, _| Ok(Box::new(write_set_iterator.clone())))
+        .in_sequence(&mut expectation_sequence);
+
+    // Expect a call to get an event iterator
+    let events_iterator = output_list_with_proof
+        .clone()
+        .transactions_and_outputs
+        .into_iter()
+        .map(|(_, output)| Ok(output.events().to_vec()));
+    mock_db
+        .expect_get_events_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items))
+        .returning(move |_, _| Ok(Box::new(events_iterator.clone())))
+        .in_sequence(&mut expectation_sequence);
+
+    // Expect a call to get an auxiliary data iterator
+    let auxiliary_data_iterator = output_list_with_proof
+        .clone()
+        .transactions_and_outputs
+        .into_iter()
+        .map(|(_, output)| Ok(output.auxiliary_data().clone()));
+    mock_db
+        .expect_get_auxiliary_data_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items))
+        .returning(move |_, _| Ok(Box::new(auxiliary_data_iterator.clone())))
+        .in_sequence(&mut expectation_sequence);
+
+    // Expect a call to get a persisted auxiliary info iterator
+    let persisted_auxiliary_info_iterator = persisted_auxiliary_infos.clone().into_iter().map(Ok);
+    mock_db
+        .expect_get_persisted_auxiliary_info_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items as usize))
+        .returning(move |_, _| Ok(Box::new(persisted_auxiliary_info_iterator.clone())))
+        .in_sequence(&mut expectation_sequence);
+
+    // Expect a call to get the transaction accumulator range proof
+    let accumulator_range_proof = output_list_with_proof
+        .proof
+        .ledger_info_to_transaction_infos_proof;
+    mock_db
+        .expect_get_transaction_accumulator_range_proof()
+        .times(1)
+        .with(eq(start_version), always(), eq(proof_version))
+        .returning(move |_, _, _| Ok(accumulator_range_proof.clone()))
+        .in_sequence(&mut expectation_sequence);
 }
 
 /// Sets an expectation on the given mock db for a call to fetch transactions
@@ -447,18 +654,87 @@ pub fn expect_get_transactions(
     proof_version: u64,
     include_events: bool,
     transaction_list: TransactionListWithProofV2,
+    use_size_and_time_aware_chunking: bool,
 ) {
-    // Expect a call to get transactions with proof
+    // If size and time-aware chunking are disabled, expect the legacy implementation
+    if !use_size_and_time_aware_chunking {
+        mock_db
+            .expect_get_transactions()
+            .times(1)
+            .with(
+                eq(start_version),
+                eq(num_items),
+                eq(proof_version),
+                eq(include_events),
+            )
+            .returning(move |_, _, _, _| Ok(transaction_list.clone()));
+        return;
+    }
+
+    // Expect a call to get a transaction iterator
+    let (transaction_list_with_proof, persisted_auxiliary_infos) = transaction_list.into_parts();
+    let mut expectation_sequence = Sequence::new();
+    let transaction_iterator = transaction_list_with_proof
+        .clone()
+        .transactions
+        .into_iter()
+        .map(Ok);
     mock_db
-        .expect_get_transactions()
+        .expect_get_transaction_iterator()
         .times(1)
-        .with(
-            eq(start_version),
-            eq(num_items),
-            eq(proof_version),
-            eq(include_events),
-        )
-        .returning(move |_, _, _, _| Ok(transaction_list.clone()));
+        .with(eq(start_version), eq(num_items))
+        .returning(move |_, _| Ok(Box::new(transaction_iterator.clone())))
+        .in_sequence(&mut expectation_sequence);
+
+    // Expect a call to get a transaction info iterator
+    let transaction_info_iterator = transaction_list_with_proof
+        .clone()
+        .proof
+        .transaction_infos
+        .into_iter()
+        .map(Ok);
+    mock_db
+        .expect_get_transaction_info_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items))
+        .returning(move |_, _| Ok(Box::new(transaction_info_iterator.clone())))
+        .in_sequence(&mut expectation_sequence);
+
+    // Expect a call to get an event iterator (only if events are requested)
+    if include_events {
+        let events_iterator = transaction_list_with_proof
+            .clone()
+            .events
+            .unwrap()
+            .into_iter()
+            .map(Ok);
+        mock_db
+            .expect_get_events_iterator()
+            .times(1)
+            .with(eq(start_version), eq(num_items))
+            .returning(move |_, _| Ok(Box::new(events_iterator.clone())))
+            .in_sequence(&mut expectation_sequence);
+    }
+
+    // Expect a call to get a persisted auxiliary info iterator
+    let persisted_auxiliary_info_iterator = persisted_auxiliary_infos.clone().into_iter().map(Ok);
+    mock_db
+        .expect_get_persisted_auxiliary_info_iterator()
+        .times(1)
+        .with(eq(start_version), eq(num_items as usize))
+        .returning(move |_, _| Ok(Box::new(persisted_auxiliary_info_iterator.clone())))
+        .in_sequence(&mut expectation_sequence);
+
+    // Expect a call to get the transaction accumulator range proof
+    let accumulator_range_proof = transaction_list_with_proof
+        .proof
+        .ledger_info_to_transaction_infos_proof;
+    mock_db
+        .expect_get_transaction_accumulator_range_proof()
+        .times(1)
+        .with(eq(start_version), always(), eq(proof_version))
+        .returning(move |_, _, _| Ok(accumulator_range_proof.clone()))
+        .in_sequence(&mut expectation_sequence);
 }
 
 /// Extracts the peer and network ids from an optional peer network id

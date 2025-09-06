@@ -151,6 +151,8 @@ impl Default for StateSyncDriverConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageServiceConfig {
+    /// Whether to enable size and time-aware chunking
+    pub enable_size_and_time_aware_chunking: bool,
     /// Whether transaction data v2 is enabled
     pub enable_transaction_data_v2: bool,
     /// Maximum number of epoch ending ledger infos per chunk
@@ -171,6 +173,8 @@ pub struct StorageServiceConfig {
     pub max_optimistic_fetch_period_ms: u64,
     /// Maximum number of state keys and values per chunk
     pub max_state_chunk_size: u64,
+    /// Maximum time (ms) to wait for storage before truncating a response
+    pub max_storage_read_wait_time_ms: u64,
     /// Maximum period (ms) of pending subscription requests
     pub max_subscription_period_ms: u64,
     /// Maximum number of transactions per chunk
@@ -188,6 +192,7 @@ pub struct StorageServiceConfig {
 impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
+            enable_size_and_time_aware_chunking: false,
             enable_transaction_data_v2: true,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_invalid_requests_per_peer: 500,
@@ -198,7 +203,8 @@ impl Default for StorageServiceConfig {
             max_num_active_subscriptions: 30,
             max_optimistic_fetch_period_ms: 5000, // 5 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_period_ms: 30_000, // 30 seconds
+            max_storage_read_wait_time_ms: 10_000, // 10 seconds
+            max_subscription_period_ms: 30_000,    // 30 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             min_time_to_ignore_peers_secs: 300, // 5 minutes
@@ -514,9 +520,11 @@ impl ConfigOptimizer for StateSyncConfig {
         node_type: NodeType,
         chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
-        // Optimize the driver and data streaming service configs
+        // Optimize the driver
         let modified_driver_config =
             StateSyncDriverConfig::optimize(node_config, local_config_yaml, node_type, chain_id)?;
+
+        // Optimize the data streaming service
         let modified_data_streaming_config = DataStreamingServiceConfig::optimize(
             node_config,
             local_config_yaml,
@@ -524,7 +532,13 @@ impl ConfigOptimizer for StateSyncConfig {
             chain_id,
         )?;
 
-        Ok(modified_driver_config || modified_data_streaming_config)
+        // Optimize the storage service
+        let modified_storage_service_config =
+            StorageServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)?;
+
+        Ok(modified_driver_config
+            || modified_data_streaming_config
+            || modified_storage_service_config)
     }
 }
 
@@ -579,6 +593,31 @@ impl ConfigOptimizer for DataStreamingServiceConfig {
             if local_stream_config_yaml["max_concurrent_state_requests"].is_null() {
                 data_streaming_service_config.max_concurrent_state_requests =
                     MAX_CONCURRENT_STATE_REQUESTS * 2;
+                modified_config = true;
+            }
+        }
+
+        Ok(modified_config)
+    }
+}
+
+impl ConfigOptimizer for StorageServiceConfig {
+    fn optimize(
+        node_config: &mut NodeConfig,
+        local_config_yaml: &Value,
+        _node_type: NodeType,
+        chain_id: Option<ChainId>,
+    ) -> Result<bool, Error> {
+        let storage_service_config = &mut node_config.state_sync.storage_service;
+        let local_storage_config_yaml = &local_config_yaml["state_sync"]["storage_service"];
+
+        // Enable size and time-aware chunking for all networks except Mainnet
+        let mut modified_config = false;
+        if let Some(chain_id) = chain_id {
+            if !chain_id.is_mainnet()
+                && local_storage_config_yaml["enable_size_and_time_aware_chunking"].is_null()
+            {
+                storage_service_config.enable_size_and_time_aware_chunking = true;
                 modified_config = true;
             }
         }
@@ -783,6 +822,103 @@ mod tests {
             data_streaming_service_config.max_concurrent_state_requests,
             100
         );
+    }
+
+    #[test]
+    fn test_optimize_storage_service_devnet() {
+        // Create a node config with size and time-aware chunking disabled
+        let mut node_config = NodeConfig {
+            state_sync: StateSyncConfig {
+                storage_service: StorageServiceConfig {
+                    enable_size_and_time_aware_chunking: false,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Optimize the config and verify modifications are made
+        let modified_config = StateSyncConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::ValidatorFullnode,
+            Some(ChainId::new(40)), // Not mainnet or testnet
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify that size and time-aware chunking is enabled
+        let storage_service_config = &node_config.state_sync.storage_service;
+        assert!(storage_service_config.enable_size_and_time_aware_chunking);
+    }
+
+    #[test]
+    fn test_optimize_storage_service_mainnet() {
+        // Create a node config with size and time-aware chunking disabled
+        let mut node_config = NodeConfig {
+            state_sync: StateSyncConfig {
+                storage_service: StorageServiceConfig {
+                    enable_size_and_time_aware_chunking: false,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Optimize the config and verify modifications are made
+        let modified_config = StateSyncConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::PublicFullnode,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify that size and time-aware chunking is still disabled
+        let storage_service_config = &node_config.state_sync.storage_service;
+        assert!(!storage_service_config.enable_size_and_time_aware_chunking);
+    }
+
+    #[test]
+    fn test_optimize_storage_service_no_override() {
+        // Create a node config with size and time-aware chunking disabled
+        let mut node_config = NodeConfig {
+            state_sync: StateSyncConfig {
+                storage_service: StorageServiceConfig {
+                    enable_size_and_time_aware_chunking: false,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Create a local config YAML with size and time-aware chunking disabled
+        let local_config_yaml = serde_yaml::from_str(
+            r#"
+            state_sync:
+                storage_service:
+                    enable_size_and_time_aware_chunking: false
+            "#,
+        )
+        .unwrap();
+
+        // Optimize the config and verify modifications are made
+        let modified_config = StateSyncConfig::optimize(
+            &mut node_config,
+            &local_config_yaml,
+            NodeType::ValidatorFullnode,
+            Some(ChainId::testnet()),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify that size and time-aware chunking is still disabled
+        let storage_service_config = &node_config.state_sync.storage_service;
+        assert!(!storage_service_config.enable_size_and_time_aware_chunking);
     }
 
     #[test]

@@ -69,11 +69,21 @@ async fn test_peers_with_ready_subscriptions() {
 
         // Create the mock db reader
         let mut db_reader = mock::create_mock_db_reader();
-        utils::expect_get_epoch_ending_ledger_infos(&mut db_reader, 1, 2, epoch_change_proof);
+        utils::expect_get_epoch_ending_ledger_infos(
+            &mut db_reader,
+            1,
+            2,
+            epoch_change_proof,
+            false,
+        );
 
         // Create the storage reader
-        let storage_service_config = StorageServiceConfig::default();
-        let storage_reader = StorageReader::new(storage_service_config, Arc::new(db_reader));
+        let storage_service_config = utils::create_storage_config(use_request_v2, false);
+        let storage_reader = StorageReader::new(
+            storage_service_config,
+            Arc::new(db_reader),
+            time_service.clone(),
+        );
 
         // Create test data with an empty storage server summary
         let cached_storage_server_summary =
@@ -194,8 +204,12 @@ async fn test_remove_expired_subscriptions_no_new_data() {
 
         // Create the mock storage reader and time service
         let db_reader = mock::create_mock_db_reader();
-        let storage_reader = StorageReader::new(storage_service_config, Arc::new(db_reader));
         let time_service = TimeService::mock();
+        let storage_reader = StorageReader::new(
+            storage_service_config,
+            Arc::new(db_reader),
+            time_service.clone(),
+        );
 
         // Create test data with an empty storage server summary
         let cached_storage_server_summary =
@@ -359,6 +373,7 @@ async fn test_remove_expired_subscriptions_blocked_stream() {
         let storage_reader = StorageReader::new(
             storage_service_config,
             Arc::new(mock::create_mock_db_reader()),
+            time_service.clone(),
         );
 
         // Update the storage server summary so that there is new data (at version 5)
@@ -469,6 +484,7 @@ async fn test_remove_expired_subscriptions_blocked_stream_index() {
         let storage_reader = StorageReader::new(
             storage_service_config,
             Arc::new(mock::create_mock_db_reader()),
+            time_service.clone(),
         );
 
         // Update the storage server summary so that there is new data (at version 5)
@@ -720,6 +736,7 @@ async fn test_subscription_max_pending_requests() {
             max_num_active_subscriptions,
             max_transaction_output_chunk_size,
             enable_transaction_data_v2: use_request_v2,
+            enable_size_and_time_aware_chunking: false,
             ..Default::default()
         };
 
@@ -756,6 +773,7 @@ async fn test_subscription_max_pending_requests() {
                 max_transaction_output_chunk_size,
                 highest_version,
                 output_lists_with_proofs[stream_request_index as usize].clone(),
+                false,
             );
         }
 
@@ -937,6 +955,7 @@ async fn test_subscription_overwrite_streams() {
             highest_version - peer_version,
             highest_version,
             output_list_with_proof.clone(),
+            false,
         );
         utils::expect_get_transactions(
             &mut db_reader,
@@ -945,10 +964,11 @@ async fn test_subscription_overwrite_streams() {
             highest_version,
             false,
             transaction_list_with_proof.clone(),
+            false,
         );
 
         // Create a storage service config
-        let storage_config = utils::create_storage_config(use_request_v2);
+        let storage_config = utils::create_storage_config(use_request_v2, false);
 
         // Create the storage client and server
         let (mut mock_client, service, storage_service_notifier, mock_time, _) =
