@@ -979,9 +979,10 @@ where
                             } as u64
                     })
             });
-            let txn_read_write_summary = block_gas_limit_type
-                .conflict_penalty_window()
-                .map(|_| last_input_output.get_txn_read_write_summary(txn_idx));
+            let txn_read_write_summary = block_gas_limit_type.conflict_penalty_window().map(|_| {
+                last_input_output.record_storage_keys_read(txn_idx);
+                last_input_output.get_txn_read_write_summary(txn_idx)
+            });
 
             // For committed txns with Success status, calculate the accumulated gas costs.
             block_limit_processor.accumulate_fee_statement(
@@ -2183,6 +2184,7 @@ where
                         .block_gas_limit_type
                         .conflict_penalty_window()
                         .map(|_| {
+                            output.record_read_set(sequential_reads.get_storage_keys_read());
                             ReadWriteSummary::new(
                                 sequential_reads.get_read_summary(),
                                 output.get_write_summary(),
