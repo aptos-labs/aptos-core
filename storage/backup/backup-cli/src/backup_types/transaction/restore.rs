@@ -339,7 +339,7 @@ impl TransactionRestoreBatchController {
         Ok(())
     }
 
-    fn loaded_chunk_stream(&self) -> Peekable<impl Stream<Item = Result<LoadedChunk>>> {
+    fn loaded_chunk_stream(&self) -> Peekable<impl Stream<Item = Result<LoadedChunk>> + use<>> {
         let con = self.global_opt.concurrent_downloads;
 
         let manifest_handle_stream = stream::iter(self.manifest_handles.clone());

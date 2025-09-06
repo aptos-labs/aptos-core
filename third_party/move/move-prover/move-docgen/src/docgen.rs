@@ -237,7 +237,7 @@ impl<'env> Docgen<'env> {
     }
 
     /// Generate document contents, returning pairs of output file names and generated contents.
-    pub fn gen(mut self) -> Vec<(String, String)> {
+    pub fn generate(mut self) -> Vec<(String, String)> {
         // Compute missing information about schemas.
         self.compute_declared_schemas();
 

@@ -108,7 +108,7 @@ struct ReadyData {
 }
 
 #[handler]
-async fn root(health_checkers: Data<&HealthCheckers>) -> impl IntoResponse {
+async fn root(health_checkers: Data<&HealthCheckers>) -> impl IntoResponse + use<> {
     let mut ready = vec![];
     let mut not_ready = vec![];
     for health_checker in &health_checkers.health_checkers {
