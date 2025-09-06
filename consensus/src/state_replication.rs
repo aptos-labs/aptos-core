@@ -10,7 +10,7 @@ use anyhow::Result;
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
+    ledger_info::LedgerInfoWithSignatures, on_chain_config::OnChainConsensusConfig,
 };
 use std::{sync::Arc, time::Duration};
 
@@ -46,7 +46,7 @@ pub trait StateComputer: Send + Sync {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
-        order_vote_enabled: bool,
+        consensus_onchain_config: OnChainConsensusConfig,
         persisted_auxiliary_info_version: u8,
     );
 

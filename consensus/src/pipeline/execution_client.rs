@@ -351,7 +351,7 @@ impl TExecutionClient for ExecutionProxyClient {
             block_executor_onchain_config,
             transaction_deduper,
             randomness_enabled,
-            onchain_consensus_config.order_vote_enabled(),
+            onchain_consensus_config.clone(),
             aux_version,
         );
 
