@@ -10,7 +10,6 @@ Order book type definitions
 -  [Struct `AccountClientOrderId`](#0x7_order_book_types_AccountClientOrderId)
 -  [Struct `UniqueIdxType`](#0x7_order_book_types_UniqueIdxType)
 -  [Enum `OrderBookType`](#0x7_order_book_types_OrderBookType)
--  [Enum `AscendingIdGenerator`](#0x7_order_book_types_AscendingIdGenerator)
 -  [Enum `TimeInForce`](#0x7_order_book_types_TimeInForce)
 -  [Enum `TriggerCondition`](#0x7_order_book_types_TriggerCondition)
 -  [Enum `OrderMatchDetails`](#0x7_order_book_types_OrderMatchDetails)
@@ -24,8 +23,6 @@ Order book type definitions
 -  [Function `new_default_big_ordered_map`](#0x7_order_book_types_new_default_big_ordered_map)
 -  [Function `new_order_id_type`](#0x7_order_book_types_new_order_id_type)
 -  [Function `new_account_client_order_id`](#0x7_order_book_types_new_account_client_order_id)
--  [Function `new_ascending_id_generator`](#0x7_order_book_types_new_ascending_id_generator)
--  [Function `next_ascending_id`](#0x7_order_book_types_next_ascending_id)
 -  [Function `new_unique_idx_type`](#0x7_order_book_types_new_unique_idx_type)
 -  [Function `descending_idx`](#0x7_order_book_types_descending_idx)
 -  [Function `get_order_id_value`](#0x7_order_book_types_get_order_id_value)
@@ -195,45 +192,6 @@ Order book type definitions
 
 
 <dl>
-</dl>
-
-
-</details>
-
-</details>
-
-</details>
-
-<a id="0x7_order_book_types_AscendingIdGenerator"></a>
-
-## Enum `AscendingIdGenerator`
-
-
-
-<pre><code>enum <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">AscendingIdGenerator</a> <b>has</b> drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Variants</summary>
-
-
-<details>
-<summary>FromCounter</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>value: u64</code>
-</dt>
-<dd>
-
-</dd>
 </dl>
 
 
@@ -770,55 +728,6 @@ particular match operation.
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: u64
 ): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> {
     <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_types_new_ascending_id_generator"></a>
-
-## Function `new_ascending_id_generator`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_ascending_id_generator">new_ascending_id_generator</a>(): <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_ascending_id_generator">new_ascending_id_generator</a>(): <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">AscendingIdGenerator</a> {
-    AscendingIdGenerator::FromCounter { value: 0 }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_types_next_ascending_id"></a>
-
-## Function `next_ascending_id`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_ascending_id">next_ascending_id</a>(self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>): u128
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_ascending_id">next_ascending_id</a>(self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">AscendingIdGenerator</a>): u128 {
-    self.value += 1;
-    self.value <b>as</b> u128
 }
 </code></pre>
 
