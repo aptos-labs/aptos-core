@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 3-15:  publish [module 0xcafe::Module1 {]
+task 1 lines 18-18:  run 0xCAFE::Module1::function6
+return values: { 21859, 1399722001, 154, 1399722001, 1399722001 }

@@ -1,0 +1,35 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/mutate_if.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct S has copy, drop {
+        x: bool,
+        y: u64,
+        z: u64,
+    }
+    fun foo1(p0: S): S {
+        let _t1;
+        if (*&(&p0).x) _t1 = *&(&p0).y else _t1 = *&(&p0).z;
+        let _t3 = &mut _t1;
+        *_t3 = 2;
+        p0
+    }
+    fun foo2(p0: S): S {
+        let _t2;
+        if (*&(&p0).x) _t2 = *&(&p0).y else _t2 = *&(&p0).z;
+        let _t3 = &mut _t2;
+        *_t3 = 2;
+        p0
+    }
+    fun test() {
+        let _t0 = S{x: true, y: 1, z: 3};
+        let _t1 = foo1(_t0);
+        if (!(_t0 == _t1)) abort 0;
+        _t0 = S{x: false, y: 4, z: 5};
+        _t1 = foo2(_t0);
+        if (!(_t0 == _t1)) abort 1;
+    }
+}
+
+
+//# run 0xc0ffee::m::test

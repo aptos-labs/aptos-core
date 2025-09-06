@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::v2::{counters::MISC_TIMERS_SECONDS, state::PartitionState, PartitionerV2};
+use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     block_executor::partitioner::{
         PartitionedTransactions, SubBlock, SubBlocksForShard, TransactionWithDependencies,
@@ -16,9 +17,7 @@ use std::sync::Mutex;
 
 impl PartitionerV2 {
     pub(crate) fn add_edges(state: &mut PartitionState) -> PartitionedTransactions {
-        let _timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["add_edges"])
-            .start_timer();
+        let _timer = MISC_TIMERS_SECONDS.timer_with(&["add_edges"]);
 
         state.sub_block_matrix = state.thread_pool.install(|| {
             (0..state.num_rounds())

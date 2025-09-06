@@ -20,6 +20,7 @@ module 0xcafe::vectors {
 
 // -- Sourcified model before first bytecode pipeline
 module 0xcafe::vectors {
+    use std::vector;
     public entry fun guess_flips_break2(flips: vector<u8>): u64 {
         let flipsref5 = &flips;
         let _v = copy flips;

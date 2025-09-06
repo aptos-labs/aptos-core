@@ -15,7 +15,7 @@
 /// maker order in the order book. The clearinghouse can use this to track pending orders in the order book and perform
 /// any other book keeping operations.
 ///
-/// - cleanup_order(account, order_id, is_bid, remaining_size) -> Called by the market when an order is cancelled or fully filled
+/// - cleanup_order(account, order_id, is_bid, remaining_size, order_metadata) -> Called by the market when an order is cancelled or fully filled
 /// The clearinhouse can perform any cleanup operations like removing the order from the pending orders list. For every order placement
 /// that passes the validate_order_placement check,
 /// the market guarantees that the cleanup_order API will be called once and only once with the remaining size of the order.
@@ -448,8 +448,7 @@ module aptos_experimental::market {
         emit_order_open: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
-        // Validate that the order is valid from position management perspective
-        if (time_in_force == immediate_or_cancel()) {
+        if (time_in_force == immediate_or_cancel() && trigger_condition.is_none()) {
             return self.cancel_single_order_internal(
                 user_addr,
                 limit_price,
@@ -565,6 +564,7 @@ module aptos_experimental::market {
             maker_order.get_book_type_from_match_details(),
             maker_order.is_bid_from_match_details(),
             maker_cancel_size,
+            metadata,
             callbacks
         );
     }
@@ -605,7 +605,7 @@ module aptos_experimental::market {
             callbacks
         );
         callbacks.cleanup_order(
-            user_addr, order_id, is_bid, size_delta
+            user_addr, order_id, is_bid, size_delta, metadata
         );
         return OrderMatchResult {
             order_id,
@@ -622,11 +622,12 @@ module aptos_experimental::market {
         book_type: OrderBookType,
         is_bid: bool,
         remaining_size: u64,
+        metadata: Option<M>,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         if (book_type == single_order_book_type()) {
             callbacks.cleanup_order(
-                user_addr, order_id, is_bid, remaining_size
+                user_addr, order_id, is_bid, remaining_size, metadata.destroy_some()
             );
         } else {
             callbacks.cleanup_bulk_orders(
@@ -777,6 +778,7 @@ module aptos_experimental::market {
                 maker_order.get_book_type_from_match_details(),
                 !is_bid, // is_bid is inverted for maker orders
                 0, // 0 because the order is fully filled
+                maker_order.get_metadata_from_match_details(),
                 callbacks
             );
         };
@@ -987,7 +989,7 @@ module aptos_experimental::market {
             };
             if (remaining_size == 0) {
                 cleanup_order_internal(
-                    user_addr, order_id, single_order_book_type(), is_bid, 0, callbacks
+                    user_addr, order_id, single_order_book_type(), is_bid, 0, option::some(metadata), callbacks
                 );
                 break;
             };
@@ -1127,7 +1129,7 @@ module aptos_experimental::market {
             metadata
         ) = order.destroy_single_order();
         cleanup_order_internal(
-            account, order_id, single_order_book_type(), is_bid, remaining_size, callbacks
+            account, order_id, single_order_book_type(), is_bid, remaining_size, option::some(metadata), callbacks
         );
         self.emit_event_for_order(
             order_id,

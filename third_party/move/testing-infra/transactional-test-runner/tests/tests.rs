@@ -13,8 +13,8 @@ use std::{error::Error, path::Path};
 fn run(path: &Path) -> anyhow::Result<(), Box<dyn Error>> {
     run_test_with_config(
         TestRunConfig::default()
-            .cross_compile_into(SyntaxChoice::ASM, true)
-            .cross_compile_into(SyntaxChoice::Source, true),
+            .cross_compile_into(SyntaxChoice::ASM, true, None)
+            .cross_compile_into(SyntaxChoice::Source, true, None),
         path,
     )
 }

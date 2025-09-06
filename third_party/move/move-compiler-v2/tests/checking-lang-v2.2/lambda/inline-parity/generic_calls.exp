@@ -27,6 +27,6 @@ module 0x42::m {
         f(s);
     }
     fun test_receiver_inference(s: S<u64>) {
-        inlined<u64>(|arg0| id(arg0), s)
+        inlined<u64>(|arg0| id<u64>(arg0), s)
     }
 }

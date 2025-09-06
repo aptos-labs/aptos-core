@@ -1,0 +1,166 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/funs_as_storage_key.move`
+
+//# publish
+module 0x42::mod2 {
+    struct Registry<T0: copy + store> has store, key {
+        func: T0,
+    }
+    public fun get_item<T0: copy + store>(p0: address): T0
+        acquires Registry
+    {
+        *&borrow_global<Registry<T0>>(p0).func
+    }
+    public fun item_exists<T0: copy + store>(p0: address): bool {
+        exists<Registry<T0>>(p0)
+    }
+    public fun remove_item<T0: copy + store>(p0: address): T0
+        acquires Registry
+    {
+        let Registry<T0>{func: _t3} = move_from<Registry<T0>>(p0);
+        _t3
+    }
+    public fun save_item<T0: copy + store>(p0: &signer, p1: T0) {
+        let _t4 = Registry<T0>{func: p1};
+        move_to<Registry<T0>>(p0, _t4);
+    }
+}
+
+
+//# publish
+module 0x42::mod3 {
+    use 0x42::mod2;
+    use 0x1::signer;
+    struct MyStruct1 has copy, store, key {
+        x: u64,
+    }
+    struct MyStruct2 has copy, store, key {
+        y: u8,
+    }
+    public fun test_items(p0: signer, p1: bool): bool {
+        let _t2: |address|(bool) has copy + drop + store = |arg0| mod2::item_exists<MyStruct1>(arg0);
+        let _t3: |address|(bool) has copy + drop + store = |arg0| mod2::item_exists<MyStruct2>(arg0);
+        let _t4 = signer::address_of(&p0);
+        if (!exists<MyStruct1>(_t4)) {
+            let _t5 = MyStruct1{x: 3};
+            mod2::save_item<MyStruct1>(&p0, _t5);
+            let _t19 = &p0;
+            move_to<MyStruct1>(_t19, _t5)
+        };
+        if (p1) mod2::save_item<|address|(bool) has copy + drop + store>(&p0, _t2) else mod2::save_item<|address|(bool) has copy + drop + store>(&p0, _t3);
+        if (!mod2::item_exists<|address|(bool) has copy + drop + store>(_t4)) abort 14566554180833181696;
+        let _t27 = mod2::get_item<|address|(bool) has copy + drop + store>(_t4);
+        let _t8 = _t27(_t4);
+        if (!(p1 == _t8)) abort 14566554180833181696;
+        let _t36 = mod2::remove_item<|address|(bool) has copy + drop + store>(_t4);
+        true
+    }
+}
+
+
+//# publish
+module 0x42::mod4 {
+    struct Wrapper<T0> has key {
+        fv: T0,
+    }
+    fun check_exists(p0: &signer) {
+        if (!exists<Wrapper<|&u64, &mut u8|(&u64) has copy + drop + store>>(@0x42)) abort 404;
+    }
+    fun initialize(p0: &signer) {
+        let _t3 = Wrapper<|&u64, &mut u8|(&u64) has copy + drop + store>{fv: |arg0,arg1| test(arg0, arg1)};
+        move_to<Wrapper<|&u64, &mut u8|(&u64) has copy + drop + store>>(p0, _t3);
+    }
+    #[persistent]
+    fun test(p0: &u64, p1: &mut u8): &u64 {
+        p0
+    }
+}
+
+
+//# publish
+module 0x42::mod5 {
+    struct VecWrapper<T0> has key {
+        fvs: vector<T0>,
+    }
+    fun check_exists(p0: &signer) {
+        if (!exists<VecWrapper<|&u64, &mut u8|(&u64) has copy + drop + store>>(@0x42)) abort 404;
+    }
+    fun initialize(p0: &signer) {
+        let _t2: |&u64, &mut u8|&u64 has copy + drop = |arg0,arg1| test(arg0, arg1);
+        let _t3 = 0x1::vector::empty<|&u64, &mut u8|(&u64) has copy + drop + store>();
+        0x1::vector::push_back<|&u64, &mut u8|(&u64) has copy + drop + store>(&mut _t3, _t2);
+        let _t5 = VecWrapper<|&u64, &mut u8|(&u64) has copy + drop + store>{fvs: _t3};
+        move_to<VecWrapper<|&u64, &mut u8|(&u64) has copy + drop + store>>(p0, _t5);
+    }
+    #[persistent]
+    fun test(p0: &u64, p1: &mut u8): &u64 {
+        p0
+    }
+}
+
+
+//# publish
+module 0x42::mod6 {
+    struct VecWrapper<T0> has key {
+        fvs: vector<T0>,
+    }
+    fun compute(p0: &signer): u8
+        acquires VecWrapper
+    {
+        let _t1;
+        if (exists<VecWrapper<|&mut u8| has drop + store>>(@0x42)) _t1 = false else _t1 = !exists<VecWrapper<|&mut u8| has store>>(@0x42);
+        if (!_t1) abort 404;
+        let _t2 = &borrow_global<VecWrapper<|&mut u8| has copy + drop + store>>(@0x42).fvs;
+        let _t3 = 0u8;
+        let _t4 = 0;
+        while (_t4 < 3) {
+            let _t5 = 0x1::vector::borrow<|&mut u8| has copy + drop + store>(_t2, _t4);
+            let _t24 = &mut _t3;
+            let _t26 = *_t5;
+            _t26(_t24);
+            _t4 = _t4 + 1;
+            continue
+        };
+        _t3
+    }
+    fun initialize(p0: &signer) {
+        let _t2: |&mut u8| has copy + drop = |arg0| test1(arg0);
+        let _t3: |&mut u8| has copy + drop = |arg0| test2(arg0);
+        let _t4: |&mut u8| has copy + drop = |arg0| test3(arg0);
+        let _t5 = 0x1::vector::empty<|&mut u8| has copy + drop + store>();
+        let _t6 = &mut _t5;
+        0x1::vector::push_back<|&mut u8| has copy + drop + store>(_t6, _t2);
+        0x1::vector::push_back<|&mut u8| has copy + drop + store>(_t6, _t3);
+        0x1::vector::push_back<|&mut u8| has copy + drop + store>(_t6, _t4);
+        let _t9 = VecWrapper<|&mut u8| has copy + drop + store>{fvs: _t5};
+        move_to<VecWrapper<|&mut u8| has copy + drop + store>>(p0, _t9);
+    }
+    #[persistent]
+    fun test1(p0: &mut u8) {
+        *p0 = *p0 + 1u8;
+    }
+    #[persistent]
+    fun test2(p0: &mut u8) {
+        *p0 = *p0 + 2u8;
+    }
+    #[persistent]
+    fun test3(p0: &mut u8) {
+        *p0 = *p0 + 3u8;
+    }
+}
+
+
+//# run 0x42::mod3::test_items --signers 0x42 --args true
+
+//# run 0x42::mod3::test_items --signers 0x42 --args false
+
+//# run 0x42::mod4::initialize --signers 0x42
+
+//# run 0x42::mod4::check_exists --signers 0x42
+
+//# run 0x42::mod5::initialize --signers 0x42
+
+//# run 0x42::mod5::check_exists --signers 0x42
+
+//# run 0x42::mod6::initialize --signers 0x42
+
+//# run 0x42::mod6::compute --signers 0x42

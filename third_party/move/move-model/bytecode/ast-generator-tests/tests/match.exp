@@ -330,7 +330,7 @@ module 0x815::m {
                 }
             };
             if (_t1 is Institution) {
-                let Entity::Institution{id: _t9,admin: _t10} = self;
+                let Entity::Institution{id: _t9, admin: _t10} = self;
                 _t2 = _t9;
                 break
             };

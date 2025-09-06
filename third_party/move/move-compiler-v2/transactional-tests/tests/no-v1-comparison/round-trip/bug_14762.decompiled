@@ -1,0 +1,57 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/bug_14762.move`
+
+//# publish
+module 0x42::m {
+    use 0x1::option;
+    use 0x1::vector;
+    struct T has copy, drop, store {
+        issuer: vector<u8>,
+        version: u64,
+    }
+    struct J has copy, drop, store {
+        variant: u64,
+    }
+    struct S has copy, drop, store {
+        entries: vector<T>,
+    }
+    fun test(p0: &mut S, p1: vector<u8>): option::Option<T> {
+        let _t8;
+        let _t2 = &p0.entries;
+        let _t3 = false;
+        let _t4 = 0;
+        let _t5 = 0;
+        let _t6 = vector::length<T>(_t2);
+        'l0: loop {
+            loop {
+                if (!(_t5 < _t6)) break 'l0;
+                if (*&vector::borrow<T>(_t2, _t5).issuer == p1) break;
+                _t5 = _t5 + 1
+            };
+            _t3 = true;
+            _t4 = _t5;
+            break
+        };
+        if (_t3) _t8 = option::some<T>(vector::remove<T>(&mut p0.entries, _t4)) else _t8 = option::none<T>();
+        _t8
+    }
+    fun test1() {
+        let _t8 = T{issuer: vector[1u8], version: 1};
+        let _t11 = T{issuer: vector[2u8], version: 0};
+        let _t12 = vector::empty<T>();
+        let _t13 = &mut _t12;
+        vector::push_back<T>(_t13, _t8);
+        vector::push_back<T>(_t13, _t11);
+        let _t2 = S{entries: _t12};
+        let _t3 = test(&mut _t2, vector[0u8]);
+        if (!option::is_none<T>(&_t3)) abort 0;
+        let _t4 = test(&mut _t2, vector[1u8]);
+        if (!option::is_some<T>(&_t4)) abort 0;
+        if (!(*&option::borrow<T>(&_t4).issuer == vector[1u8])) abort 0;
+        let _t5 = test(&mut _t2, vector[2u8]);
+        if (!option::is_some<T>(&_t5)) abort 0;
+        if (!(*&option::borrow<T>(&_t5).issuer == vector[2u8])) abort 0;
+    }
+}
+
+
+//# run 0x42::m::test1

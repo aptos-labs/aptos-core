@@ -15,7 +15,7 @@ use crate::{
     DbReader,
 };
 use anyhow::Result;
-use aptos_metrics_core::{IntCounterHelper, TimerHelper};
+use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_types::{
     state_store::{
         hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
@@ -259,7 +259,7 @@ impl TStateView for CachedStateView {
     }
 
     fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateSlot> {
-        let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
+        let _timer = TIMER.timer_with(&["get_state_value"]);
         COUNTER.inc_with(&["sv_total_get"]);
 
         // First check if requested key is already memorized.

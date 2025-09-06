@@ -1,0 +1,29 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/persistent.move`
+
+//# publish
+module 0x66::test {
+    use 0x1::signer;
+    struct Work has store, key {
+        _0: ||(u64) has store,
+    }
+    entry fun exec(p0: &signer)
+        acquires Work
+    {
+        let _t2 = signer::address_of(p0);
+        let Work{_0: _t4} = move_from<Work>(_t2);
+        if (!(_t4() == 3)) abort 14566554180833181696;
+    }
+    #[persistent]
+    fun should_be_storable(): u64 {
+        3
+    }
+    entry fun store(p0: &signer) {
+        let _t3 = Work{_0: || should_be_storable()};
+        move_to<Work>(p0, _t3);
+    }
+}
+
+
+//# run 0x66::test::store --signers 0x66
+
+//# run 0x66::test::exec --signers 0x66

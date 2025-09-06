@@ -1,0 +1,136 @@
+//**** Cross-compiled for `move` syntax from `tests/operators/arithmetic_operators_u16.move`
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1u16 + 65535u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 65135u16 + 6555u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0u16 - 1u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 54u16 - 100u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 32767u16 * 32767u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 33767u16 * 2u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0u16 / 0u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1u16 / 0u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 65535u16 / 0u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0u16 % 0u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1u16 % 0u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 65535u16 % 0u16;
+    }
+}

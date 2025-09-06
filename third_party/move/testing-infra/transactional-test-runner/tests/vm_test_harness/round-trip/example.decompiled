@@ -25,7 +25,9 @@ module 0x42::N {
         let _t3 = R<u64>{v: 0};
         move_to<R<u64>>(p0, _t3);
     }
-    public fun take(p0: &signer): u64 {
+    public fun take(p0: &signer): u64
+        acquires R
+    {
         let _t2 = signer::address_of(p0);
         let R<u64>{v: _t4} = move_from<R<u64>>(_t2);
         _t4
