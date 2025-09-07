@@ -87,7 +87,7 @@ impl StateSummary {
             .flat_map(|shard| {
                 shard
                     .iter()
-                    .map(|(k, u)| (*k, u.value_hash_opt()))
+                    .filter_map(|(k, u)| u.value_hash_opt().map(|hash_opt| (*k, hash_opt)))
                     // The keys in the shard are already unique, and shards are ordered by the
                     // first nibble of the key hash. `batch_update_sorted_uniq` can be
                     // called if within each shard items are sorted by key hash.

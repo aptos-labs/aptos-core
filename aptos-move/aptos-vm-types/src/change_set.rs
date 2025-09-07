@@ -218,7 +218,7 @@ impl VMChangeSet {
     pub fn try_combine_into_storage_change_set(
         self,
         module_write_set: ModuleWriteSet,
-        _read_set: BTreeSet<StateKey>,
+        read_set: BTreeSet<StateKey>,
     ) -> Result<StorageChangeSet, PanicError> {
         // Converting VMChangeSet into TransactionOutput (i.e. storage change set), can
         // be done here only if dynamic_change_set_optimizations have not been used/produced
@@ -265,10 +265,7 @@ impl VMChangeSet {
         write_set_mut.extend(aggregator_v1_write_set);
 
         let events = events.into_iter().map(|(e, _)| e).collect();
-        // TODO(HotState): construct write set with the reads.
-        let write_set = write_set_mut
-            .freeze()
-            .expect("Freezing a WriteSet does not fail.");
+        let write_set = write_set_mut.freeze_with_reads(read_set);
         Ok(StorageChangeSet::new(write_set, events))
     }
 
