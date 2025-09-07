@@ -844,6 +844,8 @@ where
         HashSet::new()
     }
 
+    fn record_read_set(&self, _keys_read: HashSet<<Self::Txn as Transaction>::Key>) {}
+
     fn legacy_sequential_materialize_agg_v1(
         &self,
         _view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
