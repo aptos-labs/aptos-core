@@ -83,12 +83,24 @@ impl PersistedWriteOp {
 }
 
 /// Shared in memory representation between the (value) WriteOp and the (hotness) HotStateOp
-#[derive(Clone, Debug, Eq, PartialEq, AsRefStr)]
+#[derive(Clone, Eq, PartialEq, AsRefStr)]
 pub enum BaseStateOp {
     Creation(StateValue),
     Modification(StateValue),
     Deletion(StateValueMetadata),
     MakeHot,
+}
+
+impl std::fmt::Debug for BaseStateOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let var = match self {
+            Self::Creation(_) => "Creation(...)",
+            Self::Modification(_) => "Modification(...)",
+            Self::Deletion(_) => "Deletion(...)",
+            Self::MakeHot => "MakeHot",
+        };
+        write!(f, "{}", var)
+    }
 }
 
 impl BaseStateOp {
@@ -676,14 +688,9 @@ impl WriteSet {
                     .map(|(key, op)| (key, op.as_base_op())),
                 |a, b| a.0.cmp(b.0),
             )
-            .map(|entry| {
-                // It seems like it's possible to have a key that is both in `value` and `hotness`
-                // (possibly due to inaccurate read write summary). If this happens we discard the
-                // hotness change, since the recently written keys will be made hot anyway.
-                match entry {
-                    EitherOrBoth::Left(e) | EitherOrBoth::Right(e) => e,
-                    EitherOrBoth::Both(_, _) => panic!("Should not happen."),
-                }
+            .map(|entry| match entry {
+                EitherOrBoth::Left(e) | EitherOrBoth::Right(e) => e,
+                EitherOrBoth::Both(_, _) => panic!("This should not happen!!!"),
             })
     }
 }
@@ -714,6 +721,10 @@ impl WriteSetV0 {
 
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
         self.0.get(key)
+    }
+
+    pub fn contains(&self, key: &StateKey) -> bool {
+        self.0.contains(key)
     }
 
     fn get_total_supply(&self) -> Option<u128> {
@@ -804,6 +815,10 @@ impl WriteSetMut {
 
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
         self.write_set.get(key)
+    }
+
+    pub fn contains(&self, key: &StateKey) -> bool {
+        self.write_set.contains_key(key)
     }
 
     pub fn as_inner_mut(&mut self) -> &mut BTreeMap<StateKey, WriteOp> {
