@@ -1230,6 +1230,31 @@ where
 
         ret
     }
+
+    pub(crate) fn get_storage_keys_read(&self) -> HashSet<T::Key> {
+        let mut ret = HashSet::new();
+        for (key, read) in &self.data_reads {
+            if let DataRead::Versioned(_, _, _) = read {
+                ret.insert(key.clone());
+            }
+        }
+
+        for (key, group_reads) in &self.group_reads {
+            for read in group_reads.inner_reads.values() {
+                if let DataRead::Versioned(_, _, _) = read {
+                    ret.insert(key.clone());
+                    break;
+                }
+            }
+        }
+
+        for key in self.module_reads.keys() {
+            let key = T::Key::from_address_and_module_name(key.address(), key.name());
+            ret.insert(key);
+        }
+
+        ret
+    }
 }
 
 #[derive(Derivative)]
@@ -1273,6 +1298,18 @@ where
             ret.insert(InputOutputKey::DelayedField(*key));
         }
 
+        ret
+    }
+
+    /// Returns all storage keys read (excluding delayed fields).
+    pub(crate) fn get_storage_keys_read(&self) -> HashSet<T::Key> {
+        let mut ret = self.resource_reads.clone();
+        ret.extend(self.group_reads.keys().cloned());
+        ret.extend(
+            self.module_reads
+                .iter()
+                .map(|key| T::Key::from_address_and_module_name(key.address(), key.name())),
+        );
         ret
     }
 }
