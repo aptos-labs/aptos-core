@@ -7,7 +7,6 @@
 
 use crate::state_store::{
     state_key::StateKey,
-    state_slot::StateSlot,
     state_value::{PersistedStateValueMetadata, StateValue, StateValueMetadata},
 };
 use anyhow::{bail, ensure, Result};
@@ -19,7 +18,7 @@ use once_cell::sync::Lazy;
 use ref_cast::RefCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
-    collections::{btree_map, BTreeMap},
+    collections::{btree_map, BTreeMap, HashSet},
     fmt::{Debug, Formatter},
 };
 use strum_macros::AsRefStr;
@@ -89,19 +88,17 @@ pub enum BaseStateOp {
     Creation(StateValue),
     Modification(StateValue),
     Deletion(StateValueMetadata),
-    MakeHot { prev_slot: StateSlot },
-    Eviction { prev_slot: StateSlot },
+    MakeHot,
 }
 
 impl BaseStateOp {
-    pub fn as_state_value_opt(&self) -> Option<&StateValue> {
+    pub fn as_state_value_opt(&self) -> Option<Option<&StateValue>> {
         use BaseStateOp::*;
 
         match self {
-            Creation(val) | Modification(val) => Some(val),
-            Deletion(_) => None,
-            MakeHot { prev_slot } => prev_slot.as_state_value_opt(),
-            Eviction { prev_slot } => prev_slot.as_state_value_opt(),
+            Creation(val) | Modification(val) => Some(Some(val)),
+            Deletion(_) => Some(None),
+            MakeHot => None,
         }
     }
 
@@ -110,7 +107,7 @@ impl BaseStateOp {
 
         match self {
             Creation(_) | Modification(_) | Deletion(_) => Some(WriteOp::ref_cast(self)),
-            MakeHot { .. } | Eviction { .. } => None,
+            MakeHot => None,
         }
     }
 
@@ -123,7 +120,7 @@ impl BaseStateOp {
 
         match self {
             Creation(_) | Modification(_) | Deletion(_) => true,
-            MakeHot { .. } | Eviction { .. } => false,
+            MakeHot => false,
         }
     }
 }
@@ -143,9 +140,7 @@ impl WriteOp {
                 BaseStateOp::Creation(v) => Creation(v.bytes().clone()),
                 BaseStateOp::Modification(v) => Modification(v.bytes().clone()),
                 BaseStateOp::Deletion { .. } => Deletion,
-                BaseStateOp::MakeHot { .. } | BaseStateOp::Eviction { .. } => {
-                    unreachable!("malformed write op")
-                },
+                BaseStateOp::MakeHot => unreachable!("malformed write op"),
             },
             Some(metadata) => match &self.0 {
                 BaseStateOp::Creation(v) => CreationWithMetadata {
@@ -157,9 +152,7 @@ impl WriteOp {
                     metadata,
                 },
                 BaseStateOp::Deletion { .. } => DeletionWithMetadata { metadata },
-                BaseStateOp::MakeHot { .. } | BaseStateOp::Eviction { .. } => {
-                    unreachable!("malformed write op")
-                },
+                BaseStateOp::MakeHot => unreachable!("malformed write op"),
             },
         }
     }
@@ -172,8 +165,7 @@ impl WriteOp {
         use BaseStateOp::*;
 
         match (&mut op.0, other.0) {
-            (MakeHot { .. }, ..) | (.., MakeHot { .. })
-            | (Eviction { .. }, ..) | (.., Eviction { .. }) => unreachable!("malformed write op"),
+            (MakeHot, ..) | (.., MakeHot) => unreachable!("malformed write op"),
             (Modification { .. } | Creation { .. }, Creation { .. }) // create existing
             | (Deletion { .. }, Modification { .. } | Deletion { .. }) // delete or modify already deleted
             => {
@@ -225,12 +217,15 @@ impl WriteOp {
         Ok(())
     }
 
-    pub fn as_state_value_opt(&self) -> Option<&StateValue> {
+    pub fn as_state_value_opt(&self) -> Option<Option<&StateValue>> {
         self.0.as_state_value_opt()
     }
 
     pub fn bytes(&self) -> Option<&Bytes> {
-        self.as_state_value_opt().map(StateValue::bytes)
+        match self.as_state_value_opt() {
+            Some(Some(value)) => Some(value.bytes()),
+            _ => None,
+        }
     }
 
     /// Size not counting metadata.
@@ -244,7 +239,7 @@ impl WriteOp {
         match &self.0 {
             Creation(v) | Modification(v) => v.metadata(),
             Deletion(meta) => meta,
-            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 
@@ -254,7 +249,7 @@ impl WriteOp {
         match &mut self.0 {
             Creation(v) | Modification(v) => v.metadata_mut(),
             Deletion(meta) => meta,
-            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 
@@ -264,7 +259,7 @@ impl WriteOp {
         match self.0 {
             Creation(v) | Modification(v) => v.into_metadata(),
             Deletion(meta) => meta,
-            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 
@@ -314,7 +309,7 @@ impl WriteOp {
                 write_len: get_size().expect("Modification must have size"),
             },
             Deletion { .. } => WriteOpSize::Deletion,
-            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 
@@ -332,7 +327,7 @@ impl WriteOp {
         match &self.0 {
             Creation(_) | Modification(_) => false,
             Deletion(_) => true,
-            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 }
@@ -441,13 +436,16 @@ impl TransactionWrite for WriteOp {
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
-        self.as_state_value_opt().cloned()
+        self.as_state_value_opt().unwrap().cloned()
     }
 
     // Note that even if WriteOp is DeletionWithMetadata, the method returns None, as a later
     // read would not read the metadata of the deletion op.
     fn as_state_value_metadata(&self) -> Option<StateValueMetadata> {
-        self.as_state_value_opt().map(StateValue::metadata).cloned()
+        self.as_state_value_opt()
+            .unwrap()
+            .map(StateValue::metadata)
+            .cloned()
     }
 
     fn from_state_value(maybe_state_value: Option<StateValue>) -> Self {
@@ -463,9 +461,7 @@ impl TransactionWrite for WriteOp {
             BaseStateOp::Creation { .. } => Creation,
             BaseStateOp::Modification { .. } => Modification,
             BaseStateOp::Deletion { .. } => Deletion,
-            BaseStateOp::MakeHot { .. } | BaseStateOp::Eviction { .. } => {
-                unreachable!("malformed write op")
-            },
+            BaseStateOp::MakeHot => unreachable!("malformed write op"),
         }
     }
 
@@ -475,7 +471,7 @@ impl TransactionWrite for WriteOp {
         match &mut self.0 {
             Creation(v) | Modification(v) => v.set_bytes(bytes),
             Deletion { .. } => (),
-            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 }
@@ -507,7 +503,7 @@ impl Debug for WriteOp {
             Deletion(metadata) => {
                 write!(f, "Deletion(metadata:{:?})", metadata,)
             },
-            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 }
@@ -530,8 +526,8 @@ impl Default for ValueWriteSet {
 pub struct HotStateOp(BaseStateOp);
 
 impl HotStateOp {
-    pub fn make_hot(prev_slot: StateSlot) -> Self {
-        Self(BaseStateOp::MakeHot { prev_slot })
+    pub fn make_hot() -> Self {
+        Self(BaseStateOp::MakeHot)
     }
 
     pub fn as_base_op(&self) -> &BaseStateOp {
@@ -548,12 +544,7 @@ impl Debug for HotStateOp {
         use BaseStateOp::*;
 
         match &self.0 {
-            MakeHot { prev_slot } => {
-                write!(f, "MakeHot(prev_slot:{:?})", prev_slot)
-            },
-            Eviction { prev_slot } => {
-                write!(f, "Eviction(prev_slot:{:?})", prev_slot)
-            },
+            MakeHot => write!(f, "MakeHot"),
             Creation(_) | Modification(_) | Deletion(_) => {
                 unreachable!("malformed hot state op")
             },
@@ -565,7 +556,8 @@ impl Debug for HotStateOp {
 pub struct WriteSet {
     value: ValueWriteSet,
     /// TODO(HotState): this field is not serialized for now.
-    hotness: BTreeMap<StateKey, HotStateOp>,
+    /// Also, maybe make this a `BTreeSet` later since the op doesn't contain anything?
+    read_only: BTreeMap<StateKey, HotStateOp>,
 }
 
 impl Serialize for WriteSet {
@@ -585,7 +577,7 @@ impl<'de> Deserialize<'de> for WriteSet {
         let value = ValueWriteSet::deserialize(deserializer)?;
         Ok(Self {
             value,
-            hotness: BTreeMap::new(),
+            read_only: BTreeMap::new(),
         })
     }
 }
@@ -632,7 +624,7 @@ impl WriteSet {
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
         self.as_v0()
             .iter()
-            .map(|(key, op)| (key, op.as_state_value_opt()))
+            .map(|(key, op)| (key, op.as_state_value_opt().unwrap()))
     }
 
     pub fn state_updates_cloned(
@@ -655,7 +647,7 @@ impl WriteSet {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.as_v0().is_empty() && self.hotness.is_empty()
+        self.as_v0().is_empty() && self.read_only.is_empty()
     }
 
     pub fn expect_into_write_op_iter(self) -> impl IntoIterator<Item = (StateKey, WriteOp)> {
@@ -679,26 +671,17 @@ impl WriteSet {
             .iter()
             .map(|(key, op)| (key, op.as_base_op()))
             .merge_join_by(
-                self.hotness.iter().map(|(key, op)| (key, op.as_base_op())),
+                self.read_only
+                    .iter()
+                    .map(|(key, op)| (key, op.as_base_op())),
                 |a, b| a.0.cmp(b.0),
             )
-            .map(|entry| {
-                // It seems like it's possible to have a key that is both in `value` and `hotness`
-                // (possibly due to inaccurate read write summary). If this happens we discard the
-                // hotness change, since the recently written keys will be made hot anyway.
-                match entry {
-                    EitherOrBoth::Left(e) | EitherOrBoth::Right(e) => e,
-                    EitherOrBoth::Both(e, _) => e,
-                }
+            .map(|entry| match entry {
+                EitherOrBoth::Left(e) | EitherOrBoth::Right(e) => e,
+                EitherOrBoth::Both(_, _) => {
+                    panic!("Writes and read-only keys should be disjoint.")
+                },
             })
-    }
-
-    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
-        assert!(
-            self.hotness.is_empty(),
-            "hotness should only be initialized once."
-        );
-        self.hotness = hotness;
     }
 }
 
@@ -798,10 +781,19 @@ impl WriteSetMut {
 
     pub fn freeze(self) -> Result<WriteSet> {
         // TODO: add structural validation
-        Ok(WriteSet {
+        Ok(self.freeze_with_reads(HashSet::new()))
+    }
+
+    pub fn freeze_with_reads(self, reads: HashSet<StateKey>) -> WriteSet {
+        let read_only = reads
+            .into_iter()
+            .filter(|key| !self.write_set.contains_key(key))
+            .map(|key| (key, HotStateOp::make_hot()))
+            .collect();
+        WriteSet {
             value: ValueWriteSet::V0(WriteSetV0(self)),
-            hotness: BTreeMap::new(),
-        })
+            read_only,
+        }
     }
 
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
