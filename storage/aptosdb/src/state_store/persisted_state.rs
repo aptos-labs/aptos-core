@@ -25,7 +25,7 @@ impl PersistedState {
 
     pub fn new_empty() -> Self {
         Self::new_empty_with_config(
-            HOT_STATE_MAX_ITEMS_PER_SHARD,
+            HOT_STATE_MAX_ITEMS_PER_SHARD.get(),
             HOT_STATE_MAX_BYTES_PER_SHARD,
             HOT_STATE_MAX_SINGLE_VALUE_BYTES,
         )
