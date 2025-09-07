@@ -294,7 +294,7 @@ fn serialize_return_value(
         .with_func_args_deserialization(function_value_extension)
         .serialize(&value, &layout)?
         .ok_or_else(serialization_error)?;
-    Ok((bytes, layout))
+    Ok((bytes, layout.as_ref().clone()))
 }
 
 fn serialize_return_values(

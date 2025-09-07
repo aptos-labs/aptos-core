@@ -137,8 +137,8 @@ struct TableData {
 /// A structure representing a single table.
 struct Table {
     handle: TableHandle,
-    key_layout: MoveTypeLayout,
-    value_layout: MoveTypeLayout,
+    key_layout: Arc<MoveTypeLayout>,
+    value_layout: Arc<MoveTypeLayout>,
     content: BTreeMap<Vec<u8>, GlobalValue>,
 }
 

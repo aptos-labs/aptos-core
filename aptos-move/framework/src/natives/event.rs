@@ -114,8 +114,10 @@ fn native_write_to_event_store(
         ContractEvent::new_v1(key, seq_num, ty_tag, blob).map_err(|_| SafeNativeError::Abort {
             abort_code: ECANNOT_CREATE_EVENT,
         })?;
-    ctx.events
-        .push((event, contains_delayed_fields.then_some(layout)));
+    ctx.events.push((
+        event,
+        contains_delayed_fields.then_some(layout.as_ref().clone()),
+    ));
     Ok(smallvec![])
 }
 
@@ -282,8 +284,10 @@ fn native_write_module_event_to_store(
     let event = ContractEvent::new_v2(type_tag, blob).map_err(|_| SafeNativeError::Abort {
         abort_code: ECANNOT_CREATE_EVENT,
     })?;
-    ctx.events
-        .push((event, contains_delayed_fields.then_some(layout)));
+    ctx.events.push((
+        event,
+        contains_delayed_fields.then_some(layout.as_ref().clone()),
+    ));
 
     Ok(smallvec![])
 }

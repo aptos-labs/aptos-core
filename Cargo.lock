@@ -12774,6 +12774,7 @@ dependencies = [
  "bytes",
  "cfg-if",
  "claims",
+ "dashmap 7.0.0-rc2",
  "fail",
  "hashbrown 0.14.3",
  "hex",
