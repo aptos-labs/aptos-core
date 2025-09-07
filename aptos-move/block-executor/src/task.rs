@@ -244,4 +244,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
     fn get_write_summary(
         &self,
     ) -> HashSet<InputOutputKey<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Tag>>;
+
+    // Records all the keys read during the execution of this transaction.
+    fn record_read_set(&self, keys_read: impl IntoIterator<Item = <Self::Txn as Transaction>::Key>);
 }

@@ -31,48 +31,13 @@ impl StateUpdateRef<'_> {
                 hot_since_version: self.version,
                 lru_info: LRUEntry::uninitialized(),
             },
-            BaseStateOp::MakeHot { prev_slot } => match prev_slot {
-                StateSlot::ColdVacant => StateSlot::HotVacant {
-                    hot_since_version: self.version,
-                    lru_info: LRUEntry::uninitialized(),
-                },
-                StateSlot::HotVacant { .. } => StateSlot::HotVacant {
-                    hot_since_version: self.version,
-                    lru_info: LRUEntry::uninitialized(),
-                },
-                StateSlot::ColdOccupied {
-                    value_version,
-                    value,
-                }
-                | StateSlot::HotOccupied {
-                    value_version,
-                    value,
-                    ..
-                } => StateSlot::HotOccupied {
-                    value_version,
-                    value,
-                    hot_since_version: self.version,
-                    lru_info: LRUEntry::uninitialized(),
-                },
-            },
-            BaseStateOp::Eviction { prev_slot } => match prev_slot {
-                StateSlot::HotVacant { .. } => StateSlot::ColdVacant,
-                StateSlot::HotOccupied {
-                    value_version,
-                    value,
-                    ..
-                } => StateSlot::ColdOccupied {
-                    value_version,
-                    value,
-                },
-                StateSlot::ColdVacant | StateSlot::ColdOccupied { .. } => {
-                    unreachable!("only hot slots can be evicted")
-                },
-            },
+            BaseStateOp::MakeHot => unreachable!("can not happen"),
         }
     }
 
-    pub fn value_hash_opt(&self) -> Option<HashValue> {
-        self.state_op.as_state_value_opt().map(|val| val.hash())
+    pub fn value_hash_opt(&self) -> Option<Option<HashValue>> {
+        self.state_op
+            .as_state_value_opt()
+            .map(|val_opt| val_opt.map(|val| val.hash()))
     }
 }

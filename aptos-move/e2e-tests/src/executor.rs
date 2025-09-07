@@ -1432,7 +1432,7 @@ fn finish_session_assert_no_modules(
         .expect("Failed to finish the session");
 
     change_set
-        .try_combine_into_storage_change_set(ModuleWriteSet::empty())
+        .try_combine_into_storage_change_set(ModuleWriteSet::empty(), BTreeSet::new())
         .expect("Failed to convert to storage ChangeSet")
         .into_inner()
 }
