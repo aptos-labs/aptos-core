@@ -52,23 +52,6 @@ impl<T: Transaction> ReadWriteSummary<T> {
             writes: self.writes.into_iter().map(collapse).collect(),
         }
     }
-
-    pub fn keys_written(&self) -> impl Iterator<Item = &T::Key> {
-        Self::keys_except_delayed_fields(self.writes.iter())
-    }
-
-    pub fn keys_read(&self) -> impl Iterator<Item = &T::Key> {
-        Self::keys_except_delayed_fields(self.reads.iter())
-    }
-
-    fn keys_except_delayed_fields<'a>(
-        keys: impl Iterator<Item = &'a InputOutputKey<T::Key, T::Tag>>,
-    ) -> impl Iterator<Item = &'a T::Key> {
-        keys.filter_map(|k| match k {
-            InputOutputKey::Resource(key) | InputOutputKey::Group(key, _) => Some(key),
-            InputOutputKey::DelayedField(_) => None,
-        })
-    }
 }
 
 impl<T: Transaction> fmt::Debug for ReadWriteSummary<T> {
