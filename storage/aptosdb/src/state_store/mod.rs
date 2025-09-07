@@ -757,12 +757,12 @@ impl StateStore {
                         if self.state_kv_db.enabled_sharding() {
                             batch.put::<StateValueByKeyHashSchema>(
                                 &(CryptoHash::hash(*key), version),
-                                &write_op.as_state_value_opt().cloned(),
+                                &write_op.as_state_value_opt().unwrap().cloned(),
                             )
                         } else {
                             batch.put::<StateValueSchema>(
                                 &((*key).clone(), version),
-                                &write_op.as_state_value_opt().cloned(),
+                                &write_op.as_state_value_opt().unwrap().cloned(),
                             )
                         }
                     })

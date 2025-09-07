@@ -23,6 +23,7 @@ use aptos_types::{
         StateViewId, NUM_STATE_SHARDS,
     },
     transaction::Version,
+    write_set::BaseStateOp,
 };
 use arr_macro::arr;
 use derive_more::Deref;
@@ -169,7 +170,13 @@ impl State {
             .map(|(cache, overlay, updates)| {
                 let new_items = updates
                     .iter()
-                    .map(|(k, u)| ((*k).clone(), u.to_result_slot()))
+                    .map(|(k, u)| {
+                        let slot = match u.state_op {
+                            BaseStateOp::MakeHot => Self::expect_old_slot(overlay, cache, k),
+                            _ => u.to_result_slot(),
+                        };
+                        ((*k).clone(), slot)
+                    })
                     .collect_vec();
 
                 (
@@ -207,25 +214,43 @@ impl State {
         let mut items_delta: i64 = 0;
         let mut bytes_delta: i64 = 0;
         for (k, v) in updates {
+            if matches!(v.state_op, BaseStateOp::MakeHot) {
+                continue;
+            }
+
             let key_size = k.size();
-            if let Some(value) = v.state_op.as_state_value_opt() {
+            if let Some(Some(value)) = v.state_op.as_state_value_opt() {
                 items_delta += 1;
                 bytes_delta += (key_size + value.size()) as i64;
             }
 
-            // TODO(aldenhu): avoid cloning the state value (by not using DashMap)
             // n.b. all updated state items must be read and recorded in the state cache,
             // otherwise we can't calculate the correct usage.
-            let old_slot = overlay
-                .get(k)
-                .or_else(|| cache.get(*k).map(|entry| entry.value().clone()))
-                .expect("Must cache read");
+            let old_slot = Self::expect_old_slot(overlay, cache, k);
             if old_slot.is_occupied() {
                 items_delta -= 1;
                 bytes_delta -= (key_size + old_slot.size()) as i64;
             }
         }
         (items_delta, bytes_delta)
+    }
+
+    fn expect_old_slot(
+        overlay: &LayeredMap<StateKey, StateSlot>,
+        cache: &StateCacheShard,
+        key: &StateKey,
+    ) -> StateSlot {
+        match overlay.get(key) {
+            Some(slot) => slot,
+            None => {
+                // TODO(aldenhu): avoid cloning the state value (by not using DashMap)
+                cache
+                    .get(key)
+                    .unwrap_or_else(|| panic!("Key {:?} must exist in the cache.", key))
+                    .value()
+                    .clone()
+            },
+        }
     }
 }
 
@@ -310,7 +335,7 @@ impl LedgerState {
             persisted_snapshot.clone(),
             self.latest().clone(),
         );
-        state_view.prime_cache(updates)?;
+        state_view.prime_cache(updates, false)?;
 
         let updated = self.update_with_memorized_reads(
             persisted_snapshot,
