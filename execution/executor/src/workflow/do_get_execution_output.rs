@@ -377,6 +377,7 @@ impl Parser {
         base_state_view.prime_cache(to_commit.state_update_refs(), !prime_state_cache)?;
 
         let result_state = parent_state.update_with_memorized_reads(
+            Arc::clone(&base_state_view.hot),
             base_state_view.persisted_state(),
             to_commit.state_update_refs(),
             base_state_view.memorized_reads(),
