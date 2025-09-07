@@ -32,14 +32,14 @@ use bytes::Bytes;
 use claims::{assert_err, assert_matches, assert_ok, assert_some_eq};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
-    account_address::AccountAddress,
-    ident_str,
-    language_storage::{ModuleId, StructTag},
-    value::MoveTypeLayout,
+    account_address::AccountAddress, ident_str, language_storage::StructTag, value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 /// Testcases:
 /// ```text
@@ -311,13 +311,21 @@ fn test_roundtrip_to_storage_change_set() {
         name: ident_str!("Foo").into(),
         type_args: vec![],
     };
-    let test_module_id = ModuleId::new(AccountAddress::ONE, ident_str!("bar").into());
-
+    let module_key1 = StateKey::module(&AccountAddress::ONE, ident_str!("foo"));
+    let module_key2 = StateKey::module(&AccountAddress::TWO, ident_str!("bar"));
     let resource_key = StateKey::resource(&AccountAddress::ONE, &test_struct_tag).unwrap();
-    let module_key = StateKey::module_id(&test_module_id);
+
+    let read_keys: BTreeSet<_> = [
+        resource_key.clone(),
+        module_key1.clone(),
+        module_key2.clone(),
+    ]
+    .into_iter()
+    .collect();
+
     let write_set = WriteSetMut::new(vec![
         (resource_key, WriteOp::legacy_deletion()),
-        (module_key, WriteOp::legacy_deletion()),
+        (module_key1, WriteOp::legacy_deletion()),
     ])
     .freeze()
     .unwrap();
@@ -329,7 +337,7 @@ fn test_roundtrip_to_storage_change_set() {
         );
 
     let storage_change_set_after =
-        assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));
+        assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set, read_keys));
     assert_eq!(storage_change_set_before, storage_change_set_after)
 }
 
@@ -343,7 +351,8 @@ fn test_failed_conversion_to_change_set() {
         .build();
 
     // Unchecked conversion ignores deltas.
-    let vm_status = change_set.try_combine_into_storage_change_set(ModuleWriteSet::empty());
+    let vm_status =
+        change_set.try_combine_into_storage_change_set(ModuleWriteSet::empty(), BTreeSet::new());
     assert_matches!(vm_status, Err(PanicError::CodeInvariantError(_)));
 }
 
@@ -358,7 +367,7 @@ fn test_conversion_to_change_set_fails() {
 
     assert_err!(change_set
         .clone()
-        .try_combine_into_storage_change_set(ModuleWriteSet::empty()));
+        .try_combine_into_storage_change_set(ModuleWriteSet::empty(), BTreeSet::new()));
 }
 
 #[test]
