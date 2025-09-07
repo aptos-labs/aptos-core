@@ -448,6 +448,8 @@ pub struct AptosDataClientConfig {
     pub max_transaction_output_chunk_size: u64,
     /// Timeout (in ms) when waiting for an optimistic fetch response
     pub optimistic_fetch_timeout_ms: u64,
+    /// The duration (in seconds) after which to panic if no progress has been made
+    pub progress_check_max_stall_time_secs: u64,
     /// First timeout (in ms) when waiting for a response
     pub response_timeout_ms: u64,
     /// Timeout (in ms) when waiting for a subscription response
@@ -474,8 +476,9 @@ impl Default for AptosDataClientConfig {
             max_subscription_lag_secs: 20, // 20 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
-            optimistic_fetch_timeout_ms: 5000,        // 5 seconds
-            response_timeout_ms: 10_000,              // 10 seconds
+            optimistic_fetch_timeout_ms: 5000,         // 5 seconds
+            progress_check_max_stall_time_secs: 86400, // 24 hours (long enough to debug any issues at runtime)
+            response_timeout_ms: 10_000,               // 10 seconds
             subscription_response_timeout_ms: 15_000, // 15 seconds (longer than a regular timeout because of prefetching)
             use_compression: true,
         }
