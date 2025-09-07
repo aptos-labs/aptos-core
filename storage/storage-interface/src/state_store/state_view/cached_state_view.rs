@@ -15,6 +15,7 @@ use crate::{
     DbReader,
 };
 use anyhow::Result;
+use aptos_logger::info;
 use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_types::{
     state_store::{
@@ -168,25 +169,39 @@ impl CachedStateView {
         )
     }
 
-    pub fn prime_cache(&self, updates: &StateUpdateRefs) -> Result<()> {
+    pub fn prime_cache(&self, updates: &StateUpdateRefs, make_hot_only: bool) -> Result<()> {
         let _timer = TIMER.timer_with(&["prime_state_cache"]);
 
         IO_POOL.install(|| {
             if let Some(updates) = updates.for_last_checkpoint_batched() {
-                self.prime_cache_for_batched_updates(updates)?;
+                self.prime_cache_for_batched_updates(updates, make_hot_only)?;
             }
             if let Some(updates) = updates.for_latest_batched() {
-                self.prime_cache_for_batched_updates(updates)?;
+                self.prime_cache_for_batched_updates(updates, make_hot_only)?;
             }
             Ok(())
         })
     }
 
-    fn prime_cache_for_batched_updates(&self, updates: &BatchedStateUpdateRefs) -> Result<()> {
-        updates
-            .shards
-            .par_iter()
-            .try_for_each(|shard| self.prime_cache_for_keys(shard.keys().cloned()))
+    fn prime_cache_for_batched_updates(
+        &self,
+        updates: &BatchedStateUpdateRefs,
+        make_hot_only: bool,
+    ) -> Result<()> {
+        updates.shards.par_iter().try_for_each(|shard| {
+            self.prime_cache_for_keys(
+                shard
+                    .iter()
+                    .filter_map(|(k, u)| {
+                        if make_hot_only && u.state_op.is_value_write_op() {
+                            None
+                        } else {
+                            Some(k)
+                        }
+                    })
+                    .cloned(),
+            )
+        })
     }
 
     fn prime_cache_for_keys<'a, T: IntoIterator<Item = &'a StateKey> + Send>(
@@ -259,6 +274,11 @@ impl TStateView for CachedStateView {
     }
 
     fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateSlot> {
+        info!(
+            "CachedStateView::get_state_slot. Next version: {}. Key: {:?}",
+            self.next_version(),
+            state_key
+        );
         let _timer = TIMER.timer_with(&["get_state_value"]);
         COUNTER.inc_with(&["sv_total_get"]);
 

@@ -7,6 +7,7 @@ use crate::{
     view::{LatestView, ViewState},
 };
 use ambassador::delegate_to_methods;
+use aptos_logger::info;
 use aptos_mvhashmap::types::TxnIndex;
 #[cfg(test)]
 use aptos_types::on_chain_config::CurrentTimeMicroseconds;
@@ -51,6 +52,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestVi
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
         let key = T::Key::from_address_and_module_name(key.address(), key.name());
+        info!("LatestView as ModuleCodeBuilder::build: {:?}", key);
         self.get_raw_base_value(&key)
             .map_err(|err| err.finish(Location::Undefined))?
             .map(|state_value| {
@@ -164,6 +166,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'_,
                 Ok(read)
             },
             ViewState::Unsync(state) => {
+                info!("Trying to get {:?} from global module cache", key);
                 if let Some(module) = self.global_module_cache.get(key) {
                     state.read_set.borrow_mut().capture_module_read(key.clone());
                     return Ok(Some((module, Self::Version::default())));

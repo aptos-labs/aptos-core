@@ -46,7 +46,7 @@ use aptos_types::{
         AuxiliaryInfoTrait, BlockOutput, PersistedAuxiliaryInfo, Transaction, TransactionOutput,
         TransactionStatus, Version,
     },
-    write_set::{HotStateOp, TransactionWrite, WriteSet},
+    write_set::{TransactionWrite, WriteSet},
 };
 use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
@@ -119,7 +119,7 @@ impl DoGetExecutionOutput {
             onchain_config,
             transaction_slice_metadata,
         )?;
-        let (mut transaction_outputs, block_epilogue_txn) = block_output.into_inner();
+        let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
         let (transactions, mut auxiliary_infos) = txn_provider.into_inner();
         let mut transactions = transactions
             .into_iter()
@@ -142,32 +142,6 @@ impl DoGetExecutionOutput {
             };
 
             auxiliary_infos.push(block_epilogue_aux_info);
-        }
-
-        // Manually create hotness write sets for block epilogue transaction(s), based on the block
-        // end info saved. Note that even if we are re-executing transactions during a state sync,
-        // the block end info is not re-computed and has to come from the previous execution.
-        //
-        // If the input transactions are from a normal block, the last one should be the epilogue.
-        // If they are from a chunk (i.e. we are re-executing transactions during state sync), then
-        // there could be zero or more block epilogue transactions, and we need to handle all of
-        // them.
-        //
-        // TODO(HotState): it might be better to do this in AptosVM::execute_single_transaction,
-        // but we need to figure out how to properly construct `VMOutput` from block end info.
-        for (transaction, output) in transactions.iter().zip_eq(transaction_outputs.iter_mut()) {
-            if let Transaction::BlockEpilogue(payload) = transaction {
-                assert!(output.status().is_kept(), "Block epilogue must be kept");
-                output.add_hotness(
-                    payload
-                        .try_get_slots_to_make_hot()
-                        .cloned()
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(|(key, slot)| (key, HotStateOp::make_hot(slot)))
-                        .collect(),
-                );
-            }
         }
 
         Parser::parse(
@@ -400,9 +374,7 @@ impl Parser {
                 .transpose()?
         };
 
-        if prime_state_cache {
-            base_state_view.prime_cache(to_commit.state_update_refs())?;
-        }
+        base_state_view.prime_cache(to_commit.state_update_refs(), !prime_state_cache)?;
 
         let result_state = parent_state.update_with_memorized_reads(
             base_state_view.persisted_state(),

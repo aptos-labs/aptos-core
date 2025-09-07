@@ -4929,6 +4929,7 @@ dependencies = [
  "aptos-aggregator",
  "aptos-gas-algebra",
  "aptos-gas-schedule",
+ "aptos-logger",
  "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",

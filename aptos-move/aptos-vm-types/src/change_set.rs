@@ -15,6 +15,7 @@ use aptos_aggregator::{
     delta_change_set::{serialize, DeltaOp},
     resolver::AggregatorV1Resolver,
 };
+use aptos_logger::info;
 use aptos_types::{
     contract_event::ContractEvent,
     error::{code_invariant_error, PanicError},
@@ -218,8 +219,10 @@ impl VMChangeSet {
     pub fn try_combine_into_storage_change_set(
         self,
         module_write_set: ModuleWriteSet,
-        _read_set: BTreeSet<StateKey>,
+        read_set: BTreeSet<StateKey>,
     ) -> Result<StorageChangeSet, PanicError> {
+        info!("final read set: {:?}", read_set);
+
         // Converting VMChangeSet into TransactionOutput (i.e. storage change set), can
         // be done here only if dynamic_change_set_optimizations have not been used/produced
         // data into the output.
@@ -264,11 +267,10 @@ impl VMChangeSet {
         write_set_mut.extend(module_write_set.into_write_ops());
         write_set_mut.extend(aggregator_v1_write_set);
 
+        info!("final write set: {:?}", write_set_mut.write_set.keys().cloned().collect::<BTreeSet<_>>());
+
         let events = events.into_iter().map(|(e, _)| e).collect();
-        // TODO(HotState): construct write set with the reads.
-        let write_set = write_set_mut
-            .freeze()
-            .expect("Freezing a WriteSet does not fail.");
+        let write_set = write_set_mut.freeze_with_reads(read_set);
         Ok(StorageChangeSet::new(write_set, events))
     }
 

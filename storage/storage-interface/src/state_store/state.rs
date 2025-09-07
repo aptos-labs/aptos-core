@@ -16,6 +16,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
+use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
@@ -23,6 +24,7 @@ use aptos_types::{
         StateViewId, NUM_STATE_SHARDS,
     },
     transaction::Version,
+    write_set::BaseStateOp,
 };
 use arr_macro::arr;
 use derive_more::Deref;
@@ -145,6 +147,7 @@ impl State {
         let _timer = TIMER.timer_with(&["state__update"]);
 
         // 1. The update batch must begin at self.next_version().
+        let fv = updates.first_version;
         assert_eq!(self.next_version(), updates.first_version);
         // 2. The cache must be at a version equal or newer than `persisted`, otherwise
         //    updates between the cached version and the persisted version are potentially
@@ -160,25 +163,41 @@ impl State {
         assert!(self.next_version() >= state_cache.next_version());
 
         let overlay = self.make_delta(persisted);
-        let (shards, usage_delta_per_shard): (Vec<_>, Vec<_>) = (
+        let (shards, usage_delta_per_shard): (Vec<_>, Vec<_>) = itertools::multizip((
             state_cache.shards.as_slice(),
             overlay.shards.as_slice(),
             updates.shards.as_slice(),
-        )
-            .into_par_iter()
-            .map(|(cache, overlay, updates)| {
-                let new_items = updates
-                    .iter()
-                    .map(|(k, u)| ((*k).clone(), u.to_result_slot()))
-                    .collect_vec();
+        ))
+        .enumerate()
+        .map(|(shard_id, (cache, overlay, updates))| {
+            info!(
+                "shard_id: {}. first_version: {}, state cache: {:?}",
+                shard_id,
+                fv,
+                cache.iter().map(|entry| entry.key().clone()).collect_vec()
+            );
+            let new_items = updates
+                .iter()
+                .map(|(k, u)| match u.state_op {
+                    BaseStateOp::MakeHot => {
+                        let slot = cache
+                            .get(*k)
+                            .expect(&format!("Key {:?} should be in the cache. u.version: {}", *k, u.version))
+                            .value()
+                            .clone();
+                        ((*k).clone(), slot)
+                    },
+                    _ => ((*k).clone(), u.to_result_slot()),
+                })
+                .collect_vec();
 
-                (
-                    // TODO(aldenhu): change interface to take iter of ref
-                    overlay.new_layer(&new_items),
-                    Self::usage_delta_for_shard(cache, overlay, updates),
-                )
-            })
-            .unzip();
+            (
+                // TODO(aldenhu): change interface to take iter of ref
+                overlay.new_layer(&new_items),
+                Self::usage_delta_for_shard(cache, overlay, updates),
+            )
+        })
+        .unzip();
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let usage = self.update_usage(usage_delta_per_shard);
 
@@ -207,8 +226,12 @@ impl State {
         let mut items_delta: i64 = 0;
         let mut bytes_delta: i64 = 0;
         for (k, v) in updates {
+            if matches!(v.state_op, BaseStateOp::MakeHot) {
+                continue;
+            }
+
             let key_size = k.size();
-            if let Some(value) = v.state_op.as_state_value_opt() {
+            if let Some(Some(value)) = v.state_op.as_state_value_opt() {
                 items_delta += 1;
                 bytes_delta += (key_size + value.size()) as i64;
             }
@@ -310,7 +333,7 @@ impl LedgerState {
             persisted_snapshot.clone(),
             self.latest().clone(),
         );
-        state_view.prime_cache(updates)?;
+        state_view.prime_cache(updates, false)?;
 
         let updated = self.update_with_memorized_reads(
             persisted_snapshot,
