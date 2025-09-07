@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{db::test_helper::arb_key_universe, state_store::persisted_state::PersistedState};
-use aptos_block_executor::hot_state_op_accumulator::BlockHotStateOpAccumulator;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_scratchpad::test_utils::naive_smt::NaiveSmt;
@@ -549,16 +548,10 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
         let base_view = state_by_version
             .get_state(next_version.checked_sub(1))
             .clone();
-        let mut op_accu = BlockHotStateOpAccumulator::<StateKey, _>::new_with_config(
-            &base_view,
-            MAX_PROMOTIONS_PER_BLOCK,
-            REFRESH_INTERVAL_VERSIONS,
-        );
         for txn in block_txns {
             // No promotions except for block epilogue.
             state_by_version
                 .append_version(txn.writes.iter().map(|(k, v)| (k, v.as_ref())), vec![]);
-            op_accu.add_transaction(txn.writes.iter().map(|(k, _v)| k), txn.reads.iter());
             all_txns.push(Txn {
                 reads: txn.reads,
                 write_set: txn
