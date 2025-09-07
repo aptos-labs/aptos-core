@@ -40,6 +40,7 @@ use std::{
     fmt::{self, Debug, Display, Formatter},
     iter, mem,
     rc::Rc,
+    sync::Arc,
 };
 
 /// Values can be recursive, and so it is important that we do not use recursive algorithms over
@@ -3461,8 +3462,8 @@ impl GlobalValue {
 
     pub fn into_effect_with_layout(
         self,
-        layout: MoveTypeLayout,
-    ) -> Option<Op<(Value, MoveTypeLayout)>> {
+        layout: Arc<MoveTypeLayout>,
+    ) -> Option<Op<(Value, Arc<MoveTypeLayout>)>> {
         self.0
             .into_effect()
             .map(|op| op.map(|v| (Value(v), layout)))

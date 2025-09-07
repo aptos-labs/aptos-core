@@ -178,7 +178,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     /// Returns the runtime layout of a type that can be used to (de)serialize the value.
     ///
     /// NOTE: use with caution as this ignores the flag if layout contains delayed fields or not.
-    pub fn type_to_type_layout(&mut self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+    pub fn type_to_type_layout(&mut self, ty: &Type) -> PartialVMResult<Arc<MoveTypeLayout>> {
         let layout = self
             .loader_context()
             .type_to_type_layout_with_delayed_fields(ty)?
@@ -202,7 +202,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     pub fn type_to_type_layout_check_no_delayed_fields(
         &mut self,
         ty: &Type,
-    ) -> PartialVMResult<MoveTypeLayout> {
+    ) -> PartialVMResult<Arc<MoveTypeLayout>> {
         let layout = self
             .loader_context()
             .type_to_type_layout_with_delayed_fields(ty)?;
@@ -415,7 +415,10 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
                 ty,
             )
         })?;
-        Ok(layout.into_layout_when_has_no_delayed_fields())
+        // irrelevant for benchmark
+        Ok(layout
+            .into_layout_when_has_no_delayed_fields()
+            .map(|l| l.as_ref().clone()))
     }
 }
 
