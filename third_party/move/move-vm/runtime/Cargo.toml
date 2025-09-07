@@ -16,6 +16,7 @@ better_any = { workspace = true }
 bytes = { workspace = true }
 cfg-if = { workspace = true }
 claims = { workspace = true }
+dashmap = { workspace = true }
 fail = { workspace = true }
 hashbrown = { workspace = true }
 lazy_static = { workspace = true }
