@@ -58,7 +58,7 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
-    block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
+    block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     contract_event::ContractEvent,
     fee_statement::FeeStatement,
@@ -68,7 +68,6 @@ use aptos_types::{
         ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features, OnChainConfig,
         TimedFeatureFlag, TimedFeatures,
     },
-    randomness::Randomness,
     state_store::{StateView, TStateView},
     transaction::{
         authenticator::{AbstractionAuthData, AnySignature, AuthenticationProof},
@@ -2306,9 +2305,7 @@ impl AptosVM {
         let mut gas_meter = UnmeteredGasMeter;
         let mut session = self.new_session(resolver, SessionId::block_meta(&block_metadata), None);
 
-        let args = serialize_values(
-            &block_metadata.get_prologue_move_args(account_config::reserved_vm_address()),
-        );
+        let args = serialize_values(&block_metadata.get_move_args());
 
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
@@ -2358,41 +2355,7 @@ impl AptosVM {
             None,
         );
 
-        let block_metadata_with_randomness = match block_metadata_ext {
-            BlockMetadataExt::V0(_) => unreachable!(),
-            BlockMetadataExt::V1(v1) => v1,
-        };
-
-        let BlockMetadataWithRandomness {
-            id,
-            epoch,
-            round,
-            proposer,
-            previous_block_votes_bitvec,
-            failed_proposer_indices,
-            timestamp_usecs,
-            randomness,
-        } = block_metadata_with_randomness;
-
-        let args = vec![
-            MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
-            MoveValue::Address(AccountAddress::from_bytes(id.to_vec()).unwrap()),
-            MoveValue::U64(epoch),
-            MoveValue::U64(round),
-            MoveValue::Address(proposer),
-            failed_proposer_indices
-                .into_iter()
-                .map(|i| i as u64)
-                .collect::<Vec<_>>()
-                .as_move_value(),
-            previous_block_votes_bitvec.as_move_value(),
-            MoveValue::U64(timestamp_usecs),
-            randomness
-                .as_ref()
-                .map(Randomness::randomness_cloned)
-                .as_move_value(),
-        ];
-
+        let args = block_metadata_ext.get_move_args();
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
 
