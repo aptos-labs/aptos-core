@@ -35,17 +35,24 @@ use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
     TransactionType::{self, CoinTransfer},
 };
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::{
+    account_address::AccountAddress,
+    on_chain_config::{FeatureFlag, Features},
+    transaction::{TransactionPayload, EntryFunction, Transaction},
+};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId};
+use aptos_sdk::types::AccountKey;
+use std::time::{Duration, Instant};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use measurements::{EventMeasurements, OverallMeasurement, OverallMeasuring};
 use pipeline::PipelineConfig;
+use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use std::{
     fs,
     path::Path,
     sync::{atomic::AtomicUsize, Arc},
-    time::Instant,
 };
 use tokio::runtime::Runtime;
 
@@ -60,6 +67,100 @@ pub fn default_benchmark_features() -> Features {
     features.disable(FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION);
     features
 }
+
+// Use a fixed benchmark proposer address
+pub fn get_benchmark_proposer_address() -> AccountAddress {
+    // Use a simple address that avoids special validation
+    AccountAddress::from_hex_literal("0x2").expect("Valid hex address")
+}
+
+// Create account creation transaction for the proposer
+pub fn create_proposer_account_transaction(
+    root_account: &mut crate::LocalAccount,
+    proposer_address: AccountAddress,
+) -> Transaction {
+    let transfer_amount = 10000000u64; // 100 APT in microAPT
+    info!("💰 Creating proposer account funding transaction:");
+    info!("  • From: {} (root account)", root_account.address());
+    info!("  • To: {} (proposer)", proposer_address);
+    info!("  • Amount: 100 APT ({} microAPT)", transfer_amount);
+
+    // Transfer some coins to create the proposer account
+    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::ONE,
+            Identifier::new("aptos_account").expect("Valid identifier"),
+        ),
+        Identifier::new("transfer").expect("Valid identifier"),
+        vec![],
+        vec![
+            bcs::to_bytes(&proposer_address).expect("Should serialize address"),
+            bcs::to_bytes(&transfer_amount).expect("Should serialize amount"),
+        ],
+    ));
+
+    info!("📝 Created entry function call: 0x1::aptos_account::transfer");
+
+    let transaction_factory = crate::TransactionGenerator::create_transaction_factory();
+    let signed_txn = root_account.sign_with_transaction_builder(transaction_factory.payload(payload));
+    info!("✅ Transaction signed with root account");
+
+    Transaction::UserTransaction(signed_txn)
+}
+
+// Create a LocalAccount for the proposer with a deterministic private key
+pub fn create_proposer_local_account() -> crate::LocalAccount {
+    use aptos_crypto::ed25519::Ed25519PrivateKey;
+
+    // Use a deterministic seed for the proposer private key (for AccountAddress::ONE)
+    let seed = [0x00, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03,
+                0x00, 0x04, 0x00, 0x05, 0x00, 0x06, 0x00, 0x07,
+                0x00, 0x08, 0x00, 0x09, 0x00, 0x0A, 0x00, 0x0B,
+                0x00, 0x0C, 0x00, 0x0D, 0x00, 0x0E, 0x00, 0x0F];
+
+    let private_key = Ed25519PrivateKey::try_from(&seed[..]).expect("Valid private key");
+    let account_key = AccountKey::from_private_key(private_key);
+
+    crate::LocalAccount::new(get_benchmark_proposer_address(), account_key, 0)
+}
+
+// Create initialize_stake_owner transaction to set up StakePool
+// This must be called by the proposer account itself
+pub fn create_stake_owner_init_transaction(
+    proposer_account: &mut crate::LocalAccount,
+) -> Transaction {
+    let proposer_address = proposer_account.address();
+    info!("📋 Creating initialize_stake_owner transaction:");
+    info!("  • Proposer address: {}", proposer_address);
+    info!("  • Stake amount: 1 APT (1000000 microAPT)");
+    info!("  • Operator address: {}", proposer_address);
+    info!("  • Voter address: {}", proposer_address);
+
+    // Create initialize_stake_owner transaction with minimal stake
+    let stake_amount = 1000000u64; // 1 APT in microAPT
+    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::ONE,
+            Identifier::new("stake").expect("Valid identifier"),
+        ),
+        Identifier::new("initialize_stake_owner").expect("Valid identifier"),
+        vec![],
+        vec![
+            bcs::to_bytes(&stake_amount).expect("Should serialize stake amount"),
+            bcs::to_bytes(&proposer_address).expect("Should serialize operator address"),
+            bcs::to_bytes(&proposer_address).expect("Should serialize voter address"),
+        ],
+    ));
+
+    info!("📝 Created entry function call: 0x1::stake::initialize_stake_owner");
+
+    let transaction_factory = crate::TransactionGenerator::create_transaction_factory();
+    let signed_txn = proposer_account.sign_with_transaction_builder(transaction_factory.payload(payload));
+    info!("✅ Transaction signed with proposer account");
+
+    Transaction::UserTransaction(signed_txn)
+}
+
 
 pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
     DbReaderWriter::new(
@@ -408,6 +509,71 @@ pub fn add_accounts<V>(
     );
 }
 
+// Execute proposer setup transactions synchronously by using existing benchmark infrastructure
+pub fn execute_proposer_setup_sync(
+    db: &DbReaderWriter,
+    root_account: &mut crate::LocalAccount,
+    proposer_address: AccountAddress,
+) {
+    info!("🚀 Setting up proposer using existing benchmark pipeline...");
+
+    // Step 1: Create account funding transaction
+    info!("💰 Creating account funding transaction for proposer: {}", proposer_address);
+    let account_create_txn = create_proposer_account_transaction(root_account, proposer_address);
+
+    // Step 2: Create proposer LocalAccount for stake initialization
+    let mut proposer_account = create_proposer_local_account();
+    info!("🔑 Created proposer LocalAccount: {}", proposer_account.address());
+
+    // Step 3: Create stake initialization transaction
+    // Note: This should work because is_allowed() returns true when no AllowedValidators resource exists
+    info!("🏗️ Creating stake initialization transaction...");
+    let stake_init_txn = create_stake_owner_init_transaction(&mut proposer_account);
+
+    // Execute setup transactions using the pipeline (simplified approach)
+    info!("⚡ Executing {} setup transactions through pipeline...", 2);
+    let setup_txns = vec![account_create_txn, stake_init_txn];
+
+    // Use a simple temporary pipeline to execute these transactions
+    let executor = BlockExecutor::<AptosVMBlockExecutor>::new(db.clone());
+    let start_version = db.reader.get_latest_ledger_info_version().unwrap();
+
+    let (temp_pipeline, setup_sender) = Pipeline::new(
+        executor,
+        start_version,
+        &PipelineConfig {
+            generate_then_execute: false,
+            split_stages: false,
+            skip_commit: false,
+            allow_discards: false,
+            allow_aborts: false,
+            allow_retries: false,
+            num_executor_shards: 0,
+            num_generator_workers: 1,
+            partitioner_config: PartitionerV2Config::default(),
+            num_sig_verify_threads: 8,
+            print_transactions: false,
+        },
+        None,
+    );
+
+    // Send setup transactions
+    setup_sender.send(setup_txns).expect("Failed to send setup transactions");
+
+    // Start processing and wait for completion
+    temp_pipeline.start_pipeline_processing();
+    temp_pipeline.join();
+
+    info!("✅ Setup transactions completed successfully!");
+
+    // Brief pause to ensure commit is fully processed
+    std::thread::sleep(Duration::from_millis(200));
+
+    info!("🎉 Proposer setup verified and ready for benchmark!");
+}
+
+
+
 fn add_accounts_impl<V>(
     num_new_accounts: usize,
     init_account_balance: u64,
@@ -440,9 +606,17 @@ fn add_accounts_impl<V>(
         Some(1 + num_new_accounts / block_size * 101 / 100),
     );
 
+    let mut root_account = TransactionGenerator::read_root_account(genesis_key, &db);
+    let proposer_address = get_benchmark_proposer_address();
+
+    // Execute proposer setup transactions synchronously first
+    info!("🚀 Setting up proposer synchronously before starting benchmark...");
+    execute_proposer_setup_sync(&db, &mut root_account, proposer_address);
+    info!("✅ Proposer setup completed and committed successfully!");
+
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
-        TransactionGenerator::read_root_account(genesis_key, &db),
+        root_account,
         block_sender,
         &source_dir,
         None,
