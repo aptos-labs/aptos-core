@@ -397,8 +397,10 @@ impl ReleaseEntry {
 
                     let execution_hash = get_execution_hash(result);
                     let mut hash_string = "vector[".to_string();
-                    for b in execution_hash.iter() {
-                        hash_string.push_str(format!("{}u8,", b).as_str());
+                    if let Some(execution_hash) = execution_hash {
+                        for b in execution_hash.iter() {
+                            hash_string.push_str(format!("{}u8,", b).as_str());
+                        }
                     }
                     hash_string.push(']');
 
