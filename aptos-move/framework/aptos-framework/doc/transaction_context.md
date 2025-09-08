@@ -8,6 +8,8 @@
 -  [Struct `AUID`](#0x1_transaction_context_AUID)
 -  [Struct `EntryFunctionPayload`](#0x1_transaction_context_EntryFunctionPayload)
 -  [Struct `MultisigPayload`](#0x1_transaction_context_MultisigPayload)
+-  [Struct `ScheduledTxnConfig`](#0x1_transaction_context_ScheduledTxnConfig)
+-  [Struct `TransactionPayloadConfig`](#0x1_transaction_context_TransactionPayloadConfig)
 -  [Constants](#@Constants_0)
 -  [Function `get_txn_hash`](#0x1_transaction_context_get_txn_hash)
 -  [Function `get_transaction_hash`](#0x1_transaction_context_get_transaction_hash)
@@ -39,6 +41,12 @@
 -  [Function `multisig_payload_internal`](#0x1_transaction_context_multisig_payload_internal)
 -  [Function `multisig_address`](#0x1_transaction_context_multisig_address)
 -  [Function `inner_entry_function_payload`](#0x1_transaction_context_inner_entry_function_payload)
+-  [Function `payload_config`](#0x1_transaction_context_payload_config)
+-  [Function `payload_config_internal`](#0x1_transaction_context_payload_config_internal)
+-  [Function `payload_scheduled_txn_config_allow_resched`](#0x1_transaction_context_payload_scheduled_txn_config_allow_resched)
+-  [Function `payload_scheduled_txn_config_auth_seqno`](#0x1_transaction_context_payload_scheduled_txn_config_auth_seqno)
+-  [Function `payload_scheduled_txn_config_auth_expiration`](#0x1_transaction_context_payload_scheduled_txn_config_auth_expiration)
+-  [Function `payload_config_scheduled_txn_auth_token`](#0x1_transaction_context_payload_config_scheduled_txn_auth_token)
 -  [Specification](#@Specification_1)
     -  [Function `get_txn_hash`](#@Specification_1_get_txn_hash)
     -  [Function `get_transaction_hash`](#@Specification_1_get_transaction_hash)
@@ -172,6 +180,85 @@ Represents the multisig payload.
 </dd>
 <dt>
 <code>entry_function_payload: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_transaction_context_ScheduledTxnConfig"></a>
+
+## Struct `ScheduledTxnConfig`
+
+
+
+<pre><code><b>struct</b> <a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">ScheduledTxnConfig</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>allow_rescheduling: bool</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>expiration_time: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>authorization_seqno: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_transaction_context_TransactionPayloadConfig"></a>
+
+## Struct `TransactionPayloadConfig`
+
+Represents the payload configuration for transactions.
+
+
+<pre><code><b>struct</b> <a href="transaction_context.md#0x1_transaction_context_TransactionPayloadConfig">TransactionPayloadConfig</a> <b>has</b> <b>copy</b>, drop
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>multisig_address: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<b>address</b>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>replay_protection_nonce: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>scheduled_txn_auth_token: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">transaction_context::ScheduledTxnConfig</a>&gt;</code>
 </dt>
 <dd>
 
@@ -958,6 +1045,156 @@ Returns the inner entry function payload of the multisig payload.
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_inner_entry_function_payload">inner_entry_function_payload</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">MultisigPayload</a>): Option&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>&gt; {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     payload.entry_function_payload
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_payload_config"></a>
+
+## Function `payload_config`
+
+Returns the transaction payload config if the current transaction has such a config. Otherwise, return <code>None</code>.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_config">payload_config</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_TransactionPayloadConfig">transaction_context::TransactionPayloadConfig</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_config">payload_config</a>(): Option&lt;<a href="transaction_context.md#0x1_transaction_context_TransactionPayloadConfig">TransactionPayloadConfig</a>&gt; {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <a href="transaction_context.md#0x1_transaction_context_payload_config_internal">payload_config_internal</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_payload_config_internal"></a>
+
+## Function `payload_config_internal`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_config_internal">payload_config_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_TransactionPayloadConfig">transaction_context::TransactionPayloadConfig</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_config_internal">payload_config_internal</a>(): Option&lt;<a href="transaction_context.md#0x1_transaction_context_TransactionPayloadConfig">TransactionPayloadConfig</a>&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_payload_scheduled_txn_config_allow_resched"></a>
+
+## Function `payload_scheduled_txn_config_allow_resched`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_scheduled_txn_config_allow_resched">payload_scheduled_txn_config_allow_resched</a>(payload_config: &<a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">transaction_context::ScheduledTxnConfig</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_scheduled_txn_config_allow_resched">payload_scheduled_txn_config_allow_resched</a>(payload_config: &<a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">ScheduledTxnConfig</a>): bool {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    payload_config.allow_rescheduling
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_payload_scheduled_txn_config_auth_seqno"></a>
+
+## Function `payload_scheduled_txn_config_auth_seqno`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_scheduled_txn_config_auth_seqno">payload_scheduled_txn_config_auth_seqno</a>(payload_config: &<a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">transaction_context::ScheduledTxnConfig</a>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_scheduled_txn_config_auth_seqno">payload_scheduled_txn_config_auth_seqno</a>(payload_config: &<a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">ScheduledTxnConfig</a>): u64 {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    payload_config.authorization_seqno
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_payload_scheduled_txn_config_auth_expiration"></a>
+
+## Function `payload_scheduled_txn_config_auth_expiration`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_scheduled_txn_config_auth_expiration">payload_scheduled_txn_config_auth_expiration</a>(payload_config: &<a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">transaction_context::ScheduledTxnConfig</a>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_scheduled_txn_config_auth_expiration">payload_scheduled_txn_config_auth_expiration</a>(payload_config: &<a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">ScheduledTxnConfig</a>): u64 {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    payload_config.expiration_time
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_payload_config_scheduled_txn_auth_token"></a>
+
+## Function `payload_config_scheduled_txn_auth_token`
+
+Returns the scheduled transaction auth token from the payload config.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_config_scheduled_txn_auth_token">payload_config_scheduled_txn_auth_token</a>(config: &<a href="transaction_context.md#0x1_transaction_context_TransactionPayloadConfig">transaction_context::TransactionPayloadConfig</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">transaction_context::ScheduledTxnConfig</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_config_scheduled_txn_auth_token">payload_config_scheduled_txn_auth_token</a>(config: &<a href="transaction_context.md#0x1_transaction_context_TransactionPayloadConfig">TransactionPayloadConfig</a>): Option&lt;<a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">ScheduledTxnConfig</a>&gt; {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    config.scheduled_txn_auth_token
 }
 </code></pre>
 
