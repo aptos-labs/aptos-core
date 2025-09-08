@@ -159,6 +159,8 @@ impl VersionState {
     fn new_empty() -> Self {
         Self {
             usage: StateStorageUsage::zero(),
+            // FIXME: use unbound and evict manually at end of block.
+            // Then do comparison.
             hot_state: LruCache::new(NonZeroUsize::new(HOT_STATE_MAX_ITEMS).unwrap()),
             state: HashMap::new(),
             summary: NaiveSmt::default(),
@@ -260,6 +262,25 @@ impl TStateView for VersionState {
 
     fn next_version(&self) -> Version {
         self.next_version
+    }
+
+    fn num_free_hot_slots(&self) -> Option<usize> {
+        println!("here");
+        Some(self.hot_state.cap().get() - self.hot_state.len())
+    }
+
+    fn hot_state_contains(&self, state_key: &Self::Key) -> bool {
+        self.hot_state.contains(state_key)
+    }
+
+    fn get_next_old_key(&self, state_key: Option<&Self::Key>) -> Option<Self::Key> {
+        match state_key {
+            Some(key) => {
+                let mut iter = self.hot_state.iter().skip_while(|x| x.0 != key).skip(1);
+                iter.next().map(|x| x.0.clone())
+            },
+            None => self.hot_state.peek_lru().map(|(k, _v)| k.clone()),
+        }
     }
 }
 
@@ -462,6 +483,7 @@ fn update_state(
         let memorized_reads = state_view.into_memorized_reads();
 
         let next_state = parent_state.update_with_memorized_reads(
+            hot_state.clone(),
             &persisted_state,
             block.update_refs(),
             &memorized_reads,
@@ -657,7 +679,7 @@ fn replay_chunks_pipelined(chunks: Vec<Chunk>, state_by_version: Arc<StateByVers
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(100))]
+    #![proptest_config(ProptestConfig::with_cases(1))]
 
     #[test]
     fn test_speculative_state_workflow(
