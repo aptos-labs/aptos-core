@@ -194,7 +194,7 @@ impl traits::Transcript for Transcript {
         let W = sc.get_total_weight();
 
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
-        let (f, extra) = fiat_shamir::fiat_shamir(
+        let (f, extra) = fiat_shamir::fiat_shamir_das(
             self,
             sc.get_threshold_config(),
             pp,
