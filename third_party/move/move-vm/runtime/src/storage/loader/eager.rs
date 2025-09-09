@@ -19,6 +19,7 @@ use move_binary_format::{
     access::ScriptAccess,
     errors::{PartialVMError, PartialVMResult, VMResult},
     file_format::CompiledScript,
+    CompiledModule,
 };
 use move_core_types::{
     identifier::IdentStr,
@@ -242,11 +243,11 @@ where
         _gas_meter: &mut impl DependencyGasMeter,
         _traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
-    ) -> PartialVMResult<Vec<Metadata>> {
+    ) -> PartialVMResult<Arc<CompiledModule>> {
         // Note:
         //   For backwards compatibility, metadata accesses were never metered.
         self.module_storage
-            .unmetered_get_existing_module_metadata(module_id.address(), module_id.name())
+            .unmetered_get_existing_deserialized_module(module_id.address(), module_id.name())
             .map_err(|err| err.to_partial())
     }
 }
