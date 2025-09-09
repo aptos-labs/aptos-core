@@ -12,12 +12,13 @@ use crate::{
     keyless::{KeylessPublicKey, KeylessSignature},
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
+    state_store::state_slot::StateSlot,
     transaction::authenticator::{
-        AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
+        AASigningData, AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
         TransactionAuthenticator,
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
-    write_set::{HotStateOp, WriteSet},
+    write_set::WriteSet,
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
@@ -36,7 +37,6 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
-    collections::BTreeMap,
     convert::TryFrom,
     fmt::{self, Debug, Display, Formatter},
 };
@@ -54,9 +54,7 @@ pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
 
-pub use self::block_epilogue::{
-    BlockEndInfo, BlockEndInfoExt, BlockEpiloguePayload, FeeDistribution, TBlockEndInfoExt,
-};
+pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload, FeeDistribution};
 use crate::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::TransactionEvent,
@@ -587,8 +585,10 @@ fn gen_auth(
             AccountAuthenticator::ed25519(Ed25519PublicKey::from(private_key), sender_signature)
         },
         Auth::Abstraction(function_info, sign_function) => {
-            let digest =
-                HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
+            let digest = AASigningData::signing_message_digest(
+                signing_message(user_signed_message)?,
+                function_info.clone(),
+            )?;
             AccountAuthenticator::abstraction(
                 function_info.clone(),
                 digest.clone(),
@@ -600,8 +600,10 @@ fn gen_auth(
             account_identity,
             sign_function,
         } => {
-            let digest =
-                HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
+            let digest = AASigningData::signing_message_digest(
+                signing_message(user_signed_message)?,
+                function_info.clone(),
+            )?;
             AccountAuthenticator::derivable_abstraction(
                 function_info.clone(),
                 digest.clone(),
@@ -1851,10 +1853,6 @@ impl TransactionOutput {
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
         self.write_set.state_update_refs()
     }
-
-    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
-        self.write_set.add_hotness(hotness);
-    }
 }
 
 /// `TransactionInfo` is the object we store in the transaction accumulator. It consists of the
@@ -2901,7 +2899,7 @@ impl Transaction {
 
     pub fn block_epilogue_v1(
         block_id: HashValue,
-        block_end_info: BlockEndInfoExt,
+        block_end_info: BlockEndInfo,
         fee_distribution: FeeDistribution,
     ) -> Self {
         Self::BlockEpilogue(BlockEpiloguePayload::V1 {
@@ -3029,7 +3027,7 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
 
     fn block_epilogue_v1(
         _block_id: HashValue,
-        _block_end_info: TBlockEndInfoExt<Self::Key>,
+        _block_end_info: BlockEndInfo,
         _fee_distribution: FeeDistribution,
     ) -> Self {
         unimplemented!()

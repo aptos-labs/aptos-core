@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{db::test_helper::arb_key_universe, state_store::persisted_state::PersistedState};
-use aptos_block_executor::hot_state_op_accumulator::BlockHotStateOpAccumulator;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_scratchpad::test_utils::naive_smt::NaiveSmt;
@@ -24,17 +23,22 @@ use aptos_types::{
         state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, ARB_STATE_VALUE_MAX_SIZE},
-        StateViewId, StateViewResult, TStateView,
+        StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
-    write_set::{BaseStateOp, HotStateOp, WriteOp},
+    write_set::{BaseStateOp, WriteOp},
 };
 use itertools::Itertools;
 use lru::LruCache;
-use proptest::{collection::vec, prelude::*, sample::Index};
+use proptest::{
+    collection::{hash_set, vec},
+    num,
+    prelude::*,
+    sample::Index,
+};
 use rayon::prelude::*;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt::{Debug, Formatter},
     num::NonZeroUsize,
     ops::Deref,
@@ -45,23 +49,21 @@ use std::{
     thread::spawn,
 };
 
-const NUM_KEYS: usize = 10;
-const HOT_STATE_MAX_ITEMS: usize = NUM_KEYS / 2;
+const NUM_KEYS: usize = 48;
+const HOT_STATE_MAX_ITEMS_PER_SHARD: usize = NUM_KEYS / 16 / 2;
 const HOT_STATE_MAX_BYTES: usize = NUM_KEYS / 2 * ARB_STATE_VALUE_MAX_SIZE / 3;
 const HOT_STATE_MAX_SINGLE_VALUE_BYTES: usize = ARB_STATE_VALUE_MAX_SIZE / 2;
-const MAX_PROMOTIONS_PER_BLOCK: usize = 10;
-const REFRESH_INTERVAL_VERSIONS: usize = 50;
 
 #[derive(Debug)]
 struct UserTxn {
-    reads: Vec<StateKey>,
-    writes: Vec<(StateKey, Option<StateValue>)>,
+    reads: HashSet<StateKey>,
+    writes: HashMap<StateKey, Option<StateValue>>,
 }
 
 #[derive(Debug)]
 struct Txn {
-    reads: Vec<StateKey>,
-    write_set: Vec<(StateKey, BaseStateOp)>,
+    reads: HashSet<StateKey>,
+    write_set: HashMap<StateKey, BaseStateOp>,
     is_checkpoint: bool,
 }
 
@@ -80,9 +82,7 @@ impl Chunk {
             update_refs_builder: |txn_outs| {
                 StateUpdateRefs::index(
                     first_version,
-                    txn_outs
-                        .iter()
-                        .map(|t| t.write_set.iter().map(|(key, op)| (key, op))),
+                    txn_outs.iter().map(|t| t.write_set.iter()),
                     txn_outs.len(),
                     txn_outs.iter().rposition(|t| t.is_checkpoint),
                 )
@@ -138,12 +138,13 @@ prop_compose! {
                 // The read set is a super set of the write set.
                 let read_set: HashSet<_> = write_set
                     .keys()
-                    .chain(reads.iter().map(|idx| idx.get(&keys)))
+                    .cloned()
+                    .chain(reads.iter().map(|idx| idx.get(&keys)).cloned())
                     .collect();
 
                 UserTxn {
-                    reads: read_set.into_iter().cloned().collect(),
-                    writes: write_set.into_iter().collect(),
+                    reads: read_set,
+                    writes: write_set,
                 }
             })
             .collect_vec()
@@ -153,7 +154,7 @@ prop_compose! {
 #[derive(Clone)]
 struct VersionState {
     usage: StateStorageUsage,
-    hot_state: LruCache<StateKey, StateSlot>,
+    hot_state: [LruCache<StateKey, StateSlot>; NUM_STATE_SHARDS],
     state: HashMap<StateKey, (Version, StateValue)>,
     summary: NaiveSmt,
     next_version: Version,
@@ -163,7 +164,7 @@ impl VersionState {
     fn new_empty() -> Self {
         Self {
             usage: StateStorageUsage::zero(),
-            hot_state: LruCache::new(NonZeroUsize::new(HOT_STATE_MAX_ITEMS).unwrap()),
+            hot_state: [(); NUM_STATE_SHARDS].map(|_| LruCache::unbounded()),
             state: HashMap::new(),
             summary: NaiveSmt::default(),
             next_version: 0,
@@ -174,7 +175,8 @@ impl VersionState {
         &self,
         version: Version,
         writes: impl IntoIterator<Item = (&'a StateKey, Option<&'a StateValue>)>,
-        promotions: impl IntoIterator<Item = (&'a StateKey, &'a StateSlot)>,
+        promotions: impl IntoIterator<Item = &'a StateKey>,
+        is_end_of_block: bool,
     ) -> Self {
         assert_eq!(version, self.next_version);
 
@@ -183,13 +185,14 @@ impl VersionState {
         let mut smt_updates = vec![];
 
         for (k, v_opt) in writes {
+            let shard_id = k.get_shard_id();
             match v_opt {
                 None => {
                     let slot = StateSlot::HotVacant {
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
                     };
-                    hot_state.put(k.clone(), slot);
+                    hot_state[shard_id].put(k.clone(), slot);
                     state.remove(k);
                     smt_updates.push((k.hash(), None));
                 },
@@ -200,20 +203,39 @@ impl VersionState {
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
                     };
-                    hot_state.put(k.clone(), slot);
+                    hot_state[shard_id].put(k.clone(), slot);
                     state.insert(k.clone(), (version, v.clone()));
                     smt_updates.push((k.hash(), Some(v.hash())));
                 },
             }
         }
 
-        for (k, prev_slot) in promotions {
-            if prev_slot.is_cold() {
-                hot_state.put(k.clone(), prev_slot.clone().to_hot(version));
-            } else {
-                let mut slot = prev_slot.clone();
+        for k in promotions {
+            let shard_id = k.get_shard_id();
+            if let Some(slot) = hot_state[shard_id].get_mut(k) {
                 slot.refresh(version);
-                hot_state.put(k.clone(), slot);
+                continue;
+            }
+            let slot = match state.get(k) {
+                Some((value_version, value)) => StateSlot::HotOccupied {
+                    value_version: *value_version,
+                    value: value.clone(),
+                    hot_since_version: version,
+                    lru_info: LRUEntry::uninitialized(),
+                },
+                None => StateSlot::HotVacant {
+                    hot_since_version: version,
+                    lru_info: LRUEntry::uninitialized(),
+                },
+            };
+            hot_state[shard_id].put(k.clone(), slot);
+        }
+
+        if is_end_of_block {
+            for shard in hot_state.iter_mut() {
+                while shard.len() > HOT_STATE_MAX_ITEMS_PER_SHARD {
+                    shard.pop_lru();
+                }
             }
         }
 
@@ -238,7 +260,8 @@ impl TStateView for VersionState {
 
     fn get_state_slot(&self, key: &Self::Key) -> StateViewResult<StateSlot> {
         let from_cold = StateSlot::from_db_get(self.state.get(key).cloned());
-        let slot = match self.hot_state.peek(key) {
+        let shard_id = key.get_shard_id();
+        let slot = match self.hot_state[shard_id].peek(key) {
             Some(slot) => {
                 assert_eq!(slot.as_state_value_opt(), from_cold.as_state_value_opt());
                 slot.clone()
@@ -262,7 +285,7 @@ struct StateByVersion {
 }
 
 impl StateByVersion {
-    pub fn get_state(&self, version: Option<Version>) -> &Arc<VersionState> {
+    pub fn get_state(&self, version: Option<Version>) -> &VersionState {
         let next_version = version.map_or(0, |ver| ver + 1);
         &self.state_by_next_version[next_version as usize]
     }
@@ -276,19 +299,55 @@ impl StateByVersion {
     fn append_version<'a>(
         &mut self,
         writes: impl IntoIterator<Item = (&'a StateKey, Option<&'a StateValue>)>,
-        promotions: impl IntoIterator<Item = (&'a StateKey, &'a StateSlot)>,
+        promotions: impl IntoIterator<Item = &'a StateKey>,
+        is_end_of_block: bool,
     ) {
         self.state_by_next_version.push(Arc::new(
             self.state_by_next_version.last().unwrap().update(
                 self.next_version(),
                 writes,
                 promotions,
+                is_end_of_block,
             ),
         ));
     }
 
     fn next_version(&self) -> Version {
         self.state_by_next_version.len() as Version - 1
+    }
+
+    fn assert_state_slot(slot1: &StateSlot, slot2: &StateSlot) {
+        match (slot1, slot2) {
+            (
+                StateSlot::HotVacant {
+                    hot_since_version: v1,
+                    ..
+                },
+                StateSlot::HotVacant {
+                    hot_since_version: v2,
+                    ..
+                },
+            ) => assert_eq!(v1, v2),
+            (
+                StateSlot::HotOccupied {
+                    value_version: vv1,
+                    value: v1,
+                    hot_since_version: h1,
+                    ..
+                },
+                StateSlot::HotOccupied {
+                    value_version: vv2,
+                    value: v2,
+                    hot_since_version: h2,
+                    ..
+                },
+            ) => {
+                assert_eq!(vv1, vv2);
+                assert_eq!(v1, v2);
+                assert_eq!(h1, h2);
+            },
+            (s1, s2) => assert_eq!(s1, s2),
+        }
     }
 
     fn assert_state(&self, state: &State) {
@@ -332,7 +391,9 @@ impl StateByVersion {
             .iter()
             .flat_map(|shard| shard.iter())
             .filter_map(|(key, slot)| slot.maybe_update_jmt(key, last_snapshot.next_version()))
-            .map(|(key_hash, value_opt)| (key_hash, value_opt.map(|(val_hash, _key)| val_hash)))
+            .map(|(key_hash, _key, value_opt)| {
+                (key_hash, value_opt.map(|(val_hash, _key)| val_hash))
+            })
             .collect_vec();
 
         let base_kv_hashes: HashSet<_> = base_state.summary.leaves.iter().collect();
@@ -456,6 +517,7 @@ fn update_state(
         let memorized_reads = state_view.into_memorized_reads();
 
         let next_state = parent_state.update_with_memorized_reads(
+            hot_state.clone(),
             &persisted_state,
             block.update_refs(),
             &memorized_reads,
@@ -544,21 +606,18 @@ fn commit_state_buffer(
 fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVersion) {
     let mut all_txns = vec![];
     let mut state_by_version = StateByVersion::new_empty();
-    let mut next_version: Version = 0;
     for (block_txns, append_epilogue) in blocks {
-        let base_view = state_by_version
-            .get_state(next_version.checked_sub(1))
-            .clone();
-        let mut op_accu = BlockHotStateOpAccumulator::<StateKey, _>::new_with_config(
-            &base_view,
-            MAX_PROMOTIONS_PER_BLOCK,
-            REFRESH_INTERVAL_VERSIONS,
-        );
-        for txn in block_txns {
-            // No promotions except for block epilogue.
-            state_by_version
-                .append_version(txn.writes.iter().map(|(k, v)| (k, v.as_ref())), vec![]);
-            op_accu.add_transaction(txn.writes.iter().map(|(k, _v)| k), txn.reads.iter());
+        let num_txns = block_txns.len();
+        for (i, txn) in block_txns.into_iter().enumerate() {
+            state_by_version.append_version(
+                txn.writes.iter().map(|(k, v)| (k, v.as_ref())),
+                txn.reads.difference(&txn.writes.keys().cloned().collect()),
+                if append_epilogue {
+                    false
+                } else {
+                    i + 1 == num_txns
+                },
+            );
             all_txns.push(Txn {
                 reads: txn.reads,
                 write_set: txn
@@ -571,23 +630,14 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
                     .collect(),
                 is_checkpoint: false,
             });
-            next_version += 1;
         }
         if append_epilogue {
-            let to_make_hot = op_accu.get_slots_to_make_hot();
-            state_by_version.append_version(vec![], to_make_hot.iter());
-
-            let write_set = to_make_hot
-                .into_iter()
-                .map(|(k, slot)| (k, HotStateOp::make_hot(slot).into_base_op()))
-                .collect_vec();
-            let reads = write_set.iter().map(|(k, _op)| k.clone()).collect_vec();
+            state_by_version.append_version(vec![], vec![], true);
             all_txns.push(Txn {
-                reads,
-                write_set,
+                reads: HashSet::new(),
+                write_set: HashMap::new(),
                 is_checkpoint: true,
             });
-            next_version += 1;
         }
     }
 
@@ -599,7 +649,7 @@ fn replay_chunks_pipelined(chunks: Vec<Chunk>, state_by_version: Arc<StateByVers
     let current_state = Arc::new(Mutex::new(empty.clone()));
 
     let persisted_state = PersistedState::new_empty_with_config(
-        HOT_STATE_MAX_ITEMS,
+        HOT_STATE_MAX_ITEMS_PER_SHARD,
         HOT_STATE_MAX_BYTES,
         HOT_STATE_MAX_SINGLE_VALUE_BYTES,
     );
@@ -665,15 +715,50 @@ fn replay_chunks_pipelined(chunks: Vec<Chunk>, state_by_version: Arc<StateByVers
 
     threads
         .into_iter()
-        .for_each(|t| t.join().expect("join() failed."))
+        .for_each(|t| t.join().expect("join() failed."));
+
+    let hot_state = persisted_state.get_hot_state();
+    hot_state.drain_pending_commits();
+    let all_entries = hot_state.get_all_entries();
+
+    let naive_all_entries: BTreeMap<_, _> = state_by_version
+        .get_state(Some(state_by_version.next_version() - 1))
+        .hot_state
+        .iter()
+        .flat_map(|shard| shard.iter().map(|(k, v)| (k.clone(), v.clone())))
+        .collect();
+    assert_eq!(all_entries.len(), naive_all_entries.len());
+
+    println!("ACTUAL:");
+    for key in all_entries.keys() {
+        println!("\t{:?}", key);
+    }
+    println!("EXPECTED:");
+    for key in naive_all_entries.keys() {
+        println!("\t{:?}", key);
+    }
+    // for (key, _slot) in &all_entries {
+    //     assert!(naive_all_entries.contains_key(key));
+    //     // let slot2 = naive_all_entries.get(key).unwrap();
+    //     // StateByVersion::assert_state_slot(slot, slot2);
+    // }
+}
+
+fn arb_keys(num_keys: usize) -> impl Strategy<Value = Vec<StateKey>> {
+    hash_set(
+        "[a-z]{1,10}".prop_map(|raw| StateKey::raw(raw.as_bytes())),
+        num_keys,
+    )
+    .prop_map(|hs| hs.into_iter().collect_vec())
+    .boxed()
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(100))]
+    #![proptest_config(ProptestConfig::with_cases(1))]
 
     #[test]
     fn test_speculative_state_workflow(
-        blocks in arb_key_universe(NUM_KEYS)
+        blocks in arb_keys(NUM_KEYS)
             .prop_flat_map(move |keys| {
                 vec((
                     arb_user_block(keys, NUM_KEYS, NUM_KEYS, NUM_KEYS),

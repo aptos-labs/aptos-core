@@ -147,6 +147,27 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         }
     }
 
+    pub(crate) fn record_storage_keys_read(&self, txn_idx: TxnIndex) {
+        let read_keys = self
+            .read_set(txn_idx)
+            .unwrap_or_else(|| {
+                panic!("[BlockSTM]: Read set for txn {txn_idx} must be recorded after execution")
+            })
+            .get_storage_keys_read();
+        match self.outputs[txn_idx as usize]
+            .load_full()
+            .unwrap_or_else(|| {
+                panic!("[BlockSTM]: Execution output for txn {txn_idx} must be recorded after execution")
+            })
+            .as_ref()
+        {
+            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                output.record_read_set(read_keys);
+            },
+            _ => (),
+        }
+    }
+
     /// Does a transaction at txn_idx have SkipRest.
     pub(crate) fn block_skips_rest_at_idx(&self, txn_idx: TxnIndex) -> bool {
         matches!(
