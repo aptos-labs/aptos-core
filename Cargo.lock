@@ -4963,6 +4963,7 @@ dependencies = [
  "bytes",
  "claims",
  "either",
+ "maplit",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",

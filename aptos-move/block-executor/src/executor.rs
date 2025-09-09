@@ -46,8 +46,8 @@ use aptos_types::{
     on_chain_config::{BlockGasLimitType, Features},
     state_store::{state_value::StateValue, TStateView},
     transaction::{
-        block_epilogue::TBlockEndInfoExt, AuxiliaryInfoTrait, BlockExecutableTransaction,
-        BlockOutput, FeeDistribution,
+        block_epilogue::BlockEndInfo, AuxiliaryInfoTrait, BlockExecutableTransaction, BlockOutput,
+        FeeDistribution,
     },
     vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOp},
@@ -76,7 +76,7 @@ use std::{
     },
 };
 
-struct SharedSyncParams<'a, 'b, T, E, S>
+struct SharedSyncParams<'a, T, E, S>
 where
     T: BlockExecutableTransaction,
     E: ExecutorTask<Txn = T>,
@@ -90,7 +90,7 @@ where
         &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
     last_input_output: &'a TxnLastInputOutput<T, E::Output, E::Error>,
     delayed_field_id_counter: &'a AtomicU32,
-    block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<'b, T, S>>,
+    block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
     final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
 }
 
@@ -852,7 +852,7 @@ where
         scheduler: SchedulerWrapper,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
+        block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
@@ -979,9 +979,10 @@ where
                             } as u64
                     })
             });
-            let txn_read_write_summary = block_gas_limit_type
-                .conflict_penalty_window()
-                .map(|_| last_input_output.get_txn_read_write_summary(txn_idx));
+            let txn_read_write_summary = block_gas_limit_type.conflict_penalty_window().map(|_| {
+                last_input_output.record_storage_keys_read(txn_idx);
+                last_input_output.get_txn_read_write_summary(txn_idx)
+            });
 
             // For committed txns with Success status, calculate the accumulated gas costs.
             block_limit_processor.accumulate_fee_statement(
@@ -1246,7 +1247,7 @@ where
         skip_module_reads_validation: &AtomicBool,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
-        block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
+        block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         block_epilogue_txn: &ExplicitSyncWrapper<Option<T>>,
         num_txns_materialized: &AtomicU32,
@@ -1527,7 +1528,7 @@ where
         environment: &AptosEnvironment,
         worker_id: u32,
         num_workers: u32,
-        shared_sync_params: &SharedSyncParams<'_, '_, T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
         start_delayed_field_id_counter: u32,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let num_txns = block.num_txns() as u32;
@@ -1729,7 +1730,6 @@ where
                 .resize_with(num_txns, E::Output::skip_output);
         }
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
-            base_view,
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
             num_txns,
@@ -1744,7 +1744,7 @@ where
         let versioned_cache = MVHashMap::new();
         let scheduler = SchedulerV2::new(num_txns, num_workers);
 
-        let shared_sync_params: SharedSyncParams<'_, '_, T, E, S> = SharedSyncParams {
+        let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
             base_view,
             scheduler: &scheduler,
             versioned_cache: &versioned_cache,
@@ -1826,7 +1826,6 @@ where
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
-            base_view,
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
             num_txns + 1,
@@ -1910,7 +1909,7 @@ where
         block_id: HashValue,
         signature_verified_block: &TP,
         outputs: &[E::Output],
-        block_end_info: TBlockEndInfoExt<T::Key>,
+        block_end_info: BlockEndInfo,
         features: &Features,
     ) -> T {
         // TODO(grao): Remove this check once AIP-88 is fully enabled.
@@ -1923,7 +1922,7 @@ where
             return T::state_checkpoint(block_id);
         }
         if !features.is_calculate_transaction_fee_for_distribution_enabled() {
-            return T::block_epilogue_v0(block_id, block_end_info.to_persistent());
+            return T::block_epilogue_v0(block_id, block_end_info);
         }
 
         let mut amount = BTreeMap::new();
@@ -2093,8 +2092,7 @@ where
         let counter = RefCell::new(start_counter);
         let unsync_map = UnsyncMap::new();
         let mut ret = Vec::with_capacity(num_txns);
-        let mut block_limit_processor = BlockGasLimitProcessor::<T, S>::new(
-            base_view,
+        let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
             num_txns,
@@ -2183,6 +2181,11 @@ where
                         .block_gas_limit_type
                         .conflict_penalty_window()
                         .map(|_| {
+                            // TODO(HotState): This probably should go outside this map so it's
+                            // done regardless of block_gas_limit_type, but there are some test
+                            // failures to sort out. Put it here to unblock some e2e testing first.
+                            // Same with parallel execution.
+                            output.record_read_set(sequential_reads.get_storage_keys_read());
                             ReadWriteSummary::new(
                                 sequential_reads.get_read_summary(),
                                 output.get_write_summary(),
