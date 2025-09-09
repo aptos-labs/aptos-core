@@ -1230,6 +1230,10 @@ where
 
         ret
     }
+
+    pub(crate) fn get_storage_keys_read(&self) -> HashSet<T::Key> {
+        keys_except_delayed_fields::<T>(self.get_read_summary())
+    }
 }
 
 #[derive(Derivative)]
@@ -1275,6 +1279,22 @@ where
 
         ret
     }
+
+    pub(crate) fn get_storage_keys_read(&self) -> HashSet<T::Key> {
+        keys_except_delayed_fields::<T>(self.get_read_summary())
+    }
+}
+
+/// Returns all storage keys read (excluding delayed fields).
+fn keys_except_delayed_fields<T: Transaction>(
+    keys: impl IntoIterator<Item = InputOutputKey<T::Key, T::Tag>>,
+) -> HashSet<T::Key> {
+    keys.into_iter()
+        .filter_map(|key| match key {
+            InputOutputKey::Resource(key) | InputOutputKey::Group(key, _) => Some(key),
+            InputOutputKey::DelayedField(_) => None,
+        })
+        .collect()
 }
 
 #[cfg(test)]
