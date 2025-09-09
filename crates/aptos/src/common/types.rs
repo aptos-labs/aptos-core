@@ -43,7 +43,10 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{HardwareWalletAccount, HardwareWalletType, LocalAccount, TransactionSigner},
 };
+use aptos_transaction_simulation::SimulationStateStore;
+use aptos_transaction_simulation_session::Session;
 use aptos_types::{
+    account_config::AccountResource,
     chain_id::ChainId,
     transaction::{
         authenticator::AuthenticationKey, EntryFunction, MultisigTransactionPayload,
@@ -74,7 +77,7 @@ use std::{
     convert::TryFrom,
     fmt::{Debug, Display, Formatter},
     fs::OpenOptions,
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -1799,6 +1802,10 @@ pub struct TransactionOptions {
     #[clap(long)]
     pub(crate) profile_gas: bool,
 
+    /// If this option is set, simulate the transaction using a local session.
+    #[clap(long)]
+    pub(crate) session: Option<PathBuf>,
+
     /// Replay protection mechanism to use when generating the transaction.
     ///
     /// When "nonce" is chosen, the transaction will be an orderless transaction and contains a replay protection nonce.
@@ -1880,11 +1887,26 @@ impl TransactionOptions {
     }
 
     pub async fn view(&self, payload: ViewFunction) -> CliTypedResult<Vec<serde_json::Value>> {
-        let client = self.rest_client()?;
-        Ok(client
-            .view_bcs_with_json_response(&payload, None)
-            .await?
-            .into_inner())
+        match &self.session {
+            None => {
+                let client = self.rest_client()?;
+                Ok(client
+                    .view_bcs_with_json_response(&payload, None)
+                    .await?
+                    .into_inner())
+            },
+
+            Some(session_path) => {
+                let mut sess = Session::load(session_path)?;
+                let output = sess.execute_view_function(
+                    payload.module,
+                    payload.function,
+                    payload.ty_args,
+                    payload.args,
+                )?;
+                Ok(output)
+            },
+        }
     }
 
     /// Submit a transaction
@@ -2097,6 +2119,7 @@ impl TransactionOptions {
         const DEFAULT_MAX_GAS: u64 = 2_000_000;
 
         let (sender_key, sender_address) = self.get_key_and_address()?;
+        // TODO: Consider fetching the min gas unit price from the chain
         let gas_unit_price = self
             .gas_options
             .gas_unit_price
@@ -2148,6 +2171,76 @@ impl TransactionOptions {
             success,
             timestamp_us: None,
             version: Some(version), // The transaction is not comitted so there is no new version.
+            vm_status: Some(vm_status.to_string()),
+        };
+
+        Ok(summary)
+    }
+
+    pub async fn simulate_using_session(
+        &self,
+        session_path: &Path,
+        payload: TransactionPayload,
+    ) -> CliTypedResult<TransactionSummary> {
+        let mut sess = Session::load(session_path)?;
+
+        let state_store = sess.state_store();
+
+        // Fetch the chain states required for the simulation
+        const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
+        const DEFAULT_MAX_GAS: u64 = 2_000_000;
+
+        let (sender_key, sender_address) = self.get_key_and_address()?;
+
+        // TODO: Support orderless transactions
+        let account = state_store.get_resource::<AccountResource>(sender_address)?;
+        let seq_num = match account {
+            Some(account) => account.sequence_number,
+            None => 0,
+        };
+
+        // TODO: Consider fetching the min gas unit price from the chain
+        let gas_unit_price = self
+            .gas_options
+            .gas_unit_price
+            .unwrap_or(DEFAULT_GAS_UNIT_PRICE);
+
+        let balance = state_store.get_apt_balance(sender_address)?;
+        let max_gas = self.gas_options.max_gas.unwrap_or_else(|| {
+            if gas_unit_price == 0 {
+                DEFAULT_MAX_GAS
+            } else {
+                std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
+            }
+        });
+
+        let transaction_factory = TransactionFactory::new(state_store.get_chain_id()?)
+            .with_gas_unit_price(gas_unit_price)
+            .with_max_gas_amount(max_gas)
+            .with_transaction_expiration_time(self.gas_options.expiration_secs);
+        let sender_account = &mut LocalAccount::new(sender_address, sender_key, seq_num);
+        let transaction =
+            sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
+        let hash = transaction.committed_hash();
+
+        let (vm_status, txn_output) = sess.execute_transaction(transaction)?;
+
+        let success = match txn_output.status() {
+            TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
+            TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
+        };
+
+        let summary = TransactionSummary {
+            transaction_hash: hash.into(),
+            gas_used: Some(txn_output.gas_used()),
+            gas_unit_price: Some(gas_unit_price),
+            pending: None,
+            sender: Some(sender_address),
+            sequence_number: Some(seq_num),
+            replay_protector: None,
+            success,
+            timestamp_us: None,
+            version: None,
             vm_status: Some(vm_status.to_string()),
         };
 
