@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache,
+    data_cache::MoveVmDataCache,
     interpreter::Interpreter,
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
@@ -22,7 +22,6 @@ use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
-    resolver::ResourceResolver,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{Locals, Reference, VMValueCast, Value},
 };
@@ -57,12 +56,11 @@ impl MoveVM {
     pub fn execute_loaded_function(
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         loader: &impl Loader,
-        resource_resolver: &impl ResourceResolver,
     ) -> VMResult<SerializedReturnValues> {
         let vm_config = loader.runtime_environment().vm_config();
         let check_invariant_in_swap_loc = vm_config.check_invariant_in_swap_loc;
@@ -104,7 +102,6 @@ impl MoveVM {
                 loader,
                 &ty_depth_checker,
                 &layout_converter,
-                resource_resolver,
                 gas_meter,
                 traversal_context,
                 extensions,
