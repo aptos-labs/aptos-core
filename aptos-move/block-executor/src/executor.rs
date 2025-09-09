@@ -46,8 +46,7 @@ use aptos_types::{
     on_chain_config::{BlockGasLimitType, Features},
     state_store::{state_value::StateValue, TStateView},
     transaction::{
-        block_epilogue::BlockEndInfo, AuxiliaryInfoTrait, BlockExecutableTransaction, BlockOutput,
-        FeeDistribution,
+        AuxiliaryInfoTrait, BlockEndInfo, BlockExecutableTransaction, BlockOutput, FeeDistribution,
     },
     vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOp},
@@ -867,6 +866,7 @@ where
         block: &TP,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
+        info!("prepare_and_queue_commit_ready_txn: txn_idx: {txn_idx}");
         let block_limit_processor = &mut block_limit_processor.acquire();
         let mut side_effect_at_commit = false;
 

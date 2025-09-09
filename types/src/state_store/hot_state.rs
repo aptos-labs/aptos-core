@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::num::NonZeroUsize;
+
 // 256 MiB per shard
 pub const HOT_STATE_MAX_BYTES_PER_SHARD: usize = 256 * 1024 * 1024;
 // 250k items per shard
-pub const HOT_STATE_MAX_ITEMS_PER_SHARD: usize = 250_000;
+pub const HOT_STATE_MAX_ITEMS_PER_SHARD: NonZeroUsize = NonZeroUsize::new(3).unwrap();
 // 10KB, worst case the hot state still caches about 400K items (all shards)
 pub const HOT_STATE_MAX_SINGLE_VALUE_BYTES: usize = 10 * 1024;
 
