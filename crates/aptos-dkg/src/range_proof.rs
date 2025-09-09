@@ -556,7 +556,7 @@ mod tests {
         let num_chunks: usize = 8;
         let coefs = correlated_randomness(&mut rng, radix, num_chunks, &target_sum);
         let actual_sum: Scalar = (0..num_chunks)
-            .map(|i| coefs[i] * Scalar::from(radix.pow(i as u32) as u64))
+            .map(|i| coefs[i] * Scalar::from(radix.pow(i as u32)))
             .sum();
         assert_eq!(target_sum, actual_sum);
     }

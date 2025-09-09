@@ -30,7 +30,12 @@ fn range_proof_completeness() {
         .collect();
     let (cc, r) = commit(&pp, &zz, &mut rng);
     let proof = batch_prove(&mut rng, &pp, &zz, &cc, &r);
-    println!("proof size for \\ell = {} and n = {} is {} bytes", ell, n, 48 + (48+96)*ell);
+    println!(
+        "proof size for \\ell = {} and n = {} is {} bytes",
+        ell,
+        n,
+        48 + (48 + 96) * ell
+    );
     println!("prove finished, vrfy1 starting");
     batch_verify(&pp, &cc, &proof).unwrap();
 
