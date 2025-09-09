@@ -1,0 +1,55 @@
+
+Diagnostics:
+warning: [lint] Returning a `signer` leaks authority; avoid returning signer values.
+  ┌─ tests/stackless_bytecode_lints/return_signer.move:4:34
+  │
+4 │     public fun error(s: signer): signer { s }
+  │                                  ^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_signer)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_signer.
+
+warning: [lint] Returning a `signer` leaks authority; avoid returning signer values.
+  ┌─ tests/stackless_bytecode_lints/return_signer.move:5:37
+  │
+5 │     public fun ret_ref(s: &signer): &signer { s }
+  │                                     ^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_signer)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_signer.
+
+warning: [lint] Returning a `signer` leaks authority; avoid returning signer values.
+  ┌─ tests/stackless_bytecode_lints/return_signer.move:6:45
+  │
+6 │     public fun ret_mut_ref(s: &mut signer): &mut signer { s }
+  │                                             ^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_signer)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_signer.
+
+warning: [lint] Returning a `signer` leaks authority; avoid returning signer values.
+  ┌─ tests/stackless_bytecode_lints/return_signer.move:7:44
+  │
+7 │     public fun ret_vec(v: vector<signer>): vector<signer> { v }
+  │                                            ^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_signer)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_signer.
+
+warning: [lint] Returning a `signer` leaks authority; avoid returning signer values.
+  ┌─ tests/stackless_bytecode_lints/return_signer.move:8:46
+  │
+8 │     public fun ret_tuple(s: signer, t: u64): (u64, signer) { (t, s) }
+  │                                              ^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_signer)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_signer.
+
+warning: [lint] Returning a `signer` leaks authority; avoid returning signer values.
+  ┌─ tests/stackless_bytecode_lints/return_signer.move:9:43
+  │
+9 │     public fun ret_wrapped(w: W<signer>): W<signer> { w }
+  │                                           ^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_signer)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_signer.
