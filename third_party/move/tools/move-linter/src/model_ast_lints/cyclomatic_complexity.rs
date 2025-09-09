@@ -110,7 +110,7 @@ impl ExpChecker for CyclomaticComplexity {
             // loop, while, for
             Loop(_, _) => {
                 let delta = if detect_for_loop(expr, function) {
-                    // For loop expansion generates: Loop(+1) + IfElse(+1) + IfElse(+1) + LoopCont(+1) + LoopCont(+1) = +5 extra
+                    // For loop expansion generates: Loop(+1) + IfElse(+1) + IfElse(+1) + IfElse(+1) + LoopCont(+1) + LoopCont(+1) = +6 extra
                     // But we want for to count as +1 total, so we subtract 4 here
                     -4
                 } else if detect_while_loop(expr) {
