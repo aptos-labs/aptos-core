@@ -103,6 +103,15 @@ impl ShardedDbPathConfig {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub enum RocksDBStatsLevel {
+    ExceptHistogramOrTimers,
+    ExceptTimers,
+    ExceptDetailedTimers,
+    ExceptTimeForMutex,
+    All,
+}
+
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
@@ -124,6 +133,10 @@ pub struct RocksdbConfig {
     /// Whether to pin L0 filters and indexes in memory. Only makes sense if
     /// `cache_index_and_filter_blocks` is `true`.
     pub pin_l0_filter_and_index_blocks_in_cache: bool,
+    /// The level of details for statistics. Higher level might cause more overhead.
+    pub stats_level: Option<RocksDBStatsLevel>,
+    /// If not zero, dump stats to LOG every this many seconds.
+    pub stats_dump_period_sec: Option<u32>,
 }
 
 impl RocksdbConfig {
@@ -153,6 +166,10 @@ impl Default for RocksdbConfig {
             cache_index_and_filter_blocks: true,
             // L0 index/filter blocks are usually small and used frequently.
             pin_l0_filter_and_index_blocks_in_cache: true,
+            // Disable statistics by default since there might be some overhead.
+            stats_level: None,
+            // Use RocksDB's default if not specified.
+            stats_dump_period_sec: None,
         }
     }
 }
