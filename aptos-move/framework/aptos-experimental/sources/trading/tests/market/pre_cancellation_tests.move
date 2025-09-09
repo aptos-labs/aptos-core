@@ -12,7 +12,7 @@ module aptos_experimental::pre_cancellation_tests {
         place_order_and_verify, verify_cancel_event,
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::market::{new_market, new_market_config, cancel_order_with_client_id};
+    use aptos_experimental::market::{new_market, new_market_config};
 
     const PRE_CANCEL_WINDOW_SECS: u64 = 1; // 1 second
 

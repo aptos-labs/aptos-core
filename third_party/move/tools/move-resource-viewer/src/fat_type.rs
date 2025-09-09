@@ -376,8 +376,19 @@ impl FatType {
                     .map(|tys| Self::from_layout_slice(tys, limit))
                     .collect::<PartialVMResult<Vec<Vec<_>>>>()?,
             ),
-            // TODO(#15664): get rid of fat type to support captured functions.
-            Native(..) | Struct(_) | Function => {
+            Function => {
+                // We cannot derive the actual type from layout, however, a dummy
+                // function type will do since annotation of closures is not depending
+                // actually on their type, but only their (hidden) captured arguments.
+                // Currently, `from_runtime_layout` is only used to annotate captured arguments
+                // of closures.
+                FatType::Function(Box::new(FatFunctionType {
+                    args: vec![],
+                    results: vec![],
+                    abilities: AbilitySet::EMPTY,
+                }))
+            },
+            Native(..) | Struct(_) => {
                 return Err(PartialVMError::new_invariant_violation(format!(
                     "cannot derive fat type for {:?}",
                     layout

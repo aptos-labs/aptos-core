@@ -1,0 +1,17 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/mutate_vector.move`
+
+//# publish
+module 0x42::m {
+    struct Scalar has copy, drop, store {
+        data: vector<u8>,
+    }
+    public fun new_scalar_from_u8(p0: u8): Scalar {
+        let _t1 = scalar_zero();
+        let _t2 = 0x1::vector::borrow_mut<u8>(&mut (&mut _t1).data, 0);
+        *_t2 = p0;
+        _t1
+    }
+    public fun scalar_zero(): Scalar {
+        Scalar{data: vector[0u8]}
+    }
+}

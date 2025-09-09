@@ -73,7 +73,7 @@ module 0x42::object {
         inner: address,
     }
 
-    inline fun transfer_raw_inner(object: address, to: address, a1: bool) acquires ObjectCore {
+    inline fun transfer_raw_inner(object: address, to: address, a1: bool) {
         let object_core = borrow_global_mut<ObjectCore>(object);
         if (object_core.owner != to) {
             if (a1) {

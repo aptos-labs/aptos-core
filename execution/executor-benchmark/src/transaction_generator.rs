@@ -8,6 +8,7 @@ use crate::{
 };
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
+use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::LocalAccount,
@@ -221,7 +222,9 @@ impl TransactionGenerator {
 
     pub fn create_transaction_factory() -> TransactionFactory {
         TransactionFactory::new(ChainId::test())
-            .with_transaction_expiration_time(300)
+            // executor benchmark doesn't have BlockMetadata txns, time doesn't pass for it
+            // so we need to use absolute timestamp (so orderless txns are not rejected as too far in the future)
+            .with_absolute_transaction_expiration_timestamp(30)
             .with_gas_unit_price(100)
     }
 
@@ -681,7 +684,7 @@ impl TransactionGenerator {
         F: Fn(T, &AccountCache) -> Option<Transaction> + Send + Sync,
         S: Fn(&T) -> usize,
     {
-        let _timer = TIMER.with_label_values(&["generate_block"]).start_timer();
+        let _timer = TIMER.timer_with(&["generate_block"]);
         let block_size = inputs.len();
         let mut jobs = Vec::new();
         jobs.resize_with(self.num_workers, BTreeMap::new);
@@ -739,9 +742,7 @@ impl TransactionGenerator {
             );
         }
 
-        NUM_TXNS
-            .with_label_values(&["generation_done"])
-            .inc_by(transactions.len() as u64);
+        NUM_TXNS.inc_with_by(&["generation_done"], transactions.len() as u64);
 
         if let Some(sender) = &self.block_sender {
             sender.send(transactions).unwrap();

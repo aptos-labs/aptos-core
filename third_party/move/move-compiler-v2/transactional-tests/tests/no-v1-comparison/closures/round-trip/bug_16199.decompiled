@@ -1,0 +1,23 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/bug_16199.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test() {
+        let _t0 = |arg0| lambda__3__test(arg0);
+        let _t6 = _t0(1);
+        let _t7 = _t6(2);
+        if (!(_t7(3) == 6)) abort 14566554180833181696;
+    }
+    fun lambda__3__test(p0: u64): |u64|(|u64|(u64)) {
+        |arg0| lambda__2__test(p0, arg0)
+    }
+    fun lambda__1__test(p0: u64, p1: u64, p2: u64): u64 {
+        p0 + p1 + p2
+    }
+    fun lambda__2__test(p0: u64, p1: u64): |u64|(u64) {
+        |arg0| lambda__1__test(p0, p1, arg0)
+    }
+}
+
+
+//# run 0xc0ffee::m::test

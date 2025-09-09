@@ -5,6 +5,7 @@ use crate::{
     counters, hot_state_op_accumulator::BlockHotStateOpAccumulator, types::ReadWriteSummary,
 };
 use aptos_logger::{info, warn};
+use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
@@ -131,9 +132,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             // PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
             let accumulated_block_gas = self.get_effective_accumulated_block_gas();
             if accumulated_block_gas >= per_block_gas_limit {
-                counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
-                    .with_label_values(&[mode])
-                    .inc();
+                counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc_with(&[mode]);
                 info!(
                     "[BlockSTM]: execution ({}) early halted due to \
                     accumulated_block_gas {} >= PER_BLOCK_GAS_LIMIT {}",
@@ -146,9 +145,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         if let Some(per_block_output_limit) = self.block_gas_limit_type.block_output_limit() {
             let accumulated_output = self.get_accumulated_approx_output_size();
             if accumulated_output >= per_block_output_limit {
-                counters::EXCEED_PER_BLOCK_OUTPUT_LIMIT_COUNT
-                    .with_label_values(&[mode])
-                    .inc();
+                counters::EXCEED_PER_BLOCK_OUTPUT_LIMIT_COUNT.inc_with(&[mode]);
                 info!(
                     "[BlockSTM]: execution ({}) early halted due to \
                     accumulated_output {} >= PER_BLOCK_OUTPUT_LIMIT {}",
@@ -292,10 +289,11 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
 
-        TBlockEndInfoExt::new(inner)
+        let to_make_hot = self.get_slots_to_make_hot();
+        TBlockEndInfoExt::new(inner, to_make_hot)
     }
 
-    pub(crate) fn get_slots_to_make_hot(&self) -> BTreeMap<T::Key, StateSlot> {
+    fn get_slots_to_make_hot(&self) -> BTreeMap<T::Key, StateSlot> {
         if self.hot_state_op_accumulator.is_none() {
             warn!("BlockHotStateOpAccumulator is not set.");
         }

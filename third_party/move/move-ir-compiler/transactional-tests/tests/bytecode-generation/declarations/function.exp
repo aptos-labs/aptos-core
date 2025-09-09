@@ -6,7 +6,7 @@ struct Coin
   value: u64
 
 // Function definition at index 0
-public fun value(l0: &Example::Coin): u64
+public fun value(l0: &Coin): u64
     local l1: &u64
     move_loc l0
     borrow_field Coin, value
@@ -17,10 +17,10 @@ public fun value(l0: &Example::Coin): u64
     ret
 
 // Function definition at index 1
-public fun deposit(l0: &mut Example::Coin, l1: Example::Coin)
+public fun deposit(l0: &mut Coin, l1: Coin)
     local l2: &mut u64
     local l3: u64
-    local l4: &Example::Coin
+    local l4: &Coin
     local l5: u64
     local l6: u64
     local l7: u64
@@ -34,7 +34,7 @@ public fun deposit(l0: &mut Example::Coin, l1: Example::Coin)
     borrow_loc l1
     st_loc l4
     move_loc l4
-    call Example::value
+    call value
     // @10
     st_loc l5
     copy_loc l3
@@ -61,7 +61,7 @@ entry public fun f()
 
 // Function definition at index 1
 entry public fun g()
-    call M::f
+    call f
     ret
 
 

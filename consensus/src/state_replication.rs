@@ -47,6 +47,7 @@ pub trait StateComputer: Send + Sync {
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
         order_vote_enabled: bool,
+        persisted_auxiliary_info_version: u8,
     );
 
     // Reconfigure to clear epoch state at end of epoch.

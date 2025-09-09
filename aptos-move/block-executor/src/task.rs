@@ -11,7 +11,7 @@ use aptos_types::{
     error::PanicError,
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
-    transaction::BlockExecutableTransaction as Transaction,
+    transaction::{AuxiliaryInfoTrait, BlockExecutableTransaction as Transaction},
     write_set::WriteOp,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -60,6 +60,9 @@ pub trait ExecutorTask {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
+    /// Type of auxiliary info.
+    type AuxiliaryInfo: AuxiliaryInfoTrait;
+
     /// The output of a transaction. This should contain the side effect of this transaction.
     type Output: TransactionOutput<Txn = Self::Txn> + 'static;
 
@@ -87,6 +90,7 @@ pub trait ExecutorTask {
         > + AptosCodeStorage
               + BlockSynchronizationKillSwitch),
         txn: &Self::Txn,
+        auxiliary_info: &Self::AuxiliaryInfo,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 
@@ -108,7 +112,11 @@ pub trait TransactionOutput: Send + Sync + Debug {
         Option<Arc<MoveTypeLayout>>,
     )>;
 
-    fn module_write_set(&self) -> Vec<ModuleWrite<<Self::Txn as Transaction>::Value>>;
+    fn module_write_set(
+        &self,
+    ) -> impl AsRef<
+        BTreeMap<<Self::Txn as Transaction>::Key, ModuleWrite<<Self::Txn as Transaction>::Value>>,
+    > + '_;
 
     fn aggregator_v1_write_set(
         &self,
@@ -174,7 +182,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
             .collect()
     }
 
-    fn resource_group_tags(
+    fn legacy_v1_resource_group_tags(
         &self,
     ) -> Vec<(
         <Self::Txn as Transaction>::Key,

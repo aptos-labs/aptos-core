@@ -1076,14 +1076,17 @@ impl Generator {
                 let rhs = self.make_temp(ctx, srcs[0]);
                 self.gen_match(ctx, dests, qsid, None, rhs);
             },
-            MoveTo(_, _, inst) => {
-                self.gen_call_stm(ctx, Some(inst), dests, Operation::MoveTo, srcs);
+            MoveTo(mid, sid, inst) => {
+                let ty = Type::Struct(*mid, *sid, inst.to_vec());
+                self.gen_call_stm(ctx, Some(&vec![ty]), dests, Operation::MoveTo, srcs);
             },
-            MoveFrom(_, _, inst) => {
-                self.gen_call_stm(ctx, Some(inst), dests, Operation::MoveFrom, srcs);
+            MoveFrom(mid, sid, inst) => {
+                let ty = Type::Struct(*mid, *sid, inst.to_vec());
+                self.gen_call_stm(ctx, Some(&vec![ty]), dests, Operation::MoveFrom, srcs);
             },
-            Exists(_, _, inst) => {
-                self.gen_call_stm(ctx, Some(inst), dests, Operation::Exists(None), srcs);
+            Exists(mid, sid, inst) => {
+                let ty = Type::Struct(*mid, *sid, inst.to_vec());
+                self.gen_call_stm(ctx, Some(&vec![ty]), dests, Operation::Exists(None), srcs);
             },
             TestVariant(mid, sid, variant, inst) => {
                 self.gen_call_stm(
@@ -1108,13 +1111,16 @@ impl Generator {
                 let rhs = self.make_temp(ctx, srcs[0]);
                 self.gen_match(ctx, dests, qsid, Some(*variant), rhs);
             },
-            BorrowGlobal(_, _, inst) => self.gen_call_stm(
-                ctx,
-                Some(inst),
-                dests,
-                Operation::BorrowGlobal(ctx.ref_kind(dests[0])),
-                srcs,
-            ),
+            BorrowGlobal(mid, sid, inst) => {
+                let ty = Type::Struct(*mid, *sid, inst.to_vec());
+                self.gen_call_stm(
+                    ctx,
+                    Some(&vec![ty]),
+                    dests,
+                    Operation::BorrowGlobal(ctx.ref_kind(dests[0])),
+                    srcs,
+                );
+            },
             BorrowLoc => self.gen_call_stm(
                 ctx,
                 None,
@@ -1928,6 +1934,8 @@ impl IfElseTransformer<'_> {
     }
 
     /// Attempts to unify 3 patterns of an `if-else` Exp or `if-else`s embedded in a Sequence Exp.
+    /// The goal is to uniform the code for matching `try_make_if` and `try_make_if_else`. Otherwise, we will have to enumerate too many variants of them.
+    /// If `try_make_if` and `try_make_if_else` are not matched eventually, the unification here will be discarded.
     ///
     /// Pattern 1
     /// ```move
@@ -2087,25 +2095,15 @@ struct AssignTransformer<'a> {
 
 impl AssignTransformer<'_> {
     /// Check if an expression is safe to eliminate, assuming its result is never used.
-    /// [TODO]: Refine the list for better optimization
-    fn safe_to_eliminate(&self, exp: &Exp) -> bool {
-        let mut is_safe = true;
-        exp.visit_post_order(&mut |e| {
-            use ExpData::*;
-            use Operation::*;
-            match e {
-                LocalVar(..)
-                | Value(..)
-                | Temporary(..)
-                | Call(_, Freeze(..), _)
-                | Call(_, Borrow(ReferenceKind::Immutable), _) => {},
-                _ => {
-                    is_safe = false;
-                },
-            }
-            is_safe // stop if already not safe
-        });
-        is_safe // return the final safe status
+    /// The current rules are insanely conservative to ensure safety
+    fn safe_to_eliminate(exp: &Exp) -> bool {
+        match exp.as_ref() {
+            ExpData::LocalVar(..) | ExpData::Value(..) | ExpData::Temporary(..) => true,
+            ExpData::Call(_, ops, args) => {
+                ops.is_ok_to_remove_from_code() && args.iter().all(Self::safe_to_eliminate)
+            },
+            _ => false,
+        }
     }
 }
 
@@ -2113,7 +2111,7 @@ impl ExpRewriterFunctions for AssignTransformer<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         if let ExpData::Sequence(id, stms) = exp.as_ref() {
             // If this is a sequence, simplify.
-            ExpData::Sequence(*id, self.simplify_seq(*id, stms)).into_exp()
+            ExpData::Sequence(*id, self.simplify_seq(stms)).into_exp()
         } else {
             self.rewrite_exp_descent(exp)
         }
@@ -2121,70 +2119,273 @@ impl ExpRewriterFunctions for AssignTransformer<'_> {
 }
 
 impl AssignTransformer<'_> {
-    fn simplify_seq(&mut self, seq_id: NodeId, stms: &[Exp]) -> Vec<Exp> {
-        let Some(last) = stms.last() else {
+    fn simplify_seq(&mut self, stms: &[Exp]) -> Vec<Exp> {
+        if stms.is_empty() {
             return vec![];
-        };
-        let mut after_block_usage = self.usage[&last.node_id()].clone();
-        if matches!(last.as_ref(), ExpData::LoopCont(..)) && stms.len() > 1 {
-            // TODO: it seems to be weird to need to go back after terminator, but the usage
-            //   after the terminator is cleared (because the code there is never used). Lets try
-            //   to consolidate this in a better way
-            let before_last = &stms[stms.len() - 2];
-            if let Some(u) = self.usage.get(&before_last.node_id()) {
-                after_block_usage.join(u);
-            }
         }
-        let mut blocks = vec![];
         let mut new_stms = vec![];
         let mut substitution: BTreeMap<Symbol, Exp> = BTreeMap::new();
-        for stm in stms {
+        for (idx, stm) in stms.iter().enumerate() {
             let stm_usage = self.usage[&stm.node_id()].clone();
             match stm.as_ref() {
-                // Check whether an assignment can be eliminated because it is used only once.
-                // This is often the case with stackless bytecode generated
-                // from stack code.
-                ExpData::Assign(id, Pattern::Var(_, var), rhs)
+                // Check whether an assignment can be eliminated by replacing the use of the LHS directly with the RHS
+                ExpData::Assign(_, Pattern::Var(var_id, var), rhs)
                 if
-                // Cannot be read outside this block
-                after_block_usage.read_count(*var) == 0 &&
-                    // Must be read zero or once inside the block
-                    stm_usage.read_count(*var) <= 1 &&
-                    // If it's been written to after, only via this exact statement (this
-                    // happens if we are in a loop).
-                    stm_usage.is_single_assignment(*var, id) &&
-                    // Must not be borrowed after this statement
-                    !stm_usage.is_borrowed(*var)
-                =>
-                    {
-                        substitution.insert(
-                            *var,
-                            self.rewrite_exp(self.builder.unfold(&substitution, rhs.clone())));
-
-                        // Check if the RHS of an assignment to a non-used var is safe to eliminate
-                        // We must substitute the variable in the RHS before checking it, as those variables will get eliminated together with the RHS!
-                        if stm_usage.read_count(*var) == 0 && !self.safe_to_eliminate(&self.builder.unfold(&substitution, rhs.clone())) {
-                            new_stms.push(self.rewrite_exp(self.builder.unfold(&substitution, rhs.clone())));
+                // If it's been written to, must be only via this exact statement
+                stm_usage.is_single_assignment(*var, var_id) &&
+                // Must not be borrowed after this statement
+                !stm_usage.is_borrowed(*var) &&
+                // Must be read zero times or once
+                stm_usage.read_count(*var) <= 1 &&
+                // The read can only be done by statements after the current statement in this sequence
+                stm_usage.only_read_in_range(var, &stms[idx + 1..])
+                => {
+                        // If the result is not used and the RHS is safe to eliminate, we can discard the assignment
+                        let read_cnt = stm_usage.read_count(*var);
+                        let rhs_unfolded = self.builder.unfold(&substitution, rhs.clone());
+                        if read_cnt == 0 && Self::safe_to_eliminate(&rhs_unfolded) {
+                            continue;
                         }
+                        // If the RHS is safe to simplify and the result is used once, we can substitute the var with RHS
+                        if read_cnt == 1 && self.safe_to_simplify(var, rhs, stms.get(idx + 1..).unwrap_or(&[]), &substitution) {
+                            assert!(substitution.insert(*var, self.rewrite_exp(rhs_unfolded)).is_none());
+                            continue;
+                        }
+                        // Otherwise, let's keep the assignment as it is
+                        new_stms.push(self.rewrite_exp(self.builder.unfold(&substitution, stm.clone())));
                     },
                 _ => {
-                    // [TODO #17119]: this is not absolutely safe to do, because the result of `rhs` could change between the assignment and the usage.
-                    // Extra checks are needed to ensure safety.
                     new_stms.push(self.rewrite_exp(
                         self.builder.unfold(&substitution, stm.clone())))
                 },
             }
         }
-        let default_loc = self.builder.env().get_node_loc(seq_id);
-        // Process all blocks which have been saved for later
-        while let Some((prev_stms, pat, def)) = blocks.pop() {
-            let block =
-                self.builder
-                    .block(pat, Some(def), self.builder.seq(&default_loc, new_stms));
-            new_stms = prev_stms;
-            new_stms.push(block)
-        }
         new_stms
+    }
+
+    /// Analyze if the following pattern
+    /// ```move
+    ///  let _t = rhs; // _t is only used once and never written to again
+    ///  stmt1
+    ///  stmt2
+    ///  ...
+    ///  stmtN
+    ///  use(_t)
+    /// ```
+    ///  can be safely simplified to
+    /// ```move
+    ///  stmt1
+    ///  stmt2
+    ///  ...
+    ///  stmtN
+    ///  use(rhs)
+    /// ```
+    ///
+    fn safe_to_simplify(
+        &self,
+        target_var: &Symbol,
+        rhs: &Exp,
+        stmts: &[Exp],
+        substitution: &BTreeMap<Symbol, Exp>,
+    ) -> bool {
+        // If there are no statements after the assignment, or
+        // if the target var is used immediately after its assignment, we can safely simplify it.
+        // While this seems to be hacky, it is very effective in reducing compiler-introduced temp vars.
+        if stmts.first().map_or(true, |first_exp| {
+            Self::used_immediately(
+                target_var,
+                &self.builder.unfold(substitution, first_exp.clone()),
+                Self::safe_to_eliminate(rhs),
+            )
+        }) {
+            return true;
+        }
+
+        // Make sure RHS has no side effects
+        if !Self::safe_to_eliminate(&self.builder.unfold(substitution, rhs.clone())) {
+            return false;
+        }
+
+        // Check if moving the RHS to a later location might incur different results
+        // Algorithm:
+        // - Gather all the variables used by the RHS and their types
+        // - Check every statement in the sequence before usage of the target variable:
+        //   - If any of the RHS free var is redefined or mutably borrowed, we cannot move the RHS around
+        //
+        // Step 1: gather all free vars used by the RHS
+        let rhs = self.builder.unfold(substitution, rhs.clone());
+        let rhs_free_vars = rhs.free_vars();
+
+        // Analyze all the follow-up statements
+        for stmt in stmts {
+            // Step 2: Get all the free vars usage by a statement
+            let stmt = self.builder.unfold(substitution, stmt.clone());
+            let mut stmt_usage = UsageInfo::default();
+            fetch_usage(&mut stmt_usage, &stmt);
+
+            // Step 3: Give up if any of the free vars used by the RHS is written to/mutably borrowed in the statement
+            if rhs_free_vars
+                .iter()
+                .any(|var| stmt_usage.writes.contains_key(var))
+            {
+                return false;
+            }
+
+            // Step 4: If the target var is reached, we are good to go!
+            let stmt_free_vars = stmt.free_vars();
+            if stmt_free_vars.contains(target_var) {
+                return true;
+            }
+        }
+        true
+    }
+
+    /// Check if the target variable is the first variable accessed during execution of the expression.
+    /// `rhs_safe` indicates whether the RHS assigned to the target variable has no side effects.
+    fn used_immediately(target_var: &Symbol, exp: &Exp, rhs_safe: bool) -> bool {
+        match exp.as_ref() {
+            ExpData::LocalVar(_, var) => *var == *target_var,
+            ExpData::IfElse(_, cond, _, _) => Self::used_immediately(target_var, cond, rhs_safe),
+            ExpData::Assign(_, _, rhs) => Self::used_immediately(target_var, rhs, rhs_safe),
+            ExpData::Sequence(_, stmts) => stmts
+                .first()
+                .map_or(false, |e| Self::used_immediately(target_var, e, rhs_safe)),
+            ExpData::Block(_, _, bind, body) => {
+                if let Some(bind) = bind {
+                    // If there is a binding, we check the bind
+                    Self::used_immediately(target_var, bind, rhs_safe)
+                } else {
+                    // Otherwise, we check the body
+                    Self::used_immediately(target_var, body, rhs_safe)
+                }
+            },
+            ExpData::Match(_, target, _) => Self::used_immediately(target_var, target, rhs_safe),
+            ExpData::Return(_, ret) => Self::used_immediately(target_var, ret, rhs_safe),
+            ExpData::Mutate(_, _, rhs) => Self::used_immediately(target_var, rhs, rhs_safe),
+            ExpData::Call(_, op, args) => match op {
+                // Operations with exactly one argument
+                Operation::Freeze(_)
+                | Operation::Borrow(_)
+                | Operation::Deref
+                | Operation::Not
+                | Operation::Cast
+                | Operation::Select(_, _, _)
+                | Operation::SelectVariants(_, _, _)
+                | Operation::TestVariants(_, _, _) => args
+                    .first()
+                    .map_or(false, |e| Self::used_immediately(target_var, e, rhs_safe)),
+                // Operations with two arguments
+                Operation::Add
+                | Operation::Copy
+                | Operation::Move
+                | Operation::Sub
+                | Operation::Mul
+                | Operation::Mod
+                | Operation::Div
+                | Operation::BitOr
+                | Operation::BitAnd
+                | Operation::Xor
+                | Operation::Shl
+                | Operation::Shr
+                | Operation::And
+                | Operation::Or
+                | Operation::Eq
+                | Operation::Neq
+                | Operation::Lt
+                | Operation::Gt
+                | Operation::Le
+                | Operation::Ge => args.first().zip(args.get(1)).map_or(false, |(op1, op2)| {
+                    // Safe to assume immediate reuse if:
+                    // - the target variable is used in the first argument, OR
+                    // - the target variable is used in the second argument, but both the first argument and the RHS have no side effects.
+                    Self::used_immediately(target_var, op1, rhs_safe)
+                        || (Self::safe_to_eliminate(op1)
+                            && rhs_safe
+                            && Self::used_immediately(target_var, op2, rhs_safe))
+                }),
+                // Operations with or without arguments
+                Operation::MoveFunction(_, _) | Operation::Pack(_, _, _) | Operation::Tuple => {
+                    for (idx, arg) in args.iter().enumerate() {
+                        // Safe to assume immediate reuse if:
+                        // - the target variable is immediately used in the first argument
+                        if idx == 0 && Self::used_immediately(target_var, arg, rhs_safe) {
+                            return true;
+                        }
+                        // OR
+                        // - the target variable is immediately used in a follow-up argument, but all the arguments before it and the RHS have no side effects
+                        if idx != 0 && rhs_safe && Self::used_immediately(target_var, arg, rhs_safe)
+                        {
+                            return true;
+                        }
+                        if !rhs_safe || !Self::safe_to_eliminate(arg) {
+                            return false;
+                        }
+                    }
+                    false
+                },
+                // [TODO] handle global resource operators after issue #17010 is fixed
+                Operation::Abort
+                | Operation::Closure(..)
+                | Operation::Vector
+                | Operation::Exists(..)
+                | Operation::BorrowGlobal(..)
+                | Operation::MoveFrom
+                | Operation::MoveTo
+                | Operation::SpecFunction(..)
+                | Operation::UpdateField(..)
+                | Operation::Result(..)
+                | Operation::Index
+                | Operation::Slice
+                | Operation::Range
+                | Operation::Implies
+                | Operation::Iff
+                | Operation::Identical
+                | Operation::Len
+                | Operation::TypeDomain
+                | Operation::TypeValue
+                | Operation::ResourceDomain
+                | Operation::Global(..)
+                | Operation::CanModify
+                | Operation::Old
+                | Operation::Trace(..)
+                | Operation::EmptyVec
+                | Operation::SingleVec
+                | Operation::UpdateVec
+                | Operation::ConcatVec
+                | Operation::IndexOfVec
+                | Operation::InRangeRange
+                | Operation::InRangeVec
+                | Operation::ContainsVec
+                | Operation::RangeVec
+                | Operation::MaxU256
+                | Operation::MaxU128
+                | Operation::MaxU64
+                | Operation::MaxU32
+                | Operation::MaxU16
+                | Operation::MaxU8
+                | Operation::Bv2Int
+                | Operation::Int2Bv
+                | Operation::AbortFlag
+                | Operation::AbortCode
+                | Operation::WellFormed
+                | Operation::BoxValue
+                | Operation::UnboxValue
+                | Operation::EmptyEventStore
+                | Operation::EventStoreIncludedIn
+                | Operation::EventStoreIncludes
+                | Operation::ExtendEventStore
+                | Operation::NoOp => false,
+            },
+            ExpData::Value(..)
+            | ExpData::Temporary(..)
+            | ExpData::Lambda(..)
+            | ExpData::Quant(..)
+            | ExpData::Loop(..)
+            | ExpData::LoopCont(..)
+            | ExpData::SpecBlock(..)
+            | ExpData::Invoke(..)
+            | ExpData::Invalid(..) => false,
+        }
     }
 }
 
@@ -2351,7 +2552,8 @@ fn analyze_post_usage(target: &FunctionTarget, exp: &ExpData) -> BTreeMap<NodeId
     analyzer.compute_post_state(&mut post_state, exp, UsageInfo::default());
     if DEBUG {
         debug!(
-            "post exp usage: {}",
+            "post exp usage for function {}:\n {}\n",
+            target.get_name().display(target.global_env().symbol_pool()),
             exp.display_with_annotator(target.global_env(), &|id| {
                 if let Some(u) = post_state.get(&id) {
                     u.debug_print(target.global_env())
@@ -2379,33 +2581,51 @@ fn analyze_global_usage(exp: &ExpData) -> BTreeMap<Symbol, BTreeSet<NodeId>> {
 
 /// Helper function to gather variable usage
 fn fetch_usage(state: &mut UsageInfo, e: &ExpData) {
-    use ExpData::*;
-    match e {
-        Assign(id, pat, rhs) => {
-            for (_, var) in pat.vars() {
-                state.add_write(var, *id)
-            }
-            rhs.visit_free_local_vars(|id, var| state.add_read(var, id))
-        },
-        Block(id, pat, binding, body) => {
-            if let Some(b) = binding {
-                b.visit_free_local_vars(|id, var| state.add_read(var, id))
-            }
-            for (_, var) in pat.vars() {
-                state.add_write(var, *id)
-            }
-            body.visit_free_local_vars(|id, var| state.add_read(var, id))
-        },
-        Call(_, Operation::Borrow(kind), args) => args[0].visit_free_local_vars(|id, var| {
-            // Args supposed to be only a single variable, and marking everything in
-            // this exp as borrowed is safe.
-            if *kind == ReferenceKind::Mutable {
-                state.add_write(var, id)
-            }
-            state.add_borrow(var, id);
-        }),
-        _ => e.visit_free_local_vars(|id, var| state.add_read(var, id)),
+    let mut borrows = BTreeSet::new();
+    let mut writes = BTreeSet::new();
+
+    // Recursively gather writes and borrows info first
+    let mut visitor = |e: &ExpData| {
+        use ExpData::*;
+        match e {
+            Assign(_, pat, _) => {
+                for (var_id, var) in pat.vars() {
+                    writes.insert((var, var_id));
+                }
+            },
+            Block(_, pat, _, _) => {
+                for (var_id, var) in pat.vars() {
+                    writes.insert((var, var_id));
+                }
+            },
+            Call(_, Operation::Borrow(kind), args) => args[0].visit_free_local_vars(|id, var| {
+                // Args supposed to be only a single variable, and marking everything in
+                // this exp as borrowed is safe.
+                if *kind == ReferenceKind::Mutable {
+                    writes.insert((var, id));
+                }
+                borrows.insert((var, id));
+            }),
+            _ => {},
+        }
+        true
+    };
+    e.visit_pre_order(&mut visitor);
+
+    // Why not directly add writes and borrows in the loop above: writes removes borrows!
+
+    for (var, id) in writes.iter() {
+        state.add_write(*var, *id);
     }
+    for (var, id) in borrows.iter() {
+        state.add_borrow(*var, *id);
+    }
+    // Why not collects reads together with writes and borrows in the loop above: too many cases and easy to miss!
+    e.visit_free_local_vars(|id, var| {
+        if !writes.contains(&(var, id)) && !borrows.contains(&(var, id)) {
+            state.add_read(var, id)
+        }
+    });
 }
 
 impl UsageInfo {
@@ -2447,6 +2667,16 @@ impl UsageInfo {
             .get(&var)
             .map(|s| !s.is_empty())
             .unwrap_or(false)
+    }
+
+    /// Check if a var is read in the given range of expressions
+    fn only_read_in_range(&self, var: &Symbol, range: &[Exp]) -> bool {
+        self.reads.get(var).map_or(true, |read_set| {
+            read_set.iter().all(|reader| {
+                // Check if every read of the variable is by some expression in the range
+                range.iter().any(|exp| exp.node_ids().contains(reader))
+            })
+        })
     }
 
     #[allow(unused)]
@@ -2536,9 +2766,10 @@ where
         match exp {
             ExpData::Sequence(_, stms) if !stms.is_empty() => {
                 for stm in stms.iter().rev() {
-                    if let ExpData::LoopCont(cont_id, _, true) = stm.as_ref() {
-                        let header = self.cont_to_loop[cont_id];
-                        post_state = post_state_map[&header].clone();
+                    // Let's jump over loop continues as they have been handled
+                    if let ExpData::LoopCont(_, _, _) = stm.as_ref() {
+                        post_state = self.state(&stm.node_id()).cloned().unwrap_or_default();
+                        continue;
                     }
                     self.compute_post_state(post_state_map, stm.as_ref(), post_state);
                     post_state = self.state(&stm.node_id()).cloned().unwrap_or_default();
@@ -2546,8 +2777,14 @@ where
             },
             ExpData::Loop(id, body) => {
                 for (cont_id, is_cont) in &self.loop_to_cont[id] {
+                    let header = self.cont_to_loop[cont_id];
                     if *is_cont {
-                        post_state_map.insert(*cont_id, post_state.clone());
+                        // Var usage after a `continue` should include usage both inside and after the target loop
+                        post_state_map
+                            .insert(*cont_id, self.state(&header).cloned().unwrap_or_default());
+                    } else {
+                        // Var usage after a `break` should include usage after the target loop
+                        post_state_map.insert(*cont_id, post_state_map[&header].clone());
                     }
                 }
                 self.compute_post_state(post_state_map, body, post_state)

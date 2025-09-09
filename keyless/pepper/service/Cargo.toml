@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 aes-gcm = { workspace = true }
 anyhow = { workspace = true }
+aptos-build-info = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-inspection-service = { workspace = true }
@@ -29,7 +30,6 @@ ark-ff = { workspace = true }
 ark-groth16 = { workspace = true }
 ark-serialize = { workspace = true }
 bcs = { workspace = true }
-dashmap = { workspace = true }
 firestore = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
@@ -42,5 +42,6 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha3 = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true }
 uuid = { workspace = true }

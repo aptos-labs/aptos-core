@@ -10,7 +10,7 @@ use ambassador::delegatable_trait;
 use bytes::Bytes;
 use hashbrown::HashSet;
 #[cfg(fuzzing)]
-use move_binary_format::access::ModuleAccess;
+use move_binary_format::{access::ModuleAccess, errors::Location};
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult, VMResult},
     CompiledModule,

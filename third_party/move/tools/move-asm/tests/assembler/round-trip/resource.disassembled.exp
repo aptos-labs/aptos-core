@@ -1,0 +1,27 @@
+processed 1 task
+task 0 lines 3-23:  publish --print-bytecode --verbose [// Bytecode version v7]
+
+== BEGIN Bytecode ==
+// Bytecode version v7
+module 0x66::test
+struct S has drop + key
+  x: u64
+
+// Function definition at index 0
+fun move_to(l0: &signer)
+    move_loc l0
+    ld_u64 3
+    pack S
+    move_to S
+    ret
+
+// Function definition at index 1
+fun borrow(l0: address): u64 acquires S
+    move_loc l0
+    borrow_global S
+    borrow_field S, x
+    read_ref
+    ret
+
+
+== END Bytecode ==

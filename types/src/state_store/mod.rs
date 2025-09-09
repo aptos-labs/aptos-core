@@ -183,11 +183,11 @@ where
 /// Test-only basic [StateView] implementation with generic keys.
 #[cfg(any(test, feature = "testing"))]
 pub struct MockStateView<K> {
-    data: std::collections::HashMap<K, StateValue>,
+    data: std::collections::HashMap<K, StateSlot>,
 }
 
 #[cfg(any(test, feature = "testing"))]
-impl<K> MockStateView<K> {
+impl<K: Eq + Hash> MockStateView<K> {
     pub fn empty() -> Self {
         Self {
             data: std::collections::HashMap::new(),
@@ -195,6 +195,15 @@ impl<K> MockStateView<K> {
     }
 
     pub fn new(data: std::collections::HashMap<K, StateValue>) -> Self {
+        Self {
+            data: data
+                .into_iter()
+                .map(|(k, v)| (k, StateSlot::from_db_get(Some((0, v)))))
+                .collect(),
+        }
+    }
+
+    pub fn new_with_state_slot(data: std::collections::HashMap<K, StateSlot>) -> Self {
         Self { data }
     }
 }
@@ -203,8 +212,12 @@ impl<K> MockStateView<K> {
 impl<K: Clone + Eq + Hash> TStateView for MockStateView<K> {
     type Key = K;
 
-    fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {
-        Ok(self.data.get(state_key).cloned())
+    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
+        Ok(self
+            .data
+            .get(state_key)
+            .cloned()
+            .unwrap_or(StateSlot::ColdVacant))
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {

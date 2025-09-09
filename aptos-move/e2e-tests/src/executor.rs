@@ -50,8 +50,9 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionExecutableRef,
-        TransactionOutput, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        AuxiliaryInfo, BlockOutput, ExecutionStatus, SignedTransaction, Transaction,
+        TransactionExecutableRef, TransactionOutput, TransactionStatus, VMValidatorResult,
+        ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -882,6 +883,7 @@ impl FakeExecutor {
     pub fn execute_transaction_with_gas_profiler(
         &self,
         txn: SignedTransaction,
+        auxiliary_info: &AuxiliaryInfo,
     ) -> anyhow::Result<(TransactionOutput, TransactionGasLog)> {
         let txn = txn
             .check_signature()
@@ -919,6 +921,7 @@ impl FakeExecutor {
                 };
                 gas_profiler
             },
+            auxiliary_info,
         )?;
 
         Ok((

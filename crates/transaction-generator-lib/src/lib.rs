@@ -95,7 +95,6 @@ pub enum TransactionType {
     Workflow {
         workflow_kind: Box<dyn WorkflowKind>,
         num_modules: usize,
-        use_account_pool: bool,
         progress_type: WorkflowProgress,
     },
 }
@@ -397,7 +396,6 @@ pub async fn create_txn_generator_creator(
                 },
                 TransactionType::Workflow {
                     num_modules,
-                    use_account_pool,
                     workflow_kind,
                     progress_type,
                 } => Box::new(
@@ -408,7 +406,6 @@ pub async fn create_txn_generator_creator(
                         &root_account,
                         txn_executor,
                         num_modules,
-                        use_account_pool.then(|| accounts_pool.clone()),
                         cur_phase.clone(),
                         progress_type,
                     )

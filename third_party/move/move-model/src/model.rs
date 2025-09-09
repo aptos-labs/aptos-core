@@ -1708,11 +1708,104 @@ impl GlobalEnv {
         }
         let used_modules = self.get_used_modules_from_bytecode(&module);
         let friend_modules = self.get_friend_modules_from_bytecode(&module);
+
+        // If use decls decls are empty, let's propagage them from the CompiledModule with aliases assigned
+        let use_decls = if self.module_data[module_id.0 as usize].use_decls.is_empty() {
+            // Map to keep track of aliases for used modules
+            // key: module name (without address)
+            // value: [module address -> module alias]
+            let mut aliases = BTreeMap::new();
+            let mut make_alias = |address: Address, module_name: Symbol| {
+                // module name does not exist: alias not needed but keep track of it
+                let addr_alias_map = aliases.entry(module_name).or_insert_with(|| {
+                    let mut inner_map = BTreeMap::new();
+                    inner_map.insert(address.clone(), module_name);
+                    inner_map
+                });
+                // The module name exists and the address has not been recorded, we need to make an alias for this module name at this address
+                if addr_alias_map.get(&address).is_none() {
+                    let module_alias = format!(
+                        "{}_{}",
+                        module_name.display(&self.symbol_pool),
+                        addr_alias_map.len()
+                    );
+                    let alias = self.symbol_pool.make(&module_alias);
+                    addr_alias_map.insert(address, alias);
+                    return Some(alias);
+                }
+                None
+            };
+            used_modules
+                .iter()
+                .map(|mid| {
+                    let module_env = self.get_module(*mid);
+                    let name = module_env.get_name();
+                    UseDecl {
+                        loc: Loc::default(),
+                        module_name: name.clone(),
+                        module_id: Some(*mid),
+                        alias: make_alias(name.addr().clone(), name.name()),
+                        members: vec![],
+                    }
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+        // If friend decls are empty, let's propagage them from the CompiledModule
+        // Different from use decls, we allow friend modules that have not been added to the GlobalEnv
+        // - why: use decls are ensured to be added when `with_dep_closure` is set, which is not the case for friend decls
+        let friend_decls = if self.module_data[module_id.0 as usize]
+            .friend_decls
+            .is_empty()
+        {
+            module
+                .immediate_friends_iter()
+                .map(|(ff_addr, ff_name)| {
+                    let addr = Address::Numerical(*ff_addr);
+                    let name = self.symbol_pool.make(ff_name.as_str());
+                    let module_name = ModuleName::new(addr, name);
+                    let module_id = self
+                        .find_module(&module_name)
+                        .map(|module_env| module_env.get_id());
+                    FriendDecl {
+                        loc: Loc::default(),
+                        module_name,
+                        module_id,
+                    }
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+
         let mod_data = &mut self.module_data[module_id.0 as usize];
         mod_data.used_modules = used_modules;
+        mod_data.use_decls = use_decls;
         mod_data.friend_modules = friend_modules;
+        mod_data.friend_decls = friend_decls;
         mod_data.compiled_module = Some(module);
         mod_data.source_map = Some(source_map);
+    }
+
+    /// Updates modules previously loaded into the environment
+    pub fn update_loaded_modules(&mut self) {
+        // update friend modules that are not ready when loading a module
+        let friend_modules_vec: Vec<Option<BTreeSet<ModuleId>>> =
+            self.module_data
+                .iter()
+                .map(|mod_data| {
+                    mod_data.compiled_module.as_ref().map(|compiled_module| {
+                        self.get_friend_modules_from_bytecode(compiled_module)
+                    })
+                })
+                .collect();
+
+        for (mod_data, friend_modules_opt) in self.module_data.iter_mut().zip(friend_modules_vec) {
+            if let Some(friend_modules) = friend_modules_opt {
+                mod_data.friend_modules = friend_modules;
+            }
+        }
     }
 
     fn get_used_funs_from_bytecode(
@@ -2187,6 +2280,16 @@ impl GlobalEnv {
     /// Return the `StructEnv` for `str`
     pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv {
         self.get_module(str.module_id).into_struct(str.id)
+    }
+
+    /// Return the `Option<StructEnv>` for `str`
+    pub fn get_struct_opt(&self, str: QualifiedId<StructId>) -> Option<StructEnv> {
+        self.get_module_opt(str.module_id).and_then(|module| {
+            module.data.struct_data.get(&str.id).map(|data| StructEnv {
+                module_env: module,
+                data,
+            })
+        })
     }
 
     // Gets the number of modules in this environment.

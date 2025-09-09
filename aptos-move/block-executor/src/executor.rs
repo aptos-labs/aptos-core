@@ -4,7 +4,7 @@
 
 use crate::{
     captured_reads::CapturedReads,
-    code_cache_global::GlobalModuleCache,
+    code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     counters::{
         self, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, PARALLEL_EXECUTION_SECONDS,
@@ -46,17 +46,15 @@ use aptos_types::{
     on_chain_config::{BlockGasLimitType, Features},
     state_store::{state_value::StateValue, TStateView},
     transaction::{
-        block_epilogue::TBlockEndInfoExt, BlockExecutableTransaction, BlockOutput, FeeDistribution,
+        block_epilogue::TBlockEndInfoExt, AuxiliaryInfoTrait, BlockExecutableTransaction,
+        BlockOutput, FeeDistribution,
     },
     vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
-use aptos_vm_types::{
-    change_set::randomly_check_layout_matches, module_write_set::ModuleWrite,
-    resolver::ResourceGroupSize,
-};
+use aptos_vm_types::{change_set::randomly_check_layout_matches, resolver::ResourceGroupSize};
 use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
@@ -64,7 +62,7 @@ use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
-use move_vm_types::{code::ModuleCache, delayed_values::delayed_field_id::DelayedFieldID};
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use num_cpus;
 use rayon::ThreadPool;
 use scopeguard::defer;
@@ -96,22 +94,23 @@ where
     final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
 }
 
-pub struct BlockExecutor<T, E, S, L, TP> {
+pub struct BlockExecutor<T, E, S, L, TP, A> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
-    phantom: PhantomData<fn() -> (T, E, S, L, TP)>,
+    phantom: PhantomData<fn() -> (T, E, S, L, TP, A)>,
 }
 
-impl<T, E, S, L, TP> BlockExecutor<T, E, S, L, TP>
+impl<T, E, S, L, TP, A> BlockExecutor<T, E, S, L, TP, A>
 where
     T: BlockExecutableTransaction,
-    E: ExecutorTask<Txn = T>,
+    E: ExecutorTask<Txn = T, AuxiliaryInfo = A>,
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
-    TP: TxnProvider<T> + Sync,
+    TP: TxnProvider<T, A> + Sync,
+    A: AuxiliaryInfoTrait,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -196,7 +195,7 @@ where
                                 incarnation,
                                 Arc::new(group_metadata_op),
                                 None,
-                            ),
+                            )?,
                         )?;
                         abort_manager.invalidate_dependencies(
                             versioned_cache.group_data().write_v2(
@@ -241,7 +240,7 @@ where
                     incarnation,
                     Arc::new(group_metadata_op),
                     None,
-                ),
+                )?,
             )?;
             abort_manager.invalidate_dependencies(versioned_cache.group_data().write_v2(
                 group_key,
@@ -342,6 +341,7 @@ where
 
         // TODO(BlockSTMv2): proper integration w. execution pooling for performance.
         let txn = signature_verified_block.get_txn(idx_to_execute);
+        let auxiliary_info = signature_verified_block.get_auxiliary_info(idx_to_execute);
 
         let mut abort_manager = AbortManager::new(idx_to_execute, incarnation, scheduler);
         let sync_view = LatestView::new(
@@ -351,7 +351,8 @@ where
             ViewState::Sync(parallel_state),
             idx_to_execute,
         );
-        let execution_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+        let execution_result =
+            executor.execute_transaction(&sync_view, txn, &auxiliary_info, idx_to_execute);
 
         let mut read_set = sync_view.take_parallel_reads();
         if read_set.is_incorrect_use() {
@@ -393,13 +394,15 @@ where
             resource_write_set = output.resource_write_set();
             for (key, value, maybe_layout) in resource_write_set.clone().into_iter() {
                 prev_modified_resource_keys.remove(&key);
-                abort_manager.invalidate_dependencies(versioned_cache.data().write_v2::<false>(
-                    key,
-                    idx_to_execute,
-                    incarnation,
-                    value,
-                    maybe_layout,
-                ))?;
+                abort_manager.invalidate_dependencies(
+                    versioned_cache.data().write_v2::<false>(
+                        key,
+                        idx_to_execute,
+                        incarnation,
+                        value,
+                        maybe_layout,
+                    )?,
+                )?;
             }
 
             // Apply aggregator v1 writes and deltas, using versioned data's V1 (write/add_delta) APIs.
@@ -467,6 +470,7 @@ where
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
         txn: &T,
+        auxiliary_info: &A,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         executor: &E,
@@ -490,7 +494,8 @@ where
             ViewState::Sync(parallel_state),
             idx_to_execute,
         );
-        let execution_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+        let execution_result =
+            executor.execute_transaction(&sync_view, txn, auxiliary_info, idx_to_execute);
 
         let mut prev_modified_resource_keys = last_input_output
             .modified_resource_keys(idx_to_execute)
@@ -894,6 +899,7 @@ where
                         txn_idx,
                         incarnation + 1,
                         block.get_txn(txn_idx),
+                        &block.get_auxiliary_info(txn_idx),
                         last_input_output,
                         versioned_cache,
                         executor,
@@ -938,30 +944,16 @@ where
             }
         }
 
-        let module_write_set = last_input_output.module_write_set(txn_idx);
-        let mut module_ids_for_v2 = BTreeSet::new();
         // Publish modules before we decrease validation index (in V1) so that validations observe
         // the new module writes as well.
-        if !module_write_set.is_empty() {
+        if last_input_output.publish_module_write_set(
+            txn_idx,
+            global_module_cache,
+            versioned_cache,
+            runtime_environment,
+            &scheduler,
+        )? {
             side_effect_at_commit = true;
-
-            if scheduler.is_v2() {
-                module_ids_for_v2 = module_write_set
-                    .iter()
-                    .map(|write| write.module_id().clone())
-                    .collect();
-            }
-
-            Self::publish_module_writes(
-                txn_idx,
-                module_write_set,
-                global_module_cache,
-                versioned_cache,
-                runtime_environment,
-            )?;
-
-            // Record validation requirements after the modules are published.
-            scheduler.record_validation_requirements(txn_idx, module_ids_for_v2)?;
         }
 
         if side_effect_at_commit {
@@ -1030,30 +1022,6 @@ where
             .into()));
         }
 
-        Ok(())
-    }
-
-    fn publish_module_writes(
-        txn_idx: TxnIndex,
-        module_write_set: Vec<ModuleWrite<T::Value>>,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-        runtime_environment: &RuntimeEnvironment,
-    ) -> Result<(), PanicError> {
-        for write in module_write_set {
-            Self::add_module_write_to_module_cache(
-                write,
-                txn_idx,
-                runtime_environment,
-                global_module_cache,
-                versioned_cache.module_cache(),
-            )?;
-        }
         Ok(())
     }
 
@@ -1367,10 +1335,34 @@ where
                             environment.features(),
                         );
                         outputs.dereference_mut().push(E::Output::skip_output()); // placeholder
+                                                                                  // Check if existing auxiliary infos are None to maintain consistency
+                        let block_epilogue_aux_info = if num_txns > 0 {
+                            // Sample a few transactions to check the auxiliary info pattern
+                            let sample_aux_infos: Vec<_> = (0..std::cmp::min(num_txns, 3))
+                                .map(|i| block.get_auxiliary_info(i as TxnIndex))
+                                .collect();
+
+                            let all_auxiliary_infos_are_none = sample_aux_infos
+                                .iter()
+                                .all(|info| info.transaction_index().is_none());
+
+                            if all_auxiliary_infos_are_none {
+                                // If existing auxiliary infos are None, use None for consistency (version 0 behavior)
+                                A::new_empty()
+                            } else {
+                                // Otherwise, use the standard function (version 1 behavior)
+                                A::auxiliary_info_at_txn_index(num_txns as u32)
+                            }
+                        } else {
+                            // Fallback if no transactions in block
+                            A::new_empty()
+                        };
+
                         if Self::execute(
                             num_txns as u32,
                             0,
                             &txn,
+                            &block_epilogue_aux_info,
                             last_input_output,
                             versioned_cache,
                             &executor,
@@ -1490,6 +1482,7 @@ where
                         txn_idx,
                         incarnation,
                         block.get_txn(txn_idx),
+                        &block.get_auxiliary_info(txn_idx),
                         last_input_output,
                         versioned_cache,
                         &executor,
@@ -1667,7 +1660,6 @@ where
         shared_maybe_error: &AtomicBool,
         has_remaining_commit_tasks: bool,
         final_results: ExplicitSyncWrapper<Vec<E::Output>>,
-        block_limit_processor: ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         block_epilogue_txn: Option<T>,
         mut versioned_cache: MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: impl Send + 'static,
@@ -1701,16 +1693,10 @@ where
         // Explicit async drops
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
-        let to_make_hot = block_epilogue_txn
-            .is_some()
-            .then(|| block_limit_processor.acquire().get_slots_to_make_hot())
-            .unwrap_or_default();
-
         // Return final result
         Ok(BlockOutput::new(
             final_results.into_inner(),
             block_epilogue_txn,
-            to_make_hot,
         ))
     }
 
@@ -1732,7 +1718,7 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
+            return Ok(BlockOutput::new(vec![], None));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2) as u32;
@@ -1804,7 +1790,6 @@ where
             &shared_maybe_error,
             !scheduler.post_commit_processing_queue_is_empty(),
             final_results,
-            block_limit_processor,
             None, // BlockSTMv2 doesn't handle block epilogue yet.
             versioned_cache,
             scheduler,
@@ -1836,7 +1821,7 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
+            return Ok(BlockOutput::new(vec![], None));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
@@ -1912,7 +1897,6 @@ where
             &shared_maybe_error,
             scheduler.pop_from_commit_queue().is_ok(),
             final_results,
-            block_limit_processor,
             block_epilogue_txn.into_inner(),
             versioned_cache,
             scheduler,
@@ -1968,9 +1952,9 @@ where
             let txn = signature_verified_block.get_txn(i as TxnIndex);
             if let Some(user_txn) = txn.try_as_signed_user_txn() {
                 let auxiliary_info = signature_verified_block.get_auxiliary_info(i as TxnIndex);
-                if let Some(ephemeral_info) = auxiliary_info.ephemeral_info() {
+                let proposer_index = auxiliary_info.proposer_index();
+                if let Some(proposer_index) = proposer_index {
                     let gas_price = user_txn.gas_unit_price();
-                    let proposer_index = ephemeral_info.proposer_index;
                     let fee_statement = output.fee_statement();
                     let total_gas_unit = fee_statement.gas_used();
                     // Total gas unit here includes the storage fee (deposit), which is not
@@ -1995,57 +1979,6 @@ where
             }
         }
         T::block_epilogue_v1(block_id, block_end_info, FeeDistribution::new(amount))
-    }
-
-    /// Converts module write into cached module representation, and adds it to the module cache.
-    fn add_module_write_to_module_cache(
-        write: ModuleWrite<T::Value>,
-        txn_idx: TxnIndex,
-        runtime_environment: &RuntimeEnvironment,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
-        per_block_module_cache: &impl ModuleCache<
-            Key = ModuleId,
-            Deserialized = CompiledModule,
-            Verified = Module,
-            Extension = AptosModuleExtension,
-            Version = Option<TxnIndex>,
-        >,
-    ) -> Result<(), PanicError> {
-        let (id, write_op) = write.unpack();
-
-        let state_value = write_op.as_state_value().ok_or_else(|| {
-            PanicError::CodeInvariantError("Modules cannot be deleted".to_string())
-        })?;
-
-        // Since we have successfully serialized the module when converting into this transaction
-        // write, the deserialization should never fail.
-        let compiled_module = runtime_environment
-            .deserialize_into_compiled_module(state_value.bytes())
-            .map_err(|err| {
-                let msg = format!("Failed to construct the module from state value: {:?}", err);
-                PanicError::CodeInvariantError(msg)
-            })?;
-        let extension = Arc::new(AptosModuleExtension::new(state_value));
-
-        per_block_module_cache
-            .insert_deserialized_module(id.clone(), compiled_module, extension, Some(txn_idx))
-            .map_err(|err| {
-                let msg = format!(
-                    "Failed to insert code for module {}::{} at version {} to module cache: {:?}",
-                    id.address(),
-                    id.name(),
-                    txn_idx,
-                    err
-                );
-                PanicError::CodeInvariantError(msg)
-            })?;
-        global_module_cache.mark_overridden(&id);
-        Ok(())
     }
 
     fn apply_output_sequential(
@@ -2076,8 +2009,8 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
-        for write in output.module_write_set().into_iter() {
-            Self::add_module_write_to_module_cache(
+        for write in output.module_write_set().as_ref().values() {
+            add_module_write_to_module_cache::<T>(
                 write,
                 txn_idx,
                 runtime_environment,
@@ -2147,7 +2080,7 @@ where
         let num_txns = signature_verified_block.num_txns();
 
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
+            return Ok(BlockOutput::new(vec![], None));
         }
 
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -2177,6 +2110,7 @@ where
             } else {
                 break;
             };
+            let auxiliary_info = signature_verified_block.get_auxiliary_info(idx as TxnIndex);
             let latest_view = LatestView::<T, S>::new(
                 base_view,
                 module_cache_manager_guard.module_cache(),
@@ -2184,7 +2118,8 @@ where
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
-            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
+            let res =
+                executor.execute_transaction(&latest_view, txn, &auxiliary_info, idx as TxnIndex);
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Abort(err) => {
@@ -2475,11 +2410,7 @@ where
             .module_cache_mut()
             .insert_verified(unsync_map.into_modules_iter())?;
 
-        let to_make_hot = block_epilogue_txn
-            .is_some()
-            .then(|| block_limit_processor.get_slots_to_make_hot())
-            .unwrap_or_default();
-        Ok(BlockOutput::new(ret, block_epilogue_txn, to_make_hot))
+        Ok(BlockOutput::new(ret, block_epilogue_txn))
     }
 
     pub fn execute_block(
@@ -2594,7 +2525,7 @@ where
             let ret = (0..signature_verified_block.num_txns())
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
-            return Ok(BlockOutput::new(ret, None, BTreeMap::new()));
+            return Ok(BlockOutput::new(ret, None));
         }
 
         Err(sequential_error)

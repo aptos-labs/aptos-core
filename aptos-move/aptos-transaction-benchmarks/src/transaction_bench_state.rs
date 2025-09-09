@@ -25,7 +25,7 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        ExecutionStatus, Transaction, TransactionOutput, TransactionStatus,
+        AuxiliaryInfo, ExecutionStatus, Transaction, TransactionOutput, TransactionStatus,
     },
 };
 use aptos_vm::{
@@ -203,7 +203,7 @@ where
 
     fn execute_benchmark_sequential(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = txn_provider.num_txns();
@@ -251,7 +251,7 @@ where
 
     fn execute_benchmark_parallel(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<TransactionOutput>, usize) {

@@ -335,12 +335,15 @@ impl TExecutionClient for ExecutionProxyClient {
 
         let transaction_shuffler =
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
-        let block_executor_onchain_config =
+        let block_executor_onchain_config: aptos_types::block_executor::config::BlockExecutorConfigFromOnchain =
             onchain_execution_config.block_executor_onchain_config();
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
         let randomness_enabled = onchain_consensus_config.is_vtxn_enabled()
             && onchain_randomness_config.randomness_enabled();
+
+        let aux_version = onchain_execution_config.persisted_auxiliary_info_version();
+
         self.execution_proxy.new_epoch(
             &epoch_state,
             payload_manager,
@@ -349,6 +352,7 @@ impl TExecutionClient for ExecutionProxyClient {
             transaction_deduper,
             randomness_enabled,
             onchain_consensus_config.order_vote_enabled(),
+            aux_version,
         );
 
         maybe_rand_msg_tx

@@ -42,12 +42,12 @@ module 0x8675309::M {
     fun t0() {
         let f1;
         let f2;
-        Box<u64>{f1: f1,f2: f2} = new<u64>();
+        Box<u64>{f1: f1, f2: f2} = new<u64>();
         f1;
         f2;
         let f1;
         let f2;
-        Box<Box<u64>>{f1: f1,f2: f2} = new<Box<u64>>();
+        Box<Box<u64>>{f1: f1, f2: f2} = new<Box<u64>>();
         f1;
         f2;
     }

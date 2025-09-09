@@ -13,7 +13,7 @@ use aptos_types::{
     state_store::StateView,
     transaction::{
         block_epilogue::BlockEndInfo, signature_verified_transaction::SignatureVerifiedTransaction,
-        BlockOutput, Transaction, TransactionOutput,
+        AuxiliaryInfo, BlockOutput, Transaction, TransactionOutput,
     },
     vm_status::VMStatus,
 };
@@ -22,7 +22,6 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use std::collections::BTreeMap;
 
 pub struct AptosVMParallelUncoordinatedBlockExecutor;
 
@@ -33,7 +32,7 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
 
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
@@ -67,6 +66,7 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
                         &vm.as_move_resolver(state_view),
                         &code_storage,
                         &log_context,
+                        &AuxiliaryInfo::default(),
                     )
                     .map(|(_vm_status, vm_output)| {
                         vm_output
@@ -80,7 +80,6 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
         Ok(BlockOutput::new(
             transaction_outputs,
             Some(block_epilogue_txn.into()),
-            BTreeMap::new(),
         ))
     }
 }

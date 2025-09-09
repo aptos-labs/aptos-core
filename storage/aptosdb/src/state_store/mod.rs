@@ -770,9 +770,7 @@ impl StateStore {
     }
 
     pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["get_usage"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["get_usage"]);
         self.state_db.get_state_storage_usage(version)
     }
 
@@ -1145,9 +1143,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         node_batch: &StateValueBatch,
         progress: StateSnapshotProgress,
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["state_value_writer_write_chunk"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_value_writer_write_chunk"]);
         let mut batch = SchemaBatch::new();
         let mut sharded_schema_batch = self.state_kv_db.new_sharded_native_batches();
 

@@ -11,8 +11,8 @@ use aptos_framework::natives::code::PackageMetadata;
 use aptos_types::{
     account_address::AccountAddress,
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        StateViewId, StateViewResult, TStateView,
+        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, StateViewId, StateViewResult, TStateView,
     },
     transaction::{Transaction, TransactionInfo, Version},
 };
@@ -144,18 +144,21 @@ impl DebuggerStateView {
         }
     }
 
-    fn get_state_value_internal(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<StateValue>> {
+    fn get_state_slot_internal(&self, state_key: &StateKey, version: Version) -> Result<StateSlot> {
         let (tx, rx) = std::sync::mpsc::channel();
         self.query_sender
             .lock()
             .unwrap()
             .send((state_key.clone(), version, tx))
             .unwrap();
-        rx.recv()?
+        let result = rx.recv()?;
+        result.map(|s| match s {
+            None => StateSlot::ColdVacant,
+            Some(value) => StateSlot::ColdOccupied {
+                value_version: version,
+                value,
+            },
+        })
     }
 }
 
@@ -166,8 +169,8 @@ impl TStateView for DebuggerStateView {
         StateViewId::Replay
     }
 
-    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
-        self.get_state_value_internal(state_key, self.version)
+    fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateSlot> {
+        self.get_state_slot_internal(state_key, self.version)
             .map_err(Into::into)
     }
 

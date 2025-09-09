@@ -4,6 +4,9 @@
 use crate::{genesis::GENESIS_CHANGE_SET_HEAD, Account, AccountData};
 use anyhow::{anyhow, bail, Result};
 use aptos_types::{
+    account_config::{
+        primary_apt_store, CoinStoreResource, FungibleStoreResource, ObjectGroupResource,
+    },
     chain_id::ChainId,
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::{
@@ -12,11 +15,14 @@ use aptos_types::{
     },
     transaction::Version,
     write_set::{TransactionWrite, WriteSet},
+    AptosCoinType,
 };
 use bytes::Bytes;
 use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
 use move_core_types::{
-    account_address::AccountAddress, language_storage::ModuleId, move_resource::MoveResource,
+    account_address::AccountAddress,
+    language_storage::{ModuleId, StructTag},
+    move_resource::{MoveResource, MoveStructType},
 };
 use parking_lot::RwLock;
 use serde::Serialize;
@@ -79,6 +85,29 @@ pub trait SimulationStateStore: TStateView<Key = StateKey> {
         };
         modify(&mut resource)?;
         self.set_resource(addr, &resource)
+    }
+
+    fn get_resource_group<G: MoveResource>(
+        &self,
+        addr: AccountAddress,
+    ) -> Result<Option<BTreeMap<StructTag, Vec<u8>>>> {
+        let state_key = StateKey::resource_group(&addr, &G::struct_tag());
+
+        match self.get_state_value_bytes(&state_key)? {
+            Some(blob) => Ok(Some(bcs::from_bytes(&blob)?)),
+            None => Ok(None),
+        }
+    }
+
+    fn set_resource_group<G: MoveResource>(
+        &self,
+        addr: AccountAddress,
+        resource_group: &BTreeMap<StructTag, Vec<u8>>,
+    ) -> Result<()> {
+        self.set_state_value(
+            StateKey::resource_group(&addr, &G::struct_tag()),
+            StateValue::new_legacy(bcs::to_bytes(resource_group)?.into()),
+        )
     }
 
     /// Sets an on-chain config.
@@ -223,6 +252,69 @@ pub trait SimulationStateStore: TStateView<Key = StateKey> {
         self.add_account_data(&data)?;
         Ok(data)
     }
+
+    /// Fetches the APT balance of an account from the legacy coin store.
+    fn get_apt_balance_legacy(&self, address: AccountAddress) -> Result<u64> {
+        let coin_store = match self.get_resource::<CoinStoreResource<AptosCoinType>>(address)? {
+            Some(coin_store) => coin_store,
+            None => return Ok(0),
+        };
+
+        Ok(coin_store.coin())
+    }
+
+    /// Fetches the APT balance of an account from the fungible store.
+    fn get_apt_balance_fungible_store(&self, address: AccountAddress) -> Result<u64> {
+        let primary_store_object_address = primary_apt_store(address);
+        let resource_group =
+            match self.get_resource_group::<ObjectGroupResource>(primary_store_object_address)? {
+                Some(resource_group) => resource_group,
+                None => return Ok(0),
+            };
+        let fungible_store: FungibleStoreResource =
+            match resource_group.get(&FungibleStoreResource::struct_tag()) {
+                Some(blob) => bcs::from_bytes(blob)?,
+                None => return Ok(0),
+            };
+
+        Ok(fungible_store.balance)
+    }
+
+    /// Fetches the APT balance of an account.
+    /// This includes both legacy and fungible store balances.
+    fn get_apt_balance(&self, address: AccountAddress) -> Result<u64> {
+        Ok(self.get_apt_balance_legacy(address)? + self.get_apt_balance_fungible_store(address)?)
+    }
+
+    /// Adds APT to an account's fungible store.
+    fn fund_apt_fungible_store(&self, address: AccountAddress, amount: u64) -> Result<(u64, u64)> {
+        let primary_store_object_address = primary_apt_store(address);
+
+        let mut resource_group = self
+            .get_resource_group::<ObjectGroupResource>(primary_store_object_address)?
+            .unwrap_or_else(BTreeMap::new);
+
+        let mut fungible_store = match resource_group.get(&FungibleStoreResource::struct_tag()) {
+            Some(blob) => bcs::from_bytes(blob)?,
+            None => FungibleStoreResource::new(AccountAddress::TEN, 0, false),
+        };
+
+        let before = fungible_store.balance;
+        fungible_store.balance += amount;
+        let after = fungible_store.balance;
+
+        resource_group.insert(
+            FungibleStoreResource::struct_tag(),
+            bcs::to_bytes(&fungible_store)?,
+        );
+
+        self.set_resource_group::<ObjectGroupResource>(
+            primary_store_object_address,
+            &resource_group,
+        )?;
+
+        Ok((before, after))
+    }
 }
 
 /***************************************************************************************************
@@ -327,6 +419,7 @@ where
  * Delta State Store
  *
  **************************************************************************************************/
+
 /// A state storage that allows changes to be stacked on top of a base state view.
 ///
 /// This is useful for staging reversible state changes or performing simulations on top of
@@ -436,6 +529,17 @@ impl<V> DeltaStateStore<V> {
             base,
             states: RwLock::new(state_vals.into_iter().map(|(k, v)| (k, Some(v))).collect()),
         }
+    }
+
+    pub fn new_with_base_and_delta(base: V, delta: HashMap<StateKey, Option<StateValue>>) -> Self {
+        Self {
+            base,
+            states: RwLock::new(delta),
+        }
+    }
+
+    pub fn delta(&self) -> HashMap<StateKey, Option<StateValue>> {
+        self.states.read().clone()
     }
 }
 

@@ -1,0 +1,6 @@
+processed 3 tasks
+task 0 lines 3-32:  publish [module 0x42::test {]
+task 1 lines 35-35:  run 0x42::test::ref
+return values: 10
+task 2 lines 37-37:  run 0x42::test::ref_mut
+return values: 49

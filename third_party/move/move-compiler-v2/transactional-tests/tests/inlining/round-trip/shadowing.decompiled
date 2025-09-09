@@ -1,0 +1,11 @@
+//**** Cross-compiled for `move` syntax from `tests/inlining/shadowing.move`
+
+//# publish
+module 0x42::Test {
+    public fun test_shadowing() {
+        if (!(3 == 3)) abort 0;
+    }
+}
+
+
+//# run 0x42::Test::test_shadowing

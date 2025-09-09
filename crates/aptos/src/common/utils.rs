@@ -498,8 +498,8 @@ pub fn start_logger(level: Level) {
     logger.build();
 }
 
-/// For transaction payload and options, either get gas profile or submit for execution.
-pub async fn profile_or_submit(
+/// Dispatches the transaction payload to different execution backends based on options.
+pub async fn dispatch_transaction(
     payload: TransactionPayload,
     txn_options_ref: &TransactionOptions,
 ) -> CliTypedResult<TransactionSummary> {
@@ -509,8 +509,23 @@ pub async fn profile_or_submit(
         ));
     }
 
-    // Profile gas if needed.
-    if txn_options_ref.profile_gas {
+    if txn_options_ref.session.is_some() && txn_options_ref.profile_gas {
+        return Err(CliError::UnexpectedError(
+            "`--profile-gas` cannot be used with `--session yet`".to_string(),
+        ));
+    }
+
+    if txn_options_ref.session.is_some() && txn_options_ref.benchmark {
+        return Err(CliError::UnexpectedError(
+            "`--benchmark` cannot be used with `--session yet`".to_string(),
+        ));
+    }
+
+    if let Some(session_path) = &txn_options_ref.session {
+        txn_options_ref
+            .simulate_using_session(session_path, payload)
+            .await
+    } else if txn_options_ref.profile_gas {
         txn_options_ref.profile_gas(payload).await
     } else if txn_options_ref.benchmark {
         txn_options_ref.benchmark_locally(payload).await

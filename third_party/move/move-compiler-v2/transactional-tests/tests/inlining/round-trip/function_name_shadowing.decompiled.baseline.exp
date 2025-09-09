@@ -1,0 +1,5 @@
+processed 3 tasks
+task 0 lines 3-11:  publish [module 0x42::OtherModule {]
+task 1 lines 14-27:  publish [module 0x42::Test {]
+task 2 lines 30-30:  run 0x42::Test::test_shadowing
+return values: 5280

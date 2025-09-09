@@ -1,0 +1,25 @@
+//**** Cross-compiled for `move` syntax from `tests/evaluation_order/lazy_assert.move`
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1 / 0;
+        abort _t2
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
