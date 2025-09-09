@@ -259,9 +259,8 @@ impl<'kv> StateUpdateRefs<'kv> {
                     }
 
                     // If we see a hotness op, we check if there is a value write op with the same
-                    // key before. This is unlikely, but if it does happen (e.g. if the write
-                    // summary used to compute MakeHot is missing keys), we must discard the
-                    // hotness op to avoid overwriting the value write op.
+                    // key before. If so, we must discard the hotness op to avoid overwriting the
+                    // value write op.
                     // TODO(HotState): also double check this logic for state sync later. For now
                     // we do not output hotness ops for state sync.
                     match dedupped.entry(k) {
@@ -320,7 +319,7 @@ mod tests {
         let u = res.get(key).unwrap();
         assert_eq!(u.version, expected_version);
         assert_eq!(
-            u.state_op.as_state_value_opt().unwrap().bytes(),
+            u.state_op.as_state_value_opt().unwrap().unwrap().bytes(),
             expected_value
         );
     }

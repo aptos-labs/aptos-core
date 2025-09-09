@@ -9,7 +9,9 @@ Ok(
                         },
                     ),
                 ),
-                hotness: {},
+                read_only: {
+                    StateKey::AccessPath { address: 0x1, path: "Resource(0x1::aptos_governance::ApprovedExecutionHashes)" }: MakeHot,
+                },
             },
             events: [],
             gas_used: 0,

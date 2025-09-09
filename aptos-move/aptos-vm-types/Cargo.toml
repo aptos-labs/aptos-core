@@ -35,4 +35,5 @@ aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-transaction-simulation = { workspace = true }
 aptos-vm = { workspace = true }
+maplit = { workspace = true }
 test-case = { workspace = true }

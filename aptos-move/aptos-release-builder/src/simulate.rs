@@ -68,6 +68,7 @@ use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use std::{
+    collections::HashSet,
     io::Write,
     path::{Path, PathBuf},
 };
@@ -354,7 +355,7 @@ fn force_end_epoch(state_view: &impl SimulationStateStore) -> Result<()> {
 
     change_set.try_materialize_aggregator_v1_delta_set(&resolver)?;
     let (write_set, _events) = change_set
-        .try_combine_into_storage_change_set(ModuleWriteSet::empty())
+        .try_combine_into_storage_change_set(ModuleWriteSet::empty(), HashSet::new())
         .expect("Failed to convert to storage ChangeSet")
         .into_inner();
 

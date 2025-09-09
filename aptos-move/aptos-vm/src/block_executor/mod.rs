@@ -474,6 +474,18 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         writes
     }
 
+    fn record_read_set(&self, read_set: HashSet<StateKey>) {
+        assert!(
+            self.committed_output.get().is_none(),
+            "Must record read set before making TransactionOutput."
+        );
+        self.vm_output
+            .write()
+            .as_mut()
+            .expect("Should only be called after transaction is executed.")
+            .record_read_set(read_set);
+    }
+
     // Legacy interfaces, which means there are alternative, more efficient ways used in
     // BlockSTMv2. For now we do get the benefits of comparing different implementations.
     // TODO: consider adjusting sequential execution and BlockSTMv1 to use the superior

@@ -87,7 +87,7 @@ use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     env,
     fs::{self, OpenOptions},
     io::Write,
@@ -1432,7 +1432,7 @@ fn finish_session_assert_no_modules(
         .expect("Failed to finish the session");
 
     change_set
-        .try_combine_into_storage_change_set(ModuleWriteSet::empty())
+        .try_combine_into_storage_change_set(ModuleWriteSet::empty(), HashSet::new())
         .expect("Failed to convert to storage ChangeSet")
         .into_inner()
 }

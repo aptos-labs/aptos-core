@@ -85,6 +85,14 @@ impl ShardedStateCache {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PrimingPolicy {
+    /// Prime cache for all keys in the write sets.
+    All,
+    /// Only prime cache for the keys that are prepared for hot state promotion.
+    MakeHotOnly,
+}
+
 /// `CachedStateView` is like a snapshot of the global state comprised of state view at two
 /// levels, persistent storage and memory.
 /// TODO(aldenhu): This is actually MemorizingStateUpdateView?
@@ -168,25 +176,36 @@ impl CachedStateView {
         )
     }
 
-    pub fn prime_cache(&self, updates: &StateUpdateRefs) -> Result<()> {
+    pub fn prime_cache(&self, updates: &StateUpdateRefs, policy: PrimingPolicy) -> Result<()> {
         let _timer = TIMER.timer_with(&["prime_state_cache"]);
 
         IO_POOL.install(|| {
             if let Some(updates) = updates.for_last_checkpoint_batched() {
-                self.prime_cache_for_batched_updates(updates)?;
+                self.prime_cache_for_batched_updates(updates, policy)?;
             }
             if let Some(updates) = updates.for_latest_batched() {
-                self.prime_cache_for_batched_updates(updates)?;
+                self.prime_cache_for_batched_updates(updates, policy)?;
             }
             Ok(())
         })
     }
 
-    fn prime_cache_for_batched_updates(&self, updates: &BatchedStateUpdateRefs) -> Result<()> {
-        updates
-            .shards
-            .par_iter()
-            .try_for_each(|shard| self.prime_cache_for_keys(shard.keys().cloned()))
+    fn prime_cache_for_batched_updates(
+        &self,
+        updates: &BatchedStateUpdateRefs,
+        policy: PrimingPolicy,
+    ) -> Result<()> {
+        updates.shards.par_iter().try_for_each(|shard| {
+            self.prime_cache_for_keys(
+                shard
+                    .iter()
+                    .filter_map(|(k, u)| match policy {
+                        PrimingPolicy::MakeHotOnly if u.state_op.is_value_write_op() => None,
+                        _ => Some(k),
+                    })
+                    .cloned(),
+            )
+        })
     }
 
     fn prime_cache_for_keys<'a, T: IntoIterator<Item = &'a StateKey> + Send>(

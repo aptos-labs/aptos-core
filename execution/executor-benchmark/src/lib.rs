@@ -912,7 +912,7 @@ mod tests {
         assert_eq!(vm_writes.len(), other_writes.len());
 
         if values_match {
-            assert_eq!(vm_txn_output, other_txn_output);
+            assert_equal_transaction_outputs(vm_txn_output, other_txn_output);
         }
     }
 

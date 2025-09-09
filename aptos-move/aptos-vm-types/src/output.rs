@@ -22,7 +22,7 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -34,6 +34,8 @@ pub struct VMOutput {
     module_write_set: ModuleWriteSet,
     fee_statement: FeeStatement,
     status: TransactionStatus,
+    /// All keys that are read by this transaction.
+    read_set: HashSet<StateKey>,
 }
 
 impl VMOutput {
@@ -48,6 +50,7 @@ impl VMOutput {
             module_write_set,
             fee_statement,
             status,
+            read_set: HashSet::new(),
         }
     }
 
@@ -57,7 +60,12 @@ impl VMOutput {
             module_write_set: ModuleWriteSet::empty(),
             fee_statement: FeeStatement::zero(),
             status,
+            read_set: HashSet::new(),
         }
+    }
+
+    pub fn record_read_set(&mut self, read_set: HashSet<StateKey>) {
+        self.read_set = read_set;
     }
 
     pub fn aggregator_v1_delta_set(&self) -> &BTreeMap<StateKey, DeltaOp> {
@@ -171,9 +179,10 @@ impl VMOutput {
             module_write_set,
             fee_statement,
             status,
+            read_set,
         } = self;
         let (write_set, events) = change_set
-            .try_combine_into_storage_change_set(module_write_set)?
+            .try_combine_into_storage_change_set(module_write_set, read_set)?
             .into_inner();
         Ok(TransactionOutput::new(
             write_set,

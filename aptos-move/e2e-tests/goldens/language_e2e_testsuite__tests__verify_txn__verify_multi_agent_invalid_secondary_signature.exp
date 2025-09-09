@@ -9,7 +9,7 @@ Ok(
                         },
                     ),
                 ),
-                hotness: {},
+                read_only: {},
             },
             events: [],
             gas_used: 0,

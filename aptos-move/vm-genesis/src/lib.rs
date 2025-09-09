@@ -72,7 +72,7 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -231,7 +231,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     );
     assert_ok!(change_set.squash_additional_change_set(additional_change_set));
 
-    let change_set = assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));
+    let change_set = assert_ok!(
+        change_set.try_combine_into_storage_change_set(module_write_set, HashSet::new())
+    );
     verify_genesis_module_write_set(change_set.write_set());
     verify_genesis_events(change_set.events());
 
@@ -396,7 +398,9 @@ pub fn encode_genesis_change_set(
     );
     assert_ok!(change_set.squash_additional_change_set(additional_change_set));
 
-    let change_set = assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));
+    let change_set = assert_ok!(
+        change_set.try_combine_into_storage_change_set(module_write_set, HashSet::new())
+    );
     verify_genesis_module_write_set(change_set.write_set());
     verify_genesis_events(change_set.events());
 
@@ -1521,7 +1525,9 @@ pub fn test_genesis_module_publishing() {
     );
 
     // All write ops must be a creation!
-    let change_set = assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));
+    let change_set = assert_ok!(
+        change_set.try_combine_into_storage_change_set(module_write_set, HashSet::new())
+    );
     verify_genesis_module_write_set(change_set.write_set());
 }
 
