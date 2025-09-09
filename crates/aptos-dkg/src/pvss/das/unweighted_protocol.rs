@@ -167,7 +167,7 @@ impl traits::Transcript for Transcript {
 
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
         // TODO: benchmark this
-        let (f, extra) = fiat_shamir::fiat_shamir(
+        let (f, extra) = fiat_shamir::fiat_shamir_das(
             self,
             sc,
             pp,
