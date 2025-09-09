@@ -8,7 +8,10 @@ use aptos_crypto::HashValue;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 use aptos_types::{
-    account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
+    account_config::{
+        randomness_event::RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_MOVE_TYPE_TAG,
+        NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
+    },
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     contract_event::ContractEvent,
     dkg::DKG_START_EVENT_MOVE_TYPE_TAG,
@@ -276,6 +279,7 @@ pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
         || type_tag == DKG_START_EVENT_MOVE_TYPE_TAG.deref()
         || type_tag == NEW_EPOCH_EVENT_MOVE_TYPE_TAG.deref()
         || type_tag == NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.deref()
+        || type_tag == RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG.deref()
 }
 
 #[cfg(feature = "bench")]

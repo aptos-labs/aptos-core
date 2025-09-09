@@ -19,8 +19,8 @@ use aptos_consensus_types::{
     pipelined_block::{
         CommitLedgerResult, CommitVoteResult, ExecuteResult, LedgerUpdateResult,
         NotifyStateSyncResult, PipelineFutures, PipelineInputRx, PipelineInputTx, PipelinedBlock,
-        PostCommitResult, PostLedgerUpdateResult, PreCommitResult, PrepareResult, TaskError,
-        TaskFuture, TaskResult,
+        PostCommitResult, PostLedgerUpdateResult, PreCommitResult, PrepareResult, RandResult,
+        TaskError, TaskFuture, TaskResult,
     },
     quorum_cert::QuorumCert,
     wrapped_ledger_info::WrappedLedgerInfo,
@@ -32,6 +32,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::{error, info, trace, warn};
 use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 use aptos_types::{
+    account_config::randomness_event::RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG,
     block_executor::config::BlockExecutorConfigFromOnchain,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::OnChainConsensusConfig,
@@ -53,6 +54,7 @@ use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::{
     future::Future,
+    ops::Deref,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -325,7 +327,7 @@ impl PipelineBuilder {
         commit_proof: LedgerInfoWithSignatures,
     ) -> PipelineFutures {
         let prepare_fut = spawn_ready_fut((Arc::new(vec![]), None));
-        let rand_fut = spawn_ready_fut(None);
+        let rand_check_fut = spawn_ready_fut((None, false));
         let execute_fut = spawn_ready_fut(Duration::from_millis(0));
         let ledger_update_fut =
             spawn_ready_fut((compute_result.clone(), Duration::from_millis(0), None));
@@ -343,7 +345,7 @@ impl PipelineBuilder {
         let post_commit_fut = spawn_ready_fut(());
         PipelineFutures {
             prepare_fut,
-            rand_fut,
+            rand_check_fut,
             execute_fut,
             ledger_update_fut,
             post_ledger_update_fut,
@@ -395,7 +397,7 @@ impl PipelineBuilder {
             Self::prepare(self.block_preparer.clone(), block.clone(), qc_rx),
             Some(&mut abort_handles),
         );
-        let rand_fut = spawn_shared_fut(
+        let rand_check_fut = spawn_shared_fut(
             Self::rand_check(
                 prepare_fut.clone(),
                 parent.execute_fut.clone(),
@@ -412,7 +414,7 @@ impl PipelineBuilder {
             Self::execute(
                 prepare_fut.clone(),
                 parent.execute_fut.clone(),
-                rand_fut.clone(),
+                rand_check_fut.clone(),
                 self.executor.clone(),
                 block.clone(),
                 self.validators.clone(),
@@ -423,6 +425,7 @@ impl PipelineBuilder {
         );
         let ledger_update_fut = spawn_shared_fut(
             Self::ledger_update(
+                rand_check_fut.clone(),
                 execute_fut.clone(),
                 parent.ledger_update_fut.clone(),
                 self.executor.clone(),
@@ -499,7 +502,7 @@ impl PipelineBuilder {
         );
         let all_fut = PipelineFutures {
             prepare_fut,
-            rand_fut,
+            rand_check_fut,
             execute_fut,
             ledger_update_fut,
             post_ledger_update_fut,
@@ -577,14 +580,14 @@ impl PipelineBuilder {
         is_randomness_enabled: bool,
         rand_check_enabled: bool,
         module_cache: Arc<Mutex<Option<ValidationState<CachedStateView>>>>,
-    ) -> TaskResult<Option<Randomness>> {
+    ) -> TaskResult<RandResult> {
         let mut tracker = Tracker::start_waiting("rand_check", &block);
         parent_block_execute_fut.await?;
         let (user_txns, _) = prepare_fut.await?;
 
         tracker.start_working();
         if !is_randomness_enabled {
-            return Ok(None);
+            return Ok((None, false));
         }
         let grand_parent_id = block.quorum_cert().parent_block().id();
         let parent_state_view = executor
@@ -592,7 +595,8 @@ impl PipelineBuilder {
             .map_err(anyhow::Error::from)?;
 
         let mut has_randomness = false;
-        if rand_check_enabled {
+        // scope to drop the lock, compiler seems not able to figure out manual drop with async point
+        {
             let mut cache_guard = module_cache.lock();
             if let Some(cache_mut) = cache_guard.as_mut() {
                 // flush the cache if the execution state view is not linear
@@ -604,6 +608,9 @@ impl PipelineBuilder {
                 if previous_state_view == expected_state_view {
                     cache_mut.reset_state_view(parent_state_view);
                 } else {
+                    counters::RAND_BLOCK
+                        .with_label_values(&["reset_cache"])
+                        .inc();
                     cache_mut.reset_all(parent_state_view);
                 }
             } else {
@@ -635,17 +642,22 @@ impl PipelineBuilder {
                     }
                 }
             }
-            let label = if has_randomness { "true" } else { "false" };
-            counters::RAND_BLOCK.with_label_values(&[label]).inc();
-            if has_randomness {
-                info!(
-                    "[Pipeline] Block {} {} {} has randomness txn",
-                    block.id(),
-                    block.epoch(),
-                    block.round()
-                );
-            }
         }
+        let label = if has_randomness {
+            "has_rand"
+        } else {
+            "no_rand"
+        };
+        counters::RAND_BLOCK.with_label_values(&[label]).inc();
+        if has_randomness {
+            info!(
+                "[Pipeline] Block {} {} {} has randomness txn",
+                block.id(),
+                block.epoch(),
+                block.round()
+            );
+        }
+        drop(tracker);
         // if rand check is enabled and no txn requires randomness, we skip waiting for randomness
         let mut tracker = Tracker::start_waiting("rand_gen", &block);
         tracker.start_working();
@@ -656,7 +668,7 @@ impl PipelineBuilder {
                 .await
                 .map_err(|_| anyhow!("randomness tx cancelled"))?
         };
-        Ok(maybe_rand)
+        Ok((maybe_rand, has_randomness))
     }
 
     /// Precondition: 1. prepare finishes, 2. parent block's phase finishes 3. randomness is available
@@ -664,7 +676,7 @@ impl PipelineBuilder {
     async fn execute(
         prepare_fut: TaskFuture<PrepareResult>,
         parent_block_execute_fut: TaskFuture<ExecuteResult>,
-        rand_check: TaskFuture<Option<Randomness>>,
+        rand_check: TaskFuture<RandResult>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
         validator: Arc<[AccountAddress]>,
@@ -677,7 +689,7 @@ impl PipelineBuilder {
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
 
-        let maybe_rand = rand_check.await?;
+        let (maybe_rand, _has_randomness) = rand_check.await?;
 
         tracker.start_working();
         let metadata_txn = block.new_metadata_with_randomness(&validator, maybe_rand);
@@ -744,6 +756,7 @@ impl PipelineBuilder {
     /// What it does: Generate state compute result from the execution, it's split from execution for more parallelism
     /// It carries block timestamp from epoch-ending block to all suffix block
     async fn ledger_update(
+        rand_check: TaskFuture<RandResult>,
         execute_fut: TaskFuture<ExecuteResult>,
         parent_block_ledger_update_fut: TaskFuture<LedgerUpdateResult>,
         executor: Arc<dyn BlockExecutorTrait>,
@@ -754,14 +767,15 @@ impl PipelineBuilder {
         let execution_time = execute_fut.await?;
 
         tracker.start_working();
-        let timestamp = block.timestamp_usecs();
+        let block_clone = block.clone();
         let result = tokio::task::spawn_blocking(move || {
             executor
-                .ledger_update(block.id(), block.parent_id())
+                .ledger_update(block_clone.id(), block_clone.parent_id())
                 .map_err(anyhow::Error::from)
         })
         .await
         .expect("spawn blocking failed")?;
+        let timestamp = block.timestamp_usecs();
         observe_block(timestamp, BlockStage::EXECUTED);
         let epoch_end_timestamp =
             if result.has_reconfiguration() && !result.compute_status_for_input_txns().is_empty() {
@@ -769,6 +783,24 @@ impl PipelineBuilder {
             } else {
                 prev_epoch_end_timestamp
             };
+        // check for randomness consistency
+        let (_, has_randomness) = rand_check.await?;
+        if !has_randomness {
+            let mut label = "consistent";
+            for event in result.execution_output.subscribable_events.get(None) {
+                if event.type_tag() == RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG.deref() {
+                    error!(
+                            "[Pipeline] Block {} {} {} generated randomness event without has_randomness being true!",
+                            block.id(),
+                            block.epoch(),
+                            block.round()
+                        );
+                    label = "inconsistent";
+                    break;
+                }
+            }
+            counters::RAND_BLOCK.with_label_values(&[label]).inc();
+        }
         Ok((result, execution_time, epoch_end_timestamp))
     }
 
@@ -1027,7 +1059,7 @@ impl PipelineBuilder {
     async fn monitor(epoch: u64, round: Round, block_id: HashValue, all_futs: PipelineFutures) {
         let PipelineFutures {
             prepare_fut,
-            rand_fut: _,
+            rand_check_fut: _,
             execute_fut,
             ledger_update_fut,
             post_ledger_update_fut: _,

@@ -60,7 +60,7 @@ pub static RAND_BLOCK: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_rand_block_count",
         "Count of the total number of blocks of whether randomness is required",
-        &["rand_required"]
+        &["type"]
     )
     .unwrap()
 });
