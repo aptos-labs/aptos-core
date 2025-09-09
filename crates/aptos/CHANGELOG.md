@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+##[7.8.0]
+- New beta feature: Transaction Simulation Session
+
 ## [7.7.0]
 - Turn off sharding in the local testnet
 

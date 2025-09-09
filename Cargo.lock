@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.7.0"
+version = "7.8.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -336,6 +336,8 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-telemetry",
  "aptos-temppath",
+ "aptos-transaction-simulation",
+ "aptos-transaction-simulation-session",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
@@ -4576,6 +4578,31 @@ dependencies = [
  "parking_lot 0.12.1",
  "proptest",
  "serde",
+]
+
+[[package]]
+name = "aptos-transaction-simulation-session"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-api-types",
+ "aptos-resource-viewer",
+ "aptos-rest-client",
+ "aptos-transaction-simulation",
+ "aptos-types",
+ "aptos-validator-interface",
+ "aptos-vm",
+ "aptos-vm-environment",
+ "aptos-vm-logging",
+ "aptos-vm-types",
+ "bcs 0.1.4",
+ "hex",
+ "move-core-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -11511,8 +11538,7 @@ dependencies = [
 [[package]]
 name = "lru"
 version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86ea4e65087ff52f3862caff188d489f1fab49a0cb09e01b2e3f1a617b10aaed"
+source = "git+https://github.com/aptos-labs/lru-rs?rev=406cd2407b814add9262bbfc91c2ecd307b3f197#406cd2407b814add9262bbfc91c2ecd307b3f197"
 dependencies = [
  "hashbrown 0.15.3",
 ]
