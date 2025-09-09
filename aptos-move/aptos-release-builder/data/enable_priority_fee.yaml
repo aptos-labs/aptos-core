@@ -1,0 +1,37 @@
+---
+remote_endpoint: ~
+name: "Enable priority fee (AIP-126)"
+proposals:
+  - name: enable_priority_fee
+    metadata:
+      title: "enable priority fee"
+      description: "Calculate and distribute transaction fee to validators."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-126.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/initialize_priority_fee.move
+      - Execution:
+          V6:
+            transaction_shuffler_type:
+              use_case_aware:
+                sender_spread_factor: 32
+                platform_use_case_spread_factor: 0
+                user_use_case_spread_factor: 4
+            block_gas_limit_type:
+              complex_limit_v1:
+                effective_block_gas_limit: 30000
+                execution_gas_effective_multiplier: 1
+                io_gas_effective_multiplier: 1
+                conflict_penalty_window: 9
+                use_granular_resource_group_conflicts: false
+                use_module_publishing_block_conflict: true
+                block_output_limit: 5242880
+                include_user_txn_size_in_block_output: true
+                add_block_limit_outcome_onchain: true
+            enable_per_block_gas_limit: false
+            transaction_deduper_type: txn_hash_and_authenticator_v1
+            gas_price_to_burn: 90
+      - FeatureFlag:
+          enabled:
+            - calculate_transaction_fee_for_distribution
+            - distribute_transaction_fee
