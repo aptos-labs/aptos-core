@@ -4134,6 +4134,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-drop-helper",
  "aptos-experimental-layered-map",
  "aptos-logger",
  "aptos-metrics-core",
@@ -4956,6 +4957,7 @@ dependencies = [
  "aptos-aggregator",
  "aptos-gas-algebra",
  "aptos-gas-schedule",
+ "aptos-logger",
  "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",

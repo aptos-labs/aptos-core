@@ -83,12 +83,24 @@ impl PersistedWriteOp {
 }
 
 /// Shared in memory representation between the (value) WriteOp and the (hotness) HotStateOp
-#[derive(Clone, Debug, Eq, PartialEq, AsRefStr)]
+#[derive(Clone, Eq, PartialEq, AsRefStr)]
 pub enum BaseStateOp {
     Creation(StateValue),
     Modification(StateValue),
     Deletion(StateValueMetadata),
     MakeHot,
+}
+
+impl std::fmt::Debug for BaseStateOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let var = match self {
+            Self::Creation(_) => "Creation(...)",
+            Self::Modification(_) => "Modification(...)",
+            Self::Deletion(_) => "Deletion(...)",
+            Self::MakeHot => "MakeHot",
+        };
+        write!(f, "{}", var)
+    }
 }
 
 impl BaseStateOp {
@@ -707,6 +719,10 @@ impl WriteSetV0 {
         self.0.get(key)
     }
 
+    pub fn contains(&self, key: &StateKey) -> bool {
+        self.0.contains(key)
+    }
+
     fn get_total_supply(&self) -> Option<u128> {
         let value = self
             .0
@@ -792,6 +808,10 @@ impl WriteSetMut {
 
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
         self.write_set.get(key)
+    }
+
+    pub fn contains(&self, key: &StateKey) -> bool {
+        self.write_set.contains_key(key)
     }
 
     pub fn as_inner_mut(&mut self) -> &mut BTreeMap<StateKey, WriteOp> {

@@ -22,6 +22,9 @@ pub struct PerVersionStateUpdateRefs<'kv> {
     pub first_version: Version,
     pub num_versions: usize,
     /// TODO(HotState): let WriteOp always carry StateSlot, so we can use &'kv StateSlot here
+    /// TODO(wqfish): check if this is deterministic, i.e. if the order within one
+    /// version/transaction is deterministic.
+    /// Note(wqfish): this is the flattened write sets.
     pub shards: [Vec<(&'kv StateKey, StateUpdateRef<'kv>)>; NUM_STATE_SHARDS],
 }
 
@@ -80,6 +83,16 @@ pub struct BatchedStateUpdateRefs<'kv> {
     pub shards: [HashMap<&'kv StateKey, StateUpdateRef<'kv>>; NUM_STATE_SHARDS],
 }
 
+pub fn batched_updates_to_debug_str<'kv>(
+    shard: &HashMap<&'kv StateKey, StateUpdateRef<'kv>>,
+) -> String {
+    let mut out = "\n".to_string();
+    for (key, update) in shard {
+        out += &format!("\t{:?}: {:?}\n", key, update);
+    }
+    out
+}
+
 impl BatchedStateUpdateRefs<'_> {
     fn new_empty(first_version: Version, num_versions: usize) -> Self {
         Self {
@@ -128,8 +141,16 @@ pub struct StateUpdateRefs<'kv> {
 }
 
 impl<'kv> StateUpdateRefs<'kv> {
+    pub(crate) fn for_last_checkpoint_per_version(&self) -> Option<&PerVersionStateUpdateRefs> {
+        self.for_last_checkpoint.as_ref().map(|x| &x.0)
+    }
+
     pub(crate) fn for_last_checkpoint_batched(&self) -> Option<&BatchedStateUpdateRefs> {
         self.for_last_checkpoint.as_ref().map(|x| &x.1)
+    }
+
+    pub(crate) fn for_latest_per_version(&self) -> Option<&PerVersionStateUpdateRefs> {
+        self.for_latest.as_ref().map(|x| &x.0)
     }
 
     pub(crate) fn for_latest_batched(&self) -> Option<&BatchedStateUpdateRefs> {
