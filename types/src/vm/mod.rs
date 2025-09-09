@@ -4,3 +4,4 @@
 pub mod code;
 pub mod module_metadata;
 pub mod modules;
+pub mod versioning;
