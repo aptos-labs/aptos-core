@@ -21,6 +21,7 @@ module aptos_framework::scheduled_txns {
     use aptos_framework::transaction_context::{payload_config, payload_scheduled_txn_config_auth_expiration,
         payload_scheduled_txn_config_auth_seqno, payload_scheduled_txn_config_allow_resched
     };
+    use aptos_framework::sched_txns_sender_seqno;
 
     friend aptos_framework::block;
     friend aptos_framework::transaction_validation;
@@ -204,9 +205,7 @@ module aptos_framework::scheduled_txns {
         // Current status of the scheduled transactions module
         module_status: ScheduledTxnsModuleStatus,
         /// Expiry delta used to determine when scheduled transactions become invalid (and subsequently aborted)
-        expiry_delta: u64,
-        /// BigOrderedMap to track sender address -> current sequence number for authorization
-        sender_seqno_map: BigOrderedMap<address, u64>
+        expiry_delta: u64
     }
 
     const TO_REMOVE_PARALLELISM: u64 = GET_READY_TRANSACTIONS_LIMIT;
@@ -288,10 +287,12 @@ module aptos_framework::scheduled_txns {
             AuxiliaryData {
                 gas_fee_deposit_store_signer_cap: owner_cap,
                 module_status: ScheduledTxnsModuleStatus::Active,
-                expiry_delta: EXPIRY_DELTA_DEFAULT,
-                sender_seqno_map: big_ordered_map::new_with_reusable()
+                expiry_delta: EXPIRY_DELTA_DEFAULT
             }
         );
+
+        // Initialize sender sequence number map
+        sched_txns_sender_seqno::initialize(framework);
 
         // Initialize queue
         let queue = ScheduleQueue {
@@ -412,6 +413,7 @@ module aptos_framework::scheduled_txns {
             error::invalid_state(EINVALID_SHUTDOWN_ATTEMPT)
         );
         aux_data.module_status = ScheduledTxnsModuleStatus::ShutdownComplete;
+        sched_txns_sender_seqno::destroy_sender_seqno_map();
 
         // Clean up ToRemoveTbl
         let ToRemoveTbl { remove_tbl } = borrow_global_mut<ToRemoveTbl>(@aptos_framework);
@@ -465,41 +467,18 @@ module aptos_framework::scheduled_txns {
 
     /// Returns the current authorization sequence number for a sender address
     /// Lazy initialization: starts from 1 and stores in map upon first use
-    public fun get_sender_seqno(sender_addr: address): u64 acquires AuxiliaryData {
-        let aux_data = borrow_global_mut<AuxiliaryData>(@aptos_framework);
-        if (aux_data.sender_seqno_map.contains(&sender_addr)) {
-            *aux_data.sender_seqno_map.borrow(&sender_addr)
-        } else {
-            // Lazy initialization: start from 1
-            let initial_seqno = 1;
-            aux_data.sender_seqno_map.add(sender_addr, initial_seqno);
-            initial_seqno
-        }
+    public fun get_sender_seqno(sender_addr: address): u64 {
+        sched_txns_sender_seqno::get_sender_seqno(sender_addr)
     }
 
-    fun get_sender_seqno_readonly(sender_addr: address): u64 acquires AuxiliaryData {
-        let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
-        assert!(
-            aux_data.sender_seqno_map.contains(&sender_addr),
-            error::invalid_state(ESENDER_SEQNO_NOT_FOUND)
-        );
-        *aux_data.sender_seqno_map.borrow(&sender_addr)
+    fun get_sender_seqno_readonly(sender_addr: address): u64 {
+        sched_txns_sender_seqno::get_sender_seqno_readonly(sender_addr)
     }
 
-    /// Increments and returns the new sequence number for a sender address
+    /// Increments the sequence number for a sender address
     /// Requires that the sender already exists in sender_seqno_map (initialized via get_sender_seqno)
-    fun increment_sender_seqno(sender_addr: address) acquires AuxiliaryData {
-        let aux_data = borrow_global_mut<AuxiliaryData>(@aptos_framework);
-
-        // Assert that sender exists in map - must be initialized first via get_sender_seqno
-        assert!(
-            aux_data.sender_seqno_map.contains(&sender_addr),
-            error::invalid_state(ESENDER_SEQNO_NOT_FOUND)
-        );
-
-        let current_seqno = *aux_data.sender_seqno_map.borrow(&sender_addr);
-        let new_seqno = current_seqno + 1;
-        *aux_data.sender_seqno_map.borrow_mut(&sender_addr) = new_seqno;
+    fun increment_sender_seqno(sender_addr: address) {
+        sched_txns_sender_seqno::increment_sender_seqno(sender_addr)
     }
 
     /// Read functions for ScheduleMapKey individual parameters
@@ -529,7 +508,7 @@ module aptos_framework::scheduled_txns {
         sender_addr: address,
         scheduled_time_ms: u64,
         auth_token: &ScheduledTxnAuthToken
-    ) acquires AuxiliaryData {
+    ) {
         // Get current time and validate expiration
         let current_time_ms = timestamp::now_microseconds() / 1000;
         assert!(current_time_ms <= auth_token.expiration_time, error::invalid_argument(EAUTH_TOKEN_EXPIRED));
@@ -564,7 +543,7 @@ module aptos_framework::scheduled_txns {
         max_gas_amount: u64,
         gas_unit_price: u64,
         f: |&signer, ScheduledTxnAuthToken| has copy + store + drop
-    ): ScheduledTransaction acquires AuxiliaryData {
+    ): ScheduledTransaction {
         let sender_addr = signer::address_of(sender);
         // Extract the payload config from the current transaction context
         let payload_config_opt = payload_config();
@@ -603,7 +582,7 @@ module aptos_framework::scheduled_txns {
         max_gas_amount: u64,
         gas_unit_price: u64,
         f: |&signer, ScheduledTxnAuthToken| has copy + store + drop,
-    ): ScheduledTransaction acquires AuxiliaryData {
+    ): ScheduledTransaction {
         let sender_addr = signer::address_of(sender);
 
         // Validate the auth token (same checks as new_auth_token)
@@ -1715,7 +1694,7 @@ module aptos_framework::scheduled_txns {
     #[expected_failure(abort_code = 65551)] // EAUTH_TOKEN_EXPIRED
     fun test_auth_token_expired_validation(
         fx: &signer, user: signer
-    ) acquires AuxiliaryData {
+    ) {
         let user_addr = signer::address_of(&user);
         let curr_mock_time_micro_s = 1000000;
         setup_test_env(fx, &user, curr_mock_time_micro_s);
@@ -1742,7 +1721,7 @@ module aptos_framework::scheduled_txns {
     #[expected_failure(abort_code = 65551)] // EAUTH_TOKEN_INSUFFICIENT_DURATION
     fun test_auth_token_insufficient_duration(
         fx: &signer, user: signer
-    ) acquires AuxiliaryData {
+    ) {
         let user_addr = signer::address_of(&user);
         let curr_mock_time_micro_s = 1000000;
         setup_test_env(fx, &user, curr_mock_time_micro_s);
@@ -1796,7 +1775,7 @@ module aptos_framework::scheduled_txns {
     }
 
     #[test(fx = @0x1, user = @0x1234)]
-    #[expected_failure(abort_code = 196625)] // ESENDER_SEQNO_NOT_FOUND
+    #[expected_failure(abort_code = 196609)] // ESENDER_SEQNO_NOT_FOUND
     fun test_cancel_all_uninitialized_sender(
         fx: &signer, user: signer
     ) acquires AuxiliaryData {
