@@ -781,6 +781,7 @@ fn initialize_account_abstraction(
     exec_function(
         session,
         module_storage,
+        traversal_context,
         ACCOUNT_ABSTRACTION_MODULE_NAME,
         "register_derivable_authentication_function",
         vec![],
