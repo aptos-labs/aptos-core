@@ -38,7 +38,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig,
-    data_cache::TransactionDataCache,
+    data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     dispatch_loader,
     module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
@@ -126,12 +126,11 @@ where
             MoveVM::execute_loaded_function(
                 func,
                 args,
-                &mut self.data_cache,
+                &mut MoveVmDataCacheAdapter::new(&mut self.data_cache, self.resolver, &loader),
                 gas_meter,
                 traversal_context,
                 &mut self.extensions,
                 &loader,
-                self.resolver,
             )
         })
     }
@@ -147,12 +146,11 @@ where
         MoveVM::execute_loaded_function(
             func,
             args,
-            &mut self.data_cache,
+            &mut MoveVmDataCacheAdapter::new(&mut self.data_cache, self.resolver, loader),
             gas_meter,
             traversal_context,
             &mut self.extensions,
             loader,
-            self.resolver,
         )
     }
 
