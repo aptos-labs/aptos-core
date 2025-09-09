@@ -8,6 +8,8 @@ module aptos_framework::test_scheduled_txns {
     use aptos_framework::scheduled_txns::{Self, ScheduleMapKey, mark_txn_to_remove_test, ScheduledTxnAuthToken,
         get_sender_seqno
     };
+
+    const EXPIRY_DELTA_DEFAULT: u64 = 10 * 1000;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_validation;
 
@@ -52,6 +54,7 @@ module aptos_framework::test_scheduled_txns {
             next_schedule_time,
             1000,
             200,
+            EXPIRY_DELTA_DEFAULT,
             foo
         );
 
@@ -84,6 +87,7 @@ module aptos_framework::test_scheduled_txns {
             schedule_time,
             1000,
             200,
+            EXPIRY_DELTA_DEFAULT,
             foo
         );
 
@@ -119,6 +123,7 @@ module aptos_framework::test_scheduled_txns {
             schedule_time,
             1000,
             200,
+            EXPIRY_DELTA_DEFAULT,
             foo
         );
 
@@ -161,6 +166,7 @@ module aptos_framework::test_scheduled_txns {
                 schedule_time,
                 txn_max_gas_units,
                 gas_price_txn1,
+                EXPIRY_DELTA_DEFAULT,
                 foo
             );
         let gas_price_txn2 = 300;
@@ -175,6 +181,7 @@ module aptos_framework::test_scheduled_txns {
                 schedule_time,
                 txn_max_gas_units,
                 gas_price_txn2,
+                EXPIRY_DELTA_DEFAULT,
                 work_foo
             );
 
@@ -283,6 +290,7 @@ module aptos_framework::test_scheduled_txns {
             schedule_time,
             1000,
             200,
+            EXPIRY_DELTA_DEFAULT,
             foo
         );
         let txn2 = scheduled_txns::new_scheduled_transaction_reuse_auth_token(
@@ -291,6 +299,7 @@ module aptos_framework::test_scheduled_txns {
             schedule_time + 1000,
             1000,
             200,
+            EXPIRY_DELTA_DEFAULT,
             foo
         );
         let txn3 = scheduled_txns::new_scheduled_transaction_reuse_auth_token(
@@ -299,6 +308,7 @@ module aptos_framework::test_scheduled_txns {
             schedule_time + 2000,
             1000,
             200,
+            EXPIRY_DELTA_DEFAULT,
             foo
         );
 

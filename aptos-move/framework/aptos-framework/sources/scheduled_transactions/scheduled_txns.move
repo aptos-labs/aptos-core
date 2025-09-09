@@ -145,6 +145,8 @@ module aptos_framework::scheduled_txns {
         /// If some, a signer for the scheduling account is passed to the function and we also check the capability at
         /// the time of execution; if none, no signer is passed
         auth_token: Option<ScheduledTxnAuthToken>,
+        /// Expiry delta used to determine when this scheduled transaction becomes invalid (and subsequently aborted)
+        expiry_delta: u64,
         /// Variables are captured in the closure; optionally a signer is passed; no return
         f: ScheduledFunction
     }
@@ -203,9 +205,7 @@ module aptos_framework::scheduled_txns {
         /// Capability for managing the gas fee deposit store
         gas_fee_deposit_store_signer_cap: account::SignerCapability,
         // Current status of the scheduled transactions module
-        module_status: ScheduledTxnsModuleStatus,
-        /// Expiry delta used to determine when scheduled transactions become invalid (and subsequently aborted)
-        expiry_delta: u64
+        module_status: ScheduledTxnsModuleStatus
     }
 
     const TO_REMOVE_PARALLELISM: u64 = GET_READY_TRANSACTIONS_LIMIT;
@@ -286,8 +286,7 @@ module aptos_framework::scheduled_txns {
             framework,
             AuxiliaryData {
                 gas_fee_deposit_store_signer_cap: owner_cap,
-                module_status: ScheduledTxnsModuleStatus::Active,
-                expiry_delta: EXPIRY_DELTA_DEFAULT
+                module_status: ScheduledTxnsModuleStatus::Active
             }
         );
 
@@ -456,14 +455,6 @@ module aptos_framework::scheduled_txns {
         aux_data.module_status = ScheduledTxnsModuleStatus::Active;
     }
 
-    /// Change the expiry delta for scheduled transactions; can be called only by the framework
-    public entry fun set_expiry_delta(
-        framework: &signer, new_expiry_delta: u64
-    ) acquires AuxiliaryData {
-        system_addresses::assert_aptos_framework(framework);
-        let aux_data = borrow_global_mut<AuxiliaryData>(signer::address_of(framework));
-        aux_data.expiry_delta = new_expiry_delta;
-    }
 
     /// Returns the current authorization sequence number for a sender address
     /// Lazy initialization: starts from 1 and stores in map upon first use
@@ -525,6 +516,7 @@ module aptos_framework::scheduled_txns {
         scheduled_time_ms: u64,
         max_gas_amount: u64,
         gas_unit_price: u64,
+        expiry_delta: u64,
         f: || has copy + store + drop
     ): ScheduledTransaction {
         ScheduledTransaction {
@@ -533,6 +525,7 @@ module aptos_framework::scheduled_txns {
             max_gas_amount,
             gas_unit_price,
             auth_token: none(),
+            expiry_delta,
             f: ScheduledFunction::V1(f)
         }
     }
@@ -542,6 +535,7 @@ module aptos_framework::scheduled_txns {
         scheduled_time_ms: u64,
         max_gas_amount: u64,
         gas_unit_price: u64,
+        expiry_delta: u64,
         f: |&signer, ScheduledTxnAuthToken| has copy + store + drop
     ): ScheduledTransaction {
         let sender_addr = signer::address_of(sender);
@@ -571,6 +565,7 @@ module aptos_framework::scheduled_txns {
             max_gas_amount,
             gas_unit_price,
             auth_token: some(auth_token),
+            expiry_delta,
             f: ScheduledFunction::V1WithAuthToken(f)
         }
     }
@@ -581,6 +576,7 @@ module aptos_framework::scheduled_txns {
         scheduled_time_ms: u64,
         max_gas_amount: u64,
         gas_unit_price: u64,
+        expiry_delta: u64,
         f: |&signer, ScheduledTxnAuthToken| has copy + store + drop,
     ): ScheduledTransaction {
         let sender_addr = signer::address_of(sender);
@@ -594,6 +590,7 @@ module aptos_framework::scheduled_txns {
             max_gas_amount,
             gas_unit_price,
             auth_token: some(auth_token),
+            expiry_delta,
             f: ScheduledFunction::V1WithAuthToken(f)
         }
     }
@@ -822,21 +819,8 @@ module aptos_framework::scheduled_txns {
         let scheduled_txns = vector::empty<ScheduledTransactionInfoWithKey>();
         let count = 0;
 
-        // Seek directly to the first non-expired transaction instead of iterating from the beginning
-        let expiry_cutoff_time =
-            if (block_timestamp_ms > aux_data.expiry_delta) {
-                block_timestamp_ms - aux_data.expiry_delta
-            } else { 0 };
-
-        // Create a key to seek to the first non-expired transaction
-        // We use minimum values for gas_priority and txn_id to get the earliest transaction at this time
-        let seek_key = ScheduleMapKey {
-            time: expiry_cutoff_time,
-            gas_priority: 0, // minimum gas_priority (highest actual gas price)
-            txn_id: 0 // minimum txn_id
-        };
-
-        let iter = queue.schedule_map.lower_bound(&seek_key);
+        // Start from the beginning since we now need to check each transaction's individual expiry_delta
+        let iter = queue.schedule_map.new_begin_iter();
         while ((count < limit) && !iter.iter_is_end(&queue.schedule_map)) {
             let key = iter.iter_borrow_key();
             if (key.time > block_timestamp_ms) {
@@ -844,17 +828,27 @@ module aptos_framework::scheduled_txns {
             };
             let txn = queue.txn_table.borrow(key.txn_id);
 
-            let scheduled_txn_info_with_key =
-                ScheduledTransactionInfoWithKey {
-                    sender_addr: txn.sender_addr,
-                    max_gas_amount: txn.max_gas_amount,
-                    gas_unit_price: txn.gas_unit_price,
-                    block_timestamp_ms,
-                    key: *key
-                };
+            // Check if this transaction has expired based on its individual expiry_delta
+            let transaction_expiry_time = if (txn.expiry_delta > 0) {
+                key.time + txn.expiry_delta
+            } else {
+                U64_MAX // If expiry_delta is 0, never expire
+            };
 
-            scheduled_txns.push_back(scheduled_txn_info_with_key);
-            count = count + 1;
+            if (block_timestamp_ms <= transaction_expiry_time) {
+                // Transaction is not expired, include it
+                let scheduled_txn_info_with_key =
+                    ScheduledTransactionInfoWithKey {
+                        sender_addr: txn.sender_addr,
+                        max_gas_amount: txn.max_gas_amount,
+                        gas_unit_price: txn.gas_unit_price,
+                        block_timestamp_ms,
+                        key: *key
+                    };
+
+                scheduled_txns.push_back(scheduled_txn_info_with_key);
+                count = count + 1;
+            };
             iter = iter.iter_next(&queue.schedule_map);
         };
 
@@ -874,7 +868,6 @@ module aptos_framework::scheduled_txns {
     fun cancel_and_remove_expired_txns(
         block_timestamp_ms: u64
     ) acquires ScheduleQueue, AuxiliaryData {
-        let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
         let queue = borrow_global<ScheduleQueue>(@aptos_framework);
         let txns_to_expire = vector::empty<KeyAndTxnInfo>();
 
@@ -884,12 +877,21 @@ module aptos_framework::scheduled_txns {
         while (!iter.iter_is_end(&queue.schedule_map)
             && expire_count < EXPIRE_TRANSACTIONS_LIMIT) {
             let key = iter.iter_borrow_key();
-            if (block_timestamp_ms <= (aux_data.expiry_delta + key.time)) {
+
+            // Get transaction info and check its individual expiry_delta
+            let txn = queue.txn_table.borrow(key.txn_id);
+            let transaction_expiry_time = if (txn.expiry_delta > 0) {
+                key.time + txn.expiry_delta
+            } else {
+                U64_MAX // If expiry_delta is 0, never expire
+            };
+
+            if (block_timestamp_ms <= transaction_expiry_time) {
+                // Transaction is not expired yet, since transactions are sorted by time,
+                // we can break here if we find a non-expired transaction
                 break;
             };
 
-            // Get transaction info before cancelling
-            let txn = queue.txn_table.borrow(key.txn_id);
             let deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
 
             txns_to_expire.push_back(
@@ -1239,6 +1241,7 @@ module aptos_framework::scheduled_txns {
             next_schedule_time,
             1000,
             200,
+            EXPIRY_DELTA_DEFAULT,
             foo
         );
 
@@ -1259,31 +1262,31 @@ module aptos_framework::scheduled_txns {
         let schedule_time2 = schedule_time1 * 2;
         let schedule_time3 = schedule_time1 * 4;
         let txn1 = new_scheduled_transaction_no_signer(
-            user_addr, schedule_time1, 100, 200, foo
+            user_addr, schedule_time1, 100, 200, EXPIRY_DELTA_DEFAULT, foo
         ); // time: 1s, gas: 20
         let txn2 = new_scheduled_transaction_no_signer(
-            user_addr, schedule_time1, 100, 300, foo
+            user_addr, schedule_time1, 100, 300, EXPIRY_DELTA_DEFAULT, foo
         ); // time: 1s, gas: 30
         let txn3 = new_scheduled_transaction_no_signer(
-            user_addr, schedule_time1, 100, 100, foo
+            user_addr, schedule_time1, 100, 100, EXPIRY_DELTA_DEFAULT, foo
         ); // time: 1s, gas: 10
 
         // Create transactions with same scheduled_time and gas price
         let txn4 = new_scheduled_transaction_no_signer(
-            user_addr, schedule_time2, 1000, 200, foo
+            user_addr, schedule_time2, 1000, 200, EXPIRY_DELTA_DEFAULT, foo
         ); // time: 2s, gas: 20
         let txn5 = new_scheduled_transaction_no_signer(
-            user_addr, schedule_time2, 100, 200, foo
+            user_addr, schedule_time2, 100, 200, EXPIRY_DELTA_DEFAULT, foo
         );
         let txn6 = new_scheduled_transaction_no_signer(
-            user_addr, schedule_time2, 200, 200, foo
+            user_addr, schedule_time2, 200, 200, EXPIRY_DELTA_DEFAULT, foo
         ); // time: 2s, gas: 20
 
         let txn7 = new_scheduled_transaction_no_signer(
-            user_addr, schedule_time3, 100, 200, foo
+            user_addr, schedule_time3, 100, 200, EXPIRY_DELTA_DEFAULT, foo
         ); // time: 2s, gas: 20
         let txn8 = new_scheduled_transaction_no_signer(
-            user_addr, schedule_time3, 200, 200, foo
+            user_addr, schedule_time3, 200, 200, EXPIRY_DELTA_DEFAULT, foo
         ); // time: 2s, gas: 20
 
         // Insert all transactions
@@ -1360,7 +1363,7 @@ module aptos_framework::scheduled_txns {
         let past_time = curr_mock_time_micro_s / 1000 - 100;
         let state = State { count: 8 };
         let foo = || step(state);
-        let txn = new_scheduled_transaction_no_signer(user_addr, past_time, 100, 200, foo);
+        let txn = new_scheduled_transaction_no_signer(user_addr, past_time, 100, 200, EXPIRY_DELTA_DEFAULT, foo);
 
         // Create a signer from the handle to use for insert
         insert(&user, txn); // Should fail with EINVALID_TIME since time is in the past
@@ -1380,7 +1383,7 @@ module aptos_framework::scheduled_txns {
         let future_time = curr_mock_time + 1000;
         let state = State { count: 8 };
         let foo = || step(state);
-        let txn = new_scheduled_transaction_no_signer(user_addr, future_time, 100, 200, foo);
+        let txn = new_scheduled_transaction_no_signer(user_addr, future_time, 100, 200, EXPIRY_DELTA_DEFAULT, foo);
         insert(&other_user, txn); // Should fail with EINVALID_SIGNER
     }
 
@@ -1398,7 +1401,7 @@ module aptos_framework::scheduled_txns {
         let future_time = curr_mock_time + 1000;
         let state = State { count: 8 };
         let foo = || step(state);
-        let txn = new_scheduled_transaction_no_signer(user_addr, future_time, 100, 200, foo);
+        let txn = new_scheduled_transaction_no_signer(user_addr, future_time, 100, 200, EXPIRY_DELTA_DEFAULT, foo);
         let txn_id = insert(&user, txn);
 
         // Try to cancel the transaction with wrong user
@@ -1422,7 +1425,7 @@ module aptos_framework::scheduled_txns {
         let future_time = curr_mock_time_micro_s / 1000 + 1000;
         let state = State { count: 8 };
         let foo = || step(state);
-        let txn = new_scheduled_transaction_no_signer(user_addr, future_time, 100, 200, foo);
+        let txn = new_scheduled_transaction_no_signer(user_addr, future_time, 100, 200, EXPIRY_DELTA_DEFAULT, foo);
 
         // This should fail with EUNAVAILABLE
         insert(&user, txn);
@@ -1449,6 +1452,7 @@ module aptos_framework::scheduled_txns {
                     curr_mock_time_micro_s / 1000 + 1000 + i, // Different times to ensure unique ordering
                     100,
                     200,
+                    EXPIRY_DELTA_DEFAULT,
                     foo
                 );
             insert(&user, txn);
@@ -1499,6 +1503,7 @@ module aptos_framework::scheduled_txns {
                 curr_mock_time_micro_s / 1000 + 1000,
                 100,
                 200,
+                EXPIRY_DELTA_DEFAULT,
                 foo
             );
         insert(&user, txn1);
@@ -1518,7 +1523,7 @@ module aptos_framework::scheduled_txns {
         let state = State { count: 8 };
         let foo = || step(state);
         let txn = new_scheduled_transaction_no_signer(
-            user_addr, schedule_time, 100, 200, foo
+            user_addr, schedule_time, 100, 200, EXPIRY_DELTA_DEFAULT, foo
         );
         let _txn_key = insert(&user, txn);
         assert!(get_num_txns() == 1, 1);
@@ -1580,7 +1585,7 @@ module aptos_framework::scheduled_txns {
         let state = State { count: 8 };
         let foo = || step(state);
         let txn = new_scheduled_transaction_no_signer(
-            user_addr, schedule_time, 100, 200, foo
+            user_addr, schedule_time, 100, 200, EXPIRY_DELTA_DEFAULT, foo
         );
         insert(&user, txn); // Should fail with EUNAVAILABLE
     }
@@ -1611,6 +1616,7 @@ module aptos_framework::scheduled_txns {
             schedule_time,
             1000,
             200,
+            EXPIRY_DELTA_DEFAULT,
             foo
         );
 
@@ -1644,6 +1650,7 @@ module aptos_framework::scheduled_txns {
             schedule_time,
             1000,
             200,
+            EXPIRY_DELTA_DEFAULT,
             foo
         );
 
@@ -1679,6 +1686,7 @@ module aptos_framework::scheduled_txns {
             schedule_time,
             1000,
             200,
+            EXPIRY_DELTA_DEFAULT,
             foo
         );
 
@@ -1713,6 +1721,7 @@ module aptos_framework::scheduled_txns {
             schedule_time,
             1000,
             200,
+            EXPIRY_DELTA_DEFAULT,
             foo
         );
     }
@@ -1740,6 +1749,7 @@ module aptos_framework::scheduled_txns {
             schedule_time,
             1000,
             200,
+            EXPIRY_DELTA_DEFAULT,
             foo
         );
     }
@@ -1768,6 +1778,7 @@ module aptos_framework::scheduled_txns {
             schedule_time,
             1000,
             200,
+            EXPIRY_DELTA_DEFAULT,
             foo
         );
 
