@@ -31,7 +31,6 @@
 -  [Function `complete_shutdown`](#0x1_scheduled_txns_complete_shutdown)
 -  [Function `pause_scheduled_txns`](#0x1_scheduled_txns_pause_scheduled_txns)
 -  [Function `unpause_scheduled_txns`](#0x1_scheduled_txns_unpause_scheduled_txns)
--  [Function `set_expiry_delta`](#0x1_scheduled_txns_set_expiry_delta)
 -  [Function `get_sender_seqno`](#0x1_scheduled_txns_get_sender_seqno)
 -  [Function `get_sender_seqno_readonly`](#0x1_scheduled_txns_get_sender_seqno_readonly)
 -  [Function `increment_sender_seqno`](#0x1_scheduled_txns_increment_sender_seqno)
@@ -53,16 +52,16 @@
 -  [Function `get_ready_transactions`](#0x1_scheduled_txns_get_ready_transactions)
 -  [Function `get_ready_transactions_with_limit`](#0x1_scheduled_txns_get_ready_transactions_with_limit)
 -  [Function `mark_txn_to_remove`](#0x1_scheduled_txns_mark_txn_to_remove)
--  [Function `cancel_and_remove_expired_txns`](#0x1_scheduled_txns_cancel_and_remove_expired_txns)
 -  [Function `remove_txns`](#0x1_scheduled_txns_remove_txns)
 -  [Function `is_scheduled_function_v1`](#0x1_scheduled_txns_is_scheduled_function_v1)
 -  [Function `get_scheduled_function_v1`](#0x1_scheduled_txns_get_scheduled_function_v1)
 -  [Function `get_scheduled_function_v1_with_auth_token`](#0x1_scheduled_txns_get_scheduled_function_v1_with_auth_token)
 -  [Function `get_txn_by_key`](#0x1_scheduled_txns_get_txn_by_key)
 -  [Function `get_auth_token_from_txn`](#0x1_scheduled_txns_get_auth_token_from_txn)
--  [Function `validate_and_cancel_if_invalid_auth_token`](#0x1_scheduled_txns_validate_and_cancel_if_invalid_auth_token)
+-  [Function `fail_txn_on_invalid_auth_token`](#0x1_scheduled_txns_fail_txn_on_invalid_auth_token)
+-  [Function `fail_txn_on_expired`](#0x1_scheduled_txns_fail_txn_on_expired)
 -  [Function `create_updated_auth_token_for_execution`](#0x1_scheduled_txns_create_updated_auth_token_for_execution)
--  [Function `execute_user_function_wrapper`](#0x1_scheduled_txns_execute_user_function_wrapper)
+-  [Function `remove_txn_from_table`](#0x1_scheduled_txns_remove_txn_from_table)
 -  [Function `step`](#0x1_scheduled_txns_step)
 -  [Function `step_with_auth_token`](#0x1_scheduled_txns_step_with_auth_token)
 -  [Function `rescheduling_test_func`](#0x1_scheduled_txns_rescheduling_test_func)
@@ -81,6 +80,7 @@
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
+<b>use</b> <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno">0x1::sched_txns_sender_seqno</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
@@ -240,6 +240,12 @@ ScheduledTransaction with scheduled_time, gas params, and function
  the time of execution; if none, no signer is passed
 </dd>
 <dt>
+<code>expiry_delta: u64</code>
+</dt>
+<dd>
+ Expiry delta used to determine when this scheduled transaction becomes invalid (and subsequently aborted)
+</dd>
+<dt>
 <code>f: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledFunction">scheduled_txns::ScheduledFunction</a></code>
 </dt>
 <dd>
@@ -281,6 +287,12 @@ We pass around only needed info
 </dd>
 <dt>
 <code>gas_unit_price: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>block_timestamp_ms: u64</code>
 </dt>
 <dd>
 
@@ -510,18 +522,6 @@ Stores module level auxiliary data
 </dt>
 <dd>
 
-</dd>
-<dt>
-<code>expiry_delta: u64</code>
-</dt>
-<dd>
- Expiry delta used to determine when scheduled transactions become invalid (and subsequently aborted)
-</dd>
-<dt>
-<code>sender_seqno_map: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<b>address</b>, u64&gt;</code>
-</dt>
-<dd>
- BigOrderedMap to track sender address -> current sequence number for authorization
 </dd>
 </dl>
 
@@ -872,6 +872,26 @@ Stores module level auxiliary data
 ## Constants
 
 
+<a id="0x1_scheduled_txns_EINVALID_SIGNER"></a>
+
+Map key already exists
+
+
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_SIGNER">EINVALID_SIGNER</a>: u64 = 1;
+</code></pre>
+
+
+
+<a id="0x1_scheduled_txns_ESENDER_SEQNO_NOT_FOUND"></a>
+
+Sender sequence number not found - must be initialized first via get_sender_seqno
+
+
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ESENDER_SEQNO_NOT_FOUND">ESENDER_SEQNO_NOT_FOUND</a>: u64 = 17;
+</code></pre>
+
+
+
 <a id="0x1_scheduled_txns_AVG_SCHED_TXN_SIZE"></a>
 
 The average size of a scheduled transaction to provide an estimate of leaf nodes of BigOrderedMap
@@ -1002,16 +1022,6 @@ Trying to start shutdown when module is not in Active state
 
 
 
-<a id="0x1_scheduled_txns_EINVALID_SIGNER"></a>
-
-Map key already exists
-
-
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_SIGNER">EINVALID_SIGNER</a>: u64 = 1;
-</code></pre>
-
-
-
 <a id="0x1_scheduled_txns_EINVALID_TIME"></a>
 
 Scheduled time is in the past
@@ -1038,16 +1048,6 @@ Gas unit price is too low
 
 
 <pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ELOW_GAS_UNIT_PRICE">ELOW_GAS_UNIT_PRICE</a>: u64 = 4;
-</code></pre>
-
-
-
-<a id="0x1_scheduled_txns_ESENDER_SEQNO_NOT_FOUND"></a>
-
-Sender sequence number not found - must be initialized first via get_sender_seqno
-
-
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ESENDER_SEQNO_NOT_FOUND">ESENDER_SEQNO_NOT_FOUND</a>: u64 = 17;
 </code></pre>
 
 
@@ -1245,11 +1245,12 @@ Can be called only by the framework
         framework,
         <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
             gas_fee_deposit_store_signer_cap: owner_cap,
-            module_status: ScheduledTxnsModuleStatus::Active,
-            expiry_delta: <a href="scheduled_txns.md#0x1_scheduled_txns_EXPIRY_DELTA_DEFAULT">EXPIRY_DELTA_DEFAULT</a>,
-            sender_seqno_map: <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_reusable">big_ordered_map::new_with_reusable</a>()
+            module_status: ScheduledTxnsModuleStatus::Active
         }
     );
+
+    // Initialize sender sequence number map
+    <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_initialize">sched_txns_sender_seqno::initialize</a>(framework);
 
     // Initialize queue
     <b>let</b> queue = <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
@@ -1470,6 +1471,7 @@ Stop, remove and refund all scheduled txns
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_SHUTDOWN_ATTEMPT">EINVALID_SHUTDOWN_ATTEMPT</a>)
     );
     aux_data.module_status = ScheduledTxnsModuleStatus::ShutdownComplete;
+    <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_destroy_sender_seqno_map">sched_txns_sender_seqno::destroy_sender_seqno_map</a>();
 
     // Clean up <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>
     <b>let</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a> { remove_tbl } = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>&gt;(@aptos_framework);
@@ -1557,35 +1559,6 @@ system invariants won't be violated again.
 
 </details>
 
-<a id="0x1_scheduled_txns_set_expiry_delta"></a>
-
-## Function `set_expiry_delta`
-
-Change the expiry delta for scheduled transactions; can be called only by the framework
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_set_expiry_delta">set_expiry_delta</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_expiry_delta: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_set_expiry_delta">set_expiry_delta</a>(
-    framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_expiry_delta: u64
-) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <b>let</b> aux_data = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(framework));
-    aux_data.expiry_delta = new_expiry_delta;
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_scheduled_txns_get_sender_seqno"></a>
 
 ## Function `get_sender_seqno`
@@ -1603,16 +1576,8 @@ Lazy initialization: starts from 1 and stores in map upon first use
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno">get_sender_seqno</a>(sender_addr: <b>address</b>): u64 <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
-    <b>let</b> aux_data = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>&gt;(@aptos_framework);
-    <b>if</b> (aux_data.sender_seqno_map.contains(&sender_addr)) {
-        *aux_data.sender_seqno_map.borrow(&sender_addr)
-    } <b>else</b> {
-        // Lazy initialization: start from 1
-        <b>let</b> initial_seqno = 1;
-        aux_data.sender_seqno_map.add(sender_addr, initial_seqno);
-        initial_seqno
-    }
+<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno">get_sender_seqno</a>(sender_addr: <b>address</b>): u64 {
+    <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_get_sender_seqno">sched_txns_sender_seqno::get_sender_seqno</a>(sender_addr)
 }
 </code></pre>
 
@@ -1635,13 +1600,8 @@ Lazy initialization: starts from 1 and stores in map upon first use
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno_readonly">get_sender_seqno_readonly</a>(sender_addr: <b>address</b>): u64 <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
-    <b>let</b> aux_data = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>&gt;(@aptos_framework);
-    <b>assert</b>!(
-        aux_data.sender_seqno_map.contains(&sender_addr),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_ESENDER_SEQNO_NOT_FOUND">ESENDER_SEQNO_NOT_FOUND</a>)
-    );
-    *aux_data.sender_seqno_map.borrow(&sender_addr)
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno_readonly">get_sender_seqno_readonly</a>(sender_addr: <b>address</b>): u64 {
+    <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_get_sender_seqno_readonly">sched_txns_sender_seqno::get_sender_seqno_readonly</a>(sender_addr)
 }
 </code></pre>
 
@@ -1653,7 +1613,7 @@ Lazy initialization: starts from 1 and stores in map upon first use
 
 ## Function `increment_sender_seqno`
 
-Increments and returns the new sequence number for a sender address
+Increments the sequence number for a sender address
 Requires that the sender already exists in sender_seqno_map (initialized via get_sender_seqno)
 
 
@@ -1666,18 +1626,8 @@ Requires that the sender already exists in sender_seqno_map (initialized via get
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_increment_sender_seqno">increment_sender_seqno</a>(sender_addr: <b>address</b>) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
-    <b>let</b> aux_data = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>&gt;(@aptos_framework);
-
-    // Assert that sender <b>exists</b> in map - must be initialized first via get_sender_seqno
-    <b>assert</b>!(
-        aux_data.sender_seqno_map.contains(&sender_addr),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_ESENDER_SEQNO_NOT_FOUND">ESENDER_SEQNO_NOT_FOUND</a>)
-    );
-
-    <b>let</b> current_seqno = *aux_data.sender_seqno_map.borrow(&sender_addr);
-    <b>let</b> new_seqno = current_seqno + 1;
-    *aux_data.sender_seqno_map.borrow_mut(&sender_addr) = new_seqno;
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_increment_sender_seqno">increment_sender_seqno</a>(sender_addr: <b>address</b>) {
+    <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_increment_sender_seqno">sched_txns_sender_seqno::increment_sender_seqno</a>(sender_addr)
 }
 </code></pre>
 
@@ -1774,12 +1724,10 @@ Create ScheduleMapKey from individual parameters
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_create_schedule_map_key">create_schedule_map_key</a>(time: u64, gas_priority: u64, txn_id: u256): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a> {
-    <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a> {
-        time,
-        gas_priority,
-        txn_id
-    }
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_create_schedule_map_key">create_schedule_map_key</a>(
+    time: u64, gas_priority: u64, txn_id: u256
+): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a> {
+    <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a> { time, gas_priority, txn_id }
 }
 </code></pre>
 
@@ -1804,18 +1752,25 @@ Common validation helper for auth token based scheduled transactions
 
 
 <pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_validate_auth_token">validate_auth_token</a>(
-    sender_addr: <b>address</b>,
-    scheduled_time_ms: u64,
-    auth_token: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>
-) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
+    sender_addr: <b>address</b>, scheduled_time_ms: u64, auth_token: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>
+) {
     // Get current time and validate expiration
     <b>let</b> current_time_ms = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() / 1000;
-    <b>assert</b>!(current_time_ms &lt;= auth_token.expiration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_EXPIRED">EAUTH_TOKEN_EXPIRED</a>));
-    <b>assert</b>!(scheduled_time_ms &lt;= auth_token.expiration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_INSUFFICIENT_DURATION">EAUTH_TOKEN_INSUFFICIENT_DURATION</a>));
+    <b>assert</b>!(
+        current_time_ms &lt;= auth_token.expiration_time,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_EXPIRED">EAUTH_TOKEN_EXPIRED</a>)
+    );
+    <b>assert</b>!(
+        scheduled_time_ms &lt;= auth_token.expiration_time,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_INSUFFICIENT_DURATION">EAUTH_TOKEN_INSUFFICIENT_DURATION</a>)
+    );
 
     // Validate authorization sequence number
     <b>let</b> sender_seqno = <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno_readonly">get_sender_seqno_readonly</a>(sender_addr);
-    <b>assert</b>!(auth_token.authorization_seqno == sender_seqno, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_SEQNO_MISMATCH">EAUTH_SEQNO_MISMATCH</a>));
+    <b>assert</b>!(
+        auth_token.authorization_seqno == sender_seqno,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_SEQNO_MISMATCH">EAUTH_SEQNO_MISMATCH</a>)
+    );
 }
 </code></pre>
 
@@ -1830,7 +1785,7 @@ Common validation helper for auth token based scheduled transactions
 Constructor
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_new_scheduled_transaction_no_signer">new_scheduled_transaction_no_signer</a>(sender_addr: <b>address</b>, scheduled_time_ms: u64, max_gas_amount: u64, gas_unit_price: u64, f: || <b>has</b> <b>copy</b> + drop + store): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">scheduled_txns::ScheduledTransaction</a>
+<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_new_scheduled_transaction_no_signer">new_scheduled_transaction_no_signer</a>(sender_addr: <b>address</b>, scheduled_time_ms: u64, max_gas_amount: u64, gas_unit_price: u64, expiry_delta: u64, f: || <b>has</b> <b>copy</b> + drop + store): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">scheduled_txns::ScheduledTransaction</a>
 </code></pre>
 
 
@@ -1844,6 +1799,7 @@ Constructor
     scheduled_time_ms: u64,
     max_gas_amount: u64,
     gas_unit_price: u64,
+    expiry_delta: u64,
     f: || <b>has</b> <b>copy</b> + store + drop
 ): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a> {
     <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a> {
@@ -1852,6 +1808,7 @@ Constructor
         max_gas_amount,
         gas_unit_price,
         auth_token: none(),
+        expiry_delta,
         f: ScheduledFunction::V1(f)
     }
 }
@@ -1867,7 +1824,7 @@ Constructor
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_new_scheduled_transaction_gen_auth_token">new_scheduled_transaction_gen_auth_token</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, scheduled_time_ms: u64, max_gas_amount: u64, gas_unit_price: u64, f: |&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">scheduled_txns::ScheduledTxnAuthToken</a>| <b>has</b> <b>copy</b> + drop + store): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">scheduled_txns::ScheduledTransaction</a>
+<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_new_scheduled_transaction_gen_auth_token">new_scheduled_transaction_gen_auth_token</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, scheduled_time_ms: u64, max_gas_amount: u64, gas_unit_price: u64, expiry_delta: u64, f: |&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">scheduled_txns::ScheduledTxnAuthToken</a>| <b>has</b> <b>copy</b> + drop + store): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">scheduled_txns::ScheduledTransaction</a>
 </code></pre>
 
 
@@ -1881,24 +1838,40 @@ Constructor
     scheduled_time_ms: u64,
     max_gas_amount: u64,
     gas_unit_price: u64,
+    expiry_delta: u64,
     f: |&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>| <b>has</b> <b>copy</b> + store + drop
-): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a> <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
+): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a> {
     <b>let</b> sender_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
     // Extract the payload config from the current transaction context
     <b>let</b> payload_config_opt = payload_config();
-    <b>assert</b>!(payload_config_opt.is_some(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_NOT_FOUND">EAUTH_TOKEN_NOT_FOUND</a>));
+    <b>assert</b>!(
+        payload_config_opt.is_some(),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_NOT_FOUND">EAUTH_TOKEN_NOT_FOUND</a>)
+    );
 
     <b>let</b> payload_config = payload_config_opt.extract();
-    <b>let</b> scheduled_config_opt = aptos_framework::transaction_context::payload_config_scheduled_txn_auth_token(&payload_config);
-    <b>assert</b>!(scheduled_config_opt.is_some(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_NOT_FOUND">EAUTH_TOKEN_NOT_FOUND</a>));
+    <b>let</b> scheduled_config_opt =
+        aptos_framework::transaction_context::payload_config_scheduled_txn_auth_token(
+            &payload_config
+        );
+    <b>assert</b>!(
+        scheduled_config_opt.is_some(),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_NOT_FOUND">EAUTH_TOKEN_NOT_FOUND</a>)
+    );
 
     <b>let</b> scheduled_config = scheduled_config_opt.extract();
 
     // Create the required auth token
     <b>let</b> auth_token = <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a> {
-        allow_rescheduling: payload_scheduled_txn_config_allow_resched(&scheduled_config),
-        expiration_time: payload_scheduled_txn_config_auth_expiration(&scheduled_config),
-        authorization_seqno: payload_scheduled_txn_config_auth_seqno(&scheduled_config)
+        allow_rescheduling: payload_scheduled_txn_config_allow_resched(
+            &scheduled_config
+        ),
+        expiration_time: payload_scheduled_txn_config_auth_expiration(
+            &scheduled_config
+        ),
+        authorization_seqno: payload_scheduled_txn_config_auth_seqno(
+            &scheduled_config
+        )
     };
 
     // Validate the auth token
@@ -1910,6 +1883,7 @@ Constructor
         max_gas_amount,
         gas_unit_price,
         auth_token: some(auth_token),
+        expiry_delta,
         f: ScheduledFunction::V1WithAuthToken(f)
     }
 }
@@ -1925,7 +1899,7 @@ Constructor
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_new_scheduled_transaction_reuse_auth_token">new_scheduled_transaction_reuse_auth_token</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, auth_token: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">scheduled_txns::ScheduledTxnAuthToken</a>, scheduled_time_ms: u64, max_gas_amount: u64, gas_unit_price: u64, f: |&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">scheduled_txns::ScheduledTxnAuthToken</a>| <b>has</b> <b>copy</b> + drop + store): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">scheduled_txns::ScheduledTransaction</a>
+<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_new_scheduled_transaction_reuse_auth_token">new_scheduled_transaction_reuse_auth_token</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, auth_token: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">scheduled_txns::ScheduledTxnAuthToken</a>, scheduled_time_ms: u64, max_gas_amount: u64, gas_unit_price: u64, expiry_delta: u64, f: |&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">scheduled_txns::ScheduledTxnAuthToken</a>| <b>has</b> <b>copy</b> + drop + store): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">scheduled_txns::ScheduledTransaction</a>
 </code></pre>
 
 
@@ -1940,12 +1914,13 @@ Constructor
     scheduled_time_ms: u64,
     max_gas_amount: u64,
     gas_unit_price: u64,
+    expiry_delta: u64,
     f: |&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>| <b>has</b> <b>copy</b> + store + drop,
-): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a> <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
+): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a> {
     <b>let</b> sender_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
 
     // Validate the auth token (same checks <b>as</b> new_auth_token)
-   <a href="scheduled_txns.md#0x1_scheduled_txns_validate_auth_token">validate_auth_token</a>(sender_addr, scheduled_time_ms, &auth_token);
+    <a href="scheduled_txns.md#0x1_scheduled_txns_validate_auth_token">validate_auth_token</a>(sender_addr, scheduled_time_ms, &auth_token);
 
     <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a> {
         sender_addr,
@@ -1953,6 +1928,7 @@ Constructor
         max_gas_amount,
         gas_unit_price,
         auth_token: some(auth_token),
+        expiry_delta,
         f: ScheduledFunction::V1WithAuthToken(f)
     }
 }
@@ -2085,7 +2061,9 @@ Cancel a scheduled transaction, must be called by the signer who originally sche
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_with_key">cancel_with_key</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_with_key">cancel_with_key</a>(
+    sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>
+) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
     // If scheduling is shutdown, we cannot schedule <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> more transactions
     <b>let</b> aux_data = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>&gt;(@aptos_framework);
     <b>assert</b>!(
@@ -2347,7 +2325,7 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
 <pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions_with_limit">get_ready_transactions_with_limit</a>(
     block_timestamp_ms: u64, limit: u64
 ): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a>&gt; <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a> {
-    <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">remove_txns</a>(block_timestamp_ms);
+    <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">remove_txns</a>();
     // If scheduling is shutdown, we cannot schedule <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> more transactions
     <b>let</b> aux_data = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>&gt;(@aptos_framework);
     <b>if</b> (aux_data.module_status != ScheduledTxnsModuleStatus::Active) {
@@ -2358,21 +2336,7 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
     <b>let</b> <a href="scheduled_txns.md#0x1_scheduled_txns">scheduled_txns</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a>&gt;();
     <b>let</b> count = 0;
 
-    // Seek directly <b>to</b> the first non-expired transaction instead of iterating from the beginning
-    <b>let</b> expiry_cutoff_time =
-        <b>if</b> (block_timestamp_ms &gt; aux_data.expiry_delta) {
-            block_timestamp_ms - aux_data.expiry_delta
-        } <b>else</b> { 0 };
-
-    // Create a key <b>to</b> seek <b>to</b> the first non-expired transaction
-    // We <b>use</b> minimum values for gas_priority and txn_id <b>to</b> get the earliest transaction at this time
-    <b>let</b> seek_key = <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a> {
-        time: expiry_cutoff_time,
-        gas_priority: 0, // minimum gas_priority (highest actual gas price)
-        txn_id: 0 // minimum txn_id
-    };
-
-    <b>let</b> iter = queue.schedule_map.lower_bound(&seek_key);
+    <b>let</b> iter = queue.schedule_map.new_begin_iter();
     <b>while</b> ((count &lt; limit) && !iter.iter_is_end(&queue.schedule_map)) {
         <b>let</b> key = iter.iter_borrow_key();
         <b>if</b> (key.time &gt; block_timestamp_ms) {
@@ -2380,11 +2344,13 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
         };
         <b>let</b> txn = queue.txn_table.borrow(key.txn_id);
 
+        // Include transaction without checking expiry - expiry will be checked during execution
         <b>let</b> scheduled_txn_info_with_key =
             <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a> {
                 sender_addr: txn.sender_addr,
                 max_gas_amount: txn.max_gas_amount,
                 gas_unit_price: txn.gas_unit_price,
+                block_timestamp_ms,
                 key: *key
             };
 
@@ -2431,70 +2397,6 @@ IMP: Make sure this does not affect parallel execution of txns
 
 </details>
 
-<a id="0x1_scheduled_txns_cancel_and_remove_expired_txns"></a>
-
-## Function `cancel_and_remove_expired_txns`
-
-
-
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_and_remove_expired_txns">cancel_and_remove_expired_txns</a>(block_timestamp_ms: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_and_remove_expired_txns">cancel_and_remove_expired_txns</a>(
-    block_timestamp_ms: u64
-) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
-    <b>let</b> aux_data = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>&gt;(@aptos_framework);
-    <b>let</b> queue = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
-    <b>let</b> txns_to_expire = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_KeyAndTxnInfo">KeyAndTxnInfo</a>&gt;();
-
-    // collect expired transactions
-    <b>let</b> iter = queue.schedule_map.new_begin_iter();
-    <b>let</b> expire_count = 0;
-    <b>while</b> (!iter.iter_is_end(&queue.schedule_map)
-        && expire_count &lt; <a href="scheduled_txns.md#0x1_scheduled_txns_EXPIRE_TRANSACTIONS_LIMIT">EXPIRE_TRANSACTIONS_LIMIT</a>) {
-        <b>let</b> key = iter.iter_borrow_key();
-        <b>if</b> (block_timestamp_ms &lt;= (aux_data.expiry_delta + key.time)) {
-            <b>break</b>;
-        };
-
-        // Get transaction info before cancelling
-        <b>let</b> txn = queue.txn_table.borrow(key.txn_id);
-        <b>let</b> deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
-
-        txns_to_expire.push_back(
-            <a href="scheduled_txns.md#0x1_scheduled_txns_KeyAndTxnInfo">KeyAndTxnInfo</a> { key: *key, account_addr: txn.sender_addr, deposit_amt }
-        );
-        expire_count = expire_count + 1;
-        iter = iter.iter_next(&queue.schedule_map);
-    };
-
-    // cancel expired transactions
-    <b>while</b> (!txns_to_expire.is_empty()) {
-        <b>let</b> <a href="scheduled_txns.md#0x1_scheduled_txns_KeyAndTxnInfo">KeyAndTxnInfo</a> { key, account_addr, deposit_amt } =
-            txns_to_expire.pop_back();
-        <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(account_addr, key, deposit_amt);
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionFailedEvent">TransactionFailedEvent</a> {
-                scheduled_txn_time: key.time,
-                scheduled_txn_hash: key.txn_id,
-                sender_addr: account_addr,
-                cancelled_txn_code: CancelledTxnCode::Expired
-            }
-        );
-    };
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_scheduled_txns_remove_txns"></a>
 
 ## Function `remove_txns`
@@ -2502,7 +2404,7 @@ IMP: Make sure this does not affect parallel execution of txns
 Remove the txns that are run
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">remove_txns</a>(block_timestamp_ms: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">remove_txns</a>()
 </code></pre>
 
 
@@ -2511,9 +2413,7 @@ Remove the txns that are run
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">remove_txns</a>(
-    block_timestamp_ms: u64
-) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">remove_txns</a>() <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
     <b>let</b> to_remove = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>&gt;(@aptos_framework);
     <b>let</b> queue = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
     <b>let</b> tbl_idx: u16 = 0;
@@ -2535,7 +2435,6 @@ Remove the txns that are run
         };
         tbl_idx = tbl_idx + 1;
     };
-    <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_and_remove_expired_txns">cancel_and_remove_expired_txns</a>(block_timestamp_ms);
 }
 </code></pre>
 
@@ -2559,10 +2458,12 @@ Helper to check if scheduled function is V1 (no auth token)
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_is_scheduled_function_v1">is_scheduled_function_v1</a>(txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a>): bool {
-    match (txn.f) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_is_scheduled_function_v1">is_scheduled_function_v1</a>(
+    txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a>
+): bool {
+    match(txn.f) {
         ScheduledFunction::V1(_f) =&gt; <b>true</b>,
-        ScheduledFunction::V1WithAuthToken(_f) =&gt; <b>false</b>,
+        ScheduledFunction::V1WithAuthToken(_f) =&gt; <b>false</b>
     }
 }
 </code></pre>
@@ -2587,12 +2488,14 @@ Helper to get V1 function (no auth token)
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_scheduled_function_v1">get_scheduled_function_v1</a>(txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a>): || {
-    match (txn.f) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_scheduled_function_v1">get_scheduled_function_v1</a>(
+    txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a>
+): || {
+    match(txn.f) {
         ScheduledFunction::V1(f) =&gt; f,
         ScheduledFunction::V1WithAuthToken(_f) =&gt; {
             <b>abort</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_NOT_FOUND">EAUTH_TOKEN_NOT_FOUND</a>))
-        },
+        }
     }
 }
 </code></pre>
@@ -2617,12 +2520,14 @@ Helper to get V1WithAuthToken function
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_scheduled_function_v1_with_auth_token">get_scheduled_function_v1_with_auth_token</a>(txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a>): |&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>| {
-    match (txn.f) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_scheduled_function_v1_with_auth_token">get_scheduled_function_v1_with_auth_token</a>(
+    txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a>
+): |&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>| {
+    match(txn.f) {
         ScheduledFunction::V1(_f) =&gt; {
             <b>abort</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_NOT_FOUND">EAUTH_TOKEN_NOT_FOUND</a>))
         },
-        ScheduledFunction::V1WithAuthToken(f) =&gt; f,
+        ScheduledFunction::V1WithAuthToken(f) =&gt; f
     }
 }
 </code></pre>
@@ -2647,13 +2552,13 @@ Helper to get transaction by key for friends
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_txn_by_key">get_txn_by_key</a>(key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>): Option&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a>&gt; <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_txn_by_key">get_txn_by_key</a>(
+    key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>
+): Option&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a>&gt; <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
     <b>let</b> queue = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
     <b>if</b> (queue.txn_table.contains(key.txn_id)) {
         some(*queue.txn_table.borrow(key.txn_id))
-    } <b>else</b> {
-        none()
-    }
+    } <b>else</b> { none() }
 }
 </code></pre>
 
@@ -2677,7 +2582,9 @@ Helper to get auth token from transaction
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_auth_token_from_txn">get_auth_token_from_txn</a>(txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a>): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_auth_token_from_txn">get_auth_token_from_txn</a>(
+    txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a>
+): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a> {
     <b>assert</b>!(txn.auth_token.is_some(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_internal">error::internal</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_NOT_FOUND">EAUTH_TOKEN_NOT_FOUND</a>));
     *txn.auth_token.borrow()
 }
@@ -2687,15 +2594,15 @@ Helper to get auth token from transaction
 
 </details>
 
-<a id="0x1_scheduled_txns_validate_and_cancel_if_invalid_auth_token"></a>
+<a id="0x1_scheduled_txns_fail_txn_on_invalid_auth_token"></a>
 
-## Function `validate_and_cancel_if_invalid_auth_token`
+## Function `fail_txn_on_invalid_auth_token`
 
 Validate auth token and cancel transaction if invalid
 Returns true if token was invalid and transaction was cancelled, false if token is valid
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_validate_and_cancel_if_invalid_auth_token">validate_and_cancel_if_invalid_auth_token</a>(txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">scheduled_txns::ScheduledTransaction</a>, txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, block_timestamp_ms: u64): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_fail_txn_on_invalid_auth_token">fail_txn_on_invalid_auth_token</a>(txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">scheduled_txns::ScheduledTransaction</a>, txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, block_timestamp_ms: u64): bool
 </code></pre>
 
 
@@ -2704,26 +2611,71 @@ Returns true if token was invalid and transaction was cancelled, false if token 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_validate_and_cancel_if_invalid_auth_token">validate_and_cancel_if_invalid_auth_token</a>(
-    txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a>,
-    txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>,
-    block_timestamp_ms: u64
-): bool <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_fail_txn_on_invalid_auth_token">fail_txn_on_invalid_auth_token</a>(
+    txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a>, txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>, block_timestamp_ms: u64
+): bool {
     <b>let</b> auth_token = <a href="scheduled_txns.md#0x1_scheduled_txns_get_auth_token_from_txn">get_auth_token_from_txn</a>(txn);
     <b>let</b> sender_addr = txn.sender_addr;
 
     // Check <b>if</b> token is expired or sequence number mismatched
-    <b>if</b> (auth_token.expiration_time &lt;= block_timestamp_ms ||
-        auth_token.authorization_seqno != <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno_readonly">get_sender_seqno_readonly</a>(sender_addr)) {
-        // Cancel the transaction due <b>to</b> invalid auth token
-        <b>let</b> deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
-        <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(sender_addr, txn_key, deposit_amt);
+    <b>if</b> (auth_token.expiration_time &lt;= block_timestamp_ms
+        || auth_token.authorization_seqno != <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno_readonly">get_sender_seqno_readonly</a>(sender_addr)) {
         <a href="event.md#0x1_event_emit">event::emit</a>(
             <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionFailedEvent">TransactionFailedEvent</a> {
                 scheduled_txn_time: txn_key.time,
                 scheduled_txn_hash: txn_key.txn_id,
                 sender_addr,
                 cancelled_txn_code: CancelledTxnCode::AuthExpired
+            }
+        );
+        <b>return</b> <b>true</b>
+    };
+    <b>false</b>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_scheduled_txns_fail_txn_on_expired"></a>
+
+## Function `fail_txn_on_expired`
+
+Check if transaction has expired and emit failure event if so
+Returns true if transaction was expired and should be cancelled, false if not expired
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_fail_txn_on_expired">fail_txn_on_expired</a>(txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">scheduled_txns::ScheduledTransaction</a>, txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, block_timestamp_ms: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_fail_txn_on_expired">fail_txn_on_expired</a>(
+    txn: &<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a>, txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>, block_timestamp_ms: u64
+): bool {
+    <b>let</b> sender_addr = txn.sender_addr;
+
+    // Check <b>if</b> this transaction <b>has</b> expired based on its individual expiry_delta
+    <b>let</b> transaction_expiry_time =
+        <b>if</b> (txn.expiry_delta &gt; 0) {
+            txn_key.time + txn.expiry_delta
+        } <b>else</b> {
+            <a href="scheduled_txns.md#0x1_scheduled_txns_U64_MAX">U64_MAX</a> // If expiry_delta is 0, never expire
+        };
+
+    <b>if</b> (block_timestamp_ms &gt; transaction_expiry_time) {
+        // Transaction is expired
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionFailedEvent">TransactionFailedEvent</a> {
+                scheduled_txn_time: txn_key.time,
+                scheduled_txn_hash: txn_key.txn_id,
+                sender_addr,
+                cancelled_txn_code: CancelledTxnCode::Expired
             }
         );
         <b>return</b> <b>true</b>
@@ -2774,14 +2726,19 @@ Create updated auth token for execution (invalidates seqno if rescheduling not a
 
 </details>
 
-<a id="0x1_scheduled_txns_execute_user_function_wrapper"></a>
+<a id="0x1_scheduled_txns_remove_txn_from_table"></a>
 
-## Function `execute_user_function_wrapper`
+## Function `remove_txn_from_table`
 
-Called by the executor when the scheduled transaction is run
+Helper function to remove scheduled transaction from txn_table after execution
+The scheduled transaction is removed from two data structures at different times:
+1. From schedule_map (BigOrderedMap): Removed in next block's prologue to allow parallel execution
+of all scheduled transactions in the current block
+2. From txn_table: Removed immediately after transaction execution to enable
+proper refunding of storage gas fees to the user
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_execute_user_function_wrapper">execute_user_function_wrapper</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, block_timestamp_ms: u64): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txn_from_table">remove_txn_from_table</a>(txn_id: u256)
 </code></pre>
 
 
@@ -2790,66 +2747,9 @@ Called by the executor when the scheduled transaction is run
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_execute_user_function_wrapper">execute_user_function_wrapper</a>(
-    <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>, block_timestamp_ms: u64
-): bool <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
-    <b>let</b> queue = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
-
-    <b>if</b> (!queue.schedule_map.contains(&txn_key)) {
-        // It is possible that the scheduled transaction was cancelled before in the same <a href="block.md#0x1_block">block</a>
-        <b>return</b> <b>false</b>;
-    };
-    <b>let</b> txn = queue.txn_table.borrow(txn_key.txn_id);
-
-    match (txn.f) {
-        ScheduledFunction::V1(f) =&gt; {
-            f();
-        },
-        ScheduledFunction::V1WithAuthToken(f) =&gt; {
-            <b>let</b> sender_addr = txn.sender_addr;
-            <b>assert</b>!(txn.auth_token.is_some(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_internal">error::internal</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EAUTH_TOKEN_NOT_FOUND">EAUTH_TOKEN_NOT_FOUND</a>));
-            <b>let</b> auth_token = txn.auth_token.borrow();
-
-            // Check <b>if</b> token is expired or sequence number mismatched
-            <b>if</b> (auth_token.expiration_time &lt;= block_timestamp_ms ||
-                auth_token.authorization_seqno != <a href="scheduled_txns.md#0x1_scheduled_txns_get_sender_seqno_readonly">get_sender_seqno_readonly</a>(sender_addr)) {
-                // Cancel the transaction due <b>to</b> invalid auth token
-                <b>let</b> deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
-                <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(sender_addr, txn_key, deposit_amt);
-                <a href="event.md#0x1_event_emit">event::emit</a>(
-                    <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionFailedEvent">TransactionFailedEvent</a> {
-                        scheduled_txn_time: txn_key.time,
-                        scheduled_txn_hash: txn_key.txn_id,
-                        sender_addr,
-                        cancelled_txn_code: CancelledTxnCode::AuthExpired
-                    }
-                );
-                <b>return</b> <b>true</b>
-            };
-
-            <b>let</b> updated_auth_token = <b>if</b> (!auth_token.allow_rescheduling) {
-                // Set authorization_seqno = 0 <b>to</b> invalidate the token for <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> <b>use</b> in the user function
-                <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a> {
-                    allow_rescheduling: auth_token.allow_rescheduling,
-                    expiration_time: auth_token.expiration_time,
-                    authorization_seqno: 0
-                }
-            } <b>else</b> {
-                *auth_token
-            };
-
-            f(&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, updated_auth_token);
-        },
-    };
-
-    // The scheduled transaction is removed from two data structures at different times:
-    // 1. From schedule_map (BigOrderedMap): Removed in next <a href="block.md#0x1_block">block</a>'s prologue <b>to</b> allow parallel execution
-    //    of all scheduled transactions in the current <a href="block.md#0x1_block">block</a>
-    // 2. From txn_table: Removed immediately after transaction execution in this function <b>to</b> enable
-    //    proper refunding of storage gas fees <b>to</b> the user
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txn_from_table">remove_txn_from_table</a>(txn_id: u256) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
     <b>let</b> queue_mut = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
-    queue_mut.txn_table.remove(txn_key.txn_id);
-    <b>true</b>
+    queue_mut.txn_table.remove(txn_id);
 }
 </code></pre>
 
@@ -2900,7 +2800,9 @@ Called by the executor when the scheduled transaction is run
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_step_with_auth_token">step_with_auth_token</a>(state: <a href="scheduled_txns.md#0x1_scheduled_txns_State">State</a>, _signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _auth_token: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>) {
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_step_with_auth_token">step_with_auth_token</a>(
+    state: <a href="scheduled_txns.md#0x1_scheduled_txns_State">State</a>, _signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _auth_token: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>
+) {
     <b>if</b> (state.count &lt; 10) {
         state.count = state.count + 1;
     }
@@ -2928,22 +2830,26 @@ Called by the executor when the scheduled transaction is run
 
 
 <pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_rescheduling_test_func">rescheduling_test_func</a>(
-    sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    auth_token: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>
+    sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, auth_token: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>
 ) {
     <b>let</b> current_time = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() / 1000;
     <b>let</b> next_schedule_time = current_time + 1000; // Would schedule 1 second later
 
-    <b>let</b> foo = |<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, auth_token: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>| <a href="scheduled_txns.md#0x1_scheduled_txns_rescheduling_test_func">rescheduling_test_func</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, auth_token);
+    <b>let</b> foo =
+        |<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, auth_token: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTxnAuthToken">ScheduledTxnAuthToken</a>| <a href="scheduled_txns.md#0x1_scheduled_txns_rescheduling_test_func">rescheduling_test_func</a>(
+            <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, auth_token
+        );
 
-    <b>let</b> txn = <a href="scheduled_txns.md#0x1_scheduled_txns_new_scheduled_transaction_reuse_auth_token">new_scheduled_transaction_reuse_auth_token</a>(
-        sender,
-        auth_token,
-        next_schedule_time,
-        1000,
-        200,
-        foo
-    );
+    <b>let</b> txn =
+        <a href="scheduled_txns.md#0x1_scheduled_txns_new_scheduled_transaction_reuse_auth_token">new_scheduled_transaction_reuse_auth_token</a>(
+            sender,
+            auth_token,
+            next_schedule_time,
+            1000,
+            200,
+            <a href="scheduled_txns.md#0x1_scheduled_txns_EXPIRY_DELTA_DEFAULT">EXPIRY_DELTA_DEFAULT</a>,
+            foo
+        );
 
     <a href="scheduled_txns.md#0x1_scheduled_txns_insert">insert</a>(sender, txn);
 }

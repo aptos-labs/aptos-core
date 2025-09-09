@@ -613,7 +613,7 @@ Return epoch interval in seconds.
     <a href="state_storage.md#0x1_state_storage_on_new_block">state_storage::on_new_block</a>(<a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>());
 
     // remove_txns expects the <a href="timestamp.md#0x1_timestamp">timestamp</a> in milli seconds, so we divide by 1000.
-    <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">scheduled_txns::remove_txns</a>(<a href="timestamp.md#0x1_timestamp">timestamp</a> / 1000);
+    <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">scheduled_txns::remove_txns</a>();
 
     block_metadata_ref.epoch_interval
 }

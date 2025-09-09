@@ -7,7 +7,11 @@ module aptos_framework::test_scheduled_txns {
     use aptos_framework::user_func_wrapper;
     use aptos_framework::coin::{Self};
     use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::scheduled_txns::{Self, ScheduleMapKey, mark_txn_to_remove_test, ScheduledTxnAuthToken,
+    use aptos_framework::scheduled_txns::{
+        Self,
+        ScheduleMapKey,
+        mark_txn_to_remove_test,
+        ScheduledTxnAuthToken,
         get_sender_seqno
     };
 
@@ -32,9 +36,7 @@ module aptos_framework::test_scheduled_txns {
 
     #[persistent]
     fun simple_work_func(
-        max_gas_amount: u64,
-        max_gas_unit_price: u64,
-        delta_time: u64
+        max_gas_amount: u64, max_gas_unit_price: u64, delta_time: u64
     ) {
         // do work without rescheduling (unsigned version can't reschedule)
         let _ = max_gas_amount + max_gas_unit_price + delta_time; // consume parameters
@@ -42,29 +44,34 @@ module aptos_framework::test_scheduled_txns {
 
     #[persistent]
     fun rescheduling_test_func(
-        sender: &signer,
-        auth_token: ScheduledTxnAuthToken
+        sender: &signer, auth_token: ScheduledTxnAuthToken
     ) {
         let current_time = timestamp::now_microseconds() / 1000;
         let next_schedule_time = current_time + 10000; // Would schedule 1 second later
 
-        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| rescheduling_test_func(signer, auth_token);
+        let foo =
+            |signer: &signer, auth_token: ScheduledTxnAuthToken| rescheduling_test_func(
+                signer, auth_token
+            );
 
-        let txn = scheduled_txns::new_scheduled_transaction_reuse_auth_token(
-            sender,
-            auth_token,
-            next_schedule_time,
-            1000,
-            200,
-            EXPIRY_DELTA_DEFAULT,
-            foo
-        );
+        let txn =
+            scheduled_txns::new_scheduled_transaction_reuse_auth_token(
+                sender,
+                auth_token,
+                next_schedule_time,
+                1000,
+                200,
+                EXPIRY_DELTA_DEFAULT,
+                foo
+            );
 
         scheduled_txns::insert(sender, txn);
     }
 
     #[persistent]
-    fun user_func_with_auth_token(_signer: &signer, _auth_token: ScheduledTxnAuthToken) {
+    fun user_func_with_auth_token(
+        _signer: &signer, _auth_token: ScheduledTxnAuthToken
+    ) {
         debug::print(&string::utf8(b"Running user func..."));
     }
 
@@ -80,32 +87,36 @@ module aptos_framework::test_scheduled_txns {
         let schedule_time = curr_mock_time_micro_s / 1000 + 1000; // 1 second in future
         let expiration_time = schedule_time + 10000; // Token valid for 10 seconds
 
-        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| rescheduling_test_func(signer, auth_token);
+        let foo =
+            |signer: &signer, auth_token: ScheduledTxnAuthToken| rescheduling_test_func(
+                signer, auth_token
+            );
 
-        let auth_token = scheduled_txns::create_mock_auth_token(true, expiration_time, sender_seqno);
-        let txn = scheduled_txns::new_scheduled_transaction_reuse_auth_token(
-            &user,
-            auth_token,
-            schedule_time,
-            1000,
-            200,
-            EXPIRY_DELTA_DEFAULT,
-            foo
-        );
+        let auth_token =
+            scheduled_txns::create_mock_auth_token(true, expiration_time, sender_seqno);
+        let txn =
+            scheduled_txns::new_scheduled_transaction_reuse_auth_token(
+                &user,
+                auth_token,
+                schedule_time,
+                1000,
+                200,
+                EXPIRY_DELTA_DEFAULT,
+                foo
+            );
 
         let txn_key = scheduled_txns::insert(&user, txn);
         assert!(scheduled_txns::get_num_txns() == 1, scheduled_txns::get_num_txns());
 
         // Execute the transaction - it should work since allow_rescheduling = true
-        user_func_wrapper::execute_user_function_test(user, txn_key, schedule_time + 100);
+        user_func_wrapper::execute_user_function_test(user, txn_key, schedule_time
+            + 100);
         assert!(scheduled_txns::get_num_txns() == 2, scheduled_txns::get_num_txns());
     }
 
     #[test(fx = @0x1, user = @0x1234)]
     #[expected_failure(abort_code = 65552)]
-    fun test_disallow_reschedule_token(
-        fx: &signer, user: signer
-    ) {
+    fun test_disallow_reschedule_token(fx: &signer, user: signer) {
         let user_addr = signer::address_of(&user);
         let curr_mock_time_micro_s = 1000000;
         scheduled_txns::setup_test_env(fx, &user, curr_mock_time_micro_s);
@@ -115,26 +126,32 @@ module aptos_framework::test_scheduled_txns {
         let expiration_time = schedule_time + 10000; // Token valid for 10 seconds
 
         // Test: Create auth token with allow_rescheduling = false
-        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| rescheduling_test_func(signer, auth_token);
+        let foo =
+            |signer: &signer, auth_token: ScheduledTxnAuthToken| rescheduling_test_func(
+                signer, auth_token
+            );
 
         // Create auth token with allow_rescheduling = false
-        let auth_token = scheduled_txns::create_mock_auth_token(false, expiration_time, sender_seqno);
-        let txn = scheduled_txns::new_scheduled_transaction_reuse_auth_token(
-            &user,
-            auth_token,
-            schedule_time,
-            1000,
-            200,
-            EXPIRY_DELTA_DEFAULT,
-            foo
-        );
+        let auth_token =
+            scheduled_txns::create_mock_auth_token(false, expiration_time, sender_seqno);
+        let txn =
+            scheduled_txns::new_scheduled_transaction_reuse_auth_token(
+                &user,
+                auth_token,
+                schedule_time,
+                1000,
+                200,
+                EXPIRY_DELTA_DEFAULT,
+                foo
+            );
 
         // Insert the initial transaction
         let txn_key = scheduled_txns::insert(&user, txn);
         assert!(scheduled_txns::get_num_txns() == 1, scheduled_txns::get_num_txns());
 
         // Execute the transaction - it should work but with rescheduling disabled
-        user_func_wrapper::execute_user_function_test(user, txn_key, schedule_time + 100);
+        user_func_wrapper::execute_user_function_test(user, txn_key, schedule_time
+            + 100);
     }
 
     // Purpose of this test is to test 'scheduled_txn_epilogue'
@@ -172,11 +189,7 @@ module aptos_framework::test_scheduled_txns {
                 foo
             );
         let gas_price_txn2 = 300;
-        let work_foo = || simple_work_func(
-            gas_price_txn2,
-            txn_max_gas_units,
-            3000
-        );
+        let work_foo = || simple_work_func(gas_price_txn2, txn_max_gas_units, 3000);
         let txn2 =
             scheduled_txns::new_scheduled_transaction_no_signer(
                 user_addr,
@@ -256,7 +269,7 @@ module aptos_framework::test_scheduled_txns {
 
         // check execution without rescheduling
         mock_execute(txn2_key, user);
-        scheduled_txns::remove_txns(timestamp::now_microseconds() / 1000);
+        scheduled_txns::remove_txns();
         assert!(scheduled_txns::get_num_txns() == 0, scheduled_txns::get_num_txns());
         // Shutdown should cancel all transactions and refund all deposits
         scheduled_txns::shutdown_test(fx);
@@ -270,9 +283,7 @@ module aptos_framework::test_scheduled_txns {
     }
 
     #[test(fx = @0x1, user = @0x1234)]
-    fun test_cancel_all_with_auth_tokens(
-        fx: &signer, user: signer
-    ) {
+    fun test_cancel_all_with_auth_tokens(fx: &signer, user: signer) {
         let user_addr = signer::address_of(&user);
         let curr_mock_time_micro_s = 1000000;
         scheduled_txns::setup_test_env(fx, &user, curr_mock_time_micro_s);
@@ -282,37 +293,44 @@ module aptos_framework::test_scheduled_txns {
         let expiration_time = schedule_time + 10000;
 
         // Create multiple transactions with auth tokens
-        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| user_func_with_auth_token(signer, auth_token);
+        let foo =
+            |signer: &signer, auth_token: ScheduledTxnAuthToken| user_func_with_auth_token(
+                signer, auth_token
+            );
 
         // Create 3 transactions with the same auth seqno
-        let auth_token = scheduled_txns::create_mock_auth_token(true, expiration_time, sender_seqno);
-        let txn1 = scheduled_txns::new_scheduled_transaction_reuse_auth_token(
-            &user,
-            auth_token,
-            schedule_time,
-            1000,
-            200,
-            EXPIRY_DELTA_DEFAULT,
-            foo
-        );
-        let txn2 = scheduled_txns::new_scheduled_transaction_reuse_auth_token(
-            &user,
-            auth_token,
-            schedule_time + 1000,
-            1000,
-            200,
-            EXPIRY_DELTA_DEFAULT,
-            foo
-        );
-        let txn3 = scheduled_txns::new_scheduled_transaction_reuse_auth_token(
-            &user,
-            auth_token,
-            schedule_time + 2000,
-            1000,
-            200,
-            EXPIRY_DELTA_DEFAULT,
-            foo
-        );
+        let auth_token =
+            scheduled_txns::create_mock_auth_token(true, expiration_time, sender_seqno);
+        let txn1 =
+            scheduled_txns::new_scheduled_transaction_reuse_auth_token(
+                &user,
+                auth_token,
+                schedule_time,
+                1000,
+                200,
+                EXPIRY_DELTA_DEFAULT,
+                foo
+            );
+        let txn2 =
+            scheduled_txns::new_scheduled_transaction_reuse_auth_token(
+                &user,
+                auth_token,
+                schedule_time + 1000,
+                1000,
+                200,
+                EXPIRY_DELTA_DEFAULT,
+                foo
+            );
+        let txn3 =
+            scheduled_txns::new_scheduled_transaction_reuse_auth_token(
+                &user,
+                auth_token,
+                schedule_time + 2000,
+                1000,
+                200,
+                EXPIRY_DELTA_DEFAULT,
+                foo
+            );
 
         // Store transaction keys for later testing
         let txn1_key = scheduled_txns::insert(&user, txn1);

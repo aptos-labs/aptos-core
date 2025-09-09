@@ -16,7 +16,9 @@ module aptos_framework::user_func_wrapper {
         // Check if transaction has expired - if so, emit event and skip execution
         if (scheduled_txns::fail_txn_on_expired(txn, txn_key, block_timestamp_ms)) {
             // Transaction is expired - do not execute user function
-            scheduled_txns::remove_txn_from_table(scheduled_txns::schedule_map_key_txn_id(&txn_key));
+            scheduled_txns::remove_txn_from_table(
+                scheduled_txns::schedule_map_key_txn_id(&txn_key)
+            );
             return true
         };
 
@@ -24,17 +26,22 @@ module aptos_framework::user_func_wrapper {
             let f = scheduled_txns::get_scheduled_function_v1(txn);
             f();
         } else {
-            if (scheduled_txns::fail_txn_on_invalid_auth_token(txn, txn_key, block_timestamp_ms)) {
+            if (scheduled_txns::fail_txn_on_invalid_auth_token(
+                txn, txn_key, block_timestamp_ms
+            )) {
                 // Invalid auth token (expired or all scheduled txns canceled for the sender) - do not execute user func
             } else {
                 let f = scheduled_txns::get_scheduled_function_v1_with_auth_token(txn);
-                let updated_auth_token = scheduled_txns::create_updated_auth_token_for_execution(txn);
+                let updated_auth_token =
+                    scheduled_txns::create_updated_auth_token_for_execution(txn);
                 f(&signer, updated_auth_token);
             };
         };
 
         // Remove transaction from txn_table to enable proper refunding of storage gas fees
-        scheduled_txns::remove_txn_from_table(scheduled_txns::schedule_map_key_txn_id(&txn_key));
+        scheduled_txns::remove_txn_from_table(
+            scheduled_txns::schedule_map_key_txn_id(&txn_key)
+        );
         true
     }
 

@@ -24,9 +24,10 @@ module aptos_framework::sched_txns_sender_seqno {
     public(friend) fun initialize(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
 
-        move_to(framework, SenderSeqnoData {
-            sender_seqno_map: big_ordered_map::new_with_reusable()
-        });
+        move_to(
+            framework,
+            SenderSeqnoData { sender_seqno_map: big_ordered_map::new_with_reusable() }
+        );
     }
 
     /// Returns the current authorization sequence number for a sender address
@@ -80,11 +81,14 @@ module aptos_framework::sched_txns_sender_seqno {
     }
 
     public(friend) fun destroy_sender_seqno_map() acquires SenderSeqnoData {
-        let SenderSeqnoData { sender_seqno_map } = move_from<SenderSeqnoData>(@aptos_framework);
+        let SenderSeqnoData { sender_seqno_map } =
+            move_from<SenderSeqnoData>(@aptos_framework);
         // Clear all elements from the map before dropping it
-        sender_seqno_map.for_each(|_key, _value| {
-            // Do nothing - just consume the elements
-        });
+        sender_seqno_map.for_each(
+            |_key, _value| {
+                // Do nothing - just consume the elements
+            }
+        );
     }
 
     /// Sets a specific sequence number for a sender (useful for testing or migration)
