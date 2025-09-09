@@ -22,6 +22,8 @@ module aptos_framework::scheduled_txns {
         payload_scheduled_txn_config_auth_seqno, payload_scheduled_txn_config_allow_resched
     };
     use aptos_framework::sched_txns_sender_seqno;
+    #[test_only]
+    use aptos_std::debug;
 
     friend aptos_framework::block;
     friend aptos_framework::transaction_validation;
@@ -819,7 +821,6 @@ module aptos_framework::scheduled_txns {
         let scheduled_txns = vector::empty<ScheduledTransactionInfoWithKey>();
         let count = 0;
 
-        // Start from the beginning since we now need to check each transaction's individual expiry_delta
         let iter = queue.schedule_map.new_begin_iter();
         while ((count < limit) && !iter.iter_is_end(&queue.schedule_map)) {
             let key = iter.iter_borrow_key();
@@ -828,27 +829,18 @@ module aptos_framework::scheduled_txns {
             };
             let txn = queue.txn_table.borrow(key.txn_id);
 
-            // Check if this transaction has expired based on its individual expiry_delta
-            let transaction_expiry_time = if (txn.expiry_delta > 0) {
-                key.time + txn.expiry_delta
-            } else {
-                U64_MAX // If expiry_delta is 0, never expire
-            };
+            // Include transaction without checking expiry - expiry will be checked during execution
+            let scheduled_txn_info_with_key =
+                ScheduledTransactionInfoWithKey {
+                    sender_addr: txn.sender_addr,
+                    max_gas_amount: txn.max_gas_amount,
+                    gas_unit_price: txn.gas_unit_price,
+                    block_timestamp_ms,
+                    key: *key
+                };
 
-            if (block_timestamp_ms <= transaction_expiry_time) {
-                // Transaction is not expired, include it
-                let scheduled_txn_info_with_key =
-                    ScheduledTransactionInfoWithKey {
-                        sender_addr: txn.sender_addr,
-                        max_gas_amount: txn.max_gas_amount,
-                        gas_unit_price: txn.gas_unit_price,
-                        block_timestamp_ms,
-                        key: *key
-                    };
-
-                scheduled_txns.push_back(scheduled_txn_info_with_key);
-                count = count + 1;
-            };
+            scheduled_txns.push_back(scheduled_txn_info_with_key);
+            count = count + 1;
             iter = iter.iter_next(&queue.schedule_map);
         };
 
@@ -865,62 +857,10 @@ module aptos_framework::scheduled_txns {
         keys.push_back(key);
     }
 
-    fun cancel_and_remove_expired_txns(
-        block_timestamp_ms: u64
-    ) acquires ScheduleQueue, AuxiliaryData {
-        let queue = borrow_global<ScheduleQueue>(@aptos_framework);
-        let txns_to_expire = vector::empty<KeyAndTxnInfo>();
-
-        // collect expired transactions
-        let iter = queue.schedule_map.new_begin_iter();
-        let expire_count = 0;
-        while (!iter.iter_is_end(&queue.schedule_map)
-            && expire_count < EXPIRE_TRANSACTIONS_LIMIT) {
-            let key = iter.iter_borrow_key();
-
-            // Get transaction info and check its individual expiry_delta
-            let txn = queue.txn_table.borrow(key.txn_id);
-            let transaction_expiry_time = if (txn.expiry_delta > 0) {
-                key.time + txn.expiry_delta
-            } else {
-                U64_MAX // If expiry_delta is 0, never expire
-            };
-
-            if (block_timestamp_ms <= transaction_expiry_time) {
-                // Transaction is not expired yet, since transactions are sorted by time,
-                // we can break here if we find a non-expired transaction
-                break;
-            };
-
-            let deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
-
-            txns_to_expire.push_back(
-                KeyAndTxnInfo { key: *key, account_addr: txn.sender_addr, deposit_amt }
-            );
-            expire_count = expire_count + 1;
-            iter = iter.iter_next(&queue.schedule_map);
-        };
-
-        // cancel expired transactions
-        while (!txns_to_expire.is_empty()) {
-            let KeyAndTxnInfo { key, account_addr, deposit_amt } =
-                txns_to_expire.pop_back();
-            cancel_internal(account_addr, key, deposit_amt);
-            event::emit(
-                TransactionFailedEvent {
-                    scheduled_txn_time: key.time,
-                    scheduled_txn_hash: key.txn_id,
-                    sender_addr: account_addr,
-                    cancelled_txn_code: CancelledTxnCode::Expired
-                }
-            );
-        };
-    }
-
     /// Remove the txns that are run
     public(friend) fun remove_txns(
         block_timestamp_ms: u64
-    ) acquires ToRemoveTbl, ScheduleQueue, AuxiliaryData {
+    ) acquires ToRemoveTbl, ScheduleQueue {
         let to_remove = borrow_global_mut<ToRemoveTbl>(@aptos_framework);
         let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
         let tbl_idx: u16 = 0;
@@ -942,7 +882,6 @@ module aptos_framework::scheduled_txns {
             };
             tbl_idx = tbl_idx + 1;
         };
-        cancel_and_remove_expired_txns(block_timestamp_ms);
     }
 
     /// Helper to check if scheduled function is V1 (no auth token)
@@ -991,26 +930,54 @@ module aptos_framework::scheduled_txns {
 
     /// Validate auth token and cancel transaction if invalid
     /// Returns true if token was invalid and transaction was cancelled, false if token is valid
-    public(friend) fun validate_and_cancel_if_invalid_auth_token(
+    public(friend) fun fail_txn_on_invalid_auth_token(
         txn: &ScheduledTransaction,
         txn_key: ScheduleMapKey,
         block_timestamp_ms: u64
-    ): bool acquires AuxiliaryData, ScheduleQueue {
+    ): bool {
         let auth_token = get_auth_token_from_txn(txn);
         let sender_addr = txn.sender_addr;
 
         // Check if token is expired or sequence number mismatched
         if (auth_token.expiration_time <= block_timestamp_ms ||
             auth_token.authorization_seqno != get_sender_seqno_readonly(sender_addr)) {
-            // Cancel the transaction due to invalid auth token
-            let deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
-            cancel_internal(sender_addr, txn_key, deposit_amt);
             event::emit(
                 TransactionFailedEvent {
                     scheduled_txn_time: txn_key.time,
                     scheduled_txn_hash: txn_key.txn_id,
                     sender_addr,
                     cancelled_txn_code: CancelledTxnCode::AuthExpired
+                }
+            );
+            return true
+        };
+        false
+    }
+
+    /// Check if transaction has expired and emit failure event if so
+    /// Returns true if transaction was expired and should be cancelled, false if not expired
+    public(friend) fun fail_txn_on_expired(
+        txn: &ScheduledTransaction,
+        txn_key: ScheduleMapKey,
+        block_timestamp_ms: u64
+    ): bool {
+        let sender_addr = txn.sender_addr;
+
+        // Check if this transaction has expired based on its individual expiry_delta
+        let transaction_expiry_time = if (txn.expiry_delta > 0) {
+            txn_key.time + txn.expiry_delta
+        } else {
+            U64_MAX // If expiry_delta is 0, never expire
+        };
+
+        if (block_timestamp_ms > transaction_expiry_time) {
+            // Transaction is expired
+            event::emit(
+                TransactionFailedEvent {
+                    scheduled_txn_time: txn_key.time,
+                    scheduled_txn_hash: txn_key.txn_id,
+                    sender_addr,
+                    cancelled_txn_code: CancelledTxnCode::Expired
                 }
             );
             return true
@@ -1045,70 +1012,6 @@ module aptos_framework::scheduled_txns {
     public(friend) fun remove_txn_from_table(txn_id: u256) acquires ScheduleQueue {
         let queue_mut = borrow_global_mut<ScheduleQueue>(@aptos_framework);
         queue_mut.txn_table.remove(txn_id);
-    }
-
-
-    /// Called by the executor when the scheduled transaction is run
-    fun execute_user_function_wrapper(
-        signer: signer, txn_key: ScheduleMapKey, block_timestamp_ms: u64
-    ): bool acquires AuxiliaryData, ScheduleQueue {
-        let queue = borrow_global<ScheduleQueue>(@aptos_framework);
-
-        if (!queue.schedule_map.contains(&txn_key)) {
-            // It is possible that the scheduled transaction was cancelled before in the same block
-            return false;
-        };
-        let txn = queue.txn_table.borrow(txn_key.txn_id);
-
-        match (txn.f) {
-            ScheduledFunction::V1(f) => {
-                f();
-            },
-            ScheduledFunction::V1WithAuthToken(f) => {
-                let sender_addr = txn.sender_addr;
-                assert!(txn.auth_token.is_some(), error::internal(EAUTH_TOKEN_NOT_FOUND));
-                let auth_token = txn.auth_token.borrow();
-
-                // Check if token is expired or sequence number mismatched
-                if (auth_token.expiration_time <= block_timestamp_ms ||
-                    auth_token.authorization_seqno != get_sender_seqno_readonly(sender_addr)) {
-                    // Cancel the transaction due to invalid auth token
-                    let deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
-                    cancel_internal(sender_addr, txn_key, deposit_amt);
-                    event::emit(
-                        TransactionFailedEvent {
-                            scheduled_txn_time: txn_key.time,
-                            scheduled_txn_hash: txn_key.txn_id,
-                            sender_addr,
-                            cancelled_txn_code: CancelledTxnCode::AuthExpired
-                        }
-                    );
-                    return true
-                };
-
-                let updated_auth_token = if (!auth_token.allow_rescheduling) {
-                    // Set authorization_seqno = 0 to invalidate the token for any use in the user function
-                    ScheduledTxnAuthToken {
-                        allow_rescheduling: auth_token.allow_rescheduling,
-                        expiration_time: auth_token.expiration_time,
-                        authorization_seqno: 0
-                    }
-                } else {
-                    *auth_token
-                };
-
-                f(&signer, updated_auth_token);
-            },
-        };
-
-        // The scheduled transaction is removed from two data structures at different times:
-        // 1. From schedule_map (BigOrderedMap): Removed in next block's prologue to allow parallel execution
-        //    of all scheduled transactions in the current block
-        // 2. From txn_table: Removed immediately after transaction execution in this function to enable
-        //    proper refunding of storage gas fees to the user
-        let queue_mut = borrow_global_mut<ScheduleQueue>(@aptos_framework);
-        queue_mut.txn_table.remove(txn_key.txn_id);
-        true
     }
 
     ////////////////////////// TESTS //////////////////////////
@@ -1340,13 +1243,14 @@ module aptos_framework::scheduled_txns {
         remove_txns(timestamp::now_microseconds() / 1000);
         assert!(get_num_txns() == 1, get_num_txns());
 
-        // try expiring a txn by getting it late
+        // try expiring a txn by getting it late; we should get the txn even if it is expired as expiration happens
+        // in user_func_wrapper::execute_user_function()
         let expired_time = schedule_time2 + EXPIRY_DELTA_DEFAULT + 1000;
         assert!(
-            get_ready_transactions(expired_time).length() == 0,
+            get_ready_transactions(expired_time).length() == 1,
             get_ready_transactions(expired_time).length()
         );
-        assert!(get_num_txns() == 0, get_num_txns());
+        assert!(get_num_txns() == 1, get_num_txns());
 
         start_shutdown(fx);
     }

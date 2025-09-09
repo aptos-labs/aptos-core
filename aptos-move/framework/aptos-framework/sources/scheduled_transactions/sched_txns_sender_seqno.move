@@ -1,4 +1,6 @@
 module aptos_framework::sched_txns_sender_seqno {
+    /// We need this module outside of scheduled_txns to prevent cyclical dependency issues between
+    /// `scheduled_txns module and account module` during `key rotation handling`
     use std::error;
     use aptos_framework::big_ordered_map::{Self, BigOrderedMap};
     use aptos_framework::system_addresses;
