@@ -44,6 +44,7 @@ pub mod new_epoch;
 pub mod offer;
 pub mod opt_in_transfer;
 pub mod opt_in_transfer_event;
+pub mod randomness_event;
 pub mod royalty_mutate;
 pub mod royalty_mutate_event;
 pub mod token_cancel_offer_event;
