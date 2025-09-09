@@ -522,7 +522,7 @@ fn native_contains_box(
                 .map(u64::from)
         })
         .transpose()?;
-    let exists = Value::bool(gv.exists()?);
+    let exists = Value::bool(gv.exists());
 
     drop(table_data);
 
