@@ -944,3 +944,6 @@ futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "ba
 # so we cannot simply change the version and package for `jemalloc-sys` in one repo without running into conflicts.
 # We have to keep this shim until everything uses the same jemalloc dependency.
 jemalloc-sys = { git = "https://github.com/aptos-labs/jemalloc-sys-shim", rev = "e0920246dd74303fab9a14b990768c6ac990a59b" }
+
+# There is a bug in the lru crate, patch it until https://github.com/jeromefroe/lru-rs/pull/219 is merged and released.
+lru = { git = "https://github.com/aptos-labs/lru-rs", rev = "406cd2407b814add9262bbfc91c2ecd307b3f197" }
