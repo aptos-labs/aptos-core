@@ -1568,6 +1568,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "serde",
+ "serde_json",
  "thread_local",
  "tikv-jemallocator",
  "tokio",
