@@ -1,14 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::{state_key::StateKey, state_slot::StateSlot};
+use crate::state_store::state_key::StateKey;
 use aptos_crypto::HashValue;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt::Debug};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Debug,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -32,7 +35,7 @@ impl BlockEpiloguePayload {
         }
     }
 
-    pub fn try_get_slots_to_make_hot(&self) -> Option<&BTreeMap<StateKey, StateSlot>> {
+    pub fn try_get_slots_to_make_hot(&self) -> Option<&BTreeSet<StateKey>> {
         match self {
             Self::V0 { .. } => None,
             Self::V1 { block_end_info, .. } => Some(&block_end_info.to_make_hot),
@@ -105,7 +108,7 @@ impl BlockEndInfo {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TBlockEndInfoExt<Key: Debug + Ord> {
     inner: BlockEndInfo,
-    to_make_hot: BTreeMap<Key, StateSlot>,
+    to_make_hot: BTreeSet<Key>,
 }
 
 pub type BlockEndInfoExt = TBlockEndInfoExt<StateKey>;
@@ -114,11 +117,11 @@ impl<Key: Debug + Ord> TBlockEndInfoExt<Key> {
     pub fn new_empty() -> Self {
         Self {
             inner: BlockEndInfo::new_empty(),
-            to_make_hot: BTreeMap::new(),
+            to_make_hot: BTreeSet::new(),
         }
     }
 
-    pub fn new(inner: BlockEndInfo, to_make_hot: BTreeMap<Key, StateSlot>) -> Self {
+    pub fn new(inner: BlockEndInfo, to_make_hot: BTreeSet<Key>) -> Self {
         Self { inner, to_make_hot }
     }
 
@@ -148,7 +151,7 @@ where
         D: serde::Deserializer<'de>,
     {
         let inner = BlockEndInfo::deserialize(deserializer)?;
-        Ok(Self::new(inner, BTreeMap::new()))
+        Ok(Self::new(inner, BTreeSet::new()))
     }
 }
 
@@ -161,7 +164,7 @@ impl<Key: Debug + Ord> Arbitrary for TBlockEndInfoExt<Key> {
         // TODO(HotState): it's used in db tests (encode/decode), so we need to make sure that
         // serializing the data and then deserializing it reproduces the original value.
         any::<BlockEndInfo>()
-            .prop_map(|inner| Self::new(inner, BTreeMap::new()))
+            .prop_map(|inner| Self::new(inner, BTreeSet::new()))
             .boxed()
     }
 }
