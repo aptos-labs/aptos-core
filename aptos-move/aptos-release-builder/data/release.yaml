@@ -11,4 +11,4 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - Framework:
-          bytecode_version: 6
+          bytecode_version: 7
