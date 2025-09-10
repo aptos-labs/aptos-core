@@ -1,0 +1,118 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/tuple_swap.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct W {
+        inner: u64,
+    }
+    fun swap1(p0: u32, p1: u32): (u32, u32) {
+        (p1, p0)
+    }
+    fun swap10(p0: u64): (u64, u64) {
+        (88, p0)
+    }
+    fun swap11(): (u64, u64) {
+        (83, 53)
+    }
+    fun swap2(p0: u64, p1: u64, p2: u64, p3: u64): (u64, u64, u64, u64) {
+        (p2, p3, p1, p0)
+    }
+    fun swap3(p0: u64, p1: u64): (u64, u64) {
+        (p1, p0)
+    }
+    fun swap4(p0: W, p1: W): (W, W) {
+        (p1, p0)
+    }
+    fun swap5(): (u64, u64) {
+        let _t0 = W{inner: 258};
+        let _t1 = W{inner: 147};
+        let W{inner: _t9} = _t0;
+        let W{inner: _t11} = _t1;
+        (_t9, _t11)
+    }
+    fun swap6(p0: u64, p1: u64): (u64, u64) {
+        let _t6 = p1 + 1;
+        let _t9 = p0 + 1;
+        (_t6, _t9)
+    }
+    fun swap7(p0: u64, p1: u64): (u64, u64) {
+        let _t6 = &p0;
+        let _t9 = *&p1;
+        let _t11 = *_t6;
+        (_t9, _t11)
+    }
+    fun swap8(p0: u64, p1: u64, p2: u64): (u64, u64) {
+        let _t3 = 0;
+        let _t4 = false;
+        loop {
+            if (_t4) _t3 = _t3 + 1 else _t4 = true;
+            if (!(_t3 < p2)) break;
+            let _t5 = p0;
+            p0 = p1;
+            p1 = _t5;
+            continue
+        };
+        (p0, p1)
+    }
+    fun swap9(): (u64, u64) {
+        (23, 51)
+    }
+    public fun test1(): (u32, u32) {
+        let (_t2,_t3) = swap1(1u32, 2u32);
+        (_t2, _t3)
+    }
+    public fun test10(): (u64, u64) {
+        let (_t1,_t2) = swap10(10);
+        (_t1, _t2)
+    }
+    public fun test2(): (u64, u64, u64, u64) {
+        let (_t4,_t5,_t6,_t7) = swap2(10, 20, 30, 40);
+        (_t4, _t5, _t6, _t7)
+    }
+    public fun test3(): (u64, u64) {
+        let (_t2,_t3) = swap3(11, 22);
+        (_t2, _t3)
+    }
+    public fun test4(): (W, W) {
+        let _t1 = W{inner: 111};
+        let _t3 = W{inner: 222};
+        let (_t4,_t5) = swap4(_t1, _t3);
+        (_t4, _t5)
+    }
+    public fun test6(): (u64, u64) {
+        let (_t2,_t3) = swap6(4, 40);
+        (_t2, _t3)
+    }
+    public fun test7(): (u64, u64) {
+        let (_t2,_t3) = swap7(44, 440);
+        (_t2, _t3)
+    }
+    public fun test8(): (u64, u64, u64, u64) {
+        let (_t7,_t8) = swap8(8, 80, 8);
+        let (_t12,_t13) = swap8(8, 80, 9);
+        (_t7, _t8, _t12, _t13)
+    }
+}
+
+
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::test2
+
+//# run 0xc0ffee::m::test3
+
+//# run 0xc0ffee::m::test4
+
+//# run 0xc0ffee::m::swap5
+
+//# run 0xc0ffee::m::test6
+
+//# run 0xc0ffee::m::test7
+
+//# run 0xc0ffee::m::test8
+
+//# run 0xc0ffee::m::swap9
+
+//# run 0xc0ffee::m::test10
+
+//# run 0xc0ffee::m::swap11

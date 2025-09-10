@@ -47,7 +47,7 @@ pub enum WriteOpKind {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename = "WriteOp")]
-enum PersistedWriteOp {
+pub enum PersistedWriteOp {
     Creation(Bytes),
     Modification(Bytes),
     Deletion,
@@ -134,7 +134,7 @@ impl BaseStateOp {
 pub struct WriteOp(BaseStateOp);
 
 impl WriteOp {
-    fn to_persistable(&self) -> PersistedWriteOp {
+    pub fn to_persistable(&self) -> PersistedWriteOp {
         use PersistedWriteOp::*;
 
         let metadata = self.metadata().clone().into_persistable();

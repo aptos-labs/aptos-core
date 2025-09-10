@@ -1,0 +1,159 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/bug_16954.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun call(p0: ||(u64)): u64 {
+        p0()
+    }
+    public fun test1(): u8 {
+        let _t0 = |arg0| lambda__3__test1(1u8, arg0);
+        _t0(7u8)
+    }
+    fun lambda__3__test1(p0: u8, p1: u8): u8 {
+        p0 = p0 + p1;
+        let _t2 = |arg0| lambda__1__test1(p0, arg0);
+        let _t10 = _t2(3u8);
+        _t2 = |arg0| lambda__2__test1(p0, arg0);
+        let _t15 = _t2(4u8);
+        _t10 * _t15
+    }
+    public fun test10(): u8 {
+        let _t0 = |arg0| lambda__1__test10(2u8, arg0);
+        _t0(3u8) + 0u8
+    }
+    fun lambda__1__test10(p0: u8, p1: u8): u8 {
+        p1 + p0
+    }
+    public fun test11(): u64 {
+        let _t3 = call(|| lambda__1__test11(1));
+        let _t4 = 1 + _t3;
+        let _t7 = call(|| lambda__2__test11(1));
+        _t4 + _t7
+    }
+    fun lambda__1__test11(p0: u64): u64 {
+        p0 + 2
+    }
+    fun lambda__2__test11(p0: u64): u64 {
+        p0 - 1
+    }
+    public fun test2(): u64 {
+        let _t1: ||(||(u64)) has copy + drop = || lambda__2__test2(1);
+        let _t2 = _t1();
+        _t2()
+    }
+    fun lambda__2__test2(p0: u64): ||(u64) {
+        || lambda__1__test2(p0)
+    }
+    public fun test3(): u64 {
+        let _t0 = |arg0| lambda__2__test3(arg0);
+        _t0(1)
+    }
+    fun lambda__2__test3(p0: u64): u64 {
+        let _t3 = p0 + 1;
+        let _t4: |u64|u64 has copy + drop = |arg0| lambda__1__test3(arg0);
+        _t4(_t3)
+    }
+    public fun test4(p0: u64): u64 {
+        let _t2: ||(||(u64)) has copy + drop = || lambda__2__test4(p0);
+        let _t3 = _t2();
+        _t3()
+    }
+    fun lambda__2__test4(p0: u64): ||(u64) {
+        || lambda__1__test4(p0)
+    }
+    public fun test5(): u8 {
+        let _t0 = |arg0| lambda__2__test5(arg0);
+        _t0(7u8) + 2u8
+    }
+    fun lambda__2__test5(p0: u8): u8 {
+        let _t2: ||u8 has copy + drop = || lambda__1__test5(p0);
+        _t2()
+    }
+    public fun test6(): u64 {
+        let _t0 = |arg0| lambda__2__test6(arg0);
+        _t0(10) + 5
+    }
+    fun lambda__2__test6(p0: u64): u64 {
+        let _t3 = p0 + 1;
+        let _t4: ||u64 has copy + drop = || lambda__1__test6(_t3);
+        _t4()
+    }
+    public fun test7(): u8 {
+        let _t0 = |arg0| lambda__2__test7(arg0);
+        _t0(3u8)
+    }
+    fun lambda__2__test7(p0: u8): u8 {
+        let _t4 = p0 + 2u8;
+        let _t1 = |arg0| lambda__1__test7(_t4, arg0);
+        _t1(4u8)
+    }
+    public fun test8(): u64 {
+        let _t0: ||u64 has copy + drop = || lambda__2__test8();
+        _t0() + 1
+    }
+    fun lambda__2__test8(): u64 {
+        let _t0: ||u64 has copy + drop = || lambda__1__test8();
+        _t0() + 2
+    }
+    public fun test9(): u8 {
+        let _t0 = |arg0| lambda__2__test9(arg0);
+        _t0(4u8) + 0u8
+    }
+    fun lambda__2__test9(p0: u8): u8 {
+        let _t1 = |arg0| lambda__1__test9(arg0);
+        _t1(p0)
+    }
+    fun lambda__1__test1(p0: u8, p1: u8): u8 {
+        p1 + p0
+    }
+    fun lambda__2__test1(p0: u8, p1: u8): u8 {
+        p0 - p1
+    }
+    fun lambda__1__test2(p0: u64): u64 {
+        p0
+    }
+    fun lambda__1__test3(p0: u64): u64 {
+        p0 - 1
+    }
+    fun lambda__1__test4(p0: u64): u64 {
+        p0 + 1
+    }
+    fun lambda__1__test5(p0: u8): u8 {
+        p0 + 1u8
+    }
+    fun lambda__1__test6(p0: u64): u64 {
+        p0 + 1
+    }
+    fun lambda__1__test7(p0: u8, p1: u8): u8 {
+        p0 + p1
+    }
+    fun lambda__1__test8(): u64 {
+        3
+    }
+    fun lambda__1__test9(p0: u8): u8 {
+        p0
+    }
+}
+
+
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::test2
+
+//# run 0xc0ffee::m::test3
+
+//# run 0xc0ffee::m::test4 --args 42
+
+//# run 0xc0ffee::m::test5
+
+//# run 0xc0ffee::m::test6
+
+//# run 0xc0ffee::m::test7
+
+//# run 0xc0ffee::m::test8
+
+//# run 0xc0ffee::m::test9
+
+//# run 0xc0ffee::m::test10
+
+//# run 0xc0ffee::m::test11

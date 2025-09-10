@@ -11,7 +11,7 @@ use aptos_types::{
     error::PanicError,
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
-    transaction::BlockExecutableTransaction as Transaction,
+    transaction::{AuxiliaryInfoTrait, BlockExecutableTransaction as Transaction},
     write_set::WriteOp,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -60,6 +60,9 @@ pub trait ExecutorTask {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
+    /// Type of auxiliary info.
+    type AuxiliaryInfo: AuxiliaryInfoTrait;
+
     /// The output of a transaction. This should contain the side effect of this transaction.
     type Output: TransactionOutput<Txn = Self::Txn> + 'static;
 
@@ -87,104 +90,104 @@ pub trait ExecutorTask {
         > + AptosCodeStorage
               + BlockSynchronizationKillSwitch),
         txn: &Self::Txn,
+        auxiliary_info: &Self::AuxiliaryInfo,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 
     fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;
 }
 
-/// Trait for execution result of a single transaction.
-pub trait TransactionOutput: Send + Sync + Debug {
-    /// Type of transaction and its associated key and value.
-    type Txn: Transaction;
+/// Traits for execution result of a single transaction.
+pub trait BeforeMaterializationOutput<Txn: Transaction> {
+    /// Get the writes of a transaction from its output, separately for resources,
+    /// modules and aggregator_v1.
+    fn resource_write_set(&self) -> Vec<(Txn::Key, Arc<Txn::Value>, Option<Arc<MoveTypeLayout>>)>;
 
-    /// Get the writes of a transaction from its output, separately for resources, modules and
-    /// aggregator_v1.
-    fn resource_write_set(
-        &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        Arc<<Self::Txn as Transaction>::Value>,
-        Option<Arc<MoveTypeLayout>>,
-    )>;
+    fn module_write_set(&self) -> &BTreeMap<Txn::Key, ModuleWrite<Txn::Value>>;
 
-    fn module_write_set(&self) -> Vec<ModuleWrite<<Self::Txn as Transaction>::Value>>;
-
-    fn aggregator_v1_write_set(
-        &self,
-    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    fn aggregator_v1_write_set(&self) -> BTreeMap<Txn::Key, Txn::Value>;
 
     /// Get the aggregator V1 deltas of a transaction from its output.
-    fn aggregator_v1_delta_set(&self) -> BTreeMap<<Self::Txn as Transaction>::Key, DeltaOp>;
+    fn aggregator_v1_delta_set(&self) -> BTreeMap<Txn::Key, DeltaOp>;
 
     /// Get the delayed field changes of a transaction from its output.
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>;
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        StateValueMetadata,
-        Arc<MoveTypeLayout>,
-    )>;
+    ) -> Vec<(Txn::Key, StateValueMetadata, Arc<MoveTypeLayout>)>;
 
-    fn group_reads_needing_delayed_field_exchange(
-        &self,
-    ) -> Vec<(<Self::Txn as Transaction>::Key, StateValueMetadata)>;
+    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(Txn::Key, StateValueMetadata)>;
 
     /// Get the events of a transaction from its output.
-    fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;
+    fn get_events(&self) -> Vec<(Txn::Event, Option<MoveTypeLayout>)>;
 
     fn resource_group_write_set(
         &self,
     ) -> HashMap<
-        <Self::Txn as Transaction>::Key,
+        Txn::Key,
         (
-            <Self::Txn as Transaction>::Value,
+            Txn::Value,
             ResourceGroupSize,
-            BTreeMap<
-                <Self::Txn as Transaction>::Tag,
-                (
-                    <Self::Txn as Transaction>::Value,
-                    Option<Arc<MoveTypeLayout>>,
-                ),
-            >,
+            BTreeMap<Txn::Tag, (Txn::Value, Option<Arc<MoveTypeLayout>>)>,
         ),
     >;
 
-    fn for_each_resource_group_key_and_tags<F>(&self, callback: F) -> Result<(), PanicError>
-    where
-        F: FnMut(
-            &<Self::Txn as Transaction>::Key,
-            HashSet<&<Self::Txn as Transaction>::Tag>,
-        ) -> Result<(), PanicError>;
+    fn for_each_resource_group_key_and_tags(
+        &self,
+        // This is &mut dyn and not Impl to sidestep an internal compiler error:
+        // https://github.com/rust-lang/rust/issues/145188.
+        callback: &mut dyn FnMut(&Txn::Key, HashSet<&Txn::Tag>) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError>;
 
     // For now, the below interfaces for keys and metada and keys and tags are provided
     // to avoid unnecessarily cloning the whole resource group write set.
     // TODO: get rid of these interfaces when we can have zero-copy access to the output.
-    fn resource_group_metadata_ops(
-        &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::Value,
-    )> {
+    fn resource_group_metadata_ops(&self) -> Vec<(Txn::Key, Txn::Value)> {
         self.resource_group_write_set()
             .into_iter()
             .map(|(key, (op, _, _))| (key, op))
             .collect()
     }
 
-    fn resource_group_tags(
-        &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        HashSet<<Self::Txn as Transaction>::Tag>,
-    )> {
+    fn legacy_v1_resource_group_tags(&self) -> Vec<(Txn::Key, HashSet<Txn::Tag>)> {
         self.resource_group_write_set()
             .into_iter()
             .map(|(key, (_, _, group_ops))| (key, group_ops.keys().cloned().collect()))
             .collect()
     }
+
+    /// Return the fee statement of the transaction.
+    fn fee_statement(&self) -> FeeStatement;
+
+    fn has_new_epoch_event(&self) -> bool;
+
+    /// Deterministic, but approximate size of the output, as
+    /// before creating actual TransactionOutput, we don't know the exact size of it.
+    ///
+    /// Sum of all sizes of writes (keys + write_ops) and events.
+    fn output_approx_size(&self) -> u64;
+
+    fn get_write_summary(&self) -> HashSet<InputOutputKey<Txn::Key, Txn::Tag>>;
+}
+
+pub trait AfterMaterializationOutput<Txn: Transaction> {
+    /// Return the fee statement of the transaction.
+    fn fee_statement(&self) -> FeeStatement;
+
+    /// Returns true iff it has a new epoch event.
+    fn has_new_epoch_event(&self) -> bool;
+}
+
+pub trait TransactionOutput: Send + Sync + Debug {
+    /// Type of transaction and its associated key and value.
+    type Txn: Transaction;
+    type BeforeMaterializationGuard<'a>: BeforeMaterializationOutput<Self::Txn> + 'a
+    where
+        Self: 'a;
+    type AfterMaterializationGuard<'a>: AfterMaterializationOutput<Self::Txn> + 'a
+    where
+        Self: 'a;
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
@@ -192,11 +195,34 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Execution output for transactions that should be discarded.
     fn discard_output(discard_code: StatusCode) -> Self;
 
-    // !!![CAUTION]!!! This method should never be used in parallel execution.
-    fn legacy_sequential_materialize_agg_v1(
-        &self,
-        view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
-    );
+    // Materialization transforms the stored txn output, and may require the
+    // TransactionOutput implementation to have different processing for
+    // extracting data from the output. Hence, it is important to make the
+    // caller aware via the guard types and the chaining pattern in order to
+    // ensure the appropriate methods are called.
+    fn before_materialization<'a>(
+        &'a self,
+    ) -> Result<Self::BeforeMaterializationGuard<'a>, PanicError>;
+    fn after_materialization<'a>(
+        &'a self,
+    ) -> Result<Self::AfterMaterializationGuard<'a>, PanicError>;
+
+    /// Returns true iff the transaction status is Keep(Success).
+    fn is_materialized_and_success(&self) -> bool;
+    /// The purpose of this method is to return true if the output has been materialized
+    /// (i.e. incorporate_materialized_txn_output has been called), or false otherwise.
+    /// The method can also assert any invariants provided by the trait implementation
+    /// and the caller. For instance, in the current block executor implementation,
+    /// final output placeholders are initialized via skip_output method and not modified
+    /// until materialization - so if the output is not materialized, it must be a placeholder.
+    ///
+    /// Must be called after concurrent block execution is complete, including materializing
+    /// all required outputs (currently used to check invariants for block epilogue txn).
+    fn check_materialization(&self) -> Result<bool, PanicError>;
+
+    // Below methods perform various types of materialization. These may modify
+    // the stored output representation and hence must be carefully implemented
+    // to avoid data races with the accessor methods.
 
     /// Will be called once per transaction when the output is ready to be committed.
     /// Ensures that any writes corresponding to materialized deltas and group updates
@@ -215,25 +241,9 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn set_txn_output_for_non_dynamic_change_set(&self);
 
-    /// Return the fee statement of the transaction.
-    fn fee_statement(&self) -> FeeStatement;
-
-    /// Returns true iff the TransactionsStatus is Retry.
-    fn is_retry(&self) -> bool;
-
-    /// Returns true iff it has a new epoch event.
-    fn has_new_epoch_event(&self) -> bool;
-
-    /// Returns true iff the execution status is Keep(Success).
-    fn is_success(&self) -> bool;
-
-    /// Deterministic, but approximate size of the output, as
-    /// before creating actual TransactionOutput, we don't know the exact size of it.
-    ///
-    /// Sum of all sizes of writes (keys + write_ops) and events.
-    fn output_approx_size(&self) -> u64;
-
-    fn get_write_summary(
+    // !!![CAUTION]!!! These methods should never be used in parallel execution.
+    fn legacy_sequential_materialize_agg_v1(
         &self,
-    ) -> HashSet<InputOutputKey<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Tag>>;
+        view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
+    );
 }

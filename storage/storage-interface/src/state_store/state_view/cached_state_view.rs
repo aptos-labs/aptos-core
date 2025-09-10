@@ -15,12 +15,12 @@ use crate::{
     DbReader,
 };
 use anyhow::Result;
-use aptos_metrics_core::{IntCounterHelper, TimerHelper};
+use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_types::{
     state_store::{
         hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
-        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewId,
-        StateViewResult, TStateView, NUM_STATE_SHARDS,
+        state_storage_usage::StateStorageUsage, StateViewId, StateViewResult, TStateView,
+        NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
@@ -172,10 +172,10 @@ impl CachedStateView {
         let _timer = TIMER.timer_with(&["prime_state_cache"]);
 
         IO_POOL.install(|| {
-            if let Some(updates) = &updates.for_last_checkpoint {
+            if let Some(updates) = updates.for_last_checkpoint_batched() {
                 self.prime_cache_for_batched_updates(updates)?;
             }
-            if let Some(updates) = &updates.for_latest {
+            if let Some(updates) = updates.for_latest_batched() {
                 self.prime_cache_for_batched_updates(updates)?;
             }
             Ok(())
@@ -259,7 +259,7 @@ impl TStateView for CachedStateView {
     }
 
     fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateSlot> {
-        let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
+        let _timer = TIMER.timer_with(&["get_state_value"]);
         COUNTER.inc_with(&["sv_total_get"]);
 
         // First check if requested key is already memorized.
@@ -330,7 +330,7 @@ impl TStateView for CachedStateView {
 
 pub struct CachedDbStateView {
     db_state_view: DbStateView,
-    state_cache: RwLock<HashMap<StateKey, Option<StateValue>>>,
+    state_cache: RwLock<HashMap<StateKey, StateSlot>>,
 }
 
 impl From<DbStateView> for CachedDbStateView {
@@ -349,18 +349,16 @@ impl TStateView for CachedDbStateView {
         self.db_state_view.id()
     }
 
-    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
+    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
         // First check if the cache has the state value.
         if let Some(val_opt) = self.state_cache.read().get(state_key) {
             // This can return None, which means the value has been deleted from the DB.
             return Ok(val_opt.clone());
         }
-        let state_value_option = self.db_state_view.get_state_value(state_key)?;
+        let state_slot = self.db_state_view.get_state_slot(state_key)?;
         // Update the cache if still empty
         let mut cache = self.state_cache.write();
-        let new_value = cache
-            .entry(state_key.clone())
-            .or_insert_with(|| state_value_option);
+        let new_value = cache.entry(state_key.clone()).or_insert_with(|| state_slot);
         Ok(new_value.clone())
     }
 

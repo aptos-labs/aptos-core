@@ -18,7 +18,6 @@ use crate::{
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext},
 };
 use itertools::Itertools;
-use move_binary_format::access::ModuleAccess;
 use move_core_types::ability::AbilitySet;
 use std::collections::{BTreeMap, BTreeSet};
 //
@@ -68,47 +67,27 @@ impl<'a> Sourcifier<'a> {
         }
         self.writer.indent();
 
-        // If the compiled module is attached, get `use` and `friend` declarations from it.
-        // Why: some modules may not have been loaded into the `GlobalEnv` yet, so information in
-        // `ModuleEnv` may be incomplete.
-        if let Some(module) = &module_env.data.compiled_module {
-            for use_ in module.immediate_dependencies() {
-                emitln!(
-                    self.writer,
-                    "use 0x{}::{};",
-                    use_.address().short_str_lossless(),
-                    use_.name()
-                )
-            }
-            for friend in &module.friend_decls {
-                let friend_id = module.module_id_for_handle(friend);
-                emitln!(
-                    self.writer,
-                    "friend 0x{}::{};",
-                    friend_id.address().short_str_lossless(),
-                    friend_id.name()
-                )
-            }
-        } else {
-            for use_ in module_env.get_used_modules(false) {
-                emitln!(
-                    self.writer,
-                    "use {};",
-                    self.env().get_module(use_).get_full_name_str()
-                )
-            }
-            for friend in module_env.get_friend_modules() {
-                emitln!(
-                    self.writer,
-                    "friend {};",
-                    self.env().get_module(friend).get_full_name_str()
-                )
-            }
+        for use_ in module_env.get_use_decls() {
+            emitln!(
+                self.writer,
+                "use {}{};",
+                use_.module_name.display_full(self.env()).to_string(),
+                use_.alias
+                    .map(|alias| format!(" as {}", alias.display(self.env().symbol_pool())))
+                    .unwrap_or_default()
+            )
+        }
+        for friend_ in module_env.get_friend_decls() {
+            emitln!(
+                self.writer,
+                "friend {};",
+                friend_.module_name.display_full(self.env()).to_string()
+            )
         }
 
         if module_env.get_struct_count() > 0 {
             for struct_env in module_env.get_structs() {
-                self.print_struct(struct_env.get_qualified_id())
+                self.print_struct(struct_env.get_qualified_id());
             }
         }
         if module_env.get_function_count() > 0 {
@@ -181,7 +160,7 @@ impl<'a> Sourcifier<'a> {
         if let Some(def) = def {
             // A sequence or block is already automatically printed in braces with indent
             let requires_braces = !Self::is_braced(def);
-            let exp_sourcifier = ExpSourcifier::for_fun(self, &fun_env, def, self.amend);
+            let exp_sourcifier = ExpSourcifier::for_fun(self, &fun_env, tctx, def, self.amend);
             if requires_braces {
                 self.print_block(|| {
                     if !def.is_unit_exp() {
@@ -526,17 +505,22 @@ impl<'a> Sourcifier<'a> {
 
     fn module_qualifier(&self, tctx: &TypeDisplayContext, mid: ModuleId) -> String {
         let module_env = self.env().get_module(mid);
-        if tctx.module_name.as_ref() == Some(module_env.get_name()) {
+        let module_name = module_env.get_name();
+        if tctx.is_current_module(module_name) {
             // Current module, no qualification needed
             "".to_string()
         } else {
             format!(
                 "{}::",
-                if tctx.used_modules.contains(&mid) {
-                    self.sym(module_env.get_name().name())
-                } else {
-                    module_env.get_full_name_str()
-                }
+                tctx.get_alias(module_name)
+                    .map(|sym| self.sym(sym))
+                    .unwrap_or_else(|| {
+                        if tctx.used_modules.contains(&mid) {
+                            self.sym(module_env.get_name().name())
+                        } else {
+                            module_env.get_full_name_str()
+                        }
+                    })
             )
         }
     }
@@ -614,14 +598,14 @@ impl<'a> ExpSourcifier<'a> {
     pub fn for_fun(
         parent: &'a Sourcifier<'a>,
         fun_env: &'a FunctionEnv,
+        tctx: TypeDisplayContext<'a>,
         exp: &Exp,
         amend: bool,
     ) -> Self {
-        let type_display_context = fun_env.get_type_display_ctx();
         let temp_names = (0..fun_env.get_parameter_count())
             .map(|i| (i, fun_env.get_local_name(i)))
             .collect();
-        Self::new(parent, type_display_context, temp_names, exp, amend)
+        Self::new(parent, tctx, temp_names, exp, amend)
     }
 
     fn new(
@@ -690,7 +674,7 @@ impl<'a> ExpSourcifier<'a> {
                         emit!(self.wr(), "{} ", capture_kind);
                     };
                     emit!(self.wr(), "|");
-                    self.print_pat(pat, true);
+                    self.print_pat(pat, true, false);
                     emit!(self.wr(), "| ");
                     self.print_exp(Prio::General, true, body);
                     if let Some(spec) = spec_opt {
@@ -735,7 +719,7 @@ impl<'a> ExpSourcifier<'a> {
                                     }
                                     LetOrStm::Let(pat, binding) => {
                                         emit!(self.wr(), "let ");
-                                        self.print_pat(pat, false);
+                                        self.print_pat(pat, false, !binding.as_ref().is_some_and(|exp| matches!(exp.as_ref(), ExpData::Call(_, Operation::Closure(..), _))));
                                         if let Some(exp) = binding {
                                             emit!(self.wr(), " = ");
                                             self.print_exp(Prio::General, matches!(exp.as_ref(), Block(..) | Sequence(..)), exp);
@@ -781,7 +765,7 @@ impl<'a> ExpSourcifier<'a> {
                 emitln!(self.wr(), ") {");
                 self.wr().indent();
                 for arm in arms {
-                    self.print_pat(&arm.pattern, false);
+                    self.print_pat(&arm.pattern, false, true);
                     if let Some(exp) = &arm.condition {
                         emit!(self.wr(), " if ");
                         self.print_exp(Prio::General, false, exp);
@@ -893,7 +877,7 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_exp(Prio::General, false, val)
             }),
             Assign(_, pat, val) => self.parenthesize(context_prio, Prio::General, || {
-                self.print_pat(pat, false);
+                self.print_pat(pat, false, true);
                 emit!(self.wr(), " = ");
                 self.print_exp(
                     Prio::General,
@@ -991,12 +975,14 @@ impl<'a> ExpSourcifier<'a> {
                         emit!(self.wr(), "<<inconsistent closure mask>>");
                         return;
                     };
-                    let call_exp = ExpData::Call(
-                        self.env().new_node(loc.clone(), res_ty.as_ref().clone()),
-                        Operation::MoveFunction(*mid, *fid),
-                        all_args,
-                    )
-                    .into_exp();
+                    let new_node_id = self.env().new_node(loc.clone(), res_ty.as_ref().clone());
+                    let call_exp =
+                        ExpData::Call(new_node_id, Operation::MoveFunction(*mid, *fid), all_args)
+                            .into_exp();
+                    // Need to migrate the type instantiations to move function call.
+                    if let Some(inst) = self.env().get_node_instantiation_opt(id) {
+                        self.env().set_node_instantiation(new_node_id, inst);
+                    }
                     let lambda_pat = if lambda_params.len() != 1 {
                         Pattern::Tuple(
                             self.env()
@@ -1254,7 +1240,7 @@ impl<'a> ExpSourcifier<'a> {
         };
         self.parent.print_list(
             open,
-            ",",
+            ", ",
             close,
             struct_env
                 .get_fields_optional_variant(*variant)
@@ -1308,14 +1294,14 @@ impl<'a> ExpSourcifier<'a> {
         }
     }
 
-    fn print_pat(&self, pat: &Pattern, no_parenthesize: bool) {
+    fn print_pat(&self, pat: &Pattern, no_parenthesize: bool, no_type: bool) {
         match pat {
             Pattern::Var(node_id, name) => {
                 emit!(self.wr(), "{}", self.sym(*name));
                 let ty = self.env().get_node_type(*node_id);
                 if let Type::Fun(_, _, ability) = ty {
-                    if !ability.is_empty() {
-                        emit!(self.wr(), " : {}", self.ty(&ty));
+                    if !ability.is_empty() && !no_type {
+                        emit!(self.wr(), ": {}", self.ty(&ty));
                     }
                 }
             },
@@ -1328,12 +1314,12 @@ impl<'a> ExpSourcifier<'a> {
                     ("", "")
                 };
                 self.parent.print_list(start, ",", end, elems.iter(), |p| {
-                    self.print_pat(p, no_parenthesize)
+                    self.print_pat(p, no_parenthesize, no_type)
                 })
             },
             Pattern::Struct(_, qid, variant, elems) => {
                 self.print_constructor(qid, variant, elems.iter(), |p| {
-                    self.print_pat(p, no_parenthesize)
+                    self.print_pat(p, no_parenthesize, no_type)
                 })
             },
             Pattern::Error(_) => emit!(self.wr(), "*error*"),

@@ -1,0 +1,61 @@
+//**** Cross-compiled for `move` syntax from `tests/operator_eval/op_with_side_effect_32.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun add3(p0: u64, p1: u64, p2: u64): u64 {
+        p0 + p1 + p2
+    }
+    fun inc(p0: &mut u64): u64 {
+        *p0 = *p0 + 1;
+        *p0
+    }
+    fun inc_by(p0: &mut u64, p1: u64): u64 {
+        *p0 = *p0 + p1;
+        *p0
+    }
+    public fun test1(): u64 {
+        let _t0 = 1;
+        let _t2 = _t0;
+        let _t3 = _t0;
+        _t0 = inc(&mut _t0);
+        let _t6 = _t0;
+        _t0 = _t0 + 1;
+        let _t10 = _t0;
+        _t0 = _t0 + 1;
+        let _t15 = add3(_t6, _t10, _t0);
+        _t0 = inc(&mut _t0) + 1;
+        let _t20 = _t0;
+        let _t21 = _t0;
+        _t0 = _t0 + 1;
+        let _t26 = add3(_t20, _t21, _t0);
+        let _t27 = add3(_t3, _t15, _t26);
+        let _t28 = _t2 + _t27;
+        let _t32 = inc(&mut _t0) + 1;
+        _t28 + _t32
+    }
+    public fun test2(): u64 {
+        let _t0 = 1;
+        let _t2 = _t0;
+        let _t3 = _t0;
+        _t0 = inc_by(&mut _t0, 3);
+        let _t7 = _t0;
+        _t0 = _t0 + 1;
+        let _t11 = _t0;
+        _t0 = _t0 + 1;
+        let _t16 = add3(_t7, _t11, _t0);
+        _t0 = inc(&mut _t0) + 1;
+        let _t21 = _t0;
+        let _t22 = _t0;
+        _t0 = _t0 + 1;
+        let _t27 = add3(_t21, _t22, _t0);
+        let _t28 = add3(_t3, _t16, _t27);
+        let _t29 = _t2 + _t28;
+        let _t34 = inc_by(&mut _t0, 47) + 1;
+        _t29 + _t34
+    }
+}
+
+
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::test2

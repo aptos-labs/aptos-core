@@ -1,0 +1,23 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/borrowed_from_one_path.move`
+
+//# publish
+module 0x42::m {
+    struct R has key {
+        data: vector<u64>,
+    }
+    fun f(p0: u8, p1: &vector<u64>): u64
+        acquires R
+    {
+        let _t2;
+        if (p0 == 0u8) _t2 = &borrow_global<R>(@0x1).data else _t2 = p1;
+        *0x1::vector::borrow<u64>(_t2, 0)
+    }
+    fun g(p0: u8, p1: &mut vector<u64>)
+        acquires R
+    {
+        let _t2;
+        if (p0 == 0u8) _t2 = &mut borrow_global_mut<R>(@0x1).data else _t2 = p1;
+        let _t13 = 0x1::vector::borrow_mut<u64>(_t2, 0);
+        *_t13 = 1;
+    }
+}

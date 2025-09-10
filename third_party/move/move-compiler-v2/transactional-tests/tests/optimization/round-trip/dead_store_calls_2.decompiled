@@ -1,0 +1,18 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/dead_store_calls_2.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun four(): u64 {
+        4
+    }
+    fun ten(): u64 {
+        10
+    }
+    public fun test(): u64 {
+        let _t0 = four();
+        ten()
+    }
+}
+
+
+//# run 0xc0ffee::m::test

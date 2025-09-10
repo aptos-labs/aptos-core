@@ -100,7 +100,7 @@ module 0x8675309::M {
         let (x,y);
     }
     fun t2() {
-        let S{f: f,g: g};
+        let S{f: f, g: g};
     }
     fun two_unused(x: u64, y: bool) {
     }

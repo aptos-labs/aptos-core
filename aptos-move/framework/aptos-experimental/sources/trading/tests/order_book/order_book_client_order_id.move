@@ -4,7 +4,7 @@ module aptos_experimental::order_book_client_order_id {
     use std::signer;
     use aptos_experimental::order_book_types::new_order_id_type;
     use aptos_experimental::order_book_types::good_till_cancelled;
-    use aptos_experimental::order_book::{new_order_request, destroy_order_book, set_up_test_with_id};
+    use aptos_experimental::order_book::{new_single_order_request, destroy_order_book, set_up_test_with_id};
 
     #[test(user1 = @0x456)]
     public fun test_try_cancel_order_with_client_order_id_success(
@@ -18,7 +18,7 @@ module aptos_experimental::order_book_client_order_id {
 
         // Create an order request with client order ID
         let order_req =
-            new_order_request(
+            new_single_order_request(
                 user1_addr,
                 order_id,
                 option::some(client_order_id),
@@ -59,7 +59,7 @@ module aptos_experimental::order_book_client_order_id {
         let cancel_result =
             order_book.try_cancel_order_with_client_order_id(user1_addr, nonexistent_client_order_id);
         assert!(cancel_result.is_none());
-        destroy_order_book(order_book);
+        order_book.destroy_order_book();
     }
 
     #[test(user1 = @0x456, user2 = @0x789)]
@@ -75,7 +75,7 @@ module aptos_experimental::order_book_client_order_id {
 
         // Create an order request with client order ID for user1
         let order_req =
-            new_order_request(
+            new_single_order_request(
                 user1_addr,
                 order_id,
                 option::some(client_order_id),
@@ -117,7 +117,7 @@ module aptos_experimental::order_book_client_order_id {
 
         // Create and place first order
         let order_req_1 =
-            new_order_request(
+            new_single_order_request(
                 user1_addr,
                 order_id_1,
                 option::some(client_order_id_1),
@@ -133,7 +133,7 @@ module aptos_experimental::order_book_client_order_id {
 
         // Create and place second order
         let order_req_2 =
-            new_order_request(
+            new_single_order_request(
                 user1_addr,
                 order_id_2,
                 option::some(client_order_id_2),
@@ -149,7 +149,7 @@ module aptos_experimental::order_book_client_order_id {
 
         // Create and place third order
         let order_req_3 =
-            new_order_request(
+            new_single_order_request(
                 user1_addr,
                 order_id_3,
                 option::some(client_order_id_3),
@@ -202,7 +202,7 @@ module aptos_experimental::order_book_client_order_id {
 
         // Create an order request WITHOUT client order ID
         let order_req =
-            new_order_request(
+            new_single_order_request(
                 user1_addr,
                 order_id,
                 option::none(), // No client order ID
@@ -238,7 +238,7 @@ module aptos_experimental::order_book_client_order_id {
         // Create maker order (bid) with client order ID
         let maker_order_id = new_order_id_type(1);
         let maker_order_req =
-            new_order_request(
+            new_single_order_request(
                 user1_addr,
                 maker_order_id,
                 option::some(client_order_id),
@@ -260,7 +260,7 @@ module aptos_experimental::order_book_client_order_id {
         // Re-add the order for matching test
         let maker_order_id2 = new_order_id_type(2);
         let maker_order_req2 =
-            new_order_request(
+            new_single_order_request(
                 user1_addr,
                 maker_order_id2,
                 option::some(client_order_id),
@@ -306,7 +306,7 @@ module aptos_experimental::order_book_client_order_id {
         // Create maker order (bid) with client order ID - larger size
         let maker_order_id = new_order_id_type(1);
         let maker_order_req =
-            new_order_request(
+            new_single_order_request(
                 user1_addr,
                 maker_order_id,
                 option::some(client_order_id),
@@ -375,7 +375,7 @@ module aptos_experimental::order_book_client_order_id {
 
             // Create and place order
             let order_req =
-                new_order_request(
+                new_single_order_request(
                     user1_addr,
                     order_id,
                     option::some(client_order_id),
@@ -411,7 +411,7 @@ module aptos_experimental::order_book_client_order_id {
         // Create large maker order (bid) with client order ID
         let maker_order_id = new_order_id_type(1);
         let maker_order_req =
-            new_order_request(
+            new_single_order_request(
                 user1_addr,
                 maker_order_id,
                 option::some(client_order_id),
@@ -464,7 +464,7 @@ module aptos_experimental::order_book_client_order_id {
             let order_id = order_ids[i];
 
             let order_req =
-                new_order_request(
+                new_single_order_request(
                     user1_addr,
                     order_id,
                     option::some(client_order_id),

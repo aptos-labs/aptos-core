@@ -5,7 +5,7 @@ set -e
 
 # Check if the required arguments are provided
 if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 <FIRESTORE_EMULATOR_HOST> <GOOGLE_APPLICATION_CREDENTIALS> <PROJECT_ID>"
+    echo "Usage: $0 <FIRESTORE_EMULATOR_HOST> <GOOGLE_APPLICATION_CREDENTIALS> <GOOGLE_PROJECT_ID>"
     exit 1
 fi
 

@@ -129,14 +129,14 @@ module 0x99::enum_simple {
             let Shape::Circle{radius: _t8} = self;
             _t2 = true
         } else if (_t1 is Rectangle) {
-            let Shape::Rectangle{width: _t14,height: _t15} = self;
+            let Shape::Rectangle{width: _t14, height: _t15} = self;
             _t2 = false
         } else abort 14566554180833181697;
         _t2
     }
     fun example_destroy_shapes() {
         let _t2 = Shape::Circle{radius: 0};
-        let _t0 = Shape::Rectangle{width: 0,height: 0};
+        let _t0 = Shape::Rectangle{width: 0, height: 0};
         let _t6 = destroy_empty(_t2);
         let _t8 = destroy_empty(_t0);
     }

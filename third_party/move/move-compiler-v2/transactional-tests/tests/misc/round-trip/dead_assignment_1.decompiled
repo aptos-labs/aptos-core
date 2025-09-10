@@ -1,0 +1,14 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/dead_assignment_1.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun foo(p0: u64): u64 {
+        p0
+    }
+    public fun test() {
+        if (!(foo(2) == 2)) abort 42;
+    }
+}
+
+
+//# run 0xc0ffee::m::test

@@ -1,0 +1,42 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/reentrancy_module_lock.move`
+
+//# publish
+module 0x42::callee {
+    public fun call_me<T0>(p0: &mut T0, p1: |&mut T0|) {
+        p1(p0);
+    }
+}
+
+
+//# publish
+module 0x42::caller {
+    use 0x42::callee;
+    struct R has copy, drop, key {
+        count: u64,
+    }
+    fun init(p0: &signer) {
+        let _t3 = R{count: 0};
+        move_to<R>(p0, _t3);
+    }
+    #[module_lock]
+    fun callback_not_ok(): bool
+        acquires R
+    {
+        let _t0 = borrow_global_mut<R>(@0x42);
+        let _t5: |&mut R| has copy + drop = |arg0| do_something(arg0);
+        callee::call_me<R>(_t0, _t5);
+        let _t1 = &mut _t0.count;
+        *_t1 = *_t1 + 1;
+        if (!(*&_t0.count == 2)) abort 14566554180833181696;
+        true
+    }
+    fun do_something(p0: &mut R) {
+        let _t1 = &mut p0.count;
+        *_t1 = *_t1 + 1;
+    }
+}
+
+
+//# run 0x42::caller::init --signers 0x42
+
+//# run 0x42::caller::callback_not_ok --verbose

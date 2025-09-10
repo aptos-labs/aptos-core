@@ -2,12 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    executor_utilities::update_transaction_on_abort,
     scheduler::{DependencyResult, Scheduler, TWaitForDependency},
     scheduler_v2::SchedulerV2,
+    task::ExecutorTask,
+    txn_last_input_output::TxnLastInputOutput,
 };
-use aptos_mvhashmap::types::{Incarnation, TxnIndex};
-use aptos_types::error::PanicError;
+use aptos_mvhashmap::{
+    types::{Incarnation, TxnIndex},
+    MVHashMap,
+};
+use aptos_types::{error::PanicError, transaction::BlockExecutableTransaction};
 use move_core_types::language_storage::ModuleId;
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::BTreeSet,
     sync::atomic::{AtomicBool, Ordering},
@@ -92,6 +99,56 @@ impl SchedulerWrapper<'_> {
             SchedulerWrapper::V1(scheduler, _) => scheduler.has_halted(),
             SchedulerWrapper::V2(scheduler, _) => {
                 scheduler.is_halted_or_aborted(txn_idx, incarnation)
+            },
+        }
+    }
+
+    pub(crate) fn abort_pre_final_reexecution<T, E>(
+        &self,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+    ) -> Result<(), PanicError>
+    where
+        T: BlockExecutableTransaction,
+        E: ExecutorTask<Txn = T>,
+    {
+        match self {
+            SchedulerWrapper::V1(_, _) => {
+                // Updating the scheduler state not required as the execute method invoked
+                // in [executor::execute_txn_after_commit] does not take in the scheduler.
+                update_transaction_on_abort::<T, E>(txn_idx, last_input_output, versioned_cache);
+            },
+            SchedulerWrapper::V2(scheduler, _) => {
+                scheduler.direct_abort(txn_idx, incarnation, true)?;
+            },
+        }
+        Ok(())
+    }
+
+    pub(crate) fn prepare_for_block_epilogue<T, E>(
+        &self,
+        block_epilogue_idx: TxnIndex,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+    ) -> Result<Incarnation, PanicError>
+    where
+        T: BlockExecutableTransaction,
+        E: ExecutorTask<Txn = T>,
+    {
+        match self {
+            SchedulerWrapper::V1(scheduler, _) => {
+                let incarnation = scheduler.prepare_for_block_epilogue(block_epilogue_idx)?;
+                update_transaction_on_abort::<T, E>(
+                    block_epilogue_idx,
+                    last_input_output,
+                    versioned_cache,
+                );
+                Ok(incarnation)
+            },
+            SchedulerWrapper::V2(scheduler, _) => {
+                scheduler.prepare_for_block_epilogue(block_epilogue_idx)
             },
         }
     }

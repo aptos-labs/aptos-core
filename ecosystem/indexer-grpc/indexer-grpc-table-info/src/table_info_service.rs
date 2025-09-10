@@ -4,7 +4,7 @@
 use crate::{
     backup_restore::gcs::GcsBackupRestoreOperator, snapshot_folder_name, snapshot_folder_prefix,
 };
-use anyhow::{Context, Error};
+use anyhow::{anyhow, Context, Error};
 use aptos_api::context::Context as ApiContext;
 use aptos_api_types::TransactionOnChainData;
 use aptos_db_indexer::db_v2::IndexerAsyncV2;
@@ -377,9 +377,7 @@ impl TableInfoService {
         let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
         indexer_async_v2
             .index_table_info(context.db.clone(), first_version, &write_sets_slice)
-            .expect(
-                "[Table Info] Failed to process write sets and index to the table info rocksdb",
-            );
+            .map_err(|err| anyhow!("[Table Info] Failed to process write sets and index to the table info rocksdb: {}", err))?;
 
         info!(
             table_info_first_version = first_version,

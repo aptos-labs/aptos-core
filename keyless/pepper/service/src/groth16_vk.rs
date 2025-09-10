@@ -1,15 +1,12 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::watcher::{unhexlify_api_bytes, ExternalResource};
+use crate::{cached_resources::CachedResource, utils};
 use anyhow::{anyhow, Result};
-use aptos_infallible::RwLock;
 use ark_bn254::{Bn254, G1Affine, G2Affine};
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use ark_serialize::CanonicalDeserialize;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct VKeyData {
@@ -54,12 +51,8 @@ impl OnChainGroth16VerificationKey {
     }
 }
 
-/// This variable holds the cached on-chain VK. A refresh loop exists to update it periodically.
-pub static ONCHAIN_GROTH16_VK: Lazy<Arc<RwLock<Option<OnChainGroth16VerificationKey>>>> =
-    Lazy::new(|| Arc::new(RwLock::new(None)));
-
 fn g1_from_api_repr(api_repr: &str) -> Result<G1Affine> {
-    let bytes = unhexlify_api_bytes(api_repr)
+    let bytes = utils::unhexlify_api_bytes(api_repr)
         .map_err(|e| anyhow!("g1_from_api_repr() failed with unhex err: {e}"))?;
     let ret = G1Affine::deserialize_compressed(bytes.as_slice())
         .map_err(|e| anyhow!("g1_from_api_repr() failed with g1 deser err: {e}"))?;
@@ -67,14 +60,14 @@ fn g1_from_api_repr(api_repr: &str) -> Result<G1Affine> {
 }
 
 fn g2_from_api_repr(api_repr: &str) -> Result<G2Affine> {
-    let bytes = unhexlify_api_bytes(api_repr)
+    let bytes = utils::unhexlify_api_bytes(api_repr)
         .map_err(|e| anyhow!("g2_from_api_repr() failed with unhex err: {e}"))?;
     let ret = G2Affine::deserialize_compressed(bytes.as_slice())
         .map_err(|e| anyhow!("g2_from_api_repr() failed with g2 deser err: {e}"))?;
     Ok(ret)
 }
 
-impl ExternalResource for OnChainGroth16VerificationKey {
+impl CachedResource for OnChainGroth16VerificationKey {
     fn resource_name() -> String {
         "OnChainGroth16VerificationKey".to_string()
     }

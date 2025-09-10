@@ -32,6 +32,7 @@ module 0x1::Test {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x1::Test {
+    use std::vector;
     struct S has drop {
         x: u8,
     }

@@ -1,0 +1,136 @@
+//**** Cross-compiled for `move` syntax from `tests/operators/arithmetic_operators_u64.move`
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1 + 18446744073709551615;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 12000000000000000000 + 10000000000000000000;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0 - 1;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 54 - 100;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 4294967296 * 4294967296;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 9223372036854775808 * 2;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0 / 0;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1 / 0;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 18446744073709551615 / 0;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0 % 0;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1 % 0;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 18446744073709551615 % 0;
+    }
+}

@@ -104,7 +104,8 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
     tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AccountAuthenticator>(&samples)?;
-    tracer.trace_type::<transaction::authenticator::AbstractionAuthData>(&samples)?;
+    tracer.trace_type::<transaction::authenticator::AbstractAuthenticationData>(&samples)?;
+    tracer.trace_type::<transaction::authenticator::AbstractAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::TransactionAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;

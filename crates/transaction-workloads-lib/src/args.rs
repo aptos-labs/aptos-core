@@ -4,7 +4,7 @@
 use crate::{
     move_workloads::{LoopType, PreBuiltPackagesImpl},
     token_workflow::TokenWorkflowKind,
-    EntryPoints, OrderBookState,
+    EntryPoints, MonotonicCounterType, OrderBookState,
 };
 use aptos_transaction_generator_lib::{TransactionType, WorkflowProgress};
 use clap::{Parser, ValueEnum};
@@ -100,6 +100,11 @@ pub enum TransactionTypeArg {
     /// That means we will match rarely, but single match will be creating ~100 positions
     OrderBookBalancedSizeSkewed80Pct1Market,
     OrderBookBalancedSizeSkewed80Pct50Markets,
+    // Monotonic counter throughput tests
+    MonotonicCounterSingle,
+    MonotonicCounterMultiple10,
+    MonotonicCounterMultiple100,
+    MonotonicCounterMultiple1000,
 }
 
 impl TransactionTypeArg {
@@ -321,7 +326,6 @@ impl TransactionTypeArg {
                     creation_balance: 200000,
                 }),
                 num_modules: 1,
-                use_account_pool: sender_use_account_pool,
                 progress_type: workflow_progress_type,
             },
             TransactionTypeArg::LiquidityPoolSwap => {
@@ -444,6 +448,26 @@ impl TransactionTypeArg {
                     buy_frequency: 0.01,
                     max_sell_size: 50,
                     max_buy_size: 950,
+                })
+            },
+            TransactionTypeArg::MonotonicCounterSingle => {
+                call_custom_module(EntryPoints::MonotonicCounter {
+                    counter_type: MonotonicCounterType::Single,
+                })
+            },
+            TransactionTypeArg::MonotonicCounterMultiple10 => {
+                call_custom_module(EntryPoints::MonotonicCounter {
+                    counter_type: MonotonicCounterType::Multiple { count: 10 },
+                })
+            },
+            TransactionTypeArg::MonotonicCounterMultiple100 => {
+                call_custom_module(EntryPoints::MonotonicCounter {
+                    counter_type: MonotonicCounterType::Multiple { count: 100 },
+                })
+            },
+            TransactionTypeArg::MonotonicCounterMultiple1000 => {
+                call_custom_module(EntryPoints::MonotonicCounter {
+                    counter_type: MonotonicCounterType::Multiple { count: 1000 },
                 })
             },
         }

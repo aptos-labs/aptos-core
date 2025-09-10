@@ -22,7 +22,7 @@ use aptos_executor_types::{
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
-use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
+use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
         state::State, state_summary::ProvableStateSummary,
@@ -184,7 +184,6 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         } = txn_output_list_with_proof;
         let (transactions, transaction_outputs): (Vec<_>, Vec<_>) =
             transactions_and_outputs.into_iter().unzip();
-
         let chunk = ChunkToApply {
             transactions,
             transaction_outputs,
@@ -564,6 +563,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             let next_begin = if verify_execution_mode.should_verify() {
                 self.verify_execution(
                     transactions,
+                    persisted_aux_info,
                     transaction_infos,
                     write_sets,
                     event_vecs,
@@ -593,6 +593,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     fn verify_execution(
         &self,
         transactions: &[Transaction],
+        persisted_aux_info: &[PersistedAuxiliaryInfo],
         transaction_infos: &[TransactionInfo],
         write_sets: &[WriteSet],
         event_vecs: &[Vec<ContractEvent>],
@@ -610,9 +611,11 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .map(|t| t.into())
             .collect::<Vec<SignatureVerifiedTransaction>>();
 
-        let mut auxiliary_info = Vec::new();
-        // TODO(grao): Pass in persisted auxiliary info.
-        auxiliary_info.resize(txns.len(), AuxiliaryInfo::new_empty());
+        let auxiliary_info = persisted_aux_info
+            .iter()
+            .take((end_version - begin_version) as usize)
+            .map(|persisted_aux_info| AuxiliaryInfo::new(*persisted_aux_info, None))
+            .collect::<Vec<_>>();
         // State sync executor shouldn't have block gas limit.
         let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),

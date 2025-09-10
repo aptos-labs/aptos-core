@@ -1,0 +1,16 @@
+//**** Cross-compiled for `move` syntax from `tests/inlining/phantoms.move`
+
+//# publish
+module 0x42::phantoms {
+    struct T {
+    }
+    struct S<phantom T0> has drop {
+        addr: address,
+    }
+    public fun test_phantoms() {
+        let _t1 = S<T>{addr: @0x12};
+    }
+}
+
+
+//# run 0x42::phantoms::test_phantoms

@@ -1,0 +1,25 @@
+//**** Cross-compiled for `move` syntax from `tests/operator_eval/op_with_side_effect_39.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct S has drop {
+        x: u64,
+        y: u64,
+        z: u64,
+    }
+    fun inc(p0: &mut u64, p1: u64): u64 {
+        *p0 = *p0 + p1;
+        *p0
+    }
+    public fun test(): u64 {
+        let _t0 = 1;
+        let _t5 = _t0;
+        let _t8 = inc(&mut _t0, 7);
+        let _t11 = inc(&mut _t0, 11);
+        let S{x: _t13, y: _t14, z: _t15} = S{x: _t5, y: _t8, z: _t11};
+        _t13 + _t14 + _t15
+    }
+}
+
+
+//# run 0xc0ffee::m::test

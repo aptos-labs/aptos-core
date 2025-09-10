@@ -165,7 +165,7 @@ impl UnverifiedEvent {
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
             UnverifiedEvent::BatchMsg(b) => {
                 if !self_message {
-                    b.verify(peer_id, max_num_batches)?;
+                    b.verify(peer_id, max_num_batches, validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["batch"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -1635,6 +1635,17 @@ impl RoundManager {
                 "{}", order_vote_msg
             );
             self.network.broadcast_order_vote(order_vote_msg).await;
+            if proposed_block.pipeline_futs().is_some() {
+                if let Some(tx) = proposed_block.pipeline_tx().lock().as_mut() {
+                    let _ = tx.order_vote_tx.take().map(|tx| tx.send(()));
+                }
+                let network = self.network.clone();
+                tokio::spawn(async move {
+                    if let Some(commit_vote) = proposed_block.wait_for_commit_vote().await {
+                        network.broadcast_commit_vote(commit_vote).await;
+                    }
+                });
+            }
             ORDER_VOTE_BROADCASTED.inc();
         }
         Ok(())

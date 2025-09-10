@@ -170,6 +170,20 @@ impl TransactionGasLog {
             Value::Array(aggregated.ops.into_iter().map(convert_op).collect()),
         );
         data.insert(
+            "methods".to_string(),
+            Value::Array(aggregated.methods.into_iter().map(convert_op).collect()),
+        );
+        data.insert(
+            "methods_self".to_string(),
+            Value::Array(
+                aggregated
+                    .methods_self
+                    .into_iter()
+                    .map(convert_op)
+                    .collect(),
+            ),
+        );
+        data.insert(
             "reads".to_string(),
             Value::Array(
                 aggregated
@@ -301,7 +315,7 @@ impl TransactionGasLog {
         }
 
         // Execution trace
-        let mut tree = self.exec_io.to_erased().tree;
+        let mut tree = self.exec_io.to_erased(true).tree;
         tree.include_child_costs();
 
         let mut table = vec![];

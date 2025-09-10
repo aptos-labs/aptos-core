@@ -73,6 +73,7 @@ module 0x42::m {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::m {
+    use std::vector;
     public entry fun init() {
         let _x = {
             let (v) = (vector[]);

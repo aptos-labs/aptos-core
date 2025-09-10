@@ -24,7 +24,8 @@ module 0x1::string {
     public fun insert(self: &mut String, at: u64, o: String) {
         let _t4;
         let _t3 = &self.bytes;
-        if (at <= vector::length<u8>(_t3)) _t4 = internal_is_char_boundary(_t3, at) else _t4 = false;
+        let _t12 = vector::length<u8>(_t3);
+        if (at <= _t12) _t4 = internal_is_char_boundary(_t3, at) else _t4 = false;
         if (!_t4) abort 2;
         let _t5 = length(freeze(self));
         let _t6 = sub_string(freeze(self), 0, at);
@@ -39,7 +40,8 @@ module 0x1::string {
         let _t6;
         let _t5;
         let _t3 = &self.bytes;
-        if (j <= vector::length<u8>(_t3)) _t5 = i <= j else _t5 = false;
+        let _t4 = vector::length<u8>(_t3);
+        if (j <= _t4) _t5 = i <= j else _t5 = false;
         if (_t5) _t6 = internal_is_char_boundary(_t3, i) else _t6 = false;
         if (_t6) _t7 = internal_is_char_boundary(_t3, j) else _t7 = false;
         if (!_t7) abort 2;

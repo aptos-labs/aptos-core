@@ -10,7 +10,7 @@ use anyhow::{anyhow, Result};
 use aptos_crypto::HashValue;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
+    ledger_info::LedgerInfoWithSignatures, on_chain_config::OnChainConsensusConfig,
 };
 use std::{sync::Arc, time::Duration};
 
@@ -59,7 +59,8 @@ impl StateComputer for RandomComputeResultStateComputer {
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
         _: bool,
-        _: bool,
+        _: OnChainConsensusConfig,
+        _: u8,
     ) {
     }
 

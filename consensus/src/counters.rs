@@ -55,6 +55,16 @@ fn gas_buckets() -> Vec<f64> {
 pub static OP_COUNTERS: Lazy<aptos_metrics_core::op_counters::OpMetrics> =
     Lazy::new(|| aptos_metrics_core::op_counters::OpMetrics::new_and_registered("consensus"));
 
+/// Count of the total number of blocks of whether randomness is required
+pub static RAND_BLOCK: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_rand_block_count",
+        "Count of the total number of blocks of whether randomness is required",
+        &["type"]
+    )
+    .unwrap()
+});
+
 /// Counts the total number of errors
 pub static ERROR_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(

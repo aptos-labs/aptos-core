@@ -26,7 +26,7 @@ fn main() {
             let config = TestRunConfig::default()
                 .with_masm()
                 .with_echo()
-                .cross_compile_into(SyntaxChoice::ASM, true);
+                .cross_compile_into(SyntaxChoice::ASM, true, None);
             Trial::test(prompt, move || {
                 vm_test_harness::run_test_with_config(config, &p)
                     .map_err(|err| format!("{:?}", err).into())
