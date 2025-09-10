@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_keyless_pepper_service::{
-    account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
-    account_managers::ACCOUNT_MANAGERS,
+    accounts::{
+        account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
+        account_managers::ACCOUNT_MANAGERS,
+    },
     external_resources::{
         jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher, resource_fetcher::CachedResources,
     },
