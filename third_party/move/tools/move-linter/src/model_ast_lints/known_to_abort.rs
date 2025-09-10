@@ -76,7 +76,7 @@ impl ExpChecker for KnownToAbort {
         let env = function_env.env();
         match expr {
             Call(id, op, args) if args.len() == 2 => {
-                let (lhs, rhs): (&ExpData, &ExpData) = (&args[0], &args[1]);
+                let (lhs, rhs) = (args[0].as_ref(), args[1].as_ref());
 
                 if let Some(msg) = match (lhs, op, rhs) {
                     (_, Div, Value(_, Number(n))) if n == &BigInt::from(0) => {
