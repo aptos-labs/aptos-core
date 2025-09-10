@@ -295,6 +295,7 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
             writer,
             factory,
             enable_enum_option,
+            unit_test_config.fail_fast,
         )
         .unwrap()
         .1
