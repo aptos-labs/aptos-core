@@ -24,7 +24,8 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::{
-    state::LedgerState, state_view::cached_state_view::CachedStateView,
+    state::LedgerState,
+    state_view::cached_state_view::{CachedStateView, PrimingPolicy},
 };
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_types::transaction::ExecutionStatus;
@@ -164,7 +165,7 @@ impl DoGetExecutionOutput {
                         .cloned()
                         .unwrap_or_default()
                         .into_iter()
-                        .map(|(key, slot)| (key, HotStateOp::make_hot(slot)))
+                        .map(|key| (key, HotStateOp::make_hot()))
                         .collect(),
                 );
             }
@@ -400,9 +401,20 @@ impl Parser {
                 .transpose()?
         };
 
-        if prime_state_cache {
-            base_state_view.prime_cache(to_commit.state_update_refs())?;
-        }
+        base_state_view.prime_cache(
+            to_commit.state_update_refs(),
+            if prime_state_cache {
+                PrimingPolicy::All
+            } else {
+                // Most of the transaction reads should already be in the cache, but some module
+                // reads in the transactions might be done via the global module cache instead of
+                // cached state view, so they are not present in the cache.
+                // Therfore, we must prime the cache for the keys that we are going to promote into
+                // hot state, regardless of `prime_state_cache`, because the write sets have only
+                // the keys, not the values.
+                PrimingPolicy::MakeHotOnly
+            },
+        )?;
 
         let result_state = parent_state.update_with_memorized_reads(
             base_state_view.persisted_state(),
