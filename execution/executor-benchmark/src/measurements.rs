@@ -14,6 +14,7 @@ use aptos_metrics_core::Histogram;
 use move_core_types::language_storage::StructTag;
 use std::{
     collections::{BTreeMap, HashMap},
+    fmt::Write,
     time::Instant,
 };
 
@@ -120,6 +121,7 @@ static OTHER_LABELS: &[(&str, bool, &str)] = &[
 #[derive(Debug, Clone)]
 struct ExecutionTimeMeasurement {
     output_size: f64,
+    output_count: u64,
 
     sig_verify_total_time: f64,
     partitioning_total_time: f64,
@@ -136,6 +138,9 @@ impl ExecutionTimeMeasurement {
         let output_size = PROCESSED_TXNS_OUTPUT_SIZE
             .with_label_values(&["execution"])
             .get_sample_sum();
+        let output_count = PROCESSED_TXNS_OUTPUT_SIZE
+            .with_label_values(&["execution"])
+            .get_sample_count();
 
         let sig_verify_total = TIMER.with_label_values(&["sig_verify"]).get_sample_sum();
         let partitioning_total = TIMER.with_label_values(&["partition"]).get_sample_sum();
@@ -159,6 +164,7 @@ impl ExecutionTimeMeasurement {
 
         Self {
             output_size,
+            output_count,
             sig_verify_total_time: sig_verify_total,
             partitioning_total_time: partitioning_total,
             execution_total_time: execution_total,
@@ -175,6 +181,7 @@ impl ExecutionTimeMeasurement {
 
         Self {
             output_size: end.output_size - self.output_size,
+            output_count: end.output_count - self.output_count,
             sig_verify_total_time: end.sig_verify_total_time - self.sig_verify_total_time,
             partitioning_total_time: end.partitioning_total_time - self.partitioning_total_time,
             execution_total_time: end.execution_total_time - self.execution_total_time,
@@ -288,6 +295,10 @@ impl OverallMeasurement {
         self.delta_execution.output_size / self.elapsed
     }
 
+    pub fn get_output_per_txn(&self) -> f64 {
+        self.delta_execution.output_size / self.delta_execution.output_count as f64
+    }
+
     pub fn print_end(&self) {
         let num_txns = self.num_txns as f64;
 
@@ -341,6 +352,11 @@ impl OverallMeasurement {
             "{} output: {} bytes/s",
             self.prefix,
             self.get_output_per_s()
+        );
+        info!(
+            "{} output: {} bytes/txn",
+            self.prefix,
+            self.get_output_per_txn()
         );
 
         info!(
@@ -403,17 +419,17 @@ impl OverallMeasurement {
         );
     }
 
-    pub fn print_end_table(stages: &[Self], overall: &Self) {
-        for v in stages.iter().chain(std::iter::once(overall)) {
-            println!("{}  {}", v.prefix, v.metadata);
-        }
+    pub fn format_end_table(stages: &[Self], overall: &Self) -> String {
+        let mut result = "".to_string();
         fn print_one(
+            result: &mut String,
             stages: &[OverallMeasurement],
             overall: &OverallMeasurement,
             name: &str,
             fun: impl Fn(&OverallMeasurement) -> String,
         ) {
-            println!(
+            writeln!(
+                result,
                 "{: <12}{}",
                 name,
                 stages
@@ -421,30 +437,60 @@ impl OverallMeasurement {
                     .chain(std::iter::once(overall))
                     .map(fun)
                     .collect::<String>()
-            );
+            )
+            .unwrap();
         }
 
-        print_one(stages, overall, "", |v| {
+        print_one(&mut result, stages, overall, "", |v| {
             format!("{: >12}", v.prefix.replace("Staged execution: ", ""))
         });
-        print_one(stages, overall, "TPS", |v| {
+        print_one(&mut result, stages, overall, "txn/s", |v| {
             format!("{: >12.2}", v.get_tps())
         });
-        print_one(stages, overall, "GPS", |v| {
+        print_one(&mut result, stages, overall, "gas/s", |v| {
             format!("{: >12.2}", v.get_gps())
         });
-        print_one(stages, overall, "effGPS", |v| {
+        print_one(&mut result, stages, overall, "eff_gas/s", |v| {
             format!("{: >12.2}", v.get_effective_gps())
         });
-        print_one(stages, overall, "GPT", |v| {
+        print_one(&mut result, stages, overall, "conf_mul", |v| {
+            format!("{: >12.2}", v.get_effective_conflict_multiplier())
+        });
+        print_one(&mut result, stages, overall, "gas/txn", |v| {
             format!("{: >12.2}", v.get_gpt())
         });
-        print_one(stages, overall, "ioGPT", |v| {
+        print_one(&mut result, stages, overall, "io gas/txn", |v| {
             format!("{: >12.2}", v.get_io_gpt())
         });
-        print_one(stages, overall, "exeGPT", |v| {
+        print_one(&mut result, stages, overall, "exe gas/txn", |v| {
             format!("{: >12.2}", v.get_execution_gpt())
         });
+        print_one(&mut result, stages, overall, "output/txn", |v| {
+            format!("{: >12.2}", v.get_output_per_txn())
+        });
+        result
+    }
+
+    pub fn print_end_table(stages: &[Self], overall: &Self) {
+        for v in stages.iter().chain(std::iter::once(overall)) {
+            println!("{}  {}", v.prefix, v.metadata);
+        }
+        println!("{}", Self::format_end_table(stages, overall));
+    }
+
+    pub fn json_end_table(&self) -> serde_json::Value {
+        serde_json::json!({
+            "stage": self.prefix.replace("Staged execution: ", ""),
+            "metadata": self.metadata,
+            "txns/s": format!("{:.2}", self.get_tps()),
+            "gas/s": format!("{:.2}", self.get_gps()),
+            "eff_gas/s": format!("{:.2}", self.get_effective_gps()),
+            "conf_mul": format!("{:.2}", self.get_effective_conflict_multiplier()),
+            "gas/txn": format!("{:.2}", self.get_gpt()),
+            "io gas/txn": format!("{:.2}", self.get_io_gpt()),
+            "exe gas/txn": format!("{:.2}", self.get_execution_gpt()),
+            "output/txn": format!("{: >12.2}", self.get_output_per_txn()),
+        })
     }
 }
 

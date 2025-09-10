@@ -58,6 +58,7 @@ once_cell = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 thread_local = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
