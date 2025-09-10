@@ -97,7 +97,7 @@ where
 
     // Invoke the handler and generate the response
     match request_handler
-        .handle(vuf_private_key, jwk_cache, cached_resources, pepper_request)
+        .handle_request(vuf_private_key, jwk_cache, cached_resources, pepper_request)
         .await
     {
         Ok(pepper_response) => {
