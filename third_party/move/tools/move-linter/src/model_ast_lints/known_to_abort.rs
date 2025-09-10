@@ -98,8 +98,8 @@ impl ExpChecker for KnownToAbort {
                 match args[0].as_ref() {
                     Value(_, Number(constant_value)) => {
                         let target_type = env.get_node_type(expr.node_id());
-                        if self.check_cast_overflow(constant_value, &target_type) {
-                            self.report(env, &env.get_node_loc(*id), CAST_OVERFLOW_MSG);
+                        if let Some(msg) = self.check_cast_overflow(constant_value, &target_type) {
+                            self.report(env, &env.get_node_loc(*id), msg);
                         }
                     },
                     Call(_, op, inner_args) => {
@@ -111,8 +111,8 @@ impl ExpChecker for KnownToAbort {
 
                         if let Some(constant_value) = constant_value {
                             let target_type = env.get_node_type(expr.node_id());
-                            if self.check_cast_overflow(&constant_value, &target_type) {
-                                self.report(env, &env.get_node_loc(*id), CAST_OVERFLOW_MSG);
+                            if let Some(msg) = self.check_cast_overflow(&constant_value, &target_type) {
+                                self.report(env, &env.get_node_loc(*id), msg);
                             }
                         }
                     },
@@ -145,16 +145,20 @@ impl KnownToAbort {
         }
     }
 
-    fn check_cast_overflow(&self, value: &BigInt, target_type: &Type) -> bool {
+    fn check_cast_overflow(&self, value: &BigInt, target_type: &Type) -> Option<&'static str> {
         let Type::Primitive(prim_ty) = target_type else {
-            return false;
+            return None;
         };
 
         let (Some(min_val), Some(max_val)) = (prim_ty.get_min_value(), prim_ty.get_max_value())
         else {
-            return false;
+            return None;
         };
 
-        value < &min_val || value > &max_val
+        if value < &min_val || value > &max_val {
+            Some(CAST_OVERFLOW_MSG)
+        } else {
+            None
+        }
     }
 }
