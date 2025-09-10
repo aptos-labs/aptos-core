@@ -17,11 +17,6 @@ const ENV_ONCHAIN_KEYLESS_CONFIG_URL: &str = "ONCHAIN_KEYLESS_CONFIG_URL";
 const ENV_ONCHAIN_GROTH16_VK_URL: &str = "ONCHAIN_GROTH16_VK_URL";
 const RESOURCE_FETCH_INTERVAL_SECS: u64 = 10;
 
-/// A simple trait for resources that can be cached and refreshed
-pub trait CachedResource {
-    fn resource_name() -> String;
-}
-
 /// A struct that holds the cached resources and their refresh logic
 #[derive(Clone, Debug, Default)]
 pub struct CachedResources {
@@ -91,15 +86,13 @@ impl CachedResources {
 }
 
 /// Starts a background task that periodically fetches and caches the resource from the given URL
-fn start_external_resource_refresh_loop<
-    T: DeserializeOwned + CachedResource + Send + Sync + 'static,
->(
+fn start_external_resource_refresh_loop<T: DeserializeOwned + Send + Sync + 'static>(
     resource_url: String,
     local_cache: Arc<RwLock<Option<T>>>,
 ) {
     info!(
         "Starting the cached resource refresh loop for {}!",
-        T::resource_name()
+        resource_url
     );
 
     // Create the request client
@@ -117,10 +110,8 @@ fn start_external_resource_refresh_loop<
                 Ok(response) => response,
                 Err(error) => {
                     warn!(
-                        "Failed to fetch resource {} from {}! Error: {}",
-                        T::resource_name(),
-                        resource_url,
-                        error
+                        "Failed to fetch resource from {}! Error: {}",
+                        resource_url, error
                     );
                     continue; // Retry in the next loop
                 },
@@ -131,10 +122,8 @@ fn start_external_resource_refresh_loop<
                 Ok(resource) => resource,
                 Err(error) => {
                     warn!(
-                        "Failed to parse resource {} from {}! Error: {}",
-                        T::resource_name(),
-                        resource_url,
-                        error
+                        "Failed to parse resource from {}! Error: {}",
+                        resource_url, error
                     );
                     continue; // Retry in the next loop
                 },

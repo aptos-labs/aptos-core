@@ -21,6 +21,7 @@ use firestore::async_trait;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
+/// A generic handler trait for processing requests and producing responses
 #[async_trait]
 pub trait HandlerTrait<TRequest, TResponse>: Send + Sync {
     /// Returns the name of the handler (e.g., the type name). This is useful for logging.
@@ -29,7 +30,7 @@ pub trait HandlerTrait<TRequest, TResponse>: Send + Sync {
     }
 
     // TODO: is there a way we can remove the vuf_private_key param here?
-    async fn handle(
+    async fn handle_request(
         &self,
         vuf_private_key: &ark_bls12_381::Fr,
         jwk_cache: JWKCache,
@@ -38,18 +39,19 @@ pub trait HandlerTrait<TRequest, TResponse>: Send + Sync {
     ) -> Result<TResponse, PepperServiceError>;
 }
 
+/// A handler for processing pepper fetch requests
 pub struct V0FetchHandler;
 
 #[async_trait]
 impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
-    async fn handle(
+    async fn handle_request(
         &self,
         vuf_private_key: &ark_bls12_381::Fr,
         jwk_cache: JWKCache,
         _cached_resources: CachedResources,
         request: PepperRequest,
     ) -> Result<PepperResponse, PepperServiceError> {
-        let session_id = Uuid::new_v4();
+        // Parse the request
         let PepperRequest {
             jwt,
             epk,
@@ -59,10 +61,11 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
             derivation_path,
         } = request;
 
+        // Fetch the pepper
         let (_pepper_base, pepper, address) = process_common(
             vuf_private_key,
             jwk_cache,
-            &session_id,
+            &Uuid::new_v4(),
             jwt,
             epk,
             exp_date_secs,
@@ -75,6 +78,7 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
         )
         .await?;
 
+        // Return the pepper response
         Ok(PepperResponse {
             pepper,
             address: address.to_vec(),
@@ -82,18 +86,19 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
     }
 }
 
+/// A handler for processing signature requests
 pub struct V0SignatureHandler;
 
 #[async_trait]
 impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
-    async fn handle(
+    async fn handle_request(
         &self,
         vuf_private_key: &ark_bls12_381::Fr,
         jwk_cache: JWKCache,
         _cached_resources: CachedResources,
         request: PepperRequest,
     ) -> Result<SignatureResponse, PepperServiceError> {
-        let session_id = Uuid::new_v4();
+        // Parse the request
         let PepperRequest {
             jwt,
             epk,
@@ -103,10 +108,11 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
             derivation_path,
         } = request;
 
+        // Fetch the pepper base (i.e., VUF signature)
         let (pepper_base, _pepper, _address) = process_common(
             vuf_private_key,
             jwk_cache,
-            &session_id,
+            &Uuid::new_v4(),
             jwt,
             epk,
             exp_date_secs,
@@ -119,36 +125,65 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
         )
         .await?;
 
+        // Return the signature response
         Ok(SignatureResponse {
             signature: pepper_base,
         })
     }
 }
 
-#[macro_export]
-macro_rules! invalid_signature {
-    ($message:expr) => {
-        PepperServiceError::BadRequest($message.to_owned())
-    };
-}
-
+/// A handler for processing signature verification requests
 pub struct V0VerifyHandler;
 
 #[async_trait]
 impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
-    async fn handle(
+    async fn handle_request(
         &self,
         _: &ark_bls12_381::Fr,
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: VerifyRequest,
     ) -> Result<VerifyResponse, PepperServiceError> {
+        // Parse the verify request
         let VerifyRequest {
             public_key,
             signature,
             message,
             address: _,
         } = request;
+
+        // Fetch the keyless public key and signature from the request
+        let (keyless_public_key, keyless_signature) = match (&public_key, &signature) {
+            (AnyPublicKey::Keyless { public_key }, AnySignature::Keyless { signature }) => {
+                (public_key, signature)
+            },
+            (unsupported_public_key, unsupported_signature) => {
+                return Err(PepperServiceError::BadRequest(format!(
+                    "Unsupported public key or signature types for keyless verify request: {:?}, {:?}",
+                    unsupported_public_key, unsupported_signature
+                )));
+            },
+        };
+
+        // Verify the keyless signature
+        let KeylessSignature {
+            cert,
+            jwt_header_json: _,
+            exp_date_secs: _,
+            ephemeral_pubkey,
+            ephemeral_signature,
+        } = keyless_signature;
+        let current_time_microseconds = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+        keyless_signature
+            .verify_expiry(current_time_microseconds)
+            .map_err(|_| invalid_signature!("The ephemeral keypair has expired"))?;
+
+        let KeylessPublicKey { idc: _, iss_val } = keyless_public_key;
+
+
         if let (AnyPublicKey::Keyless { public_key }, AnySignature::Keyless { signature }) =
             (&public_key, &signature)
         {
@@ -184,7 +219,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
                         "API keyless config not cached locally.".to_string(),
                     )
                 })?;
-            let config = config_api_repr.to_rust_repr().map_err(|e| {
+            let config = config_api_repr.get_keyless_configuration().map_err(|e| {
                 PepperServiceError::InternalError(format!(
                     "Could not parse API keyless config: {e}"
                 ))
@@ -259,11 +294,13 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
                                         "No Groth16 VK cached locally.".to_string(),
                                     )
                                 })?;
-                            let ark_groth16_pvk = onchain_groth16_vk.to_ark_pvk().map_err(|e| {
-                                PepperServiceError::InternalError(format!(
-                                    "Onchain-to-ark convertion err: {e}"
-                                ))
-                            })?;
+                            let ark_groth16_pvk = onchain_groth16_vk
+                                .to_ark_prepared_verifying_key()
+                                .map_err(|e| {
+                                    PepperServiceError::InternalError(format!(
+                                        "Onchain-to-ark convertion err: {e}"
+                                    ))
+                                })?;
                             let result =
                                 zksig.verify_groth16_proof(public_inputs_hash, &ark_groth16_pvk);
                             result.map_err(|_| {
