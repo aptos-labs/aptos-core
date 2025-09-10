@@ -177,6 +177,9 @@ impl TestRunner {
             .build()
             .unwrap()
             .install(|| {
+                // we do a try_reduce so that we can short-circuit on fail-fast
+                // if not in fail-fast mode, we expect no errors at all
+                // if in fail-fast mode, we expect only FailFast errors
                 let stats = self
                     .tests
                     .module_tests
@@ -185,18 +188,17 @@ impl TestRunner {
                         self.testing_config.exec_module_tests( plan, writer, options)
                     })
                     .try_reduce(TestStatistics::new, |a, b| Ok(a.combine(b)));
-                // If we got an error, it must be a fail-fast error, so extract the stats until the first failure.
-                let final_stats = match stats {
-                    Err(e) if !self.testing_config.fail_fast => panic!("We expect no errors at all when not in fail-fast mode, but got: {:?}", e),
-                    Err(e) => {
-                        if let Some(fail_fast) = e.downcast_ref::<FailFast>() {
-                            fail_fast.0.clone()
-                        } else {
-                            panic!("Only FailFast errors are expected in fail-fast mode, but got a different error: {:?}", e);
-                        }
-                    },
-                    Ok(stats) => stats,
-                };
+
+                let final_stats = stats.unwrap_or_else(|e| {
+                    if !self.testing_config.fail_fast {
+                        panic!("We expect no errors at all when not in fail-fast mode, but got: {:?}", e);
+                    }
+                    e.downcast_ref::<FailFast>().map(|fail_fast| {
+                        fail_fast.0.clone() // The error wraps the stats up to the first failure
+                    }).unwrap_or_else(|| {
+                        panic!("Only FailFast errors are expected in fail-fast mode, but got a different error: {:?}", e);
+                    })
+                });
 
                 Ok(TestResults::new(final_stats, self.tests))
             })
