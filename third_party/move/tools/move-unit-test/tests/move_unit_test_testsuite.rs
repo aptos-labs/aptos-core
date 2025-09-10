@@ -56,6 +56,7 @@ fn run_test_with_modifiers(
                     buffer,
                     UnitTestFactoryWithCostTable::new(None, None),
                     false,
+                    unit_test_config.fail_fast,
                 )?,
                 modified_exp_path,
             ))
@@ -77,6 +78,7 @@ fn run_test_with_modifiers(
             buffer,
             UnitTestFactoryWithCostTable::new(None, None),
             false,
+            unit_test_config.fail_fast,
         )?,
         path.with_extension(exp_ext),
     ));

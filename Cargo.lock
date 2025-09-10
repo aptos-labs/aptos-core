@@ -12910,6 +12910,7 @@ dependencies = [
  "rayon",
  "regex",
  "tempfile",
+ "thiserror",
 ]
 
 [[package]]
