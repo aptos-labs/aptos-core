@@ -40,6 +40,12 @@ use move_vm_runtime::{
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;
 use std::{io::Write, marker::Send, sync::Mutex, time::Instant};
+use thiserror::Error;
+
+/// Fail-fast error to short-circuit test execution
+#[derive(Debug, Error)]
+#[error("fail-fast triggered with {0:?}")]
+struct FailFast(pub TestStatistics);
 
 /// Test state common to all tests
 pub struct SharedTestingConfig {
@@ -49,6 +55,7 @@ pub struct SharedTestingConfig {
     #[allow(dead_code)] // used by some features
     source_files: Vec<String>,
     record_writeset: bool,
+    fail_fast: bool,
 }
 
 pub struct TestRunner {
@@ -119,6 +126,7 @@ impl TestRunner {
         genesis_state: Option<ChangeSet>,
         record_writeset: bool,
         enable_enum_option: bool,
+        fail_fast: bool,
     ) -> Result<Self> {
         let native_function_table = native_function_table.unwrap_or_else(|| {
             move_stdlib::natives::all_natives(
@@ -152,6 +160,7 @@ impl TestRunner {
                 starting_storage_state,
                 source_files,
                 record_writeset,
+                fail_fast,
             },
             num_threads,
             tests,
@@ -163,23 +172,55 @@ impl TestRunner {
         writer: &Mutex<W>,
         options: &Mutex<F>,
     ) -> Result<TestResults> {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(self.num_threads)
-            .build()
-            .unwrap()
-            .install(|| {
-                let final_statistics = self
-                    .tests
-                    .module_tests
-                    .par_iter()
-                    .map(|(_, test_plan)| {
-                        self.testing_config
-                            .exec_module_tests(test_plan, writer, options)
-                    })
-                    .reduce(TestStatistics::new, |acc, stats| acc.combine(stats));
+        if self.testing_config.fail_fast {
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(self.num_threads)
+                .build()
+                .unwrap()
+                .install(|| {
+                    let stats = self
+                        .tests
+                        .module_tests
+                        .par_iter()
+                        .map(|(_, plan)| {
+                            self.testing_config
+                                .exec_module_tests(plan, writer, options, true)
+                        })
+                        .try_reduce(TestStatistics::new, |a, b| Ok(a.combine(b)));
+                    // If we got an error, it must be a fail-fast error, so extract the stats until the first failure.
+                    let final_stats = match stats {
+                        Err(e) => {
+                            if let Some(fail_fast) = e.downcast_ref::<FailFast>() {
+                                fail_fast.0.clone()
+                            } else {
+                                panic!("unexpected error: {:?}", e);
+                            }
+                        },
+                        Ok(stats) => stats,
+                    };
 
-                Ok(TestResults::new(final_statistics, self.tests))
-            })
+                    Ok(TestResults::new(final_stats, self.tests))
+                })
+        } else {
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(self.num_threads)
+                .build()
+                .unwrap()
+                .install(|| {
+                    let final_statistics = self
+                        .tests
+                        .module_tests
+                        .par_iter()
+                        .map(|(_, test_plan)| {
+                            self.testing_config
+                                .exec_module_tests(test_plan, writer, options, false)
+                                .unwrap() // cannot fail in non-fail-fast mode
+                        })
+                        .reduce(TestStatistics::new, |acc, stats| acc.combine(stats));
+
+                    Ok(TestResults::new(final_statistics, self.tests))
+                })
+        }
     }
 
     pub fn filter(&mut self, test_name_slice: &str) {
@@ -338,7 +379,8 @@ impl SharedTestingConfig {
         test_plan: &ModuleTestPlan,
         output: &TestOutput<impl Write>,
         factory: &Mutex<F>,
-    ) -> TestStatistics {
+        fail_fast: bool,
+    ) -> Result<TestStatistics> {
         let mut stats = TestStatistics::new();
 
         for (function_name, test_info) in &test_plan.tests {
@@ -409,7 +451,10 @@ impl SharedTestingConfig {
                                     save_session_state(),
                                 ),
                                 test_plan,
-                            )
+                            );
+                            if fail_fast {
+                                return Err(FailFast(stats).into());
+                            }
                         },
                         Some(ExpectedFailure::ExpectedWithCodeDEPRECATED(expected_code)) => {
                             output.fail(function_name);
@@ -424,7 +469,10 @@ impl SharedTestingConfig {
                                     save_session_state(),
                                 ),
                                 test_plan,
-                            )
+                            );
+                            if fail_fast {
+                                return Err(FailFast(stats).into());
+                            }
                         },
                         None if err.major_status() == StatusCode::OUT_OF_GAS => {
                             // Ran out of ticks, report a test timeout and log a test failure
@@ -437,7 +485,10 @@ impl SharedTestingConfig {
                                     save_session_state(),
                                 ),
                                 test_plan,
-                            )
+                            );
+                            if fail_fast {
+                                return Err(FailFast(stats).into());
+                            }
                         },
                         None => {
                             output.fail(function_name);
@@ -449,7 +500,10 @@ impl SharedTestingConfig {
                                     save_session_state(),
                                 ),
                                 test_plan,
-                            )
+                            );
+                            if fail_fast {
+                                return Err(FailFast(stats).into());
+                            }
                         },
                     }
                 },
@@ -475,7 +529,7 @@ impl SharedTestingConfig {
             }
         }
 
-        stats
+        Ok(stats)
     }
 
     fn exec_module_tests<F: UnitTestFactory>(
@@ -483,8 +537,9 @@ impl SharedTestingConfig {
         test_plan: &ModuleTestPlan,
         writer: &Mutex<impl Write>,
         factory: &Mutex<F>,
-    ) -> TestStatistics {
+        fail_fast: bool,
+    ) -> Result<TestStatistics> {
         let output = TestOutput { test_plan, writer };
-        self.exec_module_tests_move_vm_and_stackless_vm(test_plan, &output, factory)
+        self.exec_module_tests_move_vm_and_stackless_vm(test_plan, &output, factory, fail_fast)
     }
 }
