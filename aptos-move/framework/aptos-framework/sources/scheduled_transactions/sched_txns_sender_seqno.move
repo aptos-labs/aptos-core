@@ -21,7 +21,7 @@ module aptos_framework::sched_txns_sender_seqno {
     }
 
     /// Initialize the sender sequence number map - called from scheduled_txns::initialize
-    public(friend) fun initialize(framework: &signer) {
+    public fun initialize(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
 
         move_to(
@@ -80,15 +80,11 @@ module aptos_framework::sched_txns_sender_seqno {
         // If sender doesn't exist, do nothing
     }
 
-    public(friend) fun destroy_sender_seqno_map() acquires SenderSeqnoData {
-        let SenderSeqnoData { sender_seqno_map } =
-            move_from<SenderSeqnoData>(@aptos_framework);
-        // Clear all elements from the map before dropping it
-        sender_seqno_map.for_each(
-            |_key, _value| {
-                // Do nothing - just consume the elements
-            }
-        );
+    public(friend) fun reset_sender_seqno_map() acquires SenderSeqnoData {
+        let seqno_data = borrow_global_mut<SenderSeqnoData>(@aptos_framework);
+        seqno_data.sender_seqno_map.for_each_and_clear(|_key, _value| {
+            // Just consume the elements, leaving the map empty
+        });
     }
 
     /// Sets a specific sequence number for a sender (useful for testing or migration)

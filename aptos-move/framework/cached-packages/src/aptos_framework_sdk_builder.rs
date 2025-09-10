@@ -22,6 +22,7 @@ use aptos_types::{
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, TypeTag},
+    u256::U256,
 };
 
 type Bytes = Vec<u8>;
@@ -942,6 +943,18 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
+    /// Entry function for cancel that takes individual ScheduleMapKey parameters
+    ScheduledTxnsCancel {
+        time: u64,
+        gas_priority: u64,
+        txn_id: U256,
+    },
+
+    /// Cancel all scheduled transactions for a sender using lazy cancel approach.
+    /// This increments the sender's authorization sequence number, which will cause
+    /// all existing scheduled transactions with auth tokens to fail validation when executed.
+    ScheduledTxnsCancelAll {},
+
     /// Continues shutdown process. Can only be called when module status is ShutdownInProgress.
     ScheduledTxnsContinueShutdown {
         cancel_batch_size: u64,
@@ -953,11 +966,6 @@ pub enum EntryFunctionCall {
     /// Re-initialize the module after the shutdown is complete
     /// We need a governance proposal to re-initialize the module.
     ScheduledTxnsReInitialize {},
-
-    /// Change the expiry delta for scheduled transactions; can be called only by the framework
-    ScheduledTxnsSetExpiryDelta {
-        new_expiry_delta: u64,
-    },
 
     /// Starts the shutdown process. Can only be called when module status is Active.
     /// We need a governance proposal to shutdown the module. Possible reasons to shutdown are:
@@ -1817,14 +1825,17 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             ),
+            ScheduledTxnsCancel {
+                time,
+                gas_priority,
+                txn_id,
+            } => scheduled_txns_cancel(time, gas_priority, txn_id),
+            ScheduledTxnsCancelAll {} => scheduled_txns_cancel_all(),
             ScheduledTxnsContinueShutdown { cancel_batch_size } => {
                 scheduled_txns_continue_shutdown(cancel_batch_size)
             },
             ScheduledTxnsInitialize {} => scheduled_txns_initialize(),
             ScheduledTxnsReInitialize {} => scheduled_txns_re_initialize(),
-            ScheduledTxnsSetExpiryDelta { new_expiry_delta } => {
-                scheduled_txns_set_expiry_delta(new_expiry_delta)
-            },
             ScheduledTxnsStartShutdown {} => scheduled_txns_start_shutdown(),
             ScheduledTxnsUnpauseScheduledTxns {} => scheduled_txns_unpause_scheduled_txns(),
             StakeAddStake { amount } => stake_add_stake(amount),
@@ -4492,6 +4503,44 @@ pub fn resource_account_create_resource_account_and_publish_package(
     ))
 }
 
+/// Entry function for cancel that takes individual ScheduleMapKey parameters
+pub fn scheduled_txns_cancel(time: u64, gas_priority: u64, txn_id: U256) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("scheduled_txns").to_owned(),
+        ),
+        ident_str!("cancel").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&time).unwrap(),
+            bcs::to_bytes(&gas_priority).unwrap(),
+            bcs::to_bytes(&txn_id).unwrap(),
+        ],
+    ))
+}
+
+/// Cancel all scheduled transactions for a sender using lazy cancel approach.
+/// This increments the sender's authorization sequence number, which will cause
+/// all existing scheduled transactions with auth tokens to fail validation when executed.
+pub fn scheduled_txns_cancel_all() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("scheduled_txns").to_owned(),
+        ),
+        ident_str!("cancel_all").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 /// Continues shutdown process. Can only be called when module status is ShutdownInProgress.
 pub fn scheduled_txns_continue_shutdown(cancel_batch_size: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -4538,22 +4587,6 @@ pub fn scheduled_txns_re_initialize() -> TransactionPayload {
         ident_str!("re_initialize").to_owned(),
         vec![],
         vec![],
-    ))
-}
-
-/// Change the expiry delta for scheduled transactions; can be called only by the framework
-pub fn scheduled_txns_set_expiry_delta(new_expiry_delta: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("scheduled_txns").to_owned(),
-        ),
-        ident_str!("set_expiry_delta").to_owned(),
-        vec![],
-        vec![bcs::to_bytes(&new_expiry_delta).unwrap()],
     ))
 }
 
@@ -7032,6 +7065,26 @@ mod decoder {
         }
     }
 
+    pub fn scheduled_txns_cancel(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ScheduledTxnsCancel {
+                time: bcs::from_bytes(script.args().get(0)?).ok()?,
+                gas_priority: bcs::from_bytes(script.args().get(1)?).ok()?,
+                txn_id: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn scheduled_txns_cancel_all(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::ScheduledTxnsCancelAll {})
+        } else {
+            None
+        }
+    }
+
     pub fn scheduled_txns_continue_shutdown(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7055,18 +7108,6 @@ mod decoder {
     pub fn scheduled_txns_re_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::ScheduledTxnsReInitialize {})
-        } else {
-            None
-        }
-    }
-
-    pub fn scheduled_txns_set_expiry_delta(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::ScheduledTxnsSetExpiryDelta {
-                new_expiry_delta: bcs::from_bytes(script.args().get(0)?).ok()?,
-            })
         } else {
             None
         }
@@ -8161,6 +8202,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::resource_account_create_resource_account_and_publish_package),
         );
         map.insert(
+            "scheduled_txns_cancel".to_string(),
+            Box::new(decoder::scheduled_txns_cancel),
+        );
+        map.insert(
+            "scheduled_txns_cancel_all".to_string(),
+            Box::new(decoder::scheduled_txns_cancel_all),
+        );
+        map.insert(
             "scheduled_txns_continue_shutdown".to_string(),
             Box::new(decoder::scheduled_txns_continue_shutdown),
         );
@@ -8171,10 +8220,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "scheduled_txns_re_initialize".to_string(),
             Box::new(decoder::scheduled_txns_re_initialize),
-        );
-        map.insert(
-            "scheduled_txns_set_expiry_delta".to_string(),
-            Box::new(decoder::scheduled_txns_set_expiry_delta),
         );
         map.insert(
             "scheduled_txns_start_shutdown".to_string(),

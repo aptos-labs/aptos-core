@@ -177,8 +177,8 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         data: TransactionOnChainData,
     ) -> Result<Transaction> {
         use aptos_types::transaction::Transaction::{
-            BlockEpilogue, BlockMetadata, BlockMetadataExt, GenesisTransaction, StateCheckpoint,
-            UserTransaction,
+            BlockEpilogue, BlockMetadata, BlockMetadataExt, GenesisTransaction,
+            ScheduledTransaction, StateCheckpoint, UserTransaction,
         };
         let aux_data = self
             .db
@@ -207,6 +207,13 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 BlockMetadataTransaction::from_internal_ext(txn, info, events),
             ),
             StateCheckpoint(_) => {
+                Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
+                    info,
+                    timestamp: timestamp.into(),
+                })
+            },
+            ScheduledTransaction(_) => {
+                // todo: to be addressed in the future commit regarding APIs
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
                     timestamp: timestamp.into(),
@@ -355,11 +362,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             Payload(aptos_types::transaction::TransactionPayloadInner::V1 {
                 executable,
                 extra_config,
-            }) => match extra_config {
-                aptos_types::transaction::TransactionExtraConfig::V1 {
-                    multisig_address,
-                    replay_protection_nonce: _,
-                } => {
+            }) => {
+                let multisig_address = extra_config.multisig_address();
+                {
                     if let Some(multisig_address) = multisig_address {
                         match executable {
                             aptos_types::transaction::TransactionExecutable::EntryFunction(
@@ -399,7 +404,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             },
                         }
                     }
-                },
+                }
             },
             // Deprecated.
             ModuleBundle(_) => bail!("Module bundle payload has been removed"),

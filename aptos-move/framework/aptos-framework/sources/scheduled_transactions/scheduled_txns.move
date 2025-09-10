@@ -293,9 +293,6 @@ module aptos_framework::scheduled_txns {
             }
         );
 
-        // Initialize sender sequence number map
-        sched_txns_sender_seqno::initialize(framework);
-
         // Initialize queue
         let queue = ScheduleQueue {
             schedule_map: big_ordered_map::new_with_reusable(),
@@ -415,7 +412,7 @@ module aptos_framework::scheduled_txns {
             error::invalid_state(EINVALID_SHUTDOWN_ATTEMPT)
         );
         aux_data.module_status = ScheduledTxnsModuleStatus::ShutdownComplete;
-        sched_txns_sender_seqno::destroy_sender_seqno_map();
+        sched_txns_sender_seqno::reset_sender_seqno_map();
 
         // Clean up ToRemoveTbl
         let ToRemoveTbl { remove_tbl } = borrow_global_mut<ToRemoveTbl>(@aptos_framework);
@@ -577,6 +574,8 @@ module aptos_framework::scheduled_txns {
                 &scheduled_config
             )
         };
+
+        get_sender_seqno(sender_addr); // Lazy initialization if needed
 
         // Validate the auth token
         validate_auth_token(sender_addr, scheduled_time_ms, &auth_token);
@@ -1085,6 +1084,7 @@ module aptos_framework::scheduled_txns {
         transaction_fee::store_aptos_coin_mint_cap_for_test(fx, mint);
         let user_addr = signer::address_of(user);
         aptos_framework::aptos_account::create_account(user_addr);
+        aptos_framework::sched_txns_sender_seqno::initialize(fx);
         initialize(fx);
         timestamp::set_time_has_started_for_testing(fx);
         timestamp::update_global_time_for_test(curr_mock_time_ms);

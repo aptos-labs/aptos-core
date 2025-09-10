@@ -12,7 +12,7 @@
 -  [Function `get_sender_seqno_readonly`](#0x1_sched_txns_sender_seqno_get_sender_seqno_readonly)
 -  [Function `increment_sender_seqno`](#0x1_sched_txns_sender_seqno_increment_sender_seqno)
 -  [Function `handle_key_rotation`](#0x1_sched_txns_sender_seqno_handle_key_rotation)
--  [Function `destroy_sender_seqno_map`](#0x1_sched_txns_sender_seqno_destroy_sender_seqno_map)
+-  [Function `reset_sender_seqno_map`](#0x1_sched_txns_sender_seqno_reset_sender_seqno_map)
 -  [Function `set_sender_seqno`](#0x1_sched_txns_sender_seqno_set_sender_seqno)
 -  [Function `contains_sender`](#0x1_sched_txns_sender_seqno_contains_sender)
 
@@ -84,7 +84,7 @@ Sender sequence number not found - must be initialized first via get_sender_seqn
 Initialize the sender sequence number map - called from scheduled_txns::initialize
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -93,7 +93,7 @@ Initialize the sender sequence number map - called from scheduled_txns::initiali
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code><b>public</b> <b>fun</b> <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
 
     <b>move_to</b>(
@@ -237,13 +237,13 @@ Only increments if the sender already exists in the sender_seqno_map
 
 </details>
 
-<a id="0x1_sched_txns_sender_seqno_destroy_sender_seqno_map"></a>
+<a id="0x1_sched_txns_sender_seqno_reset_sender_seqno_map"></a>
 
-## Function `destroy_sender_seqno_map`
+## Function `reset_sender_seqno_map`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_destroy_sender_seqno_map">destroy_sender_seqno_map</a>()
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_reset_sender_seqno_map">reset_sender_seqno_map</a>()
 </code></pre>
 
 
@@ -252,15 +252,11 @@ Only increments if the sender already exists in the sender_seqno_map
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_destroy_sender_seqno_map">destroy_sender_seqno_map</a>() <b>acquires</b> <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_SenderSeqnoData">SenderSeqnoData</a> {
-    <b>let</b> <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_SenderSeqnoData">SenderSeqnoData</a> { sender_seqno_map } =
-        <b>move_from</b>&lt;<a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_SenderSeqnoData">SenderSeqnoData</a>&gt;(@aptos_framework);
-    // Clear all elements from the map before dropping it
-    sender_seqno_map.for_each(
-        |_key, _value| {
-            // Do nothing - just consume the elements
-        }
-    );
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_reset_sender_seqno_map">reset_sender_seqno_map</a>() <b>acquires</b> <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_SenderSeqnoData">SenderSeqnoData</a> {
+    <b>let</b> seqno_data = <b>borrow_global_mut</b>&lt;<a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_SenderSeqnoData">SenderSeqnoData</a>&gt;(@aptos_framework);
+    seqno_data.sender_seqno_map.for_each_and_clear(|_key, _value| {
+        // Just consume the elements, leaving the map empty
+    });
 }
 </code></pre>
 

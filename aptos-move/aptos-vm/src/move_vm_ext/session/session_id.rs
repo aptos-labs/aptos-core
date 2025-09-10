@@ -78,6 +78,18 @@ pub enum SessionId {
         // block id
         id: HashValue,
     },
+    ScheduledTxn {
+        hash: HashValue,
+    },
+    ScheduledTxnPrologue {
+        hash: HashValue,
+    },
+    ScheduledTxnEpilogue {
+        hash: HashValue,
+    },
+    ScheduledTxnAbort {
+        hash: HashValue,
+    },
 }
 
 impl SessionId {
@@ -175,6 +187,22 @@ impl SessionId {
         }
     }
 
+    pub fn scheduled_txn(hash: HashValue) -> Self {
+        Self::ScheduledTxn { hash }
+    }
+
+    pub fn scheduled_txn_prologue(hash: HashValue) -> Self {
+        Self::ScheduledTxnPrologue { hash }
+    }
+
+    pub fn scheduled_txn_epilogue(hash: HashValue) -> Self {
+        Self::ScheduledTxnEpilogue { hash }
+    }
+
+    pub fn scheduled_txn_abort(hash: HashValue) -> Self {
+        Self::ScheduledTxnAbort { hash }
+    }
+
     pub fn as_uuid(&self) -> HashValue {
         self.hash()
     }
@@ -190,7 +218,11 @@ impl SessionId {
             | Self::OrderlessTxnProlouge { script_hash, .. }
             | Self::OrderlessTxnEpilogue { script_hash, .. }
             | Self::OrderlessRunOnAbort { script_hash, .. } => script_hash,
-            Self::BlockMeta { id: _ }
+            Self::ScheduledTxn { hash: _ }
+            | Self::ScheduledTxnPrologue { hash: _ }
+            | Self::ScheduledTxnEpilogue { hash: _ }
+            | Self::ScheduledTxnAbort { hash: _ }
+            | Self::BlockMeta { id: _ }
             | Self::Genesis { id: _ }
             | Self::Void
             | Self::BlockEpilogue { id: _ }

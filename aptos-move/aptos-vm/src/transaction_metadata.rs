@@ -8,7 +8,8 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationProof, user_transaction_context::UserTransactionContext,
+        authenticator::AuthenticationProof,
+        user_transaction_context::{PayloadConfig, UserTransactionContext},
         EntryFunction, Multisig, MultisigTransactionPayload, ReplayProtector, SignedTransaction,
         TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig,
         TransactionPayload, TransactionPayloadInner,
@@ -35,6 +36,7 @@ pub struct TransactionMetadata {
     pub is_keyless: bool,
     pub entry_function_payload: Option<EntryFunction>,
     pub multisig_payload: Option<Multisig>,
+    pub payload_config: Option<PayloadConfig>,
 }
 
 impl TransactionMetadata {
@@ -105,6 +107,32 @@ impl TransactionMetadata {
                         _ => None,
                     },
                 }),
+                _ => None,
+            },
+            payload_config: match txn.payload() {
+                TransactionPayload::Payload(TransactionPayloadInner::V1 {
+                    extra_config, ..
+                }) => match extra_config {
+                    TransactionExtraConfig::V1 {
+                        multisig_address,
+                        replay_protection_nonce,
+                    } => Some(PayloadConfig {
+                        multisig_address: *multisig_address,
+                        replay_protection_nonce: *replay_protection_nonce,
+                        scheduled_txn_auth_token: None,
+                    }),
+                    TransactionExtraConfig::V2 {
+                        multisig_address,
+                        replay_protection_nonce,
+                        permissions_table,
+                    } => Some(PayloadConfig {
+                        multisig_address: *multisig_address,
+                        replay_protection_nonce: *replay_protection_nonce,
+                        scheduled_txn_auth_token: permissions_table
+                            .as_ref()
+                            .and_then(|table| table.get_scheduled_txn_config().ok()?),
+                    }),
+                },
                 _ => None,
             },
         }
@@ -190,7 +218,7 @@ impl TransactionMetadata {
     }
 
     pub fn as_user_transaction_context(&self) -> UserTransactionContext {
-        UserTransactionContext::new(
+        UserTransactionContext::new_with_payload_config(
             self.sender,
             self.secondary_signers.clone(),
             self.fee_payer.unwrap_or(self.sender),
@@ -201,6 +229,8 @@ impl TransactionMetadata {
                 .map(|entry_func| entry_func.as_entry_function_payload()),
             self.multisig_payload()
                 .map(|multisig| multisig.as_multisig_payload()),
+            false,
+            self.payload_config.clone(),
         )
     }
 }

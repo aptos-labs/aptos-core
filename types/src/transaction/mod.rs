@@ -48,6 +48,7 @@ mod block_output;
 mod change_set;
 mod module;
 mod multisig;
+pub mod scheduled_txn;
 mod script;
 pub mod signature_verified_transaction;
 pub mod use_case;
@@ -67,6 +68,7 @@ use crate::{
     on_chain_config::{FeatureFlag, Features},
     proof::accumulator::InMemoryEventAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::scheduled_txn::ScheduledTransactionInfoWithKey,
     validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
@@ -170,9 +172,7 @@ mod tests {
 }
 
 /// RawTransaction is the portion of a transaction that a client signs.
-#[derive(
-    Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
-)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct RawTransaction {
     /// Sender's address.
     sender: AccountAddress,
@@ -612,9 +612,7 @@ fn gen_auth(
     })
 }
 
-#[derive(
-    Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
-)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub enum RawTransactionWithData {
     MultiAgent {
         raw_txn: RawTransaction,
@@ -660,7 +658,7 @@ pub struct DeprecatedPayload {
 }
 
 /// Different kinds of transactions.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TransactionPayload {
     /// A transaction that executes code.
     Script(Script),
@@ -677,7 +675,7 @@ pub enum TransactionPayload {
     Payload(TransactionPayloadInner),
 }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TransactionPayloadInner {
     V1 {
         executable: TransactionExecutable,
@@ -738,12 +736,87 @@ impl TransactionExecutableRef<'_> {
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct ScheduledTxnConfig {
+    pub allow_rescheduling: bool,
+    pub expiration_time: u64,
+    pub authorization_seqno: u64,
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub enum PermissionsType {
+    ScheduledTxnsPermissions,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct PermissionsTbl {
+    permissions: std::collections::HashMap<PermissionsType, Vec<u8>>,
+}
+
+impl PermissionsTbl {
+    pub fn new() -> Self {
+        Self {
+            permissions: std::collections::HashMap::new(),
+        }
+    }
+
+    pub fn with_scheduled_txn_config(config: ScheduledTxnConfig) -> Result<Self, bcs::Error> {
+        let mut table = Self::new();
+        table.set_scheduled_txn_config(config)?;
+        Ok(table)
+    }
+
+    pub fn set_scheduled_txn_config(
+        &mut self,
+        config: ScheduledTxnConfig,
+    ) -> Result<(), bcs::Error> {
+        let bytes = bcs::to_bytes(&config)?;
+        self.permissions
+            .insert(PermissionsType::ScheduledTxnsPermissions, bytes);
+        Ok(())
+    }
+
+    pub fn get_scheduled_txn_config(&self) -> Result<Option<ScheduledTxnConfig>, bcs::Error> {
+        if let Some(bytes) = self
+            .permissions
+            .get(&PermissionsType::ScheduledTxnsPermissions)
+        {
+            let config: ScheduledTxnConfig = bcs::from_bytes(bytes)?;
+            Ok(Some(config))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.permissions.is_empty()
+    }
+}
+
+impl Default for PermissionsTbl {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TransactionExtraConfig {
     V1 {
         multisig_address: Option<AccountAddress>,
         // None for regular transactions
         // Some(nonce) for orderless transactions
         replay_protection_nonce: Option<u64>,
+    },
+    V2 {
+        multisig_address: Option<AccountAddress>,
+        // None for regular transactions
+        // Some(nonce) for orderless transactions
+        replay_protection_nonce: Option<u64>,
+        // None for regular transactions
+        // Some(permissions) for transactions with permissions
+        permissions_table: Option<PermissionsTbl>,
     },
 }
 
@@ -866,6 +939,16 @@ impl TransactionPayload {
                         replay_protection_nonce: replay_protection_nonce
                             .or_else(|| Some(rng.gen())),
                     },
+                    TransactionExtraConfig::V2 {
+                        multisig_address,
+                        replay_protection_nonce,
+                        permissions_table,
+                    } => TransactionExtraConfig::V2 {
+                        multisig_address,
+                        replay_protection_nonce: replay_protection_nonce
+                            .or_else(|| Some(rng.gen())),
+                        permissions_table,
+                    },
                 }
             }
             TransactionPayload::Payload(TransactionPayloadInner::V1 {
@@ -889,6 +972,10 @@ impl TransactionExtraConfig {
                 replay_protection_nonce,
                 ..
             } => *replay_protection_nonce,
+            Self::V2 {
+                replay_protection_nonce,
+                ..
+            } => *replay_protection_nonce,
         }
     }
 
@@ -899,9 +986,22 @@ impl TransactionExtraConfig {
     pub fn multisig_address(&self) -> Option<AccountAddress> {
         match self {
             Self::V1 {
-                multisig_address,
-                replay_protection_nonce: _,
+                multisig_address, ..
             } => *multisig_address,
+            Self::V2 {
+                multisig_address, ..
+            } => *multisig_address,
+        }
+    }
+
+    pub fn scheduled_txn_auth_token(&self) -> Option<ScheduledTxnConfig> {
+        match self {
+            Self::V1 { .. } => None,
+            Self::V2 {
+                permissions_table, ..
+            } => permissions_table
+                .as_ref()
+                .and_then(|table| table.get_scheduled_txn_config().ok()?),
         }
     }
 }
@@ -2842,6 +2942,9 @@ pub enum Transaction {
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     /// Replaces StateCheckpoint, with optionally having more data.
     BlockEpilogue(BlockEpiloguePayload),
+
+    /// Transaction that was originally scheduled by user; it will be executed by the system
+    ScheduledTransaction(ScheduledTransactionInfoWithKey),
 }
 
 impl From<BlockMetadataExt> for Transaction {
@@ -2909,6 +3012,7 @@ impl Transaction {
             Transaction::StateCheckpoint(_) => "state_checkpoint",
             Transaction::BlockEpilogue(_) => "block_epilogue",
             Transaction::ValidatorTransaction(vt) => vt.type_name(),
+            Transaction::ScheduledTransaction(_) => "scheduled_transaction",
             Transaction::BlockMetadataExt(bmet) => bmet.type_name(),
         }
     }
@@ -2925,7 +3029,8 @@ impl Transaction {
             | Transaction::GenesisTransaction(_)
             | Transaction::BlockMetadata(_)
             | Transaction::BlockMetadataExt(_)
-            | Transaction::ValidatorTransaction(_) => false,
+            | Transaction::ValidatorTransaction(_)
+            | Transaction::ScheduledTransaction(_) => false,
         }
     }
 
@@ -2936,7 +3041,8 @@ impl Transaction {
             | Transaction::BlockEpilogue(_)
             | Transaction::UserTransaction(_)
             | Transaction::GenesisTransaction(_)
-            | Transaction::ValidatorTransaction(_) => false,
+            | Transaction::ValidatorTransaction(_)
+            | Transaction::ScheduledTransaction(_) => false,
         }
     }
 }
