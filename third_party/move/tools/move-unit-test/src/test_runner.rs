@@ -214,7 +214,7 @@ impl TestRunner {
                         .map(|(_, test_plan)| {
                             self.testing_config
                                 .exec_module_tests(test_plan, writer, options, false)
-                                .unwrap() // cannot fail in non-fail-fast mode
+                                .expect("exec_module_tests should not fail in non-fail-fast mode")
                         })
                         .reduce(TestStatistics::new, |acc, stats| acc.combine(stats));
 
