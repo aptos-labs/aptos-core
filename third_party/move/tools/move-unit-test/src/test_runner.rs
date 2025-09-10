@@ -172,55 +172,39 @@ impl TestRunner {
         writer: &Mutex<W>,
         options: &Mutex<F>,
     ) -> Result<TestResults> {
-        if self.testing_config.fail_fast {
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(self.num_threads)
-                .build()
-                .unwrap()
-                .install(|| {
-                    let stats = self
-                        .tests
-                        .module_tests
-                        .par_iter()
-                        .map(|(_, plan)| {
-                            self.testing_config
-                                .exec_module_tests(plan, writer, options, true)
-                        })
-                        .try_reduce(TestStatistics::new, |a, b| Ok(a.combine(b)));
-                    // If we got an error, it must be a fail-fast error, so extract the stats until the first failure.
-                    let final_stats = match stats {
-                        Err(e) => {
-                            if let Some(fail_fast) = e.downcast_ref::<FailFast>() {
-                                fail_fast.0.clone()
-                            } else {
-                                panic!("Only FailFast errors are expected in fail-fast mode, but got a different error: {:?}", e);
-                            }
-                        },
-                        Ok(stats) => stats,
-                    };
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(self.num_threads)
+            .build()
+            .unwrap()
+            .install(|| {
+                let stats = self
+                    .tests
+                    .module_tests
+                    .par_iter()
+                    .map(|(_, plan)| {
+                        self.testing_config.exec_module_tests(
+                            plan,
+                            writer,
+                            options,
+                            self.testing_config.fail_fast,
+                        )
+                    })
+                    .try_reduce(TestStatistics::new, |a, b| Ok(a.combine(b)));
+                // If we got an error, it must be a fail-fast error, so extract the stats until the first failure.
+                let final_stats = match stats {
+                    Err(e) if !self.testing_config.fail_fast => panic!("We expect no errors at all when not in fail-fast mode, but got: {:?}", e),
+                    Err(e) => {
+                        if let Some(fail_fast) = e.downcast_ref::<FailFast>() {
+                            fail_fast.0.clone()
+                        } else {
+                            panic!("Only FailFast errors are expected in fail-fast mode, but got a different error: {:?}", e);
+                        }
+                    },
+                    Ok(stats) => stats,
+                };
 
-                    Ok(TestResults::new(final_stats, self.tests))
-                })
-        } else {
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(self.num_threads)
-                .build()
-                .unwrap()
-                .install(|| {
-                    let final_statistics = self
-                        .tests
-                        .module_tests
-                        .par_iter()
-                        .map(|(_, test_plan)| {
-                            self.testing_config
-                                .exec_module_tests(test_plan, writer, options, false)
-                                .expect("exec_module_tests should not fail in non-fail-fast mode")
-                        })
-                        .reduce(TestStatistics::new, |acc, stats| acc.combine(stats));
-
-                    Ok(TestResults::new(final_statistics, self.tests))
-                })
-        }
+                Ok(TestResults::new(final_stats, self.tests))
+            })
     }
 
     pub fn filter(&mut self, test_name_slice: &str) {
