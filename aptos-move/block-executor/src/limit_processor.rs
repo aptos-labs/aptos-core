@@ -9,7 +9,6 @@ use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
-    state_store::{state_slot::StateSlot, TStateView},
     transaction::{
         block_epilogue::{BlockEndInfo, TBlockEndInfoExt},
         BlockExecutableTransaction as Transaction,
@@ -17,12 +16,12 @@ use aptos_types::{
 };
 use claims::{assert_le, assert_none};
 use once_cell::sync::Lazy;
-use std::{collections::BTreeMap, env, time::Instant};
+use std::{collections::BTreeSet, env, time::Instant};
 
 pub static PRINT_CONFLICTS_INFO: Lazy<bool> =
     Lazy::new(|| env::var("PRINT_CONFLICTS_INFO").is_ok());
 
-pub struct BlockGasLimitProcessor<'s, T: Transaction, S> {
+pub struct BlockGasLimitProcessor<T: Transaction> {
     block_gas_limit_type: BlockGasLimitType,
     block_gas_limit_override: Option<u64>,
     accumulated_raw_block_gas: u64,
@@ -33,19 +32,18 @@ pub struct BlockGasLimitProcessor<'s, T: Transaction, S> {
     txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
     start_time: Instant,
     print_conflicts_info: bool,
-    hot_state_op_accumulator: Option<BlockHotStateOpAccumulator<'s, T::Key, S>>,
+    hot_state_op_accumulator: Option<BlockHotStateOpAccumulator<T::Key>>,
 }
 
-impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s, T, S> {
+impl<T: Transaction> BlockGasLimitProcessor<T> {
     pub fn new(
-        base_view: &'s S,
         block_gas_limit_type: BlockGasLimitType,
         block_gas_limit_override: Option<u64>,
         init_size: usize,
     ) -> Self {
         let hot_state_op_accumulator = block_gas_limit_type
             .add_block_limit_outcome_onchain()
-            .then(|| BlockHotStateOpAccumulator::new(base_view));
+            .then(BlockHotStateOpAccumulator::new);
         Self {
             block_gas_limit_type,
             block_gas_limit_override,
@@ -289,18 +287,18 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
 
-        let to_make_hot = self.get_slots_to_make_hot();
+        let to_make_hot = self.get_keys_to_make_hot();
         TBlockEndInfoExt::new(inner, to_make_hot)
     }
 
-    fn get_slots_to_make_hot(&self) -> BTreeMap<T::Key, StateSlot> {
+    fn get_keys_to_make_hot(&self) -> BTreeSet<T::Key> {
         if self.hot_state_op_accumulator.is_none() {
             warn!("BlockHotStateOpAccumulator is not set.");
         }
 
         self.hot_state_op_accumulator
             .as_ref()
-            .map(|x| x.get_slots_to_make_hot())
+            .map(|x| x.get_keys_to_make_hot())
             .unwrap_or_default()
     }
 }
@@ -314,9 +312,6 @@ mod test {
             types::{KeyType, MockTransaction},
         },
         types::InputOutputKey,
-    };
-    use aptos_types::state_store::{
-        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewResult,
     };
     use std::collections::HashSet;
     // TODO: add tests for accumulate_fee_statement / compute_conflict_multiplier for different BlockGasLimitType configs
@@ -335,26 +330,11 @@ mod test {
 
     type TestTxn = MockTransaction<KeyType<u64>, MockEvent>;
 
-    struct MockStateView;
-    const EMPTY_STATE_VIEW: MockStateView = MockStateView;
-
-    impl TStateView for MockStateView {
-        type Key = KeyType<u64>;
-
-        fn get_state_value(&self, _key: &Self::Key) -> StateViewResult<Option<StateValue>> {
-            Ok(None)
-        }
-
-        fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
-            Ok(StateStorageUsage::zero())
-        }
-    }
-
-    type TestProcessor<'s> = BlockGasLimitProcessor<'s, TestTxn, MockStateView>;
+    type TestProcessor = BlockGasLimitProcessor<TestTxn>;
 
     #[test]
     fn test_output_limit_not_used() {
-        let mut processor = TestProcessor::new(&EMPTY_STATE_VIEW, DEFAULT_COMPLEX_LIMIT, None, 10);
+        let mut processor = TestProcessor::new(DEFAULT_COMPLEX_LIMIT, None, 10);
         // Assert passing none here doesn't panic.
         processor.accumulate_fee_statement(FeeStatement::zero(), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -378,7 +358,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(&EMPTY_STATE_VIEW, block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
 
         processor.accumulate_fee_statement(execution_fee(10), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -402,7 +382,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(&EMPTY_STATE_VIEW, block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
 
         processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(10));
         assert_eq!(processor.accumulated_approx_output_size, 10);
@@ -440,7 +420,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(&EMPTY_STATE_VIEW, block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
 
         processor.accumulate_fee_statement(
             execution_fee(10),
@@ -502,7 +482,7 @@ mod test {
             use_granular_resource_group_conflicts: true,
         };
 
-        let mut processor = TestProcessor::new(&EMPTY_STATE_VIEW, block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
 
         assert!(!processor.should_end_block_parallel());
         processor.accumulate_fee_statement(
