@@ -370,14 +370,14 @@ impl Parser {
             .collect();
 
         // Isolate retries and discards.
-        let (to_retry, to_discard, has_reconfig) = Self::extract_retries_and_discards(
+        let (to_retry, to_discard) = Self::extract_retries_and_discards(
             &mut transactions,
             &mut transaction_outputs,
             &mut persisted_auxiliary_infos,
         );
 
         let mut block_end_info = None;
-        if is_block && !has_reconfig {
+        if is_block {
             if let Some(Transaction::BlockEpilogue(payload)) = transactions.last() {
                 block_end_info = payload.try_as_block_end_info().cloned();
                 ensure!(statuses_for_input_txns.pop().is_some());
@@ -385,14 +385,14 @@ impl Parser {
         }
 
         // The rest is to be committed, attach block epilogue as needed and optionally get next EpochState.
-        let to_commit = {
+        let (to_commit, has_reconfig) = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__to_commit"]);
             let to_commit = TransactionsWithOutput::new(
                 transactions,
                 transaction_outputs,
                 persisted_auxiliary_infos,
             );
-            TransactionsToKeep::index(first_version, to_commit, has_reconfig)
+            TransactionsToKeep::index(first_version, to_commit, is_block)
         };
         let next_epoch_state = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__next_epoch_state"]);
@@ -458,17 +458,8 @@ impl Parser {
         transactions: &mut Vec<Transaction>,
         transaction_outputs: &mut Vec<TransactionOutput>,
         persisted_auxiliary_infos: &mut Vec<PersistedAuxiliaryInfo>,
-    ) -> (TransactionsWithOutput, TransactionsWithOutput, bool) {
+    ) -> (TransactionsWithOutput, TransactionsWithOutput) {
         let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__retries_and_discards"]);
-
-        let last_non_retry = transaction_outputs
-            .iter()
-            .rposition(|t| !t.status().is_retry());
-        let is_reconfig = if let Some(idx) = last_non_retry {
-            transaction_outputs[idx].has_new_epoch_event()
-        } else {
-            false
-        };
 
         let mut to_discard = TransactionsWithOutput::new_empty();
         let mut to_retry = TransactionsWithOutput::new_empty();
@@ -520,7 +511,7 @@ impl Parser {
             }
         });
 
-        (to_retry, to_discard, is_reconfig)
+        (to_retry, to_discard)
     }
 
     fn ensure_next_epoch_state(to_commit: &TransactionsWithOutput) -> Result<EpochState> {
@@ -696,9 +687,8 @@ mod tests {
                 transaction_index: 3,
             },
         ];
-        let (to_retry, to_discard, is_reconfig) =
+        let (to_retry, to_discard) =
             Parser::extract_retries_and_discards(&mut txns, &mut txn_outs, &mut auxiliary_infos);
-        assert!(!is_reconfig);
         assert_eq!(to_retry.len(), 1);
         assert_eq!(to_discard.len(), 1);
         assert_eq!(txns.len(), 2);
@@ -720,10 +710,6 @@ mod tests {
 
     #[test]
     fn test_extract_retry_and_discard_reconfig() {
-        let reconfig_event = ContractEvent::new_v2_with_type_tag_str(
-            "0x1::reconfiguration::NewEpochEvent",
-            b"".to_vec(),
-        );
         let mut txns = vec![
             Transaction::dummy(),
             Transaction::dummy(),
@@ -732,7 +718,7 @@ mod tests {
         let mut txn_outs = vec![
             TransactionOutput::new(
                 WriteSet::default(),
-                vec![reconfig_event],
+                vec![],
                 0,
                 TransactionStatus::Keep(ExecutionStatus::Success),
                 TransactionAuxiliaryData::default(),
@@ -763,9 +749,8 @@ mod tests {
                 transaction_index: 2,
             },
         ];
-        let (to_retry, to_discard, is_reconfig) =
+        let (to_retry, to_discard) =
             Parser::extract_retries_and_discards(&mut txns, &mut txn_outs, &mut auxiliary_infos);
-        assert!(is_reconfig);
         assert_eq!(to_retry.len(), 2);
         assert_eq!(to_discard.len(), 0);
         assert_eq!(txns.len(), 1);
