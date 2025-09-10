@@ -668,7 +668,7 @@ impl PipelineBuilder {
                 .await
                 .map_err(|_| anyhow!("randomness tx cancelled"))?
         };
-        Ok((maybe_rand, has_randomness))
+        Ok((Some(maybe_rand), has_randomness))
     }
 
     /// Precondition: 1. prepare finishes, 2. parent block's phase finishes 3. randomness is available
@@ -689,10 +689,15 @@ impl PipelineBuilder {
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
 
-        let (maybe_rand, _has_randomness) = rand_check.await?;
+        let (rand_result, _has_randomness) = rand_check.await?;
 
         tracker.start_working();
-        let metadata_txn = block.new_metadata_with_randomness(&validator, maybe_rand);
+        // if randomness is disabled, the metadata skips DKG and triggers immediate reconfiguration
+        let metadata_txn = if let Some(maybe_rand) = rand_result {
+            block.new_metadata_with_randomness(&validator, maybe_rand)
+        } else {
+            block.new_block_metadata(&validator).into()
+        };
         let txns = [
             vec![SignatureVerifiedTransaction::from(Transaction::from(
                 metadata_txn,

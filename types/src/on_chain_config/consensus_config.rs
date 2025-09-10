@@ -424,6 +424,19 @@ impl OnChainConsensusConfig {
             } => *rand_check,
         }
     }
+
+    pub fn disable_rand_check(&mut self) {
+        match self {
+            OnChainConsensusConfig::V5 {
+                rand_check_enabled, ..
+            } => {
+                *rand_check_enabled = false;
+            },
+            _ => {
+                // rand_check not supported. No-op.
+            },
+        }
+    }
 }
 
 /// This is used when on-chain config is not initialized.
