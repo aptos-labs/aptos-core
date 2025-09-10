@@ -19,6 +19,7 @@ module 0xc0ffee::m {
     }
   }
 
+  #[lint::skip(cyclomatic_complexity)]
   public fun arg_cmp(a: u64, b: u64, addr: address) : u64 acquires Counter, NestedCounter, HyperNestedCounter {
     if (a + b < a) {
       a + b
