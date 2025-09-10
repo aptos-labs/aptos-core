@@ -839,7 +839,8 @@ where
         )
         .map_err(|e| match function.module_id() {
             Some(id) => {
-                let e = if true {//cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
+                let e = if true {
+                    //cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
                     e.with_exec_state(self.get_internal_state())
                 } else {
                     e

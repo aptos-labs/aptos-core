@@ -362,12 +362,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             Payload(aptos_types::transaction::TransactionPayloadInner::V1 {
                 executable,
                 extra_config,
-            }) => match extra_config {
-                aptos_types::transaction::TransactionExtraConfig::V1 {
-                    multisig_address,
-                    replay_protection_nonce: _,
-                    scheduled_txn_auth_token: _,
-                } => {
+            }) => {
+                let multisig_address = extra_config.multisig_address();
+                {
                     if let Some(multisig_address) = multisig_address {
                         match executable {
                             aptos_types::transaction::TransactionExecutable::EntryFunction(
@@ -407,7 +404,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             },
                         }
                     }
-                },
+                }
             },
             // Deprecated.
             ModuleBundle(_) => bail!("Module bundle payload has been removed"),
@@ -767,7 +764,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         extra_config: ExtraConfig::V1 {
                             multisig_address: None,
                             replay_protection_nonce: Some(nonce),
-                            scheduled_txn_auth_token: None,
                         },
                     })
                 } else {
@@ -781,7 +777,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         extra_config: ExtraConfig::V1 {
                             multisig_address: None,
                             replay_protection_nonce: Some(nonce),
-                            scheduled_txn_auth_token: None,
                         },
                     })
                 } else {
@@ -807,7 +802,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         extra_config: ExtraConfig::V1 {
                             multisig_address: Some(multisig.multisig_address.into()),
                             replay_protection_nonce: Some(nonce),
-                            scheduled_txn_auth_token: None,
                         },
                     })
                 } else {
