@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: Invalid operation: pack of `m::S` can only be done within the defining module `0xc0ffee::m`
+   ┌─ tests/file-format-generator/bug_17477.move:10:16
+   │
+10 │     public fun test1() {
+   │                ^^^^^
+11 │         spec {};
+12 │         let _ = S { x: 42 };
+   │                 ----------- packed here

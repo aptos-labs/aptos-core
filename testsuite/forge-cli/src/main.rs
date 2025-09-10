@@ -11,7 +11,7 @@ use clap::{Parser, Subcommand};
 use futures::{future, FutureExt};
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use serde_json::{json, Value};
-use std::{self, env, num::NonZeroUsize, process, time::Duration};
+use std::{self, num::NonZeroUsize, process, time::Duration};
 use sugars::{boxed, hmap};
 use suites::{
     dag::get_dag_test,
@@ -28,7 +28,6 @@ use suites::{
     },
 };
 use tokio::runtime::Runtime;
-use url::Url;
 
 mod suites;
 
@@ -56,8 +55,6 @@ struct Args {
         default_value = "land_blocking"
     )]
     suite: String,
-    #[clap(long, num_args = 0..)]
-    changelog: Option<Vec<String>>,
 
     // subcommand groups
     #[clap(subcommand)]
@@ -288,7 +285,7 @@ fn main() -> Result<()> {
                         duration,
                         LocalFactory::from_workspace(swarm_dir)?,
                     );
-                    run_forge_with_changelog(forge, &args.options, args.changelog.clone())
+                    run_forge(forge, &args.options)
                 },
                 TestCommand::K8sSwarm(k8s) => {
                     if let Some(move_modules_dir) = &k8s.move_modules_dir {
@@ -330,7 +327,7 @@ fn main() -> Result<()> {
                             k8s.deployer_profile.clone(),
                         )?,
                     );
-                    run_forge_with_changelog(forge, &args.options, args.changelog)
+                    run_forge(forge, &args.options)
                 },
             }
         },
@@ -416,11 +413,7 @@ fn main() -> Result<()> {
     }
 }
 
-pub fn run_forge_with_changelog<F: Factory>(
-    forge: Forge<F>,
-    options: &Options,
-    optional_changelog: Option<Vec<String>>,
-) -> Result<()> {
+pub fn run_forge<F: Factory>(forge: Forge<F>, options: &Options) -> Result<()> {
     if options.list {
         forge.list()?;
 
@@ -428,68 +421,17 @@ pub fn run_forge_with_changelog<F: Factory>(
     }
 
     let forge_result = forge.run();
-    let report = forge_result.map_err(|e| {
+    let summary = forge_result.map_err(|e| {
         eprintln!("Failed to run tests:\n{}", e);
         anyhow::anyhow!(e)
     })?;
 
-    if let Some(changelog) = optional_changelog {
-        if changelog.len() != 2 {
-            println!("Use: changelog <from> <to>");
-            process::exit(1);
-        }
-        let to_commit = changelog[1].clone();
-        let from_commit = Some(changelog[0].clone());
-        send_changelog_message(&report.to_string(), &from_commit, &to_commit);
-    }
-    Ok(())
-}
-
-pub fn send_changelog_message(perf_msg: &str, from_commit: &Option<String>, to_commit: &str) {
-    println!(
-        "Generating changelog from {:?} to {}",
-        from_commit, to_commit
-    );
-    let changelog = get_changelog(from_commit.as_ref(), to_commit);
-    let msg = format!("{}\n\n{}", changelog, perf_msg);
-    let slack_url: Option<Url> = env::var("SLACK_URL")
-        .map(|u| u.parse().expect("Failed to parse SLACK_URL"))
-        .ok();
-    if let Some(ref slack_url) = slack_url {
-        let slack_client = SlackClient::new();
-        if let Err(e) = slack_client.send_message(slack_url, &msg) {
-            println!("Failed to send slack message: {}", e);
-        }
-    }
-}
-
-fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String {
-    let github_client = GitHub::new();
-    let commits = github_client.get_commits("aptos-labs/aptos-core", upstream_commit);
-    match commits {
-        Err(e) => {
-            println!("Failed to get github commits: {:?}", e);
-            format!("*Revision upstream_{}*", upstream_commit)
-        },
-        Ok(commits) => {
-            let mut msg = format!("*Revision {}*", upstream_commit);
-            for commit in commits {
-                if let Some(prev_commit) = prev_commit {
-                    if commit.sha.starts_with(prev_commit) {
-                        break;
-                    }
-                }
-                let commit_lines: Vec<_> = commit.commit.message.split('\n').collect();
-                let commit_head = commit_lines[0];
-                let commit_head = commit_head.replace("[breaking]", "*[breaking]*");
-                let short_sha = &commit.sha[..6];
-                let email_parts: Vec<_> = commit.commit.author.email.split('@').collect();
-                let author = email_parts[0];
-                let line = format!("\n>\u{2022} {} _{}_ {}", short_sha, author, commit_head);
-                msg.push_str(&line);
-            }
-            msg
-        },
+    if summary.success() {
+        Ok(())
+    } else if summary.is_soft_failure() {
+        process::exit(51);
+    } else {
+        process::exit(1);
     }
 }
 
@@ -526,7 +468,7 @@ fn get_test_suite(
         boxed!(|| get_state_sync_test(test_name)),
         boxed!(|| get_dag_test(test_name, duration, test_cmd)),
         boxed!(|| get_indexer_test(test_name)),
-        boxed!(|| get_ungrouped_test(test_name)),
+        boxed!(|| get_ungrouped_test(test_name, duration)),
     ];
 
     for named_suite in named_test_suites.iter() {

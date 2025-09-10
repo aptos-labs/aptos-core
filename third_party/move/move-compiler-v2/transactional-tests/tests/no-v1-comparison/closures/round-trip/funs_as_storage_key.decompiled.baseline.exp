@@ -1,0 +1,85 @@
+processed 13 tasks
+task 0 lines 3-26:  publish [module 0x42::mod2 {]
+task 1 lines 29-57:  publish [module 0x42::mod3 {]
+task 2 lines 60-76:  publish [module 0x42::mod4 {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE2:65:22
+   │
+65 │     fun check_exists(p0: &signer) {
+   │                      ^^
+
+warning: Unused value of parameter `p1`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p1`), or binding to `_`
+   ┌─ TEMPFILE2:73:24
+   │
+73 │     fun test(p0: &u64, p1: &mut u8): &u64 {
+   │                        ^^
+
+
+task 3 lines 79-98:  publish [module 0x42::mod5 {]
+Error: compilation errors:
+ error: type `|&u64, &mut u8|&u64 has copy + drop` is missing required ability `store`
+   ┌─ TEMPFILE3:90:89
+   │
+90 │         0x1::vector::push_back<|&u64, &mut u8|(&u64) has copy + drop + store>(&mut _t3, _t2);
+   │                                                                                         ^^^
+
+
+task 4 lines 101-149:  publish [module 0x42::mod6 {]
+Error: compilation errors:
+ error: type `|&mut u8| has copy + drop` is missing required ability `store`
+    ┌─ TEMPFILE4:131:72
+    │
+131 │         0x1::vector::push_back<|&mut u8| has copy + drop + store>(_t6, _t2);
+    │                                                                        ^^^
+
+error: type `|&mut u8| has copy + drop` is missing required ability `store`
+    ┌─ TEMPFILE4:132:72
+    │
+132 │         0x1::vector::push_back<|&mut u8| has copy + drop + store>(_t6, _t3);
+    │                                                                        ^^^
+
+error: type `|&mut u8| has copy + drop` is missing required ability `store`
+    ┌─ TEMPFILE4:133:72
+    │
+133 │         0x1::vector::push_back<|&mut u8| has copy + drop + store>(_t6, _t4);
+    │                                                                        ^^^
+
+
+task 5 lines 152-152:  run 0x42::mod3::test_items --signers 0x42 --args true
+return values: true
+task 6 lines 154-154:  run 0x42::mod3::test_items --signers 0x42 --args false
+return values: true
+task 7 lines 156-156:  run 0x42::mod4::initialize --signers 0x42
+task 8 lines 158-158:  run 0x42::mod4::check_exists --signers 0x42
+task 9 lines 160-160:  run 0x42::mod5::initialize --signers 0x42
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 10 lines 162-162:  run 0x42::mod5::check_exists --signers 0x42
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 11 lines 164-164:  run 0x42::mod6::initialize --signers 0x42
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 12 lines 166-166:  run 0x42::mod6::compute --signers 0x42
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

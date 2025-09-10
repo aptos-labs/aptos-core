@@ -1,0 +1,23 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/bug_16625.move`
+
+//# publish
+module 0xcafe::m {
+    struct S has copy, drop {
+        f: ||(u8) has copy + drop,
+    }
+    fun foo(p0: S) {
+        let _t5 = *&(&p0).f;
+        let _t1 = _t5();
+        let _t7 = &mut _t1;
+        *_t7 = 1u8;
+    }
+    public fun main() {
+        foo(S{f: || lambda__1__main()});
+    }
+    fun lambda__1__main(): u8 {
+        42u8
+    }
+}
+
+
+//# run 0xCAFE::m::main

@@ -1,84 +1,62 @@
 processed 4 tasks
-
-task 0 'print-bytecode'. lines 1-18:
-// Move bytecode v7
-script {
-
-
-main() /* def_idx: 0 */ {
-L0:	loc0: u64
-B0:
-	0: LdU64(0)
-	1: StLoc[0](loc0: u64)
-B1:
-	2: CopyLoc[0](loc0: u64)
-	3: LdU64(5)
-	4: Lt
-	5: BrFalse(11)
-B2:
-	6: CopyLoc[0](loc0: u64)
-	7: LdU64(1)
-	8: Add
-	9: StLoc[0](loc0: u64)
-	10: Branch(2)
-B3:
-	11: Ret
-}
-}
-
-task 1 'print-bytecode'. lines 20-32:
-// Move bytecode v7
-script {
+task 0 lines 1-18:  print-bytecode [// This is roughly equivalent to the following Move program:]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+l1: copy_loc l0
+    ld_u64 5
+    lt
+    // @5
+    br_false l0
+    copy_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    // @10
+    branch l1
+l0: ret
 
 
-main() /* def_idx: 0 */ {
-L0:	loc0: u64
-B0:
-	0: LdU64(0)
-	1: StLoc[0](loc0: u64)
-B1:
-	2: LdTrue
-	3: BrFalse(6)
-B2:
-	4: Ret
-B3:
-	5: Branch(2)
-B4:
-	6: Ret
-}
-}
-
-task 2 'print-bytecode'. lines 34-42:
-// Move bytecode v7
-script {
+task 1 lines 20-32:  print-bytecode [// `return` statements can appear anywhere, even within a loop.]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+l1: ld_true
+    br_false l0
+    ret
+    // @5
+    branch l1
+l0: ret
 
 
-main() /* def_idx: 0 */ {
-B0:
-	0: LdTrue
-	1: BrFalse(3)
-B1:
-	2: Branch(3)
-B2:
-	3: Ret
-}
-}
-
-task 3 'print-bytecode'. lines 44-55:
-// Move bytecode v7
-script {
+task 2 lines 34-42:  print-bytecode [// This is roughly equivalent to the following Move code: `while (true) { break; }`.]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    ld_true
+    br_false l0
+    branch l0
+l0: ret
 
 
-main() /* def_idx: 0 */ {
-B0:
-	0: Branch(2)
-B1:
-	1: Branch(0)
-B2:
-	2: Branch(4)
-B3:
-	3: Branch(0)
-B4:
-	4: Ret
-}
-}
+task 3 lines 44-55:  print-bytecode [// This is roughly equivalent to the following Move code: `loop { loop { break; } break; }`.]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+l1: branch l0
+    branch l1
+l0: branch l2
+    branch l1
+l2: ret
+
+

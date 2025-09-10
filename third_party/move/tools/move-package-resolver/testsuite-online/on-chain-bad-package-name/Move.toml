@@ -1,0 +1,6 @@
+[package]
+name = "Pack"
+version = "0.1.2"
+
+[dependencies]
+DoesNotExist = { aptos = "https://fullnode.mainnet.aptoslabs.com", address = "0x1" }

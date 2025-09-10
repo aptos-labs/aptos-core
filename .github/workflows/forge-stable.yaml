@@ -3,6 +3,7 @@ name: Continuous Forge Tests - Stable
 
 # We have various Forge Stable tests here, that test out different situations and workloads.
 #
+#
 # Dashboard showing historical results: https://grafana.aptoslabs.com/d/bdnt45ggsg000f/forge-stable-performance?orgId=1
 
 # Tests are named based on how they are set up, some of the common flavors are:
@@ -10,23 +11,23 @@ name: Continuous Forge Tests - Stable
 #   be more realisistic. They use "wrap_with_realistic_env", which sets:
 #   * MultiRegionNetworkEmulationTest which splits nodes into 4 "regions", which have different
 #     x-region and in-region latencies and reliability rates
-#   * CpuChaosTest which tries to make nodes have heterogenous hardware, by loading a few cores fully 
-#     on a few nodes. But this is not too helpful, as block execution time variance is minimal 
+#   * CpuChaosTest which tries to make nodes have heterogenous hardware, by loading a few cores fully
+#     on a few nodes. But this is not too helpful, as block execution time variance is minimal
 #     (as we generally have a few idle cores, and real variance mostly comes from variance in cpu speed instead)
-# * sweep - means running a multiple tests within a single test, by having everything the same, except for one 
+# * sweep - means running a multiple tests within a single test, by having everything the same, except for one
 #   thing - i.e. the thing we sweep over. There are two main dimensions we "sweep" over:
-#   * load sweep - this generally uses const tps workload, and varies the load across the tests (i.e. 10 vs 100 vs 1000 TPS) 
+#   * load sweep - this generally uses const tps workload, and varies the load across the tests (i.e. 10 vs 100 vs 1000 TPS)
 #   * workload sweep - this varies the transaction type being submitted, trying to test out how the system behaves
 #     when different part of the system are stressed (i.e. low vs high output sizes, good vs bad gas calibration, parallel vs sequential, etc)
 # * graceful - tests where we are overloading the system - i.e. submitting more transactions than we expect system to handle,
 #   and seeing how it behaves. overall e2e latency is then high, but we can test that only validator -> block proposal has increased.
 #   additionally, we generally add a small TPS high-fee traffic in these tests, to confirm it is unaffected by the high load.
 # * changing-working-quorum - tests where we intentionally make nodes unreachable (cut their network), and bring them back,
-#   and go to cut network on next set of nodes - requiring state-sync to catch up, consensus to work with different set of 
+#   and go to cut network on next set of nodes - requiring state-sync to catch up, consensus to work with different set of
 #   nodes being required to form consensus. During each iteration, we test that enough progress was made.
 #
 # Main success criteria used across the tests are:
-# * throughput and expiration/rejection rate 
+# * throughput and expiration/rejection rate
 # * latency (avg / p50 / p90 / p99 )
 # * latency breakdown across the components - currently within a validator alone:
 #   batch->pos->proposal->ordered->committed
@@ -62,31 +63,31 @@ on:
         required: true
         type: choice
         description: The specific stable test to run. If 'all', all stable tests will be run
-        default: 'all'
+        default: "all"
         options:
           - all
           - framework-upgrade-test
-          # Test varies the load, i.e. sending 10, 100, 1000, 5000, etc TPS, and then measuring 
+          # Test varies the load, i.e. sending 10, 100, 1000, 5000, etc TPS, and then measuring
           # onchain TPS, expired rate, as well as p50/p90/p99 latency, among other things,
-          # testing that we don't degrade performance both for low, mid and high loads. 
+          # testing that we don't degrade performance both for low, mid and high loads.
           - realistic-env-load-sweep
-          # Test varies the workload, across some basic workloads (i.e. some cheap, some expensive), 
+          # Test varies the workload, across some basic workloads (i.e. some cheap, some expensive),
           # and checks that throughput and performance across different stages
           - realistic-env-workload-sweep
           # Test sends ConstTps workload above what the system can handle, while additionally sending
           # non-small high-fee traffic (1000 TPS), and measures overall system performance.
           - realistic-env-graceful-overload
-          # Test varies the workload (opposite ends of gas calibration, high and low output sizes, 
-          # sequential / parallel, etc), and sends ConstTPS for each above what the system can handle, 
-          # while sending low TPS of high fee transactions. And primarily confirms that high-fee traffic 
+          # Test varies the workload (opposite ends of gas calibration, high and low output sizes,
+          # sequential / parallel, etc), and sends ConstTPS for each above what the system can handle,
+          # while sending low TPS of high fee transactions. And primarily confirms that high-fee traffic
           # has predictably low latency, and execution pipeline doesn't get backed up.
           - realistic-env-graceful-workload-sweep
-          # Test varies workload, which is user-contracts, such that max throughput varies from high to mid to low, 
+          # Test varies workload, which is user-contracts, such that max throughput varies from high to mid to low,
           # while testing that unrelated transactions paying the same gas price, are able to go through.
           - realistic-env-fairness-workload-sweep
           # Test which tunes all configurations for largest throughput possible (potentially sacrificing latency a bit)
           - realistic-network-tuned-for-throughput
-          # Run small-ish load, but checks that at all times all nodes are making progress, 
+          # Run small-ish load, but checks that at all times all nodes are making progress,
           # catching any unexpected unreliabilities/delays in consensus
           - consensus-stress-test
           # Send a mix of different workloads, to catch issues with different interactions of workloads.
@@ -96,7 +97,7 @@ on:
           - fullnode-reboot-stress-test
           - compat
           # Send low TPS (100 TPS)
-          # Cut network on enough nodes, such that all others are needed for consensus. Then bring a few back, and cut 
+          # Cut network on enough nodes, such that all others are needed for consensus. Then bring a few back, and cut
           # same amount of new ones - requiring all that were brought back to state-sync and continue executing.
           # Check that in each iteration - we were able to make meaningful progress.
           - changing-working-quorum-test
@@ -105,7 +106,7 @@ on:
           - changing-working-quorum-test-high-load
           - pfn-const-tps-realistic-env
           # Run a production config (same as land blocking run) max load (via mempool backlog), but run it for 2 hours,
-          # to check reliability and consistency of the newtork. 
+          # to check reliability and consistency of the newtork.
           - realistic-env-max-load-long
       JOB_PARALLELISM:
         required: false
@@ -121,7 +122,7 @@ on:
       - "testsuite/find_latest_image.py"
 
 concurrency:
-  group: forge-stable-${{ format('{0}-{1}-{2}-{3}', github.ref_name, inputs.GIT_SHA, inputs.IMAGE_TAG, inputs.TEST_NAME) }}
+  group: forge-stable-${{ format('{0}-{1}-{2}-{3}', github.ref_name, inputs.GIT_SHA || github.sha || github.head_ref || github.ref, inputs.IMAGE_TAG, inputs.TEST_NAME) }}
   cancel-in-progress: true
 
 env:
@@ -288,3 +289,4 @@ jobs:
       FORGE_ENABLE_FAILPOINTS: ${{ matrix.FORGE_ENABLE_FAILPOINTS || false }}
       POST_TO_SLACK: true
       SEND_RESULTS_TO_TRUNK: true
+      FORGE_CONTINUOUS_TEST_MODE: true

@@ -33,9 +33,9 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        AuxiliaryInfo, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo,
+        AuxiliaryInfo, AuxiliaryInfoTrait, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo,
         Transaction::{self, UserTransaction},
-        TransactionListWithProof, TransactionWithProof, WriteSetPayload,
+        TransactionListWithProofV2, TransactionWithProof, WriteSetPayload,
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
@@ -441,10 +441,12 @@ where
 }
 
 pub fn verify_transactions(
-    txn_list_with_proof: &TransactionListWithProof,
+    txn_list_with_proof: &TransactionListWithProofV2,
     expected_txns: &[Transaction],
 ) -> Result<()> {
-    let txns = &txn_list_with_proof.transactions;
+    let txns = &txn_list_with_proof
+        .get_transaction_list_with_proof()
+        .transactions;
     ensure!(
         *txns == expected_txns,
         "expected txns {:?} doesn't equal to returned txns {:?}",

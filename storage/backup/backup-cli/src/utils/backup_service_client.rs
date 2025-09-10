@@ -9,7 +9,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_db::backup::backup_handler::DbState;
-use aptos_metrics_core::{IntCounterHelper, TimerHelper};
+use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_types::transaction::Version;
 use clap::Parser;
 use futures::TryStreamExt;
@@ -152,7 +152,7 @@ impl BackupServiceClient {
     ) -> Result<impl AsyncRead> {
         self.get(
             "transactions",
-            &format!("{}/{}", start_version, num_transactions,),
+            &format!("{}/{}", start_version, num_transactions),
         )
         .await
     }

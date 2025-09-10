@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'run'. lines 1-5:
+task 0 lines 1-5:  run [main<T>() { // too few type arguments]
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
     sub_status: None,

@@ -4,7 +4,7 @@
 use crate::{
     backup_restore::gcs::GcsBackupRestoreOperator, snapshot_folder_name, snapshot_folder_prefix,
 };
-use anyhow::{Context, Error};
+use anyhow::{anyhow, Context, Error};
 use aptos_api::context::Context as ApiContext;
 use aptos_api_types::TransactionOnChainData;
 use aptos_db_indexer::db_v2::IndexerAsyncV2;
@@ -284,7 +284,6 @@ impl TableInfoService {
     /// It's used in the first loop to process batches in parallel,
     /// and it's used in the second loop to process transactions sequentially
     /// if pending on items are not empty
-    /// TODO: better error handling with retry.
     async fn process_transactions(
         context: Arc<ApiContext>,
         indexer_async_v2: Arc<IndexerAsyncV2>,
@@ -295,8 +294,21 @@ impl TableInfoService {
         let end_version = raw_txns.last().unwrap().version;
         let num_transactions = raw_txns.len();
 
-        Self::parse_table_info(context.clone(), raw_txns.clone(), indexer_async_v2)
-            .expect("[Table Info] Failed to parse table info");
+        loop {
+            // NOTE: The retry is unlikely to be helpful. Put a loop here just to avoid panic and
+            // allow the rest of FN functionality continue to work.
+            match Self::parse_table_info(
+                context.clone(),
+                raw_txns.clone(),
+                indexer_async_v2.clone(),
+            ) {
+                Ok(_) => break,
+                Err(e) => {
+                    error!(error = ?e, "Error during parse_table_info.");
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                },
+            }
+        }
 
         log_grpc_step(
             SERVICE_TYPE,
@@ -365,9 +377,7 @@ impl TableInfoService {
         let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
         indexer_async_v2
             .index_table_info(context.db.clone(), first_version, &write_sets_slice)
-            .expect(
-                "[Table Info] Failed to process write sets and index to the table info rocksdb",
-            );
+            .map_err(|err| anyhow!("[Table Info] Failed to process write sets and index to the table info rocksdb: {}", err))?;
 
         info!(
             table_info_first_version = first_version,

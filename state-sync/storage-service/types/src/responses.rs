@@ -27,7 +27,10 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{
+        TransactionListWithProof, TransactionListWithProofV2, TransactionOutputListWithProof,
+        TransactionOutputListWithProofV2, Version,
+    },
 };
 use num_traits::{PrimInt, Zero};
 #[cfg(test)]
@@ -129,6 +132,12 @@ pub type TransactionOrOutputListWithProof = (
     Option<TransactionOutputListWithProof>,
 );
 
+/// A useful type to hold optional transaction data v2
+pub type TransactionOrOutputListWithProofV2 = (
+    Option<TransactionListWithProofV2>,
+    Option<TransactionOutputListWithProofV2>,
+);
+
 /// A single data response.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[allow(clippy::large_enum_variant)]
@@ -144,24 +153,155 @@ pub enum DataResponse {
     TransactionsWithProof(TransactionListWithProof),
     NewTransactionsOrOutputsWithProof((TransactionOrOutputListWithProof, LedgerInfoWithSignatures)),
     TransactionsOrOutputsWithProof(TransactionOrOutputListWithProof),
+
+    // All the responses listed below are for transaction data v2 (i.e., transactions with auxiliary information).
+    // TODO: eventually we should deprecate all the old response types.
+    TransactionDataWithProof(TransactionDataWithProofResponse),
+    NewTransactionDataWithProof(NewTransactionDataWithProofResponse),
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct TransactionDataWithProofResponse {
+    pub transaction_data_response_type: TransactionDataResponseType,
+    pub transaction_list_with_proof: Option<TransactionListWithProofV2>,
+    pub transaction_output_list_with_proof: Option<TransactionOutputListWithProofV2>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct NewTransactionDataWithProofResponse {
+    pub transaction_data_response_type: TransactionDataResponseType,
+    pub transaction_list_with_proof: Option<TransactionListWithProofV2>,
+    pub transaction_output_list_with_proof: Option<TransactionOutputListWithProofV2>,
+    pub ledger_info_with_signatures: LedgerInfoWithSignatures,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum TransactionDataResponseType {
+    TransactionData,
+    TransactionOutputData,
 }
 
 impl DataResponse {
     /// Returns a summary label for the response
     pub fn get_label(&self) -> &'static str {
         match self {
-            Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
-            Self::NewTransactionOutputsWithProof(_) => "new_transaction_outputs_with_proof",
-            Self::NewTransactionsWithProof(_) => "new_transactions_with_proof",
-            Self::NumberOfStatesAtVersion(_) => "number_of_states_at_version",
-            Self::ServerProtocolVersion(_) => "server_protocol_version",
-            Self::StateValueChunkWithProof(_) => "state_value_chunk_with_proof",
-            Self::StorageServerSummary(_) => "storage_server_summary",
-            Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
-            Self::TransactionsWithProof(_) => "transactions_with_proof",
-            Self::NewTransactionsOrOutputsWithProof(_) => "new_transactions_or_outputs_with_proof",
-            Self::TransactionsOrOutputsWithProof(_) => "transactions_or_outputs_with_proof",
+            Self::EpochEndingLedgerInfos(_) => Self::get_epoch_ending_ledger_info_label(),
+            Self::NewTransactionOutputsWithProof(_) => {
+                Self::get_new_transaction_outputs_with_proof_label()
+            },
+            Self::NewTransactionsWithProof(_) => Self::get_new_transactions_with_proof_label(),
+            Self::NumberOfStatesAtVersion(_) => Self::get_number_of_states_at_version_label(),
+            Self::ServerProtocolVersion(_) => Self::get_server_protocol_version_label(),
+            Self::StateValueChunkWithProof(_) => Self::get_state_value_chunk_with_proof_label(),
+            Self::StorageServerSummary(_) => Self::get_storage_server_summary_label(),
+            Self::TransactionOutputsWithProof(_) => {
+                Self::get_transaction_outputs_with_proof_label()
+            },
+            Self::TransactionsWithProof(_) => Self::get_transactions_with_proof_label(),
+            Self::NewTransactionsOrOutputsWithProof(_) => {
+                Self::get_new_transactions_or_outputs_with_proof_label()
+            },
+            Self::TransactionsOrOutputsWithProof(_) => {
+                Self::get_transactions_or_outputs_with_proof_label()
+            },
+
+            // Transaction data v2 responses (transactions with auxiliary data)
+            Self::TransactionDataWithProof(response) => {
+                match response.transaction_data_response_type {
+                    TransactionDataResponseType::TransactionData => {
+                        Self::get_transactions_with_proof_v2_label()
+                    },
+                    TransactionDataResponseType::TransactionOutputData => {
+                        Self::get_transaction_outputs_with_proof_v2_label()
+                    },
+                }
+            },
+            Self::NewTransactionDataWithProof(response) => {
+                match response.transaction_data_response_type {
+                    TransactionDataResponseType::TransactionData => {
+                        Self::new_transactions_with_proof_v2_label()
+                    },
+                    TransactionDataResponseType::TransactionOutputData => {
+                        Self::get_transaction_outputs_with_proof_v2_label()
+                    },
+                }
+            },
         }
+    }
+
+    /// Returns a label for the epoch ending ledger info response
+    pub fn get_epoch_ending_ledger_info_label() -> &'static str {
+        "epoch_ending_ledger_infos"
+    }
+
+    /// Returns a label for the new transaction outputs with proof response
+    pub fn get_new_transaction_outputs_with_proof_label() -> &'static str {
+        "new_transaction_outputs_with_proof"
+    }
+
+    /// Returns a label for the new transactions with proof response
+    pub fn get_new_transactions_with_proof_label() -> &'static str {
+        "new_transactions_with_proof"
+    }
+
+    /// Returns a label for the number of states at version response
+    pub fn get_number_of_states_at_version_label() -> &'static str {
+        "number_of_states_at_version"
+    }
+
+    /// Returns a label for the server protocol version response
+    pub fn get_server_protocol_version_label() -> &'static str {
+        "server_protocol_version"
+    }
+
+    /// Returns a label for the state value chunk with proof response
+    pub fn get_state_value_chunk_with_proof_label() -> &'static str {
+        "state_value_chunk_with_proof"
+    }
+
+    /// Returns a label for the storage server summary response
+    pub fn get_storage_server_summary_label() -> &'static str {
+        "storage_server_summary"
+    }
+
+    /// Returns a label for the transaction outputs with proof response
+    pub fn get_transaction_outputs_with_proof_label() -> &'static str {
+        "transaction_outputs_with_proof"
+    }
+
+    /// Returns a label for the transactions with proof response
+    pub fn get_transactions_with_proof_label() -> &'static str {
+        "transactions_with_proof"
+    }
+
+    /// Returns a label for the new transactions or outputs with proof response
+    pub fn get_new_transactions_or_outputs_with_proof_label() -> &'static str {
+        "new_transactions_or_outputs_with_proof"
+    }
+
+    /// Returns a label for the transactions or outputs with proof response
+    pub fn get_transactions_or_outputs_with_proof_label() -> &'static str {
+        "transactions_or_outputs_with_proof"
+    }
+
+    /// Returns a label for the transactions with proof v2 response
+    pub fn get_transactions_with_proof_v2_label() -> &'static str {
+        "transactions_with_proof_v2"
+    }
+
+    /// Returns a label for the transaction outputs with proof v2 response
+    pub fn get_transaction_outputs_with_proof_v2_label() -> &'static str {
+        "transaction_outputs_with_proof_v2"
+    }
+
+    /// Returns a label for the new transactions with proof v2 response
+    pub fn new_transactions_with_proof_v2_label() -> &'static str {
+        "new_transactions_with_proof_v2"
+    }
+
+    /// Returns a label for the new transaction outputs with proof v2 response
+    pub fn new_transaction_outputs_with_proof_v2_label() -> &'static str {
+        "new_transaction_outputs_with_proof_v2"
     }
 }
 
@@ -214,14 +354,37 @@ impl TryFrom<StorageServiceResponse> for EpochChangeProof {
 }
 
 impl TryFrom<StorageServiceResponse>
-    for (TransactionOutputListWithProof, LedgerInfoWithSignatures)
+    for (TransactionOutputListWithProofV2, LedgerInfoWithSignatures)
 {
     type Error = crate::responses::Error;
 
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
         let data_response = response.get_data_response()?;
         match data_response {
-            DataResponse::NewTransactionOutputsWithProof(inner) => Ok(inner),
+            DataResponse::NewTransactionOutputsWithProof((
+                output_list_with_proof,
+                ledger_info_with_signatures,
+            )) => Ok((
+                TransactionOutputListWithProofV2::new_from_v1(output_list_with_proof),
+                ledger_info_with_signatures,
+            )),
+            DataResponse::NewTransactionDataWithProof(response) => {
+                if let TransactionDataResponseType::TransactionOutputData =
+                    response.transaction_data_response_type
+                {
+                    if let Some(output_list_with_proof_v2) =
+                        response.transaction_output_list_with_proof
+                    {
+                        return Ok((
+                            output_list_with_proof_v2,
+                            response.ledger_info_with_signatures,
+                        ));
+                    }
+                }
+                Err(Error::UnexpectedResponseError(
+                    "new_transaction_output_list_with_proof is empty".into(),
+                ))
+            },
             _ => Err(Error::UnexpectedResponseError(format!(
                 "expected new_transaction_outputs_with_proof, found {}",
                 data_response.get_label()
@@ -230,13 +393,36 @@ impl TryFrom<StorageServiceResponse>
     }
 }
 
-impl TryFrom<StorageServiceResponse> for (TransactionListWithProof, LedgerInfoWithSignatures) {
+impl TryFrom<StorageServiceResponse> for (TransactionListWithProofV2, LedgerInfoWithSignatures) {
     type Error = crate::responses::Error;
 
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
         let data_response = response.get_data_response()?;
         match data_response {
-            DataResponse::NewTransactionsWithProof(inner) => Ok(inner),
+            DataResponse::NewTransactionsWithProof((
+                transaction_list_with_proof,
+                ledger_info_with_signatures,
+            )) => Ok((
+                TransactionListWithProofV2::new_from_v1(transaction_list_with_proof),
+                ledger_info_with_signatures,
+            )),
+            DataResponse::NewTransactionDataWithProof(response) => {
+                if let TransactionDataResponseType::TransactionData =
+                    response.transaction_data_response_type
+                {
+                    if let Some(transaction_list_with_proof_v2) =
+                        response.transaction_list_with_proof
+                    {
+                        return Ok((
+                            transaction_list_with_proof_v2,
+                            response.ledger_info_with_signatures,
+                        ));
+                    }
+                }
+                Err(Error::UnexpectedResponseError(
+                    "new_transaction_list_with_proof is empty".into(),
+                ))
+            },
             _ => Err(Error::UnexpectedResponseError(format!(
                 "expected new_transactions_with_proof, found {}",
                 data_response.get_label()
@@ -290,13 +476,29 @@ impl TryFrom<StorageServiceResponse> for StorageServerSummary {
     }
 }
 
-impl TryFrom<StorageServiceResponse> for TransactionOutputListWithProof {
+impl TryFrom<StorageServiceResponse> for TransactionOutputListWithProofV2 {
     type Error = crate::responses::Error;
 
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
         let data_response = response.get_data_response()?;
         match data_response {
-            DataResponse::TransactionOutputsWithProof(inner) => Ok(inner),
+            DataResponse::TransactionOutputsWithProof(output_list_with_proof) => Ok(
+                TransactionOutputListWithProofV2::new_from_v1(output_list_with_proof),
+            ),
+            DataResponse::TransactionDataWithProof(response) => {
+                if let TransactionDataResponseType::TransactionOutputData =
+                    response.transaction_data_response_type
+                {
+                    if let Some(output_list_with_proof_v2) =
+                        response.transaction_output_list_with_proof
+                    {
+                        return Ok(output_list_with_proof_v2);
+                    }
+                }
+                Err(Error::UnexpectedResponseError(
+                    "transaction_output_list_with_proof is empty".into(),
+                ))
+            },
             _ => Err(Error::UnexpectedResponseError(format!(
                 "expected transaction_outputs_with_proof, found {}",
                 data_response.get_label()
@@ -305,13 +507,29 @@ impl TryFrom<StorageServiceResponse> for TransactionOutputListWithProof {
     }
 }
 
-impl TryFrom<StorageServiceResponse> for TransactionListWithProof {
+impl TryFrom<StorageServiceResponse> for TransactionListWithProofV2 {
     type Error = crate::responses::Error;
 
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
         let data_response = response.get_data_response()?;
         match data_response {
-            DataResponse::TransactionsWithProof(inner) => Ok(inner),
+            DataResponse::TransactionsWithProof(transaction_list_with_proof) => Ok(
+                TransactionListWithProofV2::new_from_v1(transaction_list_with_proof),
+            ),
+            DataResponse::TransactionDataWithProof(response) => {
+                if let TransactionDataResponseType::TransactionData =
+                    response.transaction_data_response_type
+                {
+                    if let Some(transaction_list_with_proof_v2) =
+                        response.transaction_list_with_proof
+                    {
+                        return Ok(transaction_list_with_proof_v2);
+                    }
+                }
+                Err(Error::UnexpectedResponseError(
+                    "transaction_list_with_proof is empty".into(),
+                ))
+            },
             _ => Err(Error::UnexpectedResponseError(format!(
                 "expected transactions_with_proof, found {}",
                 data_response.get_label()
@@ -321,14 +539,33 @@ impl TryFrom<StorageServiceResponse> for TransactionListWithProof {
 }
 
 impl TryFrom<StorageServiceResponse>
-    for (TransactionOrOutputListWithProof, LedgerInfoWithSignatures)
+    for (TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)
 {
     type Error = crate::responses::Error;
 
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
         let data_response = response.get_data_response()?;
         match data_response {
-            DataResponse::NewTransactionsOrOutputsWithProof(inner) => Ok(inner),
+            DataResponse::NewTransactionsOrOutputsWithProof((
+                (transaction_list_with_proof, output_list_with_proof),
+                ledger_info_with_signatures,
+            )) => Ok((
+                (
+                    transaction_list_with_proof.map(TransactionListWithProofV2::new_from_v1),
+                    output_list_with_proof.map(TransactionOutputListWithProofV2::new_from_v1),
+                ),
+                ledger_info_with_signatures,
+            )),
+            DataResponse::NewTransactionDataWithProof(response) => {
+                let transaction_or_output_list_with_proof = (
+                    response.transaction_list_with_proof,
+                    response.transaction_output_list_with_proof,
+                );
+                Ok((
+                    transaction_or_output_list_with_proof,
+                    response.ledger_info_with_signatures,
+                ))
+            },
             _ => Err(Error::UnexpectedResponseError(format!(
                 "expected new_transactions_or_outputs_with_proof, found {}",
                 data_response.get_label()
@@ -337,13 +574,23 @@ impl TryFrom<StorageServiceResponse>
     }
 }
 
-impl TryFrom<StorageServiceResponse> for TransactionOrOutputListWithProof {
+impl TryFrom<StorageServiceResponse> for TransactionOrOutputListWithProofV2 {
     type Error = crate::responses::Error;
 
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
         let data_response = response.get_data_response()?;
         match data_response {
-            DataResponse::TransactionsOrOutputsWithProof(inner) => Ok(inner),
+            DataResponse::TransactionsOrOutputsWithProof((
+                transaction_list_with_proof,
+                output_list_with_proof,
+            )) => Ok((
+                transaction_list_with_proof.map(TransactionListWithProofV2::new_from_v1),
+                output_list_with_proof.map(TransactionOutputListWithProofV2::new_from_v1),
+            )),
+            DataResponse::TransactionDataWithProof(response) => Ok((
+                response.transaction_list_with_proof,
+                response.transaction_output_list_with_proof,
+            )),
             _ => Err(Error::UnexpectedResponseError(format!(
                 "expected transactions_or_outputs_with_proof, found {}",
                 data_response.get_label()

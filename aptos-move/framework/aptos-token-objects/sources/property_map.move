@@ -235,7 +235,7 @@ module aptos_token_objects::property_map {
     }
 
     /// Read a type and verify that the type is correct
-    inline fun read_typed<T: key, V>(object: &Object<T>, key: &String): vector<u8> acquires PropertyMap {
+    inline fun read_typed<T: key, V>(object: &Object<T>, key: &String): vector<u8> {
         let (type, value) = read(object, key);
         assert!(
             type == type_info::type_name<V>(),
@@ -308,7 +308,7 @@ module aptos_token_objects::property_map {
         add_internal(ref, key, type, bcs::to_bytes(&value));
     }
 
-    inline fun add_internal(ref: &MutatorRef, key: String, type: u8, value: vector<u8>) acquires PropertyMap {
+    inline fun add_internal(ref: &MutatorRef, key: String, type: u8, value: vector<u8>) {
         assert_exists(ref.self);
         let property_map = &mut PropertyMap[ref.self];
         property_map.inner.add(key, PropertyValue { type, value });
@@ -327,7 +327,7 @@ module aptos_token_objects::property_map {
         update_internal(ref, key, type, bcs::to_bytes(&value));
     }
 
-    inline fun update_internal(ref: &MutatorRef, key: &String, type: u8, value: vector<u8>) acquires PropertyMap {
+    inline fun update_internal(ref: &MutatorRef, key: &String, type: u8, value: vector<u8>) {
         assert_exists(ref.self);
         let property_map = &mut PropertyMap[ref.self];
         let old_value = property_map.inner.borrow_mut(key);

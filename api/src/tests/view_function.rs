@@ -1,11 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{new_test_context, new_test_context_with_config};
+use super::{
+    new_test_context, new_test_context_with_config, new_test_context_with_orderless_flags,
+};
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::{NodeConfig, ViewFilter, ViewFunctionId};
 use aptos_types::account_address::AccountAddress;
+use rstest::rstest;
 use serde_json::{json, Value};
 use std::{path::PathBuf, str::FromStr};
 
@@ -27,8 +30,19 @@ fn build_coin_decimals_request() -> Value {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_simple_view() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_simple_view(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
     let txn1 = context.mint_user_account(creator).await;
@@ -44,8 +58,22 @@ async fn test_simple_view() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_view_gas_used_header() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_view_gas_used_header(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
     let txn1 = context.mint_user_account(creator).await;
@@ -76,7 +104,14 @@ async fn test_view_gas_used_header() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_view_allowlist() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_view_allowlist(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut node_config = NodeConfig::default();
 
     // Allowlist only the balance function.
@@ -86,7 +121,12 @@ async fn test_view_allowlist() {
         function_name: "balance".to_string(),
     }]);
 
-    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
@@ -111,7 +151,14 @@ async fn test_view_allowlist() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_view_blocklist() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_view_blocklist(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut node_config = NodeConfig::default();
 
     // Blocklist the balance function.
@@ -121,7 +168,12 @@ async fn test_view_blocklist() {
         function_name: "balance".to_string(),
     }]);
 
-    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
@@ -146,32 +198,22 @@ async fn test_view_blocklist() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_view_error_type_resolution_error() {
-    let mut context = new_test_context(current_function_name!());
-    let creator = &mut context.gen_account();
-    let owner = &mut context.gen_account();
-    let txn1 = context.mint_user_account(creator).await;
-    let txn2 = context.account_transfer(creator, owner, 100_000);
-
-    context.commit_block(&vec![txn1, txn2]).await;
-
-    let resp = context
-        .expect_status_code(400)
-        .post(
-            "/view",
-            json!({
-                "function":"0x1::coin::is_account_registered",
-                "arguments": vec![AccountAddress::random().to_string()],
-                "type_arguments": ["0x1::aptos_coin::NewCoin"], // Does not exist
-            }),
-        )
-        .await;
-    context.check_golden_output_no_prune(resp);
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_view_error_move_abort() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_view_error_move_abort(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
     let txn1 = context.mint_user_account(creator).await;
@@ -187,6 +229,44 @@ async fn test_view_error_move_abort() {
                 "function":"0x1::account::get_rotation_capability_offer_for", // Rotation capability does not exist
                 "arguments": vec![owner.address().to_string()],
                 "type_arguments": [],
+            }),
+        )
+        .await;
+    context.check_golden_output_no_prune(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_view_error_type_resolution_error(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let creator = &mut context.gen_account();
+    let owner = &mut context.gen_account();
+    let txn1 = context.mint_user_account(creator).await;
+    let txn2 = context.account_transfer(creator, owner, 100_000);
+
+    context.commit_block(&vec![txn1, txn2]).await;
+
+    let resp = context
+        .expect_status_code(400)
+        .post(
+            "/view",
+            json!({
+                "function":"0x1::coin::is_account_registered",
+                "arguments": vec![AccountAddress::random().to_string()],
+                "type_arguments": ["0x1::aptos_coin::NewCoin"], // Does not exist
             }),
         )
         .await;
@@ -219,8 +299,22 @@ async fn test_view_does_not_exist() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_simple_view_invalid() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_simple_view_invalid(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
     let txn1 = context.mint_user_account(creator).await;
@@ -244,10 +338,25 @@ async fn test_simple_view_invalid() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_versioned_simple_view() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_versioned_simple_view(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let creator = &mut context.gen_account();
     let owner = &mut context.gen_account();
+    let initial_ledger_version = u64::from(context.get_latest_ledger_info().ledger_version);
     let txn1 = context.mint_user_account(creator).await;
     let txn2 = context.account_transfer(creator, owner, 100_000);
     let txn3 = context.account_transfer(creator, owner, 100_000);
@@ -256,7 +365,7 @@ async fn test_versioned_simple_view() {
 
     let resp = context
         .post(
-            "/view?ledger_version=3",
+            &format!("/view?ledger_version={}", initial_ledger_version + 3),
             json!({
                 "function":"0x1::coin::balance",
                 "arguments": vec![owner.address().to_string()],
@@ -269,8 +378,19 @@ async fn test_versioned_simple_view() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_view_tuple() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_view_tuple(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let payload = aptos_stdlib::publish_module_source(
         "test_module",
         r#"
@@ -284,8 +404,17 @@ async fn test_view_tuple() {
     );
 
     let root_account = context.root_account().await;
-    let module_txn =
-        root_account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+    let module_txn = root_account.sign_with_transaction_builder(
+        context
+            .transaction_factory()
+            .payload(payload)
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload_with_rng(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
+    );
 
     context.commit_block(&vec![module_txn]).await;
 
@@ -303,14 +432,35 @@ async fn test_view_tuple() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_view_aggregator() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_view_aggregator(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let account = context.root_account().await;
 
     let named_addresses = vec![("addr".to_string(), account.address())];
     let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("src/tests/move/pack_counter");
     let payload = TestContext::build_package(path, named_addresses);
-    let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+    let txn = account.sign_with_transaction_builder(
+        context
+            .transaction_factory()
+            .payload(payload)
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload_with_rng(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
+    );
     context.commit_block(&vec![txn]).await;
 
     let function = format!("{}::counter::add_and_get_counter_value", account.address());

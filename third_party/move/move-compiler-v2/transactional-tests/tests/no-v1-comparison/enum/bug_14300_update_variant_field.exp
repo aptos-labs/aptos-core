@@ -1,10 +1,8 @@
 processed 4 tasks
-
-task 1 'run'. lines 41-41:
+task 0 lines 1-39:  publish [module 0x815::m {]
+task 1 lines 41-41:  run 0x815::m::update_common_field
 return values: 15
-
-task 2 'run'. lines 43-43:
+task 2 lines 43-43:  run 0x815::m::update_non_common_field
 return values: 15
-
-task 3 'run'. lines 45-45:
+task 3 lines 45-45:  run 0x815::m::update_common_field_different_offset
 return values: 15

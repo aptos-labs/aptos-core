@@ -1,0 +1,37 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/fun_refs.move`
+
+//# publish
+module 0x42::test {
+    public fun ref(): u64 {
+        let _t0: |u64|(u64) has copy + drop = |arg0| lambda__1__ref(arg0);
+        ref_helper(&_t0, 5)
+    }
+    fun lambda__1__ref(p0: u64): u64 {
+        p0 + p0
+    }
+    fun ref_helper(p0: &|u64|(u64) has copy, p1: u64): u64 {
+        let _t2 = *p0;
+        _t2(p1)
+    }
+    public fun ref_mut(): u64 {
+        let _t0: |u64|(u64) has copy + drop = |arg0| lambda__1__ref_mut(arg0);
+        ref_mut_helper(&mut _t0, 5);
+        _t0(2)
+    }
+    fun lambda__1__ref_mut(p0: u64): u64 {
+        p0 * p0
+    }
+    fun ref_mut_helper(p0: &mut |u64|(u64) has copy + drop, p1: u64) {
+        let _t2 = *p0;
+        *p0 = |arg0| lambda__1__ref_mut_helper(p1, _t2, arg0);
+    }
+    fun lambda__1__ref_mut_helper(p0: u64, p1: |u64|(u64) has copy + drop, p2: u64): u64 {
+        let _t5 = p0 + p2;
+        p1(_t5)
+    }
+}
+
+
+//# run 0x42::test::ref
+
+//# run 0x42::test::ref_mut

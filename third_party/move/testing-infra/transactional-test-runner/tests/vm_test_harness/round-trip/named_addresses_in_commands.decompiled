@@ -1,0 +1,35 @@
+//**** Cross-compiled for `move` syntax from `tests/vm_test_harness/named_addresses_in_commands.move`
+
+//# init --addresses A=42
+
+//# run --signers A
+script {
+    use 0x1::signer;
+    fun main(p0: signer) {
+        if (!(signer::address_of(&p0) == @0x2a)) abort 1000;
+    }
+}
+
+
+//# publish
+module 0x2a::M {
+    struct Foo has key {
+        x: u64,
+    }
+    public fun publish_foo(p0: &signer) {
+        let _t3 = Foo{x: 500};
+        move_to<Foo>(p0, _t3);
+    }
+}
+
+
+//# run --signers A
+script {
+    use 0x2a::M;
+    fun main(p0: signer) {
+        M::publish_foo(&p0);
+    }
+}
+
+
+//# view --address A --resource 0x2a::M::Foo

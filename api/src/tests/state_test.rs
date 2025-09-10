@@ -1,11 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::new_test_context;
+use super::{new_test_context, new_test_context_with_orderless_flags};
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_sdk::{transaction_builder::aptos_stdlib::aptos_token_stdlib, types::LocalAccount};
 use aptos_storage_interface::DbReader;
 use move_core_types::account_address::AccountAddress;
+use rstest::rstest;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -122,11 +123,26 @@ async fn test_get_account_module_not_found() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_merkle_leaves_with_nft_transfer() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_merkle_leaves_with_nft_transfer(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut ctx = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let num_block_resource = 1;
+    // For orderless transaction, 1 nonce table bucket and 1 storage slots in big ordered map are created
+    let num_nonce_table_resource = if use_orderless_transactions { 1 } else { 0 };
 
-    let ctx = &mut context;
     let creator = &mut ctx.gen_account();
     let owner = &mut ctx.gen_account();
     let txn1 = ctx.mint_user_account(creator).await;
@@ -134,35 +150,46 @@ async fn test_merkle_leaves_with_nft_transfer() {
 
     let collection_name = "collection name".to_owned().into_bytes();
     let token_name = "token name".to_owned().into_bytes();
-    let collection_builder =
-        ctx.transaction_factory()
-            .payload(aptos_token_stdlib::token_create_collection_script(
-                collection_name.clone(),
-                "description".to_owned().into_bytes(),
-                "uri".to_owned().into_bytes(),
-                20_000_000,
-                vec![false, false, false],
-            ));
+    let collection_builder = ctx
+        .transaction_factory()
+        .payload(aptos_token_stdlib::token_create_collection_script(
+            collection_name.clone(),
+            "description".to_owned().into_bytes(),
+            "uri".to_owned().into_bytes(),
+            20_000_000,
+            vec![false, false, false],
+        ))
+        .expiration_timestamp_secs(ctx.get_expiration_time())
+        .upgrade_payload_with_rng(
+            &mut ctx.rng,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
 
     let collection_txn = creator.sign_with_transaction_builder(collection_builder);
-
-    let token_builder =
-        ctx.transaction_factory()
-            .payload(aptos_token_stdlib::token_create_token_script(
-                collection_name.clone(),
-                token_name.clone(),
-                "collection description".to_owned().into_bytes(),
-                3,
-                4,
-                "uri".to_owned().into_bytes(),
-                creator.address(),
-                1,
-                0,
-                vec![false, false, false, false, true],
-                vec!["age".as_bytes().to_vec()],
-                vec!["3".as_bytes().to_vec()],
-                vec!["int".as_bytes().to_vec()],
-            ));
+    let token_builder = ctx
+        .transaction_factory()
+        .payload(aptos_token_stdlib::token_create_token_script(
+            collection_name.clone(),
+            token_name.clone(),
+            "collection description".to_owned().into_bytes(),
+            3,
+            4,
+            "uri".to_owned().into_bytes(),
+            creator.address(),
+            1,
+            0,
+            vec![false, false, false, false, true],
+            vec!["age".as_bytes().to_vec()],
+            vec!["3".as_bytes().to_vec()],
+            vec!["int".as_bytes().to_vec()],
+        ))
+        .expiration_timestamp_secs(ctx.get_expiration_time())
+        .upgrade_payload_with_rng(
+            &mut ctx.rng,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
 
     let token_txn = creator.sign_with_transaction_builder(token_builder);
 
@@ -183,7 +210,13 @@ async fn test_merkle_leaves_with_nft_transfer() {
                 token_name.clone(),
                 0,
                 1,
-            )),
+            ))
+            .expiration_timestamp_secs(ctx.get_expiration_time())
+            .upgrade_payload_with_rng(
+                &mut ctx.rng,
+                use_txn_payload_v2_format,
+                use_orderless_transactions,
+            ),
     );
     ctx.commit_block(&vec![transfer_to_owner_txn]).await;
     let num_leaves_after_transfer_nft = ctx
@@ -192,7 +225,7 @@ async fn test_merkle_leaves_with_nft_transfer() {
         .unwrap();
     assert_eq!(
         num_leaves_after_transfer_nft,
-        num_leaves_at_beginning + 3 /* 1 token store + 1 token + 1 account resource */ + num_block_resource
+        num_leaves_at_beginning + 3 /* 1 token store + 1 token + 1 account resource */ + num_block_resource + num_nonce_table_resource
     );
 
     let transfer_to_creator_txn = owner.sign_multi_agent_with_transaction_builder(
@@ -204,7 +237,13 @@ async fn test_merkle_leaves_with_nft_transfer() {
                 token_name.clone(),
                 0,
                 1,
-            )),
+            ))
+            .expiration_timestamp_secs(ctx.get_expiration_time())
+            .upgrade_payload_with_rng(
+                &mut ctx.rng,
+                use_txn_payload_v2_format,
+                use_orderless_transactions,
+            ),
     );
     ctx.commit_block(&vec![transfer_to_creator_txn]).await;
     let num_leaves_after_return_nft = ctx
@@ -214,7 +253,7 @@ async fn test_merkle_leaves_with_nft_transfer() {
 
     assert_eq!(
         num_leaves_after_return_nft,
-        num_leaves_at_beginning + 2 + num_block_resource * 2
+        num_leaves_at_beginning + 2 + num_block_resource * 2 + 2 * num_nonce_table_resource
     );
 }
 

@@ -1,0 +1,148 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/positional_fields/assign_field.move`
+
+//# publish
+module 0x42::test {
+    enum E has drop {
+        V1 {
+            _0: u8,
+            _1: bool,
+        }
+        V2 {
+            _0: S3,
+        }
+    }
+    struct S3 has drop {
+        _0: S2,
+        _1: S0,
+        _2: S2,
+    }
+    struct S2 has copy, drop {
+        _0: S0,
+        _1: u8,
+    }
+    struct S0 has copy, drop {
+        x: u8,
+    }
+    struct S1 has drop {
+        _0: u64,
+        _1: bool,
+    }
+    fun assign0(p0: u64, p1: bool): S1 {
+        let _t2 = S1{_0: p0, _1: p1};
+        while (*&(&_t2)._1) {
+            let _t13 = *&(&_t2)._0 - 1;
+            let _t16 = *&(&_t2)._0;
+            _t2 = S1{_0: _t13, _1: _t16 >= 2};
+            continue
+        };
+        _t2
+    }
+    fun assign1(p0: S1): u64 {
+        let _t1 = 0;
+        loop {
+            let _t2;
+            if (!*&(&p0)._1) break;
+            if (*&(&p0)._0 > 0) _t2 = *&(&p0)._0 - 1 else _t2 = 0;
+            p0 = S1{_0: _t2, _1: _t2 >= 1};
+            _t1 = _t1 + 1;
+            continue
+        };
+        _t1
+    }
+    fun assign_chained(p0: S3): S3 {
+        let _t5 = *&(&(&(&p0)._0)._0).x;
+        let _t9 = *&(&(&p0)._1).x;
+        let _t10 = _t5 + _t9;
+        let _t15 = *&(&(&(&p0)._2)._0).x;
+        let _t16 = _t10 + _t15;
+        let _t21 = &mut (&mut (&mut (&mut p0)._0)._0).x;
+        *_t21 = 0u8;
+        let _t25 = &mut (&mut (&mut p0)._1).x;
+        *_t25 = 1u8;
+        let _t30 = &mut (&mut (&mut (&mut p0)._2)._0).x;
+        *_t30 = 2u8;
+        p0
+    }
+    fun assign_enum(p0: &mut E) {
+        if (p0 is V1) {
+            let _t8 = &mut p0._0;
+            let _t2 = &mut p0._1;
+            *_t8 = 42u8;
+            *_t2 = true
+        } else if (p0 is V2) {
+            let _t4 = &mut p0._0;
+            let _t23 = &mut (&mut (&mut _t4._0)._0).x;
+            *_t23 = 0u8;
+            let _t27 = &mut (&mut _t4._1).x;
+            *_t27 = 1u8;
+            let _t32 = &mut (&mut (&mut _t4._2)._0).x;
+            *_t32 = 2u8
+        } else abort 14566554180833181697;
+    }
+    fun simple(p0: S1): S1 {
+        let _t3 = &mut (&mut p0)._0;
+        *_t3 = 42;
+        let _t6 = &mut (&mut p0)._1;
+        *_t6 = true;
+        p0
+    }
+    fun simple_ref(p0: &mut S1) {
+        let _t3 = &mut p0._0;
+        *_t3 = 42;
+        let _t6 = &mut p0._1;
+        *_t6 = true;
+    }
+    fun test_assign0(): S1 {
+        assign0(4, true)
+    }
+    fun test_assign1(): u64 {
+        assign1(S1{_0: 4, _1: true})
+    }
+    fun test_assign_chained(): S3 {
+        let _t0 = S0{x: 42u8};
+        let _t1 = S2{_0: _t0, _1: 42u8};
+        assign_chained(S3{_0: _t1, _1: _t0, _2: _t1})
+    }
+    fun test_assign_enum_1(): bool {
+        let _t0 = S0{x: 43u8};
+        let _t1 = S2{_0: _t0, _1: 42u8};
+        let _t2 = E::V2{_0: S3{_0: _t1, _1: _t0, _2: _t1}};
+        assign_enum(&mut _t2);
+        let _t19 = S0{x: 0u8};
+        let _t3 = S0{x: 1u8};
+        let _t4 = S0{x: 2u8};
+        let _t25 = S2{_0: _t19, _1: 42u8};
+        let _t5 = S2{_0: _t4, _1: 42u8};
+        let _t6 = E::V2{_0: S3{_0: _t25, _1: _t3, _2: _t5}};
+        _t2 == _t6
+    }
+    fun test_assign_enum_2(): bool {
+        let _t0 = E::V1{_0: 0u8, _1: false};
+        assign_enum(&mut _t0);
+        let _t1 = E::V1{_0: 42u8, _1: true};
+        _t0 == _t1
+    }
+    fun test_simple(): S1 {
+        simple(S1{_0: 0, _1: false})
+    }
+    fun test_simple_ref(): S1 {
+        let _t0 = S1{_0: 0, _1: false};
+        simple_ref(&mut _t0);
+        _t0
+    }
+}
+
+
+//# run --verbose -- 0x42::test::test_simple
+
+//# run --verbose -- 0x42::test::test_simple_ref
+
+//# run --verbose -- 0x42::test::test_assign0
+
+//# run --verbose -- 0x42::test::test_assign1
+
+//# run --verbose -- 0x42::test::test_assign_chained
+
+//# run --verbose -- 0x42::test::test_assign_enum_1
+
+//# run --verbose -- 0x42::test::test_assign_enum_2

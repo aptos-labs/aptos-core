@@ -30,6 +30,7 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Struct `ValidatorInfo`](#0x1_stake_ValidatorInfo)
 -  [Resource `ValidatorSet`](#0x1_stake_ValidatorSet)
 -  [Resource `PendingTransactionFee`](#0x1_stake_PendingTransactionFee)
+-  [Enum Resource `TransactionFeeConfig`](#0x1_stake_TransactionFeeConfig)
 -  [Struct `DistributeTransactionFee`](#0x1_stake_DistributeTransactionFee)
 -  [Resource `AptosCoinCapabilities`](#0x1_stake_AptosCoinCapabilities)
 -  [Struct `IndividualValidatorPerformance`](#0x1_stake_IndividualValidatorPerformance)
@@ -85,6 +86,7 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Function `store_aptos_coin_mint_cap`](#0x1_stake_store_aptos_coin_mint_cap)
 -  [Function `remove_validators`](#0x1_stake_remove_validators)
 -  [Function `initialize_pending_transaction_fee`](#0x1_stake_initialize_pending_transaction_fee)
+-  [Function `set_transaction_fee_config`](#0x1_stake_set_transaction_fee_config)
 -  [Function `record_fee`](#0x1_stake_record_fee)
 -  [Function `initialize_stake_owner`](#0x1_stake_initialize_stake_owner)
 -  [Function `initialize_validator`](#0x1_stake_initialize_validator)
@@ -547,6 +549,45 @@ Transaction fee that is collected in current epoch, indexed by validator_index.
 </dd>
 </dl>
 
+
+</details>
+
+<a id="0x1_stake_TransactionFeeConfig"></a>
+
+## Enum Resource `TransactionFeeConfig`
+
+
+
+<pre><code>enum <a href="stake.md#0x1_stake_TransactionFeeConfig">TransactionFeeConfig</a> <b>has</b> drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V0</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>max_fee_octa_allowed_per_epoch_per_pool: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+</details>
 
 </details>
 
@@ -2602,6 +2643,36 @@ Allow on chain governance to remove validators from the validator set.
 
 </details>
 
+<a id="0x1_stake_set_transaction_fee_config"></a>
+
+## Function `set_transaction_fee_config`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_set_transaction_fee_config">set_transaction_fee_config</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="stake.md#0x1_stake_TransactionFeeConfig">stake::TransactionFeeConfig</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_set_transaction_fee_config">set_transaction_fee_config</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="stake.md#0x1_stake_TransactionFeeConfig">TransactionFeeConfig</a>) <b>acquires</b> <a href="stake.md#0x1_stake_TransactionFeeConfig">TransactionFeeConfig</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
+
+    <b>if</b> (<b>exists</b>&lt;<a href="stake.md#0x1_stake_TransactionFeeConfig">TransactionFeeConfig</a>&gt;(@aptos_framework)) {
+        *<b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_TransactionFeeConfig">TransactionFeeConfig</a>&gt;(@aptos_framework) = config;
+    } <b>else</b> {
+        <b>move_to</b>(framework, config);
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_stake_record_fee"></a>
 
 ## Function `record_fee`
@@ -3906,7 +3977,7 @@ power.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_on_new_epoch">on_new_epoch</a>(
-) <b>acquires</b> <a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="stake.md#0x1_stake_PendingTransactionFee">PendingTransactionFee</a>, <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>, <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>, <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> {
+) <b>acquires</b> <a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="stake.md#0x1_stake_PendingTransactionFee">PendingTransactionFee</a>, <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_TransactionFeeConfig">TransactionFeeConfig</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>, <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>, <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> {
     <b>let</b> validator_set = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
     <b>let</b> config = <a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>();
     <b>let</b> validator_perf = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(@aptos_framework);
@@ -4316,7 +4387,7 @@ This function shouldn't abort.
     validator_perf: &<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>,
     pool_address: <b>address</b>,
     <a href="staking_config.md#0x1_staking_config">staking_config</a>: &StakingConfig,
-) <b>acquires</b> <a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="stake.md#0x1_stake_PendingTransactionFee">PendingTransactionFee</a>, <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a> {
+) <b>acquires</b> <a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="stake.md#0x1_stake_PendingTransactionFee">PendingTransactionFee</a>, <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_TransactionFeeConfig">TransactionFeeConfig</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a> {
     <b>let</b> stake_pool = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
     <b>let</b> validator_config = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>&gt;(pool_address);
     <b>let</b> validator_index = validator_config.validator_index;
@@ -4325,11 +4396,20 @@ This function shouldn't abort.
 
     <b>let</b> fee_pending_inactive = 0;
     <b>let</b> fee_active = 0;
+    <b>let</b> fee_limit = <b>if</b> (<b>exists</b>&lt;<a href="stake.md#0x1_stake_TransactionFeeConfig">TransactionFeeConfig</a>&gt;(@aptos_framework)) {
+        <b>let</b> TransactionFeeConfig::V0 { max_fee_octa_allowed_per_epoch_per_pool } = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_TransactionFeeConfig">TransactionFeeConfig</a>&gt;(@aptos_framework);
+        *max_fee_octa_allowed_per_epoch_per_pool
+    } <b>else</b> {
+        <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a> <b>as</b> u64
+    };
 
     <b>if</b> (<b>exists</b>&lt;<a href="stake.md#0x1_stake_PendingTransactionFee">PendingTransactionFee</a>&gt;(@aptos_framework)) {
         <b>let</b> pending_fee_by_validator = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_PendingTransactionFee">PendingTransactionFee</a>&gt;(@aptos_framework).pending_fee_by_validator;
         <b>if</b> (pending_fee_by_validator.contains(&validator_index)) {
             <b>let</b> fee_octa = pending_fee_by_validator.remove(&validator_index).read();
+            <b>if</b> (fee_octa &gt; fee_limit) {
+                fee_octa = fee_limit;
+            };
             <b>let</b> stake_active = (<a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.active) <b>as</b> u128);
             <b>let</b> stake_pending_inactive = (<a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.pending_inactive) <b>as</b> u128);
             fee_pending_inactive = (((fee_octa <b>as</b> u128) * stake_pending_inactive / (stake_active + stake_pending_inactive)) <b>as</b> u64);

@@ -1,0 +1,56 @@
+processed 5 tasks
+task 0 lines 3-158:  publish [module 0xc0ffee::m {]
+Error: compilation errors:
+ error: cannot select field `_0` since it has different types in variants of enum `Function`
+   ┌─ TEMPFILE:18:10
+   │
+18 │         &p0._0
+   │          ^^
+   │
+   = field `_0` has type `|u64, u64|u64 has copy + drop` in variant `TwoParam` and type `||u64 has copy + drop` in variant `NoParam` and type `|u64|u64 has copy + drop` in variant `OneParam`
+
+error: type `||u64` is missing required abilities `copy + drop`
+   ┌─ TEMPFILE:28:13
+   │
+28 │             _t2 = get_func_recursive(Function::NoParam{_0: || lambda__1__get_func_recursive(_t14)})
+   │             ^^^
+
+error: type `||u64` is missing required abilities `copy + drop`
+   ┌─ TEMPFILE:31:13
+   │
+31 │             _t2 = get_func_recursive(Function::OneParam{_0: |arg0| lambda__2__get_func_recursive(_t21, arg0)})
+   │             ^^^
+
+
+task 1 lines 161-161:  run 0xc0ffee::m::test_1
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 163-163:  run 0xc0ffee::m::test_2
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 165-165:  run 0xc0ffee::m::test_3
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 167-167:  run 0xc0ffee::m::test_4
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

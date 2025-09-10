@@ -1,0 +1,86 @@
+//**** Cross-compiled for `move` syntax from `tests/inlining/objects.move`
+
+//# publish
+module 0x42::objects {
+    struct OwnerRef has drop {
+        addr: address,
+    }
+    struct ReaderRef<phantom T0: key> has drop, store {
+        addr: address,
+    }
+    struct WriterRef<phantom T0: key> has drop, store {
+        addr: address,
+    }
+    public fun make_owner_ref(p0: address): OwnerRef {
+        OwnerRef{addr: p0}
+    }
+    public fun make_reader_ref<T0: key>(p0: address): ReaderRef<T0> {
+        ReaderRef<T0>{addr: p0}
+    }
+    public fun make_writer_ref<T0: key>(p0: address): WriterRef<T0> {
+        WriterRef<T0>{addr: p0}
+    }
+    public fun owner_addr_of(p0: &OwnerRef): address {
+        *&p0.addr
+    }
+    public fun reader_addr_of<T0: key>(p0: &ReaderRef<T0>): address {
+        *&p0.addr
+    }
+    public fun writer_addr_of<T0: key>(p0: &WriterRef<T0>): address {
+        *&p0.addr
+    }
+}
+
+
+//# publish
+module 0x42::token {
+    use 0x42::objects;
+    struct Token has key {
+        val: u64,
+    }
+    public fun create(p0: &signer, p1: &objects::OwnerRef, p2: u64) {
+        let _t3 = Token{val: p2};
+        move_to<Token>(p0, _t3);
+    }
+    public fun reader_ref(p0: &objects::OwnerRef): objects::ReaderRef<Token> {
+        let _t1 = objects::owner_addr_of(p0);
+        if (!exists<Token>(_t1)) abort 22;
+        objects::make_reader_ref<Token>(_t1)
+    }
+    public fun writer_ref(p0: &objects::OwnerRef): objects::WriterRef<Token> {
+        let _t1 = objects::owner_addr_of(p0);
+        if (!exists<Token>(_t1)) abort 23;
+        objects::make_writer_ref<Token>(_t1)
+    }
+    public fun get_value(p0: &objects::ReaderRef<Token>): u64
+        acquires Token
+    {
+        let _t2 = objects::reader_addr_of<Token>(p0);
+        *&borrow_global<Token>(_t2).val
+    }
+    public fun set_value(p0: &objects::WriterRef<Token>, p1: u64)
+        acquires Token
+    {
+        let _t4 = objects::writer_addr_of<Token>(p0);
+        let _t2 = &mut borrow_global_mut<Token>(_t4).val;
+        *_t2 = p1;
+    }
+}
+
+
+//# run --signers 0x42
+script {
+    use 0x42::objects;
+    use 0x42::token;
+    fun main(p0: signer) {
+        let _t1 = objects::make_owner_ref(@0x42);
+        let _t6 = &p0;
+        let _t7 = &_t1;
+        token::create(_t6, _t7, 22);
+        let _t2 = token::reader_ref(&_t1);
+        let _t3 = token::writer_ref(&_t1);
+        if (!(token::get_value(&_t2) == 22)) abort 0;
+        token::set_value(&_t3, 23);
+        if (!(token::get_value(&_t2) == 23)) abort 1;
+    }
+}

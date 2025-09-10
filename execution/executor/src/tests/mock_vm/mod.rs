@@ -22,10 +22,10 @@ use aptos_types::{
     on_chain_config::{ConfigurationResource, ValidatorSet},
     state_store::{state_key::StateKey, StateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockEndInfo, BlockOutput,
-        ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionArgument, TransactionAuxiliaryData, TransactionExecutableRef, TransactionOutput,
-        TransactionStatus, WriteSetPayload,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockEndInfo,
+        BlockOutput, ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction,
+        Transaction, TransactionArgument, TransactionAuxiliaryData, TransactionExecutableRef,
+        TransactionOutput, TransactionStatus, WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -68,11 +68,11 @@ impl VMBlockExecutor for MockVM {
 
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
         let mut output_cache = HashMap::new();
@@ -209,7 +209,10 @@ impl VMBlockExecutor for MockVM {
             }
         }
 
-        Ok(BlockOutput::new(outputs, block_epilogue_txn))
+        Ok(BlockOutput::new(
+            outputs,
+            block_epilogue_txn.map(Into::into),
+        ))
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(

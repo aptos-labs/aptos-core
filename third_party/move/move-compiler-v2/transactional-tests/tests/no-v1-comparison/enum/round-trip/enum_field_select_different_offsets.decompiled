@@ -1,0 +1,64 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/enum/enum_field_select_different_offsets.move`
+
+//# publish
+module 0x42::m {
+    enum Data has drop {
+        V1 {
+            x: u64,
+        }
+        V2 {
+            y: bool,
+            x: u64,
+        }
+        V3 {
+            z: u8,
+            x: u64,
+        }
+    }
+    fun test_get_x_v1(): u64 {
+        let _t2;
+        let _t0 = Data::V1{x: 43};
+        let _t1 = &_t0;
+        if ((_t1 is V2) || (_t1 is V3)) _t2 = &_t1.x else _t2 = &_t1.x;
+        *_t2
+    }
+    fun test_get_x_v2(): u64 {
+        let _t2;
+        let _t0 = Data::V2{y: false, x: 43};
+        let _t1 = &_t0;
+        if ((_t1 is V2) || (_t1 is V3)) _t2 = &_t1.x else _t2 = &_t1.x;
+        *_t2
+    }
+    fun test_get_x_v3(): u64 {
+        let _t2;
+        let _t0 = Data::V3{z: 1u8, x: 43};
+        let _t1 = &_t0;
+        if ((_t1 is V2) || (_t1 is V3)) _t2 = &_t1.x else _t2 = &_t1.x;
+        *_t2
+    }
+    fun test_get_y_v1(): bool {
+        let _t0 = Data::V1{x: 43};
+        *&(&_t0).y
+    }
+    fun test_get_y_v2(): bool {
+        let _t0 = Data::V2{y: true, x: 43};
+        *&(&_t0).y
+    }
+    fun test_get_y_v3(): bool {
+        let _t0 = Data::V3{z: 1u8, x: 43};
+        *&(&_t0).y
+    }
+}
+
+
+//# run 0x42::m::test_get_x_v1
+
+//# run 0x42::m::test_get_x_v2
+
+//# run 0x42::m::test_get_x_v3
+
+//# run 0x42::m::test_get_y_v1
+
+//# run 0x42::m::test_get_y_v2
+
+//# run 0x42::m::test_get_y_v3

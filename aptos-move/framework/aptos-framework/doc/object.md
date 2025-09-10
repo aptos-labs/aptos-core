@@ -119,6 +119,7 @@ make it so that a reference to a global object can be returned from a function.
     -  [Function `new_event_handle`](#@Specification_1_new_event_handle)
     -  [Function `object_from_delete_ref`](#@Specification_1_object_from_delete_ref)
     -  [Function `delete`](#@Specification_1_delete)
+    -  [Function `generate_signer_for_extending`](#@Specification_1_generate_signer_for_extending)
     -  [Function `disable_ungated_transfer`](#@Specification_1_disable_ungated_transfer)
     -  [Function `set_untransferable`](#@Specification_1_set_untransferable)
     -  [Function `enable_ungated_transfer`](#@Specification_1_enable_ungated_transfer)
@@ -2060,7 +2061,7 @@ hierarchy.
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="object.md#0x1_object_transfer_raw_inner">transfer_raw_inner</a>(<a href="object.md#0x1_object">object</a>: <b>address</b>, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code>inline <b>fun</b> <a href="object.md#0x1_object_transfer_raw_inner">transfer_raw_inner</a>(<a href="object.md#0x1_object">object</a>: <b>address</b>, <b>to</b>: <b>address</b>) {
     <b>let</b> object_core = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
     <b>if</b> (object_core.owner != <b>to</b>) {
         <b>if</b> (std::features::module_event_migration_enabled()) {
@@ -3173,6 +3174,23 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 
 
 
+<a id="@Specification_1_generate_signer_for_extending"></a>
+
+### Function `generate_signer_for_extending`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_signer_for_extending">generate_signer_for_extending</a>(ref: &<a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>ensures</b> result == <a href="object.md#0x1_object_spec_generate_signer_for_extending">spec_generate_signer_for_extending</a>(ref);
+</code></pre>
+
+
+
 <a id="@Specification_1_disable_ungated_transfer"></a>
 
 ### Function `disable_ungated_transfer`
@@ -3526,6 +3544,17 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 
 
 <pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_generate_signer_for_extending"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_generate_signer_for_extending">spec_generate_signer_for_extending</a>(ref: &<a href="object.md#0x1_object_ExtendRef">ExtendRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
+   aptos_framework::create_signer::spec_create_signer(ref.self)
+}
 </code></pre>
 
 

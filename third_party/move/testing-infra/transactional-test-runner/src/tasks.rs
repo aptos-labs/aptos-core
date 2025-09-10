@@ -4,17 +4,25 @@
 
 #![forbid(unsafe_code)]
 
+use crate::templates::TemplateContext;
 use anyhow::{anyhow, bail, Result};
 use clap::*;
 use legacy_move_compiler::shared::NumericalAddress;
 use move_command_line_common::{
     address::ParsedAddress,
-    files::{MOVE_EXTENSION, MOVE_IR_EXTENSION},
+    files::{MOVE_ASM_EXTENSION, MOVE_EXTENSION, MOVE_IR_EXTENSION},
     types::{ParsedStructType, ParsedType},
     values::{ParsableValue, ParsedValue},
 };
 use move_core_types::identifier::Identifier;
-use std::{convert::TryInto, fmt::Debug, path::Path, str::FromStr};
+use std::{
+    convert::TryInto,
+    fmt,
+    fmt::{Debug, Formatter},
+    fs,
+    path::Path,
+    str::FromStr,
+};
 use tempfile::NamedTempFile;
 
 #[derive(Debug)]
@@ -22,6 +30,7 @@ pub struct TaskInput<Command> {
     pub command: Command,
     pub name: String,
     pub number: usize,
+    pub source: String,
     pub start_line: usize,
     pub command_lines_stop: usize,
     pub stop_line: usize,
@@ -31,10 +40,9 @@ pub struct TaskInput<Command> {
 #[allow(clippy::needless_collect)]
 pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput<Command>>> {
     use regex::Regex;
-    use std::{
-        fs::File,
-        io::{self, BufRead, Write},
-    };
+    use std::io::Write;
+    // checks whether there is a tera statement or comment header
+    let re_is_tera = Regex::new(r"(?m)^\s*\{(%|#)").unwrap();
     // checks for lines that are entirely whitespace
     let re_whitespace = Regex::new(r"^\s*$").unwrap();
     // checks for lines that start with // comments
@@ -45,11 +53,12 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
     // capturing the command text
     let re_command_text = Regex::new(r"^\s*//#\s*(.*)\s*$").unwrap();
 
-    let file = File::open(filename).unwrap();
-    let lines: Vec<String> = io::BufReader::new(file)
-        .lines()
-        .map(|ln| ln.expect("Could not parse line"))
-        .collect();
+    let mut file_content = fs::read_to_string(filename)?;
+    if re_is_tera.is_match(&file_content) {
+        let template_context = TemplateContext::default();
+        file_content = template_context.expand(&file_content)?
+    }
+    let lines: Vec<String> = file_content.lines().map(|s| s.to_owned()).collect();
 
     let lines_iter = lines.into_iter().enumerate().map(|(idx, l)| (idx + 1, l));
     let skipped_whitespace = lines_iter.skip_while(|(_line_number, line)| {
@@ -99,10 +108,17 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
 
         let start_line = commands.first().unwrap().0;
         let command_lines_stop = commands.last().unwrap().0;
-        let mut command_text = "task ".to_string();
+        let mut command_source = "".to_owned();
         for (line_number, text) in commands {
             assert!(!text.is_empty(), "{}: {}", line_number, text);
-            command_text = format!("{} {}", command_text, text);
+            command_source = format!("{} {}", command_source, text);
+        }
+        let command_text = format!("task {}", command_source);
+        if let Some((_, line)) = text.first() {
+            // Append first text line for better context
+            if !line.is_empty() {
+                command_source = format!("{} [{}]", command_source, line)
+            }
         }
         let command_split = command_text.split_ascii_whitespace().collect::<Vec<_>>();
         let name_opt = command_split.get(1).map(|s| (*s).to_owned());
@@ -144,9 +160,9 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
         let data = if file_text_vec.iter().all(|s| re_whitespace.is_match(s)) {
             None
         } else {
+            let content = file_text_vec.join("\n");
             let data = NamedTempFile::new()?;
-            data.reopen()?
-                .write_all(file_text_vec.join("\n").as_bytes())?;
+            data.reopen()?.write_all(content.as_bytes())?;
             Some(data)
         };
 
@@ -154,6 +170,7 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
             command,
             name,
             number,
+            source: command_source,
             start_line,
             command_lines_stop,
             stop_line,
@@ -169,6 +186,7 @@ impl<T> TaskInput<T> {
             command,
             name,
             number,
+            source,
             start_line,
             command_lines_stop,
             stop_line,
@@ -178,6 +196,7 @@ impl<T> TaskInput<T> {
             command: f(command),
             name,
             number,
+            source,
             start_line,
             command_lines_stop,
             stop_line,
@@ -186,10 +205,11 @@ impl<T> TaskInput<T> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SyntaxChoice {
     Source,
     IR,
+    ASM,
 }
 
 /// When printing bytecode, the input program must either be a script or a module.
@@ -206,7 +226,8 @@ pub struct PrintBytecodeCommand {
     /// The kind of input: either a script, or a module.
     #[clap(long = "input", value_enum, ignore_case = true, default_value_t = PrintBytecodeInputChoice::Script)]
     pub input: PrintBytecodeInputChoice,
-    /// Select Move source ("move") source or MoveIR ("mvir").  Is inferred from filename if absent.
+    /// Select Move source ("move"), MoveIR ("mvir"), or Move Assembler ("masm").  Is inferred
+    /// from filename if absent.
     #[clap(long = "syntax")]
     pub syntax: Option<SyntaxChoice>,
 }
@@ -385,6 +406,16 @@ fn parse_qualified_module_access(s: &str) -> Result<(ParsedAddress, Identifier, 
     Ok((addr, module, struct_))
 }
 
+impl fmt::Display for SyntaxChoice {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            SyntaxChoice::Source => MOVE_EXTENSION,
+            SyntaxChoice::IR => MOVE_IR_EXTENSION,
+            SyntaxChoice::ASM => MOVE_ASM_EXTENSION,
+        })
+    }
+}
+
 impl FromStr for SyntaxChoice {
     type Err = anyhow::Error;
 
@@ -392,10 +423,12 @@ impl FromStr for SyntaxChoice {
         match s {
             MOVE_EXTENSION => Ok(SyntaxChoice::Source),
             MOVE_IR_EXTENSION => Ok(SyntaxChoice::IR),
+            MOVE_ASM_EXTENSION => Ok(SyntaxChoice::ASM),
             _ => Err(anyhow!(
-                "Invalid syntax choice. Expected '{}' or '{}'",
+                "Invalid syntax choice. Expected '{}' or '{}' or '{}'",
                 MOVE_EXTENSION,
-                MOVE_IR_EXTENSION
+                MOVE_IR_EXTENSION,
+                MOVE_ASM_EXTENSION
             )),
         }
     }

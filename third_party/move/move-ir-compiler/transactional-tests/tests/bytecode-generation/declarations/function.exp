@@ -1,67 +1,67 @@
 processed 2 tasks
+task 0 lines 1-31:  print-bytecode --input=module [// This module defines several public functions with complex bodies.]
+// Bytecode version v7
+module 0x3d10::Example
+struct Coin
+  value: u64
 
-task 0 'print-bytecode'. lines 1-31:
-// Move bytecode v7
-module 3d10.Example {
-struct Coin {
-	value: u64
-}
+// Function definition at index 0
+public fun value(l0: &Coin): u64
+    local l1: &u64
+    move_loc l0
+    borrow_field Coin, value
+    st_loc l1
+    move_loc l1
+    read_ref
+    // @5
+    ret
 
-public value(Arg0: &Coin): u64 /* def_idx: 0 */ {
-L1:	loc0: &u64
-B0:
-	0: MoveLoc[0](Arg0: &Coin)
-	1: ImmBorrowField[0](Coin.value: u64)
-	2: StLoc[1](loc0: &u64)
-	3: MoveLoc[1](loc0: &u64)
-	4: ReadRef
-	5: Ret
-}
-public deposit(Arg0: &mut Coin, Arg1: Coin) /* def_idx: 1 */ {
-L2:	loc0: &mut u64
-L3:	loc1: u64
-L4:	loc2: &Coin
-L5:	loc3: u64
-L6:	loc4: u64
-L7:	loc5: u64
-B0:
-	0: MoveLoc[0](Arg0: &mut Coin)
-	1: MutBorrowField[0](Coin.value: u64)
-	2: StLoc[2](loc0: &mut u64)
-	3: CopyLoc[2](loc0: &mut u64)
-	4: ReadRef
-	5: StLoc[3](loc1: u64)
-	6: ImmBorrowLoc[1](Arg1: Coin)
-	7: StLoc[4](loc2: &Coin)
-	8: MoveLoc[4](loc2: &Coin)
-	9: Call value(&Coin): u64
-	10: StLoc[5](loc3: u64)
-	11: CopyLoc[3](loc1: u64)
-	12: CopyLoc[5](loc3: u64)
-	13: Add
-	14: StLoc[6](loc4: u64)
-	15: MoveLoc[6](loc4: u64)
-	16: MoveLoc[2](loc0: &mut u64)
-	17: WriteRef
-	18: MoveLoc[1](Arg1: Coin)
-	19: Unpack[0](Coin)
-	20: StLoc[7](loc5: u64)
-	21: Ret
-}
-}
-
-task 1 'print-bytecode'. lines 33-46:
-// Move bytecode v7
-module 4d10.M {
+// Function definition at index 1
+public fun deposit(l0: &mut Coin, l1: Coin)
+    local l2: &mut u64
+    local l3: u64
+    local l4: &Coin
+    local l5: u64
+    local l6: u64
+    local l7: u64
+    move_loc l0
+    mut_borrow_field Coin, value
+    st_loc l2
+    copy_loc l2
+    read_ref
+    // @5
+    st_loc l3
+    borrow_loc l1
+    st_loc l4
+    move_loc l4
+    call value
+    // @10
+    st_loc l5
+    copy_loc l3
+    copy_loc l5
+    add
+    st_loc l6
+    // @15
+    move_loc l6
+    move_loc l2
+    write_ref
+    move_loc l1
+    unpack Coin
+    // @20
+    st_loc l7
+    ret
 
 
-entry public f() /* def_idx: 0 */ {
-B0:
-	0: Ret
-}
-entry public g() /* def_idx: 1 */ {
-B0:
-	0: Call f()
-	1: Ret
-}
-}
+task 1 lines 33-46:  print-bytecode --input=module [// Functions may be declared with entry modifier]
+// Bytecode version v7
+module 0x4d10::M
+// Function definition at index 0
+entry public fun f()
+    ret
+
+// Function definition at index 1
+entry public fun g()
+    call f
+    ret
+
+

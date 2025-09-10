@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: duplicate declaration of type parameter `T2`
+  ┌─ tests/checking/typing/bug_17081.move:4:26
+  │
+4 │     struct Func1<T1, T2, T2>(|T1, T2|T2) has copy, drop;
+  │                      --  ^^
+  │                      │
+  │                      previously declared here
+
+error: duplicate declaration of type parameter `T1`
+  ┌─ tests/checking/typing/bug_17081.move:6:17
+  │
+6 │     enum E2<T1, T1, T2> has drop {
+  │             --  ^^
+  │             │
+  │             previously declared here
+
+error: duplicate declaration of type parameter `T2`
+   ┌─ tests/checking/typing/bug_17081.move:11:26
+   │
+11 │     fun local_get_x1<T2, T2>(x1: T2, x2: T2): &T2 {
+   │                      --  ^^
+   │                      │
+   │                      previously declared here

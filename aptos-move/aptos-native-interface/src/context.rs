@@ -10,11 +10,15 @@ use aptos_gas_schedule::{
     NativeGasParameters,
 };
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
-use move_binary_format::errors::{PartialVMResult, VMResult};
+use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::{
     gas_algebra::InternalGas, identifier::Identifier, language_storage::ModuleId,
 };
-use move_vm_runtime::{native_functions::NativeContext, Function};
+use move_vm_runtime::{
+    native_extensions::NativeContextExtensions,
+    native_functions::{LoaderContext, NativeContext},
+    Function,
+};
 use move_vm_types::values::Value;
 use std::{
     ops::{Deref, DerefMut},
@@ -61,7 +65,7 @@ impl DerefMut for SafeNativeContext<'_, '_, '_, '_> {
     }
 }
 
-impl SafeNativeContext<'_, '_, '_, '_> {
+impl<'b, 'c> SafeNativeContext<'_, 'b, 'c, '_> {
     /// Always remember: first charge gas, then execute!
     ///
     /// In other words, this function **MUST** always be called **BEFORE** executing **any**
@@ -107,8 +111,9 @@ impl SafeNativeContext<'_, '_, '_, '_> {
     /// dispatch.
     pub fn charge_gas_for_dependencies(&mut self, module_id: ModuleId) -> SafeNativeResult<()> {
         self.inner
+            .loader_context()
             .charge_gas_for_dependencies(module_id)
-            .map_err(|err| LimitExceededError::from_err(err.to_partial()))
+            .map_err(LimitExceededError::from_err)
     }
 
     /// Evaluates the given gas expression within the current context immediately.
@@ -126,6 +131,26 @@ impl SafeNativeContext<'_, '_, '_, '_> {
         self.misc_gas_params
             .abs_val
             .abstract_value_size(val, self.gas_feature_version)
+    }
+
+    /// Returns extensions with loader context and gas parameters. Allows to use mutable loader
+    /// context (wrapper around mutable references), while immutably borrowing the extension and
+    /// gas parameters.
+    pub fn extensions_with_loader_context_and_gas_params(
+        &mut self,
+    ) -> (
+        &NativeContextExtensions<'b>,
+        LoaderContext<'_, 'c>,
+        &AbstractValueSizeGasParameters,
+        u64,
+    ) {
+        let (extensions, native_layout_converter) = self.inner.extensions_with_loader_context();
+        (
+            extensions,
+            native_layout_converter,
+            &self.misc_gas_params.abs_val,
+            self.gas_feature_version,
+        )
     }
 
     /// Computes the abstract size of the input value.
@@ -190,16 +215,38 @@ impl SafeNativeContext<'_, '_, '_, '_> {
         Ok(())
     }
 
+    /// Loads a function definition corresponding to the given name. The module where the function
+    /// is defined must have been visited and metered (an error is returned otherwise).
     pub fn load_function(
         &mut self,
         module_id: &ModuleId,
         function_name: &Identifier,
     ) -> VMResult<Arc<Function>> {
-        let (_, function) = self.inner.module_storage().fetch_function_definition(
-            module_id.address(),
-            module_id.name(),
-            function_name,
-        )?;
-        Ok(function)
+        // INVARIANT:
+        //   There is no need to meter module loading due to function access. This is because this
+        //   function is only called for native dynamic dispatch, which pre-charges gas before the
+        //   dispatch logic:
+        //      1. Native function to load & charge modules is called.
+        //      2. Native is called to dispatch, which calls this function from native context.
+        //   Currently, native implementations in step (2) check if the module loading was metered,
+        //   but we still keep an invariant check here in case there is a mistake and the gas is
+        //   not charged.
+        let module = if self.features.is_lazy_loading_enabled() {
+            self.inner
+                .traversal_context()
+                .check_is_special_or_visited(module_id.address(), module_id.name())
+                .map_err(|err| err.finish(Location::Undefined))?;
+            self.inner
+                .module_storage()
+                .unmetered_get_existing_lazily_verified_module(module_id)?
+        } else {
+            self.inner
+                .module_storage()
+                .unmetered_get_existing_eagerly_verified_module(
+                    module_id.address(),
+                    module_id.name(),
+                )?
+        };
+        module.get_function(function_name)
     }
 }

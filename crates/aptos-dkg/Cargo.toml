@@ -51,6 +51,10 @@ name = "pvss"
 harness = false
 
 [[bench]]
+name = "range_proof"
+harness = false
+
+[[bench]]
 name = "weighted_vuf"
 harness = false
 

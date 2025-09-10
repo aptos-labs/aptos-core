@@ -3,80 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    backup::{backup_handler::BackupHandler, restore_utils},
-    common::MAX_NUM_EPOCH_ENDING_LEDGER_INFO,
-    event_store::EventStore,
-    ledger_db::{
-        ledger_metadata_db::LedgerMetadataDb,
-        transaction_auxiliary_data_db::TransactionAuxiliaryDataDb,
-        transaction_info_db::TransactionInfoDb, LedgerDb, LedgerDbSchemaBatches,
-    },
-    metrics::{
-        API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
-        OTHER_TIMERS_SECONDS,
-    },
-    pruner::{LedgerPrunerManager, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
-    rocksdb_property_reporter::RocksdbPropertyReporter,
-    schema::{
-        block_info::BlockInfoSchema,
-        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-        transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
-    },
-    state_kv_db::StateKvDb,
-    state_merkle_db::StateMerkleDb,
-    state_store::StateStore,
+    backup::backup_handler::BackupHandler, event_store::EventStore, ledger_db::LedgerDb,
+    pruner::LedgerPrunerManager, rocksdb_property_reporter::RocksdbPropertyReporter,
+    state_kv_db::StateKvDb, state_merkle_db::StateMerkleDb, state_store::StateStore,
     transaction_store::TransactionStore,
 };
-use aptos_config::config::{
-    PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
-};
-use aptos_crypto::HashValue;
+use aptos_config::config::{PrunerConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
-use aptos_metrics_core::TimerHelper;
-use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_schemadb::batch::SchemaBatch;
-use aptos_storage_interface::{
-    db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader, DbWriter, LedgerSummary,
-    Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
-};
-use aptos_types::{
-    account_address::AccountAddress,
-    account_config::{new_block_event_key, NewBlockEvent},
-    contract_event::{ContractEvent, EventWithVersion},
-    epoch_change::EpochChangeProof,
-    epoch_state::EpochState,
-    event::EventKey,
-    ledger_info::LedgerInfoWithSignatures,
-    proof::{
-        accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
-        TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
-        TransactionInfoListWithProof,
-    },
-    state_proof::StateProof,
-    state_store::{
-        state_key::{prefix::StateKeyPrefix, StateKey},
-        state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueChunkWithProof},
-        table::{TableHandle, TableInfo},
-    },
-    transaction::{
-        AccountOrderedTransactionsWithProof, Transaction, TransactionAuxiliaryData,
-        TransactionInfo, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionWithProof, Version,
-    },
-    write_set::WriteSet,
-};
-use rayon::prelude::*;
-use std::{
-    cell::Cell,
-    fmt::{Debug, Formatter},
-    iter::Iterator,
-    path::Path,
-    sync::Arc,
-    time::Instant,
-};
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
+use std::{path::Path, sync::Arc, time::Instant};
 use tokio::sync::watch::Sender;
 
 #[cfg(test)]
@@ -104,14 +42,14 @@ pub struct AptosDB {
 }
 
 // DbReader implementations and private functions used by them.
-include!("include/aptosdb_reader.rs");
+mod aptosdb_reader;
 // DbWriter implementations and private functions used by them.
-include!("include/aptosdb_writer.rs");
+mod aptosdb_writer;
 // Other private methods.
-include!("include/aptosdb_internal.rs");
+mod aptosdb_internal;
 // Testonly methods.
 #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
-include!("include/aptosdb_testonly.rs");
+mod aptosdb_testonly;
 
 #[cfg(feature = "consensus-only-perf-test")]
 pub mod fake_aptosdb;

@@ -84,18 +84,18 @@ module 0x42::fields {
         x.f = v
     }
     fun write_local_direct(): S {
-        let x = S{f: 0,g: T{h: 0}};
+        let x = S{f: 0, g: T{h: 0}};
         x.g.h = 42;
         x
     }
     fun write_local_via_ref(): S {
-        let x = S{f: 0,g: T{h: 0}};
+        let x = S{f: 0, g: T{h: 0}};
         let r = &mut x;
         r.g.h = 42;
         x
     }
     fun write_local_via_ref_2(): S {
-        let x = S{f: 0,g: T{h: 0}};
+        let x = S{f: 0, g: T{h: 0}};
         let r = &mut x.g.h;
         *r = 42;
         x

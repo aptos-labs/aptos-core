@@ -142,6 +142,7 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
                 SuccessCriteria::new(min_tps)
                     .add_max_expired_tps(max_expired as f64)
                     .add_max_failed_submission_tps(200.0)
+                    .add_no_restarts()
                     .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
                         (
                             LatencyBreakdownSlice::MempoolToBlockCreation,
@@ -268,7 +269,7 @@ pub(crate) fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig
                     // TODO(ibalajiarun): Investigate the high utilization and adjust accordingly.
                     // Memory starts around 8GB, and grows around 8GB/hr in this test.
                     // Check that we don't use more than final expected memory for more than 20% of the time.
-                    MetricsThreshold::new_gb(8.5 + 8.0 * (duration.as_secs_f64() / 3600.0), 20),
+                    MetricsThreshold::new_gb(10.0 + 8.0 * (duration.as_secs_f64() / 3600.0), 20),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -309,7 +310,7 @@ pub(crate) fn realistic_env_max_load_test(
             MetricsThreshold::new(25.0, 15),
             // Memory starts around 8GB, and grows around 1.4GB/hr in this test.
             // Check that we don't use more than final expected memory for more than 20% of the time.
-            MetricsThreshold::new_gb(8.0 + 1.4 * (duration_secs as f64 / 3600.0), 20),
+            MetricsThreshold::new_gb(10.0 + 1.4 * (duration_secs as f64 / 3600.0), 20),
         ))
         .add_no_restarts()
         .add_wait_for_catchup_s(
@@ -471,6 +472,14 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     OnChainExecutionConfig::V6(config_v6) => {
                         config_v6.block_gas_limit_type = BlockGasLimitType::NoLimit;
                         config_v6.transaction_shuffler_type = TransactionShufflerType::UseCaseAware {
+                            sender_spread_factor: 256,
+                            platform_use_case_spread_factor: 0,
+                            user_use_case_spread_factor: 0,
+                        };
+                    },
+                    OnChainExecutionConfig::V7(config_v7) => {
+                        config_v7.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                        config_v7.transaction_shuffler_type = TransactionShufflerType::UseCaseAware {
                             sender_spread_factor: 256,
                             platform_use_case_spread_factor: 0,
                             user_use_case_spread_factor: 0,

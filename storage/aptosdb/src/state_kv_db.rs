@@ -24,15 +24,14 @@ use aptos_metrics_core::TimerHelper;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{
     batch::{SchemaBatch, WriteBatch},
-    ReadOptions, DB,
+    Cache, ReadOptions, DB,
 };
-use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, Result};
+use aptos_storage_interface::Result;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use arr_macro::arr;
-use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
     path::{Path, PathBuf},
@@ -69,12 +68,22 @@ impl StateKvDb {
             });
         }
 
-        Self::open_sharded(db_paths, rocksdb_configs.state_kv_db_config, readonly)
+        let block_cache = Cache::new_hyper_clock_cache(
+            rocksdb_configs.state_kv_db_config.block_cache_size as usize,
+            /* estimated_entry_charge = */ 0,
+        );
+        Self::open_sharded(
+            db_paths,
+            rocksdb_configs.state_kv_db_config,
+            Some(&block_cache),
+            readonly,
+        )
     }
 
     pub(crate) fn open_sharded(
         db_paths: &StorageDirPaths,
         state_kv_db_config: RocksdbConfig,
+        block_cache: Option<&Cache>,
         readonly: bool,
     ) -> Result<Self> {
         let state_kv_metadata_db_path =
@@ -84,6 +93,7 @@ impl StateKvDb {
             state_kv_metadata_db_path.clone(),
             STATE_KV_METADATA_DB_NAME,
             &state_kv_db_config,
+            block_cache,
             readonly,
             /* is_hot = */ false,
         )?);
@@ -101,6 +111,7 @@ impl StateKvDb {
                     shard_root_path,
                     shard_id,
                     &state_kv_db_config,
+                    block_cache,
                     readonly,
                     /* is_hot = */ false,
                 )
@@ -125,6 +136,7 @@ impl StateKvDb {
                             shard_root_path,
                             shard_id,
                             &state_kv_db_config,
+                            block_cache,
                             readonly,
                             /* is_hot = */ true,
                         )
@@ -156,11 +168,7 @@ impl StateKvDb {
     }
 
     pub(crate) fn new_sharded_native_batches(&self) -> ShardedStateKvSchemaBatch {
-        (0..NUM_STATE_SHARDS)
-            .map(|shard_id| self.db_shard(shard_id).new_native_batch())
-            .collect_vec()
-            .try_into()
-            .expect("known to be 16 shards")
+        std::array::from_fn(|shard_id| self.db_shard(shard_id).new_native_batch())
     }
 
     pub(crate) fn commit(
@@ -169,13 +177,9 @@ impl StateKvDb {
         state_kv_metadata_batch: Option<SchemaBatch>,
         sharded_state_kv_batches: ShardedStateKvSchemaBatch,
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["state_kv_db__commit"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_kv_db__commit"]);
         {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["state_kv_db__commit_shards"])
-                .start_timer();
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_kv_db__commit_shards"]);
             THREAD_MANAGER.get_io_pool().scope(|s| {
                 let mut batches = sharded_state_kv_batches.into_iter();
                 for shard_id in 0..NUM_STATE_SHARDS {
@@ -222,6 +226,7 @@ impl StateKvDb {
         let state_kv_db = Self::open_sharded(
             &StorageDirPaths::from_path(db_root_path),
             RocksdbConfig::default(),
+            None,
             false,
         )?;
         let cp_state_kv_db_path = cp_root_path.as_ref().join(STATE_KV_DB_FOLDER_NAME);
@@ -298,6 +303,7 @@ impl StateKvDb {
         db_root_path: P,
         shard_id: usize,
         state_kv_db_config: &RocksdbConfig,
+        block_cache: Option<&Cache>,
         readonly: bool,
         is_hot: bool,
     ) -> Result<DB> {
@@ -310,6 +316,7 @@ impl StateKvDb {
             Self::db_shard_path(db_root_path, shard_id, is_hot),
             &db_name,
             state_kv_db_config,
+            block_cache,
             readonly,
             is_hot,
         )
@@ -319,6 +326,7 @@ impl StateKvDb {
         path: PathBuf,
         name: &str,
         state_kv_db_config: &RocksdbConfig,
+        block_cache: Option<&Cache>,
         readonly: bool,
         is_hot: bool,
     ) -> Result<DB> {
@@ -332,7 +340,7 @@ impl StateKvDb {
             gen_hot_state_kv_shard_cfds
         } else {
             gen_state_kv_shard_cfds
-        }(state_kv_db_config);
+        }(state_kv_db_config, block_cache);
 
         open_func(&rocksdb_opts, path, name, cfds)
     }

@@ -2,10 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    compiler::{as_module, compile_units},
-    tests::execute_function_with_single_storage_for_test,
-};
+use crate::tests::{compile_and_publish, execute_function_with_single_storage_for_test};
 use claims::assert_ok;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
@@ -62,14 +59,6 @@ fn make_dispatch_d_native() -> NativeFunction {
             args: SmallVec::new(),
         })
     })
-}
-
-fn compile_and_publish(storage: &mut InMemoryStorage, code: String) {
-    let mut units = compile_units(&code).unwrap();
-    let m = as_module(units.pop().unwrap());
-    let mut blob = vec![];
-    m.serialize(&mut blob).unwrap();
-    storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 }
 
 #[test]
@@ -197,5 +186,5 @@ fn runtime_reentrancy_check() {
     )
     .unwrap_err()
     .major_status();
-    assert_eq!(status, StatusCode::FUNCTION_RESOLUTION_FAILURE);
+    assert_eq!(status, StatusCode::LINKER_ERROR);
 }

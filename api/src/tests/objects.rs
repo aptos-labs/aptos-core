@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::new_test_context;
+use super::new_test_context_with_orderless_flags;
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_types::account_address::{self, AccountAddress};
+use rstest::rstest;
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -14,8 +15,19 @@ use std::{collections::BTreeMap, path::PathBuf};
 // 4. Transfer to cause transfer event
 // 4. Read emitted event
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_gen_object() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_gen_object(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
 
     // Prepare account
     let mut user = context.create_account().await;

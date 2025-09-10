@@ -54,7 +54,10 @@ use crate::{
     entry_points::EntryPointTransactionGenerator, p2p_transaction_generator::SamplingMode,
     workflow_delegator::WorkflowTxnGeneratorCreator,
 };
-pub use publishing::{entry_point_trait, prebuild_packages::create_prebuilt_packages_rs_file};
+pub use publishing::{
+    entry_point_trait,
+    prebuild_packages::{create_prebuilt_packages_bundle, PrebuiltPackageConfig},
+};
 
 pub const SEND_AMOUNT: u64 = 1;
 
@@ -92,7 +95,6 @@ pub enum TransactionType {
     Workflow {
         workflow_kind: Box<dyn WorkflowKind>,
         num_modules: usize,
-        use_account_pool: bool,
         progress_type: WorkflowProgress,
     },
 }
@@ -394,7 +396,6 @@ pub async fn create_txn_generator_creator(
                 },
                 TransactionType::Workflow {
                     num_modules,
-                    use_account_pool,
                     workflow_kind,
                     progress_type,
                 } => Box::new(
@@ -405,7 +406,6 @@ pub async fn create_txn_generator_creator(
                         &root_account,
                         txn_executor,
                         num_modules,
-                        use_account_pool.then(|| accounts_pool.clone()),
                         cur_phase.clone(),
                         progress_type,
                     )

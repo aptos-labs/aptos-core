@@ -595,7 +595,7 @@ fn get_config_by_name(name: &str) -> TestConfig {
 
 /// Runs test at `path` with the given `config`.
 fn run_test(path: &Path, config: TestConfig) -> anyhow::Result<()> {
-    logging::setup_logging_for_testing();
+    logging::setup_logging_for_testing(None);
     let path_str = path.display().to_string();
     let mut options = config.options.clone();
     options.warn_unused = path_str.contains("/unused/");
@@ -766,7 +766,7 @@ fn run_env_pipeline(
             );
             if is_first_pipeline {
                 // Print the sourcified model during the first env pipeline.
-                let sourcifier = Sourcifier::new(&*env);
+                let sourcifier = Sourcifier::new(&*env, true);
                 for module in env.get_modules() {
                     if module.is_primary_target() {
                         sourcifier.print_module(module.get_id())

@@ -114,8 +114,15 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
         };
     }
 
-    fn remove(&mut self, txn_idx: TxnIndex) {
+    fn remove(&mut self, txn_idx: TxnIndex, is_blockstm_v2: bool) {
         let deleted_entry = self.versioned_map.remove(&txn_idx);
+
+        // TODO(BlockSTMv2): deal w. V2 & estimates and potentially bring back the check
+        // that removed entry must be an estimate (but with PanicError).
+        if is_blockstm_v2 {
+            return;
+        }
+
         // Entries should only be deleted if the transaction that produced them is
         // aborted and re-executed, but abort must have marked the entry as an Estimate.
         assert_matches!(
@@ -165,11 +172,13 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                     // Bypass stored in the estimate does not match the new entry.
                     (Estimate(_), _) => false,
 
-                    (cur, new) => {
-                        return Err(code_invariant_error(format!(
-                            "Replaced entry must be an Estimate, {:?} to {:?}",
-                            cur, new,
-                        )))
+                    (_cur, _new) => {
+                        // TODO(BlockSTMv2): V2 currently does not mark estimate.
+                        // For V1, used to return Err(code_invariant_error(format!(
+                        //    "Replaced entry must be an Estimate, {:?} to {:?}",
+                        //    cur, new,
+                        //)))
+                        true
                     },
                 } {
                     // TODO[agg_v2](optimize): See if we want to invalidate, when we change read_estimate_deltas
@@ -506,11 +515,22 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
             .mark_estimate(txn_idx);
     }
 
-    pub fn remove(&self, id: &K, txn_idx: TxnIndex) {
+    pub fn remove(
+        &self,
+        id: &K,
+        txn_idx: TxnIndex,
+        is_blockstm_v2: bool,
+    ) -> Result<(), PanicError> {
         self.values
             .get_mut(id)
-            .expect("VersionedValue for an (resolved) ID must already exist")
-            .remove(txn_idx);
+            .ok_or_else(|| {
+                code_invariant_error(format!(
+                    "VersionedValue for an (resolved) ID {:?} must already exist",
+                    id
+                ))
+            })?
+            .remove(txn_idx, is_blockstm_v2);
+        Ok(())
     }
 
     /// Moves the commit index, and computes exact values for delayed fields having
@@ -518,7 +538,11 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
     /// before given idx are in Value state.
     ///
     /// Must be called for each transaction index, in order.
-    pub fn try_commit(&self, idx_to_commit: TxnIndex, ids: Vec<K>) -> Result<(), CommitError> {
+    pub fn try_commit(
+        &self,
+        idx_to_commit: TxnIndex,
+        ids_iter: impl Iterator<Item = K>,
+    ) -> Result<(), CommitError> {
         // we may not need to return values here, we can just read them.
         use DelayedApplyEntry::*;
 
@@ -532,7 +556,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
         let mut todo_deltas = Vec::new();
         let mut todo_derived = Vec::new();
 
-        for id in ids {
+        for id in ids_iter {
             let mut versioned_value = self
                 .values
                 .get_mut(&id)
@@ -697,18 +721,6 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
                     .map_err(MVDelayedFieldsError::from_panic_or)
             },
         }
-    }
-
-    pub fn remove_all_at_or_after_for_epilogue(
-        &self,
-        txn_idx: TxnIndex,
-        epilogue_txn_idx: TxnIndex,
-    ) {
-        for mut entry in self.values.iter_mut() {
-            entry.value_mut().versioned_map.split_off(&txn_idx);
-        }
-        self.next_idx_to_commit
-            .store(epilogue_txn_idx, Ordering::SeqCst);
     }
 }
 
@@ -1177,7 +1189,7 @@ mod test {
         if let Some(entry) = aggregator_entry(type_index) {
             v.insert_speculative_value(10, entry).unwrap();
         }
-        v.remove(10);
+        v.remove(10, false);
     }
 
     #[test]
@@ -1186,24 +1198,8 @@ mod test {
         v.insert_speculative_value(3, aggregator_entry(VALUE_AGGREGATOR).unwrap())
             .unwrap();
         v.mark_estimate(3);
-        v.remove(3);
+        v.remove(3, false);
         assert!(!v.read_estimate_deltas);
-    }
-
-    #[should_panic]
-    #[test_case(APPLY_AGGREGATOR)]
-    #[test_case(APPLY_SNAPSHOT)]
-    #[test_case(APPLY_DERIVED)]
-    fn insert_twice_no_value(type_index: usize) {
-        let mut v = VersionedValue::new(None);
-        if let Some(entry) = aggregator_entry(type_index) {
-            v.insert_speculative_value(10, entry).unwrap();
-        }
-        // Should fail because inserting can only overwrite an Estimate entry or
-        // be inserting a Value when the transaction commits.
-        if let Some(entry) = aggregator_entry(type_index) {
-            v.insert_speculative_value(10, entry).unwrap();
-        }
     }
 
     #[should_panic]

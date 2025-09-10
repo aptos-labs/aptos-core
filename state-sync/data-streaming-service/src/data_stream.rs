@@ -555,8 +555,9 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         // Get the highest version sent in the subscription response
         let highest_response_version = match response_payload {
             ResponsePayload::NewTransactionsWithProof((transactions_with_proof, _)) => {
-                if let Some(first_version) = transactions_with_proof.first_transaction_version {
-                    let num_transactions = transactions_with_proof.transactions.len();
+                if let Some(first_version) = transactions_with_proof.get_first_transaction_version()
+                {
+                    let num_transactions = transactions_with_proof.get_num_transactions();
                     first_version
                         .saturating_add(num_transactions as u64)
                         .saturating_sub(1) // first_version + num_txns - 1
@@ -567,8 +568,8 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                 }
             },
             ResponsePayload::NewTransactionOutputsWithProof((outputs_with_proof, _)) => {
-                if let Some(first_version) = outputs_with_proof.first_transaction_output_version {
-                    let num_outputs = outputs_with_proof.transactions_and_outputs.len();
+                if let Some(first_version) = outputs_with_proof.get_first_output_version() {
+                    let num_outputs = outputs_with_proof.get_num_outputs();
                     first_version
                         .saturating_add(num_outputs as u64)
                         .saturating_sub(1) // first_version + num_outputs - 1
@@ -1165,7 +1166,7 @@ fn create_missing_transactions_request(
     match response_payload {
         ResponsePayload::TransactionsWithProof(transactions_with_proof) => {
             // Check if the request was satisfied
-            let num_received_transactions = transactions_with_proof.transactions.len() as u64;
+            let num_received_transactions = transactions_with_proof.get_num_transactions() as u64;
             if num_received_transactions < num_requested_transactions {
                 let start_version = request
                     .start_version
@@ -1210,9 +1211,7 @@ fn create_missing_transaction_outputs_request(
     match response_payload {
         ResponsePayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
             // Check if the request was satisfied
-            let num_received_outputs = transaction_outputs_with_proof
-                .transactions_and_outputs
-                .len() as u64;
+            let num_received_outputs = transaction_outputs_with_proof.get_num_outputs() as u64;
             if num_received_outputs < num_requested_outputs {
                 let start_version = request
                     .start_version
@@ -1257,12 +1256,10 @@ fn create_missing_transactions_or_outputs_request(
     // Calculate the number of received data items
     let num_received_data_items = match response_payload {
         ResponsePayload::TransactionsWithProof(transactions_with_proof) => {
-            transactions_with_proof.transactions.len() as u64
+            transactions_with_proof.get_num_transactions() as u64
         },
         ResponsePayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
-            transaction_outputs_with_proof
-                .transactions_and_outputs
-                .len() as u64
+            transaction_outputs_with_proof.get_num_outputs() as u64
         },
         payload => {
             return Err(Error::AptosDataClientResponseIsInvalid(format!(

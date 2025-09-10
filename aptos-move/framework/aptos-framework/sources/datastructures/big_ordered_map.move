@@ -297,8 +297,11 @@ module aptos_std::big_ordered_map {
 
     /// Returns true iff the BigOrderedMap is empty.
     public fun is_empty<K: store, V: store>(self: &BigOrderedMap<K, V>): bool {
-        let node = self.borrow_node(self.min_leaf_index);
-        node.children.is_empty()
+        if (self.root.is_leaf) {
+            self.root.children.is_empty()
+        } else {
+            false
+        }
     }
 
     /// Returns the number of elements in the BigOrderedMap.
@@ -572,11 +575,17 @@ module aptos_std::big_ordered_map {
 
     // TODO: Temporary friend implementaiton, until for_each_ref can be made efficient.
     public(friend) inline fun for_each_ref_friend<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, f: |&K, &V|) {
-        self.for_each_leaf_node_ref(|node| {
-            node.children.for_each_ref_friend(|k: &K, v: &Child<V>| {
-                f(k, &v.value);
-            });
-        })
+        let iter = self.new_begin_iter();
+        while (!iter.iter_is_end(self)) {
+            f(iter.iter_borrow_key(), iter.iter_borrow(self));
+            iter = iter.iter_next(self);
+        };
+
+        // self.for_each_leaf_node_ref(|node| {
+        //     node.children.for_each_ref_friend(|k: &K, v: &Child<V>| {
+        //         f(k, &v.value);
+        //     });
+        // })
     }
 
     /// Apply the function to a mutable reference of each key-value pair in the map.
@@ -1435,6 +1444,7 @@ module aptos_std::big_ordered_map {
     #[test_only]
     fun validate_iteration<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>) {
         let expected_num_elements = self.compute_length();
+        assert!((expected_num_elements == 0) == self.is_empty(), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
         let num_elements = 0;
         let it = self.new_begin_iter();
         while (!it.iter_is_end(self)) {

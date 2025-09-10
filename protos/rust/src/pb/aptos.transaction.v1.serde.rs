@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
-impl serde::Serialize for AbstractionSignature {
+impl serde::Serialize for AbstractSignature {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
@@ -16,7 +16,7 @@ impl serde::Serialize for AbstractionSignature {
         if !self.signature.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.AbstractionSignature", len)?;
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.AbstractSignature", len)?;
         if !self.function_info.is_empty() {
             struct_ser.serialize_field("functionInfo", &self.function_info)?;
         }
@@ -26,7 +26,7 @@ impl serde::Serialize for AbstractionSignature {
         struct_ser.end()
     }
 }
-impl<'de> serde::Deserialize<'de> for AbstractionSignature {
+impl<'de> serde::Deserialize<'de> for AbstractSignature {
     #[allow(deprecated)]
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
@@ -74,13 +74,13 @@ impl<'de> serde::Deserialize<'de> for AbstractionSignature {
         }
         struct GeneratedVisitor;
         impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-            type Value = AbstractionSignature;
+            type Value = AbstractSignature;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.AbstractionSignature")
+                formatter.write_str("struct aptos.transaction.v1.AbstractSignature")
             }
 
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<AbstractionSignature, V::Error>
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<AbstractSignature, V::Error>
                 where
                     V: serde::de::MapAccess<'de>,
             {
@@ -104,13 +104,13 @@ impl<'de> serde::Deserialize<'de> for AbstractionSignature {
                         }
                     }
                 }
-                Ok(AbstractionSignature {
+                Ok(AbstractSignature {
                     function_info: function_info__.unwrap_or_default(),
                     signature: signature__.unwrap_or_default(),
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.AbstractionSignature", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("aptos.transaction.v1.AbstractSignature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for AccountSignature {

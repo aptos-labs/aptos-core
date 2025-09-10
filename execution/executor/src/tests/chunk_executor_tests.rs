@@ -20,7 +20,7 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
-    transaction::{TransactionListWithProof, Version},
+    transaction::{TransactionListWithProofV2, Version},
 };
 use rand::Rng;
 
@@ -49,7 +49,7 @@ impl TestExecutor {
 }
 
 fn execute_and_commit_chunks(
-    chunks: [TransactionListWithProof; 3],
+    chunks: [TransactionListWithProofV2; 3],
     ledger_info: LedgerInfoWithSignatures,
     db: &DbReaderWriter,
     executor: &ChunkExecutor<MockVM>,
@@ -99,7 +99,7 @@ fn test_executor_execute_or_apply_and_commit_chunk() {
             third_batch_start..=third_batch_start + third_batch_size - 1,
         ])
     };
-    // First test with transactions only and reset chunks to be `Vec<TransactionOutputListWithProof>`.
+    // First test with transactions only and reset chunks to be `Vec<TransactionOutputListWithProofV2>`.
     let chunks = {
         let TestExecutor {
             _path,
@@ -316,7 +316,7 @@ const PRE_COMMIT_TESTS_LATEST_VERSION: Version = 10;
 /// commits txn 1-3, pre-commits txn 4-7, returns txn 8-10 and ledger infos at 7 and 10
 fn commit_1_pre_commit_2_return_3() -> (
     DbReaderWriter,
-    TransactionListWithProof,
+    TransactionListWithProofV2,
     LedgerInfoWithSignatures,
     LedgerInfoWithSignatures,
 ) {
@@ -333,11 +333,11 @@ fn commit_1_pre_commit_2_return_3() -> (
     let block_executor = BlockExecutor::<MockVM>::new(db.clone());
     let mut parent_block_id = block_executor.committed_block_id();
     // execute and pre-commit block 1 & 2
-    for (txns, ledger_info) in &blocks[0..=1] {
+    for (txns, aux_info, ledger_info) in &blocks[0..=1] {
         let block_id = ledger_info.commit_info().id();
         let output = block_executor
             .execute_block(
-                (block_id, block(txns.clone())).into(),
+                (block_id, block(txns.clone()), aux_info.clone()).into(),
                 parent_block_id,
                 TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
             )
@@ -350,9 +350,9 @@ fn commit_1_pre_commit_2_return_3() -> (
         parent_block_id = block_id;
     }
     // commit till block 1
-    let ledger_info1 = blocks[0].1.clone();
-    let ledger_info2 = blocks[1].1.clone();
-    let ledger_info3 = blocks[2].1.clone();
+    let ledger_info1 = blocks[0].2.clone();
+    let ledger_info2 = blocks[1].2.clone();
+    let ledger_info3 = blocks[2].2.clone();
     block_executor.commit_ledger(ledger_info1).unwrap();
     assert_eq!(
         ledger_info3.ledger_info().version(),

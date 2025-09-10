@@ -1,0 +1,10 @@
+processed 9 tasks
+task 0 lines 3-161:  publish [module 0x42::test {]
+task 1 lines 164-164:  run --verbose -- 0x42::test::test1
+task 2 lines 166-166:  run --verbose -- 0x42::test::test2
+task 3 lines 168-168:  run --verbose -- 0x42::test::test3
+task 4 lines 170-170:  run --verbose -- 0x42::test::test4
+task 5 lines 172-172:  run --verbose -- 0x42::test::test5
+task 6 lines 174-174:  run --verbose -- 0x42::test::test6
+task 7 lines 176-176:  run --verbose -- 0x42::test::test7
+task 8 lines 178-178:  run --verbose -- 0x42::test::test8

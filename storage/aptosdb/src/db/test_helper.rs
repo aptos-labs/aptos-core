@@ -21,8 +21,8 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, BlockGen},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        PersistedAuxiliaryInfo, ReplayProtector, Transaction, TransactionAuxiliaryData,
-        TransactionInfo, TransactionToCommit, Version,
+        AuxiliaryInfo, PersistedAuxiliaryInfo, ReplayProtector, Transaction,
+        TransactionAuxiliaryData, TransactionInfo, TransactionToCommit, Version,
     },
     write_set::TransactionWrite,
 };
@@ -160,7 +160,7 @@ prop_compose! {
             let state_checkpoint_root_hash = smt.root_hash();
 
             // make real txn_info's
-            for txn in txns_to_commit.iter_mut() {
+            for (idx, txn) in txns_to_commit.iter_mut().enumerate() {
                 let placeholder_txn_info = txn.transaction_info();
 
                 // calculate event root hash
@@ -174,6 +174,8 @@ prop_compose! {
                     None
                 };
 
+                let auxiliary_info = AuxiliaryInfo::new(PersistedAuxiliaryInfo::V1 { transaction_index: idx as u32 }, None);
+
                 let txn_info = TransactionInfo::new(
                     txn.transaction().hash(),
                     txn.write_set().hash(),
@@ -181,8 +183,7 @@ prop_compose! {
                     state_checkpoint_hash,
                     placeholder_txn_info.gas_used(),
                     placeholder_txn_info.status().clone(),
-                    // TODO(grao): Consider making a real one?
-                    None,
+                    auxiliary_info.persisted_info_hash(),
                 );
                 txn_accumulator = txn_accumulator.append(&[txn_info.hash()]);
                 txn.set_transaction_info(txn_info);
@@ -897,7 +898,7 @@ pub fn verify_committed_transactions(
             txn_list_with_proof
                 .verify(ledger_info, Some(cur_ver))
                 .unwrap();
-            assert_eq!(txn_list_with_proof.transactions.len(), 1);
+            assert_eq!(txn_list_with_proof.get_num_transactions(), 1);
 
             let txn_output_list_with_proof = db
                 .get_transaction_outputs(cur_ver, 1, ledger_version)
@@ -905,7 +906,7 @@ pub fn verify_committed_transactions(
             txn_output_list_with_proof
                 .verify(ledger_info, Some(cur_ver))
                 .unwrap();
-            assert_eq!(txn_output_list_with_proof.transactions_and_outputs.len(), 1);
+            assert_eq!(txn_output_list_with_proof.get_num_outputs(), 1);
         }
         cur_ver += 1;
     }

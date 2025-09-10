@@ -1,0 +1,276 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/enum/match_cover.move`
+
+//# publish
+module 0xc0ffee::m {
+    enum A has drop {
+        V1 {
+            a: Q,
+            b: R,
+        }
+    }
+    enum Q has drop {
+        Q1,
+        Q2,
+    }
+    enum R has drop {
+        R1,
+        R2,
+    }
+    public fun test1(p0: A) {
+        let _t1 = &p0;
+        if ((_t1 is V1) && (&_t1.a is Q1)) {
+            let A::V1{a: _t37, b: _t38} = p0;
+            let Q::Q1{} = _t37;
+        } else if ((_t1 is V1) && (&_t1.b is R1)) {
+            let A::V1{a: _t30, b: _t31} = p0;
+            let R::R1{} = _t31;
+        } else {
+            loop {
+                if (_t1 is V1) {
+                    let _t14 = &_t1.a;
+                    let _t2 = &_t1.b;
+                    if (_t14 is Q2) {
+                        if (_t2 is R2) break}
+                };
+                abort 14566554180833181697
+            };
+            let A::V1{a: _t22, b: _t23} = p0;
+            let Q::Q2{} = _t22;
+            let R::R2{} = _t23;
+        };
+    }
+    public fun test2(p0: A) {
+        let _t11;
+        let _t10;
+        let _t1 = &p0;
+        if ((_t1 is V1) && (&_t1.a is Q1)) {
+            let A::V1{a: _t25, b: _t26} = p0;
+            let Q::Q1{} = _t25;
+        } else if ((_t1 is V1) && (&_t1.b is R1)) {
+            let A::V1{a: _t18, b: _t19} = p0;
+            let R::R1{} = _t19;
+        } else if (_t1 is V1) A::V1{a: _t10, b: _t11} = p0 else abort 14566554180833181697;
+    }
+    public fun test3(p0: A) {
+        let _t1 = &p0;
+        if ((_t1 is V1) && (&_t1.a is Q1)) {
+            let A::V1{a: _t19, b: _t20} = p0;
+            let Q::Q1{} = _t19;
+        } else if (_t1 is V1) {
+            if (&_t1.b is R1) {
+                let A::V1{a: _t12, b: _t13} = p0;
+                let R::R1{} = _t13;
+            }};
+    }
+    public fun test4(p0: A) {
+        let _t9;
+        let _t8;
+        let _t1 = &p0;
+        if ((_t1 is V1) && (&_t1.a is Q1)) {
+            let A::V1{a: _t16, b: _t17} = p0;
+            let Q::Q1{} = _t16;
+        } else if (_t1 is V1) A::V1{a: _t8, b: _t9} = p0 else abort 14566554180833181697;
+    }
+    public fun test5(p0: A) {
+        let _t1 = &p0;
+        if ((_t1 is V1) && (&_t1.a is Q1)) {
+            let A::V1{a: _t20, b: _t21} = p0;
+            let Q::Q1{} = _t20;
+        } else if ((_t1 is V1) && (&_t1.a is Q2)) {
+            let A::V1{a: _t13, b: _t14} = p0;
+            let Q::Q2{} = _t13;
+        } else abort 14566554180833181697;
+    }
+    public fun test6(p0: A) {
+        let _t1 = &p0;
+        if ((_t1 is V1) && (&_t1.a is Q1)) {
+            let A::V1{a: _t19, b: _t20} = p0;
+            let Q::Q1{} = _t19;
+        } else if (_t1 is V1) {
+            if (&_t1.a is Q2) {
+                let A::V1{a: _t12, b: _t13} = p0;
+                let Q::Q2{} = _t12;
+            }};
+    }
+}
+
+
+//# publish
+module 0xc0ffee::n {
+    enum A has drop {
+        V1 {
+            a: P,
+            b: Q,
+            c: R,
+        }
+    }
+    enum P has drop {
+        P1,
+        P2,
+    }
+    enum Q has drop {
+        Q1,
+        Q2,
+    }
+    enum R has drop {
+        R1,
+        R2,
+    }
+    public fun test(p0: A) {
+        let _t1 = &p0;
+        if ((_t1 is V1) && (&_t1.a is P1)) {
+            let A::V1{a: _t58, b: _t59, c: _t60} = p0;
+            let P::P1{} = _t58;
+        } else if ((_t1 is V1) && (&_t1.b is Q1)) {
+            let A::V1{a: _t50, b: _t51, c: _t52} = p0;
+            let Q::Q1{} = _t51;
+        } else if ((_t1 is V1) && (&_t1.c is R1)) {
+            let A::V1{a: _t42, b: _t43, c: _t44} = p0;
+            let R::R1{} = _t44;
+        } else {
+            loop {
+                if (_t1 is V1) {
+                    let _t18 = &_t1.a;
+                    let _t2 = &_t1.b;
+                    let _t3 = &_t1.c;
+                    if (_t18 is P2) {
+                        if (_t2 is Q2) {
+                            if (_t3 is R2) break}}
+                };
+                abort 14566554180833181697
+            };
+            let A::V1{a: _t32, b: _t33, c: _t34} = p0;
+            let P::P2{} = _t32;
+            let Q::Q2{} = _t33;
+            let R::R2{} = _t34;
+        };
+    }
+}
+
+
+//# publish
+module 0xc0ffee::o {
+    enum E has drop {
+        V1 {
+            a: F,
+            b: G,
+        }
+        V2 {
+            a: F,
+            b: G,
+            c: H,
+        }
+    }
+    enum F has drop {
+        F1,
+        F2 {
+            a: G,
+        }
+    }
+    enum G has drop {
+        G1 {
+            a: H,
+            b: H,
+        }
+        G2 {
+            a: H,
+        }
+    }
+    enum H has drop {
+        H1 {
+            a: u64,
+        }
+        H2 {
+            b: u64,
+        }
+    }
+    public fun test1(p0: E) {
+        let _t14;
+        let _t13;
+        let _t12;
+        let _t8;
+        let _t7;
+        let _t1 = &p0;
+        if (_t1 is V1) E::V1{a: _t7, b: _t8} = p0 else if (_t1 is V2) E::V2{a: _t12, b: _t13, c: _t14} = p0 else abort 14566554180833181697;
+    }
+    public fun test2(p0: E) {
+        let _t1 = &p0;
+        loop {
+            let _t2;
+            if (_t1 is V1) {
+                _t2 = &_t1.b;
+                if (_t2 is G1) {
+                    if (&_t2.a is H1) {
+                        let E::V1{a: _t59, b: _t60} = p0;
+                        let G::G1{a: _t61, b: _t62} = _t60;
+                        let H::H1{a: _t63} = _t61;
+                        break
+                    }}
+            };
+            if (_t1 is V1) {
+                _t2 = &_t1.b;
+                if (_t2 is G1) {
+                    if (&_t2.b is H1) {
+                        let E::V1{a: _t44, b: _t45} = p0;
+                        let G::G1{a: _t46, b: _t47} = _t45;
+                        let H::H1{a: _t48} = _t47;
+                        break
+                    }}
+            };
+            if (_t1 is V1) {
+                if (&_t1.a is F1) {
+                    let E::V1{a: _t32, b: _t33} = p0;
+                    let F::F1{} = _t32;
+                    break
+                }};
+            if (_t1 is V1) {
+                if (&_t1.a is F2) {
+                    let E::V1{a: _t24, b: _t25} = p0;
+                    let F::F2{a: _t26} = _t24;
+                    break
+                }};
+            if (!(_t1 is V2)) abort 14566554180833181697;
+            let E::V2{a: _t15, b: _t16, c: _t17} = p0;
+            break
+        };
+    }
+    public fun test3(p0: E) {
+        let _t1 = &p0;
+        loop {
+            if (_t1 is V1) {
+                if (&_t1.b is G1) {
+                    let E::V1{a: _t59, b: _t60} = p0;
+                    let G::G1{a: _t61, b: _t62} = _t60;
+                    break
+                }};
+            if (_t1 is V1) {
+                if (&_t1.a is F2) {
+                    let E::V1{a: _t51, b: _t52} = p0;
+                    let F::F2{a: _t53} = _t51;
+                    break
+                }};
+            if (_t1 is V1) {
+                let _t28 = &_t1.a;
+                let _t2 = &_t1.b;
+                if (_t28 is F1) {
+                    if (_t2 is G2) {
+                        if (&_t2.a is H2) {
+                            let E::V1{a: _t41, b: _t42} = p0;
+                            let F::F1{} = _t41;
+                            let G::G2{a: _t44} = _t42;
+                            let H::H2{b: _t45} = _t44;
+                            break
+                        }}}
+            };
+            if (_t1 is V1) {
+                if (&_t1.a is F1) {
+                    let E::V1{a: _t25, b: _t26} = p0;
+                    let F::F1{} = _t25;
+                    break
+                }};
+            if (!(_t1 is V2)) abort 14566554180833181697;
+            let E::V2{a: _t16, b: _t17, c: _t18} = p0;
+            break
+        };
+    }
+}

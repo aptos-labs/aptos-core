@@ -1,1 +1,4 @@
 processed 3 tasks
+task 0 lines 1-19:  publish [module 0x1.B {]
+task 1 lines 21-39:  publish [module 0x1.A {]
+task 2 lines 41-54:  run [import 0x1.A;]

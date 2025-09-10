@@ -1,29 +1,26 @@
 processed 4 tasks
+task 0 lines 1-16:  print-bytecode --input=module [// Moving a type defined as part of the same module is valid.]
+// Bytecode version v7
+module 0x2d6::M
+struct T has key
+  b: bool
 
-task 0 'print-bytecode'. lines 1-16:
-// Move bytecode v7
-module 2d6.M {
-struct T has key {
-	b: bool
-}
+// Function definition at index 0
+public fun new(): T
+    ld_true
+    pack T
+    ret
 
-public new(): T /* def_idx: 0 */ {
-B0:
-	0: LdTrue
-	1: Pack[0](T)
-	2: Ret
-}
-f(Arg0: signer) /* def_idx: 1 */ {
-B0:
-	0: ImmBorrowLoc[0](Arg0: signer)
-	1: Call new(): T
-	2: MoveTo[0](T)
-	3: Ret
-}
-}
+// Function definition at index 1
+fun f(l0: signer)
+    borrow_loc l0
+    call new
+    move_to T
+    ret
 
-task 2 'print-bytecode'. lines 29-39:
+
+task 1 lines 18-26:  publish [module 0x3d6.M {]
+task 2 lines 29-39:  print-bytecode --input=module [// Moving a type defined in a different module is invalid.]
 Error: Missing struct definition for T
-
-task 3 'print-bytecode'. lines 41-49:
+task 3 lines 41-49:  print-bytecode [// Moving a struct type within a script (which cannot define its own struct types) is invalid.]
 Error: Missing struct definition for T

@@ -19,10 +19,6 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
-    block_executor::{
-        config::BlockExecutorConfigFromOnchain,
-        transaction_slice_metadata::TransactionSliceMetadata,
-    },
     block_info::BlockInfo,
     bytes::NumToBytes,
     chain_id::ChainId,
@@ -33,13 +29,12 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        AuxiliaryInfo, BlockEndInfo, ExecutionStatus, PersistedAuxiliaryInfo, RawTransaction,
-        Script, SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionListWithProof,
+        AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, RawTransaction, Script,
+        SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionListWithProofV2,
         TransactionOutput, TransactionPayload, TransactionStatus, Version,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
 use mock_vm::{
     encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
@@ -341,8 +336,12 @@ fn create_blocks_and_chunks(
     block_ranges: Vec<std::ops::RangeInclusive<Version>>,
     chunk_ranges: Vec<std::ops::RangeInclusive<Version>>,
 ) -> (
-    Vec<(Vec<Transaction>, LedgerInfoWithSignatures)>,
-    Vec<TransactionListWithProof>,
+    Vec<(
+        Vec<Transaction>,
+        Vec<AuxiliaryInfo>,
+        LedgerInfoWithSignatures,
+    )>,
+    Vec<TransactionListWithProofV2>,
 ) {
     assert_eq!(*block_ranges.first().unwrap().start(), 1);
     assert_eq!(*chunk_ranges.first().unwrap().start(), 1);
@@ -387,9 +386,24 @@ fn create_blocks_and_chunks(
             .map(|v| encode_mint_transaction(gen_address(v), 10))
             .collect();
         let block_id = gen_block_id(version);
+        let aux_info: Vec<_> = (0..num_txns)
+            .map(|i| {
+                AuxiliaryInfo::new(
+                    PersistedAuxiliaryInfo::V1 {
+                        transaction_index: i as u32,
+                    },
+                    None,
+                )
+            })
+            .collect();
         let output = block_executor
             .execute_block(
-                (block_id, into_signature_verified_block(txns.clone())).into(),
+                (
+                    block_id,
+                    into_signature_verified_block(txns.clone()),
+                    aux_info.clone(),
+                )
+                    .into(),
                 parent_block_id,
                 TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
             )
@@ -397,10 +411,10 @@ fn create_blocks_and_chunks(
         assert_eq!(output.expect_last_version(), version);
         block_executor.pre_commit_block(block_id).unwrap();
         let ledger_info = gen_ledger_info(version, output.root_hash(), block_id, version);
-        out_blocks.push((txns, ledger_info));
+        out_blocks.push((txns, aux_info, ledger_info));
         parent_block_id = block_id;
     }
-    let ledger_info = out_blocks.last().unwrap().1.clone();
+    let ledger_info = out_blocks.last().unwrap().2.clone();
     let ledger_version = ledger_info.ledger_info().version();
     block_executor.commit_ledger(ledger_info).unwrap();
 
@@ -423,13 +437,13 @@ fn create_blocks_and_chunks(
 
 fn create_transaction_chunks(
     chunks: Vec<std::ops::RangeInclusive<Version>>,
-) -> (Vec<TransactionListWithProof>, LedgerInfoWithSignatures) {
+) -> (Vec<TransactionListWithProofV2>, LedgerInfoWithSignatures) {
     let num_txns = *chunks.last().unwrap().end();
     // last txn is a block epilogue
     let all_txns = 1..=num_txns;
     let (mut blocks, chunks) = create_blocks_and_chunks(vec![all_txns], chunks);
 
-    (chunks, blocks.pop().unwrap().1)
+    (chunks, blocks.pop().unwrap().2)
 }
 
 fn create_test_transaction(sequence_number: u64) -> Transaction {
@@ -494,7 +508,18 @@ fn apply_transaction_by_writeset(
         ledger_summary.state.latest().clone(),
     )
     .unwrap();
-    let aux_info = txns.iter().map(|_| AuxiliaryInfo::new_empty()).collect();
+    let aux_info = txns
+        .iter()
+        .enumerate()
+        .map(|(i, _)| {
+            AuxiliaryInfo::new(
+                PersistedAuxiliaryInfo::V1 {
+                    transaction_index: i as u32,
+                },
+                None,
+            )
+        })
+        .collect();
     let chunk_output = DoGetExecutionOutput::by_transaction_output(
         txns,
         txn_outs,
@@ -680,49 +705,6 @@ impl TestBlock {
     }
 }
 
-// Executes a list of transactions by executing and immediately committing one at a time. Returns
-// the root hash after all transactions are committed.
-fn run_transactions_naive(
-    transactions: Vec<SignatureVerifiedTransaction>,
-    block_executor_onchain_config: BlockExecutorConfigFromOnchain,
-) -> HashValue {
-    let executor = TestExecutor::new();
-    let db = &executor.db;
-
-    for txn in transactions {
-        let ledger_summary = db.reader.get_pre_committed_ledger_summary().unwrap();
-        let state_view = CachedStateView::new(
-            StateViewId::Miscellaneous,
-            db.reader.clone(),
-            ledger_summary.state.latest().clone(),
-        )
-        .unwrap();
-        let out = DoGetExecutionOutput::by_transaction_execution(
-            &MockVM::new(),
-            vec![txn].into(),
-            vec![AuxiliaryInfo::new_empty()],
-            &ledger_summary.state,
-            state_view,
-            block_executor_onchain_config.clone(),
-            TransactionSliceMetadata::unknown(),
-        )
-        .unwrap();
-        let output = ApplyExecutionOutput::run(out, ledger_summary, db.reader.as_ref()).unwrap();
-        db.writer
-            .save_transactions(
-                output.expect_complete_result().as_chunk_to_commit(),
-                None,
-                true, /* sync_commit */
-            )
-            .unwrap();
-    }
-    db.reader
-        .get_pre_committed_ledger_summary()
-        .unwrap()
-        .transaction_accumulator
-        .root_hash()
-}
-
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(5))]
 
@@ -790,12 +772,12 @@ proptest! {
         // get txn_infos from db
         let db = executor.db.reader.clone();
         prop_assert_eq!(db.expect_synced_version(), ledger_version);
-        let txn_list = db.get_transactions(
+        let (txn_list, persisted_aux_info)= db.get_transactions(
             1, /* start version */
             ledger_version, /* version */
             ledger_version, /* ledger version */
             false /* fetch events */
-        ).unwrap();
+        ).unwrap().into_parts();
         prop_assert_eq!(&block.inner_txns(), &txn_list.transactions[..num_input_txns]);
         let txn_infos = txn_list.proof.transaction_infos;
         let write_sets = db.get_write_set_iterator(1, ledger_version).unwrap().collect::<Result<_>>().unwrap();
@@ -806,7 +788,7 @@ proptest! {
         let replayer = chunk_executor_tests::TestExecutor::new();
         let chunks_enqueued = replayer.executor.enqueue_chunks(
             txn_list.transactions,
-            txn_infos.iter().map(|_| PersistedAuxiliaryInfo::None).collect(),
+            persisted_aux_info,
             txn_infos,
             write_sets,
             event_vecs,
@@ -848,6 +830,7 @@ proptest! {
                 (block_a.id, block_a.txns.clone()).into(), parent_block_id, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG
             ).unwrap();
             root_hash = output_a.root_hash();
+
             // Add one transaction for the state checkpoint.
             let ledger_info = gen_ledger_info(block_a.txns.len() as u64 + 1, root_hash, block_a.id, 1);
             executor.commit_blocks(vec![block_a.id], ledger_info).unwrap();
@@ -860,6 +843,7 @@ proptest! {
             let executor = BlockExecutor::<MockVM>::new(db);
             let output_b = executor.execute_block((block_b.id, block_b.txns.clone()).into(), parent_block_id, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG).unwrap();
             root_hash = output_b.root_hash();
+
             let ledger_info = gen_ledger_info(
                 // add two transactions for the state checkpoints
                 (block_a.txns.len() + block_b.txns.len() + 2) as u64,
@@ -870,14 +854,40 @@ proptest! {
             executor.commit_blocks(vec![block_b.id], ledger_info).unwrap();
         };
 
-        let expected_root_hash = run_transactions_naive({
-            let mut txns = vec![];
-            txns.extend(block_a.txns.iter().cloned());
-            txns.push(SignatureVerifiedTransaction::Valid(Transaction::block_epilogue_v0(block_a.id, BlockEndInfo::new_empty())));
-            txns.extend(block_b.txns.iter().cloned());
-            txns.push(SignatureVerifiedTransaction::Valid(Transaction::block_epilogue_v0(block_b.id, BlockEndInfo::new_empty())));
-            txns
-        }, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG);
+        // Execute blocks separately using BlockExecutor to match the real execution pattern
+        let expected_root_hash = {
+            let executor_naive = TestExecutor::new();
+            let db_naive = &executor_naive.db;
+
+            // Execute block A using BlockExecutor
+            let parent_block_id_a = executor_naive.committed_block_id();
+            let output_a_naive = executor_naive.execute_block(
+                (block_a.id, block_a.txns.clone()).into(),
+                parent_block_id_a,
+                TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG
+            ).unwrap();
+            let root_hash_a = output_a_naive.root_hash();
+            let ledger_info_a = gen_ledger_info(block_a.txns.len() as u64 + 1, root_hash_a, block_a.id, 1);
+            executor_naive.commit_blocks(vec![block_a.id], ledger_info_a).unwrap();
+
+            // Create new executor for block B (simulating restart)
+            let executor_b_naive = BlockExecutor::<MockVM>::new(db_naive.clone());
+            let output_b_naive = executor_b_naive.execute_block(
+                (block_b.id, block_b.txns.clone()).into(),
+                block_a.id,
+                TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG
+            ).unwrap();
+            let root_hash_b = output_b_naive.root_hash();
+            let ledger_info_b = gen_ledger_info(
+                (block_a.txns.len() + block_b.txns.len() + 2) as u64,
+                root_hash_b,
+                block_b.id,
+                2
+            );
+            executor_b_naive.commit_blocks(vec![block_b.id], ledger_info_b).unwrap();
+
+            root_hash_b
+        };
 
         prop_assert_eq!(root_hash, expected_root_hash);
     }

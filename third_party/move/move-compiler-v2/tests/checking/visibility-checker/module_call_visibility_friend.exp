@@ -61,8 +61,8 @@ module 0x2::X {
     }
 }
 module 0x2::M {
-    use 0x2::Y;
     use 0x2::X;
+    use 0x2::Y;
     friend fun f_friend() {
     }
     public fun f_public() {

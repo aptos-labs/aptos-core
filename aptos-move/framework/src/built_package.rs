@@ -26,7 +26,7 @@ use legacy_move_compiler::{
     compiled_unit::{CompiledUnit, NamedCompiledModule},
     shared::NumericalAddress,
 };
-use move_binary_format::{file_format_common, file_format_common::VERSION_7, CompiledModule};
+use move_binary_format::{file_format_common, file_format_common::VERSION_DEFAULT, CompiledModule};
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler_v2::{external_checks::ExternalChecks, options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
@@ -144,7 +144,7 @@ impl Default for BuildOptions {
 impl BuildOptions {
     pub fn move_2() -> Self {
         BuildOptions {
-            bytecode_version: Some(VERSION_7),
+            bytecode_version: Some(VERSION_DEFAULT),
             language_version: Some(LanguageVersion::latest_stable()),
             compiler_version: Some(CompilerVersion::latest_stable()),
             ..Self::default()
@@ -429,6 +429,16 @@ impl BuiltPackage {
                 unit_with_source.unit.serialize(Some(bytecode_version))
             })
             .collect()
+    }
+
+    /// Returns an iterator over the bytecode for the modules of the built package, along with the
+    /// module names.
+    pub fn module_code_iter<'a>(&'a self) -> impl Iterator<Item = (String, Vec<u8>)> + 'a {
+        self.package.root_modules().map(|unit_with_source| {
+            let bytecode_version = self.options.inferred_bytecode_version();
+            let code = unit_with_source.unit.serialize(Some(bytecode_version));
+            (unit_with_source.unit.name().as_str().to_string(), code)
+        })
     }
 
     /// Returns the abis for this package, if available.

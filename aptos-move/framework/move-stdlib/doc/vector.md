@@ -728,7 +728,14 @@ Otherwise, returns <code>(<b>false</b>, 0)</code>.
     <b>let</b> found_index = 0;
     <b>let</b> i = 0;
     <b>let</b> len = self.<a href="vector.md#0x1_vector_length">length</a>();
-    <b>while</b> (i &lt; len) {
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> i &lt;= len;
+            <b>invariant</b> <b>forall</b> j: num <b>where</b> j &gt;= 0 && j &lt; i: !f(self[j]);
+            <b>invariant</b> find ==&gt; i &lt; len && f(self[i]);
+        };
+        i &lt; len
+        }) {
         // Cannot call <b>return</b> in an inline function so we need <b>to</b> resort <b>to</b> <b>break</b> here.
         <b>if</b> (f(self.<a href="vector.md#0x1_vector_borrow">borrow</a>(i))) {
             find = <b>true</b>;
@@ -736,6 +743,9 @@ Otherwise, returns <code>(<b>false</b>, 0)</code>.
             <b>break</b>
         };
         i += 1;
+    };
+    <b>spec</b> {
+        <b>assert</b> !<a href="vector.md#0x1_vector_find">find</a> &lt;==&gt; (<b>forall</b> j: num <b>where</b> j &gt;= 0 && j &lt; len: !f(self[j]));
     };
     (find, found_index)
 }
@@ -1038,7 +1048,7 @@ Apply the function to a reference of each element in the vector.
 Apply the function to each pair of elements in the two given vectors, consuming them.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip">zip</a>&lt;Element1, Element2&gt;(self: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(Element1, Element2)|)
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip">zip</a>&lt;Element1, Element2&gt;(self: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |Element1, Element2|)
 </code></pre>
 
 
@@ -1067,7 +1077,7 @@ Apply the function to each pair of elements in the two given vectors in the reve
 This errors out if the vectors are not of the same length.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_reverse">zip_reverse</a>&lt;Element1, Element2&gt;(self: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(Element1, Element2)|)
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_reverse">zip_reverse</a>&lt;Element1, Element2&gt;(self: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |Element1, Element2|)
 </code></pre>
 
 
@@ -1106,7 +1116,7 @@ Apply the function to the references of each pair of elements in the two given v
 This errors out if the vectors are not of the same length.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_ref">zip_ref</a>&lt;Element1, Element2&gt;(self: &<a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: &<a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(&Element1, &Element2)|)
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_ref">zip_ref</a>&lt;Element1, Element2&gt;(self: &<a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: &<a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |&Element1, &Element2|)
 </code></pre>
 
 
@@ -1143,7 +1153,7 @@ This errors out if the vectors are not of the same length.
 Apply the function to a reference of each element in the vector with its index.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_enumerate_ref">enumerate_ref</a>&lt;Element&gt;(self: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |(u64, &Element)|)
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_enumerate_ref">enumerate_ref</a>&lt;Element&gt;(self: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |u64, &Element|)
 </code></pre>
 
 
@@ -1204,7 +1214,7 @@ Apply the function to mutable references to each pair of elements in the two giv
 This errors out if the vectors are not of the same length.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_mut">zip_mut</a>&lt;Element1, Element2&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(&<b>mut</b> Element1, &<b>mut</b> Element2)|)
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_mut">zip_mut</a>&lt;Element1, Element2&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |&<b>mut</b> Element1, &<b>mut</b> Element2|)
 </code></pre>
 
 
@@ -1241,7 +1251,7 @@ This errors out if the vectors are not of the same length.
 Apply the function to a mutable reference of each element in the vector with its index.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_enumerate_mut">enumerate_mut</a>&lt;Element&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |(u64, &<b>mut</b> Element)|)
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_enumerate_mut">enumerate_mut</a>&lt;Element&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |u64, &<b>mut</b> Element|)
 </code></pre>
 
 
@@ -1272,7 +1282,7 @@ Fold the function over the elements. For example, <code><a href="vector.md#0x1_v
 <code>f(f(f(0, 1), 2), 3)</code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_fold">fold</a>&lt;Accumulator, Element&gt;(self: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, init: Accumulator, f: |(Accumulator, Element)|Accumulator): Accumulator
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_fold">fold</a>&lt;Accumulator, Element&gt;(self: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, init: Accumulator, f: |Accumulator, Element|Accumulator): Accumulator
 </code></pre>
 
 
@@ -1304,7 +1314,7 @@ Fold right like fold above but working right to left. For example, <code><a href
 <code>f(1, f(2, f(3, 0)))</code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_foldr">foldr</a>&lt;Accumulator, Element&gt;(self: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, init: Accumulator, f: |(Element, Accumulator)|Accumulator): Accumulator
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_foldr">foldr</a>&lt;Accumulator, Element&gt;(self: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, init: Accumulator, f: |Element, Accumulator|Accumulator): Accumulator
 </code></pre>
 
 
@@ -1367,7 +1377,7 @@ Map the function over the references of the element pairs of two vectors, produc
 values without modifying the original vectors.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_map_ref">zip_map_ref</a>&lt;Element1, Element2, NewElement&gt;(self: &<a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: &<a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(&Element1, &Element2)|NewElement): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_map_ref">zip_map_ref</a>&lt;Element1, Element2, NewElement&gt;(self: &<a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: &<a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |&Element1, &Element2|NewElement): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;
 </code></pre>
 
 
@@ -1432,7 +1442,7 @@ Map the function over the elements of the vector, producing a new vector.
 Map the function over the element pairs of the two vectors, producing a new vector.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_map">zip_map</a>&lt;Element1, Element2, NewElement&gt;(self: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(Element1, Element2)|NewElement): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_map">zip_map</a>&lt;Element1, Element2, NewElement&gt;(self: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |Element1, Element2|NewElement): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;
 </code></pre>
 
 

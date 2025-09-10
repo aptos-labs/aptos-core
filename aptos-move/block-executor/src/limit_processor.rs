@@ -5,10 +5,11 @@ use crate::{
     counters, hot_state_op_accumulator::BlockHotStateOpAccumulator, types::ReadWriteSummary,
 };
 use aptos_logger::{info, warn};
+use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
-    state_store::TStateView,
+    state_store::{state_slot::StateSlot, TStateView},
     transaction::{
         block_epilogue::{BlockEndInfo, TBlockEndInfoExt},
         BlockExecutableTransaction as Transaction,
@@ -131,9 +132,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             // PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
             let accumulated_block_gas = self.get_effective_accumulated_block_gas();
             if accumulated_block_gas >= per_block_gas_limit {
-                counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
-                    .with_label_values(&[mode])
-                    .inc();
+                counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc_with(&[mode]);
                 info!(
                     "[BlockSTM]: execution ({}) early halted due to \
                     accumulated_block_gas {} >= PER_BLOCK_GAS_LIMIT {}",
@@ -146,9 +145,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         if let Some(per_block_output_limit) = self.block_gas_limit_type.block_output_limit() {
             let accumulated_output = self.get_accumulated_approx_output_size();
             if accumulated_output >= per_block_output_limit {
-                counters::EXCEED_PER_BLOCK_OUTPUT_LIMIT_COUNT
-                    .with_label_values(&[mode])
-                    .inc();
+                counters::EXCEED_PER_BLOCK_OUTPUT_LIMIT_COUNT.inc_with(&[mode]);
                 info!(
                     "[BlockSTM]: execution ({}) early halted due to \
                     accumulated_output {} >= PER_BLOCK_OUTPUT_LIMIT {}",
@@ -291,14 +288,20 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             block_effective_block_gas_units: self.get_effective_accumulated_block_gas(),
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
-        let slots_to_make_hot = if let Some(x) = &self.hot_state_op_accumulator {
-            x.get_slots_to_make_hot()
-        } else {
-            warn!("BlockHotStateOpAccumulator is not set.");
-            BTreeMap::new()
-        };
 
-        TBlockEndInfoExt::new(inner, slots_to_make_hot)
+        let to_make_hot = self.get_slots_to_make_hot();
+        TBlockEndInfoExt::new(inner, to_make_hot)
+    }
+
+    fn get_slots_to_make_hot(&self) -> BTreeMap<T::Key, StateSlot> {
+        if self.hot_state_op_accumulator.is_none() {
+            warn!("BlockHotStateOpAccumulator is not set.");
+        }
+
+        self.hot_state_op_accumulator
+            .as_ref()
+            .map(|x| x.get_slots_to_make_hot())
+            .unwrap_or_default()
     }
 }
 
@@ -306,7 +309,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
 mod test {
     use super::*;
     use crate::{
-        proptest_types::{
+        combinatorial_tests::{
             mock_executor::MockEvent,
             types::{KeyType, MockTransaction},
         },
