@@ -8,7 +8,7 @@ use aptos_protos::indexer::v1::{
     GetDataServiceForRequestResponse, GetTransactionsRequest,
 };
 use axum::{
-    extract::Request,
+    extract::{Request, State},
     http::{StatusCode, Uri},
     middleware::{from_fn_with_state, Next},
     response::Response,
@@ -42,8 +42,7 @@ impl GrpcGateway {
 
     pub(crate) async fn start(&self) -> anyhow::Result<()> {
         let app = Router::new()
-            .route("/*path", any(proxy))
-            .layer(Extension(self.config.clone()))
+            .route("/*path", any(proxy).with_state(self.config.clone()))
             .layer(from_fn_with_state(
                 self.config.clone(),
                 get_data_service_url,
@@ -91,7 +90,7 @@ fn override_uri_with_upstream_url(
 }
 
 async fn get_data_service_url(
-    Extension(config): Extension<Arc<IndexerGrpcGatewayConfig>>,
+    State(config): State<Arc<IndexerGrpcGatewayConfig>>,
     req: Request,
     next: Next,
 ) -> Result<Response, (StatusCode, String)> {
@@ -157,6 +156,11 @@ async fn proxy(
     data_service_url: Extension<Url>,
     mut request: Request,
 ) -> Result<Response, (StatusCode, String)> {
+    info!(
+        data_service_url = data_service_url.as_str(),
+        "Proxying request to data service: {}",
+        data_service_url.as_str()
+    );
     *request.uri_mut() = override_uri_with_upstream_url(request.uri(), &data_service_url)?;
 
     Client::builder(TokioExecutor::new())
