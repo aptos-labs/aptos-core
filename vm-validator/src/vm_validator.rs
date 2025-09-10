@@ -55,7 +55,7 @@ pub trait TransactionValidation: Send + Sync + Clone {
 /// Represents the state used for validation. Stores raw data, module cache and the execution
 /// runtime environment. Note that the state can get out-of-date, and it is the responsibility of
 /// the owner of the struct to ensure it is up-to-date.
-struct ValidationState<S> {
+pub struct ValidationState<S> {
     /// The raw snapshot of the state used for validation.
     state_view: S,
     /// Stores configs needed for execution.
@@ -69,7 +69,7 @@ struct ValidationState<S> {
 impl<S: StateView> ValidationState<S> {
     /// Creates a new state based on the state view snapshot, with empty module cache and VM
     /// initialized based on configs from the state.
-    fn new(state_view: S) -> Self {
+    pub fn new(state_view: S) -> Self {
         info!(
             AdapterLogSchema::new(state_view.id(), 0),
             "Validation environment and module cache created"
@@ -84,17 +84,18 @@ impl<S: StateView> ValidationState<S> {
 
     /// Resets the state view snapshot to the new one. Does not invalidate the module cache, nor
     /// the VM.
-    fn reset_state_view(&mut self, state_view: S) {
+    pub fn reset_state_view(&mut self, state_view: S) {
         self.state_view = state_view;
     }
 
-    fn state_view_id(&self) -> StateViewId {
+    ///  Returns the current state view ID for the caller to decide whether it's compatible with other state views.
+    pub fn state_view_id(&self) -> StateViewId {
         self.state_view.id()
     }
 
     /// Resets the state to the new one, empties module cache, and resets the VM based on the new
     /// state view snapshot.
-    fn reset_all(&mut self, state_view: S) {
+    pub fn reset_all(&mut self, state_view: S) {
         self.state_view = state_view;
         self.environment = AptosEnvironment::new(&self.state_view);
         self.module_cache = UnsyncModuleCache::empty();

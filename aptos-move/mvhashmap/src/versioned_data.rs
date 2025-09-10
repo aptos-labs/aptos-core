@@ -377,10 +377,6 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
             None => Err(Uninitialized),
         }
     }
-
-    fn remove_all_at_or_after(&mut self, txn_idx: TxnIndex) {
-        self.versioned_map.split_off(&ShiftedTxnIndex::new(txn_idx));
-    }
 }
 
 // Helper function to perform push validation whereby a read of an entry containing
@@ -782,12 +778,6 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
                 "Must resolve delta at key = {:?}, txn_idx = {}",
                 key, txn_idx
             ),
-        }
-    }
-
-    pub fn remove_all_at_or_after(&self, txn_idx: TxnIndex) {
-        for mut entry in self.values.iter_mut() {
-            entry.remove_all_at_or_after(txn_idx);
         }
     }
 

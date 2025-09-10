@@ -15,7 +15,7 @@ use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
     on_chain_config::BlockGasLimitType,
-    state_store::{state_value::StateValueMetadata, TStateView},
+    state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::AptosModuleExtension,
     write_set::WriteOp,
@@ -31,7 +31,10 @@ use std::{
     collections::{BTreeSet, HashSet},
     fmt::Debug,
     iter::{empty, Iterator},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 type TxnInput<T> = CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
@@ -66,11 +69,16 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
 
     // TODO: Consider breaking down the outputs when storing (avoid traversals, cache below).
     outputs: Vec<CachePadded<ArcSwapOption<ExecutionStatus<O, E>>>>, // txn_idx -> output.
+    // Used to record if the latest incarnation of a txn was a failure due to the
+    // speculative nature of parallel execution.
+    speculative_failures: Vec<CachePadded<AtomicBool>>,
 }
 
 impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     TxnLastInputOutput<T, O, E>
 {
+    /// num_txns passed here is typically larger than the number of txns in the block,
+    /// currently by 1 to account for the block epilogue txn.
     pub fn new(num_txns: TxnIndex) -> Self {
         Self {
             inputs: (0..num_txns)
@@ -78,6 +86,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 .collect(),
             outputs: (0..num_txns)
                 .map(|_| CachePadded::new(ArcSwapOption::empty()))
+                .collect(),
+            speculative_failures: (0..num_txns)
+                .map(|_| CachePadded::new(AtomicBool::new(false)))
                 .collect(),
         }
     }
@@ -88,8 +99,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         input: TxnInput<T>,
         output: ExecutionStatus<O, E>,
     ) {
+        self.speculative_failures[txn_idx as usize].store(false, Ordering::Relaxed);
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
+    }
+
+    pub(crate) fn record_speculative_failure(&self, txn_idx: TxnIndex) {
+        self.speculative_failures[txn_idx as usize].store(true, Ordering::Relaxed);
     }
 
     pub fn fetch_exchanged_data(
@@ -117,8 +133,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         )
     }
 
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<TxnInput<T>>> {
-        self.inputs[txn_idx as usize].load_full()
+    // Alongside the latest read set, returns the indicator of whether the latest
+    // incarnation of the txn resulted in a speculative failure.
+    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<(Arc<TxnInput<T>>, bool)> {
+        let input = self.inputs[txn_idx as usize].load_full()?;
+        let speculative_failure =
+            self.speculative_failures[txn_idx as usize].load(Ordering::Relaxed);
+        Some((input, speculative_failure))
     }
 
     // Should be called when txn_idx is committed, while holding commit lock.
@@ -133,14 +154,14 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     // all be skipped), and
     // (2) the last txn did not emit a new epoch event.
     // To avoid unnecessarily inspecting events, we only check (2) if (1) is true.
-    pub(crate) fn commit<S: TStateView<Key = T::Key>>(
+    pub(crate) fn commit(
         &self,
         txn_idx: TxnIndex,
         num_txns: TxnIndex,
         num_workers: usize,
         user_txn_bytes_len: u64,
         block_gas_limit_type: &BlockGasLimitType,
-        block_limit_processor: &mut BlockGasLimitProcessor<T, S>,
+        block_limit_processor: &mut BlockGasLimitProcessor<T>,
         scheduler: &SchedulerWrapper,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let (mut skips_rest, mut must_create_epilogue_txn, maybe_fee_statement_and_output_size) =
@@ -275,22 +296,25 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     /// Returns an error if callback returns an error.
-    pub(crate) fn for_each_resource_group_key_and_tags<F>(
+    pub(crate) fn for_each_resource_group_key_and_tags(
         &self,
         txn_idx: TxnIndex,
-        callback: F,
-    ) -> Result<(), PanicError>
-    where
-        F: FnMut(&T::Key, HashSet<&T::Tag>) -> Result<(), PanicError>,
-    {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |t| t
-                .before_materialization()?
-                .for_each_resource_group_key_and_tags(callback),
-            Ok(())
-        )
+        mut callback: impl FnMut(&T::Key, HashSet<&T::Tag>) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
+        if let Some(txn_output) = self.outputs[txn_idx as usize].load().as_ref() {
+            match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    t.before_materialization()?
+                        .for_each_resource_group_key_and_tags(&mut callback)?;
+                },
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
+                    // No resource group keys for failed transactions
+                },
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn modified_group_key_and_tags_cloned(
@@ -534,7 +558,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     pub(crate) fn get_txn_read_write_summary(&self, txn_idx: TxnIndex) -> ReadWriteSummary<T> {
-        let read_set = self.read_set(txn_idx).expect("Read set must be recorded");
+        let read_set = self.read_set(txn_idx).expect("Read set must be recorded").0;
 
         let reads = read_set.get_read_summary();
         let writes = self.get_write_summary(txn_idx);

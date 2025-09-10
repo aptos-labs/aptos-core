@@ -880,7 +880,12 @@ impl StateStore {
                 // TODO(aldenhu): cache changes here, should consume it.
                 let old_entry = cache
                     // TODO(HotState): Revisit: assuming every write op results in a hot slot
-                    .insert((*key).clone(), update_to_cold.to_result_slot())
+                    .insert(
+                        (*key).clone(),
+                        update_to_cold
+                            .to_result_slot()
+                            .expect("hot state ops should have been filtered out above"),
+                    )
                     .unwrap_or_else(|| {
                         // n.b. all updated state items must be read and recorded in the state cache,
                         // otherwise we can't calculate the correct usage. The is_untracked() hack
