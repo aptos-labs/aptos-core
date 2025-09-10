@@ -69,7 +69,9 @@ pub type TaskResult<T> = Result<T, TaskError>;
 pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
 pub type PrepareResult = (Arc<Vec<SignatureVerifiedTransaction>>, Option<u64>);
-pub type RandResult = (Option<Randomness>, bool);
+// First Option is whether randomness is enabled
+// Second Option is whether randomness is skipped
+pub type RandResult = (Option<Option<Randomness>>, bool);
 pub type ExecuteResult = Duration;
 pub type LedgerUpdateResult = (StateComputeResult, Duration, Option<u64>);
 pub type PostLedgerUpdateResult = ();

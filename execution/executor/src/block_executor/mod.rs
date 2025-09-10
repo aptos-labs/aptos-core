@@ -279,7 +279,11 @@ where
         // At this point of time two things must happen
         // 1. The block tree must also have the current block id with or without the ledger update output.
         // 2. We must have the ledger update output of the parent block.
-        let block = block_vec.pop().expect("Must exist").unwrap();
+        // Above is not ture if the block is on a forked branch.
+        let block = block_vec
+            .pop()
+            .expect("Must exist")
+            .ok_or(ExecutorError::BlockNotFound(parent_block_id))?;
         parent_block.ensure_has_child(block_id)?;
         let output = &block.output;
         let parent_out = &parent_block.output;
