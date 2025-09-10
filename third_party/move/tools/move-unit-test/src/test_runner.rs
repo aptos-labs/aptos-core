@@ -193,7 +193,7 @@ impl TestRunner {
                             if let Some(fail_fast) = e.downcast_ref::<FailFast>() {
                                 fail_fast.0.clone()
                             } else {
-                                panic!("unexpected error: {:?}", e);
+                                panic!("Only FailFast errors are expected in fail-fast mode, but got a different error: {:?}", e);
                             }
                         },
                         Ok(stats) => stats,
