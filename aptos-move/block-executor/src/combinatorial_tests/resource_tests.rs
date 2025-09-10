@@ -129,7 +129,12 @@ where
     >::new(config, executor_thread_pool, None);
 
     if block_stm_v2 {
-        block_executor.execute_transactions_parallel_v2(txn_provider, data_view, &mut guard)
+        block_executor.execute_transactions_parallel_v2(
+            txn_provider,
+            data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        )
     } else {
         block_executor.execute_transactions_parallel(
             txn_provider,

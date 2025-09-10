@@ -133,9 +133,12 @@ pub trait BeforeMaterializationOutput<Txn: Transaction> {
         ),
     >;
 
-    fn for_each_resource_group_key_and_tags<F>(&self, callback: F) -> Result<(), PanicError>
-    where
-        F: FnMut(&Txn::Key, HashSet<&Txn::Tag>) -> Result<(), PanicError>;
+    fn for_each_resource_group_key_and_tags(
+        &self,
+        // This is &mut dyn and not Impl to sidestep an internal compiler error:
+        // https://github.com/rust-lang/rust/issues/145188.
+        callback: &mut dyn FnMut(&Txn::Key, HashSet<&Txn::Tag>) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError>;
 
     // For now, the below interfaces for keys and metada and keys and tags are provided
     // to avoid unnecessarily cloning the whole resource group write set.
@@ -206,6 +209,16 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     /// Returns true iff the transaction status is Keep(Success).
     fn is_materialized_and_success(&self) -> bool;
+    /// The purpose of this method is to return true if the output has been materialized
+    /// (i.e. incorporate_materialized_txn_output has been called), or false otherwise.
+    /// The method can also assert any invariants provided by the trait implementation
+    /// and the caller. For instance, in the current block executor implementation,
+    /// final output placeholders are initialized via skip_output method and not modified
+    /// until materialization - so if the output is not materialized, it must be a placeholder.
+    ///
+    /// Must be called after concurrent block execution is complete, including materializing
+    /// all required outputs (currently used to check invariants for block epilogue txn).
+    fn check_materialization(&self) -> Result<bool, PanicError>;
 
     // Below methods perform various types of materialization. These may modify
     // the stored output representation and hence must be carefully implemented
