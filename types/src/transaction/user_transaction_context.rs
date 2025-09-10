@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::account_address::AccountAddress;
 use super::ScheduledTxnConfig;
+use move_core_types::account_address::AccountAddress;
 
 #[derive(Debug)]
 pub struct UserTransactionContext {

@@ -386,22 +386,24 @@ fn native_payload_config_internal(
                 create_option_none()
             };
 
-            let replay_protection_nonce = if let Some(nonce) = payload_config.replay_protection_nonce {
-                create_option_some_value(Value::u64(nonce))
-            } else {
-                create_option_none()
-            };
+            let replay_protection_nonce =
+                if let Some(nonce) = payload_config.replay_protection_nonce {
+                    create_option_some_value(Value::u64(nonce))
+                } else {
+                    create_option_none()
+                };
 
-            let scheduled_txn_auth_token = if let Some(config) = payload_config.scheduled_txn_auth_token {
-                let scheduled_config = Value::struct_(Struct::pack(vec![
-                    Value::bool(config.allow_rescheduling),
-                    Value::u64(config.expiration_time),
-                    Value::u64(config.authorization_seqno),
-                ]));
-                create_option_some_value(scheduled_config)
-            } else {
-                create_option_none()
-            };
+            let scheduled_txn_auth_token =
+                if let Some(config) = payload_config.scheduled_txn_auth_token {
+                    let scheduled_config = Value::struct_(Struct::pack(vec![
+                        Value::bool(config.allow_rescheduling),
+                        Value::u64(config.expiration_time),
+                        Value::u64(config.authorization_seqno),
+                    ]));
+                    create_option_some_value(scheduled_config)
+                } else {
+                    create_option_none()
+                };
 
             let payload_config_struct = Value::struct_(Struct::pack(vec![
                 multisig_address,
@@ -457,10 +459,7 @@ pub fn make_all(
             "multisig_payload_internal",
             native_multisig_payload_internal,
         ),
-        (
-            "payload_config_internal",
-            native_payload_config_internal,
-        ),
+        ("payload_config_internal", native_payload_config_internal),
     ];
 
     builder.make_named_natives(natives)

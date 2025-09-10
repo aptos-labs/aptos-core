@@ -62,8 +62,7 @@ pub static SCHEDULED_TRANSACTIONS_MODULE_INFO: Lazy<ScheduledTxnsModuleInfo> =
         )
         .unwrap(),
         mark_txn_to_remove_name: Identifier::new("mark_txn_to_remove").unwrap(),
-        execute_user_function_name: Identifier::new("execute_user_function")
-            .unwrap(),
+        execute_user_function_name: Identifier::new("execute_user_function").unwrap(),
         pause_scheduled_txns_name: Identifier::new("pause_scheduled_txns").unwrap(),
     });
 

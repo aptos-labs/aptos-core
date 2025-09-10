@@ -395,6 +395,11 @@ fn matches_multisig_address(
                 } => multisig_address
                     .map(|multisig_address| multisig_address == *address)
                     .unwrap_or(false),
+                TransactionExtraConfig::V2 {
+                    multisig_address, ..
+                } => multisig_address
+                    .map(|multisig_address| multisig_address == *address)
+                    .unwrap_or(false),
             }
         },
     }

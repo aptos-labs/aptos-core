@@ -224,7 +224,7 @@ module 0xCAFE::scheduled_txns_usage {
         // Create the appropriate lambda based on index
         let txn = if (idx == 1) {
             // Placeholder for user_func_xyz - you can define this later
-            let user_function = |s: &signer, auth_token: ScheduledTxnAuthToken| user_func_to_reschedule(s, auth_token);  // Replace with actual function
+            let user_function = |s: &signer, auth_token: ScheduledTxnAuthToken| user_func_to_reschedule(s, auth_token);
             new_scheduled_transaction_gen_auth_token(
                 user,
                 schedule_time,
@@ -235,7 +235,7 @@ module 0xCAFE::scheduled_txns_usage {
             )
         } else {
             // Placeholder for another custom function
-            let user_function = |s: &signer, auth_token: ScheduledTxnAuthToken| user_func_mod_publish(s, auth_token);  // Replace with actual function
+            let user_function = |s: &signer, auth_token: ScheduledTxnAuthToken| user_func_mod_publish(s, auth_token);
             new_scheduled_transaction_gen_auth_token(
                 user,
                 schedule_time,

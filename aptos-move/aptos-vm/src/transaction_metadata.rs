@@ -8,7 +8,8 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationProof, user_transaction_context::{UserTransactionContext, PayloadConfig},
+        authenticator::AuthenticationProof,
+        user_transaction_context::{PayloadConfig, UserTransactionContext},
         EntryFunction, Multisig, MultisigTransactionPayload, ReplayProtector, SignedTransaction,
         TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig,
         TransactionPayload, TransactionPayloadInner,
@@ -109,18 +110,28 @@ impl TransactionMetadata {
                 _ => None,
             },
             payload_config: match txn.payload() {
-                TransactionPayload::Payload(TransactionPayloadInner::V1 { extra_config, .. }) => {
-                    match extra_config {
-                        TransactionExtraConfig::V1 {
-                            multisig_address,
-                            replay_protection_nonce,
-                            scheduled_txn_auth_token,
-                        } => Some(PayloadConfig {
-                            multisig_address: *multisig_address,
-                            replay_protection_nonce: *replay_protection_nonce,
-                            scheduled_txn_auth_token: scheduled_txn_auth_token.clone(),
-                        }),
-                    }
+                TransactionPayload::Payload(TransactionPayloadInner::V1 {
+                    extra_config, ..
+                }) => match extra_config {
+                    TransactionExtraConfig::V1 {
+                        multisig_address,
+                        replay_protection_nonce,
+                    } => Some(PayloadConfig {
+                        multisig_address: *multisig_address,
+                        replay_protection_nonce: *replay_protection_nonce,
+                        scheduled_txn_auth_token: None,
+                    }),
+                    TransactionExtraConfig::V2 {
+                        multisig_address,
+                        replay_protection_nonce,
+                        permissions_table,
+                    } => Some(PayloadConfig {
+                        multisig_address: *multisig_address,
+                        replay_protection_nonce: *replay_protection_nonce,
+                        scheduled_txn_auth_token: permissions_table
+                            .as_ref()
+                            .and_then(|table| table.get_scheduled_txn_config().ok()?),
+                    }),
                 },
                 _ => None,
             },

@@ -24,11 +24,11 @@ use crate::{
     state_store::state_key::StateKey,
     transaction::{
         ChangeSet, EntryFunction, ExecutionStatus, IndexedTransactionSummary, Module, Multisig,
-        MultisigTransactionPayload, RawTransaction, ReplayProtector, ScheduledTxnConfig, Script,
-        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
-        TransactionAuxiliaryData, TransactionExecutable, TransactionExtraConfig, TransactionInfo,
-        TransactionListWithProof, TransactionPayload, TransactionPayloadInner, TransactionStatus,
-        TransactionToCommit, Version, WriteSetPayload,
+        MultisigTransactionPayload, PermissionsTbl, RawTransaction, ReplayProtector,
+        ScheduledTxnConfig, Script, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        TransactionArgument, TransactionAuxiliaryData, TransactionExecutable,
+        TransactionExtraConfig, TransactionInfo, TransactionListWithProof, TransactionPayload,
+        TransactionPayloadInner, TransactionStatus, TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -528,12 +528,29 @@ impl Arbitrary for TransactionExtraConfig {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: ()) -> Self::Strategy {
-        (any::<Option<AccountAddress>>(), any::<Option<u64>>(), any::<Option<ScheduledTxnConfig>>())
+        (
+            any::<bool>(),
+            any::<Option<AccountAddress>>(),
+            any::<Option<u64>>(),
+            any::<Option<ScheduledTxnConfig>>(),
+        )
             .prop_map(
-                |(multisig_address, replay_protection_nonce, scheduled_txn_auth_token)| TransactionExtraConfig::V1 {
-                    multisig_address,
-                    replay_protection_nonce,
-                    scheduled_txn_auth_token,
+                |(use_v2, multisig_address, replay_protection_nonce, scheduled_txn_auth_token)| {
+                    if use_v2 || scheduled_txn_auth_token.is_some() {
+                        let permissions_table = scheduled_txn_auth_token.and_then(|config| {
+                            PermissionsTbl::with_scheduled_txn_config(config).ok()
+                        });
+                        TransactionExtraConfig::V2 {
+                            multisig_address,
+                            replay_protection_nonce,
+                            permissions_table,
+                        }
+                    } else {
+                        TransactionExtraConfig::V1 {
+                            multisig_address,
+                            replay_protection_nonce,
+                        }
+                    }
                 },
             )
             .boxed()

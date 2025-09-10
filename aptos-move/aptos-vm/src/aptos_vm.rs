@@ -2995,7 +2995,10 @@ impl AptosVM {
                 code_storage,
             )
         });
-        info!("Executed the sched txn wrapper, got status {:?}", user_func_status);
+        info!(
+            "Executed the sched txn wrapper, got status {:?}",
+            user_func_status
+        );
         let txn_status = match user_func_status {
             Ok(success_status) => {
                 let user_func_executed =
