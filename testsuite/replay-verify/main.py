@@ -479,8 +479,8 @@ class ReplayScheduler:
         )
         # Because PVCs can be shared among multiple replay-verify runs, a more correct TTL
         # would be computed from the number of shards and the expected run time of the replay-verify
-        # run. However, for simplicity, we set the TTL to 3 hours.
-        pvc_ttl = 5 * 60 * 60  # 3 hours
+        # run. However, for simplicity, we set the TTL to 9 hours.
+        pvc_ttl = 9 * 60 * 60  # 9 hours
         pvcs = create_replay_verify_pvcs_from_snapshot(
             self.id,
             snapshot_name,
