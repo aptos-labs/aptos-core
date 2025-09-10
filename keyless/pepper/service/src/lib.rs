@@ -4,9 +4,8 @@
 use crate::{
     account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
     account_managers::ACCOUNT_MANAGERS,
-    cached_resources::CachedResources,
     error::PepperServiceError,
-    jwk::JWKCache,
+    external_resources::{jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
 };
 use aptos_crypto::{
     asymmetric_encryption::{
@@ -39,18 +38,14 @@ use aptos_types::{
 };
 use firestore::{async_trait, paths, struct_path::path};
 use jsonwebtoken::{Algorithm::RS256, DecodingKey, Validation};
-use jwk::get_federated_jwk;
 use rand::thread_rng;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 pub mod account_db;
 pub mod account_managers;
-pub mod cached_resources;
 pub mod error;
-pub mod groth16_vk;
-pub mod jwk;
-pub mod keyless_config;
+pub mod external_resources;
 pub mod metrics;
 pub mod request_handler;
 pub mod utils;
@@ -215,7 +210,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
             let jwt_header = signature.parse_jwt_header().map_err(|e| {
                 PepperServiceError::BadRequest(format!("JWT header decoding error: {e}"))
             })?;
-            let jwk = jwk::get_cached_jwk_as_rsa(iss_val, &jwt_header.kid, jwk_cache)
+            let jwk = jwk_fetcher::get_cached_jwk_as_rsa(iss_val, &jwt_header.kid, jwk_cache)
                 .map_err(|e| PepperServiceError::BadRequest(format!("JWK not found: {e}")))?;
             let config_api_repr = cached_resources
                 .read_on_chain_keyless_configuration()
@@ -434,11 +429,11 @@ async fn process_common(
         .kid
         .ok_or_else(|| PepperServiceError::BadRequest("missing kid in JWT".to_string()))?;
 
-    let cached_key = jwk::get_cached_jwk_as_rsa(&claims.claims.iss, &key_id, jwk_cache);
+    let cached_key = jwk_fetcher::get_cached_jwk_as_rsa(&claims.claims.iss, &key_id, jwk_cache);
 
     let jwk = match cached_key {
         Ok(key) => key,
-        Err(_) => get_federated_jwk(&jwt)
+        Err(_) => jwk_fetcher::get_federated_jwk(&jwt)
             .await
             .map_err(|e| PepperServiceError::BadRequest(format!("JWK not found: {e}")))?,
     };

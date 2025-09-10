@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    groth16_vk::OnChainGroth16VerificationKey, keyless_config::OnChainKeylessConfiguration, utils,
+    external_resources::{
+        groth16_vk::OnChainGroth16VerificationKey, keyless_config::OnChainKeylessConfiguration,
+    },
+    utils,
 };
 use aptos_infallible::RwLock;
 use aptos_logger::{info, warn};
