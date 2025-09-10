@@ -111,7 +111,9 @@ impl ExpChecker for KnownToAbort {
 
                         if let Some(constant_value) = constant_value {
                             let target_type = env.get_node_type(expr.node_id());
-                            if let Some(msg) = self.check_cast_overflow(&constant_value, &target_type) {
+                            if let Some(msg) =
+                                self.check_cast_overflow(&constant_value, &target_type)
+                            {
                                 self.report(env, &env.get_node_loc(*id), msg);
                             }
                         }
