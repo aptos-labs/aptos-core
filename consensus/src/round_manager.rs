@@ -1402,6 +1402,11 @@ impl RoundManager {
             return Ok(());
         };
 
+        ensure!(
+            !self.proposal_generator.is_proposal_under_backpressure(),
+            "Cannot start next opt round due to backpressure"
+        );
+
         let parent = parent_vote.vote_data().proposed().clone();
         let opt_proposal_round = parent.round() + 1;
         if self
