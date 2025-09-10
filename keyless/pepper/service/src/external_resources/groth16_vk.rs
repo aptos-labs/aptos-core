@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{cached_resources::CachedResource, utils};
+use crate::{external_resources::resource_fetcher::CachedResource, utils};
 use anyhow::{anyhow, Result};
 use ark_bn254::{Bn254, G1Affine, G2Affine};
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
@@ -75,7 +75,7 @@ impl CachedResource for OnChainGroth16VerificationKey {
 
 #[cfg(test)]
 mod tests {
-    use crate::groth16_vk::{OnChainGroth16VerificationKey, VKeyData};
+    use crate::external_resources::groth16_vk::{OnChainGroth16VerificationKey, VKeyData};
     use ark_bn254::{Bn254, Fr, G1Affine, G2Affine};
     use ark_groth16::Groth16;
     use ark_serialize::CanonicalDeserialize;

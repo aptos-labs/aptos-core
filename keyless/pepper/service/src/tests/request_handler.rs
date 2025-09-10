@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cached_resources::CachedResources,
-    groth16_vk::OnChainGroth16VerificationKey,
-    jwk::JWKCache,
-    keyless_config::OnChainKeylessConfiguration,
+    external_resources::{
+        groth16_vk::OnChainGroth16VerificationKey, jwk_fetcher::JWKCache,
+        keyless_config::OnChainKeylessConfiguration, resource_fetcher::CachedResources,
+    },
     request_handler::{
         handle_request, ABOUT_PATH, DEFAULT_PEPPER_SERVICE_PORT, FETCH_PATH, GROTH16_VK_PATH,
         JWK_PATH, KEYLESS_CONFIG_PATH, SIGNATURE_PATH, VERIFY_PATH, VUF_PUB_KEY_PATH,

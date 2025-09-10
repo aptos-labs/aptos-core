@@ -95,7 +95,7 @@ pub async fn get_federated_jwk(jwt: &str) -> Result<Arc<RSA_JWK>> {
 
     // Fetch the keys for the issuer
     let keys = if jwt_issuer.eq("test.federated.oidc.provider") {
-        let test_jwk = include_str!("../../../../types/src/jwks/rsa/secure_test_jwk.json");
+        let test_jwk = include_str!("../../../../../types/src/jwks/rsa/secure_test_jwk.json");
         parse_jwks(test_jwk).expect("The test JWK should parse successfully!")
     } else if AUTH_0_REGEX.is_match(&jwt_issuer) {
         let jwk_url = format!("{}.well-known/jwks.json", &jwt_issuer);
@@ -116,7 +116,7 @@ pub async fn get_federated_jwk(jwt: &str) -> Result<Arc<RSA_JWK>> {
 
 /// Inserts the test JWK into the JWT cache
 fn insert_test_jwk(jwk_cache: JWKCache) {
-    let test_jwk = include_str!("../../../../types/src/jwks/rsa/secure_test_jwk.json");
+    let test_jwk = include_str!("../../../../../types/src/jwks/rsa/secure_test_jwk.json");
     let parsed_jwk = parse_jwks(test_jwk).expect("The test JWK should parse successfully!");
     jwk_cache.lock().insert(get_sample_iss(), parsed_jwk);
 }
