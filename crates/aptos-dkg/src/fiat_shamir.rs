@@ -88,7 +88,7 @@ pub trait PVSS<T: Transcript>: ScalarProtocol {
 pub trait RangeProof {
     fn append_sep(&mut self);
 
-    fn append_vk(&mut self, vk: &(&G2Projective, &G2Projective));
+    fn append_vk(&mut self, vk: &(&G1Projective, &G2Projective, &G2Projective, &G2Projective));
 
     fn append_public_statement(&mut self, public_statement: &(usize, &range_proof::Commitment));
 
@@ -166,7 +166,7 @@ impl RangeProof for merlin::Transcript {
         self.append_message(b"dom-sep", range_proof::DST);
     }
 
-    fn append_vk(&mut self, vk: &(&G2Projective, &G2Projective)) {
+    fn append_vk(&mut self, vk: &(&G1Projective, &G2Projective, &G2Projective, &G2Projective)) {
         let vk_bytes = bcs::to_bytes(vk).expect("vk serialization should succeed");
         self.append_message(b"vk", vk_bytes.as_slice());
     }

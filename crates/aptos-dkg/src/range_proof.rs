@@ -185,10 +185,8 @@ where
 
     #[cfg(feature = "range_proof_timing")]
     println!("n = {:?}, ell = {:?}", pp.n, pp.ell);
-
     #[cfg(feature = "range_proof_timing")]
     let mut cumulative = Duration::ZERO;
-
     #[cfg(feature = "range_proof_timing")]
     let mut print_cumulative = |duration: Duration| {
         cumulative += duration;
@@ -446,7 +444,7 @@ where
     let start = Instant::now();
     // Note: The first output of `fiat_shamir_challenges` is unused, it is intended for the verifier.
     // This is not ideal, but it should not significantly affect performance.
-    let vk = (&pp.taus.t2[0], &pp.vanishing_com);
+    let vk = (&pp.lagr_g1[0], &pp.lagr_g2[0], &pp.taus.t2[0], &pp.vanishing_com);
     let public_statement = (pp.ell, cc);
     let bit_commitments = (c.as_slice(), c_hat.as_slice());
     let (_, betas) = fiat_shamir_challenges(
@@ -522,7 +520,7 @@ pub fn batch_verify(
     }
     ensure!(c.0 == g1_multi_exp(&proof.c, &powers_of_two));
 
-    let vk = (&pp.taus.t2[0], &pp.vanishing_com);
+    let vk = (&pp.lagr_g1[0], &pp.lagr_g2[0], &pp.taus.t2[0], &pp.vanishing_com);
     let public_statement = (pp.ell, c);
     let bit_commitments = (&proof.c[..], &proof.c_hat[..]);
     let (alphas, betas) = fiat_shamir_challenges(
@@ -564,7 +562,7 @@ fn byte_to_bits_le(val: u8) -> Vec<bool> {
 
 /// Compute alpha, beta.
 fn fiat_shamir_challenges(
-    vk: &(&G2Projective, &G2Projective),
+    vk: &(&G1Projective, &G2Projective, &G2Projective, &G2Projective),
     public_statement: &(usize, &Commitment),
     bit_commitments: &(&[G1Projective], &[G2Projective]),
     num_scalars: usize,
