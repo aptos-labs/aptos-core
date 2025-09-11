@@ -15,7 +15,6 @@ use aptos_storage_interface::{
     DbWriter, Result,
 };
 use aptos_types::{
-    contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{
         PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionOutput, TransactionStatus,
@@ -157,17 +156,11 @@ impl AptosDB {
                 },
             )
             .collect();
-        let is_reconfig = transaction_outputs
-            .iter()
-            .rev()
-            .flat_map(TransactionOutput::events)
-            .any(ContractEvent::is_new_epoch_event);
         let transactions_to_keep = TransactionsToKeep::make(
             first_version,
             transactions,
             transaction_outputs,
             persisted_auxiliary_infos,
-            is_reconfig,
         );
 
         let current = self.state_store.current_state_locked().clone();
@@ -194,7 +187,7 @@ impl AptosDB {
             state_summary: &new_state_summary,
             state_update_refs: transactions_to_keep.state_update_refs(),
             state_reads: &reads,
-            is_reconfig,
+            is_reconfig: transactions_to_keep.is_reconfig(),
         };
 
         self.save_transactions(chunk, ledger_info_with_sigs, sync_commit)
