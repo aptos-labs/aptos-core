@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    module_traversal::TraversalContext, Function, LoadedFunction, LoadedFunctionOwner, Module,
-    ModuleStorage, Script, WithRuntimeEnvironment,
+    module_traversal::TraversalContext, Function, FunctionValueExtensionAdapter, LoadedFunction,
+    LoadedFunctionOwner, Module, ModuleStorage, Script, WithRuntimeEnvironment,
 };
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::{
@@ -229,6 +229,9 @@ pub trait Loader:
     /// Allows to convert loader to raw module storage which does not enforce gas metering for any
     /// module access! Used to pass to native context. Any other use-cases are discouraged.
     fn unmetered_module_storage(&self) -> &dyn ModuleStorage;
+
+    /// Allows to convert loader into extension for function value (de)serialization.
+    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter;
 }
 
 /// Required for any metered script loading.
