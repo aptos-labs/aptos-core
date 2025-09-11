@@ -132,15 +132,14 @@ where
         function_name: &IdentStr,
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
-        _gas_meter: &mut impl GasMeter,
+        gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let mut gas_meter = UnmeteredGasMeter;
         dispatch_loader!(module_storage, loader, {
             let func = loader.load_instantiated_function(
                 &LegacyLoaderConfig::unmetered(),
-                &mut gas_meter,
+                gas_meter,
                 traversal_context,
                 module_id,
                 function_name,
@@ -150,7 +149,7 @@ where
                 func,
                 args,
                 &mut self.data_cache,
-                &mut gas_meter,
+                gas_meter,
                 traversal_context,
                 &mut self.extensions,
                 &loader,
@@ -163,16 +162,15 @@ where
         &mut self,
         func: LoadedFunction,
         args: Vec<impl Borrow<[u8]>>,
-        _gas_meter: &mut impl GasMeter,
+        gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         loader: &impl Loader,
     ) -> VMResult<SerializedReturnValues> {
-        let mut gas_meter = UnmeteredGasMeter;
         MoveVM::execute_loaded_function(
             func,
             args,
             &mut self.data_cache,
-            &mut gas_meter,
+            gas_meter,
             traversal_context,
             &mut self.extensions,
             loader,
