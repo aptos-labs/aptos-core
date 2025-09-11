@@ -8,8 +8,8 @@ use crate::{
         LegacyLoaderConfig, Loader, ModuleMetadataLoader, NativeModuleLoader, ScriptLoader,
         StructDefinitionLoader,
     },
-    Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, Script,
-    WithRuntimeEnvironment,
+    AsFunctionValueExtension, Function, FunctionValueExtensionAdapter, LoadedFunction, Module,
+    ModuleStorage, RuntimeEnvironment, Script, WithRuntimeEnvironment,
 };
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
@@ -281,6 +281,10 @@ where
 {
     fn unmetered_module_storage(&self) -> &dyn ModuleStorage {
         self.module_storage
+    }
+
+    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter {
+        self.module_storage.as_function_value_extension()
     }
 }
 

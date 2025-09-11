@@ -355,6 +355,7 @@ impl Serialize for WriteOp {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub enum WriteOpSize {
     Creation { write_len: u64 },
     Modification { write_len: u64 },
