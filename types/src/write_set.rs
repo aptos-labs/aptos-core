@@ -14,13 +14,16 @@ use anyhow::{bail, ensure, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_std::iterable::Iterable;
 use bytes::Bytes;
+use dashmap::DashMap;
 use itertools::{EitherOrBoth, Itertools};
+use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
 use ref_cast::RefCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::{btree_map, BTreeMap},
     fmt::{Debug, Formatter},
+    sync::atomic::AtomicU32,
 };
 use strum_macros::AsRefStr;
 
@@ -81,6 +84,14 @@ impl PersistedWriteOp {
             DeletionWithMetadata { metadata } => WriteOp::deletion(metadata.into_in_mem_form()),
         }
     }
+}
+
+lazy_static! {
+    pub static ref RESOURCE_READ_FREQUENCY: DashMap<StateKey, AtomicU32> = DashMap::new();
+}
+
+lazy_static! {
+    pub static ref RESOURCE_WRITE_FREQUENCY: DashMap<StateKey, AtomicU32> = DashMap::new();
 }
 
 /// Shared in memory representation between the (value) WriteOp and the (hotness) HotStateOp

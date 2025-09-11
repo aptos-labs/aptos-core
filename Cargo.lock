@@ -4671,6 +4671,7 @@ dependencies = [
  "hex",
  "itertools 0.13.0",
  "jsonwebtoken 8.3.0",
+ "lazy_static",
  "lru",
  "move-binary-format",
  "move-core-types",

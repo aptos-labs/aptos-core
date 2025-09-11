@@ -24,6 +24,7 @@ use aptos_types::{
         StateView, StateViewId,
     },
     vm::module_metadata::get_metadata,
+    write_set::RESOURCE_READ_FREQUENCY,
 };
 use aptos_vm_environment::gas::get_gas_feature_version;
 use aptos_vm_types::{
@@ -45,7 +46,11 @@ use move_vm_types::{
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
+    ops::DerefMut,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
 };
 
 pub fn get_resource_group_member_from_metadata(
@@ -106,6 +111,12 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         let resource_group = get_resource_group_member_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             let key = StateKey::resource_group(address, &resource_group);
+            {
+                let mut ref_mut = RESOURCE_READ_FREQUENCY
+                    .entry(key.clone())
+                    .or_insert_with(|| AtomicU32::new(0));
+                ref_mut.deref_mut().fetch_add(1, Ordering::SeqCst);
+            }
             let buf =
                 self.resource_group_view
                     .get_resource_from_group(&key, struct_tag, maybe_layout)?;
@@ -121,6 +132,12 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             Ok((buf, buf_size + group_size as usize))
         } else {
             let state_key = resource_state_key(address, struct_tag)?;
+            {
+                let mut ref_mut = RESOURCE_READ_FREQUENCY
+                    .entry(state_key.clone())
+                    .or_insert_with(|| AtomicU32::new(0));
+                ref_mut.deref_mut().fetch_add(1, Ordering::SeqCst);
+            }
             let buf = self
                 .executor_view
                 .get_resource_bytes(&state_key, maybe_layout)?;

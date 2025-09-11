@@ -35,16 +35,24 @@ use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
     TransactionType::{self, CoinTransfer},
 };
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::{
+    on_chain_config::{FeatureFlag, Features},
+    write_set::{RESOURCE_READ_FREQUENCY, RESOURCE_WRITE_FREQUENCY},
+};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use measurements::{EventMeasurements, OverallMeasurement, OverallMeasuring};
 use pipeline::PipelineConfig;
 use std::{
+    collections::{BTreeMap, BTreeSet},
     fs,
+    ops::Deref,
     path::Path,
-    sync::{atomic::AtomicUsize, Arc},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     time::Instant,
 };
 use tokio::runtime::Runtime;
@@ -167,6 +175,9 @@ where
             }
         }
     }
+
+    RESOURCE_READ_FREQUENCY.clear();
+    RESOURCE_WRITE_FREQUENCY.clear();
 
     let initialized_workload = match workload {
         BenchmarkWorkload::TransactionMix(transaction_mix) => {
@@ -313,6 +324,32 @@ where
 
     OverallMeasurement::print_end_table(&staged_results, &overall_results);
     staged_events.print_end_table();
+
+    let mut reads = BTreeMap::new();
+    let mut writes = BTreeMap::new();
+    for r in RESOURCE_READ_FREQUENCY.iter() {
+        reads
+            .entry(r.value().load(Ordering::SeqCst))
+            .or_insert_with(Vec::new)
+            .push(r.key().clone());
+    }
+    for r in RESOURCE_WRITE_FREQUENCY.iter() {
+        writes
+            .entry(r.value().load(Ordering::SeqCst))
+            .or_insert_with(Vec::new)
+            .push(r.key().clone());
+    }
+
+    println!("READS");
+    for (cnt, keys) in reads.into_iter().rev() {
+        println!("{} --> {:?}", cnt, keys);
+    }
+
+    println!("WRITES");
+    for (cnt, keys) in writes.into_iter() {
+        println!("{} --> {:?}", cnt, keys);
+    }
+
     SingleRunResults {
         measurements: overall_results,
         per_stage_measurements: staged_results,
