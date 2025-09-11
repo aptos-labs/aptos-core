@@ -54,7 +54,7 @@ impl BlockExecutorLocalConfig {
     ///   - Default module cache configs.
     pub fn default_with_concurrency_level(concurrency_level: usize) -> Self {
         Self {
-            blockstm_v2: false,
+            blockstm_v2: true,
             concurrency_level,
             allow_fallback: true,
             discard_failed_blocks: false,
