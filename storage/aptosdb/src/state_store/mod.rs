@@ -64,6 +64,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
+        hot_state::HotStateConfig,
         state_key::{prefix::StateKeyPrefix, StateKey},
         state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
@@ -330,12 +331,14 @@ impl StateStore {
             state_kv_pruner,
             skip_usage,
         });
-        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty()));
+        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
+            HotStateConfig::default(),
+        )));
         let persisted_state = PersistedState::new_empty();
         let buffered_state = if empty_buffered_state_for_restore {
             BufferedState::new_at_snapshot(
                 &state_db,
-                StateWithSummary::new_empty(),
+                StateWithSummary::new_empty(HotStateConfig::default()),
                 buffered_state_target_items,
                 current_state.clone(),
                 persisted_state.clone(),
@@ -487,7 +490,9 @@ impl StateStore {
             state_kv_pruner,
             skip_usage: false,
         });
-        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty()));
+        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
+            HotStateConfig::default(),
+        )));
         let persisted_state = PersistedState::new_empty();
         let _ = Self::create_buffered_state_from_latest_snapshot(
             &state_db,
@@ -539,6 +544,7 @@ impl StateStore {
             *SPARSE_MERKLE_PLACEHOLDER_HASH, // TODO(HotState): for now hot state always starts from empty upon restart.
             latest_snapshot_root_hash,
             usage,
+            HotStateConfig::default(),
         );
         let mut buffered_state = BufferedState::new_at_snapshot(
             state_db,
@@ -1125,7 +1131,8 @@ impl StateStore {
 
     pub fn init_state_ignoring_summary(&self, version: Option<Version>) -> Result<()> {
         let usage = self.get_usage(version)?;
-        let state = State::new_at_version(version, usage);
+        // TODO(HotState): pass proper config?
+        let state = State::new_at_version(version, usage, HotStateConfig::default());
         let ledger_state = LedgerState::new(state.clone(), state);
         self.set_state_ignoring_summary(ledger_state);
 
