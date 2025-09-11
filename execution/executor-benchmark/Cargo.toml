@@ -52,6 +52,7 @@ derivative = { workspace = true }
 indicatif = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }

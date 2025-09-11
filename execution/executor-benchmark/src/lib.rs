@@ -43,6 +43,7 @@ use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use measurements::{EventMeasurements, OverallMeasurement, OverallMeasuring};
+use move_vm_runtime::move_vm::{FUNCTION_FREQUENCY, FUNCTION_FREQUENCY_AGGREGATED};
 use pipeline::PipelineConfig;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -178,6 +179,8 @@ where
 
     RESOURCE_READ_FREQUENCY.clear();
     RESOURCE_WRITE_FREQUENCY.clear();
+    FUNCTION_FREQUENCY.clear();
+    FUNCTION_FREQUENCY_AGGREGATED.clear();
 
     let initialized_workload = match workload {
         BenchmarkWorkload::TransactionMix(transaction_mix) => {
@@ -325,28 +328,53 @@ where
     OverallMeasurement::print_end_table(&staged_results, &overall_results);
     staged_events.print_end_table();
 
-    let mut reads = BTreeMap::new();
-    let mut writes = BTreeMap::new();
-    for r in RESOURCE_READ_FREQUENCY.iter() {
-        reads
-            .entry(r.value().load(Ordering::SeqCst))
+    // let mut reads = BTreeMap::new();
+    // let mut writes = BTreeMap::new();
+    // for r in RESOURCE_READ_FREQUENCY.iter() {
+    //     reads
+    //         .entry(r.value().load(Ordering::SeqCst))
+    //         .or_insert_with(Vec::new)
+    //         .push(r.key().clone());
+    // }
+    // for r in RESOURCE_WRITE_FREQUENCY.iter() {
+    //     writes
+    //         .entry(r.value().load(Ordering::SeqCst))
+    //         .or_insert_with(Vec::new)
+    //         .push(r.key().clone());
+    // }
+    //
+    // println!("READS");
+    // for (cnt, keys) in reads.into_iter().rev() {
+    //     println!("{} --> {:?}", cnt, keys);
+    // }
+    //
+    // println!("WRITES");
+    // for (cnt, keys) in writes.into_iter() {
+    //     println!("{} --> {:?}", cnt, keys);
+    // }
+
+    let mut fs = BTreeMap::new();
+    let mut fs_agg = BTreeMap::new();
+    for r in FUNCTION_FREQUENCY.iter() {
+        fs.entry(r.value().load(Ordering::SeqCst))
             .or_insert_with(Vec::new)
             .push(r.key().clone());
     }
-    for r in RESOURCE_WRITE_FREQUENCY.iter() {
-        writes
+    for r in FUNCTION_FREQUENCY_AGGREGATED.iter() {
+        fs_agg
             .entry(r.value().load(Ordering::SeqCst))
             .or_insert_with(Vec::new)
             .push(r.key().clone());
     }
 
-    println!("READS");
-    for (cnt, keys) in reads.into_iter().rev() {
+    println!("FUNCTIONS");
+    for (cnt, keys) in fs.into_iter().rev() {
         println!("{} --> {:?}", cnt, keys);
     }
 
-    println!("WRITES");
-    for (cnt, keys) in writes.into_iter() {
+    println!();
+    println!("FUNCTIONS_AGGREGATED");
+    for (cnt, keys) in fs_agg.into_iter() {
         println!("{} --> {:?}", cnt, keys);
     }
 

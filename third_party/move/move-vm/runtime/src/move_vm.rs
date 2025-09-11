@@ -13,6 +13,8 @@ use crate::{
     },
     LoadedFunction,
 };
+use dashmap::DashMap;
+use lazy_static::lazy_static;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::LocalIndex,
@@ -26,7 +28,15 @@ use move_vm_types::{
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{Locals, Reference, VMValueCast, Value},
 };
-use std::borrow::Borrow;
+use std::{borrow::Borrow, sync::atomic::AtomicU32};
+
+lazy_static! {
+    pub static ref FUNCTION_FREQUENCY: DashMap<String, AtomicU32> = DashMap::new();
+}
+
+lazy_static! {
+    pub static ref FUNCTION_FREQUENCY_AGGREGATED: DashMap<String, AtomicU32> = DashMap::new();
+}
 
 /// Return values from function execution in [MoveVm].
 #[derive(Debug)]

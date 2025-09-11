@@ -12,6 +12,7 @@ use crate::{
     },
     loader::LazyLoadedFunction,
     module_traversal::TraversalContext,
+    move_vm::{FUNCTION_FREQUENCY, FUNCTION_FREQUENCY_AGGREGATED},
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
     reentrancy_checker::{CallType, ReentrancyChecker},
@@ -59,6 +60,7 @@ use std::{
     collections::{btree_map, VecDeque},
     fmt::Write,
     rc::Rc,
+    sync::atomic::{AtomicU32, Ordering},
 };
 
 macro_rules! set_err_info {
@@ -433,6 +435,26 @@ where
                         (function, frame_cache)
                     };
 
+                    let id = function.module_or_script_id();
+                    let name = format!(
+                        "{}::{}::{}",
+                        id.address().to_hex_literal(),
+                        id.name(),
+                        function.name()
+                    );
+                    {
+                        let r = FUNCTION_FREQUENCY_AGGREGATED
+                            .entry(name.clone())
+                            .or_insert_with(|| AtomicU32::new(0));
+                        r.fetch_add(1, Ordering::SeqCst);
+                    }
+                    {
+                        let r = FUNCTION_FREQUENCY
+                            .entry(name.clone())
+                            .or_insert_with(|| AtomicU32::new(0));
+                        r.fetch_add(1, Ordering::SeqCst);
+                    }
+
                     RTTCheck::check_call_visibility(
                         &current_frame.function,
                         &function,
@@ -530,6 +552,39 @@ where
                         let frame_cache = FrameTypeCache::make_rc();
                         (function, frame_cache)
                     };
+
+                    let id = function.module_or_script_id();
+                    let name = format!(
+                        "{}::{}::{}",
+                        id.address().to_hex_literal(),
+                        id.name(),
+                        function.name()
+                    );
+                    {
+                        let r = FUNCTION_FREQUENCY_AGGREGATED
+                            .entry(name.clone())
+                            .or_insert_with(|| AtomicU32::new(0));
+                        r.fetch_add(1, Ordering::SeqCst);
+                    }
+                    {
+                        let ty_tags = function
+                            .ty_args()
+                            .iter()
+                            .map(|ty| {
+                                let ty = TypeWithRuntimeEnvironment {
+                                    ty,
+                                    runtime_environment: self.loader.runtime_environment(),
+                                };
+                                ty.to_type_tag().to_canonical_string()
+                            })
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        let name = format!("{}<{}>", name, ty_tags);
+                        let r = FUNCTION_FREQUENCY
+                            .entry(name.clone())
+                            .or_insert_with(|| AtomicU32::new(0));
+                        r.fetch_add(1, Ordering::SeqCst);
+                    }
 
                     RTTCheck::check_call_visibility(
                         &current_frame.function,
