@@ -25,7 +25,7 @@ impl PersistedState {
 
     pub fn new_empty() -> Self {
         Self::new_empty_with_config(
-            HOT_STATE_MAX_ITEMS_PER_SHARD,
+            HOT_STATE_MAX_ITEMS_PER_SHARD.get(),
             HOT_STATE_MAX_BYTES_PER_SHARD,
             HOT_STATE_MAX_SINGLE_VALUE_BYTES,
         )
@@ -55,6 +55,11 @@ impl PersistedState {
         SUBTREE_DROPPER.wait_for_backlog_drop(Self::MAX_PENDING_DROPS);
 
         self.summary.lock().clone()
+    }
+
+    #[cfg(test)]
+    pub fn get_hot_state(&self) -> Arc<HotState> {
+        Arc::clone(&self.hot_state)
     }
 
     pub fn get_state(&self) -> (Arc<dyn HotStateView>, State) {
