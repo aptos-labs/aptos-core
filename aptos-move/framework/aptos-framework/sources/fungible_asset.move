@@ -218,6 +218,18 @@ module aptos_framework::fungible_asset {
     }
 
     #[event]
+    /// Emitted when fungible assets are created.
+    struct Creation has drop, store {
+        metadata: address,
+        name: String,
+        symbol: String,
+        decimals: u8,
+        icon_uri: String,
+        project_uri: String,
+        maximum_supply: Option<u128>
+    }
+
+    #[event]
     /// Emitted when fungible assets are deposited into a store.
     struct Deposit has drop, store {
         store: address,
@@ -299,6 +311,18 @@ module aptos_framework::fungible_asset {
         move_to(
             metadata_object_signer,
             Metadata { name, symbol, decimals, icon_uri, project_uri }
+        );
+
+        event::emit(
+            Creation {
+                metadata: signer::address_of(metadata_object_signer),
+                name,
+                symbol,
+                decimals,
+                icon_uri,
+                project_uri,
+                maximum_supply
+            }
         );
 
         if (default_to_concurrent_fungible_supply()) {
