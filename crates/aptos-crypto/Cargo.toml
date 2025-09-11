@@ -42,7 +42,6 @@ num-bigint = { workspace = true }
 num-integer = { workspace = true }
 once_cell = { workspace = true }
 p256 = { workspace = true }
-poseidon-ark = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
@@ -122,8 +121,4 @@ harness = false
 
 [[bench]]
 name = "secp256k1"
-harness = false
-
-[[bench]]
-name = "poseidon_bn254"
 harness = false
