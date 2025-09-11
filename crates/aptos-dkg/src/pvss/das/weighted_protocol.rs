@@ -3,10 +3,10 @@
 
 use crate::{
     algebra::polynomials::shamir_secret_share,
-    pvss,
+    fiat_shamir, pvss,
     pvss::{
         contribution::{batch_verify_soks, Contribution, SoK},
-        das, encryption_dlog, fiat_shamir, schnorr, traits,
+        das, encryption_dlog, schnorr, traits,
         traits::{transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig},
         LowDegreeTest, Player, WeightedConfig,
     },

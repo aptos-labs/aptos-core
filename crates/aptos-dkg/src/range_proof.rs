@@ -7,7 +7,7 @@ use crate::{
         fft::{fft_assign, ifft_assign, ifft_assign_g1, ifft_assign_g2},
         polynomials::{poly_add_assign, poly_differentiate, poly_mul_scalar},
     },
-    pvss::fiat_shamir,
+    fiat_shamir,
     utils::{
         g1_multi_exp, g2_multi_exp, multi_pairing_g1_g2, pad_to_pow2_len_minus_one,
         random::{random_g1_point, random_g2_point, random_scalar},
@@ -15,22 +15,24 @@ use crate::{
 };
 use anyhow::ensure;
 use blstrs::{G1Projective, G2Projective, Gt, Scalar};
-#[allow(unused_imports)]
-use ff::{derive::bitvec::macros::internal::funty::Fundamental, Field};
+#[cfg(feature = "range_proof_timing")]
+use ff::derive::bitvec::macros::internal::funty::Fundamental;
+use ff::Field;
 use group::Group;
 use rand::thread_rng;
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "range_proof_timing")]
+use std::time::{Duration, Instant};
 use std::{
     iter::once,
     ops::{AddAssign, Mul},
-    //    time::{Duration, Instant},
 };
 
-pub const DST: &[u8; 32] = b"APTOS_VERY_RAPID_RANGE_PROOF_DST";
+pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V1_RANGE_PROOF_DST";
 
 pub struct PowersOfTau {
-    t1: Vec<G1Projective>, // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}, g_1^{tau^{n+1}}
+    t1: Vec<G1Projective>, // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}, where `n` is the batch size
     t2: Vec<G2Projective>,
 }
 
@@ -102,7 +104,12 @@ pub fn setup(ell: usize, n: usize) -> PublicParameters {
 
     // Vanishing polynomial that we test h(X) with is (X^{n+1} - 1) / (X - \omega^n)
     //
-    // Zhoujun's faster algorithm in Lagrange basis
+    // Zhoujun's faster algorithm in Lagrange basis:
+    // Let $V(X) = \frac{X^{n+1} - 1}{X - \omega^n}$ denote the vanishing polynomial.
+
+    // Note that the $n$-th Lagrange polynomial (w.r.t. our $(n+1)$-sized FFT evaluation domain) is $\ell_n(X) = \frac{V(X)}{ \prod_{i\in[n)} (\omega^n - \omega^i) }$.
+
+    // Therefore, below we commit to $V(X)$ by simply scaling it down by $\prod_{i\in[n)} (\omega^n - \omega^i)$!
     let vanishing_com = {
         let last_eval: Scalar = (0..n).map(|i| omega_n[n] - omega_n[i]).product();
 
@@ -148,7 +155,7 @@ pub(crate) fn commit_with_randomness(
     r: &Scalar,
 ) -> Commitment {
     let mut scalars = z.to_vec();
-    let mut bases: Vec<G1Projective> = pp.lagr_g1[..scalars.len()].to_vec();
+    let mut bases: Vec<G1Projective> = pp.lagr_g1[..scalars.len()].to_vec(); // TODO: atm the range proof algorithm couples `r` with `lagr_g1.last()` causing a copy here; this can be avoided by coupling `r` with `lagr_g1.first()` instead
 
     scalars.push(*r);
     let last_base = pp.lagr_g1.last().expect("pp.lagr_g1 must not be empty");
@@ -176,15 +183,22 @@ where
     assert_eq!(pp.taus.t1.len(), pp.n + 1); // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}
     assert_eq!(pp.taus.t2.len(), pp.n + 1);
 
-    // println!("n = {:?}, ell = {:?}", pp.n, pp.ell);
-    // let mut cumulative = Duration::ZERO;
-    // let mut print_cumulative = |duration: Duration| {
-    //     cumulative += duration;
-    //     println!("     \\--> Cumulative time: {:?}", cumulative);
-    // };
+    #[cfg(feature = "range_proof_timing")]
+    println!("n = {:?}, ell = {:?}", pp.n, pp.ell);
+
+    #[cfg(feature = "range_proof_timing")]
+    let mut cumulative = Duration::ZERO;
+
+    #[cfg(feature = "range_proof_timing")]
+    let mut print_cumulative = |duration: Duration| {
+        cumulative += duration;
+        println!("     \\--> Cumulative time: {:?}", cumulative);
+    };
 
     // Step 1: Convert z_i's to bits.
-    // let start = Instant::now();
+    #[cfg(feature = "range_proof_timing")]
+    let start = Instant::now();
+
     let bits: Vec<Vec<bool>> = zz
         .iter()
         .map(|z_val| {
@@ -196,33 +210,44 @@ where
                 .collect::<Vec<_>>()
         })
         .collect();
-    // let duration = start.elapsed();
-    // println!(
-    //     "{:>8.2} mus: Chunking {:?} z_i's into bits",
-    //     duration.as_micros().as_f64(),
-    //     pp.n
-    // );
-    // print_cumulative(duration);
+
+    #[cfg(feature = "range_proof_timing")]
+    {
+        let duration = start.elapsed();
+        println!(
+            "{:>8.2} mus: Chunking {:?} z_i's into bits",
+            duration.as_micros().as_f64(),
+            pp.n
+        );
+        print_cumulative(duration);
+    }
 
     assert_eq!(pp.n, bits.len());
     assert_eq!(pp.ell, bits[0].len());
 
     // Step 2: Sample correlated randomness r_j for each f_j polynomial commitment.
-    // let start = Instant::now();
+    #[cfg(feature = "range_proof_timing")]
+    let start = Instant::now();
+
     let r = correlated_randomness(rng, 2, pp.ell, &rr);
-    // let duration = start.elapsed();
-    // println!(
-    //     "{:>8.2} mus: Correlating {:?} pieces of randomness",
-    //     duration.as_micros().as_f64(),
-    //     pp.ell
-    // );
-    // print_cumulative(duration);
+
+    #[cfg(feature = "range_proof_timing")]
+    {
+        let duration = start.elapsed();
+        println!(
+            "{:>8.2} mus: Correlating {:?} pieces of randomness",
+            duration.as_micros().as_f64(),
+            pp.ell
+        );
+        print_cumulative(duration);
+    }
 
     assert_eq!(pp.ell, r.len());
 
     // Step 3: Compute f_j(X) = \sum_{i=0}^{n-1} z_i[j] \ell_i(X) + r[j] \ell_n(X),
     // where \ell_i(X) is the ith Lagrange polynomial for the (n+1)th roots-of-unity evaluation domain.
-    // let start = Instant::now();
+    #[cfg(feature = "range_proof_timing")]
+    let start = Instant::now();
     // f_evals[j] = the evaluations of f_j(x) at all the (n+1)-th roots of unity.
     //            = (z_0[j], ..., z_{n-1}[j], r[j]), where z_i[j] is the j-th bit of z_i.
     let f_evals = (0..pp.ell)
@@ -239,16 +264,19 @@ where
     //         assert!(e.eq(&Scalar::ZERO) || e.eq(&Scalar::ONE), "f_evals[{}][{}] = {}", j, i, e);
     //     }
     // }
-    // let duration = start.elapsed();
-    // println!(
-    //     "{:>8.2} mus: Convert {:?} z_{{i,j}} bits to scalars",
-    //     duration.as_micros().as_f64(),
-    //     pp.ell * pp.n
-    // );
-    // print_cumulative(duration);
-
+    #[cfg(feature = "range_proof_timing")]
+    {
+        let duration = start.elapsed();
+        println!(
+            "{:>8.2} mus: Convert {:?} z_{{i,j}} bits to scalars",
+            duration.as_micros().as_f64(),
+            pp.ell * pp.n
+        );
+        print_cumulative(duration);
+    }
     // Step 4: Compute c_j = g_1^{f_j(\tau)}
-    // let start = Instant::now();
+    #[cfg(feature = "range_proof_timing")]
+    let start = Instant::now();
     // c[j] = c_j = g_1^{f_j(\tau)}
     let c: Vec<G1Projective> = (0..pp.ell)
         // Note: Using a multiexp will be 10-20% slower than manually multiplying.
@@ -283,18 +311,22 @@ where
             c
         })
         .collect();
-    // let duration = start.elapsed();
-    // println!(
-    //     "{:>8.2} mus: All {:?} deg-{:?} f_j G_1 commitments",
-    //     duration.as_micros().as_f64(),
-    //     pp.ell,
-    //     pp.n
-    // );
-    // print_cumulative(duration);
-    // println!("        + Each c_j took: {:?}", duration / pp.ell as u32);
+    #[cfg(feature = "range_proof_timing")]
+    {
+        let duration = start.elapsed();
+        println!(
+            "{:>8.2} mus: All {:?} deg-{:?} f_j G_1 commitments",
+            duration.as_micros().as_f64(),
+            pp.ell,
+            pp.n
+        );
+        print_cumulative(duration);
+        println!("        + Each c_j took: {:?}", duration / pp.ell as u32);
+    }
 
     // Step 5: Compute c_hat[j] = \hat{c}_j = g_2^{f_j(\tau)}
-    // let start = Instant::now();
+    #[cfg(feature = "range_proof_timing")]
+    let start = Instant::now();
     let c_hat: Vec<G2Projective> = (0..pp.ell)
         // Note: Using a multiexp will be 10-20% slower than manually multiplying.
         // .map(|j| g2_multi_exp(&pp.lagrange_basis_g2, &f_evals[j]))
@@ -317,18 +349,21 @@ where
             c_hat_j
         })
         .collect();
-    // let duration = start.elapsed();
-    // println!(
-    //     "{:>8.2} mus: All {:?} deg-{:?} f_j G_2 commitments",
-    //     duration.as_micros().as_f64(),
-    //     pp.ell,
-    //     pp.n
-    // );
-    // print_cumulative(duration);
-    // println!(
-    //     "        + Each \\hat{{c}}_j took: {:?}",
-    //     duration / pp.ell as u32
-    // );
+    #[cfg(feature = "range_proof_timing")]
+    {
+        let duration = start.elapsed();
+        println!(
+            "{:>8.2} mus: All {:?} deg-{:?} f_j G_2 commitments",
+            duration.as_micros().as_f64(),
+            pp.ell,
+            pp.n
+        );
+        print_cumulative(duration);
+        println!(
+            "        + Each \\hat{{c}}_j took: {:?}",
+            duration / pp.ell as u32
+        );
+    }
 
     let num_omegas = pp.n + 1;
 
@@ -339,7 +374,8 @@ where
     //  4. \forall i \in [0,n), compute N_j'(\omega^i) = (\omega^i - \omega^n) f_j'(\omega^i)(2f_j(\omega^i) - 1)
     //  5. for i = n, compute N_j'(\omega^n) = r_j(r_j - 1)
     //  6. \forall i \in [0,n], compute h_j(\omega^i) = N_j'(\omega^i) / ( (n+1)\omega^{i n} )
-    // let start = Instant::now();
+    #[cfg(feature = "range_proof_timing")]
+    let start = Instant::now();
     let omega_n = pp.batch_dom_n1.get_root_of_unity(pp.n);
     let n1_inv = Scalar::from(pp.n as u64 + 1).invert().unwrap();
     let mut omega_i_minus_n = Vec::with_capacity(pp.n);
@@ -394,55 +430,77 @@ where
             h_j
         })
         .collect();
-
-    // let duration = start.elapsed();
-    // println!(
-    //     "{:>8.2} mus: All {:?} deg-{:?} h_j(X) coeffs",
-    //     duration.as_micros().as_f64(),
-    //     pp.ell,
-    //     num_omegas - 1
-    // );
-    // print_cumulative(duration);
-
+    #[cfg(feature = "range_proof_timing")]
+    {
+        let duration = start.elapsed();
+        println!(
+            "{:>8.2} mus: All {:?} deg-{:?} h_j(X) coeffs",
+            duration.as_micros().as_f64(),
+            pp.ell,
+            num_omegas - 1
+        );
+        print_cumulative(duration);
+    }
     // Step 7: Fiat-Shamir transform for beta_j's.
-    // let start = Instant::now();
-    let (_, betas) =
-        fiat_shamir_challenges(&cc, c.as_slice(), c_hat.as_slice(), true, fs_transcript); // TODO: Keeping it at None until discussed
+    #[cfg(feature = "range_proof_timing")]
+    let start = Instant::now();
+    // Note: The first output of `fiat_shamir_challenges` is unused, it is intended for the verifier.
+    // This is not ideal, but it should not significantly affect performance.
+    let vk = (&pp.taus.t2[0], &pp.vanishing_com);
+    let public_statement = (pp.ell, cc);
+    let bit_commitments = (c.as_slice(), c_hat.as_slice());
+    let (_, betas) = fiat_shamir_challenges(
+        &vk,
+        &public_statement,
+        &bit_commitments,
+        c.as_slice().len(),
+        fs_transcript,
+    ); // TODO: Keeping it at None until discussed
     assert_eq!(pp.ell, betas.len());
-    // let duration = start.elapsed();
-    // println!(
-    //     "{:>8.2} mus: {:?} Fiat-Shamir challenges",
-    //     duration.as_micros().as_f64(),
-    //     betas.len()
-    // );
-    // print_cumulative(duration);
-
+    #[cfg(feature = "range_proof_timing")]
+    {
+        let duration = start.elapsed();
+        println!(
+            "{:>8.2} mus: {:?} Fiat-Shamir challenges",
+            duration.as_micros().as_f64(),
+            betas.len()
+        );
+        print_cumulative(duration);
+    }
     // Step 8: Compute h(X) = \sum_{j=0}^{ell-1} beta_j h_j(X)
-    // let start = Instant::now();
+    #[cfg(feature = "range_proof_timing")]
+    let start = Instant::now();
     let mut hh: Vec<Scalar> = vec![Scalar::ZERO; pp.n + 1];
     for j in 0..betas.len() {
         let beta_j_h_j = poly_mul_scalar(&h[j], betas[j]);
         poly_add_assign(&mut hh, &beta_j_h_j);
     }
     assert_eq!(hh.len(), num_omegas);
-    // let duration = start.elapsed();
-    // println!(
-    //     "{:>8.2} mus: h(X) as a size-{:?} linear combination of h_j(X)'s",
-    //     duration.as_micros().as_f64(),
-    //     betas.len()
-    // );
-    // print_cumulative(duration);
+    #[cfg(feature = "range_proof_timing")]
+    {
+        let duration = start.elapsed();
+        println!(
+            "{:>8.2} mus: h(X) as a size-{:?} linear combination of h_j(X)'s",
+            duration.as_micros().as_f64(),
+            betas.len()
+        );
+        print_cumulative(duration);
+    }
 
     // Step 9: Compute d = g_1^{h(X)}
-    // let start = Instant::now();
+    #[cfg(feature = "range_proof_timing")]
+    let start = Instant::now();
     let d = g1_multi_exp(&pp.lagr_g1[0..num_omegas], &hh);
-    // let duration = start.elapsed();
-    // println!(
-    //     "{:>8.2} mus: deg-{:?} h(X) commitment",
-    //     duration.as_micros().as_f64(),
-    //     hh.len() - 1
-    // );
-    // print_cumulative(duration);
+    #[cfg(feature = "range_proof_timing")]
+    {
+        let duration = start.elapsed();
+        println!(
+            "{:>8.2} mus: deg-{:?} h(X) commitment",
+            duration.as_micros().as_f64(),
+            hh.len() - 1
+        );
+        print_cumulative(duration);
+    }
 
     Proof { d, c, c_hat }
 }
@@ -464,13 +522,16 @@ pub fn batch_verify(
     }
     ensure!(c.0 == g1_multi_exp(&proof.c, &powers_of_two));
 
-    // Ensure duality: c[j] matches c_hat[j].
-    let (alphas, betas) = fiat_shamir_challenges(&c, &proof.c, &proof.c_hat, true, fs_transcript);
-    let c_check = multi_pairing_g1_g2(
-        vec![g1_multi_exp(&proof.c, &alphas), -pp.taus.t1[0]].iter(),
-        vec![pp.taus.t2[0], g2_multi_exp(&proof.c_hat, &alphas)].iter(),
+    let vk = (&pp.taus.t2[0], &pp.vanishing_com);
+    let public_statement = (pp.ell, c);
+    let bit_commitments = (&proof.c[..], &proof.c_hat[..]);
+    let (alphas, betas) = fiat_shamir_challenges(
+        &vk,
+        &public_statement,
+        &bit_commitments,
+        proof.c.len(),
+        fs_transcript,
     );
-    ensure!(Gt::identity() == c_check);
 
     // Verify h(\tau)
     let h_check = multi_pairing_g1_g2(
@@ -486,6 +547,14 @@ pub fn batch_verify(
             .iter(),
     );
     ensure!(Gt::identity() == h_check);
+
+    // Ensure duality: c[j] matches c_hat[j].
+    let c_check = multi_pairing_g1_g2(
+        vec![g1_multi_exp(&proof.c, &alphas), -pp.taus.t1[0]].iter(),
+        vec![pp.taus.t2[0], g2_multi_exp(&proof.c_hat, &alphas)].iter(),
+    );
+    ensure!(Gt::identity() == c_check);
+
     Ok(())
 }
 
@@ -495,38 +564,38 @@ fn byte_to_bits_le(val: u8) -> Vec<bool> {
 
 /// Compute alpha, beta.
 fn fiat_shamir_challenges(
-    com: &Commitment,
-    c: &[G1Projective],
-    c_hat: &[G2Projective],
-    with_alphas: bool, // atm this has to be true for both prover and verifier, because FS transcripts have to be consistent
+    vk: &(&G2Projective, &G2Projective),
+    public_statement: &(usize, &Commitment),
+    bit_commitments: &(&[G1Projective], &[G2Projective]),
+    num_scalars: usize,
     fs_transcript: &mut merlin::Transcript,
 ) -> (Vec<Scalar>, Vec<Scalar>) {
-    assert_eq!(c.len(), c_hat.len());
+    <merlin::Transcript as fiat_shamir::RangeProof>::append_sep(fs_transcript);
 
-    <merlin::Transcript as fiat_shamir::RangeProof<Scalar>>::append_range_proof_sep(fs_transcript);
+    <merlin::Transcript as fiat_shamir::RangeProof>::append_vk(fs_transcript, vk);
 
-    // Add the first prover message to the transcript
-    <merlin::Transcript as fiat_shamir::RangeProof<Scalar>>::append_range_proof_claim(
+    <merlin::Transcript as fiat_shamir::RangeProof>::append_public_statement(
         fs_transcript,
-        &(com, c),
+        public_statement,
+    );
+
+    <merlin::Transcript as fiat_shamir::RangeProof>::append_bit_commitments(
+        fs_transcript,
+        bit_commitments,
     );
 
     // Generate the Fiat–Shamir challenges from the updated transcript
     let beta_vals =
-        <merlin::Transcript as fiat_shamir::RangeProof<Scalar>>::challenge_linear_combination_128bit(
+        <merlin::Transcript as fiat_shamir::RangeProof>::challenge_linear_combination_128bit(
             fs_transcript,
-            c.len(),
+            num_scalars,
         );
 
-    let alpha_vals = if with_alphas {
-        // TODO: get rid of this, with_alpha is always true
-        <merlin::Transcript as fiat_shamir::RangeProof<Scalar>>::challenge_linear_combination_128bit(
+    let alpha_vals =
+        <merlin::Transcript as fiat_shamir::RangeProof>::challenge_linear_combination_128bit(
             fs_transcript,
-            c.len(),
-        )
-    } else {
-        Vec::new()
-    };
+            num_scalars,
+        );
 
     (alpha_vals, beta_vals)
 }

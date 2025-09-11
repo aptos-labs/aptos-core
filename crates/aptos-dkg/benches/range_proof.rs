@@ -32,10 +32,10 @@ pub fn bench_groups(c: &mut Criterion) {
                     })
                     .collect();
                 let (cc, r) = commit(&pp, &zz, &mut rng);
-                let fs_t = merlin::Transcript::new(DST);
-                (pp, zz, cc, r, fs_t)
+                (pp, zz, cc, r)
             },
-            |(pp, z_vals, com, prover_state, mut fs_t)| {
+            |(pp, z_vals, com, prover_state)| {
+                let mut fs_t = merlin::Transcript::new(DST);
                 let mut rng = thread_rng();
                 let _proof = batch_prove(&mut rng, &pp, &z_vals, &com, &prover_state, &mut fs_t);
             },
@@ -55,10 +55,10 @@ pub fn bench_groups(c: &mut Criterion) {
                 let (cc, r) = commit(&pp, &zz, &mut rng);
                 let mut fs_t = merlin::Transcript::new(DST);
                 let proof = batch_prove(&mut rng, &pp, &zz, &cc, &r, &mut fs_t);
-                let fs_t = merlin::Transcript::new(DST);
-                (pp, cc, proof, fs_t)
+                (pp, cc, proof)
             },
-            |(pp, com, proof, mut fs_t)| {
+            |(pp, com, proof)| {
+                let mut fs_t = merlin::Transcript::new(DST);
                 batch_verify(&pp, &com, &proof, &mut fs_t).unwrap();
             },
         )
@@ -67,6 +67,6 @@ pub fn bench_groups(c: &mut Criterion) {
 
 criterion_group!(
     name = benches;
-    config = Criterion::default().sample_size(50);
+    config = Criterion::default().sample_size(10);
     targets = bench_groups);
 criterion_main!(benches);

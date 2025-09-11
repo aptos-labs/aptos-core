@@ -5,6 +5,7 @@ use aptos_dkg::range_proof::{batch_prove, batch_verify, commit, setup, DST};
 use blstrs::Scalar;
 use rand::{thread_rng, RngCore};
 
+#[cfg(test)]
 fn run_range_proof_completeness(n: usize, ell: usize) {
     let mut rng = thread_rng();
     let pp = setup(ell, n);
@@ -33,6 +34,7 @@ fn run_range_proof_completeness(n: usize, ell: usize) {
     assert!(batch_verify(&pp, &cc, &invalid_proof, &mut fs_t).is_err())
 }
 
+#[cfg(test)]
 fn run_serialize_range_proof(n: usize, ell: usize) {
     let mut rng = thread_rng();
     let pp = setup(ell, n);
@@ -53,10 +55,11 @@ fn run_serialize_range_proof(n: usize, ell: usize) {
     // === Serialize to memory ===
     let encoded = bcs::to_bytes(&proof).expect("Serialization failed");
     println!(
-        "Serialized proof size (n={}, ell={}): {} bytes",
+        "Serialized proof size (n={}, ell={}): {} bytes, expected for blstrs: {} bytes",
         n,
         ell,
-        encoded.len()
+        encoded.len(),
+        2 * 8 + 48 + (48 + 96) * ell // Can get rid of the 2 * 8 by turning the Vecs in `proof` into tuples
     );
 
     // === Round-trip deserialization ===
@@ -79,6 +82,11 @@ fn run_serialize_range_proof(n: usize, ell: usize) {
 }
 
 const TEST_CASES: &[(usize, usize)] = &[
+    // (n, \ell)
+    (3, 16),
+    (7, 16),
+    (4, 16),
+    (8, 16),
     (16, 3),
     (16, 4),
     (16, 7),
