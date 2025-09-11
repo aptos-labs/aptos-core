@@ -4,7 +4,7 @@
 //! Implements versioning data structure to support linear history for Aptos VM data caches and
 //! stateful extensions (like tables).
 
-use move_binary_format::errors::PartialVMResult;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_vm_types::values::Copyable;
 use smallvec::{smallvec, SmallVec};
 use std::cmp::Ordering;
@@ -122,10 +122,7 @@ where
     }
 }
 
-impl<V> VersionedSlot<V>
-where
-    V: Copyable,
-{
+impl<V> VersionedSlot<V> {
     /// Creates a new empty versioned slot.
     pub fn new() -> Self {
         Self {
@@ -160,15 +157,6 @@ where
         self.versions.last().map(|v| &v.value)
     }
 
-    /// Returns mutable reference to the current value if its version is the same as the current
-    /// working version, otherwise performs copy-on-write and returns a mutable reference to the
-    /// new copy.
-    pub fn get_mut(&mut self, version: CurrentVersion) -> PartialVMResult<Option<&mut V>> {
-        self.gc(version);
-        self.maybe_cow(version.current)?;
-        Ok(self.versions.last_mut().map(|v| &mut v.value))
-    }
-
     /// Takes the current value.
     pub fn take(&mut self, version: CurrentVersion) -> Option<V> {
         self.gc(version);
@@ -200,6 +188,20 @@ where
                 }
             }
         }
+    }
+}
+
+impl<V> VersionedSlot<V>
+where
+    V: Copyable,
+{
+    /// Returns mutable reference to the current value if its version is the same as the current
+    /// working version, otherwise performs copy-on-write and returns a mutable reference to the
+    /// new copy.
+    pub fn get_mut(&mut self, version: CurrentVersion) -> PartialVMResult<Option<&mut V>> {
+        self.gc(version);
+        self.maybe_cow(version.current)?;
+        Ok(self.versions.last_mut().map(|v| &mut v.value))
     }
 
     /// Performs copy-on-write if the latest version is smaller than the current working version.
@@ -246,6 +248,80 @@ where
             .map(|(version, value)| VersionedValue { version, value })
             .collect();
         Self { versions }
+    }
+}
+
+/// For values stored in versioned slots, the VM computes size and metadata to charge gas and
+/// process the refund that is derived from the values. This struct implements a data structure
+/// to store such information as metadata / size, with semantics that the data can only be computed
+/// once per version. That is, for some current version V, data can only be computed once. If
+/// fetching derived data for version U > V, it will not be returned as it should be recomputed.
+///
+/// Note: it is the responsibility of the user of [VersionedSlot] and [VersionedSlotDerivedData] to
+/// synchronise access between them. E.g., if derived data is computed from a value, and the value
+/// is further mutated at the same version, the caller needs to decide how to handle such a case.
+pub struct VersionedSlotDerivedData<V> {
+    inner: VersionedSlot<V>,
+}
+
+impl<V> Default for VersionedSlotDerivedData<V> {
+    fn default() -> Self {
+        Self {
+            inner: VersionedSlot::new(),
+        }
+    }
+}
+
+impl<V> VersionedSlotDerivedData<V> {
+    /// For the given version, records data. Returns an error if the entry for the
+    /// current version already exist.
+    pub fn set_once(&mut self, version: CurrentVersion, value: V) -> PartialVMResult<()> {
+        self.inner.gc(version);
+
+        // After GC, the last value should be at most the current version. If it is the current
+        // version - data have already been computed which should not be allowed.
+        if self
+            .inner
+            .versions
+            .last()
+            .is_some_and(|v| v.version == version.current)
+        {
+            return Err(PartialVMError::new_invariant_violation(
+                "Derived data can only be computed once",
+            ));
+        }
+
+        self.inner.versions.push(VersionedValue {
+            version: version.current,
+            value,
+        });
+        Ok(())
+    }
+
+    /// If derived data has been computed for this current version, returns mutable reference
+    /// to it. Otherwise, returns [None].
+    pub fn get(&mut self, version: CurrentVersion) -> Option<&mut V> {
+        self.inner.gc(version);
+        self.inner.versions.last_mut().and_then(|v| {
+            if v.version == version.current {
+                Some(&mut v.value)
+            } else {
+                None
+            }
+        })
+    }
+
+    /// If derived data has been computed for this current version, takes the latest version of the
+    /// data and returns it. Otherwise, returns [None].
+    pub fn take(&mut self, version: CurrentVersion) -> Option<V> {
+        self.inner.gc(version);
+        self.inner.versions.pop().and_then(|v| {
+            if v.version == version.current {
+                Some(v.value)
+            } else {
+                None
+            }
+        })
     }
 }
 
