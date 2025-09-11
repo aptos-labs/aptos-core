@@ -11,6 +11,7 @@ use crate::{
     values::function_values_impl::{AbstractFunction, Closure, ClosureVisitor},
     views::{ValueView, ValueVisitor},
 };
+use atomic_refcell::AtomicRefCell;
 use itertools::Itertools;
 use move_binary_format::{
     errors::*,
@@ -35,11 +36,9 @@ use serde::{
     Deserialize,
 };
 use std::{
-    cell::RefCell,
     cmp::Ordering,
     fmt::{self, Debug, Display, Formatter},
     iter, mem,
-    rc::Rc,
     sync::Arc,
 };
 
@@ -120,21 +119,21 @@ pub(crate) enum ValueImpl {
 /// type or not, and a few specialized flavors to offer compact memory layout for small
 /// primitive types.
 ///
-/// Except when not owned by the VM stack, a container always lives inside an Rc<RefCell<>>,
+/// Except when not owned by the VM stack, a container always lives inside an Arc<AtomicRefCell<>>,
 /// making it possible to be shared by references.
 #[derive(Debug)]
 pub(crate) enum Container {
-    Locals(Rc<RefCell<Vec<ValueImpl>>>),
-    Vec(Rc<RefCell<Vec<ValueImpl>>>),
-    Struct(Rc<RefCell<Vec<ValueImpl>>>),
-    VecU8(Rc<RefCell<Vec<u8>>>),
-    VecU64(Rc<RefCell<Vec<u64>>>),
-    VecU128(Rc<RefCell<Vec<u128>>>),
-    VecBool(Rc<RefCell<Vec<bool>>>),
-    VecAddress(Rc<RefCell<Vec<AccountAddress>>>),
-    VecU16(Rc<RefCell<Vec<u16>>>),
-    VecU32(Rc<RefCell<Vec<u32>>>),
-    VecU256(Rc<RefCell<Vec<u256::U256>>>),
+    Locals(Arc<AtomicRefCell<Vec<ValueImpl>>>),
+    Vec(Arc<AtomicRefCell<Vec<ValueImpl>>>),
+    Struct(Arc<AtomicRefCell<Vec<ValueImpl>>>),
+    VecU8(Arc<AtomicRefCell<Vec<u8>>>),
+    VecU64(Arc<AtomicRefCell<Vec<u64>>>),
+    VecU128(Arc<AtomicRefCell<Vec<u128>>>),
+    VecBool(Arc<AtomicRefCell<Vec<bool>>>),
+    VecAddress(Arc<AtomicRefCell<Vec<AccountAddress>>>),
+    VecU16(Arc<AtomicRefCell<Vec<u16>>>),
+    VecU32(Arc<AtomicRefCell<Vec<u32>>>),
+    VecU256(Arc<AtomicRefCell<Vec<u256::U256>>>),
 }
 
 /// A ContainerRef is a direct reference to a container, which could live either in the frame
@@ -144,7 +143,7 @@ pub(crate) enum Container {
 pub(crate) enum ContainerRef {
     Local(Container),
     Global {
-        status: Rc<RefCell<GlobalDataStatus>>,
+        status: Arc<AtomicRefCell<GlobalDataStatus>>,
         container: Container,
     },
 }
@@ -245,12 +244,14 @@ enum GlobalValueImpl {
     /// No resource resides in this slot or in storage.
     None,
     /// A resource has been published to this slot and it did not previously exist in storage.
-    Fresh { fields: Rc<RefCell<Vec<ValueImpl>>> },
+    Fresh {
+        fields: Arc<AtomicRefCell<Vec<ValueImpl>>>,
+    },
     /// A resource resides in this slot and also in storage. The status flag indicates whether
     /// it has potentially been altered.
     Cached {
-        fields: Rc<RefCell<Vec<ValueImpl>>>,
-        status: Rc<RefCell<GlobalDataStatus>>,
+        fields: Arc<AtomicRefCell<Vec<ValueImpl>>>,
+        status: Arc<AtomicRefCell<GlobalDataStatus>>,
     },
     /// A resource used to exist in storage but has been deleted by the current transaction.
     Deleted,
@@ -264,7 +265,7 @@ pub struct GlobalValue(GlobalValueImpl);
 /// The locals for a function frame. It allows values to be read, written or taken
 /// reference from.
 #[derive(Debug)]
-pub struct Locals(Rc<RefCell<Vec<ValueImpl>>>);
+pub struct Locals(Arc<AtomicRefCell<Vec<ValueImpl>>>);
 
 /***************************************************************************************
  *
@@ -295,24 +296,24 @@ impl Container {
 
     fn rc_count(&self) -> usize {
         match self {
-            Self::Vec(r) => Rc::strong_count(r),
-            Self::Struct(r) => Rc::strong_count(r),
+            Self::Vec(r) => Arc::strong_count(r),
+            Self::Struct(r) => Arc::strong_count(r),
 
-            Self::VecU8(r) => Rc::strong_count(r),
-            Self::VecU16(r) => Rc::strong_count(r),
-            Self::VecU32(r) => Rc::strong_count(r),
-            Self::VecU64(r) => Rc::strong_count(r),
-            Self::VecU128(r) => Rc::strong_count(r),
-            Self::VecU256(r) => Rc::strong_count(r),
-            Self::VecBool(r) => Rc::strong_count(r),
-            Self::VecAddress(r) => Rc::strong_count(r),
+            Self::VecU8(r) => Arc::strong_count(r),
+            Self::VecU16(r) => Arc::strong_count(r),
+            Self::VecU32(r) => Arc::strong_count(r),
+            Self::VecU64(r) => Arc::strong_count(r),
+            Self::VecU128(r) => Arc::strong_count(r),
+            Self::VecU256(r) => Arc::strong_count(r),
+            Self::VecBool(r) => Arc::strong_count(r),
+            Self::VecAddress(r) => Arc::strong_count(r),
 
-            Self::Locals(r) => Rc::strong_count(r),
+            Self::Locals(r) => Arc::strong_count(r),
         }
     }
 
     fn master_signer(x: AccountAddress) -> Self {
-        Container::Struct(Rc::new(RefCell::new(vec![
+        Container::Struct(Arc::new(AtomicRefCell::new(vec![
             ValueImpl::U16(MASTER_SIGNER_VARIANT),
             ValueImpl::Address(x),
         ])))
@@ -323,13 +324,13 @@ impl Container {
  *
  * Borrows (Internal)
  *
- *   Helper functions to handle Rust borrows. When borrowing from a RefCell, we want
+ *   Helper functions to handle Rust borrows. When borrowing from a AtomicRefCell, we want
  *   to return an error instead of panicking.
  *
  **************************************************************************************/
 
-fn take_unique_ownership<T: Debug>(r: Rc<RefCell<T>>) -> PartialVMResult<T> {
-    match Rc::try_unwrap(r) {
+fn take_unique_ownership<T: Debug>(r: Arc<AtomicRefCell<T>>) -> PartialVMResult<T> {
+    match Arc::try_unwrap(r) {
         Ok(cell) => Ok(cell.into_inner()),
         Err(r) => Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -423,12 +424,12 @@ impl ValueImpl {
             Bool(x) => Bool(*x),
             Address(x) => Address(*x),
 
-            // Note: refs copy only clones Rc, so no need to increment depth.
+            // Note: refs copy only clones Arc, so no need to increment depth.
             ContainerRef(r) => ContainerRef(r.copy_by_ref()),
             IndexedRef(r) => IndexedRef(r.copy_by_ref()),
 
             // When cloning a container, we need to make sure we make a deep copy of the data
-            // instead of a shallow copy of the Rc. Note that we do not increment the depth here
+            // instead of a shallow copy of the Arc. Note that we do not increment the depth here
             // because we have done it when entering this value. Inside the container, depth will
             // be further incremented for nested values.
             Container(c) => Container(c.copy_value(depth, max_depth)?),
@@ -450,8 +451,8 @@ impl ValueImpl {
 
 impl Container {
     fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
-        let copy_rc_ref_vec_val = |r: &Rc<RefCell<Vec<ValueImpl>>>| {
-            Ok(Rc::new(RefCell::new(
+        let copy_rc_ref_vec_val = |r: &Arc<AtomicRefCell<Vec<ValueImpl>>>| {
+            Ok(Arc::new(AtomicRefCell::new(
                 r.borrow()
                     .iter()
                     .map(|v| v.copy_value(depth + 1, max_depth))
@@ -463,14 +464,16 @@ impl Container {
             Self::Vec(r) => Self::Vec(copy_rc_ref_vec_val(r)?),
             Self::Struct(r) => Self::Struct(copy_rc_ref_vec_val(r)?),
 
-            Self::VecU8(r) => Self::VecU8(Rc::new(RefCell::new(r.borrow().clone()))),
-            Self::VecU16(r) => Self::VecU16(Rc::new(RefCell::new(r.borrow().clone()))),
-            Self::VecU32(r) => Self::VecU32(Rc::new(RefCell::new(r.borrow().clone()))),
-            Self::VecU64(r) => Self::VecU64(Rc::new(RefCell::new(r.borrow().clone()))),
-            Self::VecU128(r) => Self::VecU128(Rc::new(RefCell::new(r.borrow().clone()))),
-            Self::VecU256(r) => Self::VecU256(Rc::new(RefCell::new(r.borrow().clone()))),
-            Self::VecBool(r) => Self::VecBool(Rc::new(RefCell::new(r.borrow().clone()))),
-            Self::VecAddress(r) => Self::VecAddress(Rc::new(RefCell::new(r.borrow().clone()))),
+            Self::VecU8(r) => Self::VecU8(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
+            Self::VecU16(r) => Self::VecU16(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
+            Self::VecU32(r) => Self::VecU32(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
+            Self::VecU64(r) => Self::VecU64(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
+            Self::VecU128(r) => Self::VecU128(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
+            Self::VecU256(r) => Self::VecU256(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
+            Self::VecBool(r) => Self::VecBool(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
+            Self::VecAddress(r) => {
+                Self::VecAddress(Arc::new(AtomicRefCell::new(r.borrow().clone())))
+            },
 
             Self::Locals(_) => {
                 return Err(
@@ -483,19 +486,19 @@ impl Container {
 
     fn copy_by_ref(&self) -> Self {
         match self {
-            Self::Vec(r) => Self::Vec(Rc::clone(r)),
-            Self::Struct(r) => Self::Struct(Rc::clone(r)),
+            Self::Vec(r) => Self::Vec(Arc::clone(r)),
+            Self::Struct(r) => Self::Struct(Arc::clone(r)),
 
-            Self::VecU8(r) => Self::VecU8(Rc::clone(r)),
-            Self::VecU16(r) => Self::VecU16(Rc::clone(r)),
-            Self::VecU32(r) => Self::VecU32(Rc::clone(r)),
-            Self::VecU64(r) => Self::VecU64(Rc::clone(r)),
-            Self::VecU128(r) => Self::VecU128(Rc::clone(r)),
-            Self::VecU256(r) => Self::VecU256(Rc::clone(r)),
-            Self::VecBool(r) => Self::VecBool(Rc::clone(r)),
-            Self::VecAddress(r) => Self::VecAddress(Rc::clone(r)),
+            Self::VecU8(r) => Self::VecU8(Arc::clone(r)),
+            Self::VecU16(r) => Self::VecU16(Arc::clone(r)),
+            Self::VecU32(r) => Self::VecU32(Arc::clone(r)),
+            Self::VecU64(r) => Self::VecU64(Arc::clone(r)),
+            Self::VecU128(r) => Self::VecU128(Arc::clone(r)),
+            Self::VecU256(r) => Self::VecU256(Arc::clone(r)),
+            Self::VecBool(r) => Self::VecBool(Arc::clone(r)),
+            Self::VecAddress(r) => Self::VecAddress(Arc::clone(r)),
 
-            Self::Locals(r) => Self::Locals(Rc::clone(r)),
+            Self::Locals(r) => Self::Locals(Arc::clone(r)),
         }
     }
 }
@@ -514,7 +517,7 @@ impl ContainerRef {
         match self {
             Self::Local(container) => Self::Local(container.copy_by_ref()),
             Self::Global { status, container } => Self::Global {
-                status: Rc::clone(status),
+                status: Arc::clone(status),
                 container: container.copy_by_ref(),
             },
         }
@@ -1352,7 +1355,7 @@ impl IndexedRef {
 
         macro_rules! swap {
             ($r1:ident, $r2:ident) => {{
-                if Rc::ptr_eq($r1, $r2) {
+                if Arc::ptr_eq($r1, $r2) {
                     if self.idx == other.idx {
                         return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                             .with_message(format!(
@@ -1524,7 +1527,7 @@ impl ContainerRef {
                         let r = match self {
                             Self::Local(_) => Self::Local(container.copy_by_ref()),
                             Self::Global { status, .. } => Self::Global {
-                                status: Rc::clone(status),
+                                status: Arc::clone(status),
                                 container: container.copy_by_ref(),
                             },
                         };
@@ -1637,7 +1640,7 @@ impl Locals {
             | ValueImpl::ClosureValue(_)
             | ValueImpl::DelayedFieldID { .. } => Ok(Value(ValueImpl::IndexedRef(IndexedRef {
                 idx,
-                container_ref: ContainerRef::Local(Container::Locals(Rc::clone(&self.0))),
+                container_ref: ContainerRef::Local(Container::Locals(Arc::clone(&self.0))),
             }))),
 
             ValueImpl::ContainerRef(_) | ValueImpl::Invalid | ValueImpl::IndexedRef(_) => Err(
@@ -1695,7 +1698,7 @@ impl SignerRef {
  **************************************************************************************/
 impl Locals {
     pub fn new(n: usize) -> Self {
-        Self(Rc::new(RefCell::new(
+        Self(Arc::new(AtomicRefCell::new(
             iter::repeat_with(|| ValueImpl::Invalid).take(n).collect(),
         )))
     }
@@ -1871,64 +1874,64 @@ impl Value {
     }
 
     pub fn struct_(s: Struct) -> Self {
-        Self(ValueImpl::Container(Container::Struct(Rc::new(
-            RefCell::new(s.fields),
+        Self(ValueImpl::Container(Container::Struct(Arc::new(
+            AtomicRefCell::new(s.fields),
         ))))
     }
 
     pub fn vector_u8(it: impl IntoIterator<Item = u8>) -> Self {
-        Self(ValueImpl::Container(Container::VecU8(Rc::new(
-            RefCell::new(it.into_iter().collect()),
+        Self(ValueImpl::Container(Container::VecU8(Arc::new(
+            AtomicRefCell::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_u16(it: impl IntoIterator<Item = u16>) -> Self {
-        Self(ValueImpl::Container(Container::VecU16(Rc::new(
-            RefCell::new(it.into_iter().collect()),
+        Self(ValueImpl::Container(Container::VecU16(Arc::new(
+            AtomicRefCell::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_u32(it: impl IntoIterator<Item = u32>) -> Self {
-        Self(ValueImpl::Container(Container::VecU32(Rc::new(
-            RefCell::new(it.into_iter().collect()),
+        Self(ValueImpl::Container(Container::VecU32(Arc::new(
+            AtomicRefCell::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_u64(it: impl IntoIterator<Item = u64>) -> Self {
-        Self(ValueImpl::Container(Container::VecU64(Rc::new(
-            RefCell::new(it.into_iter().collect()),
+        Self(ValueImpl::Container(Container::VecU64(Arc::new(
+            AtomicRefCell::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_u128(it: impl IntoIterator<Item = u128>) -> Self {
-        Self(ValueImpl::Container(Container::VecU128(Rc::new(
-            RefCell::new(it.into_iter().collect()),
+        Self(ValueImpl::Container(Container::VecU128(Arc::new(
+            AtomicRefCell::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_u256(it: impl IntoIterator<Item = u256::U256>) -> Self {
-        Self(ValueImpl::Container(Container::VecU256(Rc::new(
-            RefCell::new(it.into_iter().collect()),
+        Self(ValueImpl::Container(Container::VecU256(Arc::new(
+            AtomicRefCell::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_bool(it: impl IntoIterator<Item = bool>) -> Self {
-        Self(ValueImpl::Container(Container::VecBool(Rc::new(
-            RefCell::new(it.into_iter().collect()),
+        Self(ValueImpl::Container(Container::VecBool(Arc::new(
+            AtomicRefCell::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_address(it: impl IntoIterator<Item = AccountAddress>) -> Self {
-        Self(ValueImpl::Container(Container::VecAddress(Rc::new(
-            RefCell::new(it.into_iter().collect()),
+        Self(ValueImpl::Container(Container::VecAddress(Arc::new(
+            AtomicRefCell::new(it.into_iter().collect()),
         ))))
     }
 
     // REVIEW: This API can break
     pub fn vector_for_testing_only(it: impl IntoIterator<Item = Value>) -> Self {
-        Self(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
-            it.into_iter().map(|v| v.0).collect(),
-        )))))
+        Self(ValueImpl::Container(Container::Vec(Arc::new(
+            AtomicRefCell::new(it.into_iter().map(|v| v.0).collect()),
+        ))))
     }
 
     pub fn closure(
@@ -2788,8 +2791,8 @@ impl VectorRef {
         Ok(Value(self.0.borrow_elem(idx)?))
     }
 
-    /// Returns a RefCell reference to the underlying vector of a `&vector<u8>` value.
-    pub fn as_bytes_ref(&self) -> std::cell::Ref<'_, Vec<u8>> {
+    /// Returns a AtomicRefCell reference to the underlying vector of a `&vector<u8>` value.
+    pub fn as_bytes_ref(&self) -> atomic_refcell::AtomicRef<'_, Vec<u8>> {
         let c = self.0.container();
         match c {
             Container::VecU8(r) => r.borrow(),
@@ -3013,8 +3016,8 @@ impl Vector {
             | Type::Vector(_)
             | Type::Struct { .. }
             | Type::StructInstantiation { .. }
-            | Type::Function { .. } => Value(ValueImpl::Container(Container::Vec(Rc::new(
-                RefCell::new(elements.into_iter().map(|v| v.0).collect()),
+            | Type::Function { .. } => Value(ValueImpl::Container(Container::Vec(Arc::new(
+                AtomicRefCell::new(elements.into_iter().map(|v| v.0).collect()),
             )))),
 
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
@@ -3318,7 +3321,7 @@ impl GlobalValueImpl {
     ) -> Result<Self, (PartialVMError, ValueImpl)> {
         match val {
             ValueImpl::Container(Container::Struct(fields)) => {
-                let status = Rc::new(RefCell::new(status));
+                let status = Arc::new(AtomicRefCell::new(status));
                 Ok(Self::Cached { fields, status })
             },
             val => Err((
@@ -3354,7 +3357,7 @@ impl GlobalValueImpl {
                 _ => unreachable!(),
             },
         };
-        if Rc::strong_count(&fields) != 1 {
+        if Arc::strong_count(&fields) != 1 {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("moving global resource with dangling reference".to_string())
@@ -3389,11 +3392,11 @@ impl GlobalValueImpl {
         match self {
             Self::None | Self::Deleted => Err(PartialVMError::new(StatusCode::MISSING_DATA)),
             Self::Fresh { fields } => Ok(ValueImpl::ContainerRef(ContainerRef::Local(
-                Container::Struct(Rc::clone(fields)),
+                Container::Struct(Arc::clone(fields)),
             ))),
             Self::Cached { fields, status } => Ok(ValueImpl::ContainerRef(ContainerRef::Global {
-                container: Container::Struct(Rc::clone(fields)),
-                status: Rc::clone(status),
+                container: Container::Struct(Arc::clone(fields)),
+                status: Arc::clone(status),
             })),
         }
     }
@@ -4142,9 +4145,9 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                         layout,
                     };
                     let vector = deserializer.deserialize_seq(VectorElementVisitor(seed))?;
-                    Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
-                        vector,
-                    )))))
+                    Value(ValueImpl::Container(Container::Vec(Arc::new(
+                        AtomicRefCell::new(vector),
+                    ))))
                 },
             }),
 
@@ -4432,7 +4435,7 @@ impl Value {
 * Destructors
 *
 **************************************************************************************/
-// Locals may contain reference values that points to the same cotnainer through Rc, hencing forming
+// Locals may contain reference values that points to the same cotnainer through Arc, hencing forming
 // a cycle. Therefore values need to be manually taken out of the Locals in order to not leak memory.
 impl Drop for Locals {
     fn drop(&mut self) {
@@ -4674,7 +4677,7 @@ impl GlobalValue {
     pub fn view(&self) -> Option<impl ValueView + '_> {
         use GlobalValueImpl as G;
 
-        struct Wrapper<'b>(&'b Rc<RefCell<Vec<ValueImpl>>>);
+        struct Wrapper<'b>(&'b Arc<AtomicRefCell<Vec<ValueImpl>>>);
 
         impl ValueView for Wrapper<'_> {
             fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
@@ -4770,65 +4773,65 @@ pub mod prop {
             L::Vector(layout) => match &**layout {
                 L::U8 => vec(any::<u8>(), 0..10)
                     .prop_map(|vals| {
-                        Value(ValueImpl::Container(Container::VecU8(Rc::new(
-                            RefCell::new(vals),
+                        Value(ValueImpl::Container(Container::VecU8(Arc::new(
+                            AtomicRefCell::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::U16 => vec(any::<u16>(), 0..10)
                     .prop_map(|vals| {
-                        Value(ValueImpl::Container(Container::VecU16(Rc::new(
-                            RefCell::new(vals),
+                        Value(ValueImpl::Container(Container::VecU16(Arc::new(
+                            AtomicRefCell::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::U32 => vec(any::<u32>(), 0..10)
                     .prop_map(|vals| {
-                        Value(ValueImpl::Container(Container::VecU32(Rc::new(
-                            RefCell::new(vals),
+                        Value(ValueImpl::Container(Container::VecU32(Arc::new(
+                            AtomicRefCell::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::U64 => vec(any::<u64>(), 0..10)
                     .prop_map(|vals| {
-                        Value(ValueImpl::Container(Container::VecU64(Rc::new(
-                            RefCell::new(vals),
+                        Value(ValueImpl::Container(Container::VecU64(Arc::new(
+                            AtomicRefCell::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::U128 => vec(any::<u128>(), 0..10)
                     .prop_map(|vals| {
-                        Value(ValueImpl::Container(Container::VecU128(Rc::new(
-                            RefCell::new(vals),
+                        Value(ValueImpl::Container(Container::VecU128(Arc::new(
+                            AtomicRefCell::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::U256 => vec(any::<u256::U256>(), 0..10)
                     .prop_map(|vals| {
-                        Value(ValueImpl::Container(Container::VecU256(Rc::new(
-                            RefCell::new(vals),
+                        Value(ValueImpl::Container(Container::VecU256(Arc::new(
+                            AtomicRefCell::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::Bool => vec(any::<bool>(), 0..10)
                     .prop_map(|vals| {
-                        Value(ValueImpl::Container(Container::VecBool(Rc::new(
-                            RefCell::new(vals),
+                        Value(ValueImpl::Container(Container::VecBool(Arc::new(
+                            AtomicRefCell::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::Address => vec(any::<AccountAddress>(), 0..10)
                     .prop_map(|vals| {
-                        Value(ValueImpl::Container(Container::VecAddress(Rc::new(
-                            RefCell::new(vals),
+                        Value(ValueImpl::Container(Container::VecAddress(Arc::new(
+                            AtomicRefCell::new(vals),
                         ))))
                     })
                     .boxed(),
                 layout => vec(value_strategy_with_layout(layout), 0..10)
                     .prop_map(|vals| {
-                        Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
-                            vals.into_iter().map(|val| val.0).collect(),
-                        )))))
+                        Value(ValueImpl::Container(Container::Vec(Arc::new(
+                            AtomicRefCell::new(vals.into_iter().map(|val| val.0).collect()),
+                        ))))
                     })
                     .boxed(),
             },
