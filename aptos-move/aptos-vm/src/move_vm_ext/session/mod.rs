@@ -207,7 +207,7 @@ where
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
-            .into_change_set(&function_extension)
+            .legacy_into_change_set(&function_extension)
             .map_err(|e| e.finish(Location::Undefined))?;
 
         let aggregator_context: NativeAggregatorContext = extensions.remove();

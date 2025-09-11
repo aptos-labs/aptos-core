@@ -4328,8 +4328,12 @@ dependencies = [
 name = "aptos-table-natives"
 version = "0.1.0"
 dependencies = [
+ "aptos-gas-meter",
  "aptos-gas-schedule",
  "aptos-native-interface",
+ "aptos-types",
+ "aptos-vm-types",
+ "bcs 0.1.4",
  "better_any",
  "bytes",
  "move-binary-format",
@@ -4337,6 +4341,7 @@ dependencies = [
  "move-table-extension",
  "move-vm-runtime",
  "move-vm-types",
+ "serde",
  "sha3 0.9.1",
  "smallvec",
  "triomphe",
