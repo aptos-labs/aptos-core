@@ -8,6 +8,20 @@ pub const HOT_STATE_MAX_ITEMS_PER_SHARD: usize = 250_000;
 // 10KB, worst case the hot state still caches about 400K items (all shards)
 pub const HOT_STATE_MAX_SINGLE_VALUE_BYTES: usize = 10 * 1024;
 
+// TODO(HotState): later make this onchain config.
+#[derive(Clone, Copy, Debug)]
+pub struct HotStateConfig {
+    pub max_items_per_shard: usize,
+}
+
+impl Default for HotStateConfig {
+    fn default() -> Self {
+        Self {
+            max_items_per_shard: HOT_STATE_MAX_ITEMS_PER_SHARD,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LRUEntry<K> {
     /// The key that is slightly newer than the current entry. `None` for the newest entry.
