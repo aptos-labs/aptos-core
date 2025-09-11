@@ -35,7 +35,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     function::ClosureMask,
-    gas_algebra::{NumArgs, NumBytes, NumTypeNodes},
+    gas_algebra::{NumArgs, NumBytes},
     language_storage::TypeTag,
     vm_status::{
         sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode, StatusType,
@@ -1879,9 +1879,9 @@ impl Frame {
                     Bytecode::LdConst(idx) => {
                         let constant = self.constant_at(*idx);
 
-                        gas_meter.charge_create_ty(NumTypeNodes::new(
-                            constant.type_.num_nodes() as u64,
-                        ))?;
+                        // gas_meter.charge_create_ty(NumTypeNodes::new(
+                        //     constant.type_.num_nodes() as u64,
+                        // ))?;
 
                         gas_meter.charge_ld_const(NumBytes::new(constant.data.len() as u64))?;
 
@@ -1966,10 +1966,10 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let ((_, field_ty_count), (_, struct_ty_count)) =
-                            frame_cache.get_field_type_and_struct_type(*fi_idx, self)?;
-                        gas_meter.charge_create_ty(struct_ty_count)?;
-                        gas_meter.charge_create_ty(field_ty_count)?;
+                        // let ((_, field_ty_count), (_, struct_ty_count)) =
+                        //     frame_cache.get_field_type_and_struct_type(*fi_idx, self)?;
+                        // gas_meter.charge_create_ty(struct_ty_count)?;
+                        // gas_meter.charge_create_ty(field_ty_count)?;
 
                         let instr = if matches!(instruction, Bytecode::MutBorrowFieldGeneric(_)) {
                             S::MutBorrowFieldGeneric
@@ -2012,10 +2012,10 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let ((_, field_ty_count), (_, struct_ty_count)) =
-                            frame_cache.get_variant_field_type_and_struct_type(*fi_idx, self)?;
-                        gas_meter.charge_create_ty(struct_ty_count)?;
-                        gas_meter.charge_create_ty(field_ty_count)?;
+                        // let ((_, field_ty_count), (_, struct_ty_count)) =
+                        //     frame_cache.get_variant_field_type_and_struct_type(*fi_idx, self)?;
+                        // gas_meter.charge_create_ty(struct_ty_count)?;
+                        // gas_meter.charge_create_ty(field_ty_count)?;
 
                         let instr = match instruction {
                             Bytecode::MutBorrowVariantFieldGeneric(_) => {
@@ -2101,25 +2101,6 @@ impl Frame {
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
 
-                        let mut get_field_count_charge_gas_and_check_depth =
-                            |frame_cache: &mut FrameTypeCache| -> PartialVMResult<u16> {
-                                let field_tys =
-                                    frame_cache.get_struct_fields_types(*si_idx, self)?;
-
-                                for (_, ty_count) in field_tys {
-                                    gas_meter.charge_create_ty(*ty_count)?;
-                                }
-
-                                let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
-                                gas_meter.charge_create_ty(ty_count)?;
-                                interpreter.ty_depth_checker.check_depth_of_type(
-                                    gas_meter,
-                                    traversal_context,
-                                    ty,
-                                )?;
-                                Ok(self.field_instantiation_count(*si_idx))
-                            };
-
                         let field_count = if RTCaches::caches_enabled() {
                             let cached_field_count =
                                 &frame_cache.per_instruction_cache[self.pc as usize];
@@ -2129,14 +2110,13 @@ impl Frame {
                             {
                                 *field_count
                             } else {
-                                let field_count =
-                                    get_field_count_charge_gas_and_check_depth(frame_cache)?;
+                                let field_count = self.field_instantiation_count(*si_idx);
                                 frame_cache.per_instruction_cache[self.pc as usize] =
                                     PerInstructionCache::PackGeneric(field_count);
                                 field_count
                             }
                         } else {
-                            get_field_count_charge_gas_and_check_depth(frame_cache)?
+                            self.field_instantiation_count(*si_idx)
                         };
 
                         gas_meter.charge_pack(
@@ -2149,20 +2129,20 @@ impl Frame {
                             .push(Value::struct_(Struct::pack(args)))?;
                     },
                     Bytecode::PackVariantGeneric(si_idx) => {
-                        let field_tys =
-                            frame_cache.get_struct_variant_fields_types(*si_idx, self)?;
+                        // let field_tys =
+                        //     frame_cache.get_struct_variant_fields_types(*si_idx, self)?;
 
-                        for (_, ty_count) in field_tys {
-                            gas_meter.charge_create_ty(*ty_count)?;
-                        }
+                        // for (_, ty_count) in field_tys {
+                        //     gas_meter.charge_create_ty(*ty_count)?;
+                        // }
 
-                        let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
+                        // let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
+                        // interpreter.ty_depth_checker.check_depth_of_type(
+                        //     gas_meter,
+                        //     traversal_context,
+                        //     ty,
+                        // )?;
 
                         let info = self.get_struct_variant_instantiation_at(*si_idx);
                         gas_meter.charge_pack_variant(
@@ -2197,26 +2177,26 @@ impl Frame {
                             interpreter.operand_stack.push(value)?;
                         }
                     },
-                    Bytecode::UnpackGeneric(si_idx) => {
+                    Bytecode::UnpackGeneric(_) => {
                         // TODO: Even though the types are not needed for execution, we still
                         //       instantiate them for gas metering.
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let ty_and_field_counts =
-                            frame_cache.get_struct_fields_types(*si_idx, self)?;
-                        for (_, ty_count) in ty_and_field_counts {
-                            gas_meter.charge_create_ty(*ty_count)?;
-                        }
+                        // let ty_and_field_counts =
+                        //     frame_cache.get_struct_fields_types(*si_idx, self)?;
+                        // for (_, ty_count) in ty_and_field_counts {
+                        //     gas_meter.charge_create_ty(*ty_count)?;
+                        // }
 
-                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
-
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
+                        // let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
+                        //
+                        // interpreter.ty_depth_checker.check_depth_of_type(
+                        //     gas_meter,
+                        //     traversal_context,
+                        //     ty,
+                        // )?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2230,20 +2210,20 @@ impl Frame {
                         }
                     },
                     Bytecode::UnpackVariantGeneric(si_idx) => {
-                        let ty_and_field_counts =
-                            frame_cache.get_struct_variant_fields_types(*si_idx, self)?;
-                        for (_, ty_count) in ty_and_field_counts {
-                            gas_meter.charge_create_ty(*ty_count)?;
-                        }
+                        // let ty_and_field_counts =
+                        //     frame_cache.get_struct_variant_fields_types(*si_idx, self)?;
+                        // for (_, ty_count) in ty_and_field_counts {
+                        //     gas_meter.charge_create_ty(*ty_count)?;
+                        // }
 
-                        let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
-
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
+                        // let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
+                        //
+                        // interpreter.ty_depth_checker.check_depth_of_type(
+                        //     gas_meter,
+                        //     traversal_context,
+                        //     ty,
+                        // )?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2270,9 +2250,9 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let (_, struct_ty_count) =
-                            frame_cache.get_struct_variant_type(*sd_idx, self)?;
-                        gas_meter.charge_create_ty(struct_ty_count)?;
+                        // let (_, struct_ty_count) =
+                        //     frame_cache.get_struct_variant_type(*sd_idx, self)?;
+                        // gas_meter.charge_create_ty(struct_ty_count)?;
 
                         let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
                         gas_meter.charge_simple_instr(S::TestVariantGeneric)?;
@@ -2535,8 +2515,8 @@ impl Frame {
                     | Bytecode::ImmBorrowGlobalGeneric(si_idx) => {
                         let is_mut = matches!(instruction, Bytecode::MutBorrowGlobalGeneric(_));
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        let (ty, _) = frame_cache.get_struct_type(*si_idx, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
                         interpreter.borrow_global(
                             is_mut,
                             true,
@@ -2563,8 +2543,8 @@ impl Frame {
                     },
                     Bytecode::ExistsGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        let (ty, _) = frame_cache.get_struct_type(*si_idx, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
                         interpreter.exists(
                             true,
                             data_cache,
@@ -2590,8 +2570,8 @@ impl Frame {
                     },
                     Bytecode::MoveFromGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        let (ty, _) = frame_cache.get_struct_type(*si_idx, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
                         interpreter.move_from(
                             true,
                             data_cache,
@@ -2630,8 +2610,8 @@ impl Frame {
                             .value_as::<Reference>()?
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
-                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        let (ty, _) = frame_cache.get_struct_type(*si_idx, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
                         interpreter.move_to(
                             true,
                             data_cache,
@@ -2657,8 +2637,8 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Nop)?;
                     },
                     Bytecode::VecPack(si, num) => {
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
                         interpreter.ty_depth_checker.check_depth_of_type(
                             gas_meter,
                             traversal_context,
@@ -2674,8 +2654,8 @@ impl Frame {
                     },
                     Bytecode::VecLen(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_len(make_ty!(ty))?;
                         let value = vec_ref.len(ty)?;
                         interpreter.operand_stack.push(value)?;
@@ -2683,8 +2663,8 @@ impl Frame {
                     Bytecode::VecImmBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
                         let res = vec_ref.borrow_elem(idx, ty);
                         gas_meter.charge_vec_borrow(false, make_ty!(ty), res.is_ok())?;
                         interpreter.operand_stack.push(res?)?;
@@ -2692,8 +2672,8 @@ impl Frame {
                     Bytecode::VecMutBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
                         let res = vec_ref.borrow_elem(idx, ty);
                         gas_meter.charge_vec_borrow(true, make_ty!(ty), res.is_ok())?;
                         interpreter.operand_stack.push(res?)?;
@@ -2701,23 +2681,23 @@ impl Frame {
                     Bytecode::VecPushBack(si) => {
                         let elem = interpreter.operand_stack.pop()?;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_push_back(make_ty!(ty), &elem)?;
                         vec_ref.push_back(elem, ty)?;
                     },
                     Bytecode::VecPopBack(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
                         let res = vec_ref.pop(ty);
                         gas_meter.charge_vec_pop_back(make_ty!(ty), res.as_ref().ok())?;
                         interpreter.operand_stack.push(res?)?;
                     },
                     Bytecode::VecUnpack(si, num) => {
                         let vec_val = interpreter.operand_stack.pop_as::<Vector>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_unpack(
                             make_ty!(ty),
                             NumArgs::new(*num),
@@ -2732,8 +2712,8 @@ impl Frame {
                         let idx2 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let idx1 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_swap(make_ty!(ty))?;
                         vec_ref.swap(idx1, idx2, ty)?;
                     },
