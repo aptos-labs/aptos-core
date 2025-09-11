@@ -495,14 +495,14 @@ anstyle = "1.0.1"
 arbitrary = { version = "1.4.1", features = ["derive"] }
 arc-swap = "1.6.0"
 arr_macro = "0.2.1"
-ark-bls12-381 = "0.4.0"
-ark-bn254 = "0.4.0"
-ark-ec = "0.4.0"
-ark-ff = "0.4.0"
-ark-groth16 = "0.4.0"
-ark-relations = "0.4.0"
-ark-serialize = "0.4.0"
-ark-std = { version = "0.4.0", features = ["getrandom"] }
+ark-bls12-381 = "0.5.0"
+ark-bn254 = "0.5.0"
+ark-ec = "0.5.0"
+ark-ff = "0.5.0"
+ark-groth16 = "0.5.0"
+ark-relations = "0.5.0"
+ark-serialize = "0.5.0"
+ark-std = { version = "0.5.0", features = ["getrandom"] }
 aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.2", features = [
     "postgres_partial",
 ] }
