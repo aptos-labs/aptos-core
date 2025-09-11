@@ -15,7 +15,6 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-indexer-grpc-server-framework = { workspace = true }
-aptos-indexer-grpc-utils = { workspace = true }
 aptos-protos = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true }
@@ -23,8 +22,6 @@ clap = { workspace = true }
 futures = { workspace = true }
 http-body-util = { workspace = true }
 hyper-util = { workspace = true }
-once_cell = { workspace = true }
-prost = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
