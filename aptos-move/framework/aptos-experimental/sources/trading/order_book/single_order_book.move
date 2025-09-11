@@ -138,7 +138,7 @@ module aptos_experimental::single_order_book {
             is_bid,
             trigger_condition: option::none(),
             time_in_force,
-            metadata: metadata.destroy_some(),
+            metadata,
         }
     }
 
@@ -417,7 +417,7 @@ module aptos_experimental::single_order_book {
             metadata
         ) = order.destroy_single_order();
         assert!(is_active, EINVALID_INACTIVE_ORDER_STATE);
-        new_order_match(new_order_match_details(order_id, account, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, option::some(metadata), single_order_book_type()), matched_size)
+        new_order_match(new_order_match_details(order_id, account, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, metadata, single_order_book_type()), matched_size)
     }
 
     /// Decrease the size of the order by the given size delta. The API aborts if the order is not found in the order book or

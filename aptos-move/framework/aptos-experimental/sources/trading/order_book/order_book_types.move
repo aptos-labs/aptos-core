@@ -202,7 +202,7 @@ module aptos_experimental::order_book_types {
             remaining_size: u64,
             is_bid: bool,
             time_in_force: TimeInForce,
-            metadata: Option<M>,
+            metadata: M,
             order_book_type: OrderBookType
         }
     }
@@ -231,7 +231,7 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun destroy_order_match_details<M: store + copy + drop>(
         self: OrderMatchDetails<M>,
-    ): (OrderIdType, address, Option<u64>, UniqueIdxType, u64, u64, u64, bool, TimeInForce, Option<M>, OrderBookType) {
+    ): (OrderIdType, address, Option<u64>, UniqueIdxType, u64, u64, u64, bool, TimeInForce, M, OrderBookType) {
         let OrderMatchDetails::V1 {
             order_id,
             account,
@@ -245,7 +245,7 @@ module aptos_experimental::order_book_types {
             metadata,
             order_book_type
         } = self;
-        (order_id, account, client_order_id, unique_priority_idx, price, orig_size, remaining_size, is_bid, time_in_force,  metadata, order_book_type)
+        (order_id, account, client_order_id, unique_priority_idx, price, orig_size, remaining_size, is_bid, time_in_force, metadata, order_book_type)
     }
 
     public fun get_matched_size<M: store + copy + drop>(
@@ -302,7 +302,7 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun get_metadata_from_match_details<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
-    ): Option<M> {
+    ): M {
         self.metadata
     }
 
@@ -335,7 +335,7 @@ module aptos_experimental::order_book_types {
         remaining_size: u64,
         is_bid: bool,
         time_in_force: TimeInForce,
-        metadata: Option<M>,
+        metadata: M,
         order_book_type: OrderBookType
     ): OrderMatchDetails<M> {
         OrderMatchDetails::V1 {

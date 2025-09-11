@@ -396,18 +396,14 @@ module aptos_experimental::market {
         is_taker: bool,
         status: OrderStatus,
         details: &String,
-        metadata: Option<M>,
+        metadata: M,
         trigger_condition: Option<TriggerCondition>,
         time_in_force: TimeInForce,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
-            let metadata_bytes = if (metadata.is_some()) {
-                callbacks.get_order_metadata_bytes(metadata.destroy_some())
-            } else {
-                vector::empty()
-            };
+            let metadata_bytes = callbacks.get_order_metadata_bytes(metadata);
             event::emit(
                 OrderEvent {
                     parent: self.parent,
@@ -481,7 +477,7 @@ module aptos_experimental::market {
                 false,
                 market_types::order_status_open(),
                 &std::string::utf8(b""),
-                option::some(metadata),
+                metadata,
                 trigger_condition,
                 time_in_force,
                 callbacks
@@ -527,7 +523,7 @@ module aptos_experimental::market {
         order_id: OrderIdType,
         maker_cancellation_reason: String,
         unsettled_size: u64,
-        metadata: Option<M>,
+        metadata: M,
         time_in_force: TimeInForce,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
@@ -599,7 +595,7 @@ module aptos_experimental::market {
             is_taker,
             market_types::order_status_cancelled(),
             &cancel_details,
-            option::some(metadata),
+            metadata,
             option::none(), // trigger_condition
             time_in_force,
             callbacks
@@ -622,12 +618,12 @@ module aptos_experimental::market {
         book_type: OrderBookType,
         is_bid: bool,
         remaining_size: u64,
-        metadata: Option<M>,
+        metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         if (book_type == single_order_book_type()) {
             callbacks.cleanup_order(
-                user_addr, order_id, is_bid, remaining_size, metadata.destroy_some()
+                user_addr, order_id, is_bid, remaining_size, metadata
             );
         } else {
             callbacks.cleanup_bulk_orders(
@@ -678,7 +674,7 @@ module aptos_experimental::market {
             is_bid,
             maker_order.get_price_from_match_details(), // Order is always matched at the price of the maker
             maker_matched_size,
-            option::some(metadata),
+            metadata,
             // TODO(skedia) fix this to pass option to the callbacks
             maker_order.get_metadata_from_match_details()
         );
@@ -702,7 +698,7 @@ module aptos_experimental::market {
                 true,
                 market_types::order_status_filled(),
                 &std::string::utf8(b""),
-                option::some(metadata),
+                metadata,
                 option::none(), // trigger_condition
                 time_in_force,
                 callbacks
@@ -836,7 +832,7 @@ module aptos_experimental::market {
                 is_taker_order,
                 market_types::order_status_open(),
                 &std::string::utf8(b""),
-                option::some(metadata),
+                metadata,
                 trigger_condition,
                 time_in_force,
                 callbacks
@@ -989,7 +985,7 @@ module aptos_experimental::market {
             };
             if (remaining_size == 0) {
                 cleanup_order_internal(
-                    user_addr, order_id, single_order_book_type(), is_bid, 0, option::some(metadata), callbacks
+                    user_addr, order_id, single_order_book_type(), is_bid, 0, metadata, callbacks
                 );
                 break;
             };
@@ -1129,7 +1125,7 @@ module aptos_experimental::market {
             metadata
         ) = order.destroy_single_order();
         cleanup_order_internal(
-            account, order_id, single_order_book_type(), is_bid, remaining_size, option::some(metadata), callbacks
+            account, order_id, single_order_book_type(), is_bid, remaining_size, metadata, callbacks
         );
         self.emit_event_for_order(
             order_id,
@@ -1143,7 +1139,7 @@ module aptos_experimental::market {
             false,
             market_types::order_status_cancelled(),
             &std::string::utf8(b"Order cancelled"),
-            option::some(metadata),
+            metadata,
             option::none(), // trigger_condition
             time_in_force,
             callbacks
@@ -1193,7 +1189,7 @@ module aptos_experimental::market {
             false,
             market_types::order_status_size_reduced(),
             &std::string::utf8(b"Order size reduced"),
-            option::some(metadata),
+            metadata,
             option::none(), // trigger_condition
             time_in_force,
             callbacks
@@ -1207,6 +1203,7 @@ module aptos_experimental::market {
         bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>,
+        metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): Option<OrderIdType> {
         // TODO(skedia) Add support for events for bulk orders
@@ -1215,7 +1212,8 @@ module aptos_experimental::market {
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            metadata
         )) {
             // If the bulk order is not valid, we simply return without placing the order.
             return option::none();
@@ -1225,7 +1223,8 @@ module aptos_experimental::market {
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            metadata
         )))
     }
 
