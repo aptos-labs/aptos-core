@@ -468,7 +468,7 @@ types of pending orders are supported.
         is_bid,
         trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
         time_in_force,
-        metadata: metadata.destroy_some(),
+        metadata,
     }
 }
 </code></pre>
@@ -1004,7 +1004,7 @@ API to ensure that the order is a taker order before calling this API, otherwise
         metadata
     ) = order.destroy_single_order();
     <b>assert</b>!(is_active, <a href="single_order_book.md#0x7_single_order_book_EINVALID_INACTIVE_ORDER_STATE">EINVALID_INACTIVE_ORDER_STATE</a>);
-    new_order_match(new_order_match_details(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(metadata), single_order_book_type()), matched_size)
+    new_order_match(new_order_match_details(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, metadata, single_order_book_type()), matched_size)
 }
 </code></pre>
 
