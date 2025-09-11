@@ -24,7 +24,7 @@ use move_vm_types::{
         struct_name_indexing::StructNameIndex,
     },
 };
-use std::{str::FromStr, ops::Deref, sync::Arc};
+use std::{ops::Deref, str::FromStr, sync::Arc};
 
 lazy_static! {
     pub static ref LAYOUT_CACHE: DashMap<StructNameIndex, LayoutWithDelayedFields> = DashMap::new();

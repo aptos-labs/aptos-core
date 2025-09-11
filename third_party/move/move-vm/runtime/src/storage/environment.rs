@@ -5,6 +5,7 @@ use crate::{
     config::VMConfig,
     native_functions::{NativeFunction, NativeFunctions},
     storage::{
+        ty_layout_converter::LAYOUT_CACHE,
         ty_tag_converter::{TypeTagCache, TypeTagConverter},
         verified_module_cache::VERIFIED_MODULES_CACHE,
     },
@@ -32,7 +33,6 @@ use move_vm_types::loaded_data::{
 };
 use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap};
 use std::sync::Arc;
-use crate::storage::ty_layout_converter::LAYOUT_CACHE;
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
 /// the code cache, possibly across multiple threads.
