@@ -607,6 +607,8 @@ pub struct GlobalEnv {
     pub(crate) generated_by_v2: bool,
     /// A set of types that are instantiated in cmp module.
     pub cmp_types: RefCell<BTreeSet<Type>>,
+    /// An estimate of each target Move function's size.
+    pub function_size_estimate: RefCell<BTreeMap<QualifiedId<FunId>, FunctionSize>>,
 }
 
 /// A helper type for implementing fmt::Display depending on GlobalEnv
@@ -669,6 +671,7 @@ impl GlobalEnv {
             everything_is_target: Default::default(),
             generated_by_v2: false,
             cmp_types: RefCell::new(Default::default()),
+            function_size_estimate: RefCell::new(Default::default()),
         }
     }
 
@@ -2057,8 +2060,16 @@ impl GlobalEnv {
             .function_data
             .get_mut(&fun.id)
             .unwrap();
-        data.used_funs = Some(def.used_funs());
+        // Recompute called and used functions.
         data.called_funs = Some(def.called_funs());
+        data.used_funs = Some(def.used_funs());
+        // Reset various caches because the AST has changed.
+        *data.calling_funs.borrow_mut() = None;
+        *data.transitive_closure_of_called_funs.borrow_mut() = None;
+        *data.using_funs.borrow_mut() = None;
+        *data.transitive_closure_of_used_funs.borrow_mut() = None;
+        *data.used_functions_with_transitive_inline.borrow_mut() = None;
+        // Set the new function definition.
         data.def = Some(def);
     }
 
@@ -2660,6 +2671,42 @@ impl GlobalEnv {
             });
         }
     }
+
+    /// Update the friend declarations in all target modules, when the
+    /// callees have could have changed due to AST-level optimizations.
+    pub fn update_friend_decls_in_targets(&mut self) {
+        let mut friend_decls_to_add = BTreeMap::new();
+        for module in self.get_target_modules() {
+            let module_name = module.get_name();
+            let needed = module.need_to_be_friended_by();
+            for need_to_be_friended_by in needed {
+                let need_to_be_friend_with = self.get_module(need_to_be_friended_by);
+                let already_friended = need_to_be_friend_with
+                    .get_friend_decls()
+                    .iter()
+                    .any(|friend_decl| &friend_decl.module_name == module_name);
+                if !already_friended {
+                    let loc = need_to_be_friend_with.get_loc();
+                    let friend_decl = FriendDecl {
+                        loc,
+                        module_name: module_name.clone(),
+                        module_id: Some(module.get_id()),
+                    };
+                    friend_decls_to_add
+                        .entry(need_to_be_friended_by)
+                        .or_insert_with(Vec::new)
+                        .push(friend_decl);
+                }
+            }
+        }
+        for (module_id, friend_decls) in friend_decls_to_add {
+            let module_data = self.get_module_data_mut(module_id);
+            module_data
+                .friend_modules
+                .extend(friend_decls.iter().flat_map(|d| d.module_id));
+            module_data.friend_decls.extend(friend_decls);
+        }
+    }
 }
 
 impl Default for GlobalEnv {
@@ -2933,6 +2980,10 @@ impl GlobalEnv {
             format!(": {}", result_type.display(tctx))
         };
         format!("{}({}){}", type_params_str, params_str, result_str)
+    }
+
+    pub fn set_function_size_estimates(&self, sizes: BTreeMap<QualifiedId<FunId>, FunctionSize>) {
+        *self.function_size_estimate.borrow_mut() = sizes;
     }
 }
 
@@ -5513,5 +5564,22 @@ impl fmt::Display for EnvDisplay<'_, Parameter> {
             p.get_name().display(self.env.symbol_pool()),
             p.get_type().display(&self.env.get_type_display_ctx())
         )
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct FunctionSize {
+    /// Number of instructions in the function body
+    pub code_size: usize,
+    /// Number of local variables in the function
+    pub num_locals: usize,
+}
+
+impl FunctionSize {
+    pub fn new(code_size: usize, num_locals: usize) -> Self {
+        Self {
+            code_size,
+            num_locals,
+        }
     }
 }
