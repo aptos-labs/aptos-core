@@ -78,6 +78,19 @@ const TEST_CONFIGS: &[TestConfig] = &[
         exclude: COMMON_EXCLUSIONS,
         cross_compile: false,
     },
+    TestConfig {
+        name: "optimize-extra",
+        runner: |p| run(p, get_config_by_name("optimize-extra")),
+        experiments: &[
+            (Experiment::INLINING_OPTIMIZATION, true),
+            (Experiment::OPTIMIZE, true),
+            (Experiment::OPTIMIZE_EXTRA, true),
+        ],
+        language_version: LanguageVersion::latest(),
+        include: &[], // all tests except those excluded below
+        exclude: COMMON_EXCLUSIONS,
+        cross_compile: false,
+    },
     // Test `/operator_eval/` with language version 1 and 2
     TestConfig {
         name: "operator-eval-lang-1",
