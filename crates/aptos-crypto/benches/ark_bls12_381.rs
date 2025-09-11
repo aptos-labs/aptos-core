@@ -15,15 +15,14 @@ use aptos_crypto::test_utils::random_bytes;
 use ark_bls12_381::{Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ec::{
     hashing::HashToCurve, pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup,
+    PrimeGroup,
 };
-use ark_ff::{One, UniformRand, Zero};
-use ark_ff::AdditiveGroup;
+use ark_ff::{AdditiveGroup, One, UniformRand, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::test_rng;
 use criterion::{BenchmarkId, Criterion};
 use rand::thread_rng;
 use std::ops::{Add, Mul, Neg};
-use ark_ec::PrimeGroup;
 
 mod bench_utils;
 

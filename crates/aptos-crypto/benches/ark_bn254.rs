@@ -12,15 +12,13 @@ use crate::bench_utils::{
     bench_function_sub,
 };
 use ark_bn254::{Bn254, Fq, Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
-use ark_ec::{pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup};
-use ark_ff::{UniformRand, Zero};
+use ark_ec::{pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup, PrimeGroup};
+use ark_ff::{AdditiveGroup, UniformRand, Zero};
 use ark_groth16::Groth16;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::test_rng;
 use criterion::{Bencher, BenchmarkId, Criterion};
 use std::ops::{Mul, Neg};
-use ark_ff::AdditiveGroup;
-use ark_ec::PrimeGroup;
 
 mod bench_utils;
 
