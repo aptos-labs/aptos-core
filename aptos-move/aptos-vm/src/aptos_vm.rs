@@ -44,7 +44,6 @@ use aptos_gas_schedule::{
     AptosGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_metrics_core::IntCounterVecHelper;
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::state_store::StateViewId;
 use aptos_types::{
@@ -69,16 +68,16 @@ use aptos_types::{
         TimedFeatureFlag, TimedFeatures,
     },
     randomness::Randomness,
-    state_store::{StateView, TStateView},
+    state_store::{state_key::StateKey, StateView, TStateView},
     transaction::{
         authenticator::{AbstractAuthenticationData, AnySignature, AuthenticationProof},
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
         signature_verified_transaction::SignatureVerifiedTransaction,
-        AuxiliaryInfo, AuxiliaryInfoTrait, BlockOutput, EntryFunction, ExecutionError,
-        ExecutionStatus, ModuleBundle, MultisigTransactionPayload, ReplayProtector, Script,
-        SignedTransaction, Transaction, TransactionArgument, TransactionExecutableRef,
-        TransactionExtraConfig, TransactionOutput, TransactionPayload, TransactionStatus,
-        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
+        BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
+        MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
+        TransactionArgument, TransactionExecutableRef, TransactionExtraConfig, TransactionOutput,
+        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        WriteSetPayload,
     },
     vm::module_metadata::{
         get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
@@ -134,13 +133,13 @@ use move_core_types::{
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
-    check_dependencies_and_charge_gas, dispatch_loader,
+    check_dependencies_and_charge_gas, check_script_dependencies_and_check_gas,
+    check_type_tag_dependencies_and_charge_gas,
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
-    InstantiatedFunctionLoader, LegacyLoaderConfig, ModuleStorage, RuntimeEnvironment,
-    ScriptLoader, WithRuntimeEnvironment,
+    ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
-use move_vm_types::gas::{DependencyKind, GasMeter, UnmeteredGasMeter};
+use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
 use once_cell::sync::OnceCell;
 use std::{
@@ -176,44 +175,6 @@ macro_rules! unwrap_or_discard {
                 let o = discarded_output(s.status_code());
                 return (s, o);
             },
-        }
-    };
-}
-
-macro_rules! dispatch_transaction_arg_validation {
-    (
-        $session:ident,
-        $loader:expr,
-        $gas_meter:expr,
-        $traversal_context:expr,
-        $serialized_signers:ident,
-        $args:expr,
-        $function:expr,
-        $struct_constructors_enabled:expr,
-    ) => {
-        if move_vm_runtime::StructDefinitionLoader::is_lazy_loading_enabled($loader) {
-            transaction_arg_validation::validate_combine_signer_and_txn_args(
-                $session,
-                $loader,
-                $gas_meter,
-                $traversal_context,
-                $serialized_signers,
-                $args,
-                $function,
-                $struct_constructors_enabled,
-            )
-        } else {
-            let traversal_storage = TraversalStorage::new();
-            transaction_arg_validation::validate_combine_signer_and_txn_args(
-                $session,
-                $loader,
-                &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
-                $serialized_signers,
-                $args,
-                $function,
-                $struct_constructors_enabled,
-            )
         }
     };
 }
@@ -836,38 +797,45 @@ impl AptosVM {
             }
         }
 
-        dispatch_loader!(code_storage, loader, {
-            let legacy_loader_config = LegacyLoaderConfig {
-                charge_for_dependencies: self.gas_feature_version() >= RELEASE_V1_10,
-                charge_for_ty_tag_dependencies: self.gas_feature_version() >= RELEASE_V1_27,
-            };
-            let func = loader.load_script(
-                &legacy_loader_config,
+        // Note: Feature gating is needed here because the traversal of the dependencies could
+        //       result in shallow-loading of the modules and therefore subtle changes in
+        //       the error semantics.
+        if self.gas_feature_version() >= RELEASE_V1_10 {
+            check_script_dependencies_and_check_gas(
+                code_storage,
                 gas_meter,
                 traversal_context,
                 serialized_script.code(),
-                serialized_script.ty_args(),
             )?;
-
-            // Check that unstable bytecode cannot be executed on mainnet and verify events.
-            let script = func.owner_as_script()?;
-            self.reject_unstable_bytecode_for_script(script)?;
-            event_validation::verify_no_event_emission_in_compiled_script(script)?;
-
-            let args = dispatch_transaction_arg_validation!(
-                session,
-                &loader,
+        }
+        if self.gas_feature_version() >= RELEASE_V1_27 {
+            check_type_tag_dependencies_and_charge_gas(
+                code_storage,
                 gas_meter,
                 traversal_context,
-                serialized_signers,
-                convert_txn_args(serialized_script.args()),
-                &func,
-                self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+                serialized_script.ty_args(),
             )?;
+        }
 
-            session.execute_loaded_function(func, args, gas_meter, traversal_context, &loader)?;
-            Ok(())
-        })
+        let func =
+            code_storage.load_script(serialized_script.code(), serialized_script.ty_args())?;
+
+        // Check that unstable bytecode cannot be executed on mainnet and verify events.
+        let script = func.owner_as_script()?;
+        self.reject_unstable_bytecode_for_script(script)?;
+        event_validation::verify_no_event_emission_in_compiled_script(script)?;
+
+        let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
+            session,
+            code_storage,
+            serialized_signers,
+            convert_txn_args(serialized_script.args()),
+            &func,
+            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+        )?;
+
+        session.execute_loaded_function(func, args, gas_meter, traversal_context, code_storage)?;
+        Ok(())
     }
 
     fn validate_and_execute_entry_function(
@@ -879,66 +847,78 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         entry_fn: &EntryFunction,
     ) -> Result<(), VMStatus> {
-        dispatch_loader!(module_storage, loader, {
-            let legacy_loader_config = LegacyLoaderConfig {
-                charge_for_dependencies: self.gas_feature_version() >= RELEASE_V1_10,
-                charge_for_ty_tag_dependencies: self.gas_feature_version() >= RELEASE_V1_27,
-            };
-            let function = loader.load_instantiated_function(
-                &legacy_loader_config,
+        // Note: Feature gating is needed here because the traversal of the dependencies could
+        //       result in shallow-loading of the modules and therefore subtle changes in
+        //       the error semantics.
+        if self.gas_feature_version() >= RELEASE_V1_10 {
+            let module_id = traversal_context
+                .referenced_module_ids
+                .alloc(entry_fn.module().clone());
+            check_dependencies_and_charge_gas(module_storage, gas_meter, traversal_context, [(
+                module_id.address(),
+                module_id.name(),
+            )])?;
+        }
+
+        if self.gas_feature_version() >= RELEASE_V1_27 {
+            check_type_tag_dependencies_and_charge_gas(
+                module_storage,
                 gas_meter,
                 traversal_context,
-                entry_fn.module(),
-                entry_fn.function(),
                 entry_fn.ty_args(),
             )?;
+        }
 
-            // Native entry function is forbidden.
-            if function.is_native() {
-                return Err(
-                    PartialVMError::new(StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED)
-                        .with_message(
-                            "Executing user defined native entry function is not allowed"
-                                .to_string(),
-                        )
-                        .finish(Location::Module(entry_fn.module().clone()))
-                        .into_vm_status(),
-                );
+        let function = module_storage.load_function(
+            entry_fn.module(),
+            entry_fn.function(),
+            entry_fn.ty_args(),
+        )?;
+
+        // Native entry function is forbidden.
+        if function.is_native() {
+            return Err(
+                PartialVMError::new(StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED)
+                    .with_message(
+                        "Executing user defined native entry function is not allowed".to_string(),
+                    )
+                    .finish(Location::Module(entry_fn.module().clone()))
+                    .into_vm_status(),
+            );
+        }
+
+        // The check below should have been feature-gated in 1.11...
+        if function.is_friend_or_private() {
+            let maybe_randomness_annotation = get_randomness_annotation_for_entry_function(
+                entry_fn,
+                &function.owner_as_module()?.metadata,
+            );
+            if maybe_randomness_annotation.is_some() {
+                session.mark_unbiasable();
             }
+        }
 
-            // The check below should have been feature-gated in 1.11...
-            if function.is_friend_or_private() {
-                let maybe_randomness_annotation = get_randomness_annotation_for_entry_function(
-                    entry_fn,
-                    &function.owner_as_module()?.metadata,
-                );
-                if maybe_randomness_annotation.is_some() {
-                    session.mark_unbiasable();
-                }
-            }
+        let struct_constructors_enabled =
+            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
+        let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
+            session,
+            module_storage,
+            serialized_signers,
+            entry_fn.args().to_vec(),
+            &function,
+            struct_constructors_enabled,
+        )?;
 
-            let args = dispatch_transaction_arg_validation!(
-                session,
-                &loader,
-                gas_meter,
-                traversal_context,
-                serialized_signers,
-                entry_fn.args().to_vec(),
-                &function,
-                self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
-            )?;
-
-            // Execute the function. The function also must be an entry function!
-            function.is_entry_or_err()?;
-            session.execute_loaded_function(
-                function,
-                args,
-                gas_meter,
-                traversal_context,
-                &loader,
-            )?;
-            Ok(())
-        })
+        // Execute the function. The function also must be an entry function!
+        function.is_entry_or_err()?;
+        session.execute_loaded_function(
+            function,
+            args,
+            gas_meter,
+            traversal_context,
+            module_storage,
+        )?;
+        Ok(())
     }
 
     fn execute_script_or_entry_function<'a, 'r>(
@@ -1405,9 +1385,9 @@ impl AptosVM {
         let modules: &Vec<CompiledModule> =
             traversal_context.referenced_module_bundles.alloc(modules);
 
-        // Whether loading modules lazily, or as a full transitive closure, we always need to meter
-        // 1) old versions of modules because they are used for compatibility checks, and 2) new
-        // modules.
+        // Note: Feature gating is needed here because the traversal of the dependencies could
+        //       result in shallow-loading of the modules and therefore subtle changes in
+        //       the error semantics.
         if self.gas_feature_version() >= RELEASE_V1_10 {
             // Charge old versions of existing modules, in case of upgrades.
             for module in modules.iter() {
@@ -1423,12 +1403,7 @@ impl AptosVM {
                     .map(|v| v as u64);
                 if let Some(old_size) = size_if_old_module_exists {
                     gas_meter
-                        .charge_dependency(
-                            DependencyKind::Existing,
-                            addr,
-                            name,
-                            NumBytes::new(old_size),
-                        )
+                        .charge_dependency(false, addr, name, NumBytes::new(old_size))
                         .map_err(|err| {
                             err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
                         })?;
@@ -1437,31 +1412,41 @@ impl AptosVM {
 
             // Charge all modules in the bundle that is about to be published.
             for (module, blob) in modules.iter().zip(bundle.iter()) {
-                let addr = module.self_addr();
-                let name = module.self_name();
+                let module_id = &module.self_id();
                 gas_meter
                     .charge_dependency(
-                        DependencyKind::New,
-                        addr,
-                        name,
+                        true,
+                        module_id.address(),
+                        module_id.name(),
                         NumBytes::new(blob.code().len() as u64),
                     )
                     .map_err(|err| err.finish(Location::Undefined))?;
-
-                // In case of lazy loading: add all modules in a bundle as visited to avoid double
-                // charging during module initialization.
-                if self.features().is_lazy_loading_enabled() {
-                    traversal_context.visit_if_not_special_address(addr, name);
-                }
             }
 
-            // Charge all immediate dependencies of a published package.
-            self.charge_package_dependencies(
+            // Charge all dependencies.
+            //
+            // Must exclude the ones that are in the current bundle because they have not
+            // been published yet.
+            let module_ids_in_bundle = modules
+                .iter()
+                .map(|module| (module.self_addr(), module.self_name()))
+                .collect::<BTreeSet<_>>();
+
+            check_dependencies_and_charge_gas(
                 module_storage,
                 gas_meter,
                 traversal_context,
-                modules,
+                modules
+                    .iter()
+                    .flat_map(|module| {
+                        module
+                            .immediate_dependencies_iter()
+                            .chain(module.immediate_friends_iter())
+                    })
+                    .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
             )?;
+
+            // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
         }
 
         for (module, blob) in modules.iter().zip(bundle.iter()) {
@@ -1509,91 +1494,11 @@ impl AptosVM {
         )
     }
 
-    fn charge_package_dependencies<'a>(
-        &self,
-        module_storage: &impl AptosModuleStorage,
-        gas_meter: &mut impl AptosGasMeter,
-        traversal_context: &mut TraversalContext<'a>,
-        modules: &'a [CompiledModule],
-    ) -> Result<(), VMStatus> {
-        // Compute all IDs used in the bundle. Later, exclude these from the set of immediate
-        // dependencies and friends of the bundle for charging / checks.
-        let module_ids_in_bundle = modules
-            .iter()
-            .map(|module| (module.self_addr(), module.self_name()))
-            .collect::<BTreeSet<_>>();
-
-        // Not lazy loading: traverse all transitive dependencies and charge gas. This will
-        // recursively traverse all dependencies of the immediate dependencies and friends of the
-        // published bundle.
-        if !self.features().is_lazy_loading_enabled() {
-            check_dependencies_and_charge_gas(
-                module_storage,
-                gas_meter,
-                traversal_context,
-                modules
-                    .iter()
-                    .flat_map(|module| {
-                        module
-                            .immediate_dependencies_iter()
-                            .chain(module.immediate_friends_iter())
-                    })
-                    .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
-            )?;
-            return Ok(());
-        }
-
-        // Lazy loading otherwise.
-
-        // With lazy loading, we will check only immediate dependencies for linking checks,
-        // not the whole dependencies closure, so charge gas here for them.
-        for (dep_addr, dep_name) in modules
-            .iter()
-            .flat_map(|module| module.immediate_dependencies_iter())
-            .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name))
-        {
-            if traversal_context.visit_if_not_special_address(dep_addr, dep_name) {
-                let size = module_storage
-                    .unmetered_get_existing_module_size(dep_addr, dep_name)
-                    .map(|v| v as u64)?;
-                gas_meter
-                    .charge_dependency(
-                        DependencyKind::Existing,
-                        dep_addr,
-                        dep_name,
-                        NumBytes::new(size),
-                    )
-                    .map_err(|err| err.finish(Location::Undefined))?;
-            }
-        }
-
-        // Also, we need to make sure friends, when published, are limited to the same
-        // package (bundle).
-        for (friend_addr, friend_name) in modules
-            .iter()
-            .flat_map(|module| module.immediate_friends_iter())
-        {
-            if !module_ids_in_bundle.contains(&(friend_addr, friend_name)) {
-                let msg = format!(
-                    "Module {}::{} is declared as a friend and should be part of the \
-                             module bundle, but it is not",
-                    friend_addr, friend_name
-                );
-                let err = PartialVMError::new(StatusCode::FRIEND_NOT_FOUND_IN_MODULE_BUNDLE)
-                    .with_message(msg)
-                    .finish(Location::Undefined)
-                    .into_vm_status();
-                return Err(err);
-            }
-        }
-        Ok(())
-    }
-
     /// Validate a publish request.
     fn validate_publish_request(
         &self,
         module_storage: &impl AptosModuleStorage,
-        traversal_context: &mut TraversalContext,
+        traversal_context: &TraversalContext,
         gas_meter: &mut impl GasMeter,
         modules: &[CompiledModule],
         mut expected_modules: BTreeSet<String>,
@@ -1638,6 +1543,7 @@ impl AptosVM {
         )?;
         event_validation::validate_module_events(
             self.features(),
+            self.gas_feature_version(),
             module_storage,
             traversal_context,
             modules,
@@ -1725,6 +1631,18 @@ impl AptosVM {
         // Account Abstraction dispatchable authentication.
         let senders = transaction_data.senders();
         let proofs = transaction_data.authentication_proofs();
+
+        // Validate that the number of senders matches the number of authentication proofs
+        if senders.len() != proofs.len() {
+            return Err(VMStatus::error(
+                StatusCode::INVALID_NUMBER_OF_AUTHENTICATION_PROOFS,
+                Some(format!(
+                    "Mismatch between senders count ({}) and authentication proofs count ({})",
+                    senders.len(),
+                    proofs.len()
+                )),
+            ));
+        }
 
         // Add fee payer.
         let fee_payer_signer = if let Some(fee_payer) = transaction_data.fee_payer {
@@ -2025,14 +1943,13 @@ impl AptosVM {
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
         make_gas_meter: F,
-        auxiliary_info: &AuxiliaryInfo,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
         C: AptosCodeStorage + BlockSynchronizationKillSwitch,
         G: AptosGasMeter,
         F: FnOnce(u64, VMGasParameters, StorageGasParameters, bool, Gas, &'a C) -> G,
     {
-        let txn_metadata = TransactionMetadata::new(txn, auxiliary_info);
+        let txn_metadata = TransactionMetadata::new(txn);
 
         let is_approved_gov_script = is_approved_gov_script(resolver, txn, &txn_metadata);
 
@@ -2080,7 +1997,6 @@ impl AptosVM {
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
         modify_gas_meter: F,
-        auxiliary_info: &AuxiliaryInfo,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
         F: FnOnce(ProdGasMeter<'a, NoopBlockSynchronizationKillSwitch>) -> G,
@@ -2106,7 +2022,6 @@ impl AptosVM {
                     &NoopBlockSynchronizationKillSwitch {},
                 ))
             },
-            auxiliary_info,
         )
     }
 
@@ -2117,7 +2032,6 @@ impl AptosVM {
         code_storage: &(impl AptosCodeStorage + BlockSynchronizationKillSwitch),
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
-        auxiliary_info: &AuxiliaryInfo,
     ) -> (VMStatus, VMOutput) {
         match self.execute_user_transaction_with_custom_gas_meter(
             resolver,
@@ -2125,7 +2039,6 @@ impl AptosVM {
             txn,
             log_context,
             make_prod_gas_meter,
-            auxiliary_info,
         ) {
             Ok((vm_status, vm_output, _gas_meter)) => (vm_status, vm_output),
             Err(vm_status) => {
@@ -2615,45 +2528,33 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         module_storage: &impl AptosModuleStorage,
     ) -> Result<Vec<Vec<u8>>, VMError> {
-        dispatch_loader!(module_storage, loader, {
-            let func = loader.load_instantiated_function(
-                &LegacyLoaderConfig::unmetered(),
-                gas_meter,
-                traversal_context,
-                &module_id,
-                &func_name,
-                &ty_args,
-            )?;
+        let func = module_storage.load_function(&module_id, &func_name, &ty_args)?;
+        let metadata = get_metadata(&func.owner_as_module()?.metadata);
 
-            let metadata = get_metadata(&func.owner_as_module()?.metadata);
+        let arguments = view_function::validate_view_function(
+            session,
+            module_storage,
+            arguments,
+            func_name.as_ident_str(),
+            &func,
+            metadata.as_ref().map(Arc::as_ref),
+            vm.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+        )
+        .map_err(|e| e.finish(Location::Module(module_id)))?;
 
-            let arguments = view_function::validate_view_function(
-                session,
-                &loader,
-                gas_meter,
-                traversal_context,
-                arguments,
-                func_name.as_ident_str(),
-                &func,
-                metadata.as_ref().map(Arc::as_ref),
-                vm.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
-            )
-            .map_err(|e| e.finish(Location::Module(module_id)))?;
+        let result = session.execute_loaded_function(
+            func,
+            arguments,
+            gas_meter,
+            traversal_context,
+            module_storage,
+        )?;
 
-            let result = session.execute_loaded_function(
-                func,
-                arguments,
-                gas_meter,
-                traversal_context,
-                &loader,
-            )?;
-
-            Ok(result
-                .return_values
-                .into_iter()
-                .map(|(bytes, _ty)| bytes)
-                .collect::<Vec<_>>())
-        })
+        Ok(result
+            .return_values
+            .into_iter()
+            .map(|(bytes, _ty)| bytes)
+            .collect::<Vec<_>>())
     }
 
     fn run_prologue_with_payload(
@@ -2740,7 +2641,6 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         code_storage: &(impl AptosCodeStorage + BlockSynchronizationKillSwitch),
         log_context: &AdapterLogSchema,
-        auxiliary_info: &AuxiliaryInfo,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         assert!(!self.is_simulation, "VM has to be created for execution");
 
@@ -2783,13 +2683,8 @@ impl AptosVM {
             Transaction::UserTransaction(txn) => {
                 fail_point!("aptos_vm::execution::user_transaction");
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
-                let (vm_status, output) = self.execute_user_transaction(
-                    resolver,
-                    code_storage,
-                    txn,
-                    log_context,
-                    auxiliary_info,
-                );
+                let (vm_status, output) =
+                    self.execute_user_transaction(resolver, code_storage, txn, log_context);
 
                 if let StatusType::InvariantViolation = vm_status.status_type() {
                     match vm_status.status_code() {
@@ -2856,7 +2751,7 @@ impl AptosVM {
                     TransactionStatus::Retry => None,
                 };
                 if let Some(label) = counter_label {
-                    USER_TRANSACTIONS_EXECUTED.inc_with(&[label]);
+                    USER_TRANSACTIONS_EXECUTED.with_label_values(&[label]).inc();
                 }
                 (vm_status, output)
             },
@@ -2903,11 +2798,11 @@ impl AptosVMBlockExecutor {
     /// one of them.
     pub fn execute_block_with_config(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
         fail_point!("aptos_vm_block_executor::execute_block_with_config", |_| {
             Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -2925,7 +2820,7 @@ impl AptosVMBlockExecutor {
         let result = AptosVMBlockExecutorWrapper::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-            DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
+            DefaultTxnProvider<SignatureVerifiedTransaction>,
         >(
             txn_provider,
             state_view,
@@ -2951,11 +2846,11 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
 
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
                 blockstm_v2: false,
@@ -3063,8 +2958,7 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
         };
-        let auxiliary_info = AuxiliaryInfo::new_empty();
-        let txn_data = TransactionMetadata::new(&txn, &auxiliary_info);
+        let txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
@@ -3127,7 +3021,9 @@ impl VMValidator for AptosVM {
             ),
         };
 
-        TRANSACTIONS_VALIDATED.inc_with(&[counter_label]);
+        TRANSACTIONS_VALIDATED
+            .with_label_values(&[counter_label])
+            .inc();
 
         result
     }
@@ -3158,13 +3054,8 @@ impl AptosSimulationVM {
         let resolver = state_view.as_move_resolver();
         let code_storage = state_view.as_aptos_code_storage(&env);
 
-        let (vm_status, vm_output) = vm.execute_user_transaction(
-            &resolver,
-            &code_storage,
-            transaction,
-            &log_context,
-            &AuxiliaryInfo::new_empty(),
-        );
+        let (vm_status, vm_output) =
+            vm.execute_user_transaction(&resolver, &code_storage, transaction, &log_context);
         let txn_output = vm_output
             .try_materialize_into_transaction_output(&resolver)
             .expect("Materializing aggregator V1 deltas should never fail");
