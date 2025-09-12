@@ -693,6 +693,14 @@ pub static HOT_STATE_PLACE_HOLDER_HASH: Lazy<HashValue> =
 pub static PRE_GENESIS_BLOCK_ID: Lazy<HashValue> =
     Lazy::new(|| create_literal_hash("PRE_GENESIS_BLOCK_ID"));
 
+/// Used in `executed_state_id` of QC to represent the block has no earth QC.
+pub static MOON_BLOCK_NO_EARTH_QC_HASH: Lazy<HashValue> =
+    Lazy::new(|| create_literal_hash("MOON_BLOCK_NO_EARTH_QC_HASH"));
+
+/// Used in `executed_state_id` of QC to represent the block has earth QC.
+pub static MOON_BLOCK_HAS_EARTH_QC_HASH: Lazy<HashValue> =
+    Lazy::new(|| create_literal_hash("MOON_BLOCK_HAS_EARTH_QC_HASH"));
+
 /// Genesis block id is used as a parent of the very first block executed by the executor.
 pub static GENESIS_BLOCK_ID: Lazy<HashValue> = Lazy::new(|| {
     // This maintains the invariant that block.id() == block.hash(), for

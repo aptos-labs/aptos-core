@@ -6,11 +6,16 @@ use crate::{
     block_data::{BlockData, BlockType},
     common::{Author, Payload, Round},
     opt_block_data::OptBlockData,
+    proposal_ext::{PrimaryBlock, ProxyBlock},
     quorum_cert::QuorumCert,
 };
 use anyhow::{bail, ensure, format_err, Result};
 use aptos_bitvec::BitVec;
-use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
+use aptos_crypto::{
+    bls12381,
+    hash::{CryptoHash, MOON_BLOCK_HAS_EARTH_QC_HASH, MOON_BLOCK_NO_EARTH_QC_HASH},
+    HashValue,
+};
 use aptos_infallible::duration_since_epoch;
 use aptos_types::{
     account_address::AccountAddress,
@@ -107,6 +112,10 @@ impl Block {
         self.block_data.payload()
     }
 
+    pub fn take_payload(self) -> Option<Payload> {
+        self.block_data.take_payload()
+    }
+
     pub fn payload_size(&self) -> usize {
         match self.block_data.payload() {
             None => 0,
@@ -118,8 +127,11 @@ impl Block {
                 | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                     inline_batches.len() + proof_with_data.proofs.len()
                 },
-                Payload::OptQuorumStore(opt_quorum_store_payload) => {
-                    opt_quorum_store_payload.num_txns()
+                Payload::OptQuorumStore(_) | Payload::ProxyBlock(_) | Payload::PrimaryBlock(_) => {
+                    payload
+                        .as_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload")
+                        .num_txns()
                 },
             },
         }
@@ -143,11 +155,16 @@ impl Block {
                     proof_with_data.num_txns(),
                     proof_with_data.num_bytes(),
                 ),
-                Payload::OptQuorumStore(opt_quorum_store_payload) => (
-                    opt_quorum_store_payload.proof_with_data().num_proofs(),
-                    opt_quorum_store_payload.proof_with_data().num_txns(),
-                    opt_quorum_store_payload.proof_with_data().num_bytes(),
-                ),
+                Payload::OptQuorumStore(_) | Payload::ProxyBlock(_) | Payload::PrimaryBlock(_) => {
+                    let opt_qs_payload = payload
+                        .as_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload");
+                    (
+                        opt_qs_payload.proof_with_data().num_proofs(),
+                        opt_qs_payload.proof_with_data().num_txns(),
+                        opt_qs_payload.proof_with_data().num_bytes(),
+                    )
+                },
             },
         }
     }
@@ -169,11 +186,16 @@ impl Block {
                         .map(|(b, _)| b.num_bytes() as usize)
                         .sum(),
                 ),
-                Payload::OptQuorumStore(opt_quorum_store_payload) => (
-                    opt_quorum_store_payload.inline_batches().num_batches(),
-                    opt_quorum_store_payload.inline_batches().num_txns(),
-                    opt_quorum_store_payload.inline_batches().num_bytes(),
-                ),
+                Payload::OptQuorumStore(_) | Payload::ProxyBlock(_) | Payload::PrimaryBlock(_) => {
+                    let opt_qs_payload = payload
+                        .as_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload");
+                    (
+                        opt_qs_payload.inline_batches().num_batches(),
+                        opt_qs_payload.inline_batches().num_txns(),
+                        opt_qs_payload.inline_batches().num_bytes(),
+                    )
+                },
                 _ => (0, 0, 0),
             },
         }
@@ -184,19 +206,24 @@ impl Block {
         match self.block_data.payload() {
             None => (0, 0, 0),
             Some(payload) => match payload {
-                Payload::OptQuorumStore(opt_quorum_store_payload) => (
-                    opt_quorum_store_payload.opt_batches().len(),
-                    opt_quorum_store_payload
-                        .opt_batches()
-                        .iter()
-                        .map(|b| b.num_txns() as usize)
-                        .sum(),
-                    opt_quorum_store_payload
-                        .opt_batches()
-                        .iter()
-                        .map(|b| b.num_bytes() as usize)
-                        .sum(),
-                ),
+                Payload::OptQuorumStore(_) | Payload::ProxyBlock(_) | Payload::PrimaryBlock(_) => {
+                    let opt_qs_payload = payload
+                        .as_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload");
+                    (
+                        opt_qs_payload.opt_batches().len(),
+                        opt_qs_payload
+                            .opt_batches()
+                            .iter()
+                            .map(|b| b.num_txns() as usize)
+                            .sum(),
+                        opt_qs_payload
+                            .opt_batches()
+                            .iter()
+                            .map(|b| b.num_bytes() as usize)
+                            .sum(),
+                    )
+                },
                 _ => (0, 0, 0),
             },
         }
@@ -249,6 +276,22 @@ impl Block {
 
     pub fn is_opt_block(&self) -> bool {
         self.block_data.is_opt_block()
+    }
+
+    pub fn proxy_block(&self) -> Option<&ProxyBlock> {
+        self.payload().and_then(|p| p.proxy_block())
+    }
+
+    pub fn take_proxy_block(self) -> Option<ProxyBlock> {
+        self.take_payload().and_then(|p| p.take_proxy_block())
+    }
+
+    pub fn primary_block(&self) -> Option<&PrimaryBlock> {
+        self.payload().and_then(|p| p.primary_block())
+    }
+
+    pub fn primary_qc(&self) -> Option<&QuorumCert> {
+        self.payload().and_then(|p| p.primary_qc())
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -447,6 +490,27 @@ impl Block {
         }
     }
 
+    pub fn validate_signature_proxy_block(
+        &self,
+        primary_validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        self.proxy_block().map_or(Ok(()), |proxy_block| {
+            proxy_block.metadata().verify(primary_validator)
+        })
+    }
+
+    pub fn validate_signature_primary_block(
+        &self,
+        proxy_validator: &ValidatorVerifier,
+        primary_validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        self.primary_block().map_or(Ok(()), |primary_block| {
+            primary_block
+                .metadata()
+                .verify(proxy_validator, primary_validator)
+        })
+    }
+
     /// Makes sure that the proposal makes sense, independently of the current state.
     /// If this is the genesis block, we skip these checks.
     #[allow(unexpected_cfgs)]
@@ -531,6 +595,63 @@ impl Block {
             self.block_data.hash(),
             "Block id mismatch the hash"
         );
+        self.verify_well_formed_proxy_block()?;
+        self.verify_well_formed_primary_block()?;
+        Ok(())
+    }
+
+    pub fn verify_well_formed_proxy_block(&self) -> anyhow::Result<()> {
+        if let Some(payload) = self.payload() {
+            if let Payload::ProxyBlock(proxy_block) = payload {
+                let parent = self.quorum_cert().certified_block();
+                let parent_has_primary_qc =
+                    parent.executed_state_id() == *MOON_BLOCK_HAS_EARTH_QC_HASH;
+                let parent_no_primary_qc = parent.executed_state_id() == *MOON_BLOCK_NO_EARTH_QC_HASH;
+                ensure!(
+                    parent_has_primary_qc || parent_no_primary_qc,
+                    "Parent proxy block must have primary QC or no primary QC"
+                );
+                // verify primary round
+                if parent_has_primary_qc {
+                    ensure!(
+                        proxy_block.metadata().primary_round == parent.round() + 1,
+                        "Invalid primary round"
+                    );
+                } else {
+                    ensure!(
+                        proxy_block.metadata().primary_round == parent.round(),
+                        "Invalid primary round"
+                    );
+                }
+                // verify primary QC round
+                if let Some(primary_qc) = proxy_block.metadata().primary_qc() {
+                    if self.is_opt_block() {
+                        // grandparent primary QC is of primary_round - 2
+                        ensure!(
+                            primary_qc.certified_block().round() + 2
+                                == proxy_block.metadata().primary_round,
+                            "Invalid primary QC round"
+                        );
+                    } else {
+                        // parent primary QC is of primary_round - 1
+                        ensure!(
+                            primary_qc.certified_block().round() + 1
+                                == proxy_block.metadata().primary_round,
+                            "Invalid primary QC round"
+                        );
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn verify_well_formed_primary_block(&self) -> anyhow::Result<()> {
+        if let Some(payload) = self.payload() {
+            if let Payload::PrimaryBlock(primary_block) = payload {
+                primary_block.metadata().verify_well_formed()?;
+            }
+        }
         Ok(())
     }
 
