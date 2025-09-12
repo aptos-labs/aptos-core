@@ -34,6 +34,7 @@ pub struct VMConfig {
     pub use_call_tree_and_instruction_cache: bool,
     pub enable_lazy_loading: bool,
     pub enable_depth_checks: bool,
+    pub enable_capture_option: bool,
 }
 
 impl Default for VMConfig {
@@ -54,6 +55,7 @@ impl Default for VMConfig {
             use_call_tree_and_instruction_cache: true,
             enable_lazy_loading: true,
             enable_depth_checks: true,
+            enable_capture_option: false,
         }
     }
 }
