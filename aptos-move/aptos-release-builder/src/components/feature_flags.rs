@@ -149,6 +149,8 @@ pub enum FeatureFlag {
     EnableLazyLoading,
     CalculateTransactionFeeForDistribution,
     DistributeTransactionFee,
+    MonotonicallyIncreasingCounter,
+    EnableCaptureOption,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -395,6 +397,10 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION
             },
             FeatureFlag::DistributeTransactionFee => AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
+            FeatureFlag::MonotonicallyIncreasingCounter => {
+                AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER
+            },
+            FeatureFlag::EnableCaptureOption => AptosFeatureFlag::ENABLE_CAPTURE_OPTION,
         }
     }
 }
@@ -568,6 +574,10 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::CalculateTransactionFeeForDistribution
             },
             AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE => FeatureFlag::DistributeTransactionFee,
+            AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER => {
+                FeatureFlag::MonotonicallyIncreasingCounter
+            },
+            AptosFeatureFlag::ENABLE_CAPTURE_OPTION => FeatureFlag::EnableCaptureOption,
         }
     }
 }

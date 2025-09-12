@@ -143,6 +143,8 @@ pub enum FeatureFlag {
 
     CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
     DISTRIBUTE_TRANSACTION_FEE = 97,
+    MONOTONICALLY_INCREASING_COUNTER = 98,
+    ENABLE_CAPTURE_OPTION = 99,
 }
 
 impl FeatureFlag {
@@ -242,6 +244,8 @@ impl FeatureFlag {
             FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION,
             FeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
             FeatureFlag::ENABLE_LAZY_LOADING,
+            FeatureFlag::MONOTONICALLY_INCREASING_COUNTER,
+            FeatureFlag::ENABLE_CAPTURE_OPTION,
         ]
     }
 }

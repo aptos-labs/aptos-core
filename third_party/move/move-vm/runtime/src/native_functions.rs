@@ -360,6 +360,7 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
                 &mut self.gas_meter,
                 self.traversal_context,
                 ty,
+                false,
             )
         })
     }
