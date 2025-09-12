@@ -20,12 +20,13 @@ use aptos_types::{
     state_store::{
         hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
         state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewId,
-        StateViewResult, TStateView, NUM_STATE_SHARDS,
+        StateViewRead, StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
 use core::fmt;
 use dashmap::{mapref::entry::Entry, DashMap};
+use move_vm_types::{value_serde::ValueSerDeContext, values::GlobalValue};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use rayon::prelude::*;
@@ -35,7 +36,7 @@ use std::{
     sync::Arc,
 };
 
-pub type StateCacheShard = DashMap<StateKey, StateSlot>;
+pub type StateCacheShard = DashMap<StateKey, StateViewRead<StateSlot>>;
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -63,7 +64,7 @@ impl ShardedStateCache {
         &self.shards[shard_id]
     }
 
-    pub fn get_cloned(&self, state_key: &StateKey) -> Option<StateSlot> {
+    pub fn get_cloned(&self, state_key: &StateKey) -> Option<StateViewRead<StateSlot>> {
         self.shard(state_key.get_shard_id())
             .get(state_key)
             .map(|r| r.clone())
@@ -73,7 +74,7 @@ impl ShardedStateCache {
         self.next_version
     }
 
-    pub fn try_insert(&self, state_key: &StateKey, slot: &StateSlot) {
+    pub fn try_insert(&self, state_key: &StateKey, slot: &StateViewRead<StateSlot>) {
         let shard_id = state_key.get_shard_id();
 
         match self.shard(shard_id).entry(state_key.clone()) {
@@ -258,20 +259,32 @@ impl TStateView for CachedStateView {
         self.id
     }
 
-    fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateSlot> {
+    fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateViewRead<StateSlot>> {
         let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
         COUNTER.inc_with(&["sv_total_get"]);
 
         // First check if requested key is already memorized.
-        if let Some(slot) = self.memorized.get_cloned(state_key) {
+        if let Some(read) = self.memorized.get_cloned(state_key) {
             COUNTER.inc_with(&["sv_memorized"]);
-            return Ok(slot);
+            return Ok(read);
         }
 
         // TODO(aldenhu): reduce duplicated gets
         let slot = self.get_unmemorized(state_key)?;
-        self.memorized.try_insert(state_key, &slot);
-        Ok(slot)
+        let read = StateViewRead::new(slot);
+        self.memorized.try_insert(state_key, &read);
+        Ok(read)
+    }
+
+    fn store_state_slot_unmemorized(&self, state_key: &Self::Key, gv: &GlobalValue) {
+        let shard_id = state_key.get_shard_id();
+
+        match self.memorized.shard(shard_id).entry(state_key.clone()) {
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().set_gv(gv);
+            },
+            Entry::Vacant(_) => (),
+        };
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {

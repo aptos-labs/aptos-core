@@ -2,8 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
-
 /// Returns the hash (SHA-3-256) of the bytes.
 pub fn sha3_256(bytes: &[u8]) -> [u8; 32] {
     use sha3::{Digest, Sha3_256};

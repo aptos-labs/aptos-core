@@ -28,10 +28,8 @@ use move_vm_types::{
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{GlobalValue, Value},
 };
-use std::{
-    collections::btree_map::{BTreeMap, Entry},
-    sync::Arc,
-};
+use std::{collections::btree_map::{BTreeMap, Entry}, mem, sync::Arc};
+use move_vm_types::resolver::ValueOrBytes;
 
 /// An entry in the data cache, containing resource's [GlobalValue] as well as additional cached
 /// information such as tag, layout, and a flag whether there are any delayed fields inside the
@@ -41,6 +39,7 @@ pub(crate) struct DataCacheEntry {
     layout: Arc<MoveTypeLayout>,
     contains_delayed_fields: bool,
     value: GlobalValue,
+    owned: bool,
 }
 
 impl DataCacheEntry {
@@ -111,6 +110,7 @@ impl TransactionDataCache {
                     layout,
                     contains_delayed_fields,
                     value,
+                    owned: _,
                 } = entry;
                 if let Some(op) = value.into_effect_with_layout(layout) {
                     resources.insert(
@@ -143,6 +143,7 @@ impl TransactionDataCache {
         resource_resolver: &dyn ResourceResolver,
         addr: &AccountAddress,
         ty: &Type,
+        is_mut: bool,
     ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
         let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
             TypeTag::Struct(struct_tag) => *struct_tag,
@@ -158,6 +159,7 @@ impl TransactionDataCache {
             ty,
         )?;
 
+        let (layout, contains_delayed_fields) = layout_with_delayed_fields.unpack();
         let (data, bytes_loaded) = {
             let metadata = metadata_loader.load_module_metadata(
                 gas_meter,
@@ -167,36 +169,44 @@ impl TransactionDataCache {
 
             // If we need to process delayed fields, we pass type layout to remote storage. Remote
             // storage, in turn ensures that all delayed field values are pre-processed.
-            resource_resolver.get_resource_bytes_with_metadata_and_layout(
+            resource_resolver.get_gv_with_metadata_and_layout(
                 addr,
                 &struct_tag,
                 &metadata,
-                layout_with_delayed_fields.layout_when_contains_delayed_fields(),
+                &layout,
+                contains_delayed_fields,
             )?
         };
 
-        let function_value_extension = FunctionValueExtensionAdapter { module_storage };
-        let (layout, contains_delayed_fields) = layout_with_delayed_fields.unpack();
-        let value = match data {
-            Some(blob) => {
-                let max_value_nest_depth = function_value_extension.max_value_nest_depth();
-                let val = ValueSerDeContext::new(max_value_nest_depth)
-                    .with_func_args_deserialization(&function_value_extension)
-                    .with_delayed_fields_serde()
-                    .deserialize(&blob, &layout)
-                    .ok_or_else(|| {
-                        let msg = format!(
-                            "Failed to deserialize resource {} at {} for layout {:?}!",
-                            struct_tag.to_canonical_string(),
-                            addr,
-                            layout.as_ref(),
-                        );
-                        PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
-                            .with_message(msg)
-                    })?;
-                GlobalValue::cached(val)?
+        let (value, owned) = match data {
+            ValueOrBytes::Value(gv) => {
+                if is_mut { (gv.deep_copy()?, true) } else { (gv, false) }
             },
-            None => GlobalValue::none(),
+            ValueOrBytes::Bytes(data) => {
+                let gv  = match data {
+                    Some(blob) => {
+                        let function_value_extension = FunctionValueExtensionAdapter { module_storage };
+                        let max_value_nest_depth = function_value_extension.max_value_nest_depth();
+                        let val = ValueSerDeContext::new(max_value_nest_depth)
+                            .with_func_args_deserialization(&function_value_extension)
+                            .with_delayed_fields_serde()
+                            .deserialize(&blob, &layout)
+                            .ok_or_else(|| {
+                                let msg = format!(
+                                    "Failed to deserialize resource {} at {} for layout {:?}!",
+                                    struct_tag.to_canonical_string(),
+                                    addr,
+                                    layout.as_ref(),
+                                );
+                                PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
+                                    .with_message(msg)
+                            })?;
+                        GlobalValue::cached(val)?
+                    },
+                    None => GlobalValue::none(),
+                };
+                (gv, true)
+            }
         };
 
         let entry = DataCacheEntry {
@@ -204,6 +214,7 @@ impl TransactionDataCache {
             layout,
             contains_delayed_fields,
             value,
+            owned,
         };
         Ok((entry, NumBytes::new(bytes_loaded as u64)))
     }
@@ -246,6 +257,28 @@ impl TransactionDataCache {
         if let Some(account_cache) = self.account_map.get_mut(addr) {
             if let Some(entry) = account_cache.get_mut(ty) {
                 return Ok(&mut entry.value);
+            }
+        }
+
+        let msg = format!("Resource for {:?} at {} must exist", ty, addr);
+        let err =
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(msg);
+        Err(err)
+    }
+
+    pub(crate) fn cow(
+        &mut self,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<()> {
+        if let Some(account_cache) = self.account_map.get_mut(addr) {
+            if let Some(entry) = account_cache.get_mut(ty) {
+                if entry.value.needs_copy() && !entry.owned {
+                    let copy = entry.value.deep_copy()?;
+                    let _ = mem::replace(&mut entry.value, copy);
+                    entry.owned = true;
+                }
+                return Ok(());
             }
         }
 

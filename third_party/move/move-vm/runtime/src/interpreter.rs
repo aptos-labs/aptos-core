@@ -6,7 +6,7 @@ use crate::{
     access_control::AccessControlState,
     config::VMConfig,
     data_cache::{DataCacheEntry, TransactionDataCache},
-    frame::Frame,
+    frame::{ArcOrRc, Frame},
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
     },
@@ -59,6 +59,7 @@ use std::{
     collections::{btree_map, VecDeque},
     fmt::Write,
     rc::Rc,
+    sync::Arc,
 };
 
 macro_rules! set_err_info {
@@ -322,7 +323,7 @@ where
             gas_meter,
             CallType::Regular,
             self.vm_config,
-            function,
+            ArcOrRc::Rc(function),
             locals,
             frame_cache,
         )
@@ -470,7 +471,7 @@ where
                     self.set_new_call_frame::<RTTCheck, RTCaches>(
                         &mut current_frame,
                         gas_meter,
-                        function,
+                        ArcOrRc::Rc(function),
                         CallType::Regular,
                         frame_cache,
                         ClosureMask::empty(),
@@ -575,7 +576,7 @@ where
                     self.set_new_call_frame::<RTTCheck, RTCaches>(
                         &mut current_frame,
                         gas_meter,
-                        function,
+                        ArcOrRc::Rc(function),
                         CallType::Regular,
                         frame_cache,
                         ClosureMask::empty(),
@@ -665,7 +666,7 @@ where
                         self.set_new_call_frame::<RTTCheck, RTCaches>(
                             &mut current_frame,
                             gas_meter,
-                            callee,
+                            ArcOrRc::Arc(callee),
                             CallType::ClosureDynamicDispatch,
                             // Make sure the frame cache is empty for the new call.
                             frame_cache,
@@ -714,7 +715,7 @@ where
         &mut self,
         current_frame: &mut Frame,
         gas_meter: &mut impl GasMeter,
-        function: Rc<LoadedFunction>,
+        function: ArcOrRc<LoadedFunction>,
         call_type: CallType,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
         mask: ClosureMask,
@@ -763,7 +764,7 @@ where
     fn make_call_frame<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         gas_meter: &mut impl GasMeter,
-        function: Rc<LoadedFunction>,
+        function: ArcOrRc<LoadedFunction>,
         call_type: CallType,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
         mask: ClosureMask,
@@ -1037,7 +1038,7 @@ where
                 self.set_new_call_frame::<RTTCheck, RTCaches>(
                     current_frame,
                     gas_meter,
-                    Rc::new(target_func),
+                    ArcOrRc::Rc(Rc::new(target_func)),
                     CallType::NativeDynamicDispatch,
                     frame_cache,
                     ClosureMask::empty(),
@@ -1105,6 +1106,7 @@ where
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
+        is_mut: bool,
     ) -> PartialVMResult<DataCacheEntry> {
         let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
             self.loader,
@@ -1115,6 +1117,7 @@ where
             resource_resolver,
             &addr,
             ty,
+            is_mut,
         )?;
         gas_meter.charge_load_resource(
             addr,
@@ -1137,6 +1140,7 @@ where
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
+        is_mut: bool,
     ) -> PartialVMResult<&'c mut GlobalValue> {
         if !data_cache.contains_resource(&addr, ty) {
             let entry = self.create_and_charge_data_cache_entry(
@@ -1145,10 +1149,16 @@ where
                 traversal_context,
                 addr,
                 ty,
+                is_mut,
             )?;
             data_cache.insert_resource(addr, ty.clone(), entry)?;
+            data_cache.get_resource_mut(&addr, ty)
+        } else {
+            if is_mut {
+                data_cache.cow(&addr, ty)?;
+            }
+            data_cache.get_resource_mut(&addr, ty)
         }
-        data_cache.get_resource_mut(&addr, ty)
     }
 
     /// BorrowGlobal (mutable and not) opcode.
@@ -1172,6 +1182,7 @@ where
                 traversal_context,
                 addr,
                 ty,
+                is_mut,
             )?
             .borrow_global();
         gas_meter.charge_borrow_global(
@@ -1250,6 +1261,7 @@ where
             traversal_context,
             addr,
             ty,
+            false,
         )?;
         let exists = gv.exists()?;
         gas_meter.charge_exists(
@@ -1285,6 +1297,7 @@ where
                 traversal_context,
                 addr,
                 ty,
+                true,
             )?
             .move_from()
         {
@@ -1337,6 +1350,7 @@ where
             traversal_context,
             addr,
             ty,
+            true,
         )?;
         // NOTE(Gas): To maintain backward compatibility, we need to charge gas after attempting
         //            the move_to operation.
@@ -2277,7 +2291,7 @@ impl Frame {
                                 *fh_idx,
                                 vec![],
                             )
-                            .map(Rc::new)?;
+                            .map(Arc::new)?;
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
                         if RTTCheck::should_perform_checks() {
                             verify_pack_closure(
@@ -2297,7 +2311,7 @@ impl Frame {
                         )?;
                         interpreter
                             .operand_stack
-                            .push(Value::closure(Box::new(lazy_function), captured))?;
+                            .push(Value::closure(Arc::new(lazy_function), captured))?;
                     },
                     Bytecode::PackClosureGeneric(fi_idx, mask) => {
                         gas_meter.charge_pack_closure(
@@ -2317,7 +2331,7 @@ impl Frame {
                                 *fi_idx,
                                 ty_args,
                             )
-                            .map(Rc::new)?;
+                            .map(Arc::new)?;
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
@@ -2330,7 +2344,7 @@ impl Frame {
                         )?;
                         interpreter
                             .operand_stack
-                            .push(Value::closure(Box::new(lazy_function), captured))?;
+                            .push(Value::closure(Arc::new(lazy_function), captured))?;
 
                         if RTTCheck::should_perform_checks() {
                             verify_pack_closure(

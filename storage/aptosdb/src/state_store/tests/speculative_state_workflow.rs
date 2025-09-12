@@ -24,7 +24,7 @@ use aptos_types::{
         state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, ARB_STATE_VALUE_MAX_SIZE},
-        StateViewId, StateViewResult, TStateView,
+        StateViewId, StateViewRead, StateViewResult, TStateView,
     },
     transaction::Version,
     write_set::{BaseStateOp, HotStateOp, WriteOp},
@@ -236,7 +236,7 @@ impl VersionState {
 impl TStateView for VersionState {
     type Key = StateKey;
 
-    fn get_state_slot(&self, key: &Self::Key) -> StateViewResult<StateSlot> {
+    fn get_state_slot(&self, key: &Self::Key) -> StateViewResult<StateViewRead<StateSlot>> {
         let from_cold = StateSlot::from_db_get(self.state.get(key).cloned());
         let slot = match self.hot_state.peek(key) {
             Some(slot) => {
@@ -245,7 +245,7 @@ impl TStateView for VersionState {
             },
             None => from_cold,
         };
-        Ok(slot)
+        Ok(StateViewRead::new(slot))
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {

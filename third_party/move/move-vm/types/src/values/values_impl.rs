@@ -11,7 +11,6 @@ use crate::{
     values::function_values_impl::{AbstractFunction, Closure, ClosureVisitor},
     views::{ValueView, ValueVisitor},
 };
-use atomic_refcell::AtomicRefCell;
 use itertools::Itertools;
 use move_binary_format::{
     errors::*,
@@ -123,17 +122,17 @@ pub(crate) enum ValueImpl {
 /// making it possible to be shared by references.
 #[derive(Debug)]
 pub(crate) enum Container {
-    Locals(Arc<AtomicRefCell<Vec<ValueImpl>>>),
-    Vec(Arc<AtomicRefCell<Vec<ValueImpl>>>),
-    Struct(Arc<AtomicRefCell<Vec<ValueImpl>>>),
-    VecU8(Arc<AtomicRefCell<Vec<u8>>>),
-    VecU64(Arc<AtomicRefCell<Vec<u64>>>),
-    VecU128(Arc<AtomicRefCell<Vec<u128>>>),
-    VecBool(Arc<AtomicRefCell<Vec<bool>>>),
-    VecAddress(Arc<AtomicRefCell<Vec<AccountAddress>>>),
-    VecU16(Arc<AtomicRefCell<Vec<u16>>>),
-    VecU32(Arc<AtomicRefCell<Vec<u32>>>),
-    VecU256(Arc<AtomicRefCell<Vec<u256::U256>>>),
+    Locals(Arc<ExplicitSyncWrapper<Vec<ValueImpl>>>),
+    Vec(Arc<ExplicitSyncWrapper<Vec<ValueImpl>>>),
+    Struct(Arc<ExplicitSyncWrapper<Vec<ValueImpl>>>),
+    VecU8(Arc<ExplicitSyncWrapper<Vec<u8>>>),
+    VecU64(Arc<ExplicitSyncWrapper<Vec<u64>>>),
+    VecU128(Arc<ExplicitSyncWrapper<Vec<u128>>>),
+    VecBool(Arc<ExplicitSyncWrapper<Vec<bool>>>),
+    VecAddress(Arc<ExplicitSyncWrapper<Vec<AccountAddress>>>),
+    VecU16(Arc<ExplicitSyncWrapper<Vec<u16>>>),
+    VecU32(Arc<ExplicitSyncWrapper<Vec<u32>>>),
+    VecU256(Arc<ExplicitSyncWrapper<Vec<u256::U256>>>),
 }
 
 /// A ContainerRef is a direct reference to a container, which could live either in the frame
@@ -143,7 +142,7 @@ pub(crate) enum Container {
 pub(crate) enum ContainerRef {
     Local(Container),
     Global {
-        status: Arc<AtomicRefCell<GlobalDataStatus>>,
+        status: Arc<ExplicitSyncWrapper<GlobalDataStatus>>,
         container: Container,
     },
 }
@@ -245,13 +244,13 @@ enum GlobalValueImpl {
     None,
     /// A resource has been published to this slot and it did not previously exist in storage.
     Fresh {
-        fields: Arc<AtomicRefCell<Vec<ValueImpl>>>,
+        fields: Arc<ExplicitSyncWrapper<Vec<ValueImpl>>>,
     },
     /// A resource resides in this slot and also in storage. The status flag indicates whether
     /// it has potentially been altered.
     Cached {
-        fields: Arc<AtomicRefCell<Vec<ValueImpl>>>,
-        status: Arc<AtomicRefCell<GlobalDataStatus>>,
+        fields: Arc<ExplicitSyncWrapper<Vec<ValueImpl>>>,
+        status: Arc<ExplicitSyncWrapper<GlobalDataStatus>>,
     },
     /// A resource used to exist in storage but has been deleted by the current transaction.
     Deleted,
@@ -262,10 +261,54 @@ enum GlobalValueImpl {
 #[derive(Debug)]
 pub struct GlobalValue(GlobalValueImpl);
 
+impl GlobalValue {
+    pub fn shallow_copy(&self) -> Self {
+        match &self.0 {
+            GlobalValueImpl::None => Self(GlobalValueImpl::None),
+            GlobalValueImpl::Fresh { .. } => unreachable!("cannot be copied"),
+            GlobalValueImpl::Cached { fields, status } => Self(GlobalValueImpl::Cached {
+                fields: Arc::clone(fields),
+                status: Arc::clone(status),
+            }),
+            GlobalValueImpl::Deleted => unreachable!("cannot be copied"),
+        }
+    }
+
+    pub fn needs_copy(&self) -> bool {
+        match &self.0 {
+            GlobalValueImpl::None => true,
+            GlobalValueImpl::Fresh { .. } => false,
+            GlobalValueImpl::Cached { .. } => true,
+            GlobalValueImpl::Deleted => false,
+        }
+    }
+
+    pub fn deep_copy(&self) -> PartialVMResult<Self> {
+        match &self.0 {
+            GlobalValueImpl::None => Ok(Self(GlobalValueImpl::None)),
+            GlobalValueImpl::Fresh { .. } => unreachable!("cannot be copied"),
+            GlobalValueImpl::Cached { fields, status } => {
+                let status = Arc::new(ExplicitSyncWrapper::new(*status.dereference()));
+                let fields = {
+                    let fs = fields.dereference();
+                    fs.iter()
+                        .map(|v| v.copy_value(1, None))
+                        .collect::<PartialVMResult<Vec<_>>>()?
+                };
+                Ok(Self(GlobalValueImpl::Cached {
+                    fields: Arc::new(ExplicitSyncWrapper::new(fields)),
+                    status,
+                }))
+            },
+            GlobalValueImpl::Deleted => unreachable!("cannot be copied"),
+        }
+    }
+}
+
 /// The locals for a function frame. It allows values to be read, written or taken
 /// reference from.
 #[derive(Debug)]
-pub struct Locals(Arc<AtomicRefCell<Vec<ValueImpl>>>);
+pub struct Locals(Arc<ExplicitSyncWrapper<Vec<ValueImpl>>>);
 
 /***************************************************************************************
  *
@@ -278,19 +321,19 @@ pub struct Locals(Arc<AtomicRefCell<Vec<ValueImpl>>>);
 impl Container {
     fn len(&self) -> usize {
         match self {
-            Self::Vec(r) => r.borrow().len(),
-            Self::Struct(r) => r.borrow().len(),
+            Self::Vec(r) => r.dereference().len(),
+            Self::Struct(r) => r.dereference().len(),
 
-            Self::VecU8(r) => r.borrow().len(),
-            Self::VecU16(r) => r.borrow().len(),
-            Self::VecU32(r) => r.borrow().len(),
-            Self::VecU64(r) => r.borrow().len(),
-            Self::VecU128(r) => r.borrow().len(),
-            Self::VecU256(r) => r.borrow().len(),
-            Self::VecBool(r) => r.borrow().len(),
-            Self::VecAddress(r) => r.borrow().len(),
+            Self::VecU8(r) => r.dereference().len(),
+            Self::VecU16(r) => r.dereference().len(),
+            Self::VecU32(r) => r.dereference().len(),
+            Self::VecU64(r) => r.dereference().len(),
+            Self::VecU128(r) => r.dereference().len(),
+            Self::VecU256(r) => r.dereference().len(),
+            Self::VecBool(r) => r.dereference().len(),
+            Self::VecAddress(r) => r.dereference().len(),
 
-            Self::Locals(r) => r.borrow().len(),
+            Self::Locals(r) => r.dereference().len(),
         }
     }
 
@@ -313,7 +356,7 @@ impl Container {
     }
 
     fn master_signer(x: AccountAddress) -> Self {
-        Container::Struct(Arc::new(AtomicRefCell::new(vec![
+        Container::Struct(Arc::new(ExplicitSyncWrapper::new(vec![
             ValueImpl::U16(MASTER_SIGNER_VARIANT),
             ValueImpl::Address(x),
         ])))
@@ -329,7 +372,7 @@ impl Container {
  *
  **************************************************************************************/
 
-fn take_unique_ownership<T: Debug>(r: Arc<AtomicRefCell<T>>) -> PartialVMResult<T> {
+fn take_unique_ownership<T: Debug>(r: Arc<ExplicitSyncWrapper<T>>) -> PartialVMResult<T> {
     match Arc::try_unwrap(r) {
         Ok(cell) => Ok(cell.into_inner()),
         Err(r) => Err(
@@ -349,7 +392,7 @@ impl ContainerRef {
 
     fn mark_dirty(&self) {
         if let Self::Global { status, .. } = self {
-            *status.borrow_mut() = GlobalDataStatus::Dirty
+            *status.dereference_mut() = GlobalDataStatus::Dirty
         }
     }
 }
@@ -451,9 +494,9 @@ impl ValueImpl {
 
 impl Container {
     fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
-        let copy_rc_ref_vec_val = |r: &Arc<AtomicRefCell<Vec<ValueImpl>>>| {
-            Ok(Arc::new(AtomicRefCell::new(
-                r.borrow()
+        let copy_rc_ref_vec_val = |r: &Arc<ExplicitSyncWrapper<Vec<ValueImpl>>>| {
+            Ok(Arc::new(ExplicitSyncWrapper::new(
+                r.dereference()
                     .iter()
                     .map(|v| v.copy_value(depth + 1, max_depth))
                     .collect::<PartialVMResult<_>>()?,
@@ -464,15 +507,29 @@ impl Container {
             Self::Vec(r) => Self::Vec(copy_rc_ref_vec_val(r)?),
             Self::Struct(r) => Self::Struct(copy_rc_ref_vec_val(r)?),
 
-            Self::VecU8(r) => Self::VecU8(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
-            Self::VecU16(r) => Self::VecU16(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
-            Self::VecU32(r) => Self::VecU32(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
-            Self::VecU64(r) => Self::VecU64(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
-            Self::VecU128(r) => Self::VecU128(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
-            Self::VecU256(r) => Self::VecU256(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
-            Self::VecBool(r) => Self::VecBool(Arc::new(AtomicRefCell::new(r.borrow().clone()))),
+            Self::VecU8(r) => {
+                Self::VecU8(Arc::new(ExplicitSyncWrapper::new(r.dereference().clone())))
+            },
+            Self::VecU16(r) => {
+                Self::VecU16(Arc::new(ExplicitSyncWrapper::new(r.dereference().clone())))
+            },
+            Self::VecU32(r) => {
+                Self::VecU32(Arc::new(ExplicitSyncWrapper::new(r.dereference().clone())))
+            },
+            Self::VecU64(r) => {
+                Self::VecU64(Arc::new(ExplicitSyncWrapper::new(r.dereference().clone())))
+            },
+            Self::VecU128(r) => {
+                Self::VecU128(Arc::new(ExplicitSyncWrapper::new(r.dereference().clone())))
+            },
+            Self::VecU256(r) => {
+                Self::VecU256(Arc::new(ExplicitSyncWrapper::new(r.dereference().clone())))
+            },
+            Self::VecBool(r) => {
+                Self::VecBool(Arc::new(ExplicitSyncWrapper::new(r.dereference().clone())))
+            },
             Self::VecAddress(r) => {
-                Self::VecAddress(Arc::new(AtomicRefCell::new(r.borrow().clone())))
+                Self::VecAddress(Arc::new(ExplicitSyncWrapper::new(r.dereference().clone())))
             },
 
             Self::Locals(_) => {
@@ -700,8 +757,8 @@ impl Container {
 
         let res = match (self, other) {
             (Vec(l), Vec(r)) | (Struct(l), Struct(r)) => {
-                let l = &l.borrow();
-                let r = &r.borrow();
+                let l = &l.dereference();
+                let r = &r.dereference();
 
                 if l.len() != r.len() {
                     return Ok(false);
@@ -713,14 +770,14 @@ impl Container {
                 }
                 true
             },
-            (VecU8(l), VecU8(r)) => l.borrow().eq(&*r.borrow()),
-            (VecU16(l), VecU16(r)) => l.borrow().eq(&*r.borrow()),
-            (VecU32(l), VecU32(r)) => l.borrow().eq(&*r.borrow()),
-            (VecU64(l), VecU64(r)) => l.borrow().eq(&*r.borrow()),
-            (VecU128(l), VecU128(r)) => l.borrow().eq(&*r.borrow()),
-            (VecU256(l), VecU256(r)) => l.borrow().eq(&*r.borrow()),
-            (VecBool(l), VecBool(r)) => l.borrow().eq(&*r.borrow()),
-            (VecAddress(l), VecAddress(r)) => l.borrow().eq(&*r.borrow()),
+            (VecU8(l), VecU8(r)) => l.dereference().eq(&*r.dereference()),
+            (VecU16(l), VecU16(r)) => l.dereference().eq(&*r.dereference()),
+            (VecU32(l), VecU32(r)) => l.dereference().eq(&*r.dereference()),
+            (VecU64(l), VecU64(r)) => l.dereference().eq(&*r.dereference()),
+            (VecU128(l), VecU128(r)) => l.dereference().eq(&*r.dereference()),
+            (VecU256(l), VecU256(r)) => l.dereference().eq(&*r.dereference()),
+            (VecBool(l), VecBool(r)) => l.dereference().eq(&*r.dereference()),
+            (VecAddress(l), VecAddress(r)) => l.dereference().eq(&*r.dereference()),
 
             (Locals(_), _)
             | (Vec(_), _)
@@ -755,8 +812,8 @@ impl Container {
 
         let res = match (self, other) {
             (Vec(l), Vec(r)) | (Struct(l), Struct(r)) => {
-                let l = &l.borrow();
-                let r = &r.borrow();
+                let l = &l.dereference();
+                let r = &r.dereference();
 
                 for (v1, v2) in l.iter().zip(r.iter()) {
                     let value_cmp = v1.compare(v2, depth + 1, max_depth)?;
@@ -767,14 +824,14 @@ impl Container {
 
                 l.len().cmp(&r.len())
             },
-            (VecU8(l), VecU8(r)) => l.borrow().cmp(&*r.borrow()),
-            (VecU16(l), VecU16(r)) => l.borrow().cmp(&*r.borrow()),
-            (VecU32(l), VecU32(r)) => l.borrow().cmp(&*r.borrow()),
-            (VecU64(l), VecU64(r)) => l.borrow().cmp(&*r.borrow()),
-            (VecU128(l), VecU128(r)) => l.borrow().cmp(&*r.borrow()),
-            (VecU256(l), VecU256(r)) => l.borrow().cmp(&*r.borrow()),
-            (VecBool(l), VecBool(r)) => l.borrow().cmp(&*r.borrow()),
-            (VecAddress(l), VecAddress(r)) => l.borrow().cmp(&*r.borrow()),
+            (VecU8(l), VecU8(r)) => l.dereference().cmp(&*r.dereference()),
+            (VecU16(l), VecU16(r)) => l.dereference().cmp(&*r.dereference()),
+            (VecU32(l), VecU32(r)) => l.dereference().cmp(&*r.dereference()),
+            (VecU64(l), VecU64(r)) => l.dereference().cmp(&*r.dereference()),
+            (VecU128(l), VecU128(r)) => l.dereference().cmp(&*r.dereference()),
+            (VecU256(l), VecU256(r)) => l.dereference().cmp(&*r.dereference()),
+            (VecBool(l), VecBool(r)) => l.dereference().cmp(&*r.dereference()),
+            (VecAddress(l), VecAddress(r)) => l.dereference().cmp(&*r.dereference()),
 
             (Locals(_), _)
             | (Vec(_), _)
@@ -838,74 +895,82 @@ impl IndexedRef {
             | (Struct(r1), Locals(r2))
             | (Locals(r1), Vec(r2))
             | (Locals(r1), Struct(r2))
-            | (Locals(r1), Locals(r2)) => {
-                r1.borrow()[self.idx].equals(&r2.borrow()[other.idx], depth + 1, max_depth)?
-            },
+            | (Locals(r1), Locals(r2)) => r1.dereference()[self.idx].equals(
+                &r2.dereference()[other.idx],
+                depth + 1,
+                max_depth,
+            )?,
 
-            (VecU8(r1), VecU8(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecU16(r1), VecU16(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecU32(r1), VecU32(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecU64(r1), VecU64(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecU128(r1), VecU128(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecU256(r1), VecU256(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecBool(r1), VecBool(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecAddress(r1), VecAddress(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
+            (VecU8(r1), VecU8(r2)) => r1.dereference()[self.idx] == r2.dereference()[other.idx],
+            (VecU16(r1), VecU16(r2)) => r1.dereference()[self.idx] == r2.dereference()[other.idx],
+            (VecU32(r1), VecU32(r2)) => r1.dereference()[self.idx] == r2.dereference()[other.idx],
+            (VecU64(r1), VecU64(r2)) => r1.dereference()[self.idx] == r2.dereference()[other.idx],
+            (VecU128(r1), VecU128(r2)) => r1.dereference()[self.idx] == r2.dereference()[other.idx],
+            (VecU256(r1), VecU256(r2)) => r1.dereference()[self.idx] == r2.dereference()[other.idx],
+            (VecBool(r1), VecBool(r2)) => r1.dereference()[self.idx] == r2.dereference()[other.idx],
+            (VecAddress(r1), VecAddress(r2)) => {
+                r1.dereference()[self.idx] == r2.dereference()[other.idx]
+            },
 
             // Equality between a generic and a specialized container.
             (Locals(r1), VecU8(r2)) | (Struct(r1), VecU8(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<u8>()? == r2.borrow()[other.idx]
+                *r1.dereference()[self.idx].as_value_ref::<u8>()? == r2.dereference()[other.idx]
             },
             (VecU8(r1), Locals(r2)) | (VecU8(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u8>()?
+                r1.dereference()[self.idx] == *r2.dereference()[other.idx].as_value_ref::<u8>()?
             },
 
             (Locals(r1), VecU16(r2)) | (Struct(r1), VecU16(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<u16>()? == r2.borrow()[other.idx]
+                *r1.dereference()[self.idx].as_value_ref::<u16>()? == r2.dereference()[other.idx]
             },
             (VecU16(r1), Locals(r2)) | (VecU16(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u16>()?
+                r1.dereference()[self.idx] == *r2.dereference()[other.idx].as_value_ref::<u16>()?
             },
 
             (Locals(r1), VecU32(r2)) | (Struct(r1), VecU32(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<u32>()? == r2.borrow()[other.idx]
+                *r1.dereference()[self.idx].as_value_ref::<u32>()? == r2.dereference()[other.idx]
             },
             (VecU32(r1), Locals(r2)) | (VecU32(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u32>()?
+                r1.dereference()[self.idx] == *r2.dereference()[other.idx].as_value_ref::<u32>()?
             },
 
             (Locals(r1), VecU64(r2)) | (Struct(r1), VecU64(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<u64>()? == r2.borrow()[other.idx]
+                *r1.dereference()[self.idx].as_value_ref::<u64>()? == r2.dereference()[other.idx]
             },
             (VecU64(r1), Locals(r2)) | (VecU64(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u64>()?
+                r1.dereference()[self.idx] == *r2.dereference()[other.idx].as_value_ref::<u64>()?
             },
 
             (Locals(r1), VecU128(r2)) | (Struct(r1), VecU128(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<u128>()? == r2.borrow()[other.idx]
+                *r1.dereference()[self.idx].as_value_ref::<u128>()? == r2.dereference()[other.idx]
             },
             (VecU128(r1), Locals(r2)) | (VecU128(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u128>()?
+                r1.dereference()[self.idx] == *r2.dereference()[other.idx].as_value_ref::<u128>()?
             },
 
             (Locals(r1), VecU256(r2)) | (Struct(r1), VecU256(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<u256::U256>()? == r2.borrow()[other.idx]
+                *r1.dereference()[self.idx].as_value_ref::<u256::U256>()?
+                    == r2.dereference()[other.idx]
             },
             (VecU256(r1), Locals(r2)) | (VecU256(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u256::U256>()?
+                r1.dereference()[self.idx]
+                    == *r2.dereference()[other.idx].as_value_ref::<u256::U256>()?
             },
 
             (Locals(r1), VecBool(r2)) | (Struct(r1), VecBool(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<bool>()? == r2.borrow()[other.idx]
+                *r1.dereference()[self.idx].as_value_ref::<bool>()? == r2.dereference()[other.idx]
             },
             (VecBool(r1), Locals(r2)) | (VecBool(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<bool>()?
+                r1.dereference()[self.idx] == *r2.dereference()[other.idx].as_value_ref::<bool>()?
             },
 
             (Locals(r1), VecAddress(r2)) | (Struct(r1), VecAddress(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<AccountAddress>()? == r2.borrow()[other.idx]
+                *r1.dereference()[self.idx].as_value_ref::<AccountAddress>()?
+                    == r2.dereference()[other.idx]
             },
             (VecAddress(r1), Locals(r2)) | (VecAddress(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<AccountAddress>()?
+                r1.dereference()[self.idx]
+                    == *r2.dereference()[other.idx].as_value_ref::<AccountAddress>()?
             },
 
             // All other combinations are illegal.
@@ -946,75 +1011,91 @@ impl IndexedRef {
             | (Struct(r1), Locals(r2))
             | (Locals(r1), Vec(r2))
             | (Locals(r1), Struct(r2))
-            | (Locals(r1), Locals(r2)) => {
-                r1.borrow()[self.idx].compare(&r2.borrow()[other.idx], depth + 1, max_depth)?
-            },
+            | (Locals(r1), Locals(r2)) => r1.dereference()[self.idx].compare(
+                &r2.dereference()[other.idx],
+                depth + 1,
+                max_depth,
+            )?,
 
-            (VecU8(r1), VecU8(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecU16(r1), VecU16(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecU32(r1), VecU32(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecU64(r1), VecU64(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecU128(r1), VecU128(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecU256(r1), VecU256(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecBool(r1), VecBool(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecAddress(r1), VecAddress(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecU8(r1), VecU8(r2)) => r1.dereference()[self.idx].cmp(&r2.dereference()[other.idx]),
+            (VecU16(r1), VecU16(r2)) => {
+                r1.dereference()[self.idx].cmp(&r2.dereference()[other.idx])
+            },
+            (VecU32(r1), VecU32(r2)) => {
+                r1.dereference()[self.idx].cmp(&r2.dereference()[other.idx])
+            },
+            (VecU64(r1), VecU64(r2)) => {
+                r1.dereference()[self.idx].cmp(&r2.dereference()[other.idx])
+            },
+            (VecU128(r1), VecU128(r2)) => {
+                r1.dereference()[self.idx].cmp(&r2.dereference()[other.idx])
+            },
+            (VecU256(r1), VecU256(r2)) => {
+                r1.dereference()[self.idx].cmp(&r2.dereference()[other.idx])
+            },
+            (VecBool(r1), VecBool(r2)) => {
+                r1.dereference()[self.idx].cmp(&r2.dereference()[other.idx])
+            },
+            (VecAddress(r1), VecAddress(r2)) => {
+                r1.dereference()[self.idx].cmp(&r2.dereference()[other.idx])
+            },
 
             // Comparison between a generic and a specialized container.
-            (Locals(r1), VecU8(r2)) | (Struct(r1), VecU8(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecU8(r2)) | (Struct(r1), VecU8(r2)) => r1.dereference()[self.idx]
                 .as_value_ref::<u8>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.dereference()[other.idx]),
             (VecU8(r1), Locals(r2)) | (VecU8(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u8>()?)
+                r1.dereference()[self.idx].cmp(r2.dereference()[other.idx].as_value_ref::<u8>()?)
             },
 
-            (Locals(r1), VecU16(r2)) | (Struct(r1), VecU16(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecU16(r2)) | (Struct(r1), VecU16(r2)) => r1.dereference()[self.idx]
                 .as_value_ref::<u16>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.dereference()[other.idx]),
             (VecU16(r1), Locals(r2)) | (VecU16(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u16>()?)
+                r1.dereference()[self.idx].cmp(r2.dereference()[other.idx].as_value_ref::<u16>()?)
             },
 
-            (Locals(r1), VecU32(r2)) | (Struct(r1), VecU32(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecU32(r2)) | (Struct(r1), VecU32(r2)) => r1.dereference()[self.idx]
                 .as_value_ref::<u32>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.dereference()[other.idx]),
             (VecU32(r1), Locals(r2)) | (VecU32(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u32>()?)
+                r1.dereference()[self.idx].cmp(r2.dereference()[other.idx].as_value_ref::<u32>()?)
             },
 
-            (Locals(r1), VecU64(r2)) | (Struct(r1), VecU64(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecU64(r2)) | (Struct(r1), VecU64(r2)) => r1.dereference()[self.idx]
                 .as_value_ref::<u64>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.dereference()[other.idx]),
             (VecU64(r1), Locals(r2)) | (VecU64(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u64>()?)
+                r1.dereference()[self.idx].cmp(r2.dereference()[other.idx].as_value_ref::<u64>()?)
             },
 
-            (Locals(r1), VecU128(r2)) | (Struct(r1), VecU128(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecU128(r2)) | (Struct(r1), VecU128(r2)) => r1.dereference()[self.idx]
                 .as_value_ref::<u128>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.dereference()[other.idx]),
             (VecU128(r1), Locals(r2)) | (VecU128(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u128>()?)
+                r1.dereference()[self.idx].cmp(r2.dereference()[other.idx].as_value_ref::<u128>()?)
             },
 
-            (Locals(r1), VecU256(r2)) | (Struct(r1), VecU256(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecU256(r2)) | (Struct(r1), VecU256(r2)) => r1.dereference()[self.idx]
                 .as_value_ref::<u256::U256>()?
-                .cmp(&r2.borrow()[other.idx]),
-            (VecU256(r1), Locals(r2)) | (VecU256(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u256::U256>()?)
-            },
+                .cmp(&r2.dereference()[other.idx]),
+            (VecU256(r1), Locals(r2)) | (VecU256(r1), Struct(r2)) => r1.dereference()[self.idx]
+                .cmp(r2.dereference()[other.idx].as_value_ref::<u256::U256>()?),
 
-            (Locals(r1), VecBool(r2)) | (Struct(r1), VecBool(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecBool(r2)) | (Struct(r1), VecBool(r2)) => r1.dereference()[self.idx]
                 .as_value_ref::<bool>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.dereference()[other.idx]),
             (VecBool(r1), Locals(r2)) | (VecBool(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<bool>()?)
+                r1.dereference()[self.idx].cmp(r2.dereference()[other.idx].as_value_ref::<bool>()?)
             },
 
-            (Locals(r1), VecAddress(r2)) | (Struct(r1), VecAddress(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecAddress(r2)) | (Struct(r1), VecAddress(r2)) => r1.dereference()
+                [self.idx]
                 .as_value_ref::<AccountAddress>()?
-                .cmp(&r2.borrow()[other.idx]),
-            (VecAddress(r1), Locals(r2)) | (VecAddress(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<AccountAddress>()?)
-            },
+                .cmp(&r2.dereference()[other.idx]),
+            (VecAddress(r1), Locals(r2)) | (VecAddress(r1), Struct(r2)) => r1.dereference()
+                [self.idx]
+                .cmp(r2.dereference()[other.idx].as_value_ref::<AccountAddress>()?),
 
             // All other combinations are illegal.
             (Vec(_), _)
@@ -1079,19 +1160,19 @@ impl IndexedRef {
         use Container::*;
 
         let res = match self.container_ref.container() {
-            Vec(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
-            Struct(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
+            Vec(r) => r.dereference()[self.idx].copy_value(depth + 1, max_depth)?,
+            Struct(r) => r.dereference()[self.idx].copy_value(depth + 1, max_depth)?,
 
-            VecU8(r) => ValueImpl::U8(r.borrow()[self.idx]),
-            VecU16(r) => ValueImpl::U16(r.borrow()[self.idx]),
-            VecU32(r) => ValueImpl::U32(r.borrow()[self.idx]),
-            VecU64(r) => ValueImpl::U64(r.borrow()[self.idx]),
-            VecU128(r) => ValueImpl::U128(r.borrow()[self.idx]),
-            VecU256(r) => ValueImpl::U256(r.borrow()[self.idx]),
-            VecBool(r) => ValueImpl::Bool(r.borrow()[self.idx]),
-            VecAddress(r) => ValueImpl::Address(r.borrow()[self.idx]),
+            VecU8(r) => ValueImpl::U8(r.dereference()[self.idx]),
+            VecU16(r) => ValueImpl::U16(r.dereference()[self.idx]),
+            VecU32(r) => ValueImpl::U32(r.dereference()[self.idx]),
+            VecU64(r) => ValueImpl::U64(r.dereference()[self.idx]),
+            VecU128(r) => ValueImpl::U128(r.dereference()[self.idx]),
+            VecU256(r) => ValueImpl::U256(r.dereference()[self.idx]),
+            VecBool(r) => ValueImpl::Bool(r.dereference()[self.idx]),
+            VecAddress(r) => ValueImpl::Address(r.dereference()[self.idx]),
 
-            Locals(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
+            Locals(r) => r.dereference()[self.idx].copy_value(depth + 1, max_depth)?,
         };
 
         Ok(Value(res))
@@ -1155,7 +1236,7 @@ impl ContainerRef {
                                 .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE))
                             },
                         };
-                        *$r1.borrow_mut() = take_unique_ownership(r)?;
+                        *$r1.dereference_mut() = take_unique_ownership(r)?;
                     }};
                 }
 
@@ -1213,17 +1294,17 @@ impl IndexedRef {
 
         match (self.container_ref.container(), &x.0) {
             (Container::Locals(r), _) | (Container::Vec(r), _) | (Container::Struct(r), _) => {
-                let mut v = r.borrow_mut();
+                let v = r.dereference_mut();
                 v[self.idx] = x.0;
             },
-            (Container::VecU8(r), ValueImpl::U8(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecU16(r), ValueImpl::U16(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecU32(r), ValueImpl::U32(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecU64(r), ValueImpl::U64(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecU128(r), ValueImpl::U128(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecU256(r), ValueImpl::U256(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecBool(r), ValueImpl::Bool(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecAddress(r), ValueImpl::Address(x)) => r.borrow_mut()[self.idx] = *x,
+            (Container::VecU8(r), ValueImpl::U8(x)) => r.dereference_mut()[self.idx] = *x,
+            (Container::VecU16(r), ValueImpl::U16(x)) => r.dereference_mut()[self.idx] = *x,
+            (Container::VecU32(r), ValueImpl::U32(x)) => r.dereference_mut()[self.idx] = *x,
+            (Container::VecU64(r), ValueImpl::U64(x)) => r.dereference_mut()[self.idx] = *x,
+            (Container::VecU128(r), ValueImpl::U128(x)) => r.dereference_mut()[self.idx] = *x,
+            (Container::VecU256(r), ValueImpl::U256(x)) => r.dereference_mut()[self.idx] = *x,
+            (Container::VecBool(r), ValueImpl::Bool(x)) => r.dereference_mut()[self.idx] = *x,
+            (Container::VecAddress(r), ValueImpl::Address(x)) => r.dereference_mut()[self.idx] = *x,
 
             (Container::VecU8(_), _)
             | (Container::VecU16(_), _)
@@ -1307,18 +1388,34 @@ impl Container {
         use Container::*;
 
         match (self, other) {
-            (Vec(l), Vec(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (Struct(l), Struct(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (Vec(l), Vec(r)) => mem::swap(&mut *l.dereference_mut(), &mut *r.dereference_mut()),
+            (Struct(l), Struct(r)) => {
+                mem::swap(&mut *l.dereference_mut(), &mut *r.dereference_mut())
+            },
 
-            (VecBool(l), VecBool(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecAddress(l), VecAddress(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecBool(l), VecBool(r)) => {
+                mem::swap(&mut *l.dereference_mut(), &mut *r.dereference_mut())
+            },
+            (VecAddress(l), VecAddress(r)) => {
+                mem::swap(&mut *l.dereference_mut(), &mut *r.dereference_mut())
+            },
 
-            (VecU8(l), VecU8(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU16(l), VecU16(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU32(l), VecU32(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU64(l), VecU64(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU128(l), VecU128(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU256(l), VecU256(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecU8(l), VecU8(r)) => mem::swap(&mut *l.dereference_mut(), &mut *r.dereference_mut()),
+            (VecU16(l), VecU16(r)) => {
+                mem::swap(&mut *l.dereference_mut(), &mut *r.dereference_mut())
+            },
+            (VecU32(l), VecU32(r)) => {
+                mem::swap(&mut *l.dereference_mut(), &mut *r.dereference_mut())
+            },
+            (VecU64(l), VecU64(r)) => {
+                mem::swap(&mut *l.dereference_mut(), &mut *r.dereference_mut())
+            },
+            (VecU128(l), VecU128(r)) => {
+                mem::swap(&mut *l.dereference_mut(), &mut *r.dereference_mut())
+            },
+            (VecU256(l), VecU256(r)) => {
+                mem::swap(&mut *l.dereference_mut(), &mut *r.dereference_mut())
+            },
 
             (
                 Locals(_) | Vec(_) | Struct(_) | VecBool(_) | VecAddress(_) | VecU8(_) | VecU16(_)
@@ -1364,11 +1461,11 @@ impl IndexedRef {
                             )));
                     }
 
-                    $r1.borrow_mut().swap(self.idx, other.idx);
+                    $r1.dereference_mut().swap(self.idx, other.idx);
                 } else {
                     mem::swap(
-                        &mut $r1.borrow_mut()[self.idx],
-                        &mut $r2.borrow_mut()[other.idx],
+                        &mut $r1.dereference_mut()[self.idx],
+                        &mut $r2.dereference_mut()[other.idx],
                     )
                 }
             }};
@@ -1376,8 +1473,8 @@ impl IndexedRef {
 
         macro_rules! swap_general_with_specialized {
             ($r1:ident, $r2:ident) => {{
-                let mut r1 = $r1.borrow_mut();
-                let mut r2 = $r2.borrow_mut();
+                let r1 = $r1.dereference_mut();
+                let r2 = $r2.dereference_mut();
 
                 let v1 = *r1[self.idx].as_value_ref()?;
                 r1[self.idx] = ValueImpl::from_primitive(r2[other.idx]);
@@ -1387,8 +1484,8 @@ impl IndexedRef {
 
         macro_rules! swap_specialized_with_general {
             ($r1:ident, $r2:ident) => {{
-                let mut r1 = $r1.borrow_mut();
-                let mut r2 = $r2.borrow_mut();
+                let r1 = $r1.dereference_mut();
+                let r2 = $r2.dereference_mut();
 
                 let v2 = *r2[other.idx].as_value_ref()?;
                 r2[other.idx] = ValueImpl::from_primitive(r1[self.idx]);
@@ -1521,7 +1618,7 @@ impl ContainerRef {
 
         Ok(match self.container() {
             Container::Locals(r) | Container::Vec(r) | Container::Struct(r) => {
-                let v = r.borrow();
+                let v = r.dereference();
                 match &v[idx] {
                     ValueImpl::Container(container) => {
                         let r = match self {
@@ -1611,7 +1708,7 @@ impl StructRef {
 
 impl Locals {
     pub fn borrow_loc(&self, idx: usize) -> PartialVMResult<Value> {
-        let v = self.0.borrow();
+        let v = self.0.dereference();
         if idx >= v.len() {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
@@ -1659,7 +1756,7 @@ impl SignerRef {
     pub fn is_permissioned(&self) -> PartialVMResult<bool> {
         match &self.0 {
             ContainerRef::Local(Container::Struct(s)) => {
-                Ok(*s.borrow()[0].as_value_ref::<u16>()? == PERMISSIONED_SIGNER_VARIANT)
+                Ok(*s.dereference()[0].as_value_ref::<u16>()? == PERMISSIONED_SIGNER_VARIANT)
             },
             _ => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1673,7 +1770,7 @@ impl SignerRef {
     pub fn permission_address(&self) -> PartialVMResult<Value> {
         match &self.0 {
             ContainerRef::Local(Container::Struct(s)) => Ok(Value::address(
-                *s.borrow()
+                *s.dereference()
                     .get(PERMISSION_ADDRESS_FIELD_OFFSET)
                     .ok_or_else(|| {
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1698,7 +1795,7 @@ impl SignerRef {
  **************************************************************************************/
 impl Locals {
     pub fn new(n: usize) -> Self {
-        Self(Arc::new(AtomicRefCell::new(
+        Self(Arc::new(ExplicitSyncWrapper::new(
             iter::repeat_with(|| ValueImpl::Invalid).take(n).collect(),
         )))
     }
@@ -1714,7 +1811,7 @@ impl Locals {
     }
 
     fn copy_loc_impl(&self, idx: usize, max_depth: Option<u64>) -> PartialVMResult<Value> {
-        let v = self.0.borrow();
+        let v = self.0.dereference();
         match v.get(idx) {
             Some(ValueImpl::Invalid) => Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -1730,7 +1827,7 @@ impl Locals {
     }
 
     fn swap_loc(&mut self, idx: usize, x: Value, violation_check: bool) -> PartialVMResult<Value> {
-        let mut v = self.0.borrow_mut();
+        let v = self.0.dereference_mut();
         match v.get_mut(idx) {
             Some(v) => {
                 if violation_check {
@@ -1777,7 +1874,7 @@ impl Locals {
     /// Drop all Move values onto a different Vec to avoid leaking memory.
     /// References are excluded since they may point to invalid data.
     pub fn drop_all_values(&mut self) -> impl Iterator<Item = (usize, Value)> {
-        let mut locals = self.0.borrow_mut();
+        let locals = self.0.dereference_mut();
         let mut res = vec![];
 
         for idx in 0..locals.len() {
@@ -1797,7 +1894,7 @@ impl Locals {
     }
 
     pub fn is_invalid(&self, idx: usize) -> PartialVMResult<bool> {
-        let v = self.0.borrow();
+        let v = self.0.dereference();
         match v.get(idx) {
             Some(ValueImpl::Invalid) => Ok(true),
             Some(_) => Ok(false),
@@ -1875,67 +1972,67 @@ impl Value {
 
     pub fn struct_(s: Struct) -> Self {
         Self(ValueImpl::Container(Container::Struct(Arc::new(
-            AtomicRefCell::new(s.fields),
+            ExplicitSyncWrapper::new(s.fields),
         ))))
     }
 
     pub fn vector_u8(it: impl IntoIterator<Item = u8>) -> Self {
         Self(ValueImpl::Container(Container::VecU8(Arc::new(
-            AtomicRefCell::new(it.into_iter().collect()),
+            ExplicitSyncWrapper::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_u16(it: impl IntoIterator<Item = u16>) -> Self {
         Self(ValueImpl::Container(Container::VecU16(Arc::new(
-            AtomicRefCell::new(it.into_iter().collect()),
+            ExplicitSyncWrapper::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_u32(it: impl IntoIterator<Item = u32>) -> Self {
         Self(ValueImpl::Container(Container::VecU32(Arc::new(
-            AtomicRefCell::new(it.into_iter().collect()),
+            ExplicitSyncWrapper::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_u64(it: impl IntoIterator<Item = u64>) -> Self {
         Self(ValueImpl::Container(Container::VecU64(Arc::new(
-            AtomicRefCell::new(it.into_iter().collect()),
+            ExplicitSyncWrapper::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_u128(it: impl IntoIterator<Item = u128>) -> Self {
         Self(ValueImpl::Container(Container::VecU128(Arc::new(
-            AtomicRefCell::new(it.into_iter().collect()),
+            ExplicitSyncWrapper::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_u256(it: impl IntoIterator<Item = u256::U256>) -> Self {
         Self(ValueImpl::Container(Container::VecU256(Arc::new(
-            AtomicRefCell::new(it.into_iter().collect()),
+            ExplicitSyncWrapper::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_bool(it: impl IntoIterator<Item = bool>) -> Self {
         Self(ValueImpl::Container(Container::VecBool(Arc::new(
-            AtomicRefCell::new(it.into_iter().collect()),
+            ExplicitSyncWrapper::new(it.into_iter().collect()),
         ))))
     }
 
     pub fn vector_address(it: impl IntoIterator<Item = AccountAddress>) -> Self {
         Self(ValueImpl::Container(Container::VecAddress(Arc::new(
-            AtomicRefCell::new(it.into_iter().collect()),
+            ExplicitSyncWrapper::new(it.into_iter().collect()),
         ))))
     }
 
     // REVIEW: This API can break
     pub fn vector_for_testing_only(it: impl IntoIterator<Item = Value>) -> Self {
         Self(ValueImpl::Container(Container::Vec(Arc::new(
-            AtomicRefCell::new(it.into_iter().map(|v| v.0).collect()),
+            ExplicitSyncWrapper::new(it.into_iter().map(|v| v.0).collect()),
         ))))
     }
 
     pub fn closure(
-        fun: Box<dyn AbstractFunction>,
+        fun: Arc<dyn AbstractFunction>,
         captured: impl IntoIterator<Item = Value>,
     ) -> Self {
         Self(ValueImpl::ClosureValue(Closure::pack(fun, captured)))
@@ -2742,15 +2839,15 @@ impl VectorRef {
         //check_elem_layout(type_param, c)?;
 
         let len = match c {
-            Container::VecU8(r) => r.borrow().len(),
-            Container::VecU16(r) => r.borrow().len(),
-            Container::VecU32(r) => r.borrow().len(),
-            Container::VecU64(r) => r.borrow().len(),
-            Container::VecU128(r) => r.borrow().len(),
-            Container::VecU256(r) => r.borrow().len(),
-            Container::VecBool(r) => r.borrow().len(),
-            Container::VecAddress(r) => r.borrow().len(),
-            Container::Vec(r) => r.borrow().len(),
+            Container::VecU8(r) => r.dereference().len(),
+            Container::VecU16(r) => r.dereference().len(),
+            Container::VecU32(r) => r.dereference().len(),
+            Container::VecU64(r) => r.dereference().len(),
+            Container::VecU128(r) => r.dereference().len(),
+            Container::VecU256(r) => r.dereference().len(),
+            Container::VecBool(r) => r.dereference().len(),
+            Container::VecAddress(r) => r.dereference().len(),
+            Container::Vec(r) => r.dereference().len(),
             Container::Locals(_) | Container::Struct(_) => unreachable!(),
         };
         Ok(len)
@@ -2765,15 +2862,15 @@ impl VectorRef {
         // check_elem_layout(type_param, c)?;
 
         match c {
-            Container::VecU8(r) => r.borrow_mut().push(e.value_as()?),
-            Container::VecU16(r) => r.borrow_mut().push(e.value_as()?),
-            Container::VecU32(r) => r.borrow_mut().push(e.value_as()?),
-            Container::VecU64(r) => r.borrow_mut().push(e.value_as()?),
-            Container::VecU128(r) => r.borrow_mut().push(e.value_as()?),
-            Container::VecU256(r) => r.borrow_mut().push(e.value_as()?),
-            Container::VecBool(r) => r.borrow_mut().push(e.value_as()?),
-            Container::VecAddress(r) => r.borrow_mut().push(e.value_as()?),
-            Container::Vec(r) => r.borrow_mut().push(e.0),
+            Container::VecU8(r) => r.dereference_mut().push(e.value_as()?),
+            Container::VecU16(r) => r.dereference_mut().push(e.value_as()?),
+            Container::VecU32(r) => r.dereference_mut().push(e.value_as()?),
+            Container::VecU64(r) => r.dereference_mut().push(e.value_as()?),
+            Container::VecU128(r) => r.dereference_mut().push(e.value_as()?),
+            Container::VecU256(r) => r.dereference_mut().push(e.value_as()?),
+            Container::VecBool(r) => r.dereference_mut().push(e.value_as()?),
+            Container::VecAddress(r) => r.dereference_mut().push(e.value_as()?),
+            Container::Vec(r) => r.dereference_mut().push(e.0),
             Container::Locals(_) | Container::Struct(_) => unreachable!(),
         }
 
@@ -2792,10 +2889,10 @@ impl VectorRef {
     }
 
     /// Returns a AtomicRefCell reference to the underlying vector of a `&vector<u8>` value.
-    pub fn as_bytes_ref(&self) -> atomic_refcell::AtomicRef<'_, Vec<u8>> {
+    pub fn as_bytes_ref(&self) -> &[u8] {
         let c = self.0.container();
         match c {
-            Container::VecU8(r) => r.borrow(),
+            Container::VecU8(r) => r.dereference().as_slice(),
             _ => panic!("can only be called on vector<u8>"),
         }
     }
@@ -2812,39 +2909,39 @@ impl VectorRef {
         }
 
         let res = match c {
-            Container::VecU8(r) => match r.borrow_mut().pop() {
+            Container::VecU8(r) => match r.dereference_mut().pop() {
                 Some(x) => Value::u8(x),
                 None => err_pop_empty_vec!(),
             },
-            Container::VecU16(r) => match r.borrow_mut().pop() {
+            Container::VecU16(r) => match r.dereference_mut().pop() {
                 Some(x) => Value::u16(x),
                 None => err_pop_empty_vec!(),
             },
-            Container::VecU32(r) => match r.borrow_mut().pop() {
+            Container::VecU32(r) => match r.dereference_mut().pop() {
                 Some(x) => Value::u32(x),
                 None => err_pop_empty_vec!(),
             },
-            Container::VecU64(r) => match r.borrow_mut().pop() {
+            Container::VecU64(r) => match r.dereference_mut().pop() {
                 Some(x) => Value::u64(x),
                 None => err_pop_empty_vec!(),
             },
-            Container::VecU128(r) => match r.borrow_mut().pop() {
+            Container::VecU128(r) => match r.dereference_mut().pop() {
                 Some(x) => Value::u128(x),
                 None => err_pop_empty_vec!(),
             },
-            Container::VecU256(r) => match r.borrow_mut().pop() {
+            Container::VecU256(r) => match r.dereference_mut().pop() {
                 Some(x) => Value::u256(x),
                 None => err_pop_empty_vec!(),
             },
-            Container::VecBool(r) => match r.borrow_mut().pop() {
+            Container::VecBool(r) => match r.dereference_mut().pop() {
                 Some(x) => Value::bool(x),
                 None => err_pop_empty_vec!(),
             },
-            Container::VecAddress(r) => match r.borrow_mut().pop() {
+            Container::VecAddress(r) => match r.dereference_mut().pop() {
                 Some(x) => Value::address(x),
                 None => err_pop_empty_vec!(),
             },
-            Container::Vec(r) => match r.borrow_mut().pop() {
+            Container::Vec(r) => match r.dereference_mut().pop() {
                 Some(x) => Value(x),
                 None => err_pop_empty_vec!(),
             },
@@ -2861,7 +2958,7 @@ impl VectorRef {
 
         macro_rules! swap {
             ($v:expr) => {{
-                let mut v = $v.borrow_mut();
+                let v = $v.dereference_mut();
                 if idx1 >= v.len() || idx2 >= v.len() {
                     return Err(PartialVMError::new(StatusCode::VECTOR_OPERATION_ERROR)
                         .with_sub_status(INDEX_OUT_OF_BOUNDS));
@@ -2916,8 +3013,8 @@ impl VectorRef {
 
         macro_rules! move_range {
             ($from:expr, $to:expr) => {{
-                let mut from_v = $from.borrow_mut();
-                let mut to_v = $to.borrow_mut();
+                let from_v = $from.dereference_mut();
+                let to_v = $to.dereference_mut();
 
                 if removal_position.checked_add(length).map_or(true, |end| end > from_v.len())
                         || insert_position > to_v.len() {
@@ -2930,7 +3027,7 @@ impl VectorRef {
                 if length == 1 {
                     to_v.insert(insert_position, from_v.remove(removal_position));
                 } else if removal_position == 0 && length == from_v.len() && insert_position == to_v.len() {
-                    to_v.append(&mut from_v);
+                    to_v.append(from_v);
                 } else if (removal_position + length == from_v.len() && insert_position == to_v.len()) {
                     to_v.append(&mut from_v.split_off(removal_position));
                 } else {
@@ -3017,7 +3114,7 @@ impl Vector {
             | Type::Struct { .. }
             | Type::StructInstantiation { .. }
             | Type::Function { .. } => Value(ValueImpl::Container(Container::Vec(Arc::new(
-                AtomicRefCell::new(elements.into_iter().map(|v| v.0).collect()),
+                ExplicitSyncWrapper::new(elements.into_iter().map(|v| v.0).collect()),
             )))),
 
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
@@ -3133,31 +3230,31 @@ impl Container {
     fn legacy_size(&self) -> AbstractMemorySize {
         match self {
             Self::Locals(r) | Self::Vec(r) | Self::Struct(r) => {
-                Struct::legacy_size_impl(&r.borrow())
+                Struct::legacy_size_impl(&r.dereference())
             },
             Self::VecU8(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<u8>()) as u64)
+                AbstractMemorySize::new((r.dereference().len() * std::mem::size_of::<u8>()) as u64)
             },
             Self::VecU16(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<u16>()) as u64)
+                AbstractMemorySize::new((r.dereference().len() * std::mem::size_of::<u16>()) as u64)
             },
             Self::VecU32(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<u32>()) as u64)
+                AbstractMemorySize::new((r.dereference().len() * std::mem::size_of::<u32>()) as u64)
             },
             Self::VecU64(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<u64>()) as u64)
+                AbstractMemorySize::new((r.dereference().len() * std::mem::size_of::<u64>()) as u64)
             },
-            Self::VecU128(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<u128>()) as u64)
-            },
-            Self::VecU256(r) => AbstractMemorySize::new(
-                (r.borrow().len() * std::mem::size_of::<u256::U256>()) as u64,
+            Self::VecU128(r) => AbstractMemorySize::new(
+                (r.dereference().len() * std::mem::size_of::<u128>()) as u64,
             ),
-            Self::VecBool(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<bool>()) as u64)
-            },
+            Self::VecU256(r) => AbstractMemorySize::new(
+                (r.dereference().len() * std::mem::size_of::<u256::U256>()) as u64,
+            ),
+            Self::VecBool(r) => AbstractMemorySize::new(
+                (r.dereference().len() * std::mem::size_of::<bool>()) as u64,
+            ),
             Self::VecAddress(r) => AbstractMemorySize::new(
-                (r.borrow().len() * std::mem::size_of::<AccountAddress>()) as u64,
+                (r.dereference().len() * std::mem::size_of::<AccountAddress>()) as u64,
             ),
         }
     }
@@ -3321,7 +3418,7 @@ impl GlobalValueImpl {
     ) -> Result<Self, (PartialVMError, ValueImpl)> {
         match val {
             ValueImpl::Container(Container::Struct(fields)) => {
-                let status = Arc::new(AtomicRefCell::new(status));
+                let status = Arc::new(ExplicitSyncWrapper::new(status));
                 Ok(Self::Cached { fields, status })
             },
             val => Err((
@@ -3408,7 +3505,7 @@ impl GlobalValueImpl {
             Self::Fresh { fields } => {
                 Some(Op::New(ValueImpl::Container(Container::Struct(fields))))
             },
-            Self::Cached { fields, status } => match &*status.borrow() {
+            Self::Cached { fields, status } => match &*status.dereference() {
                 GlobalDataStatus::Dirty => {
                     Some(Op::Modify(ValueImpl::Container(Container::Struct(fields))))
                 },
@@ -3422,7 +3519,7 @@ impl GlobalValueImpl {
             Self::None => false,
             Self::Deleted => true,
             Self::Fresh { fields: _ } => true,
-            Self::Cached { fields: _, status } => match &*status.borrow() {
+            Self::Cached { fields: _, status } => match &*status.dereference() {
                 GlobalDataStatus::Dirty => true,
                 GlobalDataStatus::Clean => false,
             },
@@ -3573,7 +3670,7 @@ impl Display for ContainerRef {
             Self::Global {
                 status,
                 container: _,
-            } => write!(f, "(&container -- {:?})", &*status.borrow()),
+            } => write!(f, "(&container -- {:?})", &*status.dereference()),
         }
     }
 }
@@ -3590,16 +3687,16 @@ impl Display for Container {
 
         match self {
             Self::Locals(r) | Self::Vec(r) | Self::Struct(r) => {
-                display_list_of_items(r.borrow().iter(), f)
+                display_list_of_items(r.dereference().iter(), f)
             },
-            Self::VecU8(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU16(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU32(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU64(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU128(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU256(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecBool(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecAddress(r) => display_list_of_items(r.borrow().iter(), f),
+            Self::VecU8(r) => display_list_of_items(r.dereference().iter(), f),
+            Self::VecU16(r) => display_list_of_items(r.dereference().iter(), f),
+            Self::VecU32(r) => display_list_of_items(r.dereference().iter(), f),
+            Self::VecU64(r) => display_list_of_items(r.dereference().iter(), f),
+            Self::VecU128(r) => display_list_of_items(r.dereference().iter(), f),
+            Self::VecU256(r) => display_list_of_items(r.dereference().iter(), f),
+            Self::VecBool(r) => display_list_of_items(r.dereference().iter(), f),
+            Self::VecAddress(r) => display_list_of_items(r.dereference().iter(), f),
         }?;
 
         write!(f, ")")
@@ -3618,7 +3715,7 @@ impl Display for Locals {
             f,
             "{}",
             self.0
-                .borrow()
+                .dereference()
                 .iter()
                 .enumerate()
                 .map(|(idx, val)| format!("[{}] {}", idx, val))
@@ -3729,20 +3826,24 @@ pub mod debug {
 
     fn print_container<B: Write>(buf: &mut B, c: &Container) -> PartialVMResult<()> {
         match c {
-            Container::Vec(r) => print_list(buf, "[", r.borrow().iter(), print_value_impl, "]"),
-
-            Container::Struct(r) => {
-                print_list(buf, "{ ", r.borrow().iter(), print_value_impl, " }")
+            Container::Vec(r) => {
+                print_list(buf, "[", r.dereference().iter(), print_value_impl, "]")
             },
 
-            Container::VecU8(r) => print_list(buf, "[", r.borrow().iter(), print_u8, "]"),
-            Container::VecU16(r) => print_list(buf, "[", r.borrow().iter(), print_u16, "]"),
-            Container::VecU32(r) => print_list(buf, "[", r.borrow().iter(), print_u32, "]"),
-            Container::VecU64(r) => print_list(buf, "[", r.borrow().iter(), print_u64, "]"),
-            Container::VecU128(r) => print_list(buf, "[", r.borrow().iter(), print_u128, "]"),
-            Container::VecU256(r) => print_list(buf, "[", r.borrow().iter(), print_u256, "]"),
-            Container::VecBool(r) => print_list(buf, "[", r.borrow().iter(), print_bool, "]"),
-            Container::VecAddress(r) => print_list(buf, "[", r.borrow().iter(), print_address, "]"),
+            Container::Struct(r) => {
+                print_list(buf, "{ ", r.dereference().iter(), print_value_impl, " }")
+            },
+
+            Container::VecU8(r) => print_list(buf, "[", r.dereference().iter(), print_u8, "]"),
+            Container::VecU16(r) => print_list(buf, "[", r.dereference().iter(), print_u16, "]"),
+            Container::VecU32(r) => print_list(buf, "[", r.dereference().iter(), print_u32, "]"),
+            Container::VecU64(r) => print_list(buf, "[", r.dereference().iter(), print_u64, "]"),
+            Container::VecU128(r) => print_list(buf, "[", r.dereference().iter(), print_u128, "]"),
+            Container::VecU256(r) => print_list(buf, "[", r.dereference().iter(), print_u256, "]"),
+            Container::VecBool(r) => print_list(buf, "[", r.dereference().iter(), print_bool, "]"),
+            Container::VecAddress(r) => {
+                print_list(buf, "[", r.dereference().iter(), print_address, "]")
+            },
 
             Container::Locals(_) => Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -3774,23 +3875,23 @@ pub mod debug {
         let idx = r.idx;
         match r.container_ref.container() {
             Container::Locals(r) | Container::Vec(r) | Container::Struct(r) => {
-                print_slice_elem(buf, &r.borrow(), idx, print_value_impl)
+                print_slice_elem(buf, &r.dereference(), idx, print_value_impl)
             },
 
-            Container::VecU8(r) => print_slice_elem(buf, &r.borrow(), idx, print_u8),
-            Container::VecU16(r) => print_slice_elem(buf, &r.borrow(), idx, print_u16),
-            Container::VecU32(r) => print_slice_elem(buf, &r.borrow(), idx, print_u32),
-            Container::VecU64(r) => print_slice_elem(buf, &r.borrow(), idx, print_u64),
-            Container::VecU128(r) => print_slice_elem(buf, &r.borrow(), idx, print_u128),
-            Container::VecU256(r) => print_slice_elem(buf, &r.borrow(), idx, print_u256),
-            Container::VecBool(r) => print_slice_elem(buf, &r.borrow(), idx, print_bool),
-            Container::VecAddress(r) => print_slice_elem(buf, &r.borrow(), idx, print_address),
+            Container::VecU8(r) => print_slice_elem(buf, &r.dereference(), idx, print_u8),
+            Container::VecU16(r) => print_slice_elem(buf, &r.dereference(), idx, print_u16),
+            Container::VecU32(r) => print_slice_elem(buf, &r.dereference(), idx, print_u32),
+            Container::VecU64(r) => print_slice_elem(buf, &r.dereference(), idx, print_u64),
+            Container::VecU128(r) => print_slice_elem(buf, &r.dereference(), idx, print_u128),
+            Container::VecU256(r) => print_slice_elem(buf, &r.dereference(), idx, print_u256),
+            Container::VecBool(r) => print_slice_elem(buf, &r.dereference(), idx, print_bool),
+            Container::VecAddress(r) => print_slice_elem(buf, &r.dereference(), idx, print_address),
         }
     }
 
     pub fn print_locals<B: Write>(buf: &mut B, locals: &Locals) -> PartialVMResult<()> {
         // REVIEW: The number of spaces in the indent is currently hard coded.
-        for (idx, val) in locals.0.borrow().iter().enumerate() {
+        for (idx, val) in locals.0.dereference().iter().enumerate() {
             debug_write!(buf, "            [{}] ", idx)?;
             print_value_impl(buf, val)?;
             debug_writeln!(buf)?;
@@ -3862,7 +3963,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
                 (SerializationReadyValue {
                     ctx: self.ctx,
                     layout: struct_layout,
-                    value: &*r.borrow(),
+                    value: &*r.dereference(),
                     // Note: for struct, we increment depth for fields in the corresponding
                     // serializer.
                     depth: self.depth,
@@ -3885,16 +3986,16 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
             (L::Vector(layout), ValueImpl::Container(c)) => {
                 let layout = layout.as_ref();
                 match (layout, c) {
-                    (L::U8, Container::VecU8(r)) => r.borrow().serialize(serializer),
-                    (L::U16, Container::VecU16(r)) => r.borrow().serialize(serializer),
-                    (L::U32, Container::VecU32(r)) => r.borrow().serialize(serializer),
-                    (L::U64, Container::VecU64(r)) => r.borrow().serialize(serializer),
-                    (L::U128, Container::VecU128(r)) => r.borrow().serialize(serializer),
-                    (L::U256, Container::VecU256(r)) => r.borrow().serialize(serializer),
-                    (L::Bool, Container::VecBool(r)) => r.borrow().serialize(serializer),
-                    (L::Address, Container::VecAddress(r)) => r.borrow().serialize(serializer),
+                    (L::U8, Container::VecU8(r)) => r.dereference().serialize(serializer),
+                    (L::U16, Container::VecU16(r)) => r.dereference().serialize(serializer),
+                    (L::U32, Container::VecU32(r)) => r.dereference().serialize(serializer),
+                    (L::U64, Container::VecU64(r)) => r.dereference().serialize(serializer),
+                    (L::U128, Container::VecU128(r)) => r.dereference().serialize(serializer),
+                    (L::U256, Container::VecU256(r)) => r.dereference().serialize(serializer),
+                    (L::Bool, Container::VecBool(r)) => r.dereference().serialize(serializer),
+                    (L::Address, Container::VecAddress(r)) => r.dereference().serialize(serializer),
                     (_, Container::Vec(r)) => {
-                        let v = r.borrow();
+                        let v = r.dereference();
                         let mut t = serializer.serialize_seq(Some(v.len()))?;
                         for value in v.iter() {
                             t.serialize_element(&SerializationReadyValue {
@@ -3917,7 +4018,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
             (L::Signer, ValueImpl::Container(Container::Struct(r))) => {
                 if self.ctx.legacy_signer {
                     // Only allow serialization of master signer.
-                    if *r.borrow()[0].as_value_ref::<u16>().map_err(|_| {
+                    if *r.dereference()[0].as_value_ref::<u16>().map_err(|_| {
                         invariant_violation::<S>(format!(
                             "First field of a signer needs to be an enum descriminator, got {:?}",
                             self.value
@@ -3926,7 +4027,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
                     {
                         return Err(S::Error::custom(PartialVMError::new(StatusCode::ABORTED)));
                     }
-                    r.borrow()
+                    r.dereference()
                         .get(MASTER_ADDRESS_FIELD_OFFSET)
                         .ok_or_else(|| {
                             invariant_violation::<S>(format!(
@@ -3946,7 +4047,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
                     (SerializationReadyValue {
                         ctx: self.ctx,
                         layout: &MoveStructLayout::signer_serialization_layout(),
-                        value: &*r.borrow(),
+                        value: &*r.dereference(),
                         depth: self.depth,
                     })
                     .serialize(serializer)
@@ -4146,7 +4247,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                     };
                     let vector = deserializer.deserialize_seq(VectorElementVisitor(seed))?;
                     Value(ValueImpl::Container(Container::Vec(Arc::new(
-                        AtomicRefCell::new(vector),
+                        ExplicitSyncWrapper::new(vector),
                     ))))
                 },
             }),
@@ -4455,7 +4556,7 @@ impl Container {
         match self {
             Locals(_) => unreachable!("Should not ba able to visit a Locals container directly"),
             Vec(r) => {
-                let r = r.borrow();
+                let r = r.dereference();
                 if visitor.visit_vec(depth, r.len())? {
                     for val in r.iter() {
                         val.visit_impl(visitor, depth + 1)?;
@@ -4464,7 +4565,7 @@ impl Container {
                 Ok(())
             },
             Struct(r) => {
-                let r = r.borrow();
+                let r = r.dereference();
                 if visitor.visit_struct(depth, r.len())? {
                     for val in r.iter() {
                         val.visit_impl(visitor, depth + 1)?;
@@ -4472,14 +4573,14 @@ impl Container {
                 }
                 Ok(())
             },
-            VecU8(r) => visitor.visit_vec_u8(depth, &r.borrow()),
-            VecU16(r) => visitor.visit_vec_u16(depth, &r.borrow()),
-            VecU32(r) => visitor.visit_vec_u32(depth, &r.borrow()),
-            VecU64(r) => visitor.visit_vec_u64(depth, &r.borrow()),
-            VecU128(r) => visitor.visit_vec_u128(depth, &r.borrow()),
-            VecU256(r) => visitor.visit_vec_u256(depth, &r.borrow()),
-            VecBool(r) => visitor.visit_vec_bool(depth, &r.borrow()),
-            VecAddress(r) => visitor.visit_vec_address(depth, &r.borrow()),
+            VecU8(r) => visitor.visit_vec_u8(depth, &r.dereference()),
+            VecU16(r) => visitor.visit_vec_u16(depth, &r.dereference()),
+            VecU32(r) => visitor.visit_vec_u32(depth, &r.dereference()),
+            VecU64(r) => visitor.visit_vec_u64(depth, &r.dereference()),
+            VecU128(r) => visitor.visit_vec_u128(depth, &r.dereference()),
+            VecU256(r) => visitor.visit_vec_u256(depth, &r.dereference()),
+            VecBool(r) => visitor.visit_vec_bool(depth, &r.dereference()),
+            VecAddress(r) => visitor.visit_vec_address(depth, &r.dereference()),
         }
     }
 
@@ -4492,15 +4593,15 @@ impl Container {
         use Container::*;
 
         match self {
-            Locals(r) | Vec(r) | Struct(r) => r.borrow()[idx].visit_impl(visitor, depth + 1),
-            VecU8(vals) => visitor.visit_u8(depth + 1, vals.borrow()[idx]),
-            VecU16(vals) => visitor.visit_u16(depth + 1, vals.borrow()[idx]),
-            VecU32(vals) => visitor.visit_u32(depth + 1, vals.borrow()[idx]),
-            VecU64(vals) => visitor.visit_u64(depth + 1, vals.borrow()[idx]),
-            VecU128(vals) => visitor.visit_u128(depth + 1, vals.borrow()[idx]),
-            VecU256(vals) => visitor.visit_u256(depth + 1, vals.borrow()[idx]),
-            VecBool(vals) => visitor.visit_bool(depth + 1, vals.borrow()[idx]),
-            VecAddress(vals) => visitor.visit_address(depth + 1, vals.borrow()[idx]),
+            Locals(r) | Vec(r) | Struct(r) => r.dereference()[idx].visit_impl(visitor, depth + 1),
+            VecU8(vals) => visitor.visit_u8(depth + 1, vals.dereference()[idx]),
+            VecU16(vals) => visitor.visit_u16(depth + 1, vals.dereference()[idx]),
+            VecU32(vals) => visitor.visit_u32(depth + 1, vals.dereference()[idx]),
+            VecU64(vals) => visitor.visit_u64(depth + 1, vals.dereference()[idx]),
+            VecU128(vals) => visitor.visit_u128(depth + 1, vals.dereference()[idx]),
+            VecU256(vals) => visitor.visit_u256(depth + 1, vals.dereference()[idx]),
+            VecBool(vals) => visitor.visit_bool(depth + 1, vals.dereference()[idx]),
+            VecAddress(vals) => visitor.visit_address(depth + 1, vals.dereference()[idx]),
         }
     }
 }
@@ -4677,11 +4778,11 @@ impl GlobalValue {
     pub fn view(&self) -> Option<impl ValueView + '_> {
         use GlobalValueImpl as G;
 
-        struct Wrapper<'b>(&'b Arc<AtomicRefCell<Vec<ValueImpl>>>);
+        struct Wrapper<'b>(&'b Arc<ExplicitSyncWrapper<Vec<ValueImpl>>>);
 
         impl ValueView for Wrapper<'_> {
             fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
-                let r = self.0.borrow();
+                let r = self.0.dereference();
                 if visitor.visit_struct(0, r.len())? {
                     for val in r.iter() {
                         val.visit_impl(visitor, 1)?;
@@ -4774,68 +4875,68 @@ pub mod prop {
                 L::U8 => vec(any::<u8>(), 0..10)
                     .prop_map(|vals| {
                         Value(ValueImpl::Container(Container::VecU8(Arc::new(
-                            AtomicRefCell::new(vals),
+                            ExplicitSyncWrapper::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::U16 => vec(any::<u16>(), 0..10)
                     .prop_map(|vals| {
                         Value(ValueImpl::Container(Container::VecU16(Arc::new(
-                            AtomicRefCell::new(vals),
+                            ExplicitSyncWrapper::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::U32 => vec(any::<u32>(), 0..10)
                     .prop_map(|vals| {
                         Value(ValueImpl::Container(Container::VecU32(Arc::new(
-                            AtomicRefCell::new(vals),
+                            ExplicitSyncWrapper::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::U64 => vec(any::<u64>(), 0..10)
                     .prop_map(|vals| {
                         Value(ValueImpl::Container(Container::VecU64(Arc::new(
-                            AtomicRefCell::new(vals),
+                            ExplicitSyncWrapper::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::U128 => vec(any::<u128>(), 0..10)
                     .prop_map(|vals| {
                         Value(ValueImpl::Container(Container::VecU128(Arc::new(
-                            AtomicRefCell::new(vals),
+                            ExplicitSyncWrapper::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::U256 => vec(any::<u256::U256>(), 0..10)
                     .prop_map(|vals| {
                         Value(ValueImpl::Container(Container::VecU256(Arc::new(
-                            AtomicRefCell::new(vals),
+                            ExplicitSyncWrapper::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::Bool => vec(any::<bool>(), 0..10)
                     .prop_map(|vals| {
                         Value(ValueImpl::Container(Container::VecBool(Arc::new(
-                            AtomicRefCell::new(vals),
+                            ExplicitSyncWrapper::new(vals),
                         ))))
                     })
                     .boxed(),
                 L::Address => vec(any::<AccountAddress>(), 0..10)
                     .prop_map(|vals| {
                         Value(ValueImpl::Container(Container::VecAddress(Arc::new(
-                            AtomicRefCell::new(vals),
+                            ExplicitSyncWrapper::new(vals),
                         ))))
                     })
                     .boxed(),
                 layout => vec(value_strategy_with_layout(layout), 0..10)
                     .prop_map(|vals| {
                         Value(ValueImpl::Container(Container::Vec(Arc::new(
-                            AtomicRefCell::new(vals.into_iter().map(|val| val.0).collect()),
+                            ExplicitSyncWrapper::new(vals.into_iter().map(|val| val.0).collect()),
                         ))))
                     })
                     .boxed(),
             },
-            L::Struct(_struct_layout @ MoveStructLayout::RuntimeVariants(variants)) => {
+            L::Struct(MoveStructLayout::RuntimeVariants(variants)) => {
                 // Randomly choose a variant index
                 let variant_count = variants.len();
                 let variants = variants.clone();
@@ -4891,7 +4992,7 @@ pub mod prop {
                                         mask,
                                         captured_layouts.clone(),
                                     );
-                                    Value::closure(Box::new(fun), captured_values)
+                                    Value::closure(Arc::new(fun), captured_values)
                                 })
                             },
                         )
@@ -4969,7 +5070,7 @@ impl ValueImpl {
             (L::Address, ValueImpl::Address(x)) => MoveValue::Address(*x),
 
             (L::Struct(struct_layout), ValueImpl::Container(Container::Struct(r))) => {
-                let values_ref = r.borrow();
+                let values_ref = r.dereference();
                 let values = values_ref.as_slice();
                 if let Some((tag, variant_layouts)) =
                     try_get_variant_field_layouts(struct_layout, values)
@@ -4996,18 +5097,38 @@ impl ValueImpl {
             },
 
             (L::Vector(inner_layout), ValueImpl::Container(c)) => MoveValue::Vector(match c {
-                Container::VecU8(r) => r.borrow().iter().map(|u| MoveValue::U8(*u)).collect(),
-                Container::VecU16(r) => r.borrow().iter().map(|u| MoveValue::U16(*u)).collect(),
-                Container::VecU32(r) => r.borrow().iter().map(|u| MoveValue::U32(*u)).collect(),
-                Container::VecU64(r) => r.borrow().iter().map(|u| MoveValue::U64(*u)).collect(),
-                Container::VecU128(r) => r.borrow().iter().map(|u| MoveValue::U128(*u)).collect(),
-                Container::VecU256(r) => r.borrow().iter().map(|u| MoveValue::U256(*u)).collect(),
-                Container::VecBool(r) => r.borrow().iter().map(|u| MoveValue::Bool(*u)).collect(),
-                Container::VecAddress(r) => {
-                    r.borrow().iter().map(|u| MoveValue::Address(*u)).collect()
+                Container::VecU8(r) => r.dereference().iter().map(|u| MoveValue::U8(*u)).collect(),
+                Container::VecU16(r) => {
+                    r.dereference().iter().map(|u| MoveValue::U16(*u)).collect()
                 },
+                Container::VecU32(r) => {
+                    r.dereference().iter().map(|u| MoveValue::U32(*u)).collect()
+                },
+                Container::VecU64(r) => {
+                    r.dereference().iter().map(|u| MoveValue::U64(*u)).collect()
+                },
+                Container::VecU128(r) => r
+                    .dereference()
+                    .iter()
+                    .map(|u| MoveValue::U128(*u))
+                    .collect(),
+                Container::VecU256(r) => r
+                    .dereference()
+                    .iter()
+                    .map(|u| MoveValue::U256(*u))
+                    .collect(),
+                Container::VecBool(r) => r
+                    .dereference()
+                    .iter()
+                    .map(|u| MoveValue::Bool(*u))
+                    .collect(),
+                Container::VecAddress(r) => r
+                    .dereference()
+                    .iter()
+                    .map(|u| MoveValue::Address(*u))
+                    .collect(),
                 Container::Vec(r) => r
-                    .borrow()
+                    .dereference()
                     .iter()
                     .map(|v| v.as_move_value(inner_layout.as_ref()))
                     .collect(),
@@ -5018,7 +5139,7 @@ impl ValueImpl {
             }),
 
             (L::Signer, ValueImpl::Container(Container::Struct(r))) => {
-                let v = r.borrow();
+                let v = r.dereference();
                 match &v[MASTER_ADDRESS_FIELD_OFFSET] {
                     ValueImpl::Address(a) => MoveValue::Signer(*a),
                     v => panic!("Unexpected non-address while converting signer: {:?}", v),
@@ -5083,3 +5204,99 @@ fn check_depth(depth: u64, max_depth: Option<u64>) -> PartialVMResult<()> {
     }
     Ok(())
 }
+
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use std::{
+    cell::UnsafeCell,
+    ops::{Deref, DerefMut},
+    sync::atomic,
+};
+
+// Parallel algorithms often guarantee a sequential use of certain
+// data structures, or parts of the data-structures (like elements of
+// a vector).  The rust compiler can not prove the safety of even
+// slightly complex parallel algorithms.
+
+/// ExplicitSyncWrapper is meant to be used in parallel algorithms
+/// where we can prove that there will be no concurrent access to the
+/// underlying object (or its elements).  Use with caution - only when
+/// the safety can be proven.
+#[derive(Debug)]
+pub struct ExplicitSyncWrapper<T> {
+    value: UnsafeCell<T>,
+}
+
+pub struct Guard<'a, T> {
+    lock: &'a ExplicitSyncWrapper<T>,
+}
+
+impl<T> ExplicitSyncWrapper<T> {
+    pub const fn new(value: T) -> Self {
+        Self {
+            value: UnsafeCell::new(value),
+        }
+    }
+
+    pub fn acquire(&self) -> Guard<T> {
+        atomic::fence(atomic::Ordering::Acquire);
+        Guard { lock: self }
+    }
+
+    pub(crate) fn unlock(&self) {
+        atomic::fence(atomic::Ordering::Release);
+    }
+
+    pub fn into_inner(self) -> T {
+        self.value.into_inner()
+    }
+
+    pub fn dereference(&self) -> &T {
+        unsafe { &*self.value.get() }
+    }
+
+    // This performs the acquire fence so temporal reasoning on the result
+    // of the dereference is valid, and then returns a reference with the
+    // same lifetime as the wrapper (unlike acquire which returns a guard).
+    pub fn fence_and_dereference(&self) -> &T {
+        atomic::fence(atomic::Ordering::Acquire);
+        self.dereference()
+    }
+
+    pub fn dereference_mut<'a>(&self) -> &'a mut T {
+        unsafe { &mut *self.value.get() }
+    }
+}
+
+impl<T> Guard<'_, T> {
+    pub fn dereference(&self) -> &T {
+        self.lock.dereference()
+    }
+
+    pub fn dereference_mut(&mut self) -> &mut T {
+        self.lock.dereference_mut()
+    }
+}
+
+impl<T> Deref for Guard<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        self.lock.dereference()
+    }
+}
+
+impl<T> DerefMut for Guard<'_, T> {
+    fn deref_mut(&mut self) -> &mut T {
+        self.lock.dereference_mut()
+    }
+}
+
+impl<T> Drop for Guard<'_, T> {
+    fn drop(&mut self) {
+        self.lock.unlock();
+    }
+}
+
+unsafe impl<T> Sync for ExplicitSyncWrapper<T> {}

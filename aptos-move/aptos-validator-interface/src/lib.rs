@@ -12,7 +12,7 @@ use aptos_types::{
     account_address::AccountAddress,
     state_store::{
         state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateViewId, StateViewResult, TStateView,
+        state_value::StateValue, StateViewId, StateViewRead, StateViewResult, TStateView,
     },
     transaction::{Transaction, TransactionInfo, Version},
 };
@@ -169,8 +169,9 @@ impl TStateView for DebuggerStateView {
         StateViewId::Replay
     }
 
-    fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateSlot> {
+    fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateViewRead<StateSlot>> {
         self.get_state_slot_internal(state_key, self.version)
+            .map(StateViewRead::new)
             .map_err(Into::into)
     }
 

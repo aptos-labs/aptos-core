@@ -8,6 +8,7 @@ use aptos_types::{
 };
 use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
+use move_vm_types::values::GlobalValue;
 use std::sync::{atomic::AtomicU32, Arc};
 
 pub type AtomicTxnIndex = AtomicU32;
@@ -47,7 +48,7 @@ pub enum MVDataError {
 }
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum MVDataOutput<V> {
     /// Result of resolved delta op, always u128. Unlike with `Version`, we return
     /// actual data because u128 is cheap to copy and validation can be done correctly
@@ -126,26 +127,29 @@ impl ShiftedTxnIndex {
 
 // TODO[agg_v2](cleanup): consider adding `DoesntExist` variant.
 // Currently, "not existing value" is represented as Deletion.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum ValueWithLayout<V> {
     // When we read from storage, but don't have access to layout, we can only store the raw value.
     // This should never be returned to the user, before exchange is performed.
-    RawFromStorage(Arc<V>),
+    RawFromStorage(Arc<V>, Option<GlobalValue>),
     // We've used the optional layout, and applied exchange to the storage value.
     // The type layout is Some if there is a delayed field in the resource.
     // The type layout is None if there is no delayed field in the resource.
-    Exchanged(Arc<V>, Option<Arc<MoveTypeLayout>>),
+    Exchanged(Arc<V>, Option<Arc<MoveTypeLayout>>, Option<GlobalValue>),
 }
 
 impl<T> Clone for ValueWithLayout<T> {
     fn clone(&self) -> Self {
         match self {
-            ValueWithLayout::RawFromStorage(value) => {
-                ValueWithLayout::RawFromStorage(value.clone())
-            },
-            ValueWithLayout::Exchanged(value, layout) => {
-                ValueWithLayout::Exchanged(value.clone(), layout.clone())
-            },
+            ValueWithLayout::RawFromStorage(value, maybe_gv) => ValueWithLayout::RawFromStorage(
+                value.clone(),
+                maybe_gv.as_ref().map(|g| g.shallow_copy()),
+            ),
+            ValueWithLayout::Exchanged(value, layout, maybe_gv) => ValueWithLayout::Exchanged(
+                value.clone(),
+                layout.clone(),
+                maybe_gv.as_ref().map(|g| g.shallow_copy()),
+            ),
         }
     }
 }
@@ -153,15 +157,15 @@ impl<T> Clone for ValueWithLayout<T> {
 impl<V: TransactionWrite> ValueWithLayout<V> {
     pub fn write_op_kind(&self) -> WriteOpKind {
         match self {
-            ValueWithLayout::RawFromStorage(value) => value.write_op_kind(),
-            ValueWithLayout::Exchanged(value, _) => value.write_op_kind(),
+            ValueWithLayout::RawFromStorage(value, _) => value.write_op_kind(),
+            ValueWithLayout::Exchanged(value, _, _) => value.write_op_kind(),
         }
     }
 
     pub fn bytes_len(&self) -> Option<usize> {
         fail_point!("value_with_layout_bytes_len", |_| { Some(10) });
         match self {
-            ValueWithLayout::RawFromStorage(value) | ValueWithLayout::Exchanged(value, _) => {
+            ValueWithLayout::RawFromStorage(value, _) | ValueWithLayout::Exchanged(value, _, _) => {
                 value.bytes().map(|b| b.len())
             },
         }
@@ -169,9 +173,9 @@ impl<V: TransactionWrite> ValueWithLayout<V> {
 
     pub fn extract_value_no_layout(&self) -> &V {
         match self {
-            ValueWithLayout::RawFromStorage(value) => value.as_ref(),
-            ValueWithLayout::Exchanged(value, None) => value.as_ref(),
-            ValueWithLayout::Exchanged(_, Some(_)) => panic!("Unexpected layout"),
+            ValueWithLayout::RawFromStorage(value, _) => value.as_ref(),
+            ValueWithLayout::Exchanged(value, None, _) => value.as_ref(),
+            ValueWithLayout::Exchanged(_, Some(_), _) => panic!("Unexpected layout"),
         }
     }
 }

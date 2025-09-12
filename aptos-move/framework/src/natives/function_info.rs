@@ -152,8 +152,7 @@ fn native_is_identifier(
 
     context.charge(
         FUNCTION_INFO_CHECK_IS_IDENTIFIER_BASE
-            + FUNCTION_INFO_CHECK_IS_IDENTIFIER_PER_BYTE
-                * NumBytes::new(s_ref.as_slice().len() as u64),
+            + FUNCTION_INFO_CHECK_IS_IDENTIFIER_PER_BYTE * NumBytes::new(s_ref.len() as u64),
     )?;
 
     let result = if let Ok(str) = std::str::from_utf8(&s_ref) {

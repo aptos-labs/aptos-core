@@ -45,10 +45,10 @@ fn native_check_utf8(
     debug_assert!(args.len() == 1);
     let s_arg = pop_arg!(args, VectorRef);
     let s_ref = s_arg.as_bytes_ref();
-    let ok = std::str::from_utf8(s_ref.as_slice()).is_ok();
+    let ok = std::str::from_utf8(s_ref).is_ok();
     // TODO: extensible native cost tables
 
-    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(s_ref.as_slice().len() as u64);
+    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(s_ref.len() as u64);
 
     NativeResult::map_partial_vm_result_one(cost, Ok(Value::bool(ok)))
 }
@@ -84,7 +84,7 @@ fn native_is_char_boundary(
     let s_ref = s_arg.as_bytes_ref();
     let ok = unsafe {
         // This is safe because we guarantee the bytes to be utf8.
-        std::str::from_utf8_unchecked(s_ref.as_slice()).is_char_boundary(i as usize)
+        std::str::from_utf8_unchecked(s_ref).is_char_boundary(i as usize)
     };
     NativeResult::map_partial_vm_result_one(gas_params.base, Ok(Value::bool(ok)))
 }
@@ -128,7 +128,7 @@ fn native_sub_string(
     let s_ref = s_arg.as_bytes_ref();
     let s_str = unsafe {
         // This is safe because we guarantee the bytes to be utf8.
-        std::str::from_utf8_unchecked(s_ref.as_slice())
+        std::str::from_utf8_unchecked(s_ref)
     };
     let v = Value::vector_u8(s_str[i..j].as_bytes().iter().cloned());
 
@@ -166,10 +166,10 @@ fn native_index_of(
     debug_assert!(args.len() == 2);
     let r_arg = pop_arg!(args, VectorRef);
     let r_ref = r_arg.as_bytes_ref();
-    let r_str = unsafe { std::str::from_utf8_unchecked(r_ref.as_slice()) };
+    let r_str = unsafe { std::str::from_utf8_unchecked(r_ref) };
     let s_arg = pop_arg!(args, VectorRef);
     let s_ref = s_arg.as_bytes_ref();
-    let s_str = unsafe { std::str::from_utf8_unchecked(s_ref.as_slice()) };
+    let s_str = unsafe { std::str::from_utf8_unchecked(s_ref) };
     let pos = match s_str.find(r_str) {
         Some(size) => size,
         None => s_str.len(),

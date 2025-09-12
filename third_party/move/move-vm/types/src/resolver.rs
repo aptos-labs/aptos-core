@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::values::GlobalValue;
 use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
@@ -11,6 +12,11 @@ use move_core_types::{
 
 pub fn resource_size(resource: &Option<Bytes>) -> usize {
     resource.as_ref().map(|bytes| bytes.len()).unwrap_or(0)
+}
+
+pub enum ValueOrBytes {
+    Value(GlobalValue),
+    Bytes(Option<Bytes>),
 }
 
 /// A persistent storage backend that can resolve resources by address + type
@@ -30,4 +36,21 @@ pub trait ResourceResolver {
         metadata: &[Metadata],
         layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)>;
+
+    fn get_gv_with_metadata_and_layout(
+        &self,
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+        metadata: &[Metadata],
+        layout: &MoveTypeLayout,
+        contains_dfs: bool,
+    ) -> PartialVMResult<(ValueOrBytes, usize)> {
+        self.get_resource_bytes_with_metadata_and_layout(
+            address,
+            struct_tag,
+            metadata,
+            contains_dfs.then_some(layout),
+        )
+        .map(|(bytes, size)| (ValueOrBytes::Bytes(bytes), size))
+    }
 }

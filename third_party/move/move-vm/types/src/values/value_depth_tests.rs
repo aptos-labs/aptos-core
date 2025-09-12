@@ -16,7 +16,7 @@ use move_core_types::{
     value::{MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
-use std::{cmp::Ordering, fmt::Debug};
+use std::{cmp::Ordering, fmt::Debug, sync::Arc};
 
 #[derive(Clone, Tid)]
 struct MockFunction {
@@ -35,9 +35,9 @@ impl MockFunction {
             fun_id: ident_str!("mock").to_owned(),
             ty_args: vec![],
             mask,
-            captured_layouts: captured_layouts.into_iter().collect(),
+            captured_layouts: Arc::new(captured_layouts.into_iter().collect()),
         };
-        Value::closure(Box::new(Self { data }), captured)
+        Value::closure(Arc::new(Self { data }), captured)
     }
 }
 
@@ -50,8 +50,8 @@ impl AbstractFunction for MockFunction {
         Ok(Ordering::Equal)
     }
 
-    fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
-        Ok(Box::new(self.clone()))
+    fn clone_dyn(&self) -> PartialVMResult<Arc<dyn AbstractFunction>> {
+        Ok(Arc::new(self.clone()))
     }
 
     fn to_canonical_string(&self) -> String {

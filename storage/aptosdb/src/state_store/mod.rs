@@ -82,6 +82,7 @@ use std::{
     ops::Deref,
     sync::{Arc, MutexGuard},
 };
+use aptos_types::state_store::StateViewRead;
 
 pub(crate) mod buffered_state;
 mod state_merkle_batch_committer;
@@ -882,13 +883,13 @@ impl StateStore {
                 // TODO(aldenhu): cache changes here, should consume it.
                 let old_entry = cache
                     // TODO(HotState): Revisit: assuming every write op results in a hot slot
-                    .insert((*key).clone(), update_to_cold.to_result_slot())
+                    .insert((*key).clone(), StateViewRead::new(update_to_cold.to_result_slot()))
                     .unwrap_or_else(|| {
                         // n.b. all updated state items must be read and recorded in the state cache,
                         // otherwise we can't calculate the correct usage. The is_untracked() hack
                         // is to allow some db tests without real execution layer to pass.
                         assert!(ignore_state_cache_miss, "Must cache read.");
-                        StateSlot::ColdVacant
+                        StateViewRead::new(StateSlot::ColdVacant)
                     });
 
                 if old_entry.is_occupied() {

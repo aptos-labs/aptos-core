@@ -8,6 +8,7 @@ use crate::{
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     storage::{loader::traits::Loader, ty_layout_converter::LayoutConverter},
 };
+use atomic_refcell::AtomicRefCell;
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
     access::ModuleAccess,
@@ -34,7 +35,7 @@ use move_vm_types::{
     },
     values::{AbstractFunction, SerializedFunctionData},
 };
-use std::{cell::RefCell, cmp::Ordering, fmt::Debug, mem, rc::Rc, sync::Arc};
+use std::{cmp::Ordering, fmt::Debug, mem, rc::Rc, sync::Arc};
 
 /// A runtime function definition representation.
 pub struct Function {
@@ -117,7 +118,7 @@ impl LoadedFunction {
 /// function while sharing the loading state.
 #[derive(Clone, Tid)]
 pub(crate) struct LazyLoadedFunction {
-    pub(crate) state: Rc<RefCell<LazyLoadedFunctionState>>,
+    pub(crate) state: Arc<AtomicRefCell<LazyLoadedFunctionState>>,
 }
 
 #[derive(Clone)]
@@ -128,7 +129,7 @@ pub(crate) enum LazyLoadedFunctionState {
         data: SerializedFunctionData,
     },
     Resolved {
-        fun: Rc<LoadedFunction>,
+        fun: Arc<LoadedFunction>,
         // For a resolved function, we need to store the type argument tags,
         // even though we have the resolved `Type` for the arguments in `fun.ty_args`.
         // This is needed so we can compare with deterministic results an unresolved and
@@ -139,14 +140,16 @@ pub(crate) enum LazyLoadedFunctionState {
         // Layouts for captured arguments. The invariant is that these are always set for storable
         // closures at construction time. Non-storable closures just have None as they will not be
         // serialized anyway.
-        captured_layouts: Option<Vec<MoveTypeLayout>>,
+        captured_layouts: Option<Arc<Vec<MoveTypeLayout>>>,
     },
 }
 
 impl LazyLoadedFunction {
     pub(crate) fn new_unresolved(data: SerializedFunctionData) -> Self {
         Self {
-            state: Rc::new(RefCell::new(LazyLoadedFunctionState::Unresolved { data })),
+            state: Arc::new(AtomicRefCell::new(LazyLoadedFunctionState::Unresolved {
+                data,
+            })),
         }
     }
 
@@ -154,7 +157,7 @@ impl LazyLoadedFunction {
         layout_converter: &LayoutConverter<impl Loader>,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
-        fun: Rc<LoadedFunction>,
+        fun: Arc<LoadedFunction>,
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
         let runtime_environment = layout_converter.runtime_environment();
@@ -187,10 +190,11 @@ impl LazyLoadedFunction {
                         .with_message("Function values cannot capture delayed fields".to_string())
                 })
             })
-            .transpose()?;
+            .transpose()?
+            .map(Arc::new);
 
         Ok(Self {
-            state: Rc::new(RefCell::new(LazyLoadedFunctionState::Resolved {
+            state: Arc::new(AtomicRefCell::new(LazyLoadedFunctionState::Resolved {
                 fun,
                 ty_args,
                 mask,
@@ -282,7 +286,7 @@ impl LazyLoadedFunction {
         loader: &impl Loader,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
-    ) -> PartialVMResult<Rc<LoadedFunction>> {
+    ) -> PartialVMResult<Arc<LoadedFunction>> {
         let mut state = self.state.borrow_mut();
         Ok(match &mut *state {
             LazyLoadedFunctionState::Resolved { fun, .. } => fun.clone(),
@@ -308,7 +312,7 @@ impl LazyLoadedFunction {
                     fun: fun.clone(),
                     ty_args: mem::take(ty_args),
                     mask: *mask,
-                    captured_layouts: Some(mem::take(captured_layouts)),
+                    captured_layouts: Some(captured_layouts.clone()),
                 };
                 fun
             },
@@ -340,8 +344,8 @@ impl AbstractFunction for LazyLoadedFunction {
         })
     }
 
-    fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
-        Ok(Box::new(self.clone()))
+    fn clone_dyn(&self) -> PartialVMResult<Arc<dyn AbstractFunction>> {
+        Ok(Arc::new(self.clone()))
     }
 
     fn to_canonical_string(&self) -> String {

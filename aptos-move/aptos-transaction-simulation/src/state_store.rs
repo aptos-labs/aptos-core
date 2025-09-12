@@ -8,7 +8,7 @@ use aptos_types::{
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::{
         state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateViewId, StateViewResult, TStateView,
+        state_value::StateValue, StateViewId, StateViewRead, StateViewResult, TStateView,
     },
     transaction::Version,
     write_set::{TransactionWrite, WriteSet},
@@ -280,7 +280,7 @@ where
         }
     }
 
-    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
+    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateViewRead<StateSlot>> {
         match self {
             Self::Left(l) => l.get_state_slot(state_key),
             Self::Right(r) => r.get_state_slot(state_key),

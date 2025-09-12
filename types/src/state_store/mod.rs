@@ -12,6 +12,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use bytes::Bytes;
 use move_core_types::{language_storage::StructTag, move_resource::MoveResource};
+use move_vm_types::values::GlobalValue;
 #[cfg(any(test, feature = "testing"))]
 use std::hash::Hash;
 use std::ops::Deref;
@@ -27,6 +28,49 @@ pub mod table;
 pub const NUM_STATE_SHARDS: usize = 16;
 
 pub type StateViewResult<T, E = StateViewError> = std::result::Result<T, E>;
+
+#[derive(Debug)]
+pub struct StateViewRead<T> {
+    pub data: T,
+    gv: Option<GlobalValue>,
+}
+
+impl<T: Clone> Clone for StateViewRead<T> {
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            gv: self.gv.as_ref().map(|g| g.shallow_copy()),
+        }
+    }
+}
+
+impl<T: Clone> StateViewRead<T> {
+    pub fn new(data: T) -> Self {
+        Self { data, gv: None }
+    }
+
+    pub fn new_with_gv(data: T, gv: GlobalValue) -> Self {
+        Self { data, gv: Some(gv) }
+    }
+
+    pub fn set_gv(&mut self, gv: &GlobalValue) {
+        if self.gv.is_none() {
+            self.gv = Some(gv.shallow_copy());
+        }
+    }
+
+    pub fn unpack(self) -> (T, Option<GlobalValue>) {
+        (self.data, self.gv)
+    }
+}
+
+impl<T> Deref for StateViewRead<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
 
 /// A trait that defines a read-only snapshot of the global state. It is passed to the VM for
 /// transaction execution, during which the VM is guaranteed to read anything at the given state.
@@ -56,7 +100,12 @@ pub trait TStateView {
     }
 
     /// Gets the state slot for a given state key.
-    fn get_state_slot(&self, _state_key: &Self::Key) -> StateViewResult<StateSlot> {
+    fn get_state_slot(&self, _state_key: &Self::Key) -> StateViewResult<StateViewRead<StateSlot>> {
+        // TODO(HotState): implement for more views if accessed.
+        unimplemented!()
+    }
+
+    fn store_state_slot_unmemorized(&self, _state_key: &Self::Key, gv: &GlobalValue) {
         // TODO(HotState): implement for more views if accessed.
         unimplemented!()
     }
@@ -65,7 +114,7 @@ pub trait TStateView {
     fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {
         // if not implemented, delegate to get_state_slot.
         self.get_state_slot(state_key)
-            .map(StateSlot::into_state_value_opt)
+            .map(|v| StateSlot::into_state_value_opt(v.data))
     }
 
     /// Gets the state value bytes for a given state key.
@@ -151,7 +200,7 @@ where
         self.deref().next_version()
     }
 
-    fn get_state_slot(&self, state_key: &K) -> StateViewResult<StateSlot> {
+    fn get_state_slot(&self, state_key: &K) -> StateViewResult<StateViewRead<StateSlot>> {
         self.deref().get_state_slot(state_key)
     }
 

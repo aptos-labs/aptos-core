@@ -34,7 +34,23 @@ use move_vm_types::{
     },
     values::Locals,
 };
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, ops::Deref, rc::Rc, sync::Arc};
+
+pub enum ArcOrRc<T> {
+    Rc(Rc<T>),
+    Arc(Arc<T>),
+}
+
+impl<T> Deref for ArcOrRc<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            ArcOrRc::Rc(x) => x,
+            ArcOrRc::Arc(x) => x,
+        }
+    }
+}
 
 /// Represents the execution context for a function. When calls are made, frames are
 /// pushed and then popped to/from the call stack.
@@ -42,7 +58,7 @@ pub(crate) struct Frame {
     pub(crate) pc: u16,
     ty_builder: TypeBuilder,
     // Currently being executed function.
-    pub(crate) function: Rc<LoadedFunction>,
+    pub(crate) function: ArcOrRc<LoadedFunction>,
     // How this frame was established.
     call_type: CallType,
     // Locals for this execution context and their instantiated types.
@@ -135,7 +151,7 @@ impl Frame {
         gas_meter: &mut impl GasMeter,
         call_type: CallType,
         vm_config: &VMConfig,
-        function: Rc<LoadedFunction>,
+        function: ArcOrRc<LoadedFunction>,
         locals: Locals,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {

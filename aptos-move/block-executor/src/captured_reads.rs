@@ -36,6 +36,7 @@ use move_core_types::value::MoveTypeLayout;
 use move_vm_types::{
     code::{ModuleCode, SyncModuleCache, WithAddress, WithName, WithSize},
     delayed_values::delayed_field_id::DelayedFieldID,
+    values::GlobalValue,
 };
 use std::{
     collections::{
@@ -62,7 +63,7 @@ pub(crate) enum ReadKind {
 /// a full value, and other kinds of reads that may access only the metadata
 /// information, or check whether data exists at a given key.
 #[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""), PartialEq(bound = ""))]
+#[derivative(Debug(bound = ""), PartialEq(bound = ""))]
 pub(crate) enum DataRead<V> {
     // Version supersedes V comparison.
     Versioned(
@@ -72,6 +73,7 @@ pub(crate) enum DataRead<V> {
         // comparing the instances of V is cheaper, compare those instead.
         #[derivative(PartialEq = "ignore", Debug = "ignore")] Arc<V>,
         #[derivative(PartialEq = "ignore", Debug = "ignore")] Option<Arc<MoveTypeLayout>>,
+        #[derivative(PartialEq = "ignore", Debug = "ignore")] Option<GlobalValue>,
     ),
     // Metadata and ResourceSize are insufficient to determine each other, but both
     // can be determined from Versioned. When both are available, the information
@@ -88,6 +90,26 @@ pub(crate) enum DataRead<V> {
     // data reads implements a comparison (o.w. unreachable arm will be hit).
 }
 
+impl<V> Clone for DataRead<V> {
+    fn clone(&self) -> Self {
+        match self {
+            DataRead::Versioned(a, b, c, d) => DataRead::Versioned(
+                a.clone(),
+                b.clone(),
+                c.as_ref().cloned(),
+                d.as_ref().map(|g| g.shallow_copy()),
+            ),
+            DataRead::MetadataAndResourceSize(a, b) => {
+                DataRead::MetadataAndResourceSize(a.clone(), b.clone())
+            },
+            DataRead::Metadata(s) => DataRead::Metadata(s.clone()),
+            DataRead::ResourceSize(s) => DataRead::ResourceSize(s.clone()),
+            DataRead::Exists(v) => DataRead::Exists(*v),
+            DataRead::Resolved(v) => DataRead::Resolved(*v),
+        }
+    }
+}
+
 impl<V> DataRead<V> {
     // Assigns highest rank to Versioned / Resolved, then Metadata, then Exists.
     // (e.g. versioned read implies metadata and existence information, and
@@ -95,7 +117,7 @@ impl<V> DataRead<V> {
     fn get_kind(&self) -> ReadKind {
         use DataRead::*;
         match self {
-            Versioned(_, _, _) | Resolved(_) => ReadKind::Value,
+            Versioned(..) | Resolved(_) => ReadKind::Value,
             MetadataAndResourceSize(_, _) => ReadKind::MetadataAndResourceSize,
             Metadata(_) => ReadKind::Metadata,
             ResourceSize(_) => ReadKind::ResourceSize,
@@ -134,8 +156,8 @@ impl<V: TransactionWrite> DataRead<V> {
     /// MetadataAndResourceSize variant, but it is possible to convert in the other direction.
     pub(crate) fn convert_to(&self, kind: &ReadKind) -> Option<DataRead<V>> {
         match self {
-            DataRead::Versioned(version, v, layout) => {
-                Self::versioned_convert_to(version, v, layout, kind)
+            DataRead::Versioned(version, v, layout, maybe_gv) => {
+                Self::versioned_convert_to(version, v, layout, maybe_gv.as_ref(), kind)
             },
             DataRead::Resolved(v) => Self::resolved_convert_to(*v, kind),
             DataRead::MetadataAndResourceSize(metadata, size) => {
@@ -151,6 +173,7 @@ impl<V: TransactionWrite> DataRead<V> {
         version: &Version,
         v: &Arc<V>,
         layout: &Option<Arc<MoveTypeLayout>>,
+        maybe_gv: Option<&GlobalValue>,
         kind: &ReadKind,
     ) -> Option<DataRead<V>> {
         match kind {
@@ -158,6 +181,7 @@ impl<V: TransactionWrite> DataRead<V> {
                 version.clone(),
                 v.clone(),
                 layout.clone(),
+                maybe_gv.map(|gv| gv.shallow_copy()),
             )),
             ReadKind::MetadataAndResourceSize => Some(DataRead::MetadataAndResourceSize(
                 v.as_state_value_metadata(),
@@ -235,11 +259,11 @@ impl<V: TransactionWrite> DataRead<V> {
             // If value was never exchanged, then value shouldn't be used, and so we construct
             // a MetadataAndResourceSize variant that implies everything non-value. This also
             // ensures that RawFromStorage can't be consistent with any other value read.
-            ValueWithLayout::RawFromStorage(v) => {
+            ValueWithLayout::RawFromStorage(v, _) => {
                 DataRead::MetadataAndResourceSize(v.as_state_value_metadata(), Self::value_size(&v))
             },
-            ValueWithLayout::Exchanged(v, layout) => {
-                DataRead::Versioned(version, v.clone(), layout)
+            ValueWithLayout::Exchanged(v, layout, maybe_gv) => {
+                DataRead::Versioned(version, v.clone(), layout, maybe_gv)
             },
         }
     }
@@ -274,8 +298,8 @@ impl DataReadComparator {
     fn data_read_equals<V: PartialEq>(&self, v1: &DataRead<V>, v2: &DataRead<V>) -> bool {
         match (v1, v2) {
             (
-                DataRead::Versioned(v1_version, v1_value, v1_layout),
-                DataRead::Versioned(v2_version, v2_value, v2_layout),
+                DataRead::Versioned(v1_version, v1_value, v1_layout, _),
+                DataRead::Versioned(v2_version, v2_value, v2_layout, _),
             ) => {
                 if v1_version == v2_version {
                     true
@@ -304,7 +328,7 @@ impl DataReadComparator {
                 v1_size == v2_size
             },
             (
-                DataRead::Versioned(_, _, _),
+                DataRead::Versioned(..),
                 DataRead::Resolved(_)
                 | DataRead::MetadataAndResourceSize(_, _)
                 | DataRead::Metadata(_)
@@ -313,7 +337,7 @@ impl DataReadComparator {
             )
             | (
                 DataRead::Resolved(_),
-                DataRead::Versioned(_, _, _)
+                DataRead::Versioned(..)
                 | DataRead::MetadataAndResourceSize(_, _)
                 | DataRead::Metadata(_)
                 | DataRead::ResourceSize(_)
@@ -321,7 +345,7 @@ impl DataReadComparator {
             )
             | (
                 DataRead::MetadataAndResourceSize(_, _),
-                DataRead::Versioned(_, _, _)
+                DataRead::Versioned(..)
                 | DataRead::Resolved(_)
                 | DataRead::Metadata(_)
                 | DataRead::ResourceSize(_)
@@ -329,7 +353,7 @@ impl DataReadComparator {
             )
             | (
                 DataRead::Metadata(_),
-                DataRead::Versioned(_, _, _)
+                DataRead::Versioned(..)
                 | DataRead::Resolved(_)
                 | DataRead::MetadataAndResourceSize(_, _)
                 | DataRead::ResourceSize(_)
@@ -337,7 +361,7 @@ impl DataReadComparator {
             )
             | (
                 DataRead::ResourceSize(_),
-                DataRead::Versioned(_, _, _)
+                DataRead::Versioned(..)
                 | DataRead::Resolved(_)
                 | DataRead::MetadataAndResourceSize(_, _)
                 | DataRead::Metadata(_)
@@ -345,7 +369,7 @@ impl DataReadComparator {
             )
             | (
                 DataRead::Exists(_),
-                DataRead::Versioned(_, _, _)
+                DataRead::Versioned(..)
                 | DataRead::Resolved(_)
                 | DataRead::MetadataAndResourceSize(_, _)
                 | DataRead::Metadata(_)
@@ -622,7 +646,7 @@ where
                     return None;
                 }
 
-                if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
+                if let DataRead::Versioned(_version, value, Some(layout), _) = data_read {
                     view.filter_value_for_exchange(value, layout, delayed_write_set_ids, key)
                 } else {
                     None
@@ -638,10 +662,9 @@ where
     ) -> impl Iterator<Item = (&'a T::Key, &'a GroupRead<T>)> {
         self.group_reads.iter().filter(|(key, group_read)| {
             !skip.contains(key)
-                && group_read
-                    .inner_reads
-                    .iter()
-                    .any(|(_, data_read)| matches!(data_read, DataRead::Versioned(_, _, Some(_))))
+                && group_read.inner_reads.iter().any(|(_, data_read)| {
+                    matches!(data_read, DataRead::Versioned(_, _, Some(_), _))
+                })
         })
     }
 
@@ -1120,7 +1143,12 @@ where
                         assert!(sentinel_deletion.is_deletion());
                         matches!(
                             self.data_read_comparator.compare_data_reads(
-                                &DataRead::Versioned(Err(StorageVersion), sentinel_deletion, None),
+                                &DataRead::Versioned(
+                                    Err(StorageVersion),
+                                    sentinel_deletion,
+                                    None,
+                                    None
+                                ),
                                 r,
                             ),
                             DataReadComparison::Contains
@@ -1203,14 +1231,14 @@ where
     pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
         let mut ret = HashSet::new();
         for (key, read) in &self.data_reads {
-            if let DataRead::Versioned(_, _, _) = read {
+            if let DataRead::Versioned(..) = read {
                 ret.insert(InputOutputKey::Resource(key.clone()));
             }
         }
 
         for (key, group_reads) in &self.group_reads {
             for (tag, read) in &group_reads.inner_reads {
-                if let DataRead::Versioned(_, _, _) = read {
+                if let DataRead::Versioned(..) = read {
                     ret.insert(InputOutputKey::Group(key.clone(), tag.clone()));
                 }
             }
@@ -1589,6 +1617,7 @@ mod test {
                     10,
                     StateValueMetadata::none()
                 )),
+                None,
                 None,
             )
         );

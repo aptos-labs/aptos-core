@@ -45,7 +45,7 @@ use aptos_types::{
         errors::StateViewError,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
-        StateViewId, TStateView,
+        StateViewId, StateViewRead, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::AptosModuleExtension,
@@ -66,10 +66,14 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::{AsFunctionValueExtension, Module, RuntimeEnvironment};
+use move_vm_runtime::{
+    AsFunctionValueExtension, FunctionValueExtensionAdapter, Module, RuntimeEnvironment,
+};
 use move_vm_types::{
     delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex},
+    resolver::{resource_size, ValueOrBytes},
     value_serde::{FunctionValueExtension, ValueSerDeContext},
+    values::GlobalValue,
 };
 use std::{
     cell::RefCell,
@@ -80,6 +84,13 @@ use std::{
         Arc,
     },
 };
+use aptos_types::write_set::FREQUENCY_TABLE;
+
+#[derive(Debug)]
+pub enum ValueKind {
+    Value(GlobalValue, Option<StateValue>),
+    Serialized(Option<StateValue>, Option<Arc<MoveTypeLayout>>),
+}
 
 /// [ReadResult] wraps the result of MVHashMap's data map, while [GroupReadResult]
 /// is for the groups' MVHashMap. The client can interpret these types to
@@ -87,7 +98,7 @@ use std::{
 
 #[derive(Debug)]
 pub(crate) enum ReadResult {
-    Value(Option<StateValue>, Option<Arc<MoveTypeLayout>>),
+    Value(ValueKind),
     Metadata(Option<StateValueMetadata>),
     ResourceSize(Option<u64>),
     Exists(bool),
@@ -127,10 +138,22 @@ impl ReadResult {
     // Should not be passed a MetadataAndResourceSize variant.
     pub(crate) fn from_data_read<V: TransactionWrite>(data: DataRead<V>) -> Self {
         match data {
-            DataRead::Versioned(_, v, layout) => ReadResult::Value(v.as_state_value(), layout),
+            DataRead::Versioned(_, v, layout, maybe_gv) => {
+                let kind = match maybe_gv {
+                    None => ValueKind::Serialized(v.as_state_value(), layout),
+                    Some(gv) => {
+                        assert!(layout.is_none());
+                        ValueKind::Value(gv, v.as_state_value())
+                    },
+                };
+                ReadResult::Value(kind)
+            },
             DataRead::Resolved(v) => {
                 // TODO[agg_v1](cleanup): Move AggV1 to Delayed fields, and then handle the layout if needed
-                ReadResult::Value(Some(StateValue::new_legacy(serialize(&v).into())), None)
+                ReadResult::Value(ValueKind::Serialized(
+                    Some(StateValue::new_legacy(serialize(&v).into())),
+                    None,
+                ))
             },
             DataRead::MetadataAndResourceSize(_, _) => {
                 // Should be a Metadata or ResourceSize variant, not both.
@@ -143,8 +166,29 @@ impl ReadResult {
     }
 
     fn expect_value(self) -> Option<StateValue> {
-        if let ReadResult::Value(v, _layout) = self {
-            v
+        if let ReadResult::Value(kind) = self {
+            match kind {
+                ValueKind::Value(_, s) => s,
+                ValueKind::Serialized(s, _) => s,
+            }
+        } else {
+            unreachable!("Read result must be Value kind")
+        }
+    }
+
+    fn for_gv(self) -> (ValueOrBytes, usize) {
+        if let ReadResult::Value(kind) = self {
+            match kind {
+                ValueKind::Value(gv, s) => (
+                    ValueOrBytes::Value(gv),
+                    s.map(|b| b.bytes().len()).unwrap_or(0),
+                ),
+                ValueKind::Serialized(s, _) => {
+                    let bytes = s.map(|b| b.into_bytes());
+                    let len = resource_size(&bytes);
+                    (ValueOrBytes::Bytes(bytes), len)
+                },
+            }
         } else {
             unreachable!("Read result must be Value kind")
         }
@@ -168,7 +212,7 @@ impl GroupReadResult {
 
     pub(crate) fn from_data_read<V: TransactionWrite>(data: DataRead<V>) -> Self {
         match data {
-            DataRead::Versioned(_, v, layout) => {
+            DataRead::Versioned(_, v, layout, _) => {
                 GroupReadResult::Value(v.extract_raw_bytes(), layout)
             },
             DataRead::Resolved(_) => {
@@ -643,7 +687,7 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
                 Ok(Versioned(version, value)) => {
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     if let UnknownOrLayout::Known(layout) = layout {
-                        if let ValueWithLayout::RawFromStorage(v) = value {
+                        if let ValueWithLayout::RawFromStorage(v, maybe_gv) = value {
                             assert_eq!(version, Err(StorageVersion), "Fetched resource has unknown layout but the version is not Err(StorageVersion)");
                             match patch_base_value(v.as_ref(), layout) {
                                 Ok(patched_value) => {
@@ -652,6 +696,7 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
                                         ValueWithLayout::Exchanged(
                                             Arc::new(patched_value),
                                             layout.cloned().map(Arc::new),
+                                            maybe_gv,
                                         ),
                                     );
                                     // Refetch in case a concurrent change went through.
@@ -778,7 +823,7 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
                 Ok((version, value_with_layout)) => {
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     if let UnknownOrLayout::Known(layout) = layout {
-                        if let ValueWithLayout::RawFromStorage(v) = value_with_layout {
+                        if let ValueWithLayout::RawFromStorage(v, _) = value_with_layout {
                             assert_eq!(version, Err(StorageVersion),
                             "Fetched resource has unknown layout but the version is not Err(StorageVersion)"
                             );
@@ -894,12 +939,13 @@ impl<T: Transaction> ResourceState<T> for SequentialState<'_, T> {
             Some(mut value) => {
                 // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                 if let UnknownOrLayout::Known(layout) = layout {
-                    if let ValueWithLayout::RawFromStorage(v) = value {
+                    if let ValueWithLayout::RawFromStorage(v, maybe_gv) = value {
                         match patch_base_value(v.as_ref(), layout) {
                             Ok(patched_value) => {
                                 let exchanged_value = ValueWithLayout::Exchanged(
                                     Arc::new(patched_value.clone()),
                                     layout.cloned().map(Arc::new),
+                                    maybe_gv,
                                 );
                                 self.unsync_map
                                     .set_base_value(key.clone(), exchanged_value.clone());
@@ -978,7 +1024,7 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
             Ok(mut value) => {
                 // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                 if let UnknownOrLayout::Known(layout) = layout {
-                    if let ValueWithLayout::RawFromStorage(v) = value {
+                    if let ValueWithLayout::RawFromStorage(v, maybe_gv) = value {
                         match patch_base_value(v.as_ref(), layout) {
                             Ok(patched_value) => {
                                 let arced_layout = layout.cloned().map(Arc::new);
@@ -992,6 +1038,7 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
                                 value = ValueWithLayout::Exchanged(
                                     Arc::new(patched_value),
                                     arced_layout,
+                                    maybe_gv,
                                 );
                             },
                             Err(e) => {
@@ -1027,6 +1074,7 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
                 let empty_data_read = DataRead::Versioned(
                     Err(StorageVersion),
                     Arc::<T::Value>::new(TransactionWrite::from_state_value(None)),
+                    None,
                     None,
                 );
                 self.read_set
@@ -1351,15 +1399,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 }
 
                 match unsync_map.fetch_data(key) {
-                    Some(ValueWithLayout::Exchanged(value, Some(layout))) => self
+                    Some(ValueWithLayout::Exchanged(value, Some(layout), _)) => self
                         .filter_value_for_exchange(
                             value.as_ref(),
                             &layout,
                             delayed_write_set_ids,
                             key,
                         ),
-                    Some(ValueWithLayout::Exchanged(_, None)) => None,
-                    Some(ValueWithLayout::RawFromStorage(_)) => Some(Err(code_invariant_error(
+                    Some(ValueWithLayout::Exchanged(_, None, _)) => None,
+                    Some(ValueWithLayout::RawFromStorage(..)) => Some(Err(code_invariant_error(
                         "Cannot exchange value that was not exchanged before",
                     ))),
                     None => None,
@@ -1390,7 +1438,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 // the following is just an any call on iterator (same for resource reads).
                 let mut resources_needing_delayed_field_exchange = false;
                 for data_read in inner_reads.values() {
-                    if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
+                    if let DataRead::Versioned(_version, value, Some(layout), _) = data_read {
                         let needs_exchange = self
                             .does_value_need_exchange(value, layout.as_ref(), delayed_write_set_ids)
                             .map_err(PartialVMError::from)?;
@@ -1441,7 +1489,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                     let mut resources_needing_delayed_field_exchange = false;
                     for (tag, value_with_layout) in value_vec {
                         if tags.contains(&tag) {
-                            if let ValueWithLayout::Exchanged(value, Some(layout)) =
+                            if let ValueWithLayout::Exchanged(value, Some(layout), _) =
                                 value_with_layout
                             {
                                 let needs_exchange = self.does_value_need_exchange(
@@ -1544,11 +1592,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             &|value, layout| self.patch_base_value(value, layout),
         )?;
         if matches!(ret, ReadResult::Uninitialized) {
+            FREQUENCY_TABLE.log_base_resource_read(state_key.as_state_key());
             let from_storage =
                 TransactionWrite::from_state_value(self.get_raw_base_value(state_key)?);
             state.set_base_value(
                 state_key.clone(),
-                ValueWithLayout::RawFromStorage(Arc::new(from_storage)),
+                ValueWithLayout::RawFromStorage(Arc::new(from_storage), None),
             );
 
             // In case of concurrent storage fetches, we cannot use our value,
@@ -1579,7 +1628,103 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             .into()),
             ReadResult::Exists(_)
             | ReadResult::Metadata(_)
-            | ReadResult::Value(_, _)
+            | ReadResult::Value(_)
+            | ReadResult::ResourceSize(_) => Ok(ret),
+        }
+    }
+
+    fn get_resource_state_value_impl_for_gv(
+        &self,
+        state_key: &T::Key,
+        layout: &MoveTypeLayout,
+    ) -> PartialVMResult<ReadResult> {
+        debug_assert!(
+            !state_key.is_module_path(),
+            "Reading a module {:?} using ResourceView",
+            state_key,
+        );
+
+        let state = self.latest_view.get_resource_state();
+
+        let mut ret = state.read_cached_data_by_kind(
+            self.txn_idx,
+            state_key,
+            ReadKind::Value,
+            UnknownOrLayout::Known(None),
+            &|value, layout| self.patch_base_value(value, layout),
+        )?;
+        if matches!(ret, ReadResult::Uninitialized) {
+            FREQUENCY_TABLE.log_base_resource_read(state_key.as_state_key());
+            let read = self.base_view.get_state_slot(state_key).map_err(|e| {
+                PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                    "Unexpected storage error for {:?}: {:?}",
+                    state_key, e
+                ))
+            })?;
+            let (slot, maybe_gv) = read.unpack();
+            let gv = match maybe_gv {
+                Some(gv) => {
+                    FREQUENCY_TABLE.log_deserialized_base_resource_read(state_key.as_state_key());
+                    gv
+                },
+                None => {
+                    let gv = match slot.as_state_value_opt() {
+                        None => GlobalValue::none(),
+                        Some(sv) => {
+                            let function_value_extension = FunctionValueExtensionAdapter {
+                                module_storage: self,
+                            };
+                            let max_value_nest_depth =
+                                function_value_extension.max_value_nest_depth();
+                            let val = ValueSerDeContext::new(max_value_nest_depth)
+                                .with_func_args_deserialization(&function_value_extension)
+                                .with_delayed_fields_serde()
+                                .deserialize(&sv.bytes(), &layout)
+                                .ok_or_else(|| {
+                                    PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
+                                })?;
+                            GlobalValue::cached(val)?
+                        },
+                    };
+                    self.base_view.store_state_slot_unmemorized(state_key, &gv);
+                    gv
+                },
+            };
+            let from_storage = TransactionWrite::from_state_value(slot.into_state_value_opt());
+            state.set_base_value(
+                state_key.clone(),
+                ValueWithLayout::RawFromStorage(Arc::new(from_storage), Some(gv)),
+            );
+
+            // In case of concurrent storage fetches, we cannot use our value,
+            // but need to fetch it from versioned_map again.
+            ret = state.read_cached_data_by_kind(
+                self.txn_idx,
+                state_key,
+                ReadKind::Value,
+                UnknownOrLayout::Known(None),
+                &|value, layout| self.patch_base_value(value, layout),
+            )?;
+        }
+
+        match ret {
+            // ExecutionHalted indicates that the parallel execution is halted.
+            // The read should return immediately and log the error.
+            // For now we use SPECULATIVE_EXECUTION_ABORT_ERROR as the VM
+            // will not log the speculative error,
+            // so no actual error will be logged once the execution is halted and
+            // the speculative logging is flushed.
+            ReadResult::HaltSpeculativeExecution(msg) => Err(PartialVMError::new(
+                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+            )
+            .with_message(msg)),
+            ReadResult::Uninitialized => Err(code_invariant_error(
+                "base value must already be recorded in the MV data structure",
+            )
+            .into()),
+            ReadResult::Exists(_)
+            | ReadResult::Metadata(_)
+            | ReadResult::Value(_)
             | ReadResult::ResourceSize(_) => Ok(ret),
         }
     }
@@ -1614,7 +1759,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             .set_raw_group_base_values(group_key.clone(), base_group_sentinel_ops)?;
         self.latest_view.get_resource_state().set_base_value(
             group_key.clone(),
-            ValueWithLayout::RawFromStorage(Arc::new(metadata_op)),
+            ValueWithLayout::RawFromStorage(Arc::new(metadata_op), None),
         );
         Ok(())
     }
@@ -1648,6 +1793,15 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestView<'
             ReadKind::Value,
         )
         .map(|res| res.expect_value())
+    }
+
+    fn get_resource_gv(
+        &self,
+        state_key: &Self::Key,
+        layout: &Self::Layout,
+    ) -> PartialVMResult<(ValueOrBytes, usize)> {
+        self.get_resource_state_value_impl_for_gv(state_key, layout)
+            .map(|res| res.for_gv())
     }
 
     fn get_resource_state_value_metadata(
@@ -3158,7 +3312,7 @@ mod test {
         expected_maybe_layout: Option<MoveTypeLayout>,
     ) {
         match fetched {
-            Some(ValueWithLayout::Exchanged(write, layout)) => {
+            Some(ValueWithLayout::Exchanged(write, layout, _)) => {
                 let expected_write = expected_maybe_write.unwrap();
                 assert_eq!(write.write_op_kind(), expected_write.write_op_kind());
                 assert_eq!(write.bytes(), expected_write.bytes());
@@ -3168,7 +3322,7 @@ mod test {
                     expected_maybe_layout.as_ref()
                 );
             },
-            Some(ValueWithLayout::RawFromStorage(_)) => panic!("Unexpected RawFromStorage"),
+            Some(ValueWithLayout::RawFromStorage(..)) => panic!("Unexpected RawFromStorage"),
             None => {
                 assert_none!(expected_maybe_write);
                 assert_none!(expected_maybe_layout);

@@ -88,11 +88,9 @@ pub fn hash_to_internal(
     let suite_opt = suite_from_ty_arg!(context, &ty_args[1]);
     abort_unless_hash_to_structure_enabled!(context, structure_opt, suite_opt);
     let vector_ref = safely_pop_arg!(args, VectorRef);
-    let bytes_ref = vector_ref.as_bytes_ref();
-    let msg = bytes_ref.as_slice();
+    let msg = vector_ref.as_bytes_ref();
     let tag_ref = safely_pop_arg!(args, VectorRef);
-    let bytes_ref = tag_ref.as_bytes_ref();
-    let dst = bytes_ref.as_slice();
+    let dst = tag_ref.as_bytes_ref();
     match (structure_opt, suite_opt) {
         (Some(Structure::BLS12381G1), Some(HashToStructureSuite::Bls12381g1XmdSha256SswuRo)) => {
             context.charge(hash_to_bls12381gx_cost!(

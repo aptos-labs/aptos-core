@@ -1063,7 +1063,7 @@ where
 
                         versioned_cache.data().set_base_value(
                             k.clone(),
-                            ValueWithLayout::RawFromStorage(Arc::new(w)),
+                            ValueWithLayout::RawFromStorage(Arc::new(w), None),
                         );
                         op.apply_to(value_u128)
                             .expect("Materializing delta w. base value set must succeed")
@@ -2212,8 +2212,8 @@ where
                                 group
                                     .map(|(resource_tag, value_with_layout)| {
                                         let value = match value_with_layout {
-                                            ValueWithLayout::RawFromStorage(value)
-                                            | ValueWithLayout::Exchanged(value, _) => value,
+                                            ValueWithLayout::RawFromStorage(value, _)
+                                            | ValueWithLayout::Exchanged(value, _, _) => value,
                                         };
                                         (
                                             resource_tag,

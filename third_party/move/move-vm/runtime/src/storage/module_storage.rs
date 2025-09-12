@@ -545,7 +545,7 @@ where
 /// implements [ModuleStorage].
 pub struct FunctionValueExtensionAdapter<'a> {
     #[allow(dead_code)]
-    pub(crate) module_storage: &'a dyn ModuleStorage,
+    pub module_storage: &'a dyn ModuleStorage,
 }
 
 pub trait AsFunctionValueExtension {
@@ -564,8 +564,8 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
     fn create_from_serialization_data(
         &self,
         data: SerializedFunctionData,
-    ) -> PartialVMResult<Box<dyn AbstractFunction>> {
-        Ok(Box::new(LazyLoadedFunction::new_unresolved(data)))
+    ) -> PartialVMResult<Arc<dyn AbstractFunction>> {
+        Ok(Arc::new(LazyLoadedFunction::new_unresolved(data)))
     }
 
     fn get_serialization_data(

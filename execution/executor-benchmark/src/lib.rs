@@ -48,6 +48,7 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::Runtime;
+use aptos_types::write_set::FREQUENCY_TABLE;
 
 pub struct SingleRunResults {
     pub measurements: OverallMeasurement,
@@ -283,6 +284,7 @@ where
     if pipeline_config.generate_then_execute {
         overall_measuring.start_time = Instant::now();
     }
+    FREQUENCY_TABLE.clear();
     generator.drop_sender();
     info!("Done creating workload");
     pipeline.start_pipeline_processing();
@@ -313,6 +315,9 @@ where
 
     OverallMeasurement::print_end_table(&staged_results, &overall_results);
     staged_events.print_end_table();
+
+    FREQUENCY_TABLE.log();
+
     SingleRunResults {
         measurements: overall_results,
         per_stage_measurements: staged_results,

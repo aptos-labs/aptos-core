@@ -40,13 +40,14 @@ use move_core_types::{
 };
 use move_vm_types::{
     delayed_values::delayed_field_id::DelayedFieldID,
-    resolver::{resource_size, ResourceResolver},
+    resolver::{resource_size, ResourceResolver, ValueOrBytes},
 };
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
+use aptos_types::write_set::FREQUENCY_TABLE;
 
 pub fn get_resource_group_member_from_metadata(
     struct_tag: &StructTag,
@@ -171,6 +172,60 @@ impl<E: ExecutorView> ResourceResolver for StorageAdapter<'_, E> {
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)> {
         self.get_any_resource_with_layout(address, struct_tag, metadata, maybe_layout)
+    }
+
+    fn get_gv_with_metadata_and_layout(
+        &self,
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+        metadata: &[Metadata],
+        layout: &MoveTypeLayout,
+        contains_dfs: bool,
+    ) -> PartialVMResult<(ValueOrBytes, usize)> {
+        if contains_dfs {
+            return self
+                .get_any_resource_with_layout(
+                    address,
+                    struct_tag,
+                    metadata,
+                    contains_dfs.then_some(layout),
+                )
+                .map(|(b, s)| (ValueOrBytes::Bytes(b), s));
+        }
+
+        let resource_group = get_resource_group_member_from_metadata(struct_tag, metadata);
+        if let Some(resource_group) = resource_group {
+            let key = StateKey::resource_group(address, &resource_group);
+            let (v, buf_size) = self
+                .resource_group_view
+                .get_resource_gv_from_group(&key, struct_tag, layout)?;
+
+            let first_access = self.accessed_groups.borrow_mut().insert(key.clone());
+            let group_size = if first_access {
+                self.resource_group_view.resource_group_size(&key)?.get()
+            } else {
+                0
+            };
+
+            FREQUENCY_TABLE.log_group_read(key.clone());
+            FREQUENCY_TABLE.log_group_member_read(key.clone(), struct_tag.clone());
+
+            Ok((v, buf_size + group_size as usize))
+        } else {
+            let state_key = resource_state_key(address, struct_tag)?;
+            let (res, size) = self.executor_view.get_resource_gv(&state_key, layout)?;
+
+            match &res {
+                ValueOrBytes::Value(_) => {
+                    FREQUENCY_TABLE.log_deserialized_resource_read(state_key.clone());
+                },
+                ValueOrBytes::Bytes(_) => {
+                    FREQUENCY_TABLE.log_resource_read(state_key.clone());
+                },
+            }
+
+            Ok((res, size))
+        }
     }
 }
 

@@ -11,6 +11,10 @@ pub trait ModulePath {
     fn is_module_path(&self) -> bool;
 
     fn from_address_and_module_name(address: &AccountAddress, module_name: &IdentStr) -> Self;
+
+    fn as_state_key(&self) -> StateKey {
+        unimplemented!()
+    }
 }
 
 impl ModulePath for StateKey {
@@ -20,5 +24,9 @@ impl ModulePath for StateKey {
 
     fn from_address_and_module_name(address: &AccountAddress, module_name: &IdentStr) -> Self {
         Self::module(address, module_name)
+    }
+
+    fn as_state_key(&self) -> StateKey {
+        self.clone()
     }
 }

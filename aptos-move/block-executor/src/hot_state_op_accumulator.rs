@@ -89,7 +89,9 @@ where
             let slot = self
                 .base_view
                 .get_state_slot(key)
-                .expect("base_view.get_slot() failed.");
+                .expect("base_view.get_slot() failed.")
+                .unpack()
+                .0;
             let make_hot = match slot {
                 StateSlot::ColdVacant => {
                     COUNTER.inc_with(&["vacant_new"]);
