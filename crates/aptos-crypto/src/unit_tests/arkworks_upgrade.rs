@@ -1,3 +1,6 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use ark_bls12_381::G1Projective as G1New;
 use ark_bls12_381_old::G1Projective as G1Old;
 use ark_ec::PrimeGroup;
