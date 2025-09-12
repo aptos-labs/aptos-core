@@ -3,9 +3,12 @@
 
 use crate::{
     common::{Author, Payload, Round},
+    payload::OptQuorumStorePayload,
     quorum_cert::QuorumCert,
 };
-use aptos_types::validator_txn::ValidatorTransaction;
+use anyhow::ensure;
+use aptos_crypto::HashValue;
+use aptos_types::{validator_txn::ValidatorTransaction, validator_verifier::ValidatorVerifier};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
@@ -84,6 +87,108 @@ impl ProposalExt {
     pub fn payload(&self) -> Option<&Payload> {
         match self {
             ProposalExt::V0 { payload, .. } => Some(payload),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct MoonBlockMetadata {
+    pub earth_round: Round,
+    pub earth_qc: Option<QuorumCert>,
+}
+
+impl MoonBlockMetadata {
+    pub fn verify(&self, moon_verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        if let Some(qc) = &self.earth_qc {
+            qc.verify(moon_verifier)?;
+            ensure!(
+                qc.certified_block().round() == self.earth_round - 1,
+                "Invalid earth QC round"
+            );
+        }
+        Ok(())
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub enum MoonBlock {
+    V0 {
+        metadata: MoonBlockMetadata,
+        payload: OptQuorumStorePayload,
+    },
+}
+
+impl MoonBlock {
+    pub fn metadata(&self) -> &MoonBlockMetadata {
+        match self {
+            MoonBlock::V0 { metadata, .. } => metadata,
+        }
+    }
+
+    pub fn payload(&self) -> &OptQuorumStorePayload {
+        match self {
+            MoonBlock::V0 { payload, .. } => payload,
+        }
+    }
+
+    pub fn payload_mut(&mut self) -> &mut OptQuorumStorePayload {
+        match self {
+            MoonBlock::V0 { payload, .. } => payload,
+        }
+    }
+
+    pub fn take_payload(self) -> OptQuorumStorePayload {
+        match self {
+            MoonBlock::V0 { payload, .. } => payload,
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct MoonBlockFullMetadata {
+    pub moon_block_metadata: MoonBlockMetadata,
+    pub moon_id: HashValue,
+    pub moon_author: Author,
+    pub moon_round: Round,
+    pub moon_timestamp_usecs: u64,
+    pub moon_qc: QuorumCert,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct EarthBlockMetadata {
+    pub moon_block_full_metadata: Vec<MoonBlockFullMetadata>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub enum EarthBlock {
+    V0 {
+        metadata: EarthBlockMetadata,
+        payload: OptQuorumStorePayload,
+    },
+}
+
+impl EarthBlock {
+    pub fn metadata(&self) -> &EarthBlockMetadata {
+        match self {
+            EarthBlock::V0 { metadata, .. } => metadata,
+        }
+    }
+
+    pub fn payload(&self) -> &OptQuorumStorePayload {
+        match self {
+            EarthBlock::V0 { payload, .. } => payload,
+        }
+    }
+
+    pub fn payload_mut(&mut self) -> &mut OptQuorumStorePayload {
+        match self {
+            EarthBlock::V0 { payload, .. } => payload,
+        }
+    }
+
+    pub fn take_payload(self) -> OptQuorumStorePayload {
+        match self {
+            EarthBlock::V0 { payload, .. } => payload,
         }
     }
 }
