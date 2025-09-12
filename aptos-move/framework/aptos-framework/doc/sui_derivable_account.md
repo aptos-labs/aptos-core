@@ -31,7 +31,6 @@ Nonce: <digest>
 -  [Enum `IntentVersion`](#0x1_sui_derivable_account_IntentVersion)
 -  [Enum `AppId`](#0x1_sui_derivable_account_AppId)
 -  [Constants](#@Constants_0)
--  [Function `construct_message`](#0x1_sui_derivable_account_construct_message)
 -  [Function `get_signing_scheme`](#0x1_sui_derivable_account_get_signing_scheme)
 -  [Function `deserialize_abstract_public_key`](#0x1_sui_derivable_account_deserialize_abstract_public_key)
 -  [Function `deserialize_abstract_signature`](#0x1_sui_derivable_account_deserialize_abstract_signature)
@@ -468,52 +467,6 @@ Invalid signing scheme type.
 
 
 
-<a id="0x1_sui_derivable_account_construct_message"></a>
-
-## Function `construct_message`
-
-
-
-<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_construct_message">construct_message</a>(sui_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, domain: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, digest_utf8: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_construct_message">construct_message</a>(
-    sui_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    domain: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    digest_utf8: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <b>let</b> message = &<b>mut</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    message.append(*domain);
-    message.append(b" wants you <b>to</b> sign in <b>with</b> your Sui <a href="account.md#0x1_account">account</a>:\n");
-    message.append(*sui_public_key);
-    message.append(b"\n\nPlease confirm you explicitly initiated this request from ");
-    message.append(*domain);
-    message.append(b".");
-    message.append(b" You are approving <b>to</b> execute transaction ");
-    message.append(*entry_function_name);
-    message.append(b" on Aptos blockchain");
-    <b>let</b> network_name = network_name();
-    message.append(b" (");
-    message.append(network_name);
-    message.append(b")");
-    message.append(b".");
-    message.append(b"\n\nNonce: ");
-    message.append(*digest_utf8);
-    *message
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_sui_derivable_account_get_signing_scheme"></a>
 
 ## Function `get_signing_scheme`
@@ -620,23 +573,23 @@ to a tuple of (signing_scheme, signature, public_key)
 
 <pre><code><b>public</b> <b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_split_signature_bytes">split_signature_bytes</a>(bytes: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (u8, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
     // 1 + 64 + 32 = 97 bytes
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(bytes) == 97, <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_SIGNATURE_LENGTH">EINVALID_SIGNATURE_LENGTH</a>);
+    <b>assert</b>!(bytes.length() == 97, <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_SIGNATURE_LENGTH">EINVALID_SIGNATURE_LENGTH</a>);
 
-    <b>let</b> signing_scheme = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(bytes, 0);
+    <b>let</b> signing_scheme = bytes[0];
     <b>let</b> abstract_signature_signature = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
     <b>let</b> abstract_signature_public_key = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
 
     // Extract signature (64 bytes)
     <b>let</b> i = 1;
     <b>while</b> (i &lt; 65) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> abstract_signature_signature, *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(bytes, i));
-        i = i + 1;
+        abstract_signature_signature.push_back(bytes[i]);
+        i += 1;
     };
 
     // Extract <b>public</b> key (32 bytes)
     <b>while</b> (i &lt; 97) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> abstract_signature_public_key, *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(bytes, i));
-        i = i + 1;
+        abstract_signature_public_key.push_back(bytes[i]);
+        i += 1;
     };
 
     (signing_scheme, abstract_signature_signature, abstract_signature_public_key)
@@ -665,8 +618,8 @@ Derives the account address from the public key and returns it is a hex string w
 
 <pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_derive_account_address_from_public_key">derive_account_address_from_public_key</a>(signing_scheme: u8, public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     // Create a <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a> <b>with</b> signing scheme and <b>public</b> key bytes
-    <b>let</b> data_to_hash = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_singleton">vector::singleton</a>(signing_scheme);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> data_to_hash, public_key_bytes);
+    <b>let</b> data_to_hash = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[signing_scheme];
+    data_to_hash.append(public_key_bytes);
 
     // Compute blake2b <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>
     <b>let</b> sui_account_address = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_blake2b_256">aptos_hash::blake2b_256</a>(data_to_hash);
@@ -674,15 +627,15 @@ Derives the account address from the public key and returns it is a hex string w
     // Convert the <b>address</b> bytes <b>to</b> a hex <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">string</a> <b>with</b> "0x" prefix
     <b>let</b> sui_account_address_hex = b"0x";
     <b>let</b> i = 0;
-    <b>while</b> (i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&sui_account_address)) {
-        <b>let</b> byte = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&sui_account_address, i);
+    <b>while</b> (i &lt; sui_account_address.length()) {
+        <b>let</b> byte = sui_account_address[i];
         // Convert each byte <b>to</b> two hex characters
         <b>let</b> hex_chars = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
             <b>if</b> ((byte &gt;&gt; 4) &lt; 10) ((byte &gt;&gt; 4) + 0x30) <b>else</b> ((byte &gt;&gt; 4) - 10 + 0x61),
             <b>if</b> ((byte & 0xf) &lt; 10) ((byte & 0xf) + 0x30) <b>else</b> ((byte & 0xf) - 10 + 0x61)
         ];
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> sui_account_address_hex, hex_chars);
-        i = i + 1;
+        sui_account_address_hex.append(hex_chars);
+        i += 1;
     };
 
     // Return the <a href="account.md#0x1_account">account</a> <b>address</b> <b>as</b> hex <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">string</a>
@@ -716,7 +669,7 @@ Derives the account address from the public key and returns it is a hex string w
     <b>let</b> abstract_signature = <a href="sui_derivable_account.md#0x1_sui_derivable_account_deserialize_abstract_signature">deserialize_abstract_signature</a>(aa_auth_data.derivable_abstract_signature());
     <b>let</b> (signing_scheme, abstract_signature_signature, abstract_signature_public_key) = <a href="sui_derivable_account.md#0x1_sui_derivable_account_split_signature_bytes">split_signature_bytes</a>(&abstract_signature.signature);
 
-    // Check siging scheme is ED25519 <b>as</b> we currently only support this scheme
+    // Check siging scheme is Ed25519 <b>as</b> we currently only support this scheme
     <b>assert</b>!(<a href="sui_derivable_account.md#0x1_sui_derivable_account_get_signing_scheme">get_signing_scheme</a>(signing_scheme) == SuiSigningScheme::ED25519, <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_SIGNING_SCHEME_TYPE">EINVALID_SIGNING_SCHEME_TYPE</a>);
 
     // Derive the <a href="account.md#0x1_account">account</a> <b>address</b> from the <b>public</b> key
@@ -732,9 +685,8 @@ Derives the account address from the public key and returns it is a hex string w
     <b>assert</b>!(public_key.is_some(), <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_PUBLIC_KEY">EINVALID_PUBLIC_KEY</a>);
 
     <b>let</b> digest_utf8 = <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils_to_string">string_utils::to_string</a>(aa_auth_data.digest()).bytes();
-
     // Build the raw message
-    <b>let</b> raw_message = <a href="sui_derivable_account.md#0x1_sui_derivable_account_construct_message">construct_message</a>(&sui_account_address, &abstract_public_key.domain, entry_function_name, digest_utf8);
+    <b>let</b> raw_message = construct_message(&b"Sui", &sui_account_address, &abstract_public_key.domain, entry_function_name, digest_utf8);
 
     // Prepend <a href="sui_derivable_account.md#0x1_sui_derivable_account_Intent">Intent</a> <b>to</b> the message
     <b>let</b> intent = <a href="sui_derivable_account.md#0x1_sui_derivable_account_Intent">Intent</a> {
