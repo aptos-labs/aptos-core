@@ -58,3 +58,6 @@ doctest = false
 
 [package.metadata.cargo-machete]
 ignored = ["strum"]
+
+[features]
+spec_signed = []

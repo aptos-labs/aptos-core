@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: cannot pass `i64` to a function which expects argument of type `0x1::i64::I64`
+  ┌─ tests/signed-int/invalid/invalid_mixed_type.move:6:18
+  │
+6 │         i64::add(x, x) // while internally `i64` will be replaced with `I64`, the type system does not take them as alternatives to each other.
+  │                  ^
+
+error: cannot pass `i128` to a function which expects argument of type `0x1::i128::I128`
+   ┌─ tests/signed-int/invalid/invalid_mixed_type.move:10:19
+   │
+10 │         i128::add(x, x)
+   │                   ^

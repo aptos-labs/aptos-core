@@ -277,6 +277,7 @@ impl<'env> Abigen<'env> {
                     U256 => TypeTag::U256,
                     Address => TypeTag::Address,
                     Signer => TypeTag::Signer,
+                    I64 | I128 => unimplemented!("i64/i128 not supported before language version 2.3"),
                     Num | Range | EventStore => {
                         bail!("Type {:?} is not allowed in scripts.", ty0)
                     },

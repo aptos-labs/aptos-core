@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cannot use `()` with an operator which expects a value of type `integer`
+error: cannot use `()` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/more-v1/parser/spec_parsing_inside_fun.move:32:9
    │
 32 │         spec {} + 1;

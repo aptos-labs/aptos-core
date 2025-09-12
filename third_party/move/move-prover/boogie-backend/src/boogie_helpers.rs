@@ -341,6 +341,7 @@ pub fn boogie_type(env: &GlobalEnv, ty: &Type) -> String {
             U8 | U16 | U32 | U64 | U128 | U256 | Num | Address => "int".to_string(),
             Signer => "$signer".to_string(),
             Bool => "bool".to_string(),
+            I64 | I128 => unimplemented!("i64/i128 not supported before language version 2.3"),
             Range | EventStore => panic!("unexpected type"),
         },
         Vector(et) => format!("Vec ({})", boogie_type(env, et)),
@@ -388,6 +389,7 @@ pub fn boogie_bv_type(env: &GlobalEnv, ty: &Type) -> String {
             Address => "int".to_string(),
             Signer => "$signer".to_string(),
             Bool => "bool".to_string(),
+            I64 | I128 => unimplemented!("no i64/i128 in boogie types"),
             Range | EventStore => panic!("unexpected type"),
             Num => {
                 //TODO(tengzhang): add error message with accurate location info
@@ -490,6 +492,7 @@ pub fn boogie_type_suffix_bv(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> Strin
             U64 => boogie_num_type_string("64", bv_flag),
             U128 => boogie_num_type_string("128", bv_flag),
             U256 => boogie_num_type_string("256", bv_flag),
+            I64 | I128 => unimplemented!("no i64/i128 in boogie types"),
             Num => {
                 if bv_flag {
                     //TODO(tengzhang): add error message with accurate location info
@@ -948,6 +951,9 @@ fn type_name_to_ident_tokens(
         Type::Primitive(PrimitiveType::U256) => TypeIdentToken::make("u256"),
         Type::Primitive(PrimitiveType::Address) => TypeIdentToken::make("address"),
         Type::Primitive(PrimitiveType::Signer) => TypeIdentToken::make("signer"),
+        Type::Primitive(PrimitiveType::I64) | Type::Primitive(PrimitiveType::I128) => {
+            unreachable!("no i64/i128 in boogie types");
+        },
         Type::Vector(element) => {
             let mut tokens = TypeIdentToken::make("vector<");
             tokens.extend(type_name_to_ident_tokens(env, element, formatter));
@@ -1076,6 +1082,9 @@ fn type_name_to_info_pack(env: &GlobalEnv, ty: &Type) -> Option<TypeInfoPack> {
         | Type::Primitive(PrimitiveType::Address)
         | Type::Primitive(PrimitiveType::Signer)
         | Type::Vector(_) => None,
+        Type::Primitive(PrimitiveType::I64) | Type::Primitive(PrimitiveType::I128) => {
+            unreachable!("no i64/i128 in boogie types");
+        },
         // move types that are not allowed
         Type::Reference(..) | Type::Tuple(..) => {
             unreachable!("Prohibited move type in type_name call");

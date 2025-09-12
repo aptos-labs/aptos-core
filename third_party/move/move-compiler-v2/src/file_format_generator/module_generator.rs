@@ -336,6 +336,7 @@ impl ModuleGenerator {
                 U256 => FF::SignatureToken::U256,
                 Address => FF::SignatureToken::Address,
                 Signer => FF::SignatureToken::Signer,
+                I64 | I128 => unimplemented!("i64/i128 not supported before language version 2.3"),
                 Num | Range | EventStore => {
                     ctx.internal_error(loc, format!("unexpected specification type {:#?}", ty));
                     FF::SignatureToken::Bool

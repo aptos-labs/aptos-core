@@ -1,0 +1,133 @@
+
+Diagnostics:
+error: expected `i64` but found a value of type `u64`
+  ┌─ tests/signed-int/invalid/invalid_constants.move:2:22
+  │
+2 │   const V1_64: i64 = 1u64; // type mismatch: expected i64, actual u64
+  │                      ^^^^
+
+error: constant does not fit into `i64`
+  ┌─ tests/signed-int/invalid/invalid_constants.move:3:22
+  │
+3 │   const V2_64: i64 = 9223372036854775808; // out of upper bound: max value of i64 is 9223372036854775807
+  │                      ^^^^^^^^^^^^^^^^^^^
+
+error: constant does not fit into `i64`
+  ┌─ tests/signed-int/invalid/invalid_constants.move:4:22
+  │
+4 │   const V3_64: i64 = 9223372036854775808i64; // out of upper bound: max value of i64 is 9223372036854775807
+  │                      ^^^^^^^^^^^^^^^^^^^^^^
+
+error: constant does not fit into `i64`
+  ┌─ tests/signed-int/invalid/invalid_constants.move:5:23
+  │
+5 │   const V4_64: i64 = -9223372036854775809; // out of lower bound: min value of i64 is -9223372036854775808
+  │                       ^^^^^^^^^^^^^^^^^^^
+
+error: constant does not fit into `i64`
+  ┌─ tests/signed-int/invalid/invalid_constants.move:6:23
+  │
+6 │   const V5_64: i64 = -9223372036854775809i64; // out of lower bound: min value of i64 is -9223372036854775808
+  │                       ^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `i64` but found a value of type `i128`
+  ┌─ tests/signed-int/invalid/invalid_constants.move:7:23
+  │
+7 │   const V6_64: i64 = -1i128; // type mismatch: expected i64, actual i128
+  │                       ^^^^^
+
+error: expected `i128` but found a value of type `u128`
+  ┌─ tests/signed-int/invalid/invalid_constants.move:9:24
+  │
+9 │   const V1_128: i128 = 1u128; // type mismatch: expected i128, actual i128
+  │                        ^^^^^
+
+error: constant does not fit into `i128`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:10:24
+   │
+10 │   const V2_128: i128 = 170141183460469231731687303715884105728; // out of upper bound: max value of i128 is 170141183460469231731687303715884105727
+   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: constant does not fit into `i128`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:11:24
+   │
+11 │   const V3_128: i128 = 170141183460469231731687303715884105728i128; // out of upper bound: max value of i128 is 170141183460469231731687303715884105727
+   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: constant does not fit into `i128`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:12:25
+   │
+12 │   const V4_128: i128 = -170141183460469231731687303715884105729; // out of lower bound: min value of i64 is -170141183460469231731687303715884105728
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: constant does not fit into `i128`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:13:25
+   │
+13 │   const V5_128: i128 = -170141183460469231731687303715884105729i128; // out of lower bound: min value of i64 is -170141183460469231731687303715884105728
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `i128` but found a value of type `i64`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:14:25
+   │
+14 │   const V6_128: i128 = -1i64; // type mismatch: expected i128, actual i64
+   │                         ^^^^
+
+error: constant does not fit into `i64`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:19:13
+   │
+19 │     let c = 9223372036854775808i64; // constant does not fit into i64 && type mismatch in `res7 + c`, expected u64|u128|u256|i128, actual i64
+   │             ^^^^^^^^^^^^^^^^^^^^^^
+
+error: constant does not fit into `i64`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:21:14
+   │
+21 │     let e = -9223372036854775809i64; // constant does not fit into i64 && type mismatch in `res9 + e`, expected i128, actual i64
+   │              ^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot use `u64` with an operator which expects a value of type `i64`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:28:23
+   │
+28 │     let res6 = res5 + a;
+   │                       ^
+
+error: cannot use `i64` with an operator which expects a value of type `u64|u128|u256|i128`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:30:23
+   │
+30 │     let res8 = res7 + c;
+   │                       ^
+
+error: cannot use `i64` with an operator which expects a value of type `i128`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:32:24
+   │
+32 │     let res10 = res9 + e;
+   │                        ^
+
+error: constant does not fit into `i128`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:39:13
+   │
+39 │     let c = 170141183460469231731687303715884105728i128; // type mismatch in `res7 + c`, expected u128|u256, actual i128
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: constraint `integer` incompatible with ``
+   ┌─ tests/signed-int/invalid/invalid_constants.move:40:14
+   │
+40 │     let d = -170141183460469231731687303715884105729; // no type can be inffered
+   │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: constant does not fit into `i128`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:41:14
+   │
+41 │     let e = -170141183460469231731687303715884105729i128; // constant does not fit into i128
+   │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot use `u128` with an operator which expects a value of type `i128`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:48:23
+   │
+48 │     let res6 = res5 + a;
+   │                       ^
+
+error: cannot use `i128` with an operator which expects a value of type `u128|u256`
+   ┌─ tests/signed-int/invalid/invalid_constants.move:50:23
+   │
+50 │     let res8 = res7 + c;
+   │                       ^

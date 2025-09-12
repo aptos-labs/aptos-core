@@ -44,11 +44,9 @@ use move_ir_types::{
     location::{sp, Spanned},
     sp,
 };
-use num::{BigInt, FromPrimitive, Zero};
+use num::{BigInt, FromPrimitive};
 use std::{
-    cell::RefCell,
-    collections::{BTreeMap, BTreeSet, LinkedList},
-    mem,
+    cell::RefCell, collections::{BTreeMap, BTreeSet, LinkedList}, mem
 };
 
 #[derive(Debug)]
@@ -955,6 +953,12 @@ impl ExpTranslator<'_, '_, '_> {
                         "u256" => {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::U256));
                         },
+                        "i64" => {
+                            return check_zero_args(self, Type::new_prim(PrimitiveType::I64));
+                        },
+                        "i128" => {
+                            return check_zero_args(self, Type::new_prim(PrimitiveType::I128));
+                        },
                         "num" => return check_zero_args(self, Type::new_prim(PrimitiveType::Num)),
                         "range" => {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::Range));
@@ -1446,7 +1450,7 @@ impl ExpTranslator<'_, '_, '_> {
         };
         match &exp.value {
             EA::Exp_::Value(v) => {
-                if let Some((v, ty)) = self.translate_value(v, expected_type, context) {
+                if let Some((v, ty)) = self.translate_value(v, expected_type, context, false) {
                     make_value(self, v, ty)
                 } else {
                     self.new_error_exp()
@@ -3032,14 +3036,17 @@ impl ExpTranslator<'_, '_, '_> {
         context: &ErrorMessageContext,
     ) -> Option<(Value, Type)> {
         let tvar = self.fresh_type_var();
-        self.translate_value(v, &tvar, context)
+        self.translate_value(v, &tvar, context, false)
     }
 
+    /// Translates a value, checking it against an expected type. If `neg_val` is true,
+    /// the value needs to negated and then handled
     pub fn translate_value(
         &mut self,
         v: &EA::Value,
         expected_type: &Type,
         context: &ErrorMessageContext,
+        neg_val: bool
     ) -> Option<(Value, Type)> {
         let loc = self.to_loc(&v.loc);
         match &v.value {
@@ -3062,6 +3069,7 @@ impl ExpTranslator<'_, '_, '_> {
                 Some(PrimitiveType::U8),
                 expected_type,
                 context,
+                neg_val,
             )),
             EA::Value_::U16(x) => Some(self.translate_number(
                 &loc,
@@ -3069,6 +3077,7 @@ impl ExpTranslator<'_, '_, '_> {
                 Some(PrimitiveType::U16),
                 expected_type,
                 context,
+                neg_val,
             )),
             EA::Value_::U32(x) => Some(self.translate_number(
                 &loc,
@@ -3076,6 +3085,7 @@ impl ExpTranslator<'_, '_, '_> {
                 Some(PrimitiveType::U32),
                 expected_type,
                 context,
+                neg_val,
             )),
             EA::Value_::U64(x) => Some(self.translate_number(
                 &loc,
@@ -3083,6 +3093,7 @@ impl ExpTranslator<'_, '_, '_> {
                 Some(PrimitiveType::U64),
                 expected_type,
                 context,
+                neg_val,
             )),
             EA::Value_::U128(x) => Some(self.translate_number(
                 &loc,
@@ -3090,6 +3101,7 @@ impl ExpTranslator<'_, '_, '_> {
                 Some(PrimitiveType::U128),
                 expected_type,
                 context,
+                neg_val,
             )),
             EA::Value_::U256(x) => Some(self.translate_number(
                 &loc,
@@ -3097,9 +3109,26 @@ impl ExpTranslator<'_, '_, '_> {
                 Some(PrimitiveType::U256),
                 expected_type,
                 context,
+                neg_val,
+            )),
+            EA::Value_::I64(x) => Some(self.translate_number(
+                &loc,
+                BigInt::from(*x),
+                Some(PrimitiveType::I64),
+                expected_type,
+                context,
+                neg_val,
+            )),
+            EA::Value_::I128(x) => Some(self.translate_number(
+                &loc,
+                BigInt::from(*x),
+                Some(PrimitiveType::I128),
+                expected_type,
+                context,
+                neg_val,
             )),
             EA::Value_::InferredNum(x) => {
-                Some(self.translate_number(&loc, BigInt::from(x), None, expected_type, context))
+                Some(self.translate_number(&loc, BigInt::from(x), None, expected_type, context, neg_val))
             },
             EA::Value_::Bool(x) => Some((Value::Bool(*x), Type::new_prim(PrimitiveType::Bool))),
             EA::Value_::Bytearray(x) => {
@@ -3117,6 +3146,7 @@ impl ExpTranslator<'_, '_, '_> {
         requested_type: Option<PrimitiveType>,
         expected_type: &Type,
         context: &ErrorMessageContext,
+        neg_number: bool,
     ) -> (Value, Type) {
         // First determine the type of the number.
         let mut possible_types = if let Some(requested) = requested_type {
@@ -3134,11 +3164,11 @@ impl ExpTranslator<'_, '_, '_> {
             vec![PrimitiveType::U256]
         } else {
             // Infer the possible types from the value
-            PrimitiveType::possible_int_types(value.clone())
+            PrimitiveType::possible_int_types(value.clone(), neg_number)
         };
         let ty = if possible_types.len() == 1 {
             let actual_type = possible_types.pop().unwrap();
-            self.check_range(loc, actual_type, value.clone());
+            self.check_range(loc, actual_type, value.clone(), neg_number);
             Type::Primitive(actual_type)
         } else {
             // Multiple possible types, need to be expressed by a constraint. Note the range
@@ -3151,13 +3181,24 @@ impl ExpTranslator<'_, '_, '_> {
             )
         };
         let ty = self.check_type(loc, &ty, expected_type, context);
+        let value = if neg_number {
+            -value
+        } else {
+            value
+        };
         (Value::Number(value), ty)
     }
 
     /// Check whether value fits into primitive type, report error if not.
-    fn check_range(&mut self, loc: &Loc, ty: PrimitiveType, value: BigInt) {
+    fn check_range(&mut self, loc: &Loc, ty: PrimitiveType, mut value: BigInt, neg_number: bool) {
         let max = ty.get_max_value().unwrap_or(value.clone());
-        if value < BigInt::zero() || value > max {
+        let min = ty.get_min_value().unwrap_or(value.clone());
+
+        if neg_number {
+            value = - value;
+        }
+
+        if value < min || value > max {
             let tcx = self.type_display_context();
             self.error(
                 loc,
@@ -4397,8 +4438,39 @@ impl ExpTranslator<'_, '_, '_> {
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
+        // If we are negating a constant number, we simply replace the `Neg` operation with the number after negation
+        // Valid cases:
+        // - `let a: i64 = -1i64` --> type: `i64`; value -1
+        // - `let a: i64 = -1` --> type: `i64`; value -1
+        // - `let a = -1` --> type: `i64` or `i128`; value -1
+        // Invalid cases (all checks implemented in `translate_value`):
+        // - Type mismatch 1: `let a: u64 = -1i64` --> expected type (`u64`) and requested type (`i64`) mismatch
+        // - Type mismatch 2: `let a: u64 = -1` --> expected type (`u64`) and possible type (`i64`/`i128`) mismatch
+        // - Out of value range 1: `let a: i64 = -9223372036854775809` --> value `-9223372036854775809` does not fit in type `i64`
+        // - Out of value range 2: `let a = -1u64` --> value `-1` does not fit in type `u64`
+        let QualifiedSymbol { module_name, symbol } = self.parent.parent.unary_op_symbol(&PA::UnaryOp_::Neg);
+        if module.as_ref() == Some(&module_name)
+            && name == symbol
+            && args.len() == 1
+        {
+            if let EA::Exp_::Value(v) = &args[0].value {
+                let make_value = |et: &mut ExpTranslator, val: Value, ty: Type| {
+                    let _rty = et.check_type(&loc, &ty, expected_type, context);
+                    let id = et.new_node_id_with_type_loc(&ty, &loc);
+                    ExpData::Value(id, val)
+                };
+                if let Some((v, ty)) = self.translate_value(v, expected_type, context, true) {
+                   return make_value(self, v, ty);
+                } else {
+                    self.error(loc, &format!("value -{:?} cannot be translated into an `{}`", v.value, expected_type.display(&self.env().get_type_display_ctx())));
+                    return self.new_error_exp();
+                }
+            }
+        }
+
         // Translate arguments: arg_types is needed to do candidate matching.
         let (mut arg_types, mut translated_args) = self.translate_exp_list(args);
+
         // Special handling of receiver call functions
         if kind == CallKind::Receiver {
             debug_assert!(

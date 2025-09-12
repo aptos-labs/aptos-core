@@ -1,0 +1,17 @@
+// -- Model dump before first bytecode pipeline
+
+
+// -- Sourcified model before first bytecode pipeline
+
+
+============ bytecode before first stackless bytecode pipeline ================
+============ after AbortAnalysisProcessor: ================
+// -- Model dump before second bytecode pipeline
+
+
+============ bytecode before second stackless bytecode pipeline ================
+============ after LiveVarAnalysisProcessor: ================
+
+============ disassembled file-format ==================
+
+============ bytecode verification succeeded ========
