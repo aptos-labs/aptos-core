@@ -160,6 +160,8 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
     }
 }
 
+use ark_serialize::{CanonicalSerialize};
+
 #[allow(non_snake_case)]
 impl RangeProof for merlin::Transcript {
     fn append_sep(&mut self) {
@@ -172,8 +174,10 @@ impl RangeProof for merlin::Transcript {
     }
 
     fn append_public_statement(&mut self, public_statement: &(usize, &range_proof::Commitment)) {
-        let public_statement_bytes =
-            bcs::to_bytes(public_statement).expect("public_statement serialization should succeed");
+        let mut public_statement_bytes = Vec::new();
+        (*public_statement).0.serialize_compressed(&mut public_statement_bytes).expect("public_statement serialization should succeed");
+        (*public_statement).1.serialize_compressed(&mut public_statement_bytes).expect("public_statement serialization should succeed");
+        // TODO: CHANGE THIS STUFF
         self.append_message(b"public-statements", public_statement_bytes.as_slice());
     }
 

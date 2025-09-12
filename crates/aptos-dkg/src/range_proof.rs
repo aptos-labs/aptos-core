@@ -10,17 +10,17 @@ use crate::{
     fiat_shamir,
     utils::{
         g1_multi_exp, g2_multi_exp, multi_pairing_g1_g2, pad_to_pow2_len_minus_one,
-        random::{random_g1_point, random_g2_point, random_scalar},
+        random::{random_scalar},
     },
 };
 use anyhow::ensure;
-use blstrs::{G1Projective, G2Projective, Gt, Scalar};
+use blstrs::{G1Projective as G1ProjectiveOLD, G2Projective as G2ProjectiveOLD, Gt as GtOLD, Scalar as ScalarOLD};
 #[cfg(feature = "range_proof_timing")]
 use ff::derive::bitvec::macros::internal::funty::Fundamental;
 use ff::Field;
 use group::Group;
-use rand::thread_rng;
-use rand_core::{CryptoRng, RngCore};
+// use rand::thread_rng;
+// use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "range_proof_timing")]
 use std::time::{Duration, Instant};
@@ -28,6 +28,21 @@ use std::{
     iter::once,
     ops::{AddAssign, Mul},
 };
+
+use ark_bn254::{
+    Bn254 as PairingSetting, 
+    g1::Config as G1Config,
+    Fr, 
+    G1Affine, 
+    G2Affine, 
+    G1Projective, 
+    G2Projective,
+    Fq,
+    Config,
+};
+use ark_poly;
+use ark_std::UniformRand;
+use ark_std::rand::{thread_rng, RngCore, CryptoRng};
 
 pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V1_RANGE_PROOF_DST";
 
@@ -38,11 +53,11 @@ pub struct PowersOfTau {
 
 pub fn powers_of_tau<R>(rng: &mut R, n: usize) -> PowersOfTau
 where
-    R: RngCore + rand::Rng + CryptoRng,
+    R: RngCore + CryptoRng,
 {
-    let g1 = random_g1_point(rng);
-    let g2 = random_g2_point(rng);
-    let tau = random_scalar(rng);
+    let g1 = G1Projective::rand(rng);
+    let g2 = G2Projective::rand(rng);
+    let tau = Fr::rand(rng);
     let mut t1 = vec![g1];
     let mut t2 = vec![g2];
     for i in 0..n {
@@ -56,17 +71,19 @@ pub struct PublicParameters {
     taus: PowersOfTau,               // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}
     ell: usize,                      // the range is [0, 2^\ell)
     n: usize,                        // the number of values we are batch proving; i.e., batch size
-    lagr_g1: Vec<G1Projective>,      // of size n + 1
+    lagr_g1: Vec<G1Projective>,      // of size n + 1 // TODO: Vec<G1Affine is probably better>
     lagr_g2: Vec<G2Projective>,      // of size n + 1
     pub vanishing_com: G2Projective, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - \omega^n) used to test h(X)
     batch_dom_n1: BatchEvaluationDomain, // batch evaluation domain of size (n+1)
     dom_n1: EvaluationDomain,        // (n+1)th root of unity
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Commitment(G1Projective);
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Proof {
     d: G1Projective,          // commitment to h(X) = \sum_{j=0}^{\ell-1} beta_j h_j(X)
     c: Vec<G1Projective>,     // of size \ell
@@ -79,6 +96,8 @@ impl Proof {
     }
 }
 
+use ark_ec::PrimeGroup;
+
 /// Sets up the Borgeaud range proof for proving that size-`n` batches are in the range [0, 2^\ell).
 pub fn setup(ell: usize, n: usize) -> PublicParameters {
     let mut rng = thread_rng();
@@ -87,12 +106,14 @@ pub fn setup(ell: usize, n: usize) -> PublicParameters {
     let num_omegas = n + 1;
     assert!(num_omegas.is_power_of_two());
 
-    let taus = powers_of_tau(&mut rng, n);
+    let taus = powers_of_tau(&mut rng, n); // The taus have length `n+1`
 
-    let batch_dom_n1 = BatchEvaluationDomain::new(num_omegas);
+    let batch_dom_n1 = ark_poly::EvaluationDomain::new(num_omegas);
+    //let batch_dom_2n2 = ark_poly::EvaluationDomain::new(num_omegas * 2);
+    // let batch_dom_n1 = BatchEvaluationDomain::new(num_omegas);
     let batch_dom_2n2 = BatchEvaluationDomain::new(num_omegas * 2);
     let dom_n1 = batch_dom_2n2.get_subdomain(num_omegas);
-    let omega_n: Vec<Scalar> = (0..num_omegas)
+    let omega_n: Vec<Fr> = (0..num_omegas)
         .map(|i| batch_dom_2n2.get_all_roots_of_unity()[i * 2])
         .collect();
 
@@ -111,7 +132,7 @@ pub fn setup(ell: usize, n: usize) -> PublicParameters {
 
     // Therefore, below we commit to $V(X)$ by simply scaling it down by $\prod_{i\in[n)} (\omega^n - \omega^i)$!
     let vanishing_com = {
-        let last_eval: Scalar = (0..n).map(|i| omega_n[n] - omega_n[i]).product();
+        let last_eval: ScalarOLD = (0..n).map(|i| omega_n[n] - omega_n[i]).product();
 
         lagr_g2[n] * last_eval
     };
@@ -140,28 +161,30 @@ pub fn setup(ell: usize, n: usize) -> PublicParameters {
     }
 }
 
-pub fn commit<R>(pp: &PublicParameters, z: &[Scalar], rng: &mut R) -> (Commitment, Scalar)
+pub fn commit<R>(pp: &PublicParameters, z: &[Fr], rng: &mut R) -> (Commitment, Fr)
 where
-    R: RngCore + rand::Rng + CryptoRng,
+    R: RngCore + CryptoRng,
 {
-    let r = random_scalar(rng);
+    let r = Fr::rand(rng);
     let c = commit_with_randomness(pp, z, &r);
     (c, r)
 }
 
+use ark_ec::{VariableBaseMSM};
+
 pub(crate) fn commit_with_randomness(
     pp: &PublicParameters,
-    z: &[Scalar],
-    r: &Scalar,
+    z: &[Fr],
+    r: &Fr,
 ) -> Commitment {
     let mut scalars = z.to_vec();
-    let mut bases: Vec<G1Projective> = pp.lagr_g1[..scalars.len()].to_vec(); // TODO: atm the range proof algorithm couples `r` with `lagr_g1.last()` causing a copy here; this can be avoided by coupling `r` with `lagr_g1.first()` instead
+    let mut bases = pp.lagr_g1[..scalars.len()].to_vec(); // TODO: atm the range proof algorithm couples `r` with `lagr_g1.last()` causing a copy here; this can be avoided by coupling `r` with `lagr_g1.first()` instead
 
     scalars.push(*r);
     let last_base = pp.lagr_g1.last().expect("pp.lagr_g1 must not be empty");
     bases.push(*last_base);
 
-    let c = g1_multi_exp(&bases, &scalars);
+    let c = G1Projective::msm(&bases, &scalars).expect("could not compute msm in range proof commitment");
     Commitment(c)
 }
 
@@ -169,9 +192,9 @@ pub(crate) fn commit_with_randomness(
 pub fn batch_prove<R>(
     rng: &mut R,
     pp: &PublicParameters,
-    zz: &[Scalar],
+    zz: &[ScalarOLD],
     cc: &Commitment,
-    rr: &Scalar,
+    rr: &ScalarOLD,
     fs_transcript: &mut merlin::Transcript,
 ) -> Proof
 where
@@ -251,11 +274,11 @@ where
     let f_evals = (0..pp.ell)
         .map(|j| {
             (0..pp.n)
-                .map(|i| Scalar::from(bits[i][j] as u64))
+                .map(|i| ScalarOLD::from(bits[i][j] as u64))
                 .chain(once(r[j]))
-                .collect::<Vec<Scalar>>()
+                .collect::<Vec<ScalarOLD>>()
         })
-        .collect::<Vec<Vec<Scalar>>>();
+        .collect::<Vec<Vec<ScalarOLD>>>();
     // Assert f_evals is either 0 or 1s or r_j
     // for (j, evals) in f_evals.iter().enumerate() {
     //     for (i, e) in evals.iter().take(pp.n).enumerate() {
@@ -276,7 +299,7 @@ where
     #[cfg(feature = "range_proof_timing")]
     let start = Instant::now();
     // c[j] = c_j = g_1^{f_j(\tau)}
-    let c: Vec<G1Projective> = (0..pp.ell)
+    let c: Vec<G1ProjectiveOLD> = (0..pp.ell)
         // Note: Using a multiexp will be 10-20% slower than manually multiplying.
         // .map(|j|
         //     g1_multi_exp(&pp.lagrange_basis, &f_evals[j]))
@@ -291,7 +314,7 @@ where
             //  For example, if we want to handle n = 2048, we can set c = 16, which gives
             //  `k = \ell / c = 2048 / 16 = 128` tables, each of size 2^c => 2^{16} * 48 bytes =
             //  3 MiB / table => 384 MiB total.
-            let mut c: G1Projective = pp
+            let mut c: G1ProjectiveOLD = pp
                 .lagr_g1
                 .iter()
                 .take(pp.n)
@@ -299,7 +322,7 @@ where
                 .map(|(lagr, eval)| {
                     // Using G1Projective::mul here will be way slower! (Not sure why...)
                     if eval.is_zero_vartime() {
-                        G1Projective::identity()
+                        G1ProjectiveOLD::identity()
                     } else {
                         *lagr
                     }
@@ -325,11 +348,11 @@ where
     // Step 5: Compute c_hat[j] = \hat{c}_j = g_2^{f_j(\tau)}
     #[cfg(feature = "range_proof_timing")]
     let start = Instant::now();
-    let c_hat: Vec<G2Projective> = (0..pp.ell)
+    let c_hat: Vec<G2ProjectiveOLD> = (0..pp.ell)
         // Note: Using a multiexp will be 10-20% slower than manually multiplying.
         // .map(|j| g2_multi_exp(&pp.lagrange_basis_g2, &f_evals[j]))
         .map(|j| {
-            let mut c_hat_j: G2Projective = pp
+            let mut c_hat_j: G2ProjectiveOLD = pp
                 .lagr_g2
                 .iter()
                 .take(pp.n)
@@ -337,7 +360,7 @@ where
                 .map(|(lagr, eval)| {
                     // Using G1Projective::mul here will be way slower! (Not sure why...)
                     if eval.is_zero_vartime() {
-                        G2Projective::identity()
+                        G2ProjectiveOLD::identity()
                     } else {
                         *lagr
                     }
@@ -375,13 +398,13 @@ where
     #[cfg(feature = "range_proof_timing")]
     let start = Instant::now();
     let omega_n = pp.batch_dom_n1.get_root_of_unity(pp.n);
-    let n1_inv = Scalar::from(pp.n as u64 + 1).invert().unwrap();
+    let n1_inv = ScalarOLD::from(pp.n as u64 + 1).invert().unwrap();
     let mut omega_i_minus_n = Vec::with_capacity(pp.n);
     for i in 0..pp.n {
         let omega_i = pp.batch_dom_n1.get_root_of_unity(i);
         omega_i_minus_n.push(omega_i - omega_n);
     }
-    let h: Vec<Vec<Scalar>> = (0..pp.ell)
+    let h: Vec<Vec<ScalarOLD>> = (0..pp.ell)
         .map(|j| {
             // Interpolate f_j coeffs
             let mut f_j = f_evals[j].clone();
@@ -404,7 +427,7 @@ where
                 diff_n_j_evals.push(
                     (omega_i_minus_n[i])
                         * diff_f_j_evals[i]
-                        * (f_evals[j][i].double() - Scalar::ONE),
+                        * (f_evals[j][i].double() - ScalarOLD::ONE),
                 );
             }
 
@@ -473,7 +496,7 @@ where
     // Step 8: Compute h(X) = \sum_{j=0}^{ell-1} beta_j h_j(X)
     #[cfg(feature = "range_proof_timing")]
     let start = Instant::now();
-    let mut hh: Vec<Scalar> = vec![Scalar::ZERO; pp.n + 1];
+    let mut hh: Vec<ScalarOLD> = vec![ScalarOLD::ZERO; pp.n + 1];
     for j in 0..betas.len() {
         let beta_j_h_j = poly_mul_scalar(&h[j], betas[j]);
         poly_add_assign(&mut hh, &beta_j_h_j);
@@ -518,7 +541,7 @@ pub fn batch_verify(
     fs_transcript: &mut merlin::Transcript,
 ) -> anyhow::Result<()> {
     // TODO(Perf): Can have these precomputed in pp
-    let mut powers_of_two = vec![Scalar::ONE; pp.ell];
+    let mut powers_of_two = vec![ScalarOLD::ONE; pp.ell];
     for i in 1..pp.ell {
         let x = powers_of_two[i - 1].double();
         powers_of_two[i] = x;
@@ -554,14 +577,14 @@ pub fn batch_verify(
             .collect::<Vec<_>>()
             .iter(),
     );
-    ensure!(Gt::identity() == h_check);
+    ensure!(GtOLD::identity() == h_check);
 
     // Ensure duality: c[j] matches c_hat[j].
     let c_check = multi_pairing_g1_g2(
         vec![g1_multi_exp(&proof.c, &alphas), -pp.taus.t1[0]].iter(),
         vec![pp.taus.t2[0], g2_multi_exp(&proof.c_hat, &alphas)].iter(),
     );
-    ensure!(Gt::identity() == c_check);
+    ensure!(GtOLD::identity() == c_check);
 
     Ok(())
 }
@@ -572,12 +595,12 @@ fn byte_to_bits_le(val: u8) -> Vec<bool> {
 
 /// Compute alpha, beta.
 fn fiat_shamir_challenges(
-    vk: &(&G1Projective, &G2Projective, &G2Projective, &G2Projective),
+    vk: &(&G1ProjectiveOLD, &G2ProjectiveOLD, &G2ProjectiveOLD, &G2ProjectiveOLD),
     public_statement: &(usize, &Commitment),
-    bit_commitments: &(&[G1Projective], &[G2Projective]),
+    bit_commitments: &(&[G1ProjectiveOLD], &[G2ProjectiveOLD]),
     num_scalars: usize,
     fs_transcript: &mut merlin::Transcript,
-) -> (Vec<Scalar>, Vec<Scalar>) {
+) -> (Vec<ScalarOLD>, Vec<ScalarOLD>) {
     <merlin::Transcript as fiat_shamir::RangeProof>::append_sep(fs_transcript);
 
     <merlin::Transcript as fiat_shamir::RangeProof>::append_vk(fs_transcript, vk);
@@ -612,14 +635,14 @@ fn correlated_randomness<R>(
     rng: &mut R,
     radix: u64,
     num_chunks: usize,
-    target_sum: &Scalar,
-) -> Vec<Scalar>
+    target_sum: &ScalarOLD,
+) -> Vec<ScalarOLD>
 where
     R: RngCore + rand::Rng + CryptoRng,
 {
-    let mut r_vals = vec![Scalar::ZERO; num_chunks];
+    let mut r_vals = vec![ScalarOLD::ZERO; num_chunks];
     let mut remaining = *target_sum;
-    let radix = Scalar::from(radix);
+    let radix = ScalarOLD::from(radix);
     let mut cur_base = radix;
     for i in 1..num_chunks {
         r_vals[i] = random_scalar(rng);
@@ -637,7 +660,7 @@ mod tests {
         range_proof::{byte_to_bits_le, correlated_randomness},
         utils::random::{random_scalar, random_scalars},
     };
-    use blstrs::Scalar;
+    use blstrs::{Scalar as ScalarOLD};
     use ff::Field;
     use rand::thread_rng;
 
@@ -672,12 +695,12 @@ mod tests {
     #[test]
     fn test_correlated_randomness() {
         let mut rng = thread_rng();
-        let target_sum = Scalar::ONE;
+        let target_sum = ScalarOLD::ONE;
         let radix: u64 = 4;
         let num_chunks: usize = 8;
         let coefs = correlated_randomness(&mut rng, radix, num_chunks, &target_sum);
-        let actual_sum: Scalar = (0..num_chunks)
-            .map(|i| coefs[i] * Scalar::from(radix.pow(i as u32)))
+        let actual_sum: ScalarOLD = (0..num_chunks)
+            .map(|i| coefs[i] * ScalarOLD::from(radix.pow(i as u32)))
             .sum();
         assert_eq!(target_sum, actual_sum);
     }
