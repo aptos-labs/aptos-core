@@ -214,10 +214,26 @@ impl LazyLoadedFunction {
             .runtime_environment()
             .vm_config()
             .ty_builder;
-
+        let enable_capture_option = layout_converter
+            .runtime_environment()
+            .vm_config()
+            .enable_capture_option;
         mask.extract(fun.param_tys(), true)
             .into_iter()
             .map(|ty| {
+                if !enable_capture_option {
+                    let ty = if fun.ty_args.is_empty() {
+                        ty
+                    } else {
+                        &ty_builder.create_ty_with_subst(ty, &fun.ty_args)?
+                    };
+                    if layout_converter.contains_option_type(ty, gas_meter, traversal_context)? {
+                        return Err(
+                            PartialVMError::new(StatusCode::UNABLE_TO_CAPTURE_OPTION_TYPE)
+                                .with_message("Option type cannot be captured".to_string()),
+                        );
+                    }
+                }
                 let layout = if fun.ty_args.is_empty() {
                     layout_converter.type_to_type_layout_with_delayed_fields(
                         gas_meter,
