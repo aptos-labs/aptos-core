@@ -15,7 +15,7 @@ use move_core_types::{
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::StatusCode,
 };
-use std::cell::RefCell;
+use std::{cell::RefCell, sync::Arc};
 
 /// An extension to (de)serialize information about function values.
 #[cfg_attr(test, automock)]
@@ -24,7 +24,7 @@ pub trait FunctionValueExtension {
     fn create_from_serialization_data(
         &self,
         data: SerializedFunctionData,
-    ) -> PartialVMResult<Box<dyn AbstractFunction>>;
+    ) -> PartialVMResult<Arc<dyn AbstractFunction>>;
 
     /// Get serialization data from an `AbstractFunction`.
     fn get_serialization_data(
@@ -84,7 +84,7 @@ impl<'a> FunctionValueExtensionWithContext<'a> {
     pub(crate) fn create_from_serialization_data(
         &self,
         data: SerializedFunctionData,
-    ) -> PartialVMResult<Box<dyn AbstractFunction>> {
+    ) -> PartialVMResult<Arc<dyn AbstractFunction>> {
         self.extension.create_from_serialization_data(data)
     }
 }

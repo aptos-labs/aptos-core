@@ -12,6 +12,7 @@ edition = "2021"
 
 [dependencies]
 ambassador = { workspace = true }
+atomic_refcell = { workspace = true }
 better_any = { workspace = true }
 bytes = { workspace = true }
 cfg-if = { workspace = true }

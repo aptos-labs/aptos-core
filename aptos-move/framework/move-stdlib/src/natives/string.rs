@@ -44,11 +44,10 @@ fn native_check_utf8(
     let s_ref = s_arg.as_bytes_ref();
 
     context.charge(
-        STRING_CHECK_UTF8_BASE
-            + STRING_CHECK_UTF8_PER_BYTE * NumBytes::new(s_ref.as_slice().len() as u64),
+        STRING_CHECK_UTF8_BASE + STRING_CHECK_UTF8_PER_BYTE * NumBytes::new(s_ref.len() as u64),
     )?;
 
-    let ok = std::str::from_utf8(s_ref.as_slice()).is_ok();
+    let ok = std::str::from_utf8(s_ref).is_ok();
     // TODO: extensible native cost tables
 
     Ok(smallvec![Value::bool(ok)])
@@ -74,7 +73,7 @@ fn native_is_char_boundary(
     let s_ref = s_arg.as_bytes_ref();
     let ok = unsafe {
         // This is safe because we guarantee the bytes to be utf8.
-        std::str::from_utf8_unchecked(s_ref.as_slice()).is_char_boundary(i as usize)
+        std::str::from_utf8_unchecked(s_ref).is_char_boundary(i as usize)
     };
 
     Ok(smallvec![Value::bool(ok)])
@@ -109,7 +108,7 @@ fn native_sub_string(
     let s_ref = s_arg.as_bytes_ref();
     let s_str = unsafe {
         // This is safe because we guarantee the bytes to be utf8.
-        std::str::from_utf8_unchecked(s_ref.as_slice())
+        std::str::from_utf8_unchecked(s_ref)
     };
     let v = Value::vector_u8(s_str[i..j].as_bytes().iter().cloned());
 
@@ -133,13 +132,13 @@ fn native_index_of(
 
     let r_arg = safely_pop_arg!(args, VectorRef);
     let r_ref = r_arg.as_bytes_ref();
-    let r_str = unsafe { std::str::from_utf8_unchecked(r_ref.as_slice()) };
+    let r_str = unsafe { std::str::from_utf8_unchecked(r_ref) };
 
     context.charge(STRING_INDEX_OF_PER_BYTE_PATTERN * NumBytes::new(r_str.len() as u64))?;
 
     let s_arg = safely_pop_arg!(args, VectorRef);
     let s_ref = s_arg.as_bytes_ref();
-    let s_str = unsafe { std::str::from_utf8_unchecked(s_ref.as_slice()) };
+    let s_str = unsafe { std::str::from_utf8_unchecked(s_ref) };
     let pos = match s_str.find(r_str) {
         Some(size) => size,
         None => s_str.len(),

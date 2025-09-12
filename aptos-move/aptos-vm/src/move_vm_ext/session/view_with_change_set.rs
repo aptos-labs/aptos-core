@@ -30,7 +30,10 @@ use aptos_vm_types::{
 use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use move_vm_types::{
+    delayed_values::delayed_field_id::DelayedFieldID,
+    resolver::{resource_size, ValueOrBytes},
+};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
@@ -232,6 +235,22 @@ impl TDelayedFieldView for ExecutorViewWithChangeSet<'_> {
 impl TResourceView for ExecutorViewWithChangeSet<'_> {
     type Key = StateKey;
     type Layout = MoveTypeLayout;
+
+    fn get_resource_gv(
+        &self,
+        state_key: &Self::Key,
+        layout: &Self::Layout,
+    ) -> PartialVMResult<(ValueOrBytes, usize)> {
+        self.try_get_resource_write_op_from_change_set(state_key, "get_resource_gv")?
+            .map_or_else(
+                || self.base_executor_view.get_resource_gv(state_key, layout),
+                |write_op| {
+                    let bytes = write_op.bytes().cloned();
+                    let len = resource_size(&bytes);
+                    Ok((ValueOrBytes::Bytes(bytes), len))
+                },
+            )
+    }
 
     fn get_resource_state_value(
         &self,
