@@ -37,6 +37,7 @@ pub struct VMConfig {
     /// When this flag is set to true, Move VM will perform additional checks to ensure that
     /// reference safety is maintained during execution.
     pub paranoid_ref_checks: bool,
+    pub enable_capture_option: bool,
 }
 
 impl Default for VMConfig {
@@ -58,6 +59,7 @@ impl Default for VMConfig {
             enable_lazy_loading: true,
             enable_depth_checks: true,
             paranoid_ref_checks: false,
+            enable_capture_option: false,
         }
     }
 }
