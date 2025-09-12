@@ -199,8 +199,12 @@ impl TPayloadManager for QuorumStorePayloadManager {
                         )
                         .collect::<Vec<_>>()
                 },
-                Payload::OptQuorumStore(opt_quorum_store_payload) => {
-                    opt_quorum_store_payload.into_inner().get_all_batch_infos()
+                Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                    payload
+                        .take_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload")
+                        .into_inner()
+                        .get_all_batch_infos()
                 },
             })
             .collect();
@@ -271,7 +275,10 @@ impl TPayloadManager for QuorumStorePayloadManager {
             Payload::DirectMempool(_) => {
                 unreachable!()
             },
-            Payload::OptQuorumStore(opt_qs_payload) => {
+            Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                let opt_qs_payload = payload
+                    .as_opt_qs_payload()
+                    .expect("Should have OptQuorumStore payload");
                 prefetch_helper(
                     opt_qs_payload.opt_batches(),
                     self.batch_reader.clone(),
@@ -391,7 +398,10 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 // or inlined transactions.
                 Ok(())
             },
-            Payload::OptQuorumStore(opt_qs_payload) => {
+            Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                let opt_qs_payload = payload
+                    .as_opt_qs_payload()
+                    .expect("Should have OptQuorumStore payload");
                 let mut missing_authors = BitVec::with_num_bits(self.ordered_authors.len() as u16);
                 for batch in opt_qs_payload.opt_batches().deref() {
                     if self.batch_reader.exists(batch.digest()).is_none() {
@@ -476,7 +486,10 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 )
                 .await?
             },
-            Payload::OptQuorumStore(opt_qs_payload) => {
+            Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                let opt_qs_payload = payload
+                    .as_opt_qs_payload()
+                    .expect("Should have OptQuorumStore payload");
                 let opt_batch_txns = process_optqs_payload(
                     opt_qs_payload.opt_batches(),
                     self.batch_reader.clone(),
@@ -554,7 +567,12 @@ fn get_inline_transactions(block: &Block) -> Vec<SignedTransaction> {
                 .flat_map(|(_batch_info, txns)| txns.clone())
                 .collect()
         },
-        Payload::OptQuorumStore(opt_qs_payload) => opt_qs_payload.inline_batches().transactions(),
+        Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+            let opt_qs_payload = payload
+                .as_opt_qs_payload()
+                .expect("Should have OptQuorumStore payload");
+            opt_qs_payload.inline_batches().transactions()
+        },
         _ => {
             vec![] // Other payload types do not have inline transactions
         },

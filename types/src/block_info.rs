@@ -6,7 +6,10 @@ use crate::{
     epoch_state::EpochState, on_chain_config::ValidatorSet, transaction::Version,
     validator_verifier::ValidatorVerifier,
 };
-use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
+use aptos_crypto::hash::{
+    HashValue, ACCUMULATOR_PLACEHOLDER_HASH, MOON_BLOCK_HAS_EARTH_QC_HASH,
+    MOON_BLOCK_NO_EARTH_QC_HASH,
+};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -210,7 +213,9 @@ impl BlockInfo {
     pub fn is_ordered_only(&self) -> bool {
         *self != BlockInfo::empty()
             && self.next_epoch_state.is_none()
-            && self.executed_state_id == *ACCUMULATOR_PLACEHOLDER_HASH
+            && (self.executed_state_id == *ACCUMULATOR_PLACEHOLDER_HASH
+                || self.executed_state_id == *MOON_BLOCK_NO_EARTH_QC_HASH
+                || self.executed_state_id == *MOON_BLOCK_HAS_EARTH_QC_HASH)
             && self.version == 0
     }
 

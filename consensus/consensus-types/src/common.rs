@@ -5,6 +5,8 @@
 use crate::{
     payload::{OptBatches, OptQuorumStorePayload, PayloadExecutionLimit, TxnAndGasLimits},
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
+    proposal_ext::{EarthBlock, MoonBlock},
+    quorum_cert::QuorumCert,
 };
 use anyhow::ensure;
 use aptos_crypto::{
@@ -222,9 +224,66 @@ pub enum Payload {
         ProofWithData,
         PayloadExecutionLimit,
     ),
+    MoonBlock(MoonBlock),
+    EarthBlock(EarthBlock),
 }
 
 impl Payload {
+    pub fn as_opt_qs_payload(&self) -> Option<&OptQuorumStorePayload> {
+        match self {
+            Payload::OptQuorumStore(payload) => Some(payload),
+            Payload::MoonBlock(block) => Some(block.payload()),
+            Payload::EarthBlock(block) => Some(block.payload()),
+            _ => None,
+        }
+    }
+
+    pub fn as_opt_qs_payload_mut(&mut self) -> Option<&mut OptQuorumStorePayload> {
+        match self {
+            Payload::OptQuorumStore(payload) => Some(payload),
+            Payload::MoonBlock(block) => Some(block.payload_mut()),
+            Payload::EarthBlock(block) => Some(block.payload_mut()),
+            _ => None,
+        }
+    }
+
+    pub fn take_opt_qs_payload(self) -> Option<OptQuorumStorePayload> {
+        match self {
+            Payload::OptQuorumStore(payload) => Some(payload),
+            Payload::MoonBlock(block) => Some(block.take_payload()),
+            Payload::EarthBlock(block) => Some(block.take_payload()),
+            _ => None,
+        }
+    }
+
+    pub fn moon_block(&self) -> Option<&MoonBlock> {
+        match self {
+            Payload::MoonBlock(block) => Some(block),
+            _ => None,
+        }
+    }
+
+    pub fn take_moon_block(self) -> Option<MoonBlock> {
+        match self {
+            Payload::MoonBlock(block) => Some(block),
+            _ => None,
+        }
+    }
+
+    pub fn earth_block(&self) -> Option<&EarthBlock> {
+        match self {
+            Payload::EarthBlock(block) => Some(block),
+            _ => None,
+        }
+    }
+
+    pub fn earth_qc(&self) -> Option<&QuorumCert> {
+        match self {
+            Payload::MoonBlock(block) => block.metadata().earth_qc(),
+            _ => None,
+        }
+    }
+
     pub fn transform_to_quorum_store_v2(
         self,
         max_txns_to_execute: Option<u64>,
@@ -266,6 +325,24 @@ impl Payload {
                     }),
                 )
             },
+            Payload::MoonBlock(mut moon_block) => {
+                moon_block.payload_mut().set_execution_limit(
+                    PayloadExecutionLimit::TxnAndGasLimits(TxnAndGasLimits {
+                        transaction_limit: max_txns_to_execute,
+                        gas_limit: block_gas_limit_override,
+                    }),
+                );
+                Payload::MoonBlock(moon_block)
+            },
+            Payload::EarthBlock(mut earth_block) => {
+                earth_block.payload_mut().set_execution_limit(
+                    PayloadExecutionLimit::TxnAndGasLimits(TxnAndGasLimits {
+                        transaction_limit: max_txns_to_execute,
+                        gas_limit: block_gas_limit_override,
+                    }),
+                );
+                Payload::EarthBlock(earth_block)
+            },
         }
     }
 
@@ -298,7 +375,10 @@ impl Payload {
                         .map(|(_, txns)| txns.len())
                         .sum::<usize>()
             },
-            Payload::OptQuorumStore(opt_qs_payload) => opt_qs_payload.num_txns(),
+            Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => self
+                .as_opt_qs_payload()
+                .expect("Should have OptQuorumStore payload")
+                .num_txns(),
         }
     }
 
@@ -322,7 +402,10 @@ impl Payload {
                     .map(|(_, txns)| txns.len())
                     .sum::<usize>()) as u64)
                 .min(max_txns_to_execute.unwrap_or(u64::MAX)),
-            Payload::OptQuorumStore(opt_qs_payload) => {
+            Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                let opt_qs_payload = self
+                    .as_opt_qs_payload()
+                    .expect("Should have OptQuorumStore payload");
                 let num_txns = opt_qs_payload.num_txns() as u64;
                 let max_txns_to_execute = opt_qs_payload.max_txns_to_execute().unwrap_or(u64::MAX);
                 num_txns.min(max_txns_to_execute)
@@ -351,7 +434,10 @@ impl Payload {
             | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                 proof_with_data.proofs.is_empty() && inline_batches.is_empty()
             },
-            Payload::OptQuorumStore(opt_qs_payload) => opt_qs_payload.is_empty(),
+            Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => self
+                .as_opt_qs_payload()
+                .expect("Should have OptQuorumStore payload")
+                .is_empty(),
         }
     }
 
@@ -479,6 +565,7 @@ impl Payload {
                 let opt_qs3 = opt_qs1.extend(opt_qs2);
                 Payload::OptQuorumStore(opt_qs3)
             },
+            // MoonBlock and EarthBlock are not extendable
             (_, _) => unreachable!(),
         }
     }
@@ -511,7 +598,10 @@ impl Payload {
                         .map(|(batch_info, _)| batch_info.num_bytes() as usize)
                         .sum::<usize>()
             },
-            Payload::OptQuorumStore(opt_qs_payload) => opt_qs_payload.num_bytes(),
+            Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => self
+                .as_opt_qs_payload()
+                .expect("Should have OptQuorumStore payload")
+                .num_bytes(),
         }
     }
 
@@ -592,7 +682,12 @@ impl Payload {
                 )?;
                 Ok(())
             },
-            (true, Payload::OptQuorumStore(opt_quorum_store)) => {
+            (true, Payload::OptQuorumStore(_))
+            | (true, Payload::MoonBlock(_))
+            | (true, Payload::EarthBlock(_)) => {
+                let opt_quorum_store = self
+                    .as_opt_qs_payload()
+                    .expect("Should have OptQuorumStore payload");
                 let proof_with_data = opt_quorum_store.proof_with_data();
                 Self::verify_with_cache(&proof_with_data.batch_summary, verifier, proof_cache)?;
                 Self::verify_inline_batches(
@@ -642,8 +737,10 @@ impl Payload {
                     "Payload inline batch epoch doesn't match given epoch"
                 )
             },
-            Payload::OptQuorumStore(opt_quorum_store_payload) => {
-                opt_quorum_store_payload.check_epoch(epoch)?;
+            Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                self.as_opt_qs_payload()
+                    .expect("Should have OptQuorumStore payload")
+                    .check_epoch(epoch)?;
             },
         };
         Ok(())
@@ -678,8 +775,13 @@ impl fmt::Display for Payload {
                     proof_with_data.proofs.len()
                 )
             },
-            Payload::OptQuorumStore(opt_quorum_store) => {
-                write!(f, "{}", opt_quorum_store)
+            Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                write!(
+                    f,
+                    "{}",
+                    self.as_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload")
+                )
             },
         }
     }
@@ -792,7 +894,10 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                     Payload::DirectMempool(_) => {
                         error!("DirectMempool payload in InQuorumStore filter");
                     },
-                    Payload::OptQuorumStore(opt_qs_payload) => {
+                    Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                        let opt_qs_payload = payload
+                            .as_opt_qs_payload()
+                            .expect("Should have OptQuorumStore payload");
                         for batch in opt_qs_payload.inline_batches().iter() {
                             exclude_batches.insert(batch.info().clone());
                         }

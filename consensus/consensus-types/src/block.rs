@@ -6,11 +6,16 @@ use crate::{
     block_data::{BlockData, BlockType},
     common::{Author, Payload, Round},
     opt_block_data::OptBlockData,
+    proposal_ext::{EarthBlock, MoonBlock},
     quorum_cert::QuorumCert,
 };
 use anyhow::{bail, ensure, format_err, Result};
 use aptos_bitvec::BitVec;
-use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
+use aptos_crypto::{
+    bls12381,
+    hash::{CryptoHash, MOON_BLOCK_HAS_EARTH_QC_HASH, MOON_BLOCK_NO_EARTH_QC_HASH},
+    HashValue,
+};
 use aptos_infallible::duration_since_epoch;
 use aptos_types::{
     account_address::AccountAddress,
@@ -107,6 +112,10 @@ impl Block {
         self.block_data.payload()
     }
 
+    pub fn take_payload(self) -> Option<Payload> {
+        self.block_data.take_payload()
+    }
+
     pub fn payload_size(&self) -> usize {
         match self.block_data.payload() {
             None => 0,
@@ -118,8 +127,11 @@ impl Block {
                 | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                     inline_batches.len() + proof_with_data.proofs.len()
                 },
-                Payload::OptQuorumStore(opt_quorum_store_payload) => {
-                    opt_quorum_store_payload.num_txns()
+                Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                    payload
+                        .as_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload")
+                        .num_txns()
                 },
             },
         }
@@ -143,11 +155,16 @@ impl Block {
                     proof_with_data.num_txns(),
                     proof_with_data.num_bytes(),
                 ),
-                Payload::OptQuorumStore(opt_quorum_store_payload) => (
-                    opt_quorum_store_payload.proof_with_data().num_proofs(),
-                    opt_quorum_store_payload.proof_with_data().num_txns(),
-                    opt_quorum_store_payload.proof_with_data().num_bytes(),
-                ),
+                Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                    let opt_qs_payload = payload
+                        .as_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload");
+                    (
+                        opt_qs_payload.proof_with_data().num_proofs(),
+                        opt_qs_payload.proof_with_data().num_txns(),
+                        opt_qs_payload.proof_with_data().num_bytes(),
+                    )
+                },
             },
         }
     }
@@ -169,11 +186,16 @@ impl Block {
                         .map(|(b, _)| b.num_bytes() as usize)
                         .sum(),
                 ),
-                Payload::OptQuorumStore(opt_quorum_store_payload) => (
-                    opt_quorum_store_payload.inline_batches().num_batches(),
-                    opt_quorum_store_payload.inline_batches().num_txns(),
-                    opt_quorum_store_payload.inline_batches().num_bytes(),
-                ),
+                Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                    let opt_qs_payload = payload
+                        .as_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload");
+                    (
+                        opt_qs_payload.inline_batches().num_batches(),
+                        opt_qs_payload.inline_batches().num_txns(),
+                        opt_qs_payload.inline_batches().num_bytes(),
+                    )
+                },
                 _ => (0, 0, 0),
             },
         }
@@ -184,19 +206,24 @@ impl Block {
         match self.block_data.payload() {
             None => (0, 0, 0),
             Some(payload) => match payload {
-                Payload::OptQuorumStore(opt_quorum_store_payload) => (
-                    opt_quorum_store_payload.opt_batches().len(),
-                    opt_quorum_store_payload
-                        .opt_batches()
-                        .iter()
-                        .map(|b| b.num_txns() as usize)
-                        .sum(),
-                    opt_quorum_store_payload
-                        .opt_batches()
-                        .iter()
-                        .map(|b| b.num_bytes() as usize)
-                        .sum(),
-                ),
+                Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                    let opt_qs_payload = payload
+                        .as_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload");
+                    (
+                        opt_qs_payload.opt_batches().len(),
+                        opt_qs_payload
+                            .opt_batches()
+                            .iter()
+                            .map(|b| b.num_txns() as usize)
+                            .sum(),
+                        opt_qs_payload
+                            .opt_batches()
+                            .iter()
+                            .map(|b| b.num_bytes() as usize)
+                            .sum(),
+                    )
+                },
                 _ => (0, 0, 0),
             },
         }
@@ -249,6 +276,22 @@ impl Block {
 
     pub fn is_opt_block(&self) -> bool {
         self.block_data.is_opt_block()
+    }
+
+    pub fn moon_block(&self) -> Option<&MoonBlock> {
+        self.payload().and_then(|p| p.moon_block())
+    }
+
+    pub fn take_moon_block(self) -> Option<MoonBlock> {
+        self.take_payload().and_then(|p| p.take_moon_block())
+    }
+
+    pub fn earth_block(&self) -> Option<&EarthBlock> {
+        self.payload().and_then(|p| p.earth_block())
+    }
+
+    pub fn earth_qc(&self) -> Option<&QuorumCert> {
+        self.payload().and_then(|p| p.earth_qc())
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -447,6 +490,27 @@ impl Block {
         }
     }
 
+    pub fn validate_signature_moon_block(
+        &self,
+        earth_validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        self.moon_block().map_or(Ok(()), |moon_block| {
+            moon_block.metadata().verify(earth_validator)
+        })
+    }
+
+    pub fn validate_signature_earth_block(
+        &self,
+        moon_validator: &ValidatorVerifier,
+        earth_validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        self.earth_block().map_or(Ok(()), |earth_block| {
+            earth_block
+                .metadata()
+                .verify(moon_validator, earth_validator)
+        })
+    }
+
     /// Makes sure that the proposal makes sense, independently of the current state.
     /// If this is the genesis block, we skip these checks.
     #[allow(unexpected_cfgs)]
@@ -531,6 +595,63 @@ impl Block {
             self.block_data.hash(),
             "Block id mismatch the hash"
         );
+        self.verify_well_formed_moon_block()?;
+        self.verify_well_formed_earth_block()?;
+        Ok(())
+    }
+
+    pub fn verify_well_formed_moon_block(&self) -> anyhow::Result<()> {
+        if let Some(payload) = self.payload() {
+            if let Payload::MoonBlock(moon_block) = payload {
+                let parent = self.quorum_cert().certified_block();
+                let parent_has_earth_qc =
+                    parent.executed_state_id() == *MOON_BLOCK_HAS_EARTH_QC_HASH;
+                let parent_no_earth_qc = parent.executed_state_id() == *MOON_BLOCK_NO_EARTH_QC_HASH;
+                ensure!(
+                    parent_has_earth_qc || parent_no_earth_qc,
+                    "Parent moon block must have earth QC or no earth QC"
+                );
+                // verify earth round
+                if parent_has_earth_qc {
+                    ensure!(
+                        moon_block.metadata().earth_round == parent.round() + 1,
+                        "Invalid earth round"
+                    );
+                } else {
+                    ensure!(
+                        moon_block.metadata().earth_round == parent.round(),
+                        "Invalid earth round"
+                    );
+                }
+                // verify earth QC round
+                if let Some(earth_qc) = moon_block.metadata().earth_qc() {
+                    if self.is_opt_block() {
+                        // grandparent earth QC is of earth_round - 2
+                        ensure!(
+                            earth_qc.certified_block().round() + 2
+                                == moon_block.metadata().earth_round,
+                            "Invalid earth QC round"
+                        );
+                    } else {
+                        // parent earth QC is of earth_round - 1
+                        ensure!(
+                            earth_qc.certified_block().round() + 1
+                                == moon_block.metadata().earth_round,
+                            "Invalid earth QC round"
+                        );
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn verify_well_formed_earth_block(&self) -> anyhow::Result<()> {
+        if let Some(payload) = self.payload() {
+            if let Payload::EarthBlock(earth_block) = payload {
+                earth_block.metadata().verify_well_formed()?;
+            }
+        }
         Ok(())
     }
 

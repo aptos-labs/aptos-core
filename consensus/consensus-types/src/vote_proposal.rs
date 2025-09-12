@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{block::Block, vote_data::VoteData};
-use aptos_crypto::hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH};
+use aptos_crypto::hash::{
+    TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH, MOON_BLOCK_HAS_EARTH_QC_HASH,
+    MOON_BLOCK_NO_EARTH_QC_HASH,
+};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     epoch_state::EpochState,
@@ -59,9 +62,19 @@ impl VoteProposal {
 
     /// This function returns the vote data with a dummy executed_state_id and version
     fn vote_data_ordering_only(&self) -> VoteData {
+        let executed_state_id_place_holder = if self.block().moon_block().is_some() {
+            if self.block().earth_qc().is_some() {
+                *MOON_BLOCK_HAS_EARTH_QC_HASH
+            } else {
+                *MOON_BLOCK_NO_EARTH_QC_HASH
+            }
+        } else {
+            *ACCUMULATOR_PLACEHOLDER_HASH
+        };
+
         VoteData::new(
             self.block().gen_block_info(
-                *ACCUMULATOR_PLACEHOLDER_HASH,
+                executed_state_id_place_holder,
                 0,
                 self.next_epoch_state().cloned(),
             ),

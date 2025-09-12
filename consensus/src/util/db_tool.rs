@@ -113,7 +113,10 @@ pub fn extract_txns_from_block<'a>(
                 }
                 Ok(all_txns)
             },
-            Payload::OptQuorumStore(opt_qs_payload) => {
+            Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                let opt_qs_payload = payload
+                    .as_opt_qs_payload()
+                    .expect("Should have OptQuorumStore payload");
                 let mut all_txns = extract_txns_from_quorum_store(
                     opt_qs_payload
                         .proof_with_data()

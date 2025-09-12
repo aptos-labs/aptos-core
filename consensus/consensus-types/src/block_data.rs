@@ -176,6 +176,17 @@ impl BlockData {
         }
     }
 
+    pub fn take_payload(self) -> Option<Payload> {
+        match self.block_type {
+            BlockType::Proposal { payload, .. } | BlockType::DAGBlock { payload, .. } => {
+                Some(payload)
+            },
+            BlockType::ProposalExt(p) => p.take_payload(),
+            BlockType::OptimisticProposal(p) => Some(p.take_payload()),
+            _ => None,
+        }
+    }
+
     pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         match &self.block_type {
             BlockType::ProposalExt(p) => p.validator_txns(),
