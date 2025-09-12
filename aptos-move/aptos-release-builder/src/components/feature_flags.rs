@@ -150,6 +150,7 @@ pub enum FeatureFlag {
     CalculateTransactionFeeForDistribution,
     DistributeTransactionFee,
     MonotonicallyIncreasingCounter,
+    EnableCaptureOption,
     EnableTrustedCode,
 }
 
@@ -400,6 +401,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::MonotonicallyIncreasingCounter => {
                 AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER
             },
+            FeatureFlag::EnableCaptureOption => AptosFeatureFlag::ENABLE_CAPTURE_OPTION,
             FeatureFlag::EnableTrustedCode => AptosFeatureFlag::ENABLE_TRUSTED_CODE,
         }
     }
@@ -577,6 +579,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER => {
                 FeatureFlag::MonotonicallyIncreasingCounter
             },
+            AptosFeatureFlag::ENABLE_CAPTURE_OPTION => FeatureFlag::EnableCaptureOption,
             AptosFeatureFlag::ENABLE_TRUSTED_CODE => FeatureFlag::EnableTrustedCode,
         }
     }
