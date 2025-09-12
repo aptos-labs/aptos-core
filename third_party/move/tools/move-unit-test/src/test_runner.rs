@@ -185,7 +185,7 @@ impl TestRunner {
                     .module_tests
                     .par_iter()
                     .map(|(_, plan)| {
-                        self.testing_config.exec_module_tests( plan, writer, options)
+                        self.testing_config.exec_module_tests(plan, writer, options)
                     })
                     .try_reduce(TestStatistics::new, |a, b| Ok(a.combine(b)));
 
