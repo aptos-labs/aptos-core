@@ -70,24 +70,7 @@ fn derive_account_address_from_public_key(public_key_bytes: Vec<u8>, scheme_flag
 
     // Convert the address bytes to a hex string with "0x" prefix
     let mut sui_account_address = b"0x".to_vec();
-
-    // Convert each byte to hex and append to result
-    for byte in sui_address {
-        // Convert byte to hex chars
-        let high_nibble = if (byte >> 4) < 10 {
-            (byte >> 4) + 0x30
-        } else {
-            (byte >> 4) - 10 + 0x61
-        };
-
-        let low_nibble = if (byte & 0xF) < 10 {
-            (byte & 0xF) + 0x30
-        } else {
-            (byte & 0xF) - 10 + 0x61
-        };
-
-        sui_account_address.extend_from_slice(&[high_nibble, low_nibble]);
-    }
+    sui_account_address.extend_from_slice(&hex::encode(sui_address).as_bytes().to_vec());
 
     sui_account_address
 }
@@ -134,7 +117,6 @@ async fn test_sui_derivable_account() {
                 function_name,
                 digest
             );
-                println!("Raw message: {:?}", message);
 
                 // Create Intent message
                 let intent = Intent {

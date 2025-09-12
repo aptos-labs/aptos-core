@@ -19,7 +19,7 @@
 module aptos_framework::sui_derivable_account {
 
     use aptos_framework::auth_data::AbstractionAuthData;
-    use aptos_framework::common_account_abstractions_utils::{network_name, entry_function_name};
+    use aptos_framework::common_account_abstractions_utils::{construct_message, entry_function_name};
     use aptos_std::ed25519::{ Self, new_signature_from_bytes, new_validated_public_key_from_bytes, public_key_into_unvalidated };
     use std::bcs_stream::{ Self, deserialize_u8 };
     use std::bcs;
@@ -42,32 +42,6 @@ module aptos_framework::sui_derivable_account {
     const EINVALID_PUBLIC_KEY: u64 = 6;
     /// Account address mismatch.
     const EACCOUNT_ADDRESS_MISMATCH: u64 = 7;
-
-    fun construct_message(
-        sui_public_key: &vector<u8>,
-        domain: &vector<u8>,
-        entry_function_name: &vector<u8>,
-        digest_utf8: &vector<u8>,
-    ): vector<u8> {
-        let message = &mut vector[];
-        message.append(*domain);
-        message.append(b" wants you to sign in with your Sui account:\n");
-        message.append(*sui_public_key);
-        message.append(b"\n\nPlease confirm you explicitly initiated this request from ");
-        message.append(*domain);
-        message.append(b".");
-        message.append(b" You are approving to execute transaction ");
-        message.append(*entry_function_name);
-        message.append(b" on Aptos blockchain");
-        let network_name = network_name();
-        message.append(b" (");
-        message.append(network_name);
-        message.append(b")");
-        message.append(b".");
-        message.append(b"\n\nNonce: ");
-        message.append(*digest_utf8);
-        *message
-    }
 
     enum SuiAbstractSignature has drop {
         MessageV1 {
@@ -156,23 +130,23 @@ module aptos_framework::sui_derivable_account {
     /// to a tuple of (signing_scheme, signature, public_key)
     public fun split_signature_bytes(bytes: &vector<u8>): (u8, vector<u8>, vector<u8>) {
         // 1 + 64 + 32 = 97 bytes
-        assert!(vector::length(bytes) == 97, EINVALID_SIGNATURE_LENGTH);
+        assert!(bytes.length() == 97, EINVALID_SIGNATURE_LENGTH);
 
-        let signing_scheme = *vector::borrow(bytes, 0);
+        let signing_scheme = bytes[0];
         let abstract_signature_signature = vector::empty<u8>();
         let abstract_signature_public_key = vector::empty<u8>();
 
         // Extract signature (64 bytes)
         let i = 1;
         while (i < 65) {
-            vector::push_back(&mut abstract_signature_signature, *vector::borrow(bytes, i));
-            i = i + 1;
+            abstract_signature_signature.push_back(bytes[i]);
+            i += 1;
         };
 
         // Extract public key (32 bytes)
         while (i < 97) {
-            vector::push_back(&mut abstract_signature_public_key, *vector::borrow(bytes, i));
-            i = i + 1;
+            abstract_signature_public_key.push_back(bytes[i]);
+            i += 1;
         };
 
         (signing_scheme, abstract_signature_signature, abstract_signature_public_key)
@@ -181,8 +155,8 @@ module aptos_framework::sui_derivable_account {
     /// Derives the account address from the public key and returns it is a hex string with "0x" prefix
     fun derive_account_address_from_public_key(signing_scheme: u8, public_key_bytes: vector<u8>): vector<u8> {
         // Create a vector with signing scheme and public key bytes
-        let data_to_hash = vector::singleton(signing_scheme);
-        vector::append(&mut data_to_hash, public_key_bytes);
+        let data_to_hash = vector[signing_scheme];
+        data_to_hash.append(public_key_bytes);
 
         // Compute blake2b hash
         let sui_account_address = aptos_hash::blake2b_256(data_to_hash);
@@ -190,15 +164,15 @@ module aptos_framework::sui_derivable_account {
         // Convert the address bytes to a hex string with "0x" prefix
         let sui_account_address_hex = b"0x";
         let i = 0;
-        while (i < vector::length(&sui_account_address)) {
-            let byte = *vector::borrow(&sui_account_address, i);
+        while (i < sui_account_address.length()) {
+            let byte = sui_account_address[i];
             // Convert each byte to two hex characters
             let hex_chars = vector[
                 if ((byte >> 4) < 10) ((byte >> 4) + 0x30) else ((byte >> 4) - 10 + 0x61),
                 if ((byte & 0xf) < 10) ((byte & 0xf) + 0x30) else ((byte & 0xf) - 10 + 0x61)
             ];
-            vector::append(&mut sui_account_address_hex, hex_chars);
-            i = i + 1;
+            sui_account_address_hex.append(hex_chars);
+            i += 1;
         };
 
         // Return the account address as hex string
@@ -218,7 +192,7 @@ module aptos_framework::sui_derivable_account {
         let abstract_signature = deserialize_abstract_signature(aa_auth_data.derivable_abstract_signature());
         let (signing_scheme, abstract_signature_signature, abstract_signature_public_key) = split_signature_bytes(&abstract_signature.signature);
 
-        // Check siging scheme is ED25519 as we currently only support this scheme
+        // Check siging scheme is Ed25519 as we currently only support this scheme
         assert!(get_signing_scheme(signing_scheme) == SuiSigningScheme::ED25519, EINVALID_SIGNING_SCHEME_TYPE);
 
         // Derive the account address from the public key
@@ -234,9 +208,8 @@ module aptos_framework::sui_derivable_account {
         assert!(public_key.is_some(), EINVALID_PUBLIC_KEY);
 
         let digest_utf8 = string_utils::to_string(aa_auth_data.digest()).bytes();
-
         // Build the raw message
-        let raw_message = construct_message(&sui_account_address, &abstract_public_key.domain, entry_function_name, digest_utf8);
+        let raw_message = construct_message(&b"Sui", &sui_account_address, &abstract_public_key.domain, entry_function_name, digest_utf8);
 
         // Prepend Intent to the message
         let intent = Intent {
@@ -335,17 +308,6 @@ module aptos_framework::sui_derivable_account {
         assert!(signing_scheme == 0x00);
         assert!(signature == vector[151, 47, 171, 144, 115, 16, 129, 17, 202, 212, 180, 155, 213, 223, 249, 203, 195, 0, 84, 142, 121, 167, 29, 113, 159, 33, 177, 108, 137, 113, 160, 118, 41, 246, 199, 202, 79, 151, 27, 86, 235, 219, 123, 168, 152, 38, 124, 147, 146, 118, 101, 37, 187, 223, 206, 120, 101, 148, 33, 141, 80, 60, 155, 13]);
         assert!(public_key == vector[25, 200, 235, 92, 139, 72, 175, 189, 40, 0, 65, 76, 215, 148, 94, 194, 78, 134, 60, 189, 212, 116, 40, 134, 179, 104, 31, 249, 222, 84, 104, 202]);
-    }
-
-    #[test(framework = @0x1)]
-    fun test_construct_message(framework: &signer) {
-        chain_id::initialize_for_test(framework, 2);
-        let sui_account_address = b"0x8d6ce7a3c13617b29aaf7ec58bee5a611606a89c62c5efbea32e06d8d167bd49";
-        let domain = b"localhost:3001";
-        let entry_function_name = b"0x1::coin::transfer";
-        let digest_utf8 = b"0x041689ce61015dd0aa166aa2edc1cc74e63b3ed093f40e3ce4101fce067b24ad";
-        let message = construct_message(&sui_account_address, &domain, &entry_function_name, &digest_utf8);
-        assert!(message == b"localhost:3001 wants you to sign in with your Sui account:\n0x8d6ce7a3c13617b29aaf7ec58bee5a611606a89c62c5efbea32e06d8d167bd49\n\nPlease confirm you explicitly initiated this request from localhost:3001. You are approving to execute transaction 0x1::coin::transfer on Aptos blockchain (testnet).\n\nNonce: 0x041689ce61015dd0aa166aa2edc1cc74e63b3ed093f40e3ce4101fce067b24ad");
     }
 
     #[test(framework = @0x1)]
