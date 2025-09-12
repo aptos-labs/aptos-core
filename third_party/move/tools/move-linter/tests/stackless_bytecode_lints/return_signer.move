@@ -18,3 +18,15 @@ module 0xcafe::skip_function_leak {
     #[lint::skip(return_signer)]
     public fun error(s: signer): signer { s }
 }
+
+module 0xcafe::vesting_like {
+    struct VestingContract has key {}
+
+    public fun get_vesting_account_signer(
+        admin: signer,
+        contract_address: address,
+    ): signer acquires VestingContract {
+        let _r = borrow_global<VestingContract>(contract_address);
+        admin
+    }
+}
