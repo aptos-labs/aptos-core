@@ -1,0 +1,210 @@
+---
+name: "✅ PR Checks"
+run-name: "Running Checks for ${{ github.ref_name }}"
+on:
+  pull_request:
+    branches:
+      - movement
+      - l1-migration
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+
+env:
+  GIT_SHA: ${{ github.sha }}
+  GIT_BRANCH: ${{ github.ref_name }}
+  BUILD_DATE: ${{ github.event.head_commit.timestamp }}
+  BUILT_VIA_BUILDKIT: "true"
+  FEATURES: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-dynamic-deps:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        if: ${{ !inputs.SKIP_JOB }}
+        with:
+          ref: ${{ inputs.GIT_SHA }}
+          
+      # This will exit with failure if any of the banned dynamic deps are found.
+      - run: ./crates/aptos/scripts/check_dynamic_deps.sh
+  
+  semgrep:
+    name: semgrep/ci
+    runs-on: ubuntu-latest
+
+    container:
+      image: returntocorp/semgrep
+      options: --user root
+
+    # Skip any PR created by dependabot to avoid permission issues:
+    if: (github.actor != 'dependabot[bot]')
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: semgrep ci
+        env:
+           SEMGREP_RULES: >-
+             ./.github/linters/semgrep/pull-request-target-code-checkout.yaml
+
+  build-checks:
+    runs-on: k8s-movement-labs
+    outputs:
+      members_changed: ${{ steps.members_check.outputs.changed }}
+      docker_changed: ${{ steps.docker_check.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check if Cargo Members Changed
+        id: members_check
+        uses: ./.github/actions/cargo-members-changed
+        with:
+          base-ref: ${{ github.event.pull_request.base.ref || 'l1-migration' }}
+      - name: Check if Docker Files Changed
+        id: docker_check
+        uses: ./.github/actions/docker-files-changed
+        with:
+          base-ref: ${{ github.event.pull_request.base.ref || 'l1-migration' }}
+
+  build-binaries:
+    needs: build-checks
+    if: needs.build-checks.outputs.members_changed == 'true' || needs.build-checks.outputs.docker_changed == 'true'
+    runs-on: k8s-movement-labs
+    name: "Build Binaries with Nix"
+    strategy:
+      matrix:
+        binary:
+          - name: "aptos-node"
+            package: "aptos-node"
+            profile: "dev"
+          - name: "aptos-cli"
+            package: "aptos"
+            profile: "dev"
+          - name: "l1-migration"
+            package: "l1-migration"
+            profile: "dev"
+    env:
+      TARGET_FOLDER: target/debug
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xz-utils
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      # - name: Cache Rust dependencies
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: |
+      #       ~/.cargo/registry/index/
+      #       ~/.cargo/registry/cache/
+      #       ~/.cargo/git/db/
+      #       target/
+      #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('nix/flake.lock') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
+      #       ${{ runner.os }}-cargo-
+
+      # - name: Cache Nix store
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: /nix/store
+      #     key: ${{ runner.os }}-nix-${{ hashFiles('nix/flake.lock') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-nix-
+
+      - name: Build ${{ matrix.binary.package }}
+        run: |
+          echo "Building ${{ matrix.binary.package }} with Nix development shell..."
+          nix develop -c cargo build -p ${{ matrix.binary.package }} --profile ${{ matrix.binary.profile }} --features "${{ env.FEATURES }}"
+          echo "Binary available at ${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}"
+
+      - name: Verify binary
+        run: |
+          if [ -f "${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}" ]; then
+            echo "✅ Binary ${{ matrix.binary.package }} built successfully"
+            ls -la "${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}"
+          else
+            echo "❌ Binary ${{ matrix.binary.package }} not found"
+            exit 1
+          fi
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.binary.package }}-${{ github.sha }}
+          path: ${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}
+          retention-days: 7
+
+  build-docker:
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    name: "Build Docker Images"
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TARGET_FOLDER: target/debug
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Download artifacts
+      - name: Download aptos-node binary
+        uses: actions/download-artifact@v4
+        with:
+          name: aptos-node-${{ github.sha }}
+          path: ${{ env.TARGET_FOLDER }}
+      - name: Download aptos binary
+        uses: actions/download-artifact@v4
+        with:
+          name: aptos-${{ github.sha }}
+          path: ${{ env.TARGET_FOLDER }}
+      - name: Download l1-migration binary
+        uses: actions/download-artifact@v4
+        with:
+          name: l1-migration-${{ github.sha }}
+          path: ${{ env.TARGET_FOLDER }}
+      - name: List binaries
+        run: ls -la ${{ env.TARGET_FOLDER }}
+      # Setup Docker Buildx (replaces manual Docker checks)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: latest
+
+      # Log in to GHCR (can also use docker/login-action)
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ vars.INFRA_GH_USER }}
+          password: ${{ secrets.INFRA_GH_PAT }}
+      
+      # Set build environment variables
+      - name: Set build environment
+        run: |
+          echo "GIT_SHA_SHORT=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+      
+      # Build and push Docker image
+      - name: Build and push aptos-node Docker image
+        run: |
+          docker build --build-arg BINARY_PATH=target/debug -f docker/aptos-node/Dockerfile -t ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }} .
+          docker push ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }}
+      
+      # Output image information
+      - name: Output image information
+        run: |
+          echo "✅ Docker image built and pushed successfully!"
+          echo "📦 Image: ghcr.io/movementlabsxyz/aptos-node:${{ env.GIT_SHA_SHORT }}"
+          echo "🏷️  Tag: ${{ env.GIT_SHA_SHORT }}"
+          echo "🌐 Registry: ghcr.io/movementlabsxyz/aptos-node"

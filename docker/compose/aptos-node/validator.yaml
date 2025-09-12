@@ -23,10 +23,10 @@ execution:
 
 storage:
   rocksdb_configs:
-    enable_storage_sharding: true
+    enable_storage_sharding: false
 
 validator_network:
-  discovery_method: "onchain"
+  discovery_method: "none"
   mutual_authentication: true
   identity:
     type: "from_file"
@@ -44,3 +44,15 @@ full_node_networks:
 api:
   enabled: true
   address: "0.0.0.0:8080"
+
+admin_service:
+  enabled: true
+  address: 127.0.0.1
+  port: 9102
+
+state_sync:
+  state_sync_driver:
+    bootstrapping_mode: ExecuteOrApplyFromGenesis
+    continuous_syncing_mode: ExecuteTransactionsOrApplyOutputs
+    enable_auto_bootstrapping: true
+    max_connection_deadline_secs: 1

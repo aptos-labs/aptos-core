@@ -1,0 +1,35 @@
+# Simple Dockerfile that pulls in the aptos-node binary and installs required packages
+FROM ubuntu:22.04
+
+# Install all required shared library packages
+RUN apt-get update && apt-get install -y \
+    libjemalloc2 \
+    libdw1 \
+    librocksdb6.11 \
+    libssl3 \
+    libstdc++6 \
+    zlib1g \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy the pre-built binary (assumes you have it locally)
+COPY target/debug/aptos-node /usr/local/bin/aptos-node
+# Or for release build:
+# COPY target/release/aptos-node /usr/local/bin/aptos-node
+
+# Make binary executable
+RUN chmod +x /usr/local/bin/aptos-node
+
+# Expose default ports
+EXPOSE 8080 9101 6180
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD aptos-node --help || exit 1
+
+# Run aptos-node by default
+ENTRYPOINT ["aptos-node"]
+CMD ["--help"]

@@ -1,0 +1,123 @@
+# CI configuration for Aptos Core using Nix
+name: Aptos Core Nix Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  # Allow manual triggering
+  workflow_dispatch:
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install Nix
+      uses: cachix/install-nix-action@v20
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+
+    - name: Set up Cachix
+      uses: cachix/cachix-action@v12
+      with:
+        name: aptos-core
+        # authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}' # Optional
+
+    - name: Build aptos-core
+      run: |
+        nix build .#aptos-core
+
+    - name: Run tests
+      run: |
+        nix develop -c cargo test
+
+    - name: Check formatting
+      run: |
+        nix develop -c cargo fmt -- --check
+
+    - name: Run clippy
+      run: |
+        nix develop -c cargo clippy -- --deny warnings
+
+    - name: Upload binary
+      uses: actions/upload-artifact@v3
+      with:
+        name: aptos-node
+        path: result/bin/aptos-node
+
+  docker:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install Nix
+      uses: cachix/install-nix-action@v20
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+
+    - name: Set up Cachix
+      uses: cachix/cachix-action@v12
+      with:
+        name: aptos-core
+        # authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}' # Optional
+
+    - name: Build Docker image using Nix
+      run: |
+        nix build .#aptos-core-docker
+
+    - name: Load Docker image
+      run: |
+        # Load the Docker image from the Nix build
+        docker load -i result
+
+    - name: Tag Docker image
+      run: |
+        # Tag the image with a proper name
+        docker tag aptos-node:latest aptos-core:latest
+
+    - name: Upload Docker image as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: aptos-core-docker-image
+        path: result
+
+  # Publish job that only runs on main branch
+  publish:
+    needs: [ build, docker ]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install Nix
+      uses: cachix/install-nix-action@v20
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+
+    - name: Set up Cachix
+      uses: cachix/cachix-action@v12
+      with:
+        name: aptos-core
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+    - name: Build and push aptos-core binary
+      run: |
+        nix build .#aptos-core
+        # In a real scenario, you would upload the binary to a release or storage service here
+
+    - name: Build and push Docker image
+      run: |
+        nix build .#aptos-core-docker
+        # In a real scenario, you would push the Docker image to a registry here
+        # For example:
+        # docker load -i result
+        # docker tag aptos-node:latest your-registry/aptos-core:latest
+        # docker push your-registry/aptos-core:latest

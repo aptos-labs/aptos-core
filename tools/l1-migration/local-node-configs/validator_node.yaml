@@ -4,7 +4,6 @@ base:
   waypoint:
     from_file: /Users/bowu/data/.maptos/waypoint.txt # update to your path
 consensus:
-  vote_back_pressure_limit: 50
   safety_rules:
     service:
       type: local

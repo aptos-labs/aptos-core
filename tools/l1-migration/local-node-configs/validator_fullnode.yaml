@@ -14,14 +14,20 @@ storage:
     enable_storage_sharding: false
 
 full_node_networks:
-- network_id:
-    private: "vfn"
-  listen_address: "/ip4/0.0.0.0/tcp/6181"
-  seeds:
-    00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237:
-      addresses:
-      - "/ip4/100.112.207.119/tcp/6181/noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/handshake/0"
-      role: "Validator"
+  - network_id: "public"
+    listen_address: "/ip4/0.0.0.0/tcp/6182"
+    identity:
+      type: "from_config"
+      key: "18FD979E14162B541B874490D47BD26BC94A398429337C536C48F5E9C8708D7B"
+      peer_id: "9967ebf40ac8c2ccb38709488952da1826176584ea3067b63b1695362ecb3d1f"
+  - network_id:
+      private: "vfn"
+    listen_address: "/ip4/0.0.0.0/tcp/6181"
+    seeds:
+      00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237:
+        addresses:
+        - "/ip4/35.92.96.99/tcp/6181/noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/handshake/0"
+        role: "Validator
 
 api:
   enabled: true
