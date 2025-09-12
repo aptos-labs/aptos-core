@@ -82,6 +82,7 @@ trybuild = { workspace = true }
 
 [features]
 default = []
+arkworks-upgrade-compat-test = []
 assert-private-keys-not-cloneable = []
 cloneable-private-keys = []
 fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys", "arbitrary"]

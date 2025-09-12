@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "arkworks-upgrade-compat-test")]
 mod arkworks_upgrade;
 mod bcs_test;
 mod bls12381_test;
