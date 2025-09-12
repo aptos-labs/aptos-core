@@ -63,8 +63,12 @@ x25519-dalek = { workspace = true }
 [dev-dependencies]
 arbitrary = { workspace = true, features = ["derive"] }
 ark-bls12-381 = { workspace = true }
+ark-bls12-381-old = { package = "ark-bls12-381", version = "0.4.0" }
 ark-bn254 = { workspace = true }
+ark-ec-old = { package = "ark-ec", version = "0.4.0" }
+ark-ff-old = { package = "ark-ff", version = "0.4.0" }
 ark-serialize = { workspace = true }
+ark-serialize-old = { package = "ark-serialize", version = "0.4.0" }
 ark-std = { workspace = true }
 bitvec = { workspace = true }
 blake2 = { workspace = true }

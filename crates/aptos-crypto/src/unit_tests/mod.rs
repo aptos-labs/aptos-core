@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+mod arkworks_upgrade;
 mod bcs_test;
 mod bls12381_test;
 mod bulletproofs_test;
