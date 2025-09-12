@@ -433,6 +433,7 @@ impl Type {
         }
     }
 
+    #[inline(always)]
     pub fn paranoid_check_is_no_ref(&self, msg: &str) -> PartialVMResult<()> {
         if matches!(self, Type::Reference(_) | Type::MutableReference(_)) {
             let msg = format!("{} `{}` cannot be a reference", msg, self);
@@ -441,6 +442,7 @@ impl Type {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn paranoid_check_is_bool_ty(&self) -> PartialVMResult<()> {
         if !matches!(self, Self::Bool) {
             let msg = format!("Expected boolean type, got {}", self);
@@ -449,6 +451,7 @@ impl Type {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn paranoid_check_is_u64_ty(&self) -> PartialVMResult<()> {
         if !matches!(self, Self::U64) {
             let msg = format!("Expected U64 type, got {}", self);
@@ -457,6 +460,7 @@ impl Type {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn paranoid_check_is_address_ty(&self) -> PartialVMResult<()> {
         if !matches!(self, Self::Address) {
             let msg = format!("Expected address type, got {}", self);
@@ -465,6 +469,7 @@ impl Type {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn paranoid_check_is_signer_ref_ty(&self) -> PartialVMResult<()> {
         if let Self::Reference(inner_ty) = self {
             if matches!(inner_ty.as_ref(), Self::Signer) {
@@ -475,6 +480,7 @@ impl Type {
         paranoid_failure!(msg)
     }
 
+    #[inline(always)]
     pub fn paranoid_check_has_ability(&self, ability: Ability) -> PartialVMResult<()> {
         if !self.abilities()?.has_ability(ability) {
             let msg = format!("Type {} does not have expected ability {}", self, ability);
@@ -483,6 +489,7 @@ impl Type {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn paranoid_check_abilities(&self, expected_abilities: AbilitySet) -> PartialVMResult<()> {
         let abilities = self.abilities()?;
         if !expected_abilities.is_subset(abilities) {
@@ -495,6 +502,7 @@ impl Type {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn paranoid_check_eq(&self, expected_ty: &Self) -> PartialVMResult<()> {
         if self != expected_ty {
             let msg = format!("Expected type {}, got {}", expected_ty, self);
@@ -503,6 +511,7 @@ impl Type {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn paranoid_check_assignable(&self, expected_ty: &Self) -> PartialVMResult<()> {
         let ok = match (expected_ty, self) {
             (
@@ -537,6 +546,7 @@ impl Type {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn paranoid_check_is_vec_ty(&self, expected_elem_ty: &Self) -> PartialVMResult<()> {
         if let Self::Vector(elem_ty) = self {
             return elem_ty.paranoid_check_eq(expected_elem_ty);
@@ -546,6 +556,7 @@ impl Type {
         paranoid_failure!(msg)
     }
 
+    #[inline(always)]
     pub fn paranoid_check_is_vec_ref_ty<const IS_MUT: bool>(
         &self,
         expected_elem_ty: &Self,
@@ -601,6 +612,7 @@ impl Type {
         Ok(self.get_vec_ref_elem_ty())
     }
 
+    #[inline(always)]
     fn get_vec_ref_elem_ty(&self) -> Self {
         match self {
             Self::Reference(inner_ty) | Self::MutableReference(inner_ty) => match inner_ty.as_ref()
@@ -612,7 +624,7 @@ impl Type {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn paranoid_freeze_ref_ty(self) -> PartialVMResult<Type> {
         match self {
             Type::MutableReference(ty) => Ok(Type::Reference(ty)),
@@ -623,7 +635,7 @@ impl Type {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn paranoid_read_ref(self) -> PartialVMResult<Type> {
         match self {
             Type::Reference(inner_ty) | Type::MutableReference(inner_ty) => {
@@ -637,7 +649,7 @@ impl Type {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn paranoid_write_ref(&self, val_ty: &Type) -> PartialVMResult<()> {
         if let Type::MutableReference(inner_ty) = self {
             val_ty.paranoid_check_assignable(inner_ty)?;
@@ -648,6 +660,7 @@ impl Type {
         }
     }
 
+    #[inline(always)]
     pub fn paranoid_check_ref_eq(
         &self,
         expected_inner_ty: &Self,
@@ -668,6 +681,7 @@ impl Type {
 
     /// If the type is a mutable or immutable reference, returns the inner type it points to.
     /// Otherwise, returns [None].
+    #[inline(always)]
     pub fn get_ref_inner_ty(&self) -> Option<&Self> {
         match self {
             Type::Reference(ty) | Type::MutableReference(ty) => Some(ty.as_ref()),
@@ -688,6 +702,7 @@ impl Type {
         }
     }
 
+    #[inline(always)]
     pub fn abilities(&self) -> PartialVMResult<AbilitySet> {
         match self {
             Type::Bool
@@ -889,52 +904,54 @@ impl TypeBuilder {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_bool_ty(&self) -> Type {
         Type::Bool
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_u8_ty(&self) -> Type {
         Type::U8
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_u16_ty(&self) -> Type {
         Type::U16
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_u32_ty(&self) -> Type {
         Type::U32
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_u64_ty(&self) -> Type {
         Type::U64
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_u128_ty(&self) -> Type {
         Type::U128
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_u256_ty(&self) -> Type {
         Type::U256
     }
 
+    #[inline(always)]
     pub fn create_address_ty(&self) -> Type {
         Type::Address
     }
 
+    #[inline(always)]
     pub fn create_signer_ty(&self) -> Type {
         Type::Signer
     }
 
     /// Creates a (possibly mutable) reference type from the given inner type.
     /// Returns an error if the type size or depth are too large.
-    #[inline]
+    #[inline(always)]
     pub fn create_ref_ty(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
         let mut count = 1;
         let check = |c: &mut u64, d: u64| self.check(c, d);
@@ -959,7 +976,7 @@ impl TypeBuilder {
 
     /// Creates a vector type with the given element type, returning an error
     /// if the type size or depth are too large.
-    #[inline]
+    #[inline(always)]
     pub fn create_vec_ty(&self, elem_ty: &Type) -> PartialVMResult<Type> {
         let mut count = 1;
         let check = |c: &mut u64, d: u64| self.check(c, d);
@@ -977,14 +994,14 @@ impl TypeBuilder {
         Ok(Type::Vector(TriompheArc::new(elem_ty)))
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_struct_ty(&self, idx: StructNameIndex, ability: AbilityInfo) -> Type {
         Type::Struct { idx, ability }
     }
 
     /// Creates a fully-instantiated struct type, performing the type substitution.
     /// Returns an error if the type size or depth are too large.
-    #[inline]
+    #[inline(always)]
     pub fn create_struct_instantiation_ty(
         &self,
         struct_ty: &StructType,
@@ -1026,6 +1043,7 @@ impl TypeBuilder {
 
     /// Creates a type for a Move constant. Note that constant types can be
     /// more restrictive and therefore have their own creation API.
+    #[inline(always)]
     pub fn create_constant_ty(&self, const_tok: &SignatureToken) -> PartialVMResult<Type> {
         let mut count = 0;
         self.create_constant_ty_impl(const_tok, &mut count, 1)
@@ -1041,6 +1059,7 @@ impl TypeBuilder {
     }
 
     /// Creates a fully-instantiated type from its storage representation.
+    #[inline(always)]
     pub fn create_ty<F>(&self, ty_tag: &TypeTag, mut resolver: F) -> PartialVMResult<Type>
     where
         F: FnMut(&StructTag) -> PartialVMResult<Arc<StructType>>,
@@ -1050,12 +1069,14 @@ impl TypeBuilder {
     }
 
     /// Clones the given type, at the same time instantiating all its type parameters.
+    #[inline(always)]
     pub fn create_ty_with_subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
         let mut count = 0;
         let check = |c: &mut u64, d: u64| self.check(c, d);
         self.subst_impl(ty, ty_args, &mut count, 1, check)
     }
 
+    #[inline(always)]
     fn check(&self, count: &mut u64, depth: u64) -> PartialVMResult<()> {
         if *count >= self.max_ty_size {
             return Err(
@@ -1180,6 +1201,7 @@ impl TypeBuilder {
         )
     }
 
+    #[inline(always)]
     fn apply_subst<F, G>(
         ty: &Type,
         subst: F,
