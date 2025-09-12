@@ -153,23 +153,14 @@ fn test_fr_operations_consistency() {
         let a_new = roundtrip_old_to_new::<_, ark_bls12_381::Fr>(&a_old);
         let b_new = roundtrip_old_to_new::<_, ark_bls12_381::Fr>(&b_old);
 
-        assert_eq!(
-            a_old + b_old,
-            roundtrip_new_to_old::<_, _>(&(a_new + b_new))
-        );
-        assert_eq!(
-            a_old - b_old,
-            roundtrip_new_to_old::<_, _>(&(a_new - b_new))
-        );
-        assert_eq!(
-            a_old * b_old,
-            roundtrip_new_to_old::<_, _>(&(a_new * b_new))
-        );
+        assert_eq!(a_old + b_old, roundtrip_new_to_old(&(a_new + b_new)));
+        assert_eq!(a_old - b_old, roundtrip_new_to_old(&(a_new - b_new)));
+        assert_eq!(a_old * b_old, roundtrip_new_to_old(&(a_new * b_new)));
 
         if !a_old.is_zero() {
             assert_eq!(
                 a_old.inverse().unwrap(),
-                roundtrip_new_to_old::<_, _>(&a_new.inverse().unwrap())
+                roundtrip_new_to_old(&a_new.inverse().unwrap())
             );
         }
     }
