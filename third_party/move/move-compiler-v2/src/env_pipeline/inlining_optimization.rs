@@ -55,13 +55,12 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
             let function = env.get_function(*function_id);
             // We will consider inlining the callees in a function on if it satisfies all of:
             // - is not a part of a cycle in the call graph
-            // - is in a primary target module
+            // - is in a primary target module [TODO]
             // - is not in a script module
             // - is not a test only function
             // - is not a native function
             // - is not an inline function
             !skip_functions.contains(function_id)
-                && function.module_env.is_primary_target()
                 && !function.module_env.is_script_module()
                 && !function.is_test_only()
                 && !function.is_native()
@@ -102,11 +101,11 @@ fn inline_call_sites(
         let function_env = env.get_function(function_id);
         if let Some(def) = get_latest_def(targets, &target, &function_env) {
             let caller_module = &function_env.module_env;
-            debug_assert!(
-                caller_module.is_primary_target(),
-                "caller module `{}`",
-                caller_module.get_full_name_str()
-            );
+            // debug_assert!(
+            //     caller_module.is_primary_target(),
+            //     "caller module `{}`",
+            //     caller_module.get_full_name_str()
+            // );
             let current_caller_cost = env.function_size.borrow().get(&function_id).copied();
             let Some(caller_cost) = current_caller_cost else {
                 continue;
@@ -580,7 +579,7 @@ fn has_invisible_calls(
     callee: &FunctionEnv,
     across_package: bool,
 ) -> bool {
-    debug_assert!(caller_module.is_primary_target());
+    // debug_assert!(caller_module.is_primary_target());
     let env = callee.env();
     let caller_mid = caller_module.get_id();
     if let Some(body) = callee.get_def() {
@@ -594,6 +593,7 @@ fn has_invisible_calls(
             // TODO(#13745): hack for checking if two modules are in the same package
             let same_package = caller_module.self_address()
                 == called_function.module_env.self_address()
+                && caller_module.is_primary_target()
                 && called_function.module_env.is_primary_target();
 
             match called_function.visibility() {
