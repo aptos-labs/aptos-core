@@ -295,6 +295,22 @@ impl FunctionTargetsHolder {
             }
         }
     }
+
+    pub fn compute_move_functions_size(&self) -> BTreeMap<QualifiedId<FunId>, (usize, usize)> {
+        self.targets
+            .iter()
+            .filter_map(|(fid, variants)| {
+                let baseline_function = variants.get(&FunctionVariant::Baseline)?;
+                Some((
+                    *fid,
+                    (
+                        baseline_function.code.len(),
+                        baseline_function.local_types.len(),
+                    ),
+                ))
+            })
+            .collect()
+    }
 }
 
 impl FunctionTargetPipeline {

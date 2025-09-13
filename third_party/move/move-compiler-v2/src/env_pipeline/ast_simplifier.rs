@@ -70,13 +70,23 @@ const DEBUG: bool = false;
 
 /// Run the AST simplification pass on all target functions in the `env`.
 /// Optionally do some aggressive simplifications that may eliminate code.
-pub fn run_simplifier(env: &mut GlobalEnv, eliminate_code: bool) {
+/// Also, let the simplifier know if it is being run after inlining optimization
+/// (we do not want to emit warnings for eliminated code in such a case).
+pub fn run_simplifier(
+    env: &mut GlobalEnv,
+    eliminate_code: bool,
+    after_inlining_optimization: bool,
+) {
     let mut new_definitions = Vec::new(); // Avoid borrowing issues for env.
     for module in env.get_modules() {
         if module.is_target() {
             for func_env in module.get_functions() {
                 if let Some(def) = func_env.get_def() {
-                    let mut rewriter = SimplifierRewriter::new(&func_env, eliminate_code);
+                    let mut rewriter = SimplifierRewriter::new(
+                        &func_env,
+                        eliminate_code,
+                        after_inlining_optimization,
+                    );
                     let rewritten = rewriter.rewrite_function_body(def.clone());
                     trace!(
                         "After rewrite_function_body, function body is `{}`",
@@ -505,26 +515,29 @@ struct SimplifierRewriter<'env> {
 
     pub constant_folder: ConstantFolder<'env>,
 
-    // Guard whether entire subexpressions are eliminated (possibly hiding some warnings).
+    /// Guard whether entire subexpressions are eliminated (possibly hiding some warnings).
     pub eliminate_code: bool,
 
-    // Tracks which definition (`Let` or `Lambda` statement `NodeId`) is visible during visit to
-    // find modified local vars.  A use of a symbol which is missing must be a `Parameter`.  This is
-    // used only to determine if a symbol is in `possibly_modified_variables`.
+    /// Tracks which definition (`Let` or `Lambda` statement `NodeId`) is visible during visit to
+    /// find modified local vars.  A use of a symbol which is missing must be a `Parameter`.  This is
+    /// used only to determine if a symbol is in `possibly_modified_variables`.
     visiting_binding: ScopedMap<Symbol, NodeId>,
 
-    // Possibly modified variables are identified by `Symbol` and `Let` or `Lambda` statement `NodeId`,
-    // except enclosing function parameters, which have no `NodeId` so get `None`.
+    /// Possibly modified variables are identified by `Symbol` and `Let` or `Lambda` statement `NodeId`,
+    /// except enclosing function parameters, which have no `NodeId` so get `None`.
     possibly_modified_variables: BTreeSet<(Symbol, Option<NodeId>)>,
 
-    // Tracks constant values from scope.
+    /// Tracks constant values from scope.
     values: ScopedMap<Symbol, SimpleValue>,
 
-    // During expression rewriting, tracks whether we are evaluating a mutable borrow argument.
+    /// During expression rewriting, tracks whether we are evaluating a mutable borrow argument.
     in_mut_borrow: bool,
 
-    // Records values from outer scope of a borrow.
+    /// Records values from outer scope of a borrow.
     in_mut_borrow_stack: Vec<bool>,
+
+    /// Are we doing the simplification after the inlining optimization?
+    after_inlining_optimization: bool,
 }
 
 // Representation to record a known value of a variable to
@@ -537,7 +550,11 @@ enum SimpleValue {
 }
 
 impl<'env> SimplifierRewriter<'env> {
-    fn new(func_env: &'env FunctionEnv, eliminate_code: bool) -> Self {
+    fn new(
+        func_env: &'env FunctionEnv,
+        eliminate_code: bool,
+        after_inlining_optimization: bool,
+    ) -> Self {
         let constant_folder = ConstantFolder::new(func_env.module_env.env, false);
         Self {
             func_env,
@@ -548,6 +565,7 @@ impl<'env> SimplifierRewriter<'env> {
             values: ScopedMap::new(),
             in_mut_borrow: false,
             in_mut_borrow_stack: Vec::new(),
+            after_inlining_optimization,
         }
     }
 
@@ -1060,26 +1078,28 @@ impl ExpRewriterFunctions for SimplifierRewriter<'_> {
                 },
                 _ => None,
             } {
-                let loc = self.env().get_node_loc(eliminated_id);
-                let cond_loc = self.env().get_node_loc(cond.node_id());
-                self.env().diag_with_labels(
-                    Severity::Warning,
-                    &cond_loc,
-                    &format!(
-                        "If condition is always {}, so {} branch code eliminated as dead code",
-                        truth_value, branch_name,
-                    ),
-                    vec![
-                        (
-                            cond_loc.clone(),
-                            format!("condition is always {}", truth_value).to_string(),
+                if !self.after_inlining_optimization {
+                    let loc = self.env().get_node_loc(eliminated_id);
+                    let cond_loc = self.env().get_node_loc(cond.node_id());
+                    self.env().diag_with_labels(
+                        Severity::Warning,
+                        &cond_loc,
+                        &format!(
+                            "If condition is always {}, so {} branch code eliminated as dead code",
+                            truth_value, branch_name,
                         ),
-                        (
-                            loc,
-                            format!("{} branch eliminated", branch_name).to_string(),
-                        ),
-                    ],
-                );
+                        vec![
+                            (
+                                cond_loc.clone(),
+                                format!("condition is always {}", truth_value).to_string(),
+                            ),
+                            (
+                                loc,
+                                format!("{} branch eliminated", branch_name).to_string(),
+                            ),
+                        ],
+                    );
+                }
                 Some(result)
             } else {
                 None
@@ -1097,12 +1117,14 @@ impl ExpRewriterFunctions for SimplifierRewriter<'_> {
             let side_effecting_elts_refs = siter
                 .filter(|exp|
                         if exp.as_ref().is_ok_to_remove_from_code() {
-                            let loc = self.env().get_node_loc(exp.node_id());
-                            self.env().diag(
-                                Severity::Warning,
-                                &loc,
-                                "Expression value unused and side-effect free, so eliminated as dead code"
-                            );
+                            if !self.after_inlining_optimization {
+                                let loc = self.env().get_node_loc(exp.node_id());
+                                self.env().diag(
+                                    Severity::Warning,
+                                    &loc,
+                                    "Expression value unused and side-effect free, so eliminated as dead code"
+                                );
+                            }
                             false
                         } else {
                             true

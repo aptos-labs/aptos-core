@@ -19,7 +19,7 @@ use crate::{
     env_pipeline::{
         acquires_checker, ast_simplifier, closure_checker, cmp_rewriter,
         cyclic_instantiation_checker, flow_insensitive_checkers, function_checker, inliner,
-        lambda_lifter, lambda_lifter::LambdaLiftingOptions, model_ast_lints,
+        inlining_optimization, lambda_lifter, lambda_lifter::LambdaLiftingOptions, model_ast_lints,
         recursive_struct_checker, rewrite_target::RewritingScope, seqs_in_binop_checker,
         spec_checker, spec_rewriter, unused_params_checker, EnvProcessorPipeline,
     },
@@ -311,6 +311,8 @@ pub fn run_stackless_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
             }
         }
     }
+    env.set_function_sizes(targets.compute_move_functions_size());
+
     targets
 }
 
@@ -466,13 +468,19 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
 pub fn env_optimization_pipeline<'a, 'b>(options: &'a Options) -> EnvProcessorPipeline<'b> {
     let mut env_pipeline = EnvProcessorPipeline::<'b>::default();
 
+    if options.experiment_on(Experiment::INLINING_OPTIMIZATION) {
+        let across_package = options.experiment_on(Experiment::ACROSS_PACKAGE_INLINING);
+        env_pipeline.add("inlining optimization", {
+            move |env: &mut GlobalEnv| inlining_optimization::optimize(env, across_package)
+        });
+    }
     if options.experiment_on(Experiment::AST_SIMPLIFY_FULL) {
         env_pipeline.add("simplifier with code elimination", {
-            |env: &mut GlobalEnv| ast_simplifier::run_simplifier(env, true)
+            |env: &mut GlobalEnv| ast_simplifier::run_simplifier(env, true, true)
         });
     } else if options.experiment_on(Experiment::AST_SIMPLIFY) {
         env_pipeline.add("simplifier", {
-            |env: &mut GlobalEnv| ast_simplifier::run_simplifier(env, false)
+            |env: &mut GlobalEnv| ast_simplifier::run_simplifier(env, false, true)
         });
     }
 

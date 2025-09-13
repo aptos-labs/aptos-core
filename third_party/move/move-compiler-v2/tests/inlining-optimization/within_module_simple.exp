@@ -1,0 +1,62 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    public fun compute(): u64 {
+        Add<u64>(m::one(), m::two())
+    }
+    private fun one(): u64 {
+        1
+    }
+    public fun two(): u64 {
+        2
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    public fun compute(): u64 {
+        one() + two()
+    }
+    fun one(): u64 {
+        1
+    }
+    public fun two(): u64 {
+        2
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    public fun compute(): u64 {
+        3
+    }
+    private fun one(): u64 {
+        1
+    }
+    public fun two(): u64 {
+        2
+    }
+} // end 0xc0ffee::m
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+
+
+public compute(): u64 /* def_idx: 0 */ {
+B0:
+	0: LdU64(3)
+	1: Ret
+}
+one(): u64 /* def_idx: 1 */ {
+B0:
+	0: LdU64(1)
+	1: Ret
+}
+public two(): u64 /* def_idx: 2 */ {
+B0:
+	0: LdU64(2)
+	1: Ret
+}
+}
+============ bytecode verification succeeded ========
