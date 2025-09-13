@@ -36,7 +36,7 @@ spec aptos_framework::create_signer {
         pragma aborts_if_is_strict;
     }
 
-    /// Convert address to singer and return.
+    /// Convert address to signer and return.
     spec create_signer(addr: address): signer {
         pragma opaque;
         aborts_if [abstract] false;
