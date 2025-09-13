@@ -79,34 +79,10 @@ pub trait TStateView {
         self.get_state_value(state_key).map(|opt| opt.is_some())
     }
 
-    /// Checks if a state keyed by the given state key exists in the hot state.
-    fn contains_hot_state_value(&self, _state_key: &Self::Key) -> bool {
-        false
-    }
-
-    /// Number of free slots in hot state.
-    fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
-        [0; NUM_STATE_SHARDS]
-    }
-
-    fn get_shard_id(&self, _state_key: &Self::Key) -> usize {
-        unimplemented!();
-    }
-
-    /// If the input key is `None`, returns the oldest key as `Some(Some(key))`, unless the LRU is
-    /// empty, in which case `Some(None)` is returned.
-    ///
-    /// Otherwise, returns the key that is just a bit newer, i.e. the next candidate for eviction,
-    /// or `Some(None)` if the input key is already the newest.
-    ///
-    /// Returns `None` if the input key does not exist in hot state at all.
-    fn get_next_old_key(
-        &self,
-        _shard_id: usize,
-        _state_key: Option<&Self::Key>,
-    ) -> Option<Option<Self::Key>> {
-        unimplemented!();
-    }
+    // /// Number of items in hot state.
+    // fn num_hot_items(&self) -> [usize; NUM_STATE_SHARDS] {
+    //     [0; NUM_STATE_SHARDS]
+    // }
 }
 
 pub trait StateView: TStateView<Key = StateKey> {}
@@ -159,25 +135,9 @@ where
         self.deref().get_state_value(state_key)
     }
 
-    fn contains_hot_state_value(&self, state_key: &Self::Key) -> bool {
-        self.deref().contains_hot_state_value(state_key)
-    }
-
-    fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
-        self.deref().num_free_hot_slots()
-    }
-
-    fn get_shard_id(&self, state_key: &Self::Key) -> usize {
-        self.deref().get_shard_id(state_key)
-    }
-
-    fn get_next_old_key(
-        &self,
-        shard_id: usize,
-        state_key: Option<&Self::Key>,
-    ) -> Option<Option<Self::Key>> {
-        self.deref().get_next_old_key(shard_id, state_key)
-    }
+    // fn num_hot_items(&self) -> [usize; NUM_STATE_SHARDS] {
+    //     self.deref().num_hot_items()
+    // }
 }
 
 /// Test-only basic [StateView] implementation with generic keys.

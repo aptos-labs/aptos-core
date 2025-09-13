@@ -142,7 +142,7 @@ impl<'a> HotStateLRU<'a> {
         Some(old_slot)
     }
 
-    fn get_slot(&self, key: &StateKey) -> Option<StateSlot> {
+    pub fn get_slot(&self, key: &StateKey) -> Option<StateSlot> {
         if let Some(slot) = self.pending.get(key) {
             return Some(slot.clone());
         }
