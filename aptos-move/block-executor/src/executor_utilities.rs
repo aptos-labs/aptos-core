@@ -205,9 +205,9 @@ pub(crate) fn map_id_to_values_in_group_writes<
         let mut patched_resource_vec = Vec::with_capacity(resource_vec.len());
         for (tag, value_with_layout) in resource_vec.into_iter() {
             let value = match value_with_layout {
-                ValueWithLayout::RawFromStorage(value) => value,
-                ValueWithLayout::Exchanged(value, None) => value,
-                ValueWithLayout::Exchanged(value, Some(layout)) => Arc::new(
+                ValueWithLayout::RawFromStorage(value, _) => value,
+                ValueWithLayout::Exchanged(value, None, _) => value,
+                ValueWithLayout::Exchanged(value, Some(layout), _) => Arc::new(
                     replace_ids_with_values(&value, layout.as_ref(), latest_view)?,
                 ),
             };

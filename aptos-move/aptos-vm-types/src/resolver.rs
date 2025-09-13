@@ -16,7 +16,10 @@ use aptos_types::{
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use move_vm_types::{
+    delayed_values::delayed_field_id::DelayedFieldID,
+    resolver::{resource_size, ValueOrBytes},
+};
 use std::collections::{BTreeMap, HashMap};
 
 /// Allows requesting an immediate interrupt to ongoing transaction execution. For example, this
@@ -56,6 +59,17 @@ pub trait TResourceView {
     ) -> PartialVMResult<Option<Bytes>> {
         let maybe_state_value = self.get_resource_state_value(state_key, maybe_layout)?;
         Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
+    }
+
+    fn get_resource_gv(
+        &self,
+        state_key: &Self::Key,
+        _layout: &Self::Layout,
+    ) -> PartialVMResult<(ValueOrBytes, usize)> {
+        let maybe_state_value = self.get_resource_state_value(state_key, None)?;
+        let bytes = maybe_state_value.map(|state_value| state_value.bytes().clone());
+        let size = resource_size(&bytes);
+        Ok((ValueOrBytes::Bytes(bytes), size))
     }
 
     // These methods should not be auto-implemented via get_resource_state_value, as they do not
@@ -106,6 +120,17 @@ pub trait TResourceGroupView {
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<Bytes>>;
+
+    fn get_resource_gv_from_group(
+        &self,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
+        _layout: &Self::Layout,
+    ) -> PartialVMResult<(ValueOrBytes, usize)> {
+        let b = self.get_resource_from_group(group_key, resource_tag, None)?;
+        let len = resource_size(&b);
+        Ok((ValueOrBytes::Bytes(b), len))
+    }
 
     /// Needed for charging storage fees for a resource group write, as that requires knowing
     /// the size of the resource group AFTER the changeset of the transaction is applied (while

@@ -127,10 +127,10 @@ fn format_vector<'a>(
     Ok(())
 }
 
-fn format_closure_captured_arguments(
+fn format_closure_captured_arguments<'a>(
     context: &mut FormatContext,
     mask: ClosureMask,
-    mut captured_layouts: impl Iterator<Item = impl MoveLayout>,
+    mut captured_layouts: impl Iterator<Item = &'a (impl MoveLayout + 'a)>,
     mut captured_arguments: impl Iterator<Item = Value>,
     depth: usize,
     newline: bool,
@@ -430,7 +430,7 @@ fn native_format_impl(
                 format_closure_captured_arguments(
                     context,
                     fun.closure_mask(),
-                    captured_layouts.into_iter(),
+                    captured_layouts.iter(),
                     args,
                     depth,
                     !context.single_line,
@@ -531,7 +531,7 @@ fn native_format_list(
     let fmt_ref = safely_pop_arg!(arguments, VectorRef);
     let fmt_ref2 = fmt_ref.as_bytes_ref();
     // Could use unsafe here, but it's forbidden in this crate.
-    let fmt = std::str::from_utf8(fmt_ref2.as_slice()).map_err(|_| SafeNativeError::Abort {
+    let fmt = std::str::from_utf8(fmt_ref2).map_err(|_| SafeNativeError::Abort {
         abort_code: EINVALID_FORMAT,
     })?;
 

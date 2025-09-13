@@ -4,7 +4,7 @@
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateView, StateViewResult, TStateView,
+        state_value::StateValue, StateView, StateViewRead, StateViewResult, TStateView,
     },
     transaction::Version,
 };
@@ -25,7 +25,7 @@ impl TStateView for ReadSet {
         0
     }
 
-    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
+    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateViewRead<StateSlot>> {
         let slot = match self.data.get(state_key) {
             Some(state_value) => StateSlot::ColdOccupied {
                 value_version: 0,
@@ -33,7 +33,7 @@ impl TStateView for ReadSet {
             },
             None => StateSlot::ColdVacant,
         };
-        Ok(slot)
+        Ok(StateViewRead::new(slot))
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
@@ -89,13 +89,13 @@ impl<'s, S: StateView> ReadSetCapturingStateView<'s, S> {
 impl<S: StateView> TStateView for ReadSetCapturingStateView<'_, S> {
     type Key = StateKey;
 
-    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
+    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateViewRead<StateSlot>> {
         // Check the read-set first.
         if let Some(state_value) = self.captured_reads.lock().get(state_key) {
-            return Ok(StateSlot::ColdOccupied {
+            return Ok(StateViewRead::new(StateSlot::ColdOccupied {
                 value_version: 0,
                 value: state_value.clone(),
-            });
+            }));
         }
 
         // We do not allow failures because then benchmarking will not be correct (we miss a read).

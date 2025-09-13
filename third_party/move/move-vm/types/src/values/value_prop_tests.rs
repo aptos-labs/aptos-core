@@ -9,6 +9,7 @@ use crate::{
 use better_any::TidExt;
 use move_core_types::value::MoveValue;
 use proptest::prelude::*;
+use std::sync::Arc;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10000))]
@@ -26,7 +27,7 @@ proptest! {
             });
         ext_mock
             .expect_create_from_serialization_data()
-            .returning(move |data| Ok(Box::new(mock::MockAbstractFunction::new_from_data(data))));
+            .returning(move |data| Ok(Arc::new(mock::MockAbstractFunction::new_from_data(data))));
 
         let ctx = ValueSerDeContext::new(None).with_func_args_deserialization(&ext_mock);
         let blob = ctx.serialize(&value, &layout).unwrap().expect("must serialize");

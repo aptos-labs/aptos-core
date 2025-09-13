@@ -343,8 +343,7 @@ pub fn deserialize_internal(
     let format_opt = format_from_ty_arg!(context, &ty_args[1]);
     abort_unless_serialization_format_enabled!(context, format_opt);
     let vector_ref = safely_pop_arg!(args, VectorRef);
-    let bytes_ref = vector_ref.as_bytes_ref();
-    let bytes = bytes_ref.as_slice();
+    let bytes = vector_ref.as_bytes_ref();
     match (structure_opt, format_opt) {
         (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrLsb)) => {
             // Valid BLS12381FrLsb serialization should be 32-byte.

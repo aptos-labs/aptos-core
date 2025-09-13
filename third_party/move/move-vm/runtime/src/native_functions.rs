@@ -305,7 +305,7 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
     pub fn get_captured_layouts_for_string_utils(
         &mut self,
         fun: &dyn AbstractFunction,
-    ) -> PartialVMResult<Option<Vec<MoveTypeLayout>>> {
+    ) -> PartialVMResult<Option<Arc<Vec<MoveTypeLayout>>>> {
         Ok(
             match &*LazyLoadedFunction::expect_this_impl(fun)?.state.borrow() {
                 LazyLoadedFunctionState::Unresolved { data, .. } => {
@@ -318,15 +318,18 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
                     ..
                 } => match captured_layouts.as_ref() {
                     Some(captured_layouts) => Some(captured_layouts.clone()),
-                    None => dispatch_loader!(&self.module_storage, loader, {
-                        LazyLoadedFunction::construct_captured_layouts(
-                            &LayoutConverter::new(&loader),
-                            &mut self.gas_meter,
-                            self.traversal_context,
-                            fun,
-                            *mask,
-                        )
-                    })?,
+                    None => {
+                        let layouts = dispatch_loader!(&self.module_storage, loader, {
+                            LazyLoadedFunction::construct_captured_layouts(
+                                &LayoutConverter::new(&loader),
+                                &mut self.gas_meter,
+                                self.traversal_context,
+                                fun,
+                                *mask,
+                            )
+                        })?;
+                        layouts.map(Arc::new)
+                    },
                 },
             },
         )
@@ -399,6 +402,7 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
                 self.resource_resolver,
                 &address,
                 ty,
+                false,
             )
         })
     }

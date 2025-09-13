@@ -104,7 +104,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             },
             |input| {
                 let data_read = input.get_by_kind(key, None, ReadKind::Value);
-                if let Some(DataRead::Versioned(_, value, Some(layout))) = data_read {
+                if let Some(DataRead::Versioned(_, value, Some(layout), _)) = data_read {
                     Ok((value, layout))
                 } else {
                     Err(code_invariant_error(format!(
