@@ -97,6 +97,7 @@ module aptos_experimental::market_tests_common {
     ): Option<OrderIdType> {
         market.place_bulk_order(
             signer::address_of(maker),
+            1, // sequence number for tests
             bid_prices,
             bid_sizes,
             ask_prices,
