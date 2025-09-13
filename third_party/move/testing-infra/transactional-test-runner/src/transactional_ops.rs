@@ -489,10 +489,7 @@ fn generate_script_wrapper_for_non_entry_function(
     let parameters_sig = target_module.signature_at(target_func_handle.parameters);
     let return_sig = target_module.signature_at(target_func_handle.return_);
 
-    let has_signer_by_value = parameters_sig
-        .0
-        .iter()
-        .any(|t| *t == SignatureToken::Signer);
+    let has_signer_by_value = parameters_sig.0.contains(&SignatureToken::Signer);
     let script_signer_param = if has_signer_by_value {
         "s: signer"
     } else {

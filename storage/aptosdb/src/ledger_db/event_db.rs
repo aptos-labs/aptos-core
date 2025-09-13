@@ -101,7 +101,7 @@ impl EventDb {
         &self,
         start_version: Version,
         num_versions: usize,
-    ) -> Result<EventsByVersionIter> {
+    ) -> Result<EventsByVersionIter<'_>> {
         let mut iter = self.db.iter::<EventSchema>()?;
         iter.seek(&start_version)?;
 

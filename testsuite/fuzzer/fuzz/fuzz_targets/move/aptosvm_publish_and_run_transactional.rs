@@ -159,31 +159,23 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
 
     tdbg!("verifying scripts");
     for exec_variant in exec_variant_opt.iter() {
-        match exec_variant {
+        if let ExecVariant::Script { _script, .. } = exec_variant {
             // reject bad scripts fast
-            ExecVariant::Script {
-                _script,
-                _type_args: _,
-                _args: _,
-            } => {
-                let mut script_code: Vec<u8> = vec![];
-                tdbg!("serializing script");
-                _script
-                    .serialize_for_version(Some(BYTECODE_VERSION), &mut script_code)
-                    .map_err(|_| Corpus::Reject)?;
-                tdbg!("deserializing script");
-                let s_de =
-                    CompiledScript::deserialize_with_config(&script_code, &deserializer_config)
-                        .map_err(|_| Corpus::Reject)?;
-                tdbg!("verifying script");
-                move_bytecode_verifier::verify_script_with_config(&verifier_config, &s_de).map_err(
-                    |e| {
-                        check_for_invariant_violation_vmerror(e);
-                        Corpus::Reject
-                    },
-                )?
-            },
-            _ => (),
+            let mut script_code: Vec<u8> = vec![];
+            tdbg!("serializing script");
+            _script
+                .serialize_for_version(Some(BYTECODE_VERSION), &mut script_code)
+                .map_err(|_| Corpus::Reject)?;
+            tdbg!("deserializing script");
+            let s_de = CompiledScript::deserialize_with_config(&script_code, &deserializer_config)
+                .map_err(|_| Corpus::Reject)?;
+            tdbg!("verifying script");
+            move_bytecode_verifier::verify_script_with_config(&verifier_config, &s_de).map_err(
+                |e| {
+                    check_for_invariant_violation_vmerror(e);
+                    Corpus::Reject
+                },
+            )?;
         }
     }
 

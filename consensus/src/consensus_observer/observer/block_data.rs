@@ -394,7 +394,7 @@ mod test {
         );
 
         // Verify that the payload does not exist
-        assert!(!observer_block_data.all_payloads_exist(&[pipelined_block.clone()]));
+        assert!(!observer_block_data.all_payloads_exist(std::slice::from_ref(&pipelined_block)));
 
         // Insert the block payload into the store
         observer_block_data.insert_block_payload(block_payload.clone(), true);
