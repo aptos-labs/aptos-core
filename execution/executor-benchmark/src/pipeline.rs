@@ -126,6 +126,8 @@ where
             // Assume the distributed executor and the distributed partitioner share the same worker set.
             config.num_executor_shards,
             &config.partitioner_config,
+            None, // Use default epoch (0)
+            None, // Use default proposer (AccountAddress::ZERO)
         );
 
         let mut exe = TransactionExecutor::new(executor_1, parent_block_id, ledger_update_sender);
