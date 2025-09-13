@@ -196,7 +196,7 @@ module aptos_experimental::clearinghouse_test {
             |_account, order_id, _is_taker, _is_bid, _price, _time_in_force, _size, _order_metadata| {
                 validate_order_placement(order_id)
             },
-            |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices| {
+            |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices, _metadata| {
                 validate_bulk_order_placement(account)
             },
             |_account, order_id, _is_bid, _price, _size, _order_metadata| {
@@ -227,7 +227,7 @@ module aptos_experimental::clearinghouse_test {
             |_account, order_id, _is_taker, _is_bid, _price, _time_in_force, _size, _order_metadata| {
                 validate_order_placement(order_id)
             },
-            |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices| {
+            |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices, _metadata| {
                 validate_bulk_order_placement(account)
             },
             |_account, _order_id, _is_bid, _price, _size, _order_metadata| {

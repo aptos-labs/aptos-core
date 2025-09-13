@@ -64,11 +64,11 @@ module aptos_experimental::market_types {
     enum MarketClearinghouseCallbacks<M: store + copy + drop> has drop {
         V1 {
             /// settle_trade_f arguments: taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size
-            settle_trade_f:  |address, OrderIdType, address, OrderIdType, u64, bool, u64, u64, Option<M>, Option<M>| SettleTradeResult has drop + copy,
+            settle_trade_f:  |address, OrderIdType, address, OrderIdType, u64, bool, u64, u64, M, M| SettleTradeResult has drop + copy,
             /// validate_settlement_update_f arguments: account, order_id, is_taker, is_long, price, size
             validate_order_placement_f: |address, OrderIdType, bool, bool, u64,  TimeInForce, u64, M| bool has drop + copy,
             /// Validate the bulk order placement arguments: account, bids_prices, bids_sizes, asks_prices, asks_sizes
-            validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>| bool has drop + copy,
+            validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
             /// place_maker_order_f arguments: account, order_id, is_bid, price, size, order_metadata
             place_maker_order_f: |address, OrderIdType, bool, u64, u64, M| has drop + copy,
             /// cleanup_order_f arguments: account, order_id, is_bid, remaining_size, order_metadata
@@ -96,11 +96,11 @@ module aptos_experimental::market_types {
 
     public fun new_market_clearinghouse_callbacks<M: store + copy + drop>(
         // settle_trade_f arguments: taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size
-        settle_trade_f: |address, OrderIdType, address, OrderIdType, u64, bool, u64, u64, Option<M>, Option<M>| SettleTradeResult has drop + copy,
+        settle_trade_f: |address, OrderIdType, address, OrderIdType, u64, bool, u64, u64, M, M| SettleTradeResult has drop + copy,
         // validate_settlement_update_f arguments: account, order_id, is_taker, is_long, price, size
         validate_order_placement_f: |address, OrderIdType, bool, bool, u64,  TimeInForce, u64, M| bool has drop + copy,
         // Validate the bulk order placement
-        validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>| bool has drop + copy,
+        validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
         // place_maker_order_f arguments: account, order_id, is_bid, price, size, order_metadata
         place_maker_order_f: |address, OrderIdType, bool, u64, u64, M| has drop + copy,
         // cleanup_order_f arguments: account, order_id, is_bid, remaining_size, order_metadata
@@ -146,8 +146,8 @@ module aptos_experimental::market_types {
         is_taker_long: bool,
         price: u64,
         size: u64,
-        taker_metadata: Option<M>,
-        maker_metadata: Option<M>): SettleTradeResult {
+        taker_metadata: M,
+        maker_metadata: M): SettleTradeResult {
         (self.settle_trade_f)(taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size, taker_metadata, maker_metadata)
     }
 
@@ -170,8 +170,10 @@ module aptos_experimental::market_types {
         bids_prices: vector<u64>,
         bids_sizes: vector<u64>,
         asks_prices: vector<u64>,
-        asks_sizes: vector<u64>): bool {
-        (self.validate_bulk_order_placement_f)(account, bids_prices, bids_sizes, asks_prices, asks_sizes)
+        asks_sizes: vector<u64>,
+        order_metadata: M,
+    ): bool {
+        (self.validate_bulk_order_placement_f)(account, bids_prices, bids_sizes, asks_prices, asks_sizes, order_metadata)
     }
 
     public(friend) fun place_maker_order<M: store + copy + drop>(
