@@ -128,6 +128,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-file-store-backfiller",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
+    "ecosystem/indexer-grpc/indexer-grpc-gateway",
     "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark",
     "ecosystem/indexer-grpc/indexer-grpc-manager",
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
@@ -370,6 +371,7 @@ aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-fi
 aptos-indexer-grpc-file-checker = { path = "ecosystem/indexer-grpc/indexer-grpc-file-checker" }
 aptos-indexer-grpc-file-store-backfiller = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store-backfiller" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
+aptos-indexer-grpc-gateway = { path = "ecosystem/indexer-grpc/indexer-grpc-gateway" }
 aptos-indexer-grpc-in-memory-cache-benchmark = { path = "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark" }
 aptos-indexer-grpc-manager = { path = "ecosystem/indexer-grpc/indexer-grpc-manager" }
 aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
@@ -633,8 +635,10 @@ hkdf = "0.10.0"
 hmac = "0.12.0"
 hostname = "0.3.1"
 http = "0.2.9"
+http-body-util = "0.1.1"
 httpmock = "0.6.8"
 hyper = { version = "0.14.18", features = ["full"] }
+hyper-util = { version = "0.1.3", features = ["client-legacy"] }
 im = "15.0.0"
 image = "0.24.5"
 indexmap = "2.7.0"
