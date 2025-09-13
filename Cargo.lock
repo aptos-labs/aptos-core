@@ -2366,6 +2366,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-gateway"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-protos 1.3.1",
+ "async-trait",
+ "axum 0.7.5",
+ "clap 4.5.21",
+ "futures",
+ "http-body-util",
+ "hyper-util",
+ "jemallocator",
+ "serde",
+ "tokio",
+ "tonic 0.12.3",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "aptos-indexer-grpc-in-memory-cache-benchmark"
 version = "0.1.0"
 dependencies = [
