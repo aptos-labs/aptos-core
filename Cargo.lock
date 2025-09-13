@@ -4950,6 +4950,7 @@ dependencies = [
  "anyhow",
  "aptos-block-executor",
  "aptos-cached-packages",
+ "aptos-crypto",
  "aptos-gas-schedule",
  "aptos-move-stdlib",
  "aptos-native-interface",

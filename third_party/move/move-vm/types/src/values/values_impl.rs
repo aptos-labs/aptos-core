@@ -274,6 +274,7 @@ pub struct Locals(Rc<RefCell<Vec<ValueImpl>>>);
  **************************************************************************************/
 
 impl Container {
+    #[inline(always)]
     fn len(&self) -> usize {
         match self {
             Self::Vec(r) => r.borrow().len(),
@@ -292,6 +293,7 @@ impl Container {
         }
     }
 
+    #[inline(always)]
     fn rc_count(&self) -> usize {
         match self {
             Self::Vec(r) => Rc::strong_count(r),
@@ -327,6 +329,7 @@ impl Container {
  *
  **************************************************************************************/
 
+#[inline(always)]
 fn take_unique_ownership<T: Debug>(r: Rc<RefCell<T>>) -> PartialVMResult<T> {
     match Rc::try_unwrap(r) {
         Ok(cell) => Ok(cell.into_inner()),
@@ -406,6 +409,7 @@ impl ValueImpl {
  *
  **************************************************************************************/
 impl ValueImpl {
+    #[inline(always)]
     fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
         use ValueImpl::*;
 
@@ -448,6 +452,7 @@ impl ValueImpl {
 }
 
 impl Container {
+    #[inline(always)]
     fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
         let copy_rc_ref_vec_val = |r: &Rc<RefCell<Vec<ValueImpl>>>| {
             Ok(Rc::new(RefCell::new(
@@ -480,6 +485,7 @@ impl Container {
         })
     }
 
+    #[inline(always)]
     fn copy_by_ref(&self) -> Self {
         match self {
             Self::Vec(r) => Self::Vec(Rc::clone(r)),
@@ -500,6 +506,7 @@ impl Container {
 }
 
 impl IndexedRef {
+    #[inline(always)]
     fn copy_by_ref(&self) -> Self {
         Self {
             idx: self.idx,
@@ -509,6 +516,7 @@ impl IndexedRef {
 }
 
 impl ContainerRef {
+    #[inline(always)]
     fn copy_by_ref(&self) -> Self {
         match self {
             Self::Local(container) => Self::Local(container.copy_by_ref()),
@@ -522,6 +530,7 @@ impl ContainerRef {
 
 #[cfg(test)]
 impl Value {
+    #[inline(always)]
     pub fn copy_value_with_depth(&self, max_depth: u64) -> PartialVMResult<Self> {
         Ok(Self(self.0.copy_value(1, Some(max_depth))?))
     }
@@ -1031,11 +1040,13 @@ impl IndexedRef {
 }
 
 impl Value {
+    #[inline(always)]
     pub fn equals(&self, other: &Self) -> PartialVMResult<bool> {
         self.0
             .equals(&other.0, 1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
     }
 
+    #[inline(always)]
     pub fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
         self.0
             .compare(&other.0, 1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
@@ -1043,12 +1054,14 @@ impl Value {
 
     // Test-only API to test depth checks.
     #[cfg(test)]
+    #[inline(always)]
     pub fn equals_with_depth(&self, other: &Self, max_depth: u64) -> PartialVMResult<bool> {
         self.0.equals(&other.0, 1, Some(max_depth))
     }
 
     // Test-only API to test depth checks.
     #[cfg(test)]
+    #[inline(always)]
     pub fn compare_with_depth(&self, other: &Self, max_depth: u64) -> PartialVMResult<Ordering> {
         self.0.compare(&other.0, 1, Some(max_depth))
     }
@@ -1104,22 +1117,26 @@ impl ReferenceImpl {
 }
 
 impl StructRef {
+    #[inline(always)]
     pub fn read_ref(self) -> PartialVMResult<Value> {
         self.0.read_ref(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
     }
 
     #[cfg(test)]
+    #[inline(always)]
     pub fn read_ref_with_depth(self, max_depth: u64) -> PartialVMResult<Value> {
         self.0.read_ref(1, Some(max_depth))
     }
 }
 
 impl Reference {
+    #[inline(always)]
     pub fn read_ref(self) -> PartialVMResult<Value> {
         self.0.read_ref(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
     }
 
     #[cfg(test)]
+    #[inline(always)]
     pub fn read_ref_with_depth(self, max_depth: u64) -> PartialVMResult<Value> {
         self.0.read_ref(1, Some(max_depth))
     }
@@ -1252,6 +1269,7 @@ impl ReferenceImpl {
 }
 
 impl Reference {
+    #[inline(always)]
     pub fn write_ref(self, x: Value) -> PartialVMResult<()> {
         self.0.write_ref(x)
     }
@@ -1487,6 +1505,7 @@ impl ReferenceImpl {
 }
 
 impl Reference {
+    #[inline(always)]
     pub fn swap_values(self, other: Self) -> PartialVMResult<()> {
         self.0.swap_values(other.0)
     }
@@ -1502,6 +1521,7 @@ impl Reference {
  **************************************************************************************/
 
 impl ContainerRef {
+    #[inline(always)]
     fn borrow_elem(&self, idx: usize) -> PartialVMResult<ValueImpl> {
         let len = self.container().len();
         if idx >= len {
@@ -1569,10 +1589,12 @@ impl ContainerRef {
 }
 
 impl StructRef {
+    #[inline(always)]
     pub fn borrow_field(&self, idx: usize) -> PartialVMResult<Value> {
         Ok(Value(self.0.borrow_elem(idx)?))
     }
 
+    #[inline(always)]
     pub fn borrow_variant_field(
         &self,
         allowed: &[VariantIndex],
@@ -1593,6 +1615,7 @@ impl StructRef {
         }
     }
 
+    #[inline(always)]
     pub fn test_variant(&self, variant: VariantIndex) -> PartialVMResult<Value> {
         let tag = self.get_variant_tag()?;
         Ok(Value::bool(variant == tag))
@@ -1606,6 +1629,7 @@ impl StructRef {
 }
 
 impl Locals {
+    #[inline(always)]
     pub fn borrow_loc(&self, idx: usize) -> PartialVMResult<Value> {
         let v = self.0.borrow();
         if idx >= v.len() {
@@ -1648,10 +1672,12 @@ impl Locals {
 }
 
 impl SignerRef {
+    #[inline(always)]
     pub fn borrow_signer(&self) -> PartialVMResult<Value> {
         Ok(Value(self.0.borrow_elem(1)?))
     }
 
+    #[inline(always)]
     pub fn is_permissioned(&self) -> PartialVMResult<bool> {
         match &self.0 {
             ContainerRef::Local(Container::Struct(s)) => {
@@ -1666,6 +1692,7 @@ impl SignerRef {
 
     /// Get the permission address associated with a signer.
     /// Needs to make sure the signer passed in is a permissioned signer.
+    #[inline(always)]
     pub fn permission_address(&self) -> PartialVMResult<Value> {
         match &self.0 {
             ContainerRef::Local(Container::Struct(s)) => Ok(Value::address(
@@ -1693,22 +1720,26 @@ impl SignerRef {
  *
  **************************************************************************************/
 impl Locals {
+    #[inline(always)]
     pub fn new(n: usize) -> Self {
         Self(Rc::new(RefCell::new(
             iter::repeat_with(|| ValueImpl::Invalid).take(n).collect(),
         )))
     }
 
+    #[inline(always)]
     pub fn copy_loc(&self, idx: usize) -> PartialVMResult<Value> {
         self.copy_loc_impl(idx, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
     }
 
     // Test-only API to test depth checks.
     #[cfg(test)]
+    #[inline(always)]
     pub fn copy_loc_with_depth(&self, idx: usize, max_depth: u64) -> PartialVMResult<Value> {
         self.copy_loc_impl(idx, Some(max_depth))
     }
 
+    #[inline(always)]
     fn copy_loc_impl(&self, idx: usize, max_depth: Option<u64>) -> PartialVMResult<Value> {
         let v = self.0.borrow();
         match v.get(idx) {
@@ -1725,6 +1756,7 @@ impl Locals {
         }
     }
 
+    #[inline(always)]
     fn swap_loc(&mut self, idx: usize, x: Value, violation_check: bool) -> PartialVMResult<Value> {
         let mut v = self.0.borrow_mut();
         match v.get_mut(idx) {
@@ -1750,6 +1782,7 @@ impl Locals {
         }
     }
 
+    #[inline(always)]
     pub fn move_loc(&mut self, idx: usize, violation_check: bool) -> PartialVMResult<Value> {
         match self.swap_loc(idx, Value(ValueImpl::Invalid), violation_check)? {
             Value(ValueImpl::Invalid) => Err(PartialVMError::new(
@@ -1760,6 +1793,7 @@ impl Locals {
         }
     }
 
+    #[inline(always)]
     pub fn store_loc(
         &mut self,
         idx: usize,
@@ -1772,6 +1806,7 @@ impl Locals {
 
     /// Drop all Move values onto a different Vec to avoid leaking memory.
     /// References are excluded since they may point to invalid data.
+    #[inline(always)]
     pub fn drop_all_values(&mut self) -> impl Iterator<Item = (usize, Value)> {
         let mut locals = self.0.borrow_mut();
         let mut res = vec![];
@@ -1792,6 +1827,7 @@ impl Locals {
         res.into_iter()
     }
 
+    #[inline(always)]
     pub fn is_invalid(&self, idx: usize) -> PartialVMResult<bool> {
         let v = self.0.borrow();
         match v.get(idx) {
@@ -1814,46 +1850,57 @@ impl Locals {
  *
  **************************************************************************************/
 impl Value {
+    #[inline(always)]
     pub fn delayed_value(id: DelayedFieldID) -> Self {
         Self(ValueImpl::DelayedFieldID { id })
     }
 
+    #[inline(always)]
     pub fn u8(x: u8) -> Self {
         Self(ValueImpl::U8(x))
     }
 
+    #[inline(always)]
     pub fn u16(x: u16) -> Self {
         Self(ValueImpl::U16(x))
     }
 
+    #[inline(always)]
     pub fn u32(x: u32) -> Self {
         Self(ValueImpl::U32(x))
     }
 
+    #[inline(always)]
     pub fn u64(x: u64) -> Self {
         Self(ValueImpl::U64(x))
     }
 
+    #[inline(always)]
     pub fn u128(x: u128) -> Self {
         Self(ValueImpl::U128(x))
     }
 
+    #[inline(always)]
     pub fn u256(x: u256::U256) -> Self {
         Self(ValueImpl::U256(x))
     }
 
+    #[inline(always)]
     pub fn bool(x: bool) -> Self {
         Self(ValueImpl::Bool(x))
     }
 
+    #[inline(always)]
     pub fn address(x: AccountAddress) -> Self {
         Self(ValueImpl::Address(x))
     }
 
+    #[inline(always)]
     pub fn master_signer(x: AccountAddress) -> Self {
         Self(ValueImpl::Container(Container::master_signer(x)))
     }
 
+    #[inline(always)]
     pub fn permissioned_signer(x: AccountAddress, perm_storage_address: AccountAddress) -> Self {
         Self::struct_(Struct::pack_variant(PERMISSIONED_SIGNER_VARIANT, vec![
             Value::address(x),
@@ -1863,60 +1910,70 @@ impl Value {
 
     /// Create a "unowned" reference to a signer value (&signer) for populating the &signer in
     /// execute function
+    #[inline(always)]
     pub fn master_signer_reference(x: AccountAddress) -> Self {
         Self(ValueImpl::ContainerRef(ContainerRef::Local(
             Container::master_signer(x),
         )))
     }
 
+    #[inline(always)]
     pub fn struct_(s: Struct) -> Self {
         Self(ValueImpl::Container(Container::Struct(Rc::new(
             RefCell::new(s.fields),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_u8(it: impl IntoIterator<Item = u8>) -> Self {
         Self(ValueImpl::Container(Container::VecU8(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_u16(it: impl IntoIterator<Item = u16>) -> Self {
         Self(ValueImpl::Container(Container::VecU16(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_u32(it: impl IntoIterator<Item = u32>) -> Self {
         Self(ValueImpl::Container(Container::VecU32(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_u64(it: impl IntoIterator<Item = u64>) -> Self {
         Self(ValueImpl::Container(Container::VecU64(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_u128(it: impl IntoIterator<Item = u128>) -> Self {
         Self(ValueImpl::Container(Container::VecU128(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_u256(it: impl IntoIterator<Item = u256::U256>) -> Self {
         Self(ValueImpl::Container(Container::VecU256(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_bool(it: impl IntoIterator<Item = bool>) -> Self {
         Self(ValueImpl::Container(Container::VecBool(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_address(it: impl IntoIterator<Item = AccountAddress>) -> Self {
         Self(ValueImpl::Container(Container::VecAddress(Rc::new(
             RefCell::new(it.into_iter().collect()),
@@ -1924,12 +1981,14 @@ impl Value {
     }
 
     // REVIEW: This API can break
+    #[inline(always)]
     pub fn vector_for_testing_only(it: impl IntoIterator<Item = Value>) -> Self {
         Self(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
             it.into_iter().map(|v| v.0).collect(),
         )))))
     }
 
+    #[inline(always)]
     pub fn closure(
         fun: Box<dyn AbstractFunction>,
         captured: impl IntoIterator<Item = Value>,
@@ -1958,6 +2017,7 @@ pub trait VMValueCast<T> {
 macro_rules! impl_vm_value_cast {
     ($ty:ty, $tc:ident) => {
         impl VMValueCast<$ty> for Value {
+            #[inline(always)]
             fn cast(self) -> PartialVMResult<$ty> {
                 match self.0 {
                     ValueImpl::$tc(x) => Ok(x),
@@ -1981,6 +2041,7 @@ impl_vm_value_cast!(ContainerRef, ContainerRef);
 impl_vm_value_cast!(IndexedRef, IndexedRef);
 
 impl VMValueCast<DelayedFieldID> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<DelayedFieldID> {
         match self.0 {
             ValueImpl::DelayedFieldID { id } => Ok(id),
@@ -1995,6 +2056,7 @@ impl VMValueCast<DelayedFieldID> for Value {
 }
 
 impl VMValueCast<IntegerValue> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<IntegerValue> {
         match self.0 {
             ValueImpl::U8(x) => Ok(IntegerValue::U8(x)),
@@ -2010,6 +2072,7 @@ impl VMValueCast<IntegerValue> for Value {
 }
 
 impl VMValueCast<Reference> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Reference> {
         match self.0 {
             ValueImpl::ContainerRef(r) => Ok(Reference(ReferenceImpl::ContainerRef(r))),
@@ -2021,6 +2084,7 @@ impl VMValueCast<Reference> for Value {
 }
 
 impl VMValueCast<Container> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Container> {
         match self.0 {
             ValueImpl::Container(c) => Ok(c),
@@ -2031,6 +2095,7 @@ impl VMValueCast<Container> for Value {
 }
 
 impl VMValueCast<Struct> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Struct> {
         match self.0 {
             ValueImpl::Container(Container::Struct(r)) => Ok(Struct {
@@ -2043,12 +2108,14 @@ impl VMValueCast<Struct> for Value {
 }
 
 impl VMValueCast<StructRef> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<StructRef> {
         Ok(StructRef(VMValueCast::cast(self)?))
     }
 }
 
 impl VMValueCast<Vec<u8>> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Vec<u8>> {
         match self.0 {
             ValueImpl::Container(Container::VecU8(r)) => take_unique_ownership(r),
@@ -2059,6 +2126,7 @@ impl VMValueCast<Vec<u8>> for Value {
 }
 
 impl VMValueCast<Vec<u64>> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Vec<u64>> {
         match self.0 {
             ValueImpl::Container(Container::VecU64(r)) => take_unique_ownership(r),
@@ -2069,6 +2137,7 @@ impl VMValueCast<Vec<u64>> for Value {
 }
 
 impl VMValueCast<Vec<Value>> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Vec<Value>> {
         match self.0 {
             ValueImpl::Container(Container::Vec(c)) => {
@@ -2096,6 +2165,7 @@ impl VMValueCast<Vec<Value>> for Value {
 }
 
 impl VMValueCast<SignerRef> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<SignerRef> {
         match self.0 {
             ValueImpl::ContainerRef(r) => Ok(SignerRef(r)),
@@ -2106,6 +2176,7 @@ impl VMValueCast<SignerRef> for Value {
 }
 
 impl VMValueCast<VectorRef> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<VectorRef> {
         match self.0 {
             ValueImpl::ContainerRef(r) => Ok(VectorRef(r)),
@@ -2116,6 +2187,7 @@ impl VMValueCast<VectorRef> for Value {
 }
 
 impl VMValueCast<Vector> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Vector> {
         match self.0 {
             ValueImpl::Container(c) => Ok(Vector(c)),
@@ -2126,6 +2198,7 @@ impl VMValueCast<Vector> for Value {
 }
 
 impl Value {
+    #[inline(always)]
     pub fn value_as<T>(self) -> PartialVMResult<T>
     where
         Self: VMValueCast<T>,
@@ -2135,6 +2208,7 @@ impl Value {
 }
 
 impl VMValueCast<u8> for IntegerValue {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<u8> {
         match self {
             Self::U8(x) => Ok(x),
@@ -2145,6 +2219,7 @@ impl VMValueCast<u8> for IntegerValue {
 }
 
 impl VMValueCast<u16> for IntegerValue {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<u16> {
         match self {
             Self::U16(x) => Ok(x),
@@ -2155,6 +2230,7 @@ impl VMValueCast<u16> for IntegerValue {
 }
 
 impl VMValueCast<u32> for IntegerValue {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<u32> {
         match self {
             Self::U32(x) => Ok(x),
@@ -2165,6 +2241,7 @@ impl VMValueCast<u32> for IntegerValue {
 }
 
 impl VMValueCast<u64> for IntegerValue {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<u64> {
         match self {
             Self::U64(x) => Ok(x),
@@ -2175,6 +2252,7 @@ impl VMValueCast<u64> for IntegerValue {
 }
 
 impl VMValueCast<u128> for IntegerValue {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<u128> {
         match self {
             Self::U128(x) => Ok(x),
@@ -2185,6 +2263,7 @@ impl VMValueCast<u128> for IntegerValue {
 }
 
 impl VMValueCast<u256::U256> for IntegerValue {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<u256::U256> {
         match self {
             Self::U256(x) => Ok(x),
@@ -2195,6 +2274,7 @@ impl VMValueCast<u256::U256> for IntegerValue {
 }
 
 impl IntegerValue {
+    #[inline(always)]
     pub fn value_as<T>(self) -> PartialVMResult<T>
     where
         Self: VMValueCast<T>,
@@ -2211,6 +2291,7 @@ impl IntegerValue {
  *
  **************************************************************************************/
 impl IntegerValue {
+    #[inline(always)]
     pub fn add_checked(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         let res = match (self, other) {
@@ -2231,6 +2312,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn sub_checked(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         let res = match (self, other) {
@@ -2251,6 +2333,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn mul_checked(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         let res = match (self, other) {
@@ -2271,6 +2354,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn div_checked(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         let res = match (self, other) {
@@ -2291,6 +2375,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn rem_checked(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         let res = match (self, other) {
@@ -2311,6 +2396,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn bit_or(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         Ok(match (self, other) {
@@ -2327,6 +2413,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn bit_and(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         Ok(match (self, other) {
@@ -2343,6 +2430,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn bit_xor(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         Ok(match (self, other) {
@@ -2359,6 +2447,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn shl_checked(self, n_bits: u8) -> PartialVMResult<Self> {
         use IntegerValue::*;
 
@@ -2376,6 +2465,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn shr_checked(self, n_bits: u8) -> PartialVMResult<Self> {
         use IntegerValue::*;
 
@@ -2393,6 +2483,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn lt(self, other: Self) -> PartialVMResult<bool> {
         use IntegerValue::*;
 
@@ -2413,6 +2504,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn le(self, other: Self) -> PartialVMResult<bool> {
         use IntegerValue::*;
 
@@ -2433,6 +2525,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn gt(self, other: Self) -> PartialVMResult<bool> {
         use IntegerValue::*;
 
@@ -2453,6 +2546,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn ge(self, other: Self) -> PartialVMResult<bool> {
         use IntegerValue::*;
 
@@ -2473,6 +2567,7 @@ impl IntegerValue {
         })
     }
 
+    #[inline(always)]
     pub fn into_value(self) -> Value {
         use IntegerValue::*;
 
@@ -2488,6 +2583,7 @@ impl IntegerValue {
 }
 
 impl IntegerValue {
+    #[inline(always)]
     pub fn cast_u8(self) -> PartialVMResult<u8> {
         use IntegerValue::*;
 
@@ -2536,6 +2632,7 @@ impl IntegerValue {
         }
     }
 
+    #[inline(always)]
     pub fn cast_u16(self) -> PartialVMResult<u16> {
         use IntegerValue::*;
 
@@ -2577,6 +2674,7 @@ impl IntegerValue {
         }
     }
 
+    #[inline(always)]
     pub fn cast_u32(self) -> PartialVMResult<u32> {
         use IntegerValue::*;
 
@@ -2611,6 +2709,7 @@ impl IntegerValue {
         }
     }
 
+    #[inline(always)]
     pub fn cast_u64(self) -> PartialVMResult<u64> {
         use IntegerValue::*;
 
@@ -2638,6 +2737,7 @@ impl IntegerValue {
         }
     }
 
+    #[inline(always)]
     pub fn cast_u128(self) -> PartialVMResult<u128> {
         use IntegerValue::*;
 
@@ -2658,6 +2758,7 @@ impl IntegerValue {
         }
     }
 
+    #[inline(always)]
     pub fn cast_u256(self) -> PartialVMResult<u256::U256> {
         use IntegerValue::*;
 
@@ -2686,6 +2787,7 @@ pub const VEC_UNPACK_PARITY_MISMATCH: u64 = NFE_VECTOR_ERROR_BASE + 3;
 
 // TODO: this check seems to be obsolete if paranoid mode is on,
 //   and should either be removed or move over to runtime_type_checks?
+#[inline(always)]
 fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
     match (ty, v) {
         (Type::U8, Container::VecU8(_))
@@ -2733,6 +2835,7 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
 }
 
 impl VectorRef {
+    #[inline(always)]
     pub fn length_as_usize(&self, type_param: &Type) -> PartialVMResult<usize> {
         let c: &Container = self.0.container();
         check_elem_layout(type_param, c)?;
@@ -2752,10 +2855,12 @@ impl VectorRef {
         Ok(len)
     }
 
+    #[inline(always)]
     pub fn len(&self, type_param: &Type) -> PartialVMResult<Value> {
         Ok(Value::u64(self.length_as_usize(type_param)? as u64))
     }
 
+    #[inline(always)]
     pub fn push_back(&self, e: Value, type_param: &Type) -> PartialVMResult<()> {
         let c = self.0.container();
         check_elem_layout(type_param, c)?;
@@ -2777,6 +2882,7 @@ impl VectorRef {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn borrow_elem(&self, idx: usize, type_param: &Type) -> PartialVMResult<Value> {
         let c = self.0.container();
         check_elem_layout(type_param, c)?;
@@ -2788,6 +2894,7 @@ impl VectorRef {
     }
 
     /// Returns a RefCell reference to the underlying vector of a `&vector<u8>` value.
+    #[inline(always)]
     pub fn as_bytes_ref(&self) -> std::cell::Ref<'_, Vec<u8>> {
         let c = self.0.container();
         match c {
@@ -2796,6 +2903,7 @@ impl VectorRef {
         }
     }
 
+    #[inline(always)]
     pub fn pop(&self, type_param: &Type) -> PartialVMResult<Value> {
         let c = self.0.container();
         check_elem_layout(type_param, c)?;
@@ -2851,6 +2959,7 @@ impl VectorRef {
         Ok(res)
     }
 
+    #[inline(always)]
     pub fn swap(&self, idx1: usize, idx2: usize, type_param: &Type) -> PartialVMResult<()> {
         let c = self.0.container();
         check_elem_layout(type_param, c)?;
@@ -2892,6 +3001,7 @@ impl VectorRef {
     ///
     /// Precondition for this function is that `from` and `to` vectors are required to be distinct
     /// Move will guaranteee that invariant, because it prevents from having two mutable references to the same value.
+    #[inline(always)]
     pub fn move_range(
         from_self: &Self,
         removal_position: usize,
@@ -2957,6 +3067,7 @@ impl VectorRef {
 }
 
 impl Vector {
+    #[inline(always)]
     pub fn pack(type_param: &Type, elements: Vec<Value>) -> PartialVMResult<Value> {
         let container = match type_param {
             Type::U8 => Value::vector_u8(
@@ -3027,10 +3138,12 @@ impl Vector {
         Ok(container)
     }
 
+    #[inline(always)]
     pub fn empty(type_param: &Type) -> PartialVMResult<Value> {
         Self::pack(type_param, vec![])
     }
 
+    #[inline(always)]
     pub fn unpack_unchecked(self) -> PartialVMResult<Vec<Value>> {
         let elements: Vec<_> = match self.0 {
             Container::VecU8(r) => take_unique_ownership(r)?
@@ -3071,6 +3184,7 @@ impl Vector {
         Ok(elements)
     }
 
+    #[inline(always)]
     pub fn unpack(self, type_param: &Type, expected_num: u64) -> PartialVMResult<Vec<Value>> {
         check_elem_layout(type_param, &self.0)?;
         let elements = self.unpack_unchecked()?;
@@ -3082,11 +3196,13 @@ impl Vector {
         }
     }
 
+    #[inline(always)]
     pub fn destroy_empty(self, type_param: &Type) -> PartialVMResult<()> {
         self.unpack(type_param, 0)?;
         Ok(())
     }
 
+    #[inline(always)]
     pub fn to_vec_u8(self) -> PartialVMResult<Vec<u8>> {
         check_elem_layout(&Type::U8, &self.0)?;
         if let Container::VecU8(r) = self.0 {
@@ -3247,16 +3363,19 @@ impl Reference {
  *
  **************************************************************************************/
 impl Struct {
+    #[inline(always)]
     pub fn pack<I: IntoIterator<Item = Value>>(vals: I) -> Self {
         Self {
             fields: vals.into_iter().map(|v| v.0).collect(),
         }
     }
 
+    #[inline(always)]
     pub fn unpack(self) -> PartialVMResult<impl Iterator<Item = Value>> {
         Ok(self.fields.into_iter().map(Value))
     }
 
+    #[inline(always)]
     pub fn pack_variant<I: IntoIterator<Item = Value>>(variant: VariantIndex, vals: I) -> Self {
         Self {
             fields: iter::once(Value::u16(variant))
@@ -3266,6 +3385,7 @@ impl Struct {
         }
     }
 
+    #[inline(always)]
     pub fn unpack_variant(
         self,
         variant: VariantIndex,
@@ -3285,6 +3405,7 @@ impl Struct {
         }
     }
 
+    #[inline(always)]
     pub fn unpack_with_tag(self) -> PartialVMResult<(VariantIndex, impl Iterator<Item = Value>)> {
         let Self { fields } = self;
         if fields.is_empty() {
@@ -3427,38 +3548,46 @@ impl GlobalValueImpl {
 }
 
 impl GlobalValue {
+    #[inline(always)]
     pub fn none() -> Self {
         Self(GlobalValueImpl::None)
     }
 
+    #[inline(always)]
     pub fn cached(val: Value) -> PartialVMResult<Self> {
         Ok(Self(
             GlobalValueImpl::cached(val.0, GlobalDataStatus::Clean).map_err(|(err, _val)| err)?,
         ))
     }
 
+    #[inline(always)]
     pub fn move_from(&mut self) -> PartialVMResult<Value> {
         Ok(Value(self.0.move_from()?))
     }
 
+    #[inline(always)]
     pub fn move_to(&mut self, val: Value) -> Result<(), (PartialVMError, Value)> {
         self.0
             .move_to(val.0)
             .map_err(|(err, val)| (err, Value(val)))
     }
 
+    #[inline(always)]
     pub fn borrow_global(&self) -> PartialVMResult<Value> {
         Ok(Value(self.0.borrow_global()?))
     }
 
+    #[inline(always)]
     pub fn exists(&self) -> PartialVMResult<bool> {
         self.0.exists()
     }
 
+    #[inline(always)]
     pub fn into_effect(self) -> Option<Op<Value>> {
         self.0.into_effect().map(|op| op.map(Value))
     }
 
+    #[inline(always)]
     pub fn into_effect_with_layout(
         self,
         layout: MoveTypeLayout,
@@ -3468,6 +3597,7 @@ impl GlobalValue {
             .map(|op| op.map(|v| (Value(v), layout)))
     }
 
+    #[inline(always)]
     pub fn is_mutated(&self) -> bool {
         self.0.is_mutated()
     }
@@ -3784,6 +3914,7 @@ pub mod debug {
         }
     }
 
+    #[inline(always)]
     pub fn print_locals<B: Write>(buf: &mut B, locals: &Locals) -> PartialVMResult<()> {
         // REVIEW: The number of spaces in the indent is currently hard coded.
         for (idx, val) in locals.0.borrow().iter().enumerate() {
@@ -3794,6 +3925,7 @@ pub mod debug {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn print_value<B: Write>(buf: &mut B, val: &Value) -> PartialVMResult<()> {
         print_value_impl(buf, &val.0)
     }
@@ -4416,6 +4548,7 @@ impl Value {
         })
     }
 
+    #[inline(always)]
     pub fn deserialize_constant(constant: &Constant) -> Option<Value> {
         let layout = Self::constant_sig_token_to_layout(&constant.type_)?;
         // INVARIANT:
@@ -4623,12 +4756,14 @@ impl ValueView for StructRef {
 // Note: We may want to add more helpers to retrieve value views behind references here.
 
 impl Struct {
+    #[inline(always)]
     pub fn field_views(&self) -> impl ExactSizeIterator<Item = impl ValueView + '_> + Clone {
         self.fields.iter()
     }
 }
 
 impl Vector {
+    #[inline(always)]
     pub fn elem_views(&self) -> impl ExactSizeIterator<Item = impl ValueView + '_> + Clone {
         struct ElemView<'b> {
             container: &'b Container,
@@ -4651,6 +4786,7 @@ impl Vector {
 }
 
 impl Reference {
+    #[inline(always)]
     pub fn value_view(&self) -> impl ValueView + '_ {
         struct ValueBehindRef<'b>(&'b ReferenceImpl);
 
@@ -4670,6 +4806,7 @@ impl Reference {
 }
 
 impl GlobalValue {
+    #[inline(always)]
     pub fn view(&self) -> Option<impl ValueView + '_> {
         use GlobalValueImpl as G;
 
@@ -4750,6 +4887,7 @@ pub mod prop {
         ]
     }
 
+    #[inline(always)]
     pub fn value_strategy_with_layout(layout: &MoveTypeLayout) -> impl Strategy<Value = Value> {
         use MoveTypeLayout as L;
 
@@ -4901,6 +5039,7 @@ pub mod prop {
         }
     }
 
+    #[inline(always)]
     pub fn layout_strategy() -> impl Strategy<Value = MoveTypeLayout> {
         use MoveTypeLayout as L;
 
@@ -4933,6 +5072,7 @@ pub mod prop {
         ]
     }
 
+    #[inline(always)]
     pub fn layout_and_value_strategy() -> impl Strategy<Value = (MoveTypeLayout, Value)> {
         layout_strategy().no_shrink().prop_flat_map(|layout| {
             let value_strategy = value_strategy_with_layout(&layout);
@@ -4943,6 +5083,7 @@ pub mod prop {
 
 #[cfg(any(test, feature = "fuzzing", feature = "testing"))]
 impl ValueImpl {
+    #[inline(always)]
     pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
         use crate::values::function_values_impl::mock::MockAbstractFunction;
         use MoveTypeLayout as L;
@@ -5056,6 +5197,7 @@ impl ValueImpl {
 #[cfg(any(test, feature = "fuzzing", feature = "testing"))]
 impl Value {
     // TODO: Consider removing this API, or at least it should return a Result!
+    #[inline(always)]
     pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
         self.0.as_move_value(layout)
     }
