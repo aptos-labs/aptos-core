@@ -13,7 +13,7 @@ jobs:
   check-repo:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork

@@ -60,7 +60,7 @@ jobs:
     runs-on: runs-on,family=c5ad.8xlarge,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=false
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 300 }} # the default run is 300 minutes (5 hours). Specified here because workflow_dispatch uses string rather than number
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: ./.github/actions/fullnode-sync
         with:
@@ -105,6 +105,6 @@ jobs:
       # Because we have to checkout the actions and then check out a different
       # git ref, it's possible the actions directory will be modified. So, we
       # need to check it out again for the Post Run actions/checkout to succeed.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: actions

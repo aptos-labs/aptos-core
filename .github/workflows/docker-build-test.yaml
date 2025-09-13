@@ -120,7 +120,7 @@ jobs:
     outputs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
@@ -132,7 +132,7 @@ jobs:
     outputs:
       run_framework_upgrade_test: ${{ steps.determine_test_targets.outputs.run_framework_upgrade_test }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run the test target determinator
         id: determine_test_targets
         uses: ./.github/actions/test-target-determinator
@@ -296,7 +296,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
           ref: ${{ github.ref }}

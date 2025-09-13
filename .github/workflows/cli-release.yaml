@@ -32,7 +32,7 @@ jobs:
     name: "Build Ubuntu 22.04 binary"
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
@@ -49,7 +49,7 @@ jobs:
     name: "Build Ubuntu 24.04 binary"
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
@@ -68,7 +68,7 @@ jobs:
     name: "Build Linux binary"
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
@@ -85,7 +85,7 @@ jobs:
     name: "Build Linux ARM binary"
     runs-on: ubuntu-22.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
@@ -101,7 +101,7 @@ jobs:
     name: "Build MacOS x86_64 binary"
     runs-on: macos-13
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
@@ -117,7 +117,7 @@ jobs:
     name: "Build MacOS ARM binary"
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
@@ -133,7 +133,7 @@ jobs:
     name: "Build Windows binary"
     runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       # Ensure that long paths work
