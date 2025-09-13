@@ -347,7 +347,7 @@ impl<'a> DFSLeft<'a> {
         } else if let Some(unvisited_blocks) = &mut self.unvisited {
             unvisited_blocks.pop_first()
         } else {
-            return None;
+            None
         }
     }
 

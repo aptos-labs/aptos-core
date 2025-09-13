@@ -95,7 +95,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
         .unwrap();
     assert_eq!(output.next_version(), target_version + 1);
     let ledger_info_with_sigs =
-        gen_ledger_info_with_sigs(epoch, &output, block_id, &[signer.clone()]);
+        gen_ledger_info_with_sigs(epoch, &output, block_id, std::slice::from_ref(signer));
     executor
         .commit_blocks(vec![block_id], ledger_info_with_sigs)
         .unwrap();
