@@ -9,6 +9,15 @@ warning: [lint] Directly use the boolean expression, instead of comparing it wit
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
 
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:13:9
+   │
+13 │         if (foo(x) == true) { bar() };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Directly use the negation of the boolean expression, instead of comparing it with `false`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:14:13
    │
@@ -17,6 +26,15 @@ warning: [lint] Directly use the negation of the boolean expression, instead of 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:14:9
+   │
+14 │         if (foo(x) == false) { bar() };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
 
 warning: [lint] Directly use the negation of the boolean expression, instead of comparing it with `true`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:15:13
@@ -27,6 +45,15 @@ warning: [lint] Directly use the negation of the boolean expression, instead of 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
 
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:15:9
+   │
+15 │         if (foo(x) != true) { bar() };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Directly use the boolean expression, instead of comparing it with `false`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:16:13
    │
@@ -35,6 +62,15 @@ warning: [lint] Directly use the boolean expression, instead of comparing it wit
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:16:9
+   │
+16 │         if (foo(x) != false) { bar() };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
 
 warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:17:21
@@ -45,6 +81,15 @@ warning: [lint] Directly use the boolean expression, instead of comparing it wit
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
 
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:17:9
+   │
+17 │         if (true == foo(x)) { bar() };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Directly use the negation of the boolean expression, instead of comparing it with `false`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:18:22
    │
@@ -53,6 +98,15 @@ warning: [lint] Directly use the negation of the boolean expression, instead of 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:18:9
+   │
+18 │         if (false == foo(x)) { bar() };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
 
 warning: [lint] Directly use the negation of the boolean expression, instead of comparing it with `true`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:19:21
@@ -63,6 +117,15 @@ warning: [lint] Directly use the negation of the boolean expression, instead of 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
 
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:19:9
+   │
+19 │         if (true != foo(x)) { bar() };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Directly use the boolean expression, instead of comparing it with `false`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:20:22
    │
@@ -72,6 +135,15 @@ warning: [lint] Directly use the boolean expression, instead of comparing it wit
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
 
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:20:9
+   │
+20 │         if (false != foo(x)) { bar() };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Directly use the negation of the boolean expression, instead of comparing it with `false`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:21:13
    │
@@ -80,6 +152,15 @@ warning: [lint] Directly use the negation of the boolean expression, instead of 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:21:9
+   │
+21 │         if ((x + 1 > 0) == false) { bar() };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
 
 warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:22:18
@@ -108,6 +189,15 @@ warning: [lint] Directly use the boolean expression, instead of comparing it wit
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
 
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:24:9
+   │
+24 │         take(foo(x) == true);
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:25:18
    │
@@ -117,6 +207,22 @@ warning: [lint] Directly use the boolean expression, instead of comparing it wit
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
 
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:12:30
+   │
+12 │       public fun test1(x: u64) {
+   │ ╭──────────────────────────────^
+13 │ │         if (foo(x) == true) { bar() };
+14 │ │         if (foo(x) == false) { bar() };
+15 │ │         if (foo(x) != true) { bar() };
+   · │
+25 │ │         let _z = foo(x) == TRUE;
+26 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:29:13
    │
@@ -125,3 +231,24 @@ warning: [lint] Directly use the boolean expression, instead of comparing it wit
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:29:9
+   │
+29 │         if ((*x && *y) == true) { bar() };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:28:42
+   │
+28 │       public fun test2(x: &bool, y: &bool) {
+   │ ╭──────────────────────────────────────────^
+29 │ │         if ((*x && *y) == true) { bar() };
+30 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
