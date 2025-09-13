@@ -389,7 +389,7 @@ impl CompiledPackage {
     }
 
     /// Returns compiled modules for this package and its transitive dependencies
-    pub fn all_modules_map(&self) -> Modules {
+    pub fn all_modules_map(&self) -> Modules<'_> {
         Modules::new(
             self.all_compiled_units()
                 .filter_map(|unit| match unit {
@@ -400,7 +400,7 @@ impl CompiledPackage {
         )
     }
 
-    pub fn root_modules_map(&self) -> Modules {
+    pub fn root_modules_map(&self) -> Modules<'_> {
         Modules::new(
             self.root_compiled_units
                 .iter()

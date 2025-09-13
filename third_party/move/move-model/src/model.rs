@@ -883,7 +883,7 @@ impl GlobalEnv {
     }
 
     /// Find all target modules and return in a vector
-    pub fn get_target_modules(&self) -> Vec<ModuleEnv> {
+    pub fn get_target_modules(&self) -> Vec<ModuleEnv<'_>> {
         let mut target_modules: Vec<ModuleEnv> = vec![];
         for module_env in self.get_modules() {
             if module_env.is_target() {
@@ -894,7 +894,7 @@ impl GlobalEnv {
     }
 
     /// Find all target modules and their transitive closures and return in a vector
-    pub fn get_target_modules_transitive_closure(&self) -> Vec<ModuleEnv> {
+    pub fn get_target_modules_transitive_closure(&self) -> Vec<ModuleEnv<'_>> {
         let mut target_and_transitive_modules: BTreeSet<ModuleId> = BTreeSet::new();
         let mut todo_modules: BTreeSet<ModuleId> = BTreeSet::new();
         for module_env in self.get_modules() {
@@ -925,7 +925,7 @@ impl GlobalEnv {
     }
 
     /// Find all primary target modules and return in a vector
-    pub fn get_primary_target_modules(&self) -> Vec<ModuleEnv> {
+    pub fn get_primary_target_modules(&self) -> Vec<ModuleEnv<'_>> {
         let mut target_modules: Vec<ModuleEnv> = vec![];
         for module_env in self.get_modules() {
             if module_env.is_primary_target() {
@@ -2225,7 +2225,7 @@ impl GlobalEnv {
 
     /// Gets the spec block associated with the spec block target. Only
     /// module, struct, and function specs are supported.
-    pub fn get_spec_block(&self, target: &SpecBlockTarget) -> Ref<Spec> {
+    pub fn get_spec_block(&self, target: &SpecBlockTarget) -> Ref<'_, Spec> {
         use SpecBlockTarget::*;
         match target {
             Module(mid) => self.module_data[mid.to_usize()].module_spec.borrow(),
@@ -2252,7 +2252,7 @@ impl GlobalEnv {
 
     /// Gets the spec block associated with the spec block target. Only
     /// module, struct, and function specs are supported.
-    pub fn get_spec_block_mut(&self, target: &SpecBlockTarget) -> RefMut<Spec> {
+    pub fn get_spec_block_mut(&self, target: &SpecBlockTarget) -> RefMut<'_, Spec> {
         use SpecBlockTarget::*;
         match target {
             Module(mid) => self.module_data[mid.to_usize()].module_spec.borrow_mut(),
@@ -2278,12 +2278,12 @@ impl GlobalEnv {
     }
 
     /// Return the `StructEnv` for `str`
-    pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv {
+    pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv<'_> {
         self.get_module(str.module_id).into_struct(str.id)
     }
 
     /// Return the `Option<StructEnv>` for `str`
-    pub fn get_struct_opt(&self, str: QualifiedId<StructId>) -> Option<StructEnv> {
+    pub fn get_struct_opt(&self, str: QualifiedId<StructId>) -> Option<StructEnv<'_>> {
         self.get_module_opt(str.module_id).and_then(|module| {
             module.data.struct_data.get(&str.id).map(|data| StructEnv {
                 module_env: module,
@@ -2617,7 +2617,7 @@ impl GlobalEnv {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext::new(self)
     }
 
@@ -3277,7 +3277,7 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns a context to display types for this module.
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext {
             module_name: Some(self.get_name().clone()),
             used_modules: self.get_used_modules(false),
@@ -3593,7 +3593,7 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Gets module specification.
-    pub fn get_spec(&self) -> Ref<Spec> {
+    pub fn get_spec(&self) -> Ref<'_, Spec> {
         self.data.module_spec.borrow()
     }
 
@@ -4050,7 +4050,7 @@ impl<'env> StructEnv<'env> {
     }
 
     /// Returns the data invariants associated with this struct.
-    pub fn get_spec(&self) -> Ref<Spec> {
+    pub fn get_spec(&self) -> Ref<'_, Spec> {
         self.data.spec.borrow()
     }
 
@@ -4069,7 +4069,7 @@ impl<'env> StructEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         let type_param_names = self
             .get_type_parameters()
             .iter()
@@ -4262,7 +4262,7 @@ impl NamedConstantEnv<'_> {
     }
 
     /// Returns a context to display types for this module.
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext {
             module_name: Some(self.module_env.get_name().clone()),
             used_modules: self.module_env.get_used_modules(false),
@@ -5324,7 +5324,7 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         let type_param_names = self
             .get_type_parameters()
             .iter()

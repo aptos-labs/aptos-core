@@ -167,7 +167,7 @@ impl StateKvDb {
         Ok(state_kv_db)
     }
 
-    pub(crate) fn new_sharded_native_batches(&self) -> ShardedStateKvSchemaBatch {
+    pub(crate) fn new_sharded_native_batches(&self) -> ShardedStateKvSchemaBatch<'_> {
         std::array::from_fn(|shard_id| self.db_shard(shard_id).new_native_batch())
     }
 

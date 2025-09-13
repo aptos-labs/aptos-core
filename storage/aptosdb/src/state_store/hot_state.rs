@@ -46,11 +46,11 @@ where
         self.inner.contains_key(key)
     }
 
-    fn get(&self, key: &K) -> Option<Ref<K, V>> {
+    fn get(&self, key: &K) -> Option<Ref<'_, K, V>> {
         self.inner.get(key)
     }
 
-    fn get_mut(&self, key: &K) -> Option<RefMut<K, V>> {
+    fn get_mut(&self, key: &K) -> Option<RefMut<'_, K, V>> {
         self.inner.get_mut(key)
     }
 
@@ -103,7 +103,7 @@ where
         }
     }
 
-    fn get_from_shard(&self, shard_id: usize, key: &K) -> Option<Ref<K, V>> {
+    fn get_from_shard(&self, shard_id: usize, key: &K) -> Option<Ref<'_, K, V>> {
         self.shards[shard_id].get(key)
     }
 

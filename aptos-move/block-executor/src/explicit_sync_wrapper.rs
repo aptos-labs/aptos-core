@@ -32,7 +32,7 @@ impl<T> ExplicitSyncWrapper<T> {
         }
     }
 
-    pub fn acquire(&self) -> Guard<T> {
+    pub fn acquire(&self) -> Guard<'_, T> {
         atomic::fence(atomic::Ordering::Acquire);
         Guard { lock: self }
     }

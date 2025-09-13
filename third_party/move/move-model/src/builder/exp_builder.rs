@@ -881,7 +881,7 @@ impl UnificationContext for ExpTranslator<'_, '_, '_> {
         }
     }
 
-    fn type_display_context(&self) -> TypeDisplayContext {
+    fn type_display_context(&self) -> TypeDisplayContext<'_> {
         self.type_display_context()
     }
 }

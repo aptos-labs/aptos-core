@@ -138,11 +138,11 @@ impl TestDB {
 }
 
 impl TestDB {
-    fn iter(&self) -> SchemaIterator<TestSchema> {
+    fn iter(&self) -> SchemaIterator<'_, TestSchema> {
         self.db.iter().expect("Failed to create iterator.")
     }
 
-    fn rev_iter(&self) -> SchemaIterator<TestSchema> {
+    fn rev_iter(&self) -> SchemaIterator<'_, TestSchema> {
         self.db.rev_iter().expect("Failed to create iterator.")
     }
 }
@@ -374,11 +374,11 @@ impl TestDBWithPrefixExtractor {
         }
     }
 
-    fn iter(&self) -> SchemaIterator<TestSchema> {
+    fn iter(&self) -> SchemaIterator<'_, TestSchema> {
         self.db.iter().expect("Failed to create iterator.")
     }
 
-    fn iter_with_same_prefix(&self) -> SchemaIterator<TestSchema> {
+    fn iter_with_same_prefix(&self) -> SchemaIterator<'_, TestSchema> {
         let mut opts = rocksdb::ReadOptions::default();
         opts.set_prefix_same_as_start(true);
         self.db
@@ -386,7 +386,7 @@ impl TestDBWithPrefixExtractor {
             .expect("Failed to create iterator.")
     }
 
-    fn iter_with_max_skipped_deletions(&self, num_skips: u64) -> SchemaIterator<TestSchema> {
+    fn iter_with_max_skipped_deletions(&self, num_skips: u64) -> SchemaIterator<'_, TestSchema> {
         let mut opts = rocksdb::ReadOptions::default();
         opts.set_max_skippable_internal_keys(num_skips);
         self.db
@@ -394,7 +394,7 @@ impl TestDBWithPrefixExtractor {
             .expect("Failed to create iterator.")
     }
 
-    fn iter_with_upper_bound(&self, upper_bound: Vec<u8>) -> SchemaIterator<TestSchema> {
+    fn iter_with_upper_bound(&self, upper_bound: Vec<u8>) -> SchemaIterator<'_, TestSchema> {
         let mut opts = rocksdb::ReadOptions::default();
         opts.set_iterate_upper_bound(upper_bound);
         self.db

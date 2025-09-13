@@ -711,7 +711,7 @@ impl<'a> Context<'a> {
     // Dependency Resolution
     //**********************************************************************************************
 
-    fn dependency(&self, m: &ModuleIdent) -> Result<&CompiledDependencyView> {
+    fn dependency(&self, m: &ModuleIdent) -> Result<&CompiledDependencyView<'_>> {
         let dep = self
             .dependencies
             .get(m)

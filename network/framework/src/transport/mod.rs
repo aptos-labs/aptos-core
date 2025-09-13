@@ -289,7 +289,7 @@ async fn upgrade_inbound<T: TSocket>(
                     )
                 );
             }
-            let err = io::Error::new(io::ErrorKind::Other, err);
+            let err = io::Error::other(err);
             add_pp_addr(proxy_protocol_enabled, err, &addr)
         })?;
     let remote_pubkey = socket.get_remote_static();
@@ -314,11 +314,7 @@ async fn upgrade_inbound<T: TSocket>(
                 remote_peer_id.short_str(),
                 err
             );
-            add_pp_addr(
-                proxy_protocol_enabled,
-                io::Error::new(io::ErrorKind::Other, err),
-                &addr,
-            )
+            add_pp_addr(proxy_protocol_enabled, io::Error::other(err), &addr)
         })?;
 
     // return successful connection
@@ -371,7 +367,7 @@ pub async fn upgrade_outbound<T: TSocket>(
                     )
                 );
             }
-            io::Error::new(io::ErrorKind::Other, err)
+            io::Error::other(err)
         })?;
 
     // sanity check: Noise IK should always guarantee this is true
@@ -393,7 +389,7 @@ pub async fn upgrade_outbound<T: TSocket>(
                 "handshake negotiation with peer {} failed: {}",
                 remote_peer_id, e
             );
-            io::Error::new(io::ErrorKind::Other, e)
+            io::Error::other(e)
         })?;
 
     // return successful connection

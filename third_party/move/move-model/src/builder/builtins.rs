@@ -180,7 +180,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         // conceptually: `fun _+_<A>(x: A, y: A): A where A: u8|u16|..|u256`.
         declare_arithm_ops(
             trans,
-            &[param_t_decl.clone()],
+            std::slice::from_ref(&param_t_decl),
             &[(
                 0,
                 Constraint::SomeNumber(PrimitiveType::all_int_types().into_iter().collect()),
@@ -241,7 +241,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             for pt in [ref_param_t.clone(), param_t.clone()] {
                 declare_cmp_ops(
                     trans,
-                    &[param_t_decl.clone()],
+                    std::slice::from_ref(&param_t_decl),
                     &BTreeMap::default(),
                     pt,
                     Impl, // visible only in the impl language
@@ -253,7 +253,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             // `fun _cmp_<A>(x: A, y: A): bool where A: u8|u16|..|u256`.
             declare_cmp_ops(
                 trans,
-                &[param_t_decl.clone()],
+                std::slice::from_ref(&param_t_decl),
                 &[(
                     0,
                     Constraint::SomeNumber(PrimitiveType::all_int_types().into_iter().collect()),

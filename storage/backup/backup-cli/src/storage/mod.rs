@@ -167,7 +167,8 @@ pub trait BackupStorage: Send + Sync {
         name: &ShellSafeName,
         content: &TextLine,
     ) -> Result<FileHandle> {
-        self.save_metadata_lines(name, &[content.clone()]).await
+        self.save_metadata_lines(name, std::slice::from_ref(content))
+            .await
     }
     /// The backup system always asks for all metadata files and cache and build index on top of
     /// the content of them. This means:

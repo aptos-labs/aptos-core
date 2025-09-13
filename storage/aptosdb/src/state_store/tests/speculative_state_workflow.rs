@@ -93,7 +93,7 @@ impl Chunk {
         self.borrow_txns().iter().flat_map(|t| &t.reads)
     }
 
-    fn update_refs(&self) -> &StateUpdateRefs {
+    fn update_refs(&self) -> &StateUpdateRefs<'_> {
         self.borrow_update_refs()
     }
 }

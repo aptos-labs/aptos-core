@@ -549,11 +549,11 @@ pub struct FunctionValueExtensionAdapter<'a> {
 }
 
 pub trait AsFunctionValueExtension {
-    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter;
+    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter<'_>;
 }
 
 impl<T: ModuleStorage> AsFunctionValueExtension for T {
-    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter {
+    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter<'_> {
         FunctionValueExtensionAdapter {
             module_storage: self,
         }

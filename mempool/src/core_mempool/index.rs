@@ -165,7 +165,7 @@ impl PriorityIndex {
         }
     }
 
-    pub(crate) fn iter(&self) -> PriorityQueueIter {
+    pub(crate) fn iter(&self) -> PriorityQueueIter<'_> {
         self.data.iter().rev()
     }
 
@@ -269,7 +269,7 @@ impl TTLIndex {
         }
     }
 
-    pub(crate) fn iter(&self) -> Iter<TTLOrderingKey> {
+    pub(crate) fn iter(&self) -> Iter<'_, TTLOrderingKey> {
         self.data.iter()
     }
 

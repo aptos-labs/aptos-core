@@ -198,7 +198,7 @@ impl FundApiComponents {
         source_ip: RealIp,
         header_map: &HeaderMap,
         dry_run: bool,
-    ) -> poem::Result<(CheckerData, bool, Option<SemaphorePermit>), AptosTapError> {
+    ) -> poem::Result<(CheckerData, bool, Option<SemaphorePermit<'_>>), AptosTapError> {
         let permit = match &self.concurrent_requests_semaphore {
             Some(semaphore) => match semaphore.try_acquire() {
                 Ok(permit) => Some(permit),

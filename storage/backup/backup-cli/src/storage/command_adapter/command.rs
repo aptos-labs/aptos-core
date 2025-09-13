@@ -161,7 +161,7 @@ impl AsyncRead for ChildStdoutAsDataSource<'_> {
 
         Pin::new(self.join_fut.as_mut().unwrap())
             .poll(cx)
-            .map_err(|e| ::std::io::Error::new(::std::io::ErrorKind::Other, e))
+            .map_err(::std::io::Error::other)
     }
 }
 
@@ -219,6 +219,6 @@ impl AsyncWrite for ChildStdinAsDataSink<'_> {
 
         Pin::new(self.join_fut.as_mut().unwrap())
             .poll(cx)
-            .map_err(|e| tokio::io::Error::new(tokio::io::ErrorKind::Other, e))
+            .map_err(tokio::io::Error::other)
     }
 }
