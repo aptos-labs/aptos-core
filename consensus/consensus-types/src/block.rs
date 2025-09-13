@@ -118,8 +118,11 @@ impl Block {
                 | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                     inline_batches.len() + proof_with_data.proofs.len()
                 },
-                Payload::OptQuorumStore(opt_quorum_store_payload) => {
-                    opt_quorum_store_payload.num_txns()
+                Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                    payload
+                        .as_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload")
+                        .num_txns()
                 },
             },
         }
@@ -143,11 +146,16 @@ impl Block {
                     proof_with_data.num_txns(),
                     proof_with_data.num_bytes(),
                 ),
-                Payload::OptQuorumStore(opt_quorum_store_payload) => (
-                    opt_quorum_store_payload.proof_with_data().num_proofs(),
-                    opt_quorum_store_payload.proof_with_data().num_txns(),
-                    opt_quorum_store_payload.proof_with_data().num_bytes(),
-                ),
+                Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                    let opt_qs_payload = payload
+                        .as_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload");
+                    (
+                        opt_qs_payload.proof_with_data().num_proofs(),
+                        opt_qs_payload.proof_with_data().num_txns(),
+                        opt_qs_payload.proof_with_data().num_bytes(),
+                    )
+                },
             },
         }
     }
@@ -169,11 +177,16 @@ impl Block {
                         .map(|(b, _)| b.num_bytes() as usize)
                         .sum(),
                 ),
-                Payload::OptQuorumStore(opt_quorum_store_payload) => (
-                    opt_quorum_store_payload.inline_batches().num_batches(),
-                    opt_quorum_store_payload.inline_batches().num_txns(),
-                    opt_quorum_store_payload.inline_batches().num_bytes(),
-                ),
+                Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                    let opt_qs_payload = payload
+                        .as_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload");
+                    (
+                        opt_qs_payload.inline_batches().num_batches(),
+                        opt_qs_payload.inline_batches().num_txns(),
+                        opt_qs_payload.inline_batches().num_bytes(),
+                    )
+                },
                 _ => (0, 0, 0),
             },
         }
@@ -184,19 +197,24 @@ impl Block {
         match self.block_data.payload() {
             None => (0, 0, 0),
             Some(payload) => match payload {
-                Payload::OptQuorumStore(opt_quorum_store_payload) => (
-                    opt_quorum_store_payload.opt_batches().len(),
-                    opt_quorum_store_payload
-                        .opt_batches()
-                        .iter()
-                        .map(|b| b.num_txns() as usize)
-                        .sum(),
-                    opt_quorum_store_payload
-                        .opt_batches()
-                        .iter()
-                        .map(|b| b.num_bytes() as usize)
-                        .sum(),
-                ),
+                Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                    let opt_qs_payload = payload
+                        .as_opt_qs_payload()
+                        .expect("Should have OptQuorumStore payload");
+                    (
+                        opt_qs_payload.opt_batches().len(),
+                        opt_qs_payload
+                            .opt_batches()
+                            .iter()
+                            .map(|b| b.num_txns() as usize)
+                            .sum(),
+                        opt_qs_payload
+                            .opt_batches()
+                            .iter()
+                            .map(|b| b.num_bytes() as usize)
+                            .sum(),
+                    )
+                },
                 _ => (0, 0, 0),
             },
         }
