@@ -81,6 +81,15 @@ pub enum SessionId {
 }
 
 impl SessionId {
+    pub fn txn_hash(&self) -> [u8; 32] {
+        let txn_hash: [u8; 32] = self
+            .as_uuid()
+            .to_vec()
+            .try_into()
+            .expect("HashValue should convert to [u8; 32]");
+        txn_hash
+    }
+
     pub fn txn_meta(txn_metadata: &TransactionMetadata) -> Self {
         match txn_metadata.replay_protector() {
             ReplayProtector::SequenceNumber(sequence_number) => Self::Txn {
@@ -221,7 +230,7 @@ impl SessionId {
             // It's okay to use any number here.
             Self::ValidatorTxn { .. } => 20,
 
-            // We should maintaint the order: Prologue < Txn < RunOnAbort < Epilogue
+            // We should maintain the order: Prologue < Txn < RunOnAbort < Epilogue
             Self::Prologue { .. } => 25,
             Self::OrderlessTxnProlouge { .. } => 30,
 

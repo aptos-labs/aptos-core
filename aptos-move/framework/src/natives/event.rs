@@ -14,7 +14,9 @@ use aptos_types::event::EventKey;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{
+    native_extensions::VersionControlledNativeExtension, native_functions::NativeFunction,
+};
 #[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
 use move_vm_types::{
@@ -32,9 +34,30 @@ pub struct NativeEventContext {
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
 
+impl VersionControlledNativeExtension for NativeEventContext {
+    fn undo(&mut self) {
+        // TODO(sessions): implement
+    }
+
+    fn save(&mut self) {
+        // TODO(sessions): implement
+    }
+
+    fn reset(&mut self, _txn_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        // No-op: nothing needs to be reset.
+    }
+}
+
 impl NativeEventContext {
-    pub fn into_events(self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
+    /// Returns events from the current context. Only used for non-continuous sessions which are
+    /// now legacy.
+    pub fn legacy_into_events(self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
         self.events
+    }
+
+    /// Returns iterator over all events seen so far.
+    pub fn events_iter(&self) -> impl Iterator<Item = &ContractEvent> {
+        self.events.iter().map(|(event, _)| event)
     }
 
     #[cfg(feature = "testing")]
