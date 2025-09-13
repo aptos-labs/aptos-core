@@ -32,6 +32,7 @@ use move_vm_types::loaded_data::{
 };
 use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap};
 use std::sync::Arc;
+use crate::storage::ty_layout_converter::LAYOUT_CACHE;
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
 /// the code cache, possibly across multiple threads.
@@ -80,6 +81,7 @@ impl RuntimeEnvironment {
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
     ) -> Self {
+        LAYOUT_CACHE.clear();
         let natives = NativeFunctions::new(natives)
             .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e));
         Self {
@@ -313,6 +315,7 @@ impl RuntimeEnvironment {
     /// Flushes the global caches with struct name indices and struct tags. Note that when calling
     /// this function, modules that still store indices into struct name cache must also be flushed.
     pub fn flush_struct_name_and_tag_caches(&self) {
+        LAYOUT_CACHE.clear();
         self.ty_tag_cache.flush();
         self.struct_name_index_map.flush();
     }

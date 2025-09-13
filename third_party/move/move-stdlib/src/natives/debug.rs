@@ -265,14 +265,14 @@ mod testing {
         //  2. Not called in block-execution context where delayed fields are relevant.
         let ty_layout = context.type_to_type_layout_check_no_delayed_fields(&ty)?;
 
-        match &ty_layout {
+        match &*ty_layout {
             MoveTypeLayout::Vector(_) => {
                 // Get the inner type T of a vector<T>. Again, we should not see any delayed fields
                 // in the debug context.
                 let inner_ty = get_vector_inner_type(&ty)?;
                 let inner_tyl = context.type_to_type_layout_check_no_delayed_fields(inner_ty)?;
 
-                match inner_tyl {
+                match &*inner_tyl {
                     // We cannot simply convert a `Value` (of type vector) to a `MoveValue` because
                     // there might be a struct in the vector that needs to be "decorated" using the
                     // logic in this function. Instead, we recursively "unpack" the vector until we

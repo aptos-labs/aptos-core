@@ -234,7 +234,9 @@ impl LazyLoadedFunction {
                 };
 
                 // Do not allow delayed fields to be serialized.
-                Ok(layout.into_layout_when_has_no_delayed_fields())
+                Ok(layout
+                    .into_layout_when_has_no_delayed_fields()
+                    .map(|l| l.as_ref().clone()))
             })
             .collect::<PartialVMResult<Option<Vec<_>>>>()
     }

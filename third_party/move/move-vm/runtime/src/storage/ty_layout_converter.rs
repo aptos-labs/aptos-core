@@ -7,6 +7,8 @@ use crate::{
     storage::{loader::traits::StructDefinitionLoader, ty_tag_converter::TypeTagConverter},
     RuntimeEnvironment,
 };
+use dashmap::{DashMap, Entry};
+use lazy_static::lazy_static;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     identifier::Identifier,
@@ -21,19 +23,23 @@ use move_vm_types::{
         struct_name_indexing::StructNameIndex,
     },
 };
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
+
+lazy_static! {
+    pub static ref LAYOUT_CACHE: DashMap<StructNameIndex, LayoutWithDelayedFields> = DashMap::new();
+}
 
 /// Stores type layout as well as a flag if it contains any delayed fields.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LayoutWithDelayedFields {
-    layout: MoveTypeLayout,
+    layout: Arc<MoveTypeLayout>,
     contains_delayed_fields: bool,
 }
 
 impl LayoutWithDelayedFields {
     /// If layout contains delayed fields, returns [None]. If there are no delayed fields, the
     /// layout is returned.
-    pub fn into_layout_when_has_no_delayed_fields(self) -> Option<MoveTypeLayout> {
+    pub fn into_layout_when_has_no_delayed_fields(self) -> Option<Arc<MoveTypeLayout>> {
         (!self.contains_delayed_fields).then_some(self.layout)
     }
 
@@ -44,7 +50,7 @@ impl LayoutWithDelayedFields {
     }
 
     /// Unpacks and returns the layout and delayed fields flag for the caller to handle.
-    pub fn unpack(self) -> (MoveTypeLayout, bool) {
+    pub fn unpack(self) -> (Arc<MoveTypeLayout>, bool) {
         (self.layout, self.contains_delayed_fields)
     }
 }
@@ -78,6 +84,34 @@ where
         traversal_context: &mut TraversalContext,
         ty: &Type,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
+        if let Type::Struct { idx, .. } = ty {
+            if let Some(v) = LAYOUT_CACHE.get(idx) {
+                return Ok(v.deref().clone());
+            };
+
+            let mut count = 0;
+            let (layout, contains_delayed_fields) = self.type_to_type_layout_impl::<false>(
+                gas_meter,
+                traversal_context,
+                ty,
+                &mut count,
+                1,
+            )?;
+            let l = LayoutWithDelayedFields {
+                layout: Arc::new(layout),
+                contains_delayed_fields,
+            };
+
+            let l = match LAYOUT_CACHE.entry(*idx) {
+                Entry::Occupied(e) => e.get().clone(),
+                Entry::Vacant(e) => {
+                    e.insert(l.clone());
+                    l
+                },
+            };
+            return Ok(l);
+        }
+
         self.type_to_type_layout_with_delayed_fields_impl::<false>(gas_meter, traversal_context, ty)
     }
 
@@ -175,7 +209,7 @@ where
             1,
         )?;
         Ok(LayoutWithDelayedFields {
-            layout,
+            layout: Arc::new(layout),
             contains_delayed_fields,
         })
     }
@@ -473,7 +507,7 @@ mod tests {
     fn test_layout_with_delayed_fields(contains_delayed_fields: bool) {
         let layout = LayoutWithDelayedFields {
             // Dummy layout.
-            layout: MoveTypeLayout::U8,
+            layout: Arc::new(MoveTypeLayout::U8),
             contains_delayed_fields,
         };
         assert_eq!(
@@ -521,7 +555,7 @@ mod tests {
             let layout = assert_ok!(result);
 
             assert!(!layout.contains_delayed_fields);
-            assert_eq!(&layout.layout, &expected_layout);
+            assert_eq!(layout.layout.as_ref(), &expected_layout);
         }
     }
 
@@ -622,7 +656,7 @@ mod tests {
                 false
             ));
             let layout = assert_some!(layout.into_layout_when_has_no_delayed_fields());
-            assert_eq!(layout, runtime_layout(vec![]));
+            assert_eq!(layout.as_ref(), &runtime_layout(vec![]));
 
             let layout = assert_ok!(construct_layout_for_test(
                 &layout_converter,
@@ -630,7 +664,7 @@ mod tests {
                 true
             ));
             let layout = assert_some!(layout.into_layout_when_has_no_delayed_fields());
-            assert_eq!(layout, annotated_layout(name, vec![]));
+            assert_eq!(layout.as_ref(), &annotated_layout(name, vec![]));
         }
 
         let layout = assert_ok!(construct_layout_for_test(
@@ -639,7 +673,10 @@ mod tests {
             false
         ));
         let layout = assert_some!(layout.into_layout_when_has_no_delayed_fields());
-        assert_eq!(layout, runtime_layout(vec![runtime_layout(vec![])]));
+        assert_eq!(
+            layout.as_ref(),
+            &runtime_layout(vec![runtime_layout(vec![])])
+        );
 
         let layout = assert_ok!(construct_layout_for_test(
             &layout_converter,
@@ -648,8 +685,8 @@ mod tests {
         ));
         let layout = assert_some!(layout.into_layout_when_has_no_delayed_fields());
         assert_eq!(
-            layout,
-            annotated_layout("B", vec![MoveFieldLayout::new(
+            layout.as_ref(),
+            &annotated_layout("B", vec![MoveFieldLayout::new(
                 Identifier::from_str("c").unwrap(),
                 annotated_layout("C", vec![])
             )])
