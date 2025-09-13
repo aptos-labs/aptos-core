@@ -21,8 +21,8 @@ use aptos_experimental_layered_map::{LayeredMap, MapLayer};
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
-        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        StateViewId, NUM_STATE_SHARDS,
+        hot_state::HotStateConfig, state_key::StateKey, state_slot::StateSlot,
+        state_storage_usage::StateStorageUsage, StateViewId, NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
@@ -63,6 +63,7 @@ pub struct State {
     hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
     /// The total usage of the state at the current version.
     usage: StateStorageUsage,
+    hot_state_config: HotStateConfig,
 }
 
 impl State {
@@ -71,26 +72,33 @@ impl State {
         shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
         hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
         usage: StateStorageUsage,
+        hot_state_config: HotStateConfig,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
             shards,
             hot_state_metadata,
             usage,
+            hot_state_config,
         }
     }
 
-    pub fn new_at_version(version: Option<Version>, usage: StateStorageUsage) -> Self {
+    pub fn new_at_version(
+        version: Option<Version>,
+        usage: StateStorageUsage,
+        hot_state_config: HotStateConfig,
+    ) -> Self {
         Self::new_with_updates(
             version,
             Arc::new(arr![MapLayer::new_family("state"); 16]),
             arr![HotStateMetadata::new(); 16],
             usage,
+            hot_state_config,
         )
     }
 
-    pub fn new_empty() -> Self {
-        Self::new_at_version(None, StateStorageUsage::zero())
+    pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
+        Self::new_at_version(None, StateStorageUsage::zero(), hot_state_config)
     }
 
     pub fn next_version(&self) -> Version {
@@ -191,7 +199,14 @@ impl State {
 
         // TODO(HotState): compute new hot state metadata.
         let hot_state_metadata = arr![HotStateMetadata::new(); 16];
-        State::new_with_updates(updates.last_version(), shards, hot_state_metadata, usage)
+        // TODO(HotState): extract and pass new hot state onchain config if needed.
+        State::new_with_updates(
+            updates.last_version(),
+            shards,
+            hot_state_metadata,
+            usage,
+            self.hot_state_config,
+        )
     }
 
     fn update_usage(&self, usage_delta_per_shard: Vec<(i64, i64)>) -> StateStorageUsage {
@@ -272,8 +287,8 @@ impl LedgerState {
         }
     }
 
-    pub fn new_empty() -> Self {
-        let state = State::new_empty();
+    pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
+        let state = State::new_empty(hot_state_config);
         Self::new(state.clone(), state)
     }
 

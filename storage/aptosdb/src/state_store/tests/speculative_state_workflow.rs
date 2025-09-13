@@ -19,11 +19,11 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
-        hot_state::LRUEntry,
+        hot_state::{HotStateConfig, LRUEntry},
         state_key::StateKey,
         state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, ARB_STATE_VALUE_MAX_SIZE},
+        state_value::StateValue,
         StateViewId, StateViewResult, TStateView,
     },
     transaction::Version,
@@ -47,10 +47,12 @@ use std::{
 
 const NUM_KEYS: usize = 10;
 const HOT_STATE_MAX_ITEMS: usize = NUM_KEYS / 2;
-const HOT_STATE_MAX_BYTES: usize = NUM_KEYS / 2 * ARB_STATE_VALUE_MAX_SIZE / 3;
-const HOT_STATE_MAX_SINGLE_VALUE_BYTES: usize = ARB_STATE_VALUE_MAX_SIZE / 2;
 const MAX_PROMOTIONS_PER_BLOCK: usize = 10;
 const REFRESH_INTERVAL_VERSIONS: usize = 50;
+
+const TEST_CONFIG: HotStateConfig = HotStateConfig {
+    max_items_per_shard: HOT_STATE_MAX_ITEMS,
+};
 
 #[derive(Debug)]
 struct UserTxn {
@@ -597,14 +599,10 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
 }
 
 fn replay_chunks_pipelined(chunks: Vec<Chunk>, state_by_version: Arc<StateByVersion>) {
-    let empty = LedgerStateWithSummary::new_empty();
+    let empty = LedgerStateWithSummary::new_empty(TEST_CONFIG);
     let current_state = Arc::new(Mutex::new(empty.clone()));
 
-    let persisted_state = PersistedState::new_empty_with_config(
-        HOT_STATE_MAX_ITEMS,
-        HOT_STATE_MAX_BYTES,
-        HOT_STATE_MAX_SINGLE_VALUE_BYTES,
-    );
+    let persisted_state = PersistedState::new_empty_with_config(TEST_CONFIG);
     persisted_state.hack_reset(empty.deref().clone());
 
     let (to_summary_update, from_state_update) = channel();
