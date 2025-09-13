@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-sdk = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-profiling = { workspace = true }

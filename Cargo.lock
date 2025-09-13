@@ -8180,6 +8180,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-package-builder",
  "aptos-rest-client",
+ "aptos-sdk",
  "aptos-transaction-generator-lib",
  "aptos-transaction-simulation",
  "aptos-transaction-workloads-lib",
