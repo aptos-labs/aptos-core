@@ -1,5 +1,5 @@
 //# publish
-module 0x2.A {
+module 0x22.A {
   struct C has store { x: u64 }
 
   public make(): Self.C {
@@ -9,8 +9,8 @@ module 0x2.A {
 }
 
 //# publish
-module 0x2.B {
-    import 0x2.A;
+module 0x22.B {
+    import 0x22.A;
 
     public test_copy() {
         let v: A.C;
@@ -27,7 +27,7 @@ module 0x2.B {
 }
 
 //# run --signers 0x1
-import 0x2.B;
+import 0x22.B;
 main(account: signer) {
 label b0:
     B.test_copy();

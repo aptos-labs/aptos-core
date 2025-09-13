@@ -150,6 +150,7 @@ pub enum FeatureFlag {
     CalculateTransactionFeeForDistribution,
     DistributeTransactionFee,
     MonotonicallyIncreasingCounter,
+    EnableTrustedCode,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -399,6 +400,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::MonotonicallyIncreasingCounter => {
                 AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER
             },
+            FeatureFlag::EnableTrustedCode => AptosFeatureFlag::ENABLE_TRUSTED_CODE,
         }
     }
 }
@@ -575,6 +577,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER => {
                 FeatureFlag::MonotonicallyIncreasingCounter
             },
+            AptosFeatureFlag::ENABLE_TRUSTED_CODE => FeatureFlag::EnableTrustedCode,
         }
     }
 }
