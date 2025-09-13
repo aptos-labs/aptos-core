@@ -177,7 +177,7 @@ impl InternalIndexerDB {
         min_seq_num: u64,
         num_versions: u64,
         ledger_version: Version,
-    ) -> Result<AccountOrderedTransactionsIter> {
+    ) -> Result<AccountOrderedTransactionsIter<'_>> {
         let mut iter = self.db.iter::<OrderedTransactionByAccountSchema>()?;
         iter.seek(&(address, min_seq_num))?;
         Ok(AccountOrderedTransactionsIter::new(

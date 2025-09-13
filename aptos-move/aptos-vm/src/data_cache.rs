@@ -261,11 +261,11 @@ impl<E: ExecutorView> ConfigStorage for StorageAdapter<'_, E> {
 
 /// Converts `StateView` into `AptosMoveResolver`.
 pub trait AsMoveResolver<S> {
-    fn as_move_resolver(&self) -> StorageAdapter<S>;
+    fn as_move_resolver(&self) -> StorageAdapter<'_, S>;
 }
 
 impl<S: StateView> AsMoveResolver<S> for S {
-    fn as_move_resolver(&self) -> StorageAdapter<S> {
+    fn as_move_resolver(&self) -> StorageAdapter<'_, S> {
         let features = Features::fetch_config(self).unwrap_or_default();
         let gas_feature_version = get_gas_feature_version(self);
         let resource_group_adapter = ResourceGroupAdapter::new(
@@ -317,7 +317,7 @@ pub(crate) mod tests {
     pub(crate) fn as_resolver_with_group_size_kind<S: StateView>(
         state_view: &S,
         group_size_kind: GroupSizeKind,
-    ) -> StorageAdapter<S> {
+    ) -> StorageAdapter<'_, S> {
         assert_ne!(group_size_kind, GroupSizeKind::AsSum, "not yet supported");
 
         let (gas_feature_version, resource_groups_split_in_vm_change_set_enabled) =

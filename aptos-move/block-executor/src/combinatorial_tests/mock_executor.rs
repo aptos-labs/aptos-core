@@ -858,7 +858,7 @@ where
         callback: &mut dyn FnMut(&K, HashSet<&u32>) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
         for (key, _, _, ops) in self.group_writes.iter() {
-            callback(key, ops.iter().map(|(tag, _)| tag).collect())?;
+            callback(key, ops.keys().collect())?;
         }
         Ok(())
     }

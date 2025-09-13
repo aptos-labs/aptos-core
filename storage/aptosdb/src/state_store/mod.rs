@@ -649,7 +649,7 @@ impl StateStore {
         &self.buffered_state
     }
 
-    pub fn current_state_locked(&self) -> MutexGuard<LedgerStateWithSummary> {
+    pub fn current_state_locked(&self) -> MutexGuard<'_, LedgerStateWithSummary> {
         self.current_state.lock()
     }
 
@@ -661,7 +661,7 @@ impl StateStore {
         key_prefix: &StateKeyPrefix,
         first_key_opt: Option<&StateKey>,
         desired_version: Version,
-    ) -> Result<PrefixedStateValueIterator> {
+    ) -> Result<PrefixedStateValueIterator<'_>> {
         // this can only handle non-sharded db scenario.
         // For sharded db, should look at API side using internal indexer to handle this request
         PrefixedStateValueIterator::new(
@@ -1184,7 +1184,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
                 .unwrap()
                 .statekeys_enabled()
         {
-            let keys = node_batch.iter().map(|(key, _)| key.0.clone()).collect();
+            let keys = node_batch.keys().map(|key| key.0.clone()).collect();
             self.internal_indexer_db
                 .as_ref()
                 .unwrap()

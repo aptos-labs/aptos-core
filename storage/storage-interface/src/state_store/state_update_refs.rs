@@ -110,7 +110,7 @@ impl BatchedStateUpdateRefs<'_> {
     }
 
     #[cfg(test)]
-    fn get(&self, key: &str) -> Option<&StateUpdateRef> {
+    fn get(&self, key: &str) -> Option<&StateUpdateRef<'_>> {
         let state_key = StateKey::raw(key.as_bytes());
         let shard_id = state_key.get_shard_id();
         self.shards[shard_id].get(&state_key)
@@ -128,11 +128,11 @@ pub struct StateUpdateRefs<'kv> {
 }
 
 impl<'kv> StateUpdateRefs<'kv> {
-    pub(crate) fn for_last_checkpoint_batched(&self) -> Option<&BatchedStateUpdateRefs> {
+    pub(crate) fn for_last_checkpoint_batched(&self) -> Option<&BatchedStateUpdateRefs<'_>> {
         self.for_last_checkpoint.as_ref().map(|x| &x.1)
     }
 
-    pub(crate) fn for_latest_batched(&self) -> Option<&BatchedStateUpdateRefs> {
+    pub(crate) fn for_latest_batched(&self) -> Option<&BatchedStateUpdateRefs<'_>> {
         self.for_latest.as_ref().map(|x| &x.1)
     }
 
