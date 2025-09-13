@@ -140,7 +140,7 @@ impl SimpleInstruction {
 }
 
 /// Represents a kind of dependency gas can be charged for.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DependencyKind {
     /// New dependency, typically charged on publish.
     New,

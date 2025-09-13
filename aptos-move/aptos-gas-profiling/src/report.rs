@@ -76,7 +76,16 @@ where
 impl TransactionGasLog {
     pub fn generate_html_report(&self, path: impl AsRef<Path>, header: String) -> Result<()> {
         let mut data = Map::new();
-        data.insert("title".to_string(), Value::String(header));
+        data.insert(
+            "title".to_string(),
+            Value::String(
+                if self.multi_txn {
+                    format!("{} - aggregated across multiple transactions", header)
+                } else {
+                    header
+                },
+            ),
+        );
 
         // Flamegraphs
         let graph_exec_io = self.exec_io.to_flamegraph("Execution & IO".to_string())?;
