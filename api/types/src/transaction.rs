@@ -2399,3 +2399,23 @@ pub struct GasEstimation {
     /// The prioritized estimate for the gas unit price
     pub prioritized_gas_estimate: Option<u64>,
 }
+
+/// API representation of persisted auxiliary transaction information
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct PersistedAuxiliaryInfo {
+    /// Optional transaction index in the block (None indicates no auxiliary info available)
+    pub transaction_index: Option<u32>,
+}
+
+impl From<aptos_types::transaction::PersistedAuxiliaryInfo> for PersistedAuxiliaryInfo {
+    fn from(info: aptos_types::transaction::PersistedAuxiliaryInfo) -> Self {
+        match info {
+            aptos_types::transaction::PersistedAuxiliaryInfo::None => Self {
+                transaction_index: None,
+            },
+            aptos_types::transaction::PersistedAuxiliaryInfo::V1 { transaction_index } => Self {
+                transaction_index: Some(transaction_index),
+            },
+        }
+    }
+}
