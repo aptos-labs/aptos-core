@@ -41,7 +41,7 @@ impl<'a> Modules<'a> {
     }
 
     /// Compute a dependency graph for `self`
-    pub fn compute_dependency_graph(&self) -> DependencyGraph {
+    pub fn compute_dependency_graph(&self) -> DependencyGraph<'_> {
         DependencyGraph::new(self.0.values().copied())
     }
 

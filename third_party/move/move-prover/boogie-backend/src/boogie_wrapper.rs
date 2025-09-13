@@ -1628,7 +1628,7 @@ impl ModelValue {
         // function table of $EncodeKey and turns into a map from int to encoded ModelValue.
         let encoding_key = format!(
             "$EncodeKey{}",
-            boogie_inst_suffix(wrapper.env, &[key_ty.clone()])
+            boogie_inst_suffix(wrapper.env, std::slice::from_ref(key_ty))
         );
         let encoding_map = model
             .vars
