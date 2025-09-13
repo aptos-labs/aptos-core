@@ -156,7 +156,7 @@ impl TransactionsToKeep {
         *self.borrow_is_reconfig()
     }
 
-    pub fn state_update_refs(&self) -> &StateUpdateRefs {
+    pub fn state_update_refs(&self) -> &StateUpdateRefs<'_> {
         self.borrow_state_update_refs()
     }
 

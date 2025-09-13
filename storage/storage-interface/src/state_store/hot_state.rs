@@ -172,7 +172,7 @@ impl<'a> HotStateLRU<'a> {
     }
 
     #[cfg(test)]
-    fn iter(&self) -> Iter {
+    fn iter(&self) -> Iter<'_, '_> {
         Iter {
             current_key: self.head.clone(),
             lru: self,

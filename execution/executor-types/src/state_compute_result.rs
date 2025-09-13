@@ -155,7 +155,7 @@ impl StateComputeResult {
         }
     }
 
-    pub fn as_chunk_to_commit(&self) -> ChunkToCommit {
+    pub fn as_chunk_to_commit(&self) -> ChunkToCommit<'_> {
         ChunkToCommit {
             first_version: self.ledger_update_output.first_version(),
             transactions: &self.execution_output.to_commit.transactions,

@@ -261,11 +261,11 @@ impl<E: ExecutorView> ConfigStorage for StorageAdapter<'_, E> {
 
 /// Converts `StateView` into `AptosMoveResolver`.
 pub trait AsMoveResolver<S> {
-    fn as_move_resolver(&self) -> StorageAdapter<S>;
+    fn as_move_resolver(&self) -> StorageAdapter<'_, S>;
 }
 
 impl<S: StateView> AsMoveResolver<S> for S {
-    fn as_move_resolver(&self) -> StorageAdapter<S> {
+    fn as_move_resolver(&self) -> StorageAdapter<'_, S> {
         let features = Features::fetch_config(self).unwrap_or_default();
         let gas_feature_version = get_gas_feature_version(self);
         let resource_group_adapter = ResourceGroupAdapter::new(
