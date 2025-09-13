@@ -39,7 +39,10 @@ impl RawData for LocalnetDataService {
         // Some node metadata
         let context = self.service_context.context.clone();
         let r = req.into_inner();
-        let starting_version = r.starting_version.expect("Starting version must be set");
+        let starting_version = match r.starting_version {
+            Some(version) => version,
+            None => return Err(Status::invalid_argument("Starting version must be set")),
+        };
         let ending_version = if let Some(count) = r.transactions_count {
             starting_version.saturating_add(count)
         } else {
