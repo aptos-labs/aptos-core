@@ -53,7 +53,7 @@ impl BackupServiceClient {
         }
     }
 
-    async fn get(&self, endpoint: &'static str, params: &str) -> Result<impl AsyncRead> {
+    async fn get(&self, endpoint: &'static str, params: &str) -> Result<impl AsyncRead + use<>> {
         let _timer = BACKUP_TIMER.timer_with(&[&format!("backup_service_client_get_{endpoint}")]);
 
         let url = if params.is_empty() {
@@ -97,7 +97,7 @@ impl BackupServiceClient {
         &self,
         key: HashValue,
         version: Version,
-    ) -> Result<impl AsyncRead> {
+    ) -> Result<impl AsyncRead + use<>> {
         self.get("state_range_proof", &format!("{}/{:x}", version, key))
             .await
     }
@@ -116,7 +116,7 @@ impl BackupServiceClient {
         version: Version,
         start_idx: usize,
         limit: usize,
-    ) -> Result<impl AsyncRead> {
+    ) -> Result<impl AsyncRead + use<>> {
         self.get(
             "state_snapshot_chunk",
             &format!("{}/{}/{}", version, start_idx, limit),
@@ -137,7 +137,7 @@ impl BackupServiceClient {
         &self,
         start_epoch: u64,
         end_epoch: u64,
-    ) -> Result<impl AsyncRead> {
+    ) -> Result<impl AsyncRead + use<>> {
         self.get(
             "epoch_ending_ledger_infos",
             &format!("{}/{}", start_epoch, end_epoch),
@@ -149,7 +149,7 @@ impl BackupServiceClient {
         &self,
         start_version: Version,
         num_transactions: usize,
-    ) -> Result<impl AsyncRead> {
+    ) -> Result<impl AsyncRead + use<>> {
         self.get(
             "transactions",
             &format!("{}/{}", start_version, num_transactions),
@@ -161,7 +161,7 @@ impl BackupServiceClient {
         &self,
         first_version: Version,
         last_version: Version,
-    ) -> Result<impl AsyncRead> {
+    ) -> Result<impl AsyncRead + use<>> {
         self.get(
             "transaction_range_proof",
             &format!("{}/{}", first_version, last_version,),

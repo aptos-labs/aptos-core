@@ -577,7 +577,7 @@ fn parse_required_option<F: Fn(&str) -> Result<T, E>, T, E: std::fmt::Display>(
     field_name: &'static str,
     parse: F,
 ) -> Result<T, CliError> {
-    if let Some(ref field) = option {
+    if let Some(field) = option {
         parse(field).map_err(|err| {
             CliError::CommandArgumentError(format!(
                 "Field {} is invalid in file {}.  Err: {}",
@@ -601,7 +601,7 @@ fn parse_optional_option<F: Fn(&str) -> Result<T, E>, T, E: std::fmt::Display>(
     field_name: &'static str,
     parse: F,
 ) -> Result<Option<T>, CliError> {
-    if let Some(ref field) = option {
+    if let Some(field) = option {
         parse(field)
             .map_err(|err| {
                 CliError::CommandArgumentError(format!(
