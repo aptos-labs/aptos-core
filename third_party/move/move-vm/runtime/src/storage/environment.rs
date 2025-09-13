@@ -5,6 +5,7 @@ use crate::{
     config::VMConfig,
     native_functions::{NativeFunction, NativeFunctions},
     storage::{
+        ty_layout_converter::LAYOUT_CACHE,
         ty_tag_converter::{TypeTagCache, TypeTagConverter},
         verified_module_cache::VERIFIED_MODULES_CACHE,
     },

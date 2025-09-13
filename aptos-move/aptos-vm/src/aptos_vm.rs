@@ -84,6 +84,7 @@ use aptos_types::{
         verify_module_metadata_for_module_publishing,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
+    write_set::RESOURCE_WRITE_FREQUENCY,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{
@@ -146,7 +147,11 @@ use std::{
     cmp::{max, min},
     collections::{BTreeMap, BTreeSet},
     marker::Sync,
-    sync::Arc,
+    ops::DerefMut,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
@@ -2012,6 +2017,14 @@ impl AptosVM {
                 &mut traversal_context,
             )
         });
+
+        for key in output.resource_write_set().keys() {
+            let mut ref_mut = RESOURCE_WRITE_FREQUENCY
+                .entry(key.clone())
+                .or_insert_with(|| AtomicU32::new(0));
+            ref_mut.deref_mut().fetch_add(1, Ordering::SeqCst);
+        }
+
         (vm_status, output)
     }
 
