@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::new_test_context_with_orderless_flags;
+use crate::tests::{new_test_context, new_test_context_with_orderless_flags};
 use aptos_api_test_context::{current_function_name, pretty, TestContext};
 use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_types::{
@@ -683,4 +683,65 @@ async fn test_bcs_execute_fee_payer_transaction_no_authenticator_fail(
         .as_str()
         .unwrap()
         .contains("INVALID_SIGNATURE"));
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_simulate_txn_with_randomness() {
+    let mut context = new_test_context(current_function_name!());
+    let account = context.root_account().await;
+
+    let named_addresses = vec![("addr".to_string(), account.address())];
+    let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("src/tests/move/pack_rand");
+    let payload = TestContext::build_package(path, named_addresses);
+    let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+    context.commit_block(&vec![txn]).await;
+
+    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(account.address(), ident_str!("rand").to_owned()),
+        ident_str!("rand_integer").to_owned(),
+        vec![],
+        vec![],
+    ));
+    let txn = account.sign_with_transaction_builder(
+        context
+            .transaction_factory()
+            .payload(payload)
+            .expiration_timestamp_secs(context.get_expiration_time())
+            .upgrade_payload_with_rng(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            ),
+    );
+    if let TransactionAuthenticator::Ed25519 {
+        public_key,
+        signature: _,
+    } = txn.authenticator_ref()
+    {
+        let function = format!("{}::rand::rand_integer", account.address());
+        let request = json!({
+            "sender": txn.sender().to_string(),
+            "sequence_number": txn.sequence_number().to_string(),
+            "max_gas_amount": txn.max_gas_amount().to_string(),
+            "gas_unit_price": txn.gas_unit_price().to_string(),
+            "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
+            "payload": {
+                "type": "entry_function_payload",
+                "function": function,
+                "type_arguments": [],
+                "arguments": []
+            },
+            "signature": {
+                "type": "ed25519_signature",
+                "public_key": public_key.to_string(),
+                "signature": Ed25519Signature::dummy_signature().to_string(),
+            },
+        });
+        let resp = context
+            .expect_status_code(200)
+            .post("/transactions/simulate", request)
+            .await;
+        assert!(resp[0]["success"].as_bool().is_some_and(|v| v));
+    } else {
+        unreachable!("Simulation uses Ed25519 authenticator.");
+    }
 }
