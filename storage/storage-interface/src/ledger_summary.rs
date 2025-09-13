@@ -4,6 +4,7 @@
 use crate::state_store::{state::LedgerState, state_summary::LedgerStateSummary};
 use aptos_types::{
     proof::accumulator::{InMemoryAccumulator, InMemoryTransactionAccumulator},
+    state_store::hot_state::HotStateConfig,
     transaction::Version,
 };
 use std::sync::Arc;
@@ -38,19 +39,13 @@ impl LedgerSummary {
         self.next_version().checked_sub(1)
     }
 
-    pub fn new_empty() -> Self {
-        let state = LedgerState::new_empty();
+    pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
+        let state = LedgerState::new_empty(hot_state_config);
         let state_summary = LedgerStateSummary::new_empty();
         Self::new(
             state,
             state_summary,
             Arc::new(InMemoryAccumulator::new_empty()),
         )
-    }
-}
-
-impl Default for LedgerSummary {
-    fn default() -> Self {
-        Self::new_empty()
     }
 }
