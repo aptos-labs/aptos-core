@@ -16,6 +16,7 @@ pub fn main() {
             None,
             std::io::stdout(),
             UnitTestFactoryWithCostTable::new(None, None),
+            args.fail_fast,
         )
         .unwrap();
     }

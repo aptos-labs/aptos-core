@@ -283,7 +283,14 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     // Run the tests. If any of the tests fail, then we don't produce a coverage report, so cleanup
     // the trace files.
     if !unit_test_config
-        .run_and_report_unit_tests(test_plan, Some(natives), Some(genesis), writer, factory)
+        .run_and_report_unit_tests(
+            test_plan,
+            Some(natives),
+            Some(genesis),
+            writer,
+            factory,
+            unit_test_config.fail_fast,
+        )
         .unwrap()
         .1
     {
