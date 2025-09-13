@@ -107,12 +107,12 @@ spec aptos_std::simple_map {
         pragma intrinsic;
         pragma opaque;
         aborts_if [abstract] false;
-        ensures [abstract] !spec_contains_key(old(self), key) ==> option::is_none(result_1);
-        ensures [abstract] !spec_contains_key(old(self), key) ==> option::is_none(result_2);
+        ensures [abstract] !spec_contains_key(old(self), key) ==> option::spec_is_none(result_1);
+        ensures [abstract] !spec_contains_key(old(self), key) ==> option::spec_is_none(result_2);
         ensures [abstract] spec_contains_key(self, key);
         ensures [abstract] spec_get(self, key) == value;
-        ensures [abstract] spec_contains_key(old(self), key) ==> ((option::is_some(result_1)) && (option::spec_borrow(result_1) == key));
-        ensures [abstract] spec_contains_key(old(self), key) ==> ((option::is_some(result_2)) && (option::spec_borrow(result_2) == spec_get(old(
+        ensures [abstract] spec_contains_key(old(self), key) ==> ((option::spec_is_some(result_1)) && (option::spec_borrow(result_1) == key));
+        ensures [abstract] spec_contains_key(old(self), key) ==> ((option::spec_is_some(result_2)) && (option::spec_borrow(result_2) == spec_get(old(
             self
         ), key)));
     }

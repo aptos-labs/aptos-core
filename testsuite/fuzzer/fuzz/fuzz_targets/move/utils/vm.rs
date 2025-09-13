@@ -5,9 +5,7 @@
 
 use crate::tdbg;
 use aptos_cached_packages::aptos_stdlib::code_publish_package_txn;
-use aptos_framework::natives::code::{
-    ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
-};
+use aptos_framework::natives::code::{ModuleMetadata, PackageDep, PackageMetadata, UpgradePolicy};
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::transaction::{ExecutionStatus, TransactionPayload, TransactionStatus};
 use arbitrary::Arbitrary;
@@ -90,7 +88,7 @@ fn publish_transaction_payload(modules: &[CompiledModule]) -> TransactionPayload
             name: cm.name().to_string(),
             source: vec![],
             source_map: vec![],
-            extension: MoveOption::default(),
+            extension: Option::default(),
         })
         .collect();
 
@@ -114,7 +112,7 @@ fn publish_transaction_payload(modules: &[CompiledModule]) -> TransactionPayload
         manifest: vec![],
         modules: modules_metadatas,
         deps: all_immediate_deps,
-        extension: MoveOption::default(),
+        extension: Option::default(),
     };
     let pkg_metadata = bcs::to_bytes(&metadata).expect("PackageMetadata must serialize");
     let mut pkg_code: Vec<Vec<u8>> = vec![];
