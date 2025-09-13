@@ -20,6 +20,8 @@ pub enum TimedFeatureFlag {
 
     // Fixes the bug of table natives not tracking the memory usage of the global values they create.
     FixMemoryUsageTracking,
+    // Enable checking for captured option types.
+    CaptureOption,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -115,7 +117,12 @@ impl TimedFeatureFlag {
                 .with_ymd_and_hms(2025, 3, 11, 17, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
-
+            (CaptureOption, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 9, 15, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            // For testing or mainnet, always enable this feature.
+            (CaptureOption, MAINNET | TESTING) => BEGINNING_OF_TIME,
             // For chains other than testnet and mainnet, a timed feature is considered enabled from
             // the very beginning, if left unspecified.
             (_, TESTING | DEVNET | PREMAINNET) => BEGINNING_OF_TIME,

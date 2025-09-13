@@ -9,7 +9,10 @@ use crate::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
     identifier::Identifier,
+    language_storage::ModuleId,
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -101,6 +104,120 @@ where
     /// Returns the runtime environment used in the system.
     pub(crate) fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.struct_definition_loader.runtime_environment()
+    }
+
+    pub(crate) fn contains_option_type(
+        &self,
+        ty: &Type,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+    ) -> PartialVMResult<bool> {
+        let option_module_id =
+            ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("option")));
+        let option_struct_name = Identifier::from(ident_str!("Option"));
+        use Type::*;
+        match ty {
+            Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | TyParam(..) => Ok(false),
+            Reference(ty) | MutableReference(ty) => {
+                self.contains_option_type(ty, gas_meter, traversal_context)
+            },
+            Vector(ty) => self.contains_option_type(ty, gas_meter, traversal_context),
+            Struct { idx, .. } => {
+                let struct_identifier = self
+                    .runtime_environment()
+                    .struct_name_index_map()
+                    .idx_to_struct_name(*idx)?;
+                if struct_identifier.module == option_module_id
+                    && struct_identifier.name == option_struct_name
+                {
+                    Ok(true)
+                } else {
+                    let definition = self.struct_definition_loader.load_struct_definition(
+                        gas_meter,
+                        traversal_context,
+                        idx,
+                    )?;
+                    match &definition.layout {
+                        StructLayout::Single(fields) => {
+                            for (_, field_ty) in fields {
+                                if self.contains_option_type(
+                                    field_ty,
+                                    gas_meter,
+                                    traversal_context,
+                                )? {
+                                    return Ok(true);
+                                }
+                            }
+                        },
+                        StructLayout::Variants(variants) => {
+                            for variant in variants {
+                                for (_, field_ty) in &variant.1 {
+                                    if self.contains_option_type(
+                                        field_ty,
+                                        gas_meter,
+                                        traversal_context,
+                                    )? {
+                                        return Ok(true);
+                                    }
+                                }
+                            }
+                        },
+                    }
+                    Ok(false)
+                }
+            },
+            StructInstantiation { idx, ty_args, .. } => {
+                let struct_identifier = self
+                    .runtime_environment()
+                    .struct_name_index_map()
+                    .idx_to_struct_name(*idx)?;
+                if struct_identifier.module == option_module_id
+                    && struct_identifier.name == option_struct_name
+                {
+                    Ok(true)
+                } else {
+                    let definition = self.struct_definition_loader.load_struct_definition(
+                        gas_meter,
+                        traversal_context,
+                        idx,
+                    )?;
+                    match &definition.layout {
+                        StructLayout::Single(fields) => {
+                            let tys = self.apply_subst_for_field_tys(fields, ty_args)?;
+                            for ty in tys.iter() {
+                                if self.contains_option_type(ty, gas_meter, traversal_context)? {
+                                    return Ok(true);
+                                }
+                            }
+                        },
+                        StructLayout::Variants(variants) => {
+                            for variant in variants {
+                                let tys = self.apply_subst_for_field_tys(&variant.1, ty_args)?;
+                                for ty in tys.iter() {
+                                    if self.contains_option_type(
+                                        ty,
+                                        gas_meter,
+                                        traversal_context,
+                                    )? {
+                                        return Ok(true);
+                                    }
+                                }
+                            }
+                        },
+                    }
+                    Ok(false)
+                }
+            },
+            // No need to check results because they will not appear in the layout of captured values
+            Function { args, .. } => {
+                for arg_ty in args {
+                    if self.contains_option_type(arg_ty, gas_meter, traversal_context)? {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            },
+        }
     }
 
     /// Returns the struct name for the specified index.

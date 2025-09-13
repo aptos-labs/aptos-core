@@ -909,11 +909,14 @@ pub enum StatusCode {
     // Returned when a function value is trying to capture a delayed field. This is not allowed
     // because layouts for values with delayed fields are not serializable.
     UNABLE_TO_CAPTURE_DELAYED_FIELDS = 4041,
+    // Returned when a function value is trying to capture an option. This is not allowed
+    // until the feature flag ENABLE_CAPTURE_OPTION is on.
+    UNABLE_TO_CAPTURE_OPTION_TYPE = 4042,
 
     // Reserved error code for future use. Always keep this buffer of well-defined new codes.
-    RESERVED_RUNTIME_ERROR_1 = 4042,
-    RESERVED_RUNTIME_ERROR_2 = 4043,
-    RESERVED_RUNTIME_ERROR_3 = 4044,
+    RESERVED_RUNTIME_ERROR_1 = 4043,
+    RESERVED_RUNTIME_ERROR_2 = 4044,
+    RESERVED_RUNTIME_ERROR_3 = 4045,
 
     // A reserved status to represent an unknown vm status.
     // this is u64::MAX, but we can't pattern match on that, so put the hardcoded value in
