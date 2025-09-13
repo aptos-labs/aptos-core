@@ -39,6 +39,7 @@ allowing cleaner iterator APIs.
 -  [Function `add`](#0x1_ordered_map_add)
 -  [Function `upsert`](#0x1_ordered_map_upsert)
 -  [Function `remove`](#0x1_ordered_map_remove)
+-  [Function `remove_or_none`](#0x1_ordered_map_remove_or_none)
 -  [Function `contains`](#0x1_ordered_map_contains)
 -  [Function `borrow`](#0x1_ordered_map_borrow)
 -  [Function `borrow_mut`](#0x1_ordered_map_borrow_mut)
@@ -77,7 +78,6 @@ allowing cleaner iterator APIs.
 -  [Function `destroy`](#0x1_ordered_map_destroy)
 -  [Function `for_each`](#0x1_ordered_map_for_each)
 -  [Function `for_each_ref`](#0x1_ordered_map_for_each_ref)
--  [Function `for_each_ref_friend`](#0x1_ordered_map_for_each_ref_friend)
 -  [Function `for_each_mut`](#0x1_ordered_map_for_each_mut)
 -  [Function `new_iter`](#0x1_ordered_map_new_iter)
 -  [Function `binary_search`](#0x1_ordered_map_binary_search)
@@ -510,6 +510,39 @@ Aborts with EKEY_NOT_FOUND if <code>key</code> doesn't exist.
     <b>let</b> <a href="ordered_map.md#0x1_ordered_map_Entry">Entry</a> { key: old_key, value } = self.entries.<a href="ordered_map.md#0x1_ordered_map_remove">remove</a>(index);
     <b>assert</b>!(key == &old_key, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
     value
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ordered_map_remove_or_none"></a>
+
+## Function `remove_or_none`
+
+Remove a key/value pair from the map.
+Returns none if <code>key</code> doesn't exist.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_remove_or_none">remove_or_none</a>&lt;K: drop, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;V&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_remove_or_none">remove_or_none</a>&lt;K: drop, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, key: &K): Option&lt;V&gt; {
+    <b>let</b> len = self.entries.<a href="ordered_map.md#0x1_ordered_map_length">length</a>();
+    <b>let</b> index = <a href="ordered_map.md#0x1_ordered_map_binary_search">binary_search</a>(key, &self.entries, 0, len);
+    <b>if</b> (index &lt; len && key == &self.entries[index].key) {
+        <b>let</b> <a href="ordered_map.md#0x1_ordered_map_Entry">Entry</a> { key: _, value } = self.entries.<a href="ordered_map.md#0x1_ordered_map_remove">remove</a>(index);
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(value)
+    } <b>else</b> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    }
 }
 </code></pre>
 
@@ -1689,9 +1722,6 @@ Apply the function to each key-value pair in the map, consuming it.
 
 Apply the function to a reference of each key-value pair in the map.
 
-Current implementation is O(n * log(n)). After function values will be optimized
-to O(n).
-
 
 <pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_ref">for_each_ref</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |&K, &V|)
 </code></pre>
@@ -1703,29 +1733,13 @@ to O(n).
 
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_ref">for_each_ref</a>&lt;K: <b>copy</b> + drop, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, f: |&K, &V|) {
-    // This implementation is innefficient: O(log(n)) for next_key / borrow lookups every time,
-    // but is the only one available through the <b>public</b> API.
-    <b>if</b> (!self.<a href="ordered_map.md#0x1_ordered_map_is_empty">is_empty</a>()) {
-        <b>let</b> (k, v) = self.<a href="ordered_map.md#0x1_ordered_map_borrow_front">borrow_front</a>();
-        f(k, v);
+    <b>let</b> iter = self.<a href="ordered_map.md#0x1_ordered_map_new_begin_iter">new_begin_iter</a>();
+    <b>while</b> (!iter.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)) {
+        f(iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>(self), iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow">iter_borrow</a>(self));
+        iter = iter.<a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>(self);
+    }
 
-        <b>let</b> cur_k = self.<a href="ordered_map.md#0x1_ordered_map_next_key">next_key</a>(k);
-        <b>while</b> (cur_k.is_some()) {
-            <b>let</b> k = cur_k.destroy_some();
-            f(&k, self.<a href="ordered_map.md#0x1_ordered_map_borrow">borrow</a>(&k));
-
-            cur_k = self.<a href="ordered_map.md#0x1_ordered_map_next_key">next_key</a>(&k);
-        };
-    };
-
-    // TODO: <b>if</b> we make iterator api <b>public</b> <b>update</b> <b>to</b>:
-    // <b>let</b> iter = self.<a href="ordered_map.md#0x1_ordered_map_new_begin_iter">new_begin_iter</a>();
-    // <b>while</b> (!iter.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)) {
-    //     f(iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>(self), iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow">iter_borrow</a>(self));
-    //     iter = iter.<a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>(self);
-    // }
-
-    // TODO: once <b>move</b> supports private functions udpate <b>to</b>:
+    // TODO: once <b>move</b> supports private functions <b>update</b> <b>to</b>:
     // <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(
     //     &self.entries,
     //     |entry| {
@@ -1739,42 +1753,11 @@ to O(n).
 
 </details>
 
-<a id="0x1_ordered_map_for_each_ref_friend"></a>
-
-## Function `for_each_ref_friend`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_ref_friend">for_each_ref_friend</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |&K, &V|)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) inline <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_ref_friend">for_each_ref_friend</a>&lt;K: <b>copy</b> + drop, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, f: |&K, &V|) {
-    <b>let</b> iter = self.<a href="ordered_map.md#0x1_ordered_map_new_begin_iter">new_begin_iter</a>();
-    <b>while</b> (!iter.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)) {
-        f(iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>(self), iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow">iter_borrow</a>(self));
-        iter = iter.<a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>(self);
-    }
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_ordered_map_for_each_mut"></a>
 
 ## Function `for_each_mut`
 
 Apply the function to a mutable reference of each key-value pair in the map.
-
-Current implementation is O(n * log(n)). After function values will be optimized
-to O(n).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_mut">for_each_mut</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |&K, &<b>mut</b> V|)
@@ -1787,32 +1770,12 @@ to O(n).
 
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_mut">for_each_mut</a>&lt;K: <b>copy</b> + drop, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, f: |&K, &<b>mut</b> V|) {
-    // This implementation is innefficient: O(log(n)) for next_key / borrow lookups every time,
-    // but is the only one available through the <b>public</b> API.
-    <b>if</b> (!self.<a href="ordered_map.md#0x1_ordered_map_is_empty">is_empty</a>()) {
-        <b>let</b> (k, _v) = self.<a href="ordered_map.md#0x1_ordered_map_borrow_front">borrow_front</a>();
-
-        <b>let</b> k = *k;
-        <b>let</b> done = <b>false</b>;
-        <b>while</b> (!done) {
-            f(&k, self.<a href="ordered_map.md#0x1_ordered_map_borrow_mut">borrow_mut</a>(&k));
-
-            <b>let</b> cur_k = self.<a href="ordered_map.md#0x1_ordered_map_next_key">next_key</a>(&k);
-            <b>if</b> (cur_k.is_some()) {
-                k = cur_k.destroy_some();
-            } <b>else</b> {
-                done = <b>true</b>;
-            }
-        };
-    };
-
-    // TODO: <b>if</b> we make iterator api <b>public</b> <b>update</b> <b>to</b>:
-    // <b>let</b> iter = self.<a href="ordered_map.md#0x1_ordered_map_new_begin_iter">new_begin_iter</a>();
-    // <b>while</b> (!iter.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)) {
-    //     <b>let</b> key = *iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>(self);
-    //     f(key, iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_mut">iter_borrow_mut</a>(self));
-    //     iter = iter.<a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>(self);
-    // }
+    <b>let</b> iter = self.<a href="ordered_map.md#0x1_ordered_map_new_begin_iter">new_begin_iter</a>();
+    <b>while</b> (!iter.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)) {
+        <b>let</b> key = *iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>(self);
+        f(&key, iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_mut">iter_borrow_mut</a>(self));
+        iter = iter.<a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>(self);
+    }
 
     // TODO: once <b>move</b> supports private functions udpate <b>to</b>:
     // <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_mut">vector::for_each_mut</a>(
