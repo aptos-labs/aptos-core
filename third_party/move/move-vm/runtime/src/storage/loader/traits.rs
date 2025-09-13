@@ -19,7 +19,7 @@ use move_vm_types::{
         struct_name_indexing::StructNameIndex,
     },
 };
-use std::{rc::Rc, sync::Arc};
+use std::sync::Arc;
 
 /// Provides access to struct definitions.
 pub trait StructDefinitionLoader: WithRuntimeEnvironment {
@@ -193,7 +193,7 @@ pub trait ClosureLoader: InstantiatedFunctionLoader {
         module_id: &ModuleId,
         function_name: &IdentStr,
         ty_args: &[TypeTag],
-    ) -> PartialVMResult<Rc<LoadedFunction>> {
+    ) -> PartialVMResult<Arc<LoadedFunction>> {
         self.load_instantiated_function(
             // Note: lazy loader ignores this config.
             &LegacyLoaderConfig {
@@ -207,7 +207,7 @@ pub trait ClosureLoader: InstantiatedFunctionLoader {
             ty_args,
         )
         .map_err(|err| err.to_partial())
-        .map(Rc::new)
+        .map(Arc::new)
     }
 }
 

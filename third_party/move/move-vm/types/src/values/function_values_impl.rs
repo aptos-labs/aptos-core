@@ -20,6 +20,7 @@ use std::{
     cmp::Ordering,
     fmt,
     fmt::{Debug, Display, Formatter},
+    sync::Arc,
 };
 
 /// A trait describing a function which can be executed. If this is a generic
@@ -27,16 +28,16 @@ use std::{
 /// The value system is agnostic about how this is implemented in the runtime.
 /// The `FunctionValueExtension` trait describes how to construct and
 /// deconstruct instances for serialization.
-pub trait AbstractFunction: for<'a> Tid<'a> {
+pub trait AbstractFunction: Send + Sync + for<'a> Tid<'a> {
     fn closure_mask(&self) -> ClosureMask;
     fn cmp_dyn(&self, other: &dyn AbstractFunction) -> PartialVMResult<Ordering>;
-    fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>>;
+    fn clone_dyn(&self) -> PartialVMResult<Arc<dyn AbstractFunction>>;
     fn to_canonical_string(&self) -> String;
 }
 
 /// A closure, consisting of an abstract function descriptor and the captured arguments.
 pub struct Closure(
-    pub(crate) Box<dyn AbstractFunction>,
+    pub(crate) Arc<dyn AbstractFunction>,
     pub(crate) Vec<ValueImpl>,
 );
 
@@ -52,15 +53,15 @@ pub struct SerializedFunctionData {
     /// are stored so one can verify type consistency at
     /// resolution time. It also allows to serialize an unresolved
     /// closure, making unused closure data cheap in round trips.
-    pub captured_layouts: Vec<MoveTypeLayout>,
+    pub captured_layouts: Arc<Vec<MoveTypeLayout>>,
 }
 
 impl Closure {
-    pub fn pack(fun: Box<dyn AbstractFunction>, captured: impl IntoIterator<Item = Value>) -> Self {
+    pub fn pack(fun: Arc<dyn AbstractFunction>, captured: impl IntoIterator<Item = Value>) -> Self {
         Self(fun, captured.into_iter().map(|v| v.0).collect())
     }
 
-    pub fn unpack(self) -> (Box<dyn AbstractFunction>, impl Iterator<Item = Value>) {
+    pub fn unpack(self) -> (Arc<dyn AbstractFunction>, impl Iterator<Item = Value>) {
         let Self(fun, captured) = self;
         (fun, captured.into_iter().map(Value))
     }
@@ -68,7 +69,7 @@ impl Closure {
     pub fn into_call_data(
         self,
         args: Vec<Value>,
-    ) -> PartialVMResult<(Box<dyn AbstractFunction>, Vec<Value>)> {
+    ) -> PartialVMResult<(Arc<dyn AbstractFunction>, Vec<Value>)> {
         let (fun, captured) = self.unpack();
         if let Some(all_args) = fun.closure_mask().compose(captured, args) {
             Ok((fun, all_args))
@@ -131,11 +132,11 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
         seq.serialize_element(&data.fun_id)?;
         seq.serialize_element(&data.ty_args)?;
         seq.serialize_element(&data.mask)?;
-        for (layout, value) in data.captured_layouts.into_iter().zip(captured) {
-            seq.serialize_element(&layout)?;
+        for (layout, value) in data.captured_layouts.iter().zip(captured) {
+            seq.serialize_element(layout)?;
             seq.serialize_element(&SerializationReadyValue {
                 ctx: self.ctx,
-                layout: &layout,
+                layout,
                 value,
                 depth: self.depth + 1,
             })?
@@ -201,7 +202,7 @@ impl<'d, 'c> serde::de::Visitor<'d> for ClosureVisitor<'c> {
                 fun_id,
                 ty_args,
                 mask,
-                captured_layouts,
+                captured_layouts: Arc::new(captured_layouts),
             })
             .map_err(A::Error::custom)?;
         Ok(Closure(fun, captured))
@@ -257,7 +258,7 @@ pub(crate) mod mock {
                     fun_id: Identifier::new(fun_name).unwrap(),
                     ty_args,
                     mask,
-                    captured_layouts,
+                    captured_layouts: Arc::new(captured_layouts),
                 },
             }
         }
@@ -283,7 +284,7 @@ pub(crate) mod mock {
             })
         }
 
-        fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
+        fn clone_dyn(&self) -> PartialVMResult<Arc<dyn AbstractFunction>> {
             // Didn't need it in the test
             unimplemented!("clone_dyn is not implemented for MockAbstractFunction")
         }

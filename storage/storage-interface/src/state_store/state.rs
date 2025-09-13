@@ -218,7 +218,7 @@ impl State {
             // otherwise we can't calculate the correct usage.
             let old_slot = overlay
                 .get(k)
-                .or_else(|| cache.get(*k).map(|entry| entry.value().clone()))
+                .or_else(|| cache.get(*k).map(|entry| entry.value().data.clone()))
                 .expect("Must cache read");
             if old_slot.is_occupied() {
                 items_delta -= 1;

@@ -22,7 +22,195 @@ use std::{
     collections::{btree_map, BTreeMap},
     fmt::{Debug, Formatter},
 };
+use std::ops::DerefMut;
+use std::sync::atomic::{AtomicU32, Ordering};
+use dashmap::DashMap;
+use lazy_static::lazy_static;
 use strum_macros::AsRefStr;
+use move_core_types::language_storage::StructTag;
+
+#[derive(Default)]
+pub struct FrequencyTable {
+    pub resource_reads: DashMap<StateKey, AtomicU32>,
+    pub deserialized_resource_reads: DashMap<StateKey, AtomicU32>,
+    pub base_resource_reads: DashMap<StateKey, AtomicU32>,
+    pub deserialized_base_resource_reads: DashMap<StateKey, AtomicU32>,
+    pub group_reads: DashMap<StateKey, AtomicU32>,
+    pub group_member_reads: DashMap<(StateKey, StructTag), AtomicU32>,
+}
+
+impl FrequencyTable {
+    pub fn clear(&self) {
+        self.resource_reads.clear();
+        self.deserialized_resource_reads.clear();
+        self.base_resource_reads.clear();
+        self.deserialized_base_resource_reads.clear();
+        self.group_reads.clear();
+        self.group_member_reads.clear();
+    }
+
+    pub fn log(&self) {
+        if std::env::var("LOG_RWS").is_err() {
+            return;
+        }
+
+        let mut resource_reads: BTreeMap<u32, Vec<StateKey>> = BTreeMap::new();
+        for r in self.resource_reads.iter() {
+            resource_reads
+                .entry(r.value().load(Ordering::SeqCst))
+                .or_insert_with(Vec::new)
+                .push(r.key().clone());
+        }
+
+        let mut base_resource_reads: BTreeMap<u32, Vec<StateKey>> = BTreeMap::new();
+        for r in self.base_resource_reads.iter() {
+            base_resource_reads
+                .entry(r.value().load(Ordering::SeqCst))
+                .or_insert_with(Vec::new)
+                .push(r.key().clone());
+        }
+
+        let mut deserialized_resource_reads: BTreeMap<u32, Vec<StateKey>> = BTreeMap::new();
+        for r in self.deserialized_resource_reads.iter() {
+            deserialized_resource_reads
+                .entry(r.value().load(Ordering::SeqCst))
+                .or_insert_with(Vec::new)
+                .push(r.key().clone());
+        }
+
+        let mut deserialized_base_resource_reads: BTreeMap<u32, Vec<StateKey>> = BTreeMap::new();
+        for r in self.deserialized_base_resource_reads.iter() {
+            deserialized_base_resource_reads
+                .entry(r.value().load(Ordering::SeqCst))
+                .or_insert_with(Vec::new)
+                .push(r.key().clone());
+        }
+
+        let mut group_reads: BTreeMap<u32, Vec<StateKey>> = BTreeMap::new();
+        for r in self.group_reads.iter() {
+            group_reads
+                .entry(r.value().load(Ordering::SeqCst))
+                .or_insert_with(Vec::new)
+                .push(r.key().clone());
+        }
+
+        let mut group_member_reads: BTreeMap<u32, Vec<(StateKey, StructTag)>> = BTreeMap::new();
+        for r in self.group_member_reads.iter() {
+            let (key, tag) = r.key();
+            group_member_reads
+                .entry(r.value().load(Ordering::SeqCst))
+                .or_insert_with(Vec::new)
+                .push((key.clone(), tag.clone()));
+        }
+
+        println!();
+        println!("READS");
+        for (cnt, keys) in resource_reads.into_iter().rev() {
+            println!("{} --> {:?}", cnt, keys);
+        }
+
+        println!();
+        println!("BASE READS");
+        for (cnt, keys) in base_resource_reads.into_iter().rev() {
+            println!("{} --> {:?}", cnt, keys);
+        }
+
+        println!();
+        println!("DESERIALIZED BASE READS");
+        for (cnt, keys) in deserialized_resource_reads.into_iter().rev() {
+            println!("{} --> {:?}", cnt, keys);
+        }
+
+        println!();
+        println!("DESERIALIZED BASE READS");
+        for (cnt, keys) in deserialized_base_resource_reads.into_iter().rev() {
+            println!("{} --> {:?}", cnt, keys);
+        }
+
+        println!();
+        println!("GROUP READS");
+        for (cnt, keys) in group_reads.into_iter().rev() {
+            println!("{} --> {:?}", cnt, keys);
+        }
+
+        println!();
+        println!("GROUP MEMBER READS");
+        for (cnt, keys) in group_member_reads.into_iter().rev() {
+            println!("{} --> {:?}", cnt, keys);
+        }
+    }
+
+    pub fn log_resource_read(&self, key: StateKey) {
+        if std::env::var("LOG_RWS").is_err() {
+            return;
+        }
+
+        let mut ref_mut = self.resource_reads
+            .entry(key)
+            .or_insert_with(|| AtomicU32::new(0));
+        ref_mut.deref_mut().fetch_add(1, Ordering::SeqCst);
+    }
+
+    pub fn log_deserialized_resource_read(&self, key: StateKey) {
+        if std::env::var("LOG_RWS").is_err() {
+            return;
+        }
+
+        let mut ref_mut = self.deserialized_resource_reads
+            .entry(key)
+            .or_insert_with(|| AtomicU32::new(0));
+        ref_mut.deref_mut().fetch_add(1, Ordering::SeqCst);
+    }
+
+    pub fn log_base_resource_read(&self, key: StateKey) {
+        if std::env::var("LOG_RWS").is_err() {
+            return;
+        }
+
+        let mut ref_mut = self.base_resource_reads
+            .entry(key)
+            .or_insert_with(|| AtomicU32::new(0));
+        ref_mut.deref_mut().fetch_add(1, Ordering::SeqCst);
+    }
+
+    pub fn log_deserialized_base_resource_read(&self, key: StateKey) {
+        if std::env::var("LOG_RWS").is_err() {
+            return;
+        }
+
+        let mut ref_mut = self.deserialized_base_resource_reads
+            .entry(key)
+            .or_insert_with(|| AtomicU32::new(0));
+        ref_mut.deref_mut().fetch_add(1, Ordering::SeqCst);
+    }
+
+    pub fn log_group_read(&self, key: StateKey) {
+        if std::env::var("LOG_RWS").is_err() {
+            return;
+        }
+
+        let mut ref_mut = self.group_reads
+            .entry(key)
+            .or_insert_with(|| AtomicU32::new(0));
+        ref_mut.deref_mut().fetch_add(1, Ordering::SeqCst);
+    }
+
+    pub fn log_group_member_read(&self, key: StateKey, tag: StructTag) {
+        if std::env::var("LOG_RWS").is_err() {
+            return;
+        }
+
+        let mut ref_mut = self.group_member_reads
+            .entry((key, tag))
+            .or_insert_with(|| AtomicU32::new(0));
+        ref_mut.deref_mut().fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+lazy_static! {
+    pub static ref FREQUENCY_TABLE: FrequencyTable = FrequencyTable::default();
+}
+
 
 // Note: in case this changes in the future, it doesn't have to be a constant, and can be read from
 // genesis directly if necessary.

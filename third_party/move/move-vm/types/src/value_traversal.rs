@@ -50,7 +50,7 @@ fn find_identifiers_in_value_impl(
             | Container::VecU256(_) => {},
 
             Container::Vec(v) | Container::Struct(v) => {
-                for val in v.borrow().iter() {
+                for val in v.dereference().iter() {
                     find_identifiers_in_value_impl(val, identifiers)?;
                 }
             },

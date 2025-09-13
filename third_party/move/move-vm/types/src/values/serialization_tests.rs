@@ -23,7 +23,7 @@ mod tests {
         value::{IdentifierMappingKind, MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
     };
     use serde::{Deserialize, Serialize};
-    use std::iter;
+    use std::{iter, sync::Arc};
     // ==========================================================================
     // Enums
 
@@ -352,8 +352,8 @@ mod tests {
             });
         ext_mock
             .expect_create_from_serialization_data()
-            .returning(move |data| Ok(Box::new(MockAbstractFunction::new_from_data(data))));
-        let value = Value::closure(Box::new(fun), captured);
+            .returning(move |data| Ok(Arc::new(MockAbstractFunction::new_from_data(data))));
+        let value = Value::closure(Arc::new(fun), captured);
         let blob = assert_ok!(ValueSerDeContext::new(None)
             .with_func_args_deserialization(&ext_mock)
             .serialize(&value, &fun_layout))
