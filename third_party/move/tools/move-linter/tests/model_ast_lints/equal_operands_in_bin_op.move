@@ -13,6 +13,7 @@ module 0xc0ffee::m {
 
     const TWO: u64 = 2;
 
+    #[lint::skip(cyclomatic_complexity)]
     public fun test1(x: u64) {
         if (x % x == 2) {
             abort 1;

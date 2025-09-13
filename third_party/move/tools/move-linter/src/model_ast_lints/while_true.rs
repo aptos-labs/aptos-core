@@ -4,10 +4,10 @@
 //! This module implements an expression linter that checks code of the form:
 //! `while (true) { ... }` and suggests to use `loop { ... }` instead.
 
-use legacy_move_compiler::parser::syntax::FOR_LOOP_UPDATE_ITER_FLAG;
+use crate::utils::detect_for_loop;
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
-    ast::{Exp, ExpData, Value},
+    ast::{ExpData, Value},
     model::FunctionEnv,
 };
 
@@ -23,7 +23,7 @@ impl ExpChecker for WhileTrue {
         use ExpData::{IfElse, Loop};
         // Check if `expr` is of the form: Loop(IfElse(true, then, _)).
         let Loop(id, body) = expr else { return };
-        let IfElse(_, cond, then, _) = body.as_ref() else {
+        let IfElse(_, cond, _, _) = body.as_ref() else {
             return;
         };
         let ExpData::Value(_, Value::Bool(b)) = cond.as_ref() else {
@@ -33,7 +33,7 @@ impl ExpChecker for WhileTrue {
             return;
         }
         // Check if it is the `for` loop.
-        if detect_for_loop(then, function) {
+        if detect_for_loop(expr, function) {
             return;
         }
         let env = function.env();
@@ -44,24 +44,4 @@ impl ExpChecker for WhileTrue {
             "Use the more explicit `loop` instead.",
         );
     }
-}
-
-fn detect_for_loop(then: &Exp, function: &FunctionEnv) -> bool {
-    use ExpData::{IfElse, LocalVar, Sequence};
-    // Check if `then` is of the form:
-    //   Sequence([IfElse(LocalVar(FOR_LOOP_UPDATE_ITER_FLAG), ...)])
-    // If so, it is the `for` loop.
-    let Sequence(_, stmts) = then.as_ref() else {
-        return false;
-    };
-    let Some(stmt) = stmts.first() else {
-        return false;
-    };
-    let IfElse(_, cond, _, _) = stmt.as_ref() else {
-        return false;
-    };
-    let LocalVar(_, name) = cond.as_ref() else {
-        return false;
-    };
-    name.display(function.symbol_pool()).to_string() == FOR_LOOP_UPDATE_ITER_FLAG
 }

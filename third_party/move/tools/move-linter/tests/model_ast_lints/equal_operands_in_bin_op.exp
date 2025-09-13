@@ -1,117 +1,117 @@
 
 Diagnostics:
 warning: [lint] This operation always evaluates to `0`.
-   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:17:13
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:18:13
    │
-17 │         if (x % x == 2) {
+18 │         if (x % x == 2) {
    │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `0`.
-   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:20:13
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:21:13
    │
-20 │         if ((x+1) ^ (x+1) == 2) {
+21 │         if ((x+1) ^ (x+1) == 2) {
    │             ^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `true`.
-   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:23:13
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:24:13
    │
-23 │         if (x <= x) {
+24 │         if (x <= x) {
    │             ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `true`.
-   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:26:13
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:27:13
    │
-26 │         if (x >= x) {
+27 │         if (x >= x) {
    │             ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `true`.
-   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:29:13
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:30:13
    │
-29 │         if (x == x) {
+30 │         if (x == x) {
    │             ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to the same value: `x | x` and `x & x` can be simplified to `x`.
-   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:32:13
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:33:13
    │
-32 │         if (x | x == 2) {
+33 │         if (x | x == 2) {
    │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to the same value: `x | x` and `x & x` can be simplified to `x`.
-   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:35:13
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:36:13
    │
-35 │         if (x & x == 2) {
+36 │         if (x & x == 2) {
    │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `1`.
-   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:38:13
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:39:13
    │
-38 │         if (x / x == 2) {
+39 │         if (x / x == 2) {
    │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `true`.
-   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:42:13
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:43:13
    │
-42 │         if (TWO == TWO) {
+43 │         if (TWO == TWO) {
    │             ^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `true`.
-   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:46:13
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:47:13
    │
-46 │         if (TWO == 2) {
+47 │         if (TWO == 2) {
    │             ^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `false`.
-   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:54:13
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:55:13
    │
-54 │         if (hnc.n.n.i != hnc.n.n.i) {
+55 │         if (hnc.n.n.i != hnc.n.n.i) {
    │             ^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `false`.
-   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:58:13
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:59:13
    │
-58 │         if (x < x) {
+59 │         if (x < x) {
    │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#equal_operands_in_bin_op.
 
 warning: [lint] This operation always evaluates to `false`.
-   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:62:13
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:63:13
    │
-62 │         if (x > x) {
+63 │         if (x > x) {
    │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(equal_operands_in_bin_op)]`.
