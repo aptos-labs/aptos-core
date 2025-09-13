@@ -1906,7 +1906,7 @@ pub trait UnificationContext: AbilityContext {
     ) -> Option<ReceiverFunctionInstance>;
 
     /// Returns a type display context.
-    fn type_display_context(&self) -> TypeDisplayContext;
+    fn type_display_context(&self) -> TypeDisplayContext<'_>;
 }
 
 /// Information returned about an instantiated function
@@ -1963,7 +1963,7 @@ impl UnificationContext for NoUnificationContext {
         None
     }
 
-    fn type_display_context(&self) -> TypeDisplayContext {
+    fn type_display_context(&self) -> TypeDisplayContext<'_> {
         unimplemented!("NoUnificationContext does not support type display")
     }
 }

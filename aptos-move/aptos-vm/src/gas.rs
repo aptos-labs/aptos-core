@@ -35,7 +35,7 @@ pub fn make_prod_gas_meter<T: BlockSynchronizationKillSwitch>(
     is_approved_gov_script: bool,
     meter_balance: Gas,
     block_synchronization_kill_switch: &T,
-) -> ProdGasMeter<T> {
+) -> ProdGasMeter<'_, T> {
     MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
         gas_feature_version,
         vm_gas_params,

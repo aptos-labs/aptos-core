@@ -5,11 +5,11 @@ use aptos_enum_conversion_derive::EnumConversion;
 
 #[test]
 fn test_enum_conversion_derive_valid() {
-    struct TestMessage {}
+    struct _TestMessage {}
 
     #[derive(EnumConversion)]
-    enum Messages {
-        Test(TestMessage),
+    enum _Messages {
+        Test(_TestMessage),
     }
 }
 

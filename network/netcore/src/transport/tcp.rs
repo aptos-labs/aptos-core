@@ -277,26 +277,20 @@ async fn connect_via_proxy(proxy_addr: String, addr: NetworkAddress) -> io::Resu
             let msg = &buffer[..read];
 
             if len == 0 {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!(
-                        "HTTP proxy CONNECT failed. Len == 0. Message: {}",
-                        String::from_utf8_lossy(msg)
-                    ),
-                ));
+                return Err(io::Error::other(format!(
+                    "HTTP proxy CONNECT failed. Len == 0. Message: {}",
+                    String::from_utf8_lossy(msg)
+                )));
             } else if msg.len() >= 16 {
                 if (msg.starts_with(b"HTTP/1.1 200") || msg.starts_with(b"HTTP/1.0 200"))
                     && msg.ends_with(b"\r\n\r\n")
                 {
                     return Ok(stream);
                 } else {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!(
-                            "HTTP proxy CONNECT failed! Unexpected message: {}",
-                            String::from_utf8_lossy(msg)
-                        ),
-                    ));
+                    return Err(io::Error::other(format!(
+                        "HTTP proxy CONNECT failed! Unexpected message: {}",
+                        String::from_utf8_lossy(msg)
+                    )));
                 }
             } else {
                 // Keep reading until we get at least 16 bytes
