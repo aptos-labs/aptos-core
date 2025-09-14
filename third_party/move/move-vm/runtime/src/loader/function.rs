@@ -12,6 +12,7 @@ use crate::{
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     storage::{loader::traits::Loader, ty_layout_converter::LayoutConverter},
 };
+use arc_swap::ArcSwapOption;
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
     access::ModuleAccess,
@@ -22,6 +23,7 @@ use move_binary_format::{
 use move_core_types::{
     ability::AbilitySet,
     function::ClosureMask,
+    gas_algebra::NumTypeNodes,
     identifier::{IdentStr, Identifier},
     language_storage,
     language_storage::{ModuleId, TypeTag},
@@ -38,12 +40,81 @@ use move_vm_types::{
 };
 use std::{cell::RefCell, cmp::Ordering, fmt::Debug, mem, rc::Rc, sync::Arc};
 
+#[derive(Clone)]
+pub(crate) enum BytecodeMetadata {
+    TypeAndNumNodes(Type, NumTypeNodes),
+}
+
+pub(crate) enum BytecodeMetadataEntry {
+    None,
+    Placeholder(ArcSwapOption<BytecodeMetadata>),
+}
+
+impl BytecodeMetadataEntry {
+    pub(crate) fn new(is_generic: bool) -> Self {
+        if is_generic {
+            Self::None
+        } else {
+            Self::Placeholder(ArcSwapOption::new(None))
+        }
+    }
+
+    pub(crate) fn set_ty_and_num_nodes(&self, ty: &Type, num_nodes: &NumTypeNodes) {
+        if let Self::Placeholder(placeholder) = self {
+            placeholder.swap(Some(Arc::new(BytecodeMetadata::TypeAndNumNodes(
+                ty.clone(),
+                *num_nodes,
+            ))));
+        }
+    }
+
+    pub(crate) fn get_ty_and_num_nodes(&self) -> Option<(Type, NumTypeNodes)> {
+        match self {
+            Self::None => None,
+            Self::Placeholder(placeholder) => match &*placeholder.load() {
+                None => None,
+                Some(metadata) => match metadata.as_ref() {
+                    BytecodeMetadata::TypeAndNumNodes(ty, num_nodes) => {
+                        Some((ty.clone(), *num_nodes))
+                    },
+                },
+            },
+        }
+    }
+
+    pub(crate) fn get_ty(&self) -> Option<Type> {
+        match self {
+            Self::None => None,
+            Self::Placeholder(placeholder) => match &*placeholder.load() {
+                None => None,
+                Some(metadata) => match metadata.as_ref() {
+                    BytecodeMetadata::TypeAndNumNodes(ty, _) => Some(ty.clone()),
+                },
+            },
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn get_num_nodes(&self) -> Option<NumTypeNodes> {
+        match self {
+            Self::None => None,
+            Self::Placeholder(placeholder) => match &*placeholder.load() {
+                None => None,
+                Some(metadata) => match metadata.as_ref() {
+                    BytecodeMetadata::TypeAndNumNodes(_, num_nodes) => Some(*num_nodes),
+                },
+            },
+        }
+    }
+}
+
 /// A runtime function definition representation.
 pub struct Function {
     #[allow(unused)]
     pub(crate) file_format_version: u32,
     pub(crate) index: FunctionDefinitionIndex,
     pub(crate) code: Vec<Bytecode>,
+    pub(crate) code_metadata: Vec<BytecodeMetadataEntry>,
     pub(crate) ty_param_abilities: Vec<AbilitySet>,
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
@@ -545,10 +616,15 @@ impl Function {
             &handle.access_specifiers,
         )?;
 
+        let is_generic = !ty_param_abilities.is_empty();
+        let code_metadata = (0..code.len())
+            .map(|_| BytecodeMetadataEntry::new(is_generic))
+            .collect();
         Ok(Self {
             file_format_version: module.version(),
             index,
             code,
+            code_metadata,
             ty_param_abilities,
             native,
             is_native,

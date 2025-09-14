@@ -5,10 +5,11 @@
 mod access_specifier_loader;
 
 mod function;
-pub use function::{Function, LoadedFunction, LoadedFunctionOwner};
 pub(crate) use function::{
-    FunctionHandle, FunctionInstantiation, LazyLoadedFunction, LazyLoadedFunctionState,
+    BytecodeMetadataEntry, FunctionHandle, FunctionInstantiation, LazyLoadedFunction,
+    LazyLoadedFunctionState,
 };
+pub use function::{Function, LoadedFunction, LoadedFunctionOwner};
 
 mod modules;
 pub use modules::Module;

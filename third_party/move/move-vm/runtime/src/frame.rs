@@ -4,7 +4,10 @@
 use crate::{
     config::VMConfig,
     frame_type_cache::FrameTypeCache,
-    loader::{FunctionHandle, LoadedFunctionOwner, StructVariantInfo, VariantFieldInfo},
+    loader::{
+        BytecodeMetadataEntry, FunctionHandle, LoadedFunctionOwner, StructVariantInfo,
+        VariantFieldInfo,
+    },
     module_traversal::TraversalContext,
     reentrancy_checker::CallType,
     runtime_type_checks::RuntimeTypeCheck,
@@ -169,6 +172,10 @@ impl Frame {
             local_tys,
             frame_cache,
         })
+    }
+
+    pub(crate) fn bytecode_metadata(&self) -> &BytecodeMetadataEntry {
+        &self.function.function.code_metadata[self.pc as usize]
     }
 
     pub(crate) fn ty_builder(&self) -> &TypeBuilder {
