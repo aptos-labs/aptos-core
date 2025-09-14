@@ -5,8 +5,11 @@ use super::{
     intern_type, single_signature_loader::load_single_signatures_for_script, Function,
     FunctionHandle, FunctionInstantiation,
 };
-use crate::execution_format::{
-    converter::ExecutionFormatConverter, converters::v0::ExecutionFormatConverterV0,
+use crate::{
+    execution_format::{
+        converter::ExecutionFormatConverter, converters::v0::ExecutionFormatConverterV0,
+    },
+    loader::function::BytecodeMetadataEntry,
 };
 use move_binary_format::{
     access::ScriptAccess,
@@ -114,10 +117,15 @@ impl Script {
             .collect::<PartialVMResult<Vec<_>>>()?;
         let ty_param_abilities = script.type_parameters.clone();
 
+        let is_generic = !ty_param_abilities.is_empty();
+        let code_metadata = (0..code.len())
+            .map(|_| BytecodeMetadataEntry::new(is_generic))
+            .collect();
         let main: Arc<Function> = Arc::new(Function {
             file_format_version: script.version(),
             index: FunctionDefinitionIndex(0),
             code,
+            code_metadata,
             ty_param_abilities,
             native: None,
             is_native: false,

@@ -799,52 +799,112 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(u64_ty)?;
             },
             Bytecode::VecImmBorrow(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let ty = match frame.bytecode_metadata().get_ty() {
+                    None => {
+                        let (ty, ty_count) = ty_cache.get_signature_index_type(*si, frame)?;
+                        frame
+                            .bytecode_metadata()
+                            .set_ty_and_num_nodes(ty, &ty_count);
+                        ty.clone()
+                    },
+                    Some(ty) => ty,
+                };
+
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 let elem_ref_ty = operand_stack
                     .pop_ty()?
-                    .paranoid_check_and_get_vec_elem_ref_ty::<false>(ty)?;
+                    .paranoid_check_and_get_vec_elem_ref_ty::<false>(&ty)?;
 
                 operand_stack.push_ty(elem_ref_ty)?;
             },
             Bytecode::VecMutBorrow(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let ty = match frame.bytecode_metadata().get_ty() {
+                    None => {
+                        let (ty, ty_count) = ty_cache.get_signature_index_type(*si, frame)?;
+                        frame
+                            .bytecode_metadata()
+                            .set_ty_and_num_nodes(ty, &ty_count);
+                        ty.clone()
+                    },
+                    Some(ty) => ty,
+                };
+
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 let elem_ref_ty = operand_stack
                     .pop_ty()?
-                    .paranoid_check_and_get_vec_elem_ref_ty::<true>(ty)?;
+                    .paranoid_check_and_get_vec_elem_ref_ty::<true>(&ty)?;
                 operand_stack.push_ty(elem_ref_ty)?;
             },
             Bytecode::VecPushBack(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let ty = match frame.bytecode_metadata().get_ty() {
+                    None => {
+                        let (ty, ty_count) = ty_cache.get_signature_index_type(*si, frame)?;
+                        frame
+                            .bytecode_metadata()
+                            .set_ty_and_num_nodes(ty, &ty_count);
+                        ty.clone()
+                    },
+                    Some(ty) => ty,
+                };
+
                 // For pushing an element to a vector, use assignability
-                operand_stack.pop_ty()?.paranoid_check_assignable(ty)?;
+                operand_stack.pop_ty()?.paranoid_check_assignable(&ty)?;
                 operand_stack
                     .pop_ty()?
-                    .paranoid_check_is_vec_ref_ty::<true>(ty)?;
+                    .paranoid_check_is_vec_ref_ty::<true>(&ty)?;
             },
             Bytecode::VecPopBack(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let ty = match frame.bytecode_metadata().get_ty() {
+                    None => {
+                        let (ty, ty_count) = ty_cache.get_signature_index_type(*si, frame)?;
+                        frame
+                            .bytecode_metadata()
+                            .set_ty_and_num_nodes(ty, &ty_count);
+                        ty.clone()
+                    },
+                    Some(ty) => ty,
+                };
+
                 let elem_ty = operand_stack
                     .pop_ty()?
-                    .paranoid_check_and_get_vec_elem_ty::<true>(ty)?;
+                    .paranoid_check_and_get_vec_elem_ty::<true>(&ty)?;
                 operand_stack.push_ty(elem_ty)?;
             },
             Bytecode::VecUnpack(si, num) => {
-                let (expected_elem_ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let expected_elem_ty = match frame.bytecode_metadata().get_ty() {
+                    None => {
+                        let (ty, ty_count) = ty_cache.get_signature_index_type(*si, frame)?;
+                        frame
+                            .bytecode_metadata()
+                            .set_ty_and_num_nodes(ty, &ty_count);
+                        ty.clone()
+                    },
+                    Some(ty) => ty,
+                };
+
                 let vec_ty = operand_stack.pop_ty()?;
-                vec_ty.paranoid_check_is_vec_ty(expected_elem_ty)?;
+                vec_ty.paranoid_check_is_vec_ty(&expected_elem_ty)?;
                 for _ in 0..*num {
                     operand_stack.push_ty(expected_elem_ty.clone())?;
                 }
             },
             Bytecode::VecSwap(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let ty = match frame.bytecode_metadata().get_ty() {
+                    None => {
+                        let (ty, ty_count) = ty_cache.get_signature_index_type(*si, frame)?;
+                        frame
+                            .bytecode_metadata()
+                            .set_ty_and_num_nodes(ty, &ty_count);
+                        ty.clone()
+                    },
+                    Some(ty) => ty,
+                };
+
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 operand_stack
                     .pop_ty()?
-                    .paranoid_check_is_vec_ref_ty::<true>(ty)?;
+                    .paranoid_check_is_vec_ref_ty::<true>(&ty)?;
             },
         }
         Ok(())
