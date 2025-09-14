@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
-
 use crate::{
     constants::*, core_metrics::create_core_metric_telemetry_event, metrics,
     network_metrics::create_network_metric_telemetry_event, sender::TelemetrySender,
