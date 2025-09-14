@@ -175,7 +175,7 @@ where
         self,
     ) -> (
         BorrowedOrOwned<'ctx, Ctx>,
-        impl Iterator<Item = (ModuleId, Arc<Module>)>,
+        impl Iterator<Item = (ModuleId, Arc<Module>)> + use<Ctx>,
     ) {
         let verified_modules_iter =
             self.0

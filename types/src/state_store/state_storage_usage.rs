@@ -43,10 +43,7 @@ impl StateStorageUsage {
 
     pub fn add_item(&mut self, bytes_delta: usize) {
         match self {
-            Self::Tracked {
-                ref mut items,
-                ref mut bytes,
-            } => {
+            Self::Tracked { items, bytes } => {
                 *items += 1;
                 *bytes += bytes_delta;
             },
@@ -56,10 +53,7 @@ impl StateStorageUsage {
 
     pub fn remove_item(&mut self, bytes_delta: usize) {
         match self {
-            Self::Tracked {
-                ref mut items,
-                ref mut bytes,
-            } => {
+            Self::Tracked { items, bytes } => {
                 *items -= 1;
                 *bytes -= bytes_delta;
             },

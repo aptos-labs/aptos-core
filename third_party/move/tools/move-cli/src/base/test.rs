@@ -277,7 +277,8 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     // If we need to compute test coverage set the VM tracking environment variable since we will
     // need this trace to construct the coverage information.
     if compute_coverage {
-        std::env::set_var("MOVE_VM_TRACE", &trace_path);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("MOVE_VM_TRACE", &trace_path) };
     }
 
     // Run the tests. If any of the tests fail, then we don't produce a coverage report, so cleanup

@@ -238,9 +238,11 @@ pub fn run_one(
     };
 
     // Disable colors in error reporting from the Move compiler
-    env::set_var(COLOR_MODE_ENV_VAR, "NONE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { env::set_var(COLOR_MODE_ENV_VAR, "NONE") };
     // Disable colors in error reporting from other tools.
-    env::set_var(NO_COLOR_MODE_ENV_VAR, "true");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { env::set_var(NO_COLOR_MODE_ENV_VAR, "true") };
     for args_line in args_file {
         let args_line = args_line?;
 
@@ -284,11 +286,14 @@ pub fn run_one(
                 //   1. we run with move-cli test <path-to-args-A.txt> --track-cov, and
                 //   2. in this <args-A.txt>, there is another command: test <args-B.txt>
                 // then, when running <args-B.txt>, coverage will not be tracked nor printed
-                env::remove_var(MOVE_VM_TRACING_ENV_VAR_NAME);
+                // TODO: Audit that the environment access only happens in single-threaded code.
+                unsafe { env::remove_var(MOVE_VM_TRACING_ENV_VAR_NAME) };
             },
             Some(path) => {
-                env::set_var(MOVE_VM_TRACING_ENV_VAR_NAME, path.as_os_str());
-                env::set_var(MOVE_VM_TRACING_FLUSH_ENV_VAR_NAME, path.as_os_str());
+                // TODO: Audit that the environment access only happens in single-threaded code.
+                unsafe { env::set_var(MOVE_VM_TRACING_ENV_VAR_NAME, path.as_os_str()) };
+                // TODO: Audit that the environment access only happens in single-threaded code.
+                unsafe { env::set_var(MOVE_VM_TRACING_FLUSH_ENV_VAR_NAME, path.as_os_str()) };
             },
         }
 

@@ -113,7 +113,7 @@ pub fn create_jwk_consensus_runtime(
     jwk_consensus_network_interfaces: Option<ApplicationNetworkInterfaces<JWKConsensusMsg>>,
     vtxn_pool: &VTxnPoolState,
 ) -> Option<Runtime> {
-    let jwk_consensus_runtime = match jwk_consensus_network_interfaces {
+    match jwk_consensus_network_interfaces {
         Some(interfaces) => {
             let ApplicationNetworkInterfaces {
                 network_client,
@@ -135,8 +135,7 @@ pub fn create_jwk_consensus_runtime(
             Some(jwk_consensus_runtime)
         },
         _ => None,
-    };
-    jwk_consensus_runtime
+    }
 }
 
 /// Creates and starts the consensus observer and publisher (if enabled)
