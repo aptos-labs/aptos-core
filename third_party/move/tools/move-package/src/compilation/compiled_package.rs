@@ -974,7 +974,7 @@ impl CompiledPackage {
             ..AbigenOptions::default()
         };
         let mut abigen = Abigen::new(model, &abi_options);
-        abigen.gen();
+        abigen.r#gen();
         abigen.into_result()
     }
 

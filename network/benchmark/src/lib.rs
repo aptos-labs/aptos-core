@@ -358,10 +358,10 @@ pub async fn direct_sender(
 
     // random payload filler
     for _ in 0..data_size {
-        blob.push(rng.gen());
+        blob.push(rng.r#gen());
     }
 
-    let mut counter: u64 = rng.gen();
+    let mut counter: u64 = rng.r#gen();
 
     loop {
         ticker.next().await;
@@ -424,10 +424,10 @@ pub async fn rpc_sender(
     let mut blob = Vec::<u8>::with_capacity(data_size);
     let mut rng = OsRng;
     for _ in 0..data_size {
-        blob.push(rng.gen());
+        blob.push(rng.r#gen());
     }
 
-    let mut counter: u64 = rng.gen();
+    let mut counter: u64 = rng.r#gen();
 
     let mut open_rpcs = FuturesUnordered::new();
 

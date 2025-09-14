@@ -201,10 +201,12 @@ mod tests {
     #[should_panic(expected = "No valid VUF private key could be derived or deserialized!")]
     fn test_get_pepper_service_vuf_keypair() {
         // Set the private key seed environment variable
-        std::env::set_var(ENV_VUF_KEY_SEED_HEX, TEST_VUF_KEY_SEED);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var(ENV_VUF_KEY_SEED_HEX, TEST_VUF_KEY_SEED) };
 
         // Set the fallback private key environment variable
-        std::env::set_var(ENV_VUF_KEY_HEX, TEST_VUF_KEY_HEX);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var(ENV_VUF_KEY_HEX, TEST_VUF_KEY_HEX) };
 
         // Get the pepper service VUF keypair
         let (public_key, private_key) = vuf_pub_key::get_pepper_service_vuf_keypair();
@@ -219,7 +221,8 @@ mod tests {
         assert_eq!(public_key, expected_public_key);
 
         // Remove the seed environment variable to force the fallback
-        std::env::remove_var(ENV_VUF_KEY_SEED_HEX);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var(ENV_VUF_KEY_SEED_HEX) };
 
         // Get the pepper service VUF keypair again
         let (public_key, private_key) = vuf_pub_key::get_pepper_service_vuf_keypair();
@@ -234,7 +237,8 @@ mod tests {
         assert_eq!(public_key, expected_public_key);
 
         // Remove all environment variables
-        std::env::remove_var(ENV_VUF_KEY_HEX);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var(ENV_VUF_KEY_HEX) };
 
         // Get the pepper service VUF keypair again, this should panic
         let _ = vuf_pub_key::get_pepper_service_vuf_keypair();

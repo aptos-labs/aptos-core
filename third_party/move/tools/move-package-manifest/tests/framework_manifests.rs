@@ -10,6 +10,7 @@ datatest_stable::harness!(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../../aptos-move/framework")
             .display()
+            .to_string()
     },
     r"\bMove\.toml$"
 );

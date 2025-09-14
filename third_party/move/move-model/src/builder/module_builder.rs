@@ -2744,7 +2744,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn iter_schema_includes<'a>(
         &self,
         members: &'a [EA::SpecBlockMember],
-    ) -> impl Iterator<Item = (&'a MoveIrLoc, &'a Vec<EA::PragmaProperty>, &'a EA::Exp)> {
+    ) -> impl Iterator<Item = (&'a MoveIrLoc, &'a Vec<EA::PragmaProperty>, &'a EA::Exp)> + use<'a> {
         members.iter().filter_map(|m| {
             if let EA::SpecBlockMember_::Include { properties, exp } = &m.value {
                 Some((&m.loc, properties, exp))

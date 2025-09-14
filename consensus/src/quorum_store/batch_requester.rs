@@ -41,7 +41,7 @@ impl BatchRequesterState {
         if self.num_retries == 0 {
             let mut rng = rand::thread_rng();
             // make sure nodes request from the different set of nodes
-            self.next_index = rng.gen::<usize>() % signers.len();
+            self.next_index = rng.r#gen::<usize>() % signers.len();
             counters::SENT_BATCH_REQUEST_COUNT.inc_by(num_peers as u64);
         } else {
             counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc_by(num_peers as u64);

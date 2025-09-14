@@ -796,7 +796,7 @@ impl AccountStateGen {
         self,
         account_index: Index,
         universe: &AccountInfoUniverse,
-    ) -> impl IntoIterator<Item = (StateKey, Vec<u8>)> {
+    ) -> impl IntoIterator<Item = (StateKey, Vec<u8>)> + use<> {
         let address = &universe.get_account_info(account_index).address;
         let account_resource = self
             .account_resource_gen
@@ -868,7 +868,7 @@ impl Arbitrary for TransactionToCommit {
             any_with::<AccountInfoUniverse>(1),
             any::<TransactionToCommitGen>(),
         )
-            .prop_map(|(mut universe, gen)| gen.materialize(&mut universe))
+            .prop_map(|(mut universe, txn_gen)| txn_gen.materialize(&mut universe))
             .boxed()
     }
 }

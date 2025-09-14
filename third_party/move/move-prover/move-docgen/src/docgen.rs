@@ -588,7 +588,7 @@ impl<'env> Docgen<'env> {
                         let symbol2_name = self.name_string(*symbol2).to_string();
                         let module_prefix = match module_name_option {
                             None => "".to_string(),
-                            Some(ref module_name) => {
+                            Some(module_name) => {
                                 format!("{}::", module_name.display_full(self.env))
                             },
                         };

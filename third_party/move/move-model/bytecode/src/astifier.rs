@@ -154,14 +154,14 @@ pub fn generate_ast_raw(target: &FunctionTarget) -> Option<Exp> {
     ctx.compute_loop_info(&fat_loop_info);
 
     // Create the generator and run it.
-    let mut gen = Generator {
+    let mut r#gen = Generator {
         block_stack: vec![],
         unreached_labels,
         used_labels: BTreeSet::new(),
         current_attr: None,
         block_order: BTreeMap::new(),
     };
-    Some(gen.gen(&ctx))
+    Some(r#gen.r#gen(&ctx))
 }
 
 // -------------------------------------------------------------------------------------------
@@ -502,7 +502,7 @@ impl<'a> Context<'a> {
 
 impl Generator {
     /// Run the generator.
-    fn gen(&mut self, ctx: &Context) -> Exp {
+    fn r#gen(&mut self, ctx: &Context) -> Exp {
         let mut blocks = ctx.forward_cfg.blocks();
         // Sort blocks topologically.
         self.sort_blocks(ctx, &mut blocks);

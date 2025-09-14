@@ -1294,7 +1294,7 @@ async fn parse_operations(
                     actual_txn.transaction
                 {
                     if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
+                        payload,
                     ) = txn.payload()
                     {
                         let actual_operator_address: AccountAddress = match (
@@ -1344,7 +1344,7 @@ async fn parse_operations(
                     actual_txn.transaction
                 {
                     if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
+                        payload,
                     ) = txn.payload()
                     {
                         let actual_voter_address: AccountAddress =
@@ -1417,7 +1417,7 @@ async fn parse_operations(
                     actual_txn.transaction
                 {
                     if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
+                        payload,
                     ) = txn.payload()
                     {
                         let actual_operator_address: AccountAddress =
@@ -1451,7 +1451,7 @@ async fn parse_operations(
                     actual_txn.transaction
                 {
                     if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
+                        payload,
                     ) = txn.payload()
                     {
                         let actual_operator_address: AccountAddress =
@@ -1505,7 +1505,7 @@ async fn parse_operations(
                     actual_txn.transaction
                 {
                     if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
+                        payload,
                     ) = txn.payload()
                     {
                         let actual_operator_address: AccountAddress =
@@ -1554,7 +1554,7 @@ async fn parse_operations(
                     actual_txn.transaction
                 {
                     if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
+                        payload,
                     ) = txn.payload()
                     {
                         let actual_operator_address: AccountAddress =
@@ -1593,7 +1593,7 @@ async fn parse_operations(
                     actual_txn.transaction
                 {
                     if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
+                        payload,
                     ) = txn.payload()
                     {
                         let actual_staker_address: AccountAddress =
@@ -1632,7 +1632,7 @@ async fn parse_operations(
                     actual_txn.transaction
                 {
                     if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
+                        payload,
                     ) = txn.payload()
                     {
                         let actual_pool_address: AccountAddress =
@@ -1690,7 +1690,7 @@ async fn parse_operations(
                     actual_txn.transaction
                 {
                     if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
+                        payload,
                     ) = txn.payload()
                     {
                         let actual_pool_address: AccountAddress =
@@ -1746,7 +1746,7 @@ async fn parse_operations(
                     actual_txn.transaction
                 {
                     if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
+                        payload,
                     ) = txn.payload()
                     {
                         let actual_pool_address: AccountAddress =
