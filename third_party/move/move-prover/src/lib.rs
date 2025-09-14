@@ -325,7 +325,7 @@ fn run_docgen<W: WriteColor>(
     let generator = Docgen::new(env, &options.docgen);
     let checking_elapsed = now.elapsed();
     info!("generating documentation");
-    for (file, content) in generator.gen() {
+    for (file, content) in generator.generate() {
         let path = PathBuf::from(&file);
         fs::create_dir_all(path.parent().unwrap())?;
         fs::write(path.as_path(), content)?;
