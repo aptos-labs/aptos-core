@@ -8,6 +8,7 @@
 //! The core Move VM logic.
 
 pub mod data_cache;
+pub(crate) mod execution_format;
 mod interpreter;
 mod interpreter_caches;
 mod loader;
