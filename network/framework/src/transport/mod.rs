@@ -540,7 +540,7 @@ where
         peer_id: PeerId,
         addr: NetworkAddress,
     ) -> io::Result<
-        impl Future<Output = io::Result<Connection<NoiseStream<TTransport::Output>>>> + Send + 'static,
+        impl Future<Output = io::Result<Connection<NoiseStream<TTransport::Output>>>> + Send + 'static + use<TTransport>,
     > {
         // parse aptosnet protocols
         // TODO(philiphayes): `Transport` trait should include parsing in `dial`?
@@ -589,11 +589,11 @@ where
                 Item = io::Result<(
                     impl Future<Output = io::Result<Connection<NoiseStream<TTransport::Output>>>>
                         + Send
-                        + 'static,
+                        + 'static + use<TTransport>,
                     NetworkAddress,
                 )>,
             > + Send
-            + 'static,
+            + 'static + use<TTransport>,
         NetworkAddress,
     )> {
         // listen on base transport. for example, this could be a tcp socket or

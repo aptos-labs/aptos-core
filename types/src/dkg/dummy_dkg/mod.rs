@@ -144,7 +144,7 @@ impl Uniform for DummySecret {
     where
         R: RngCore + CryptoRng,
     {
-        Self { val: rng.gen() }
+        Self { val: rng.r#gen() }
     }
 }
 

@@ -1772,7 +1772,7 @@ impl Locals {
 
     /// Drop all Move values onto a different Vec to avoid leaking memory.
     /// References are excluded since they may point to invalid data.
-    pub fn drop_all_values(&mut self) -> impl Iterator<Item = (usize, Value)> {
+    pub fn drop_all_values(&mut self) -> impl Iterator<Item = (usize, Value)> + use<> {
         let mut locals = self.0.borrow_mut();
         let mut res = vec![];
 
@@ -4750,7 +4750,7 @@ pub mod prop {
         ]
     }
 
-    pub fn value_strategy_with_layout(layout: &MoveTypeLayout) -> impl Strategy<Value = Value> {
+    pub fn value_strategy_with_layout(layout: &MoveTypeLayout) -> impl Strategy<Value = Value> + use<> {
         use MoveTypeLayout as L;
 
         match layout {

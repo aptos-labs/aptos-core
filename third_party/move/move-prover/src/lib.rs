@@ -325,7 +325,7 @@ fn run_docgen<W: WriteColor>(
     let generator = Docgen::new(env, &options.docgen);
     let checking_elapsed = now.elapsed();
     info!("generating documentation");
-    for (file, content) in generator.gen() {
+    for (file, content) in generator.generate() {
         let path = PathBuf::from(&file);
         fs::create_dir_all(path.parent().unwrap())?;
         fs::write(path.as_path(), content)?;
@@ -348,7 +348,7 @@ fn run_abigen(env: &GlobalEnv, options: &Options, now: Instant) -> anyhow::Resul
     let mut generator = Abigen::new(env, &options.abigen);
     let checking_elapsed = now.elapsed();
     info!("generating ABI files");
-    generator.gen();
+    generator.r#gen();
     for (file, content) in generator.into_result() {
         let path = PathBuf::from(&file);
         fs::create_dir_all(path.parent().unwrap())?;
@@ -367,7 +367,7 @@ fn run_errmapgen(env: &GlobalEnv, options: &Options, now: Instant) {
     let mut generator = ErrmapGen::new(env, &options.errmapgen);
     let checking_elapsed = now.elapsed();
     info!("generating error map");
-    generator.gen();
+    generator.r#gen();
     generator.save_result();
     let generating_elapsed = now.elapsed();
     info!(

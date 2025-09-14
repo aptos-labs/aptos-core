@@ -33,7 +33,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub struct FunctionGenerator<'a> {
     /// The underlying module generator.
-    gen: &'a mut ModuleGenerator,
+    r#gen: &'a mut ModuleGenerator,
     /// The set of temporaries which need to be pinned to locals because references are taken for
     /// them, or they are used in specs.
     pinned: BTreeSet<TempIndex>,
@@ -104,37 +104,37 @@ struct LabelInfo {
 impl<'a> FunctionGenerator<'a> {
     /// Runs the function generator for the given function.
     pub fn run<'b>(
-        gen: &'a mut ModuleGenerator,
+        r#gen: &'a mut ModuleGenerator,
         ctx: &'b ModuleContext,
         fun_env: FunctionEnv<'b>,
         acquires_list: &BTreeSet<StructId>,
     ) {
         let loc = fun_env.get_id_loc();
-        let function = gen.function_index(ctx, &loc, &fun_env);
+        let function = r#gen.function_index(ctx, &loc, &fun_env);
         let visibility = fun_env.visibility();
-        let fun_count = gen.module.function_defs.len();
+        let fun_count = r#gen.module.function_defs.len();
         let def_idx = FunctionDefinitionIndex::new(ctx.checked_bound(
             &loc,
             fun_count,
             MAX_FUNCTION_DEF_COUNT,
             "defined function",
         ));
-        gen.source_map
+        r#gen.source_map
             .add_top_level_function_mapping(def_idx, ctx.env.to_ir_loc(&loc), fun_env.is_native())
             .expect(SOURCE_MAP_OK);
         for TypeParameter(name, _, loc) in fun_env.get_type_parameters() {
-            gen.source_map
+            r#gen.source_map
                 .add_function_type_parameter_mapping(def_idx, ctx.source_name(name, loc))
                 .expect(SOURCE_MAP_OK)
         }
         for Parameter(name, _, loc) in fun_env.get_parameters() {
-            gen.source_map
+            r#gen.source_map
                 .add_parameter_mapping(def_idx, ctx.source_name(name, loc))
                 .expect(SOURCE_MAP_OK)
         }
-        let (gen, code) = if !fun_env.is_native() {
+        let (r#gen, code) = if !fun_env.is_native() {
             let mut fun_gen = Self {
-                gen,
+                r#gen,
                 pinned: Default::default(),
                 temps: Default::default(),
                 stack: vec![],
@@ -159,7 +159,7 @@ impl<'a> FunctionGenerator<'a> {
                 let transformed_code_chunk = peephole_optimizer::optimize(&code.code);
                 // Fix the source map for the optimized code.
                 fun_gen
-                    .gen
+                    .r#gen
                     .source_map
                     .remap_code_map(def_idx, &transformed_code_chunk.original_offsets)
                     .expect(SOURCE_MAP_OK);
@@ -171,15 +171,15 @@ impl<'a> FunctionGenerator<'a> {
             if !fun_gen.spec_blocks.is_empty() {
                 fun_env.get_mut_spec().on_impl = fun_gen.spec_blocks;
             }
-            (fun_gen.gen, Some(code))
+            (fun_gen.r#gen, Some(code))
         } else {
-            (gen, None)
+            (r#gen, None)
         };
         let acquires_global_resources = acquires_list
             .iter()
             .map(|id| {
                 let struct_env = fun_env.module_env.get_struct(*id);
-                gen.struct_def_index(ctx, &struct_env.get_loc(), &struct_env)
+                r#gen.struct_def_index(ctx, &struct_env.get_loc(), &struct_env)
             })
             .collect();
         let def = FF::FunctionDefinition {
@@ -190,7 +190,7 @@ impl<'a> FunctionGenerator<'a> {
             code,
         };
 
-        gen.module.function_defs.push(def)
+        r#gen.module.function_defs.push(def)
     }
 
     /// Generates code for a function.
@@ -250,7 +250,7 @@ impl<'a> FunctionGenerator<'a> {
         }
 
         // Deliver result
-        let locals = self.gen.signature(
+        let locals = self.r#gen.signature(
             &ctx.module,
             &ctx.loc,
             self.locals[ctx.fun.get_parameter_count()..].to_vec(),
@@ -264,7 +264,7 @@ impl<'a> FunctionGenerator<'a> {
     /// Generate file-format bytecode from a stackless bytecode and an optional next bytecode
     /// for peephole optimizations.
     fn gen_bytecode(&mut self, ctx: &BytecodeContext, bc: &Bytecode, next_bc: Option<&Bytecode>) {
-        self.gen
+        self.r#gen
             .source_map
             .add_code_mapping(
                 ctx.fun_ctx.def_idx,
@@ -566,7 +566,7 @@ impl<'a> FunctionGenerator<'a> {
                     Type::new_prim(PrimitiveType::Bool)
                 };
                 let sign = self
-                    .gen
+                    .r#gen
                     .signature(&fun_ctx.module, &fun_ctx.loc, vec![elem_type]);
                 self.gen_builtin(
                     ctx,
@@ -658,20 +658,20 @@ impl<'a> FunctionGenerator<'a> {
             &ctx.fun_ctx.loc,
             id,
             Some(
-                self.gen
+                self.r#gen
                     .signature(&ctx.fun_ctx.module, &ctx.fun_ctx.loc, inst.to_vec()),
             ),
         ) {
             self.emit(opcode)
         } else if inst.is_empty() {
-            let idx = self.gen.function_index(
+            let idx = self.r#gen.function_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
                 &fun_ctx.module.env.get_function(id),
             );
             self.emit(FF::Bytecode::Call(idx))
         } else {
-            let idx = self.gen.function_instantiation_index(
+            let idx = self.r#gen.function_instantiation_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
                 &fun_ctx.module.env.get_function(id),
@@ -696,14 +696,14 @@ impl<'a> FunctionGenerator<'a> {
         let fun_ctx = ctx.fun_ctx;
         self.abstract_push_args(ctx, source, None);
         if inst.is_empty() {
-            let idx = self.gen.function_index(
+            let idx = self.r#gen.function_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
                 &fun_ctx.module.env.get_function(id),
             );
             self.emit(FF::Bytecode::PackClosure(idx, mask))
         } else {
-            let idx = self.gen.function_instantiation_index(
+            let idx = self.r#gen.function_instantiation_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
                 &fun_ctx.module.env.get_function(id),
@@ -722,7 +722,7 @@ impl<'a> FunctionGenerator<'a> {
             .fun
             .get_local_type(*source.last().expect("invoke has function argument last"));
         let sign_idx = self
-            .gen
+            .r#gen
             .signature(&ctx.fun_ctx.module, &ctx.fun_ctx.loc, vec![
                 clos_type.clone()
             ]);
@@ -750,11 +750,11 @@ impl<'a> FunctionGenerator<'a> {
         let struct_env = &fun_ctx.module.env.get_struct(id);
         if inst.is_empty() {
             let idx = self
-                .gen
+                .r#gen
                 .struct_def_index(&fun_ctx.module, &fun_ctx.loc, struct_env);
             self.emit(mk_simple(idx))
         } else {
-            let idx = self.gen.struct_def_instantiation_index(
+            let idx = self.r#gen.struct_def_instantiation_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
                 struct_env,
@@ -782,11 +782,11 @@ impl<'a> FunctionGenerator<'a> {
         let struct_env = &fun_ctx.module.env.get_struct(id);
         if inst.is_empty() {
             let idx =
-                self.gen
+                self.r#gen
                     .struct_variant_index(&fun_ctx.module, &fun_ctx.loc, struct_env, variant);
             self.emit(mk_simple(idx))
         } else {
-            let idx = self.gen.struct_variant_inst_index(
+            let idx = self.r#gen.struct_variant_inst_index(
                 &fun_ctx.module,
                 &fun_ctx.loc,
                 struct_env,
@@ -820,7 +820,7 @@ impl<'a> FunctionGenerator<'a> {
             let field_env =
                 &struct_env.get_field_by_offset_optional_variant(Some(variants[0]), offset);
             if inst.is_empty() {
-                let idx = self.gen.variant_field_index(
+                let idx = self.r#gen.variant_field_index(
                     &fun_ctx.module,
                     &fun_ctx.loc,
                     variants,
@@ -832,7 +832,7 @@ impl<'a> FunctionGenerator<'a> {
                     self.emit(FF::Bytecode::ImmBorrowVariantField(idx))
                 }
             } else {
-                let idx = self.gen.variant_field_inst_index(
+                let idx = self.r#gen.variant_field_inst_index(
                     &fun_ctx.module,
                     &fun_ctx.loc,
                     variants,
@@ -849,7 +849,7 @@ impl<'a> FunctionGenerator<'a> {
             let field_env = &struct_env.get_field_by_offset_optional_variant(None, offset);
             if inst.is_empty() {
                 let idx = self
-                    .gen
+                    .r#gen
                     .field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
                 if is_mut {
                     self.emit(FF::Bytecode::MutBorrowField(idx))
@@ -858,7 +858,7 @@ impl<'a> FunctionGenerator<'a> {
                 }
             } else {
                 let idx = self
-                    .gen
+                    .r#gen
                     .field_inst_index(&fun_ctx.module, &fun_ctx.loc, field_env, inst);
                 if is_mut {
                     self.emit(FF::Bytecode::MutBorrowFieldGeneric(idx))
@@ -915,7 +915,7 @@ impl<'a> FunctionGenerator<'a> {
             },
             _ => {
                 let cons =
-                    self.gen
+                    self.r#gen
                         .constant_index(&ctx.fun_ctx.module, &ctx.fun_ctx.loc, cons, dest_type);
                 self.emit(FF::Bytecode::LdConst(cons));
             },
@@ -934,7 +934,7 @@ impl<'a> FunctionGenerator<'a> {
             self.gen_load_push(ctx, cons, &elem_type);
         }
         let sign = self
-            .gen
+            .r#gen
             .signature(&fun_ctx.module, &fun_ctx.loc, vec![elem_type]);
         self.emit(FF::Bytecode::VecPack(sign, vec.len() as u64));
     }
@@ -1250,7 +1250,7 @@ impl<'a> FunctionGenerator<'a> {
                 };
                 // Only add to the source map if it wasn't a parameter.
                 let name = ctx.fun.get_local_name(temp);
-                self.gen
+                self.r#gen
                     .source_map
                     .add_local_mapping(ctx.def_idx, ctx.module.source_name(name, loc))
                     .expect(SOURCE_MAP_OK);

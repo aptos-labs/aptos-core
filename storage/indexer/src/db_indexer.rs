@@ -616,7 +616,7 @@ impl DBIndexer {
         key_prefix: &StateKeyPrefix,
         cursor: Option<&StateKey>,
         ledger_version: Version,
-    ) -> Result<impl Iterator<Item = anyhow::Result<(StateKey, StateValue)>> + '_> {
+    ) -> Result<impl Iterator<Item = anyhow::Result<(StateKey, StateValue)>> + '_ + use<'_>> {
         self.indexer_db
             .ensure_cover_ledger_version(ledger_version)?;
         PrefixedStateValueIterator::new(

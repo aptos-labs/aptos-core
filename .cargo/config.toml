@@ -29,6 +29,7 @@ xclippy = [
   "-Aclippy::unnecessary-unwrap",
   "-Aclippy::mut-from-ref",
   "-Aclippy::large-enum-variant",
+  "-Aunsafe-op-in-unsafe-fn",
 ]
 x = "run --package aptos-cargo-cli --bin aptos-cargo-cli --"
 

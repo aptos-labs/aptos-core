@@ -263,14 +263,16 @@ mod tests {
     async fn test_create_client_env() {
         let secret_api = Arc::new(MockK8sResourceApi::new());
 
-        env::set_var("PROMETHEUS_URL", "http://prometheus.site");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var("PROMETHEUS_URL", "http://prometheus.site") };
 
         // this is the worst case and will default to local (and not panic)
         create_prometheus_client_from_environment(secret_api.clone())
             .await
             .unwrap();
 
-        env::set_var("PROMETHEUS_TOKEN", "token");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var("PROMETHEUS_TOKEN", "token") };
 
         // this should use the envs
         create_prometheus_client_from_environment(secret_api)
@@ -278,8 +280,10 @@ mod tests {
             .unwrap();
 
         // cleanup
-        env::remove_var("PROMETHEUS_URL");
-        env::remove_var("PROMETHEUS_TOKEN");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::remove_var("PROMETHEUS_URL") };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::remove_var("PROMETHEUS_TOKEN") };
     }
 
     #[tokio::test]

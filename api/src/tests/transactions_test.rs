@@ -972,7 +972,7 @@ async fn test_signing_message_with_payload(
         if context.use_orderless_transactions {
             let nonce = match txn.replay_protector() {
                 ReplayProtector::Nonce(n) => n,
-                _ => rand::thread_rng().gen(),
+                _ => rand::thread_rng().r#gen(),
             };
             json["replay_protection_nonce"] = json!(nonce.to_string());
         }
@@ -2458,7 +2458,7 @@ async fn test_runtime_error_message_in_interpreter(
     });
 
     if context.use_orderless_transactions {
-        let nonce = rand::thread_rng().gen::<u64>();
+        let nonce = rand::thread_rng().r#gen::<u64>();
         payload["replay_protection_nonce"] = json!(nonce.to_string());
     }
     let resp = context

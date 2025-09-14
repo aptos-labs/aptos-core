@@ -237,7 +237,7 @@ impl<'env> Docgen<'env> {
     }
 
     /// Generate document contents, returning pairs of output file names and generated contents.
-    pub fn gen(mut self) -> Vec<(String, String)> {
+    pub fn generate(mut self) -> Vec<(String, String)> {
         // Compute missing information about schemas.
         self.compute_declared_schemas();
 
@@ -588,7 +588,7 @@ impl<'env> Docgen<'env> {
                         let symbol2_name = self.name_string(*symbol2).to_string();
                         let module_prefix = match module_name_option {
                             None => "".to_string(),
-                            Some(ref module_name) => {
+                            Some(module_name) => {
                                 format!("{}::", module_name.display_full(self.env))
                             },
                         };

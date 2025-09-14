@@ -53,14 +53,14 @@ where
     // Another thread is possibly modifying the cell, explicit synchronization is needed through,
     // e.g. atomic::fence
     pub unsafe fn unsafe_expect(&self, index: usize) -> &T {
-        &*self.expect_raw(index)
+        unsafe { &*self.expect_raw(index) }
     }
 
     // The caller must guarantee the cell pointed by the index is not accessed while
     // it's mutated.
     #[allow(clippy::mut_from_ref)]
     pub unsafe fn unsafe_expect_mut(&self, index: usize) -> &mut T {
-        &mut *self.expect_raw(index)
+        unsafe { &mut *self.expect_raw(index) }
     }
 }
 

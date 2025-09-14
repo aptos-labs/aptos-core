@@ -210,7 +210,7 @@ fn create_state_keys_and_values(
     // Generate random bytes of the given size
     let mut rng = rand::thread_rng();
     let random_bytes: Bytes = (0..min_bytes_per_key_value)
-        .map(|_| rng.gen::<u8>())
+        .map(|_| rng.r#gen::<u8>())
         .collect::<Vec<_>>()
         .into();
 

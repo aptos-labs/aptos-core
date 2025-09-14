@@ -1181,10 +1181,10 @@ impl SignatureToken {
     /// Panics if this token doesn't contain a struct handle.
     pub fn debug_set_sh_idx(&mut self, sh_idx: StructHandleIndex) {
         match self {
-            SignatureToken::Struct(ref mut wrapped) => *wrapped = sh_idx,
-            SignatureToken::StructInstantiation(ref mut wrapped, _) => *wrapped = sh_idx,
-            SignatureToken::Reference(ref mut token)
-            | SignatureToken::MutableReference(ref mut token) => token.debug_set_sh_idx(sh_idx),
+            SignatureToken::Struct(wrapped) => *wrapped = sh_idx,
+            SignatureToken::StructInstantiation(wrapped, _) => *wrapped = sh_idx,
+            SignatureToken::Reference(token)
+            | SignatureToken::MutableReference(token) => token.debug_set_sh_idx(sh_idx),
             other => panic!(
                 "debug_set_sh_idx (to {}) called for non-struct token {:?}",
                 sh_idx, other
