@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
-
 use crate::{
     constants::*, core_metrics::create_core_metric_telemetry_event, metrics,
     network_metrics::create_network_metric_telemetry_event, sender::TelemetrySender,
@@ -44,7 +42,7 @@ const APTOS_NODE_CONFIG_EVENT_NAME: &str = "APTOS_NODE_CONFIG";
 /// TODO(joshlind): leverage real authentication!
 static TELEMETRY_TOKEN: Lazy<String> = Lazy::new(|| {
     let mut rng = OsRng;
-    let token = rng.gen::<u32>();
+    let token = rng.r#gen::<u32>();
     format!("TOKEN_{:?}", token)
 });
 
@@ -207,11 +205,14 @@ fn try_spawn_log_env_poll_task(sender: TelemetrySender) {
                         env::var(RUST_LOG_TELEMETRY).ok(),
                         env
                     );
-                    env::set_var(RUST_LOG_TELEMETRY, env)
+                    // TODO: Audit that the environment access only happens in single-threaded code.
+                    unsafe { env::set_var(RUST_LOG_TELEMETRY, env) }
                 } else if let Some(ref value) = original_value {
-                    env::set_var(RUST_LOG_TELEMETRY, value)
+                    // TODO: Audit that the environment access only happens in single-threaded code.
+                    unsafe { env::set_var(RUST_LOG_TELEMETRY, value) }
                 } else {
-                    env::remove_var(RUST_LOG_TELEMETRY)
+                    // TODO: Audit that the environment access only happens in single-threaded code.
+                    unsafe { env::remove_var(RUST_LOG_TELEMETRY) }
                 }
             }
         });

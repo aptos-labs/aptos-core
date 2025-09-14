@@ -152,7 +152,7 @@ impl ModuleGenerator {
             };
             SourceMap::new(ctx.env.to_ir_loc(&module_env.get_loc()), module_name_opt)
         };
-        let mut gen = Self {
+        let mut r#gen = Self {
             gen_access_specifiers,
             gen_function_attributes,
             module_idx: FF::ModuleHandleIndex(0),
@@ -176,8 +176,8 @@ impl ModuleGenerator {
             module,
             source_map,
         };
-        gen.gen_module(ctx, module_env);
-        (gen.module, gen.source_map, gen.main_handle)
+        r#gen.gen_module(ctx, module_env);
+        (r#gen.module, r#gen.source_map, r#gen.main_handle)
     }
 
     /// Generates a module, visiting all of its members.
@@ -368,9 +368,9 @@ impl ModuleGenerator {
                 }
             },
             Fun(param_ty, result_ty, abilities) => {
-                let list = |gen: &mut ModuleGenerator, ts: Vec<Type>| {
+                let list = |r#gen: &mut ModuleGenerator, ts: Vec<Type>| {
                     ts.into_iter()
-                        .map(|t| gen.signature_token(ctx, loc, &t))
+                        .map(|t| r#gen.signature_token(ctx, loc, &t))
                         .collect_vec()
                 };
                 FF::SignatureToken::Function(

@@ -380,8 +380,8 @@ impl DependencyGraph {
         }
     }
 
-    pub fn generate_txn(&mut self, gen: LoaderTransactionGen) -> Option<SignedTransaction> {
-        Some(match gen {
+    pub fn generate_txn(&mut self, r#gen: LoaderTransactionGen) -> Option<SignedTransaction> {
+        Some(match r#gen {
             LoaderTransactionGen::Invoke(idx) => {
                 self.invoke_at(&NodeIndex::new(idx.index(self.graph.node_count())))
             },

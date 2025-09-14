@@ -307,7 +307,7 @@ pub fn get_peer_priority_for_polling(poll_priority_peers: bool) -> PeerPriority 
         PeerPriority::HighPriority
     } else {
         // Generate a random u64
-        let random_number: u64 = OsRng.gen();
+        let random_number: u64 = OsRng.r#gen();
 
         // If the random number is even, return medium priority.
         // Otherwise, return low priority.

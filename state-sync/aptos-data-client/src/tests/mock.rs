@@ -189,10 +189,10 @@ impl MockNetwork {
         // Insert peer monitoring metadata for the peer
         let network_info_response = NetworkInformationResponse {
             connected_peers: Default::default(),
-            distance_from_validators: OsRng.gen(),
+            distance_from_validators: OsRng.r#gen(),
         };
         let peer_monitoring_metadata = PeerMonitoringMetadata::new(
-            Some(OsRng.gen()),
+            Some(OsRng.r#gen()),
             None,
             Some(network_info_response),
             None,

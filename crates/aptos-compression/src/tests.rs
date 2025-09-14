@@ -27,7 +27,7 @@ const MIB: usize = 1024 * 1024;
 #[test]
 fn test_basic_compression() {
     // Test compress random bytes
-    let raw_bytes: Vec<_> = (0..MIB).map(|_| rand::thread_rng().gen::<u8>()).collect();
+    let raw_bytes: Vec<_> = (0..MIB).map(|_| rand::thread_rng().r#gen::<u8>()).collect();
     test_compress_and_decompress(raw_bytes);
 
     // Test epoch ending ledger infos

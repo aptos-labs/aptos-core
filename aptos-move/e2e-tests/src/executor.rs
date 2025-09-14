@@ -362,7 +362,7 @@ impl FakeExecutor {
         )
     }
 
-    pub fn state_store(&self) -> &impl SimulationStateStore {
+    pub fn state_store(&self) -> &(impl SimulationStateStore + use<>) {
         &self.state_store
     }
 
@@ -976,7 +976,7 @@ impl FakeExecutor {
         )
     }
 
-    pub fn get_state_view(&self) -> &impl StateView {
+    pub fn get_state_view(&self) -> &(impl StateView + use<>) {
         &self.state_store
     }
 
