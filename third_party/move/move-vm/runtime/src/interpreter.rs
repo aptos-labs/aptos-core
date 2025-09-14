@@ -230,16 +230,13 @@ where
         current_frame: &Frame,
         idx: FunctionInstantiationIndex,
     ) -> VMResult<LoadedFunction> {
-        let ty_args = current_frame
-            .instantiate_generic_function(Some(gas_meter), idx)
-            .map_err(|e| set_err_info!(current_frame, e))?;
         let function = current_frame
             .build_loaded_function_from_instantiation_and_ty_args(
                 self.loader,
                 gas_meter,
                 traversal_context,
                 idx,
-                ty_args,
+                |gas_meter| current_frame.instantiate_generic_function(Some(gas_meter), idx),
             )
             .map_err(|e| self.set_location(e))?;
         Ok(function)
@@ -260,7 +257,7 @@ where
                 gas_meter,
                 traversal_context,
                 fh_idx,
-                vec![],
+                |_| Ok(vec![]),
             )
             .map_err(|e| self.set_location(e))?;
         Ok(function)
@@ -1047,7 +1044,7 @@ where
                     traversal_context,
                     &module_name,
                     &func_name,
-                    ty_args,
+                    |_| Ok(ty_args),
                 )?;
 
                 RTTCheck::check_call_visibility(
@@ -2370,7 +2367,7 @@ impl Frame {
                                 gas_meter,
                                 traversal_context,
                                 *fh_idx,
-                                vec![],
+                                |_| Ok(vec![]),
                             )
                             .map(Rc::new)?;
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
@@ -2410,7 +2407,7 @@ impl Frame {
                                 gas_meter,
                                 traversal_context,
                                 *fi_idx,
-                                ty_args,
+                                |_| Ok(ty_args),
                             )
                             .map(Rc::new)?;
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
