@@ -214,7 +214,7 @@ impl DagFetcherService {
         &mut self,
         node: &Node,
         responders: Vec<Author>,
-    ) -> anyhow::Result<Shared<impl Future<Output = Result<(), DagFetchError>>>> {
+    ) -> anyhow::Result<Shared<impl Future<Output = Result<(), DagFetchError>> + use<>>> {
         let remote_request = {
             let dag_reader = self.dag.read();
             ensure!(

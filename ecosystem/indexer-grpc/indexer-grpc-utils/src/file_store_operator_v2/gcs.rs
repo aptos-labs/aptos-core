@@ -24,7 +24,10 @@ impl GcsFileStore {
         bucket_sub_dir: Option<PathBuf>,
         service_account_path: String,
     ) -> Self {
-        env::set_var(SERVICE_ACCOUNT_ENV_VAR, service_account_path);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe {
+            env::set_var(SERVICE_ACCOUNT_ENV_VAR, service_account_path);
+        }
 
         info!(
             bucket_name = bucket_name,

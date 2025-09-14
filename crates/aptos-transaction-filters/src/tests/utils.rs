@@ -328,7 +328,7 @@ pub fn get_random_block_info() -> (HashValue, AccountAddress, u64, u64) {
 
 /// Generates and returns a random number (u64)
 pub fn get_random_u64() -> u64 {
-    OsRng.gen()
+    OsRng.r#gen()
 }
 
 /// Returns the script argument address of the given transaction

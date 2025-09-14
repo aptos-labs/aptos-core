@@ -54,9 +54,9 @@ pub fn get_data_service_url(indexer_grpc_port: u16) -> Url {
 pub fn start_node(
     test_dir: &Path,
 ) -> Result<(
-    impl Future<Output = Result<u16>>,
-    impl Future<Output = Result<u16>>,
-    impl Future<Output = Result<()>>,
+    impl Future<Output = Result<u16>> + use<>,
+    impl Future<Output = Result<u16>> + use<>,
+    impl Future<Output = Result<()>> + use<>,
 )> {
     let rng = StdRng::from_entropy();
 

@@ -79,7 +79,7 @@ impl<'env> Abigen<'env> {
     }
 
     /// Generates ABIs for all script modules in the environment (excluding the dependency set).
-    pub fn gen(&mut self) {
+    pub fn r#gen(&mut self) {
         for module in self.env.get_modules() {
             if module.is_primary_target() {
                 let mut path = PathBuf::from(&self.options.output_directory);
