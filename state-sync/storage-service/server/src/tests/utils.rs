@@ -296,7 +296,7 @@ pub fn create_transaction_list_using_sizes(
     // Generate random bytes of the given size
     let mut rng = rand::thread_rng();
     let random_bytes: Vec<u8> = (0..min_bytes_per_transaction)
-        .map(|_| rng.gen::<u8>())
+        .map(|_| rng.r#gen::<u8>())
         .collect();
 
     // Create the transaction data
@@ -767,7 +767,7 @@ pub async fn force_cache_update_notification(
     // Generate a random number and if the number is even, send
     // a state sync notification. Otherwise, advance enough time
     // to refresh the storage cache manually.
-    let random_number: u8 = OsRng.gen();
+    let random_number: u8 = OsRng.r#gen();
     if always_advance_time || random_number % 2 != 0 {
         // Advance the storage refresh time manually
         advance_storage_refresh_time(mock_time).await;
@@ -835,7 +835,7 @@ pub async fn get_number_of_states(
 
 /// Generates and returns a random number (u64)
 pub fn get_random_u64() -> u64 {
-    OsRng.gen()
+    OsRng.r#gen()
 }
 
 /// Sends a state values with proof request and processes the response
