@@ -6,6 +6,7 @@ use crate::{
     access_control::AccessControlState,
     config::VMConfig,
     data_cache::{DataCacheEntry, TransactionDataCache},
+    execution_format::instructions::Bytecode,
     frame::Frame,
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
@@ -28,9 +29,7 @@ use fail::fail_point;
 use move_binary_format::{
     errors,
     errors::*,
-    file_format::{
-        AccessKind, Bytecode, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
-    },
+    file_format::{AccessKind, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex},
 };
 use move_core_types::{
     account_address::AccountAddress,
