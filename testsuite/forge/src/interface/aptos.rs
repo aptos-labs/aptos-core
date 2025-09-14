@@ -137,7 +137,7 @@ impl AptosPublicInfo {
             rest_api_url,
             chain_id,
             root_account,
-            rng: ::rand::rngs::StdRng::from_seed(OsRng.gen()),
+            rng: ::rand::rngs::StdRng::from_seed(OsRng.r#gen()),
         }
     }
 

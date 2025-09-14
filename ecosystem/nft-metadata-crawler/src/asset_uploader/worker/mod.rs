@@ -66,7 +66,7 @@ impl AssetUploaderWorkerContext {
     }
 
     /// Uploads an asset to Cloudflare and returns the response
-    async fn upload_asset(&self, url: &Url) -> anyhow::Result<impl IntoResponse> {
+    async fn upload_asset(&self, url: &Url) -> anyhow::Result<impl IntoResponse + use<>> {
         let hashed_url = sha256::digest(url.to_string());
         let client = Client::builder()
             .timeout(Duration::from_secs(MAX_ASSET_UPLOAD_RETRY_SECONDS))

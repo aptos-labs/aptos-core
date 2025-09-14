@@ -27,7 +27,7 @@ impl Test for ForgeSetupTest {
 #[async_trait]
 impl NetworkTest for ForgeSetupTest {
     async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
-        let mut rng = StdRng::from_seed(OsRng.gen());
+        let mut rng = StdRng::from_seed(OsRng.r#gen());
         let mut ctx_locker = ctx.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
 

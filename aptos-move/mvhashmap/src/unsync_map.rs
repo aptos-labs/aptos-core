@@ -196,7 +196,7 @@ impl<
         &self,
         group_key: &K,
     ) -> (
-        impl Iterator<Item = (T, ValueWithLayout<V>)>,
+        impl Iterator<Item = (T, ValueWithLayout<V>)> + use<K, T, V, I>,
         ResourceGroupSize,
     ) {
         let binding = self.group_cache.borrow();

@@ -1120,7 +1120,7 @@ impl TestContext {
     ) {
         let mut request = if self.use_orderless_transactions {
             let mut rng = rand::thread_rng();
-            let replay_protection_nonce: u64 = rng.gen();
+            let replay_protection_nonce: u64 = rng.r#gen();
             json!({
                 "sender": account.address(),
                 "sequence_number": (u64::MAX).to_string(),
@@ -1205,7 +1205,7 @@ impl TestContext {
     ) -> Value {
         let mut request = if self.use_orderless_transactions {
             let mut rng = rand::thread_rng();
-            let replay_protection_nonce: u64 = rng.gen();
+            let replay_protection_nonce: u64 = rng.r#gen();
             json!({
                 "sender": sender.address(),
                 "sequence_number": (u64::MAX).to_string(),
@@ -1298,7 +1298,7 @@ impl TestContext {
     pub fn get_routes_with_poem(
         &self,
         poem_address: SocketAddr,
-    ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
+    ) -> impl Filter<Extract = (impl Reply + use<>,), Error = Rejection> + Clone + use<> {
         warp::path!("v1" / ..).and(reverse_proxy_filter(
             "v1".to_string(),
             format!("http://{}/v1", poem_address),

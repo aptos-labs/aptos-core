@@ -180,7 +180,7 @@ impl ProverTask for RunBoogieWithSeeds {
         let mut rng = rand::thread_rng();
         // Otherwise generate a list of random numbers to use as seeds.
         (0..num_instances)
-            .map(|_| rng.gen::<u8>() as usize)
+            .map(|_| rng.r#gen::<u8>() as usize)
             .collect()
     }
 
