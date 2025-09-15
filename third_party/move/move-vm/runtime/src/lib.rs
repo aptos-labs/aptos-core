@@ -9,6 +9,7 @@
 
 pub mod data_cache;
 mod interpreter;
+mod interpreter_caches;
 mod loader;
 pub mod logging;
 pub mod move_vm;
