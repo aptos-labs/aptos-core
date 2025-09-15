@@ -78,7 +78,7 @@ use std::{
     },
 };
 
-struct SharedSyncParams<'a, 'b, T, E, S>
+struct SharedSyncParams<'a, T, E, S>
 where
     T: BlockExecutableTransaction,
     E: ExecutorTask<Txn = T>,
@@ -92,7 +92,7 @@ where
     last_input_output: &'a TxnLastInputOutput<T, E::Output, E::Error>,
     start_shared_counter: u32,
     delayed_field_id_counter: &'a AtomicU32,
-    block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<'b, T, S>>,
+    block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
     final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
     maybe_block_epilogue_txn_idx: &'a ExplicitSyncWrapper<Option<TxnIndex>>,
 }
@@ -1376,7 +1376,7 @@ where
         worker_id: u32,
         num_workers: u32,
         scheduler: &SchedulerV2,
-        shared_sync_params: &SharedSyncParams<'_, '_, T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let num_txns = block.num_txns() as u32;
 
@@ -1668,7 +1668,6 @@ where
         );
 
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
-            base_view,
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
             num_txns,
@@ -1686,7 +1685,7 @@ where
         let mut versioned_cache = MVHashMap::new();
         let scheduler = SchedulerV2::new(num_txns, num_workers);
 
-        let shared_sync_params: SharedSyncParams<'_, '_, T, E, S> = SharedSyncParams {
+        let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
             base_view,
             versioned_cache: &versioned_cache,
             global_module_cache: module_cache_manager_guard.module_cache(),
@@ -1810,7 +1809,6 @@ where
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
-            base_view,
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
             num_txns + 1,
@@ -1837,7 +1835,7 @@ where
         let worker_ids: Vec<u32> = (0..num_workers as u32).collect();
         let maybe_executor = ExplicitSyncWrapper::new(None);
 
-        let shared_sync_params: SharedSyncParams<'_, '_, T, E, S> = SharedSyncParams {
+        let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
             base_view,
             versioned_cache: &versioned_cache,
             global_module_cache: module_cache_manager_guard.module_cache(),
@@ -2123,8 +2121,7 @@ where
 
         let mut ret = Vec::with_capacity(num_txns + 1);
 
-        let mut block_limit_processor = BlockGasLimitProcessor::<T, S>::new(
-            base_view,
+        let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
             num_txns + 1,
@@ -2582,7 +2579,7 @@ where
         transaction_slice_metadata: &TransactionSliceMetadata,
         outputs: impl Iterator<Item = &'a E::Output>,
         epilogue_txn_idx: TxnIndex,
-        block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
+        block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         environment: &AptosEnvironment,
     ) -> Result<Option<T>, PanicError> {
         // We only do this for block (when the block_id is returned). For other cases

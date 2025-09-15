@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.8.0"
+version = "7.8.1"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -2363,6 +2363,27 @@ dependencies = [
  "tokio-stream",
  "tonic 0.12.3",
  "tonic-reflection",
+]
+
+[[package]]
+name = "aptos-indexer-grpc-gateway"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-protos 1.3.1",
+ "async-trait",
+ "axum 0.7.5",
+ "clap 4.5.21",
+ "futures",
+ "http-body-util",
+ "hyper-util",
+ "jemallocator",
+ "serde",
+ "tokio",
+ "tonic 0.12.3",
+ "tracing",
+ "url",
 ]
 
 [[package]]
@@ -6145,9 +6166,9 @@ dependencies = [
 
 [[package]]
 name = "blst"
-version = "0.3.11"
+version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c94087b935a822949d3291a9989ad2b2051ea141eda0fd4e478a75f6aa3e604b"
+checksum = "4fd49896f12ac9b6dcd7a5998466b9b58263a695a3dd1ecc1aaca2e12a90b080"
 dependencies = [
  "cc",
  "glob",

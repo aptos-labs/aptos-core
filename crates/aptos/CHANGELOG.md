@@ -4,7 +4,10 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
-##[7.8.0]
+## [7.8.1]
+- Transaction Simulatiom Session: fixed resource deserialization bug
+
+## [7.8.0]
 - New beta feature: Transaction Simulation Session
 
 ## [7.7.0]

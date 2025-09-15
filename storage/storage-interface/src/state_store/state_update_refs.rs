@@ -320,7 +320,7 @@ mod tests {
         let u = res.get(key).unwrap();
         assert_eq!(u.version, expected_version);
         assert_eq!(
-            u.state_op.as_state_value_opt().unwrap().bytes(),
+            u.state_op.as_state_value_opt().unwrap().unwrap().bytes(),
             expected_value
         );
     }

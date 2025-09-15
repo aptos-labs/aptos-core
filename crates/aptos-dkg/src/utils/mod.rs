@@ -7,6 +7,7 @@ use crate::utils::{
 use blstrs::{
     pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt, Scalar,
 };
+use ff::Field;
 use group::{Curve, Group};
 use pairing::{MillerLoopResult, MultiMillerLoop};
 use rayon::ThreadPool;
@@ -178,4 +179,17 @@ impl HasMultiExp for G1Projective {
     fn multi_exp_slice(points: &[Self], scalars: &[Scalar]) -> Self {
         g1_multi_exp(points, scalars)
     }
+}
+
+/// Pads the given vector with zeros so that `(len + 1)` becomes the next power of two.
+///
+/// For example:
+/// - If `scalars.len() == 3`, then `len + 1 = 4`, already a power of two,
+///   so the vector is padded to length 3 (no change).
+/// - If `scalars.len() == 5`, then `len + 1 = 6`, next power of two is 8,
+///   so the vector is padded to length 7.
+pub(crate) fn pad_to_pow2_len_minus_one(mut scalars: Vec<Scalar>) -> Vec<Scalar> {
+    let target_len = (scalars.len() + 1).next_power_of_two() - 1;
+    scalars.resize(target_len, Scalar::ZERO);
+    scalars
 }

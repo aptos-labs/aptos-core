@@ -60,7 +60,10 @@ impl FullnodeData for FullnodeDataService {
     ) -> Result<Response<Self::GetTransactionsFromNodeStream>, Status> {
         // Gets configs for the stream, partly from the request and partly from the node config
         let r = req.into_inner();
-        let starting_version = r.starting_version.expect("Starting version must be set");
+        let starting_version = match r.starting_version {
+            Some(version) => version,
+            None => return Err(Status::invalid_argument("Starting version must be set")),
+        };
         let processor_task_count = self.service_context.processor_task_count;
         let processor_batch_size = self.service_context.processor_batch_size;
         let output_batch_size = self.service_context.output_batch_size;

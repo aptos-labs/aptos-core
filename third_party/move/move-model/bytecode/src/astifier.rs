@@ -651,7 +651,7 @@ impl Generator {
                     top_sort.add_dependency(min, other)
                 }
             }
-            debug_assert_eq!(min, top_sort.pop().expect("expected order consistent"));
+            assert_eq!(min, top_sort.pop().expect("expected order consistent"));
             blocks.push(min);
         }
         assert!(top_sort.is_empty(), "unexpected cycle in forward jumps");

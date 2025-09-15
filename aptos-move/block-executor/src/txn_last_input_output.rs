@@ -15,7 +15,7 @@ use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
     on_chain_config::BlockGasLimitType,
-    state_store::{state_value::StateValueMetadata, TStateView},
+    state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::AptosModuleExtension,
     write_set::WriteOp,
@@ -154,14 +154,14 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     // all be skipped), and
     // (2) the last txn did not emit a new epoch event.
     // To avoid unnecessarily inspecting events, we only check (2) if (1) is true.
-    pub(crate) fn commit<S: TStateView<Key = T::Key>>(
+    pub(crate) fn commit(
         &self,
         txn_idx: TxnIndex,
         num_txns: TxnIndex,
         num_workers: usize,
         user_txn_bytes_len: u64,
         block_gas_limit_type: &BlockGasLimitType,
-        block_limit_processor: &mut BlockGasLimitProcessor<T, S>,
+        block_limit_processor: &mut BlockGasLimitProcessor<T>,
         scheduler: &SchedulerWrapper,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let (mut skips_rest, mut must_create_epilogue_txn, maybe_fee_statement_and_output_size) =

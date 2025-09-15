@@ -545,8 +545,6 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReaderImpl<T> {
                 let responders = Arc::new(Mutex::new(responders));
                 let responders_clone = responders.clone();
 
-                let subscriber_rx = self.batch_store.subscribe(*batch_info.digest());
-
                 let inflight_requests_clone = self.inflight_fetch_requests.clone();
                 let batch_store = self.batch_store.clone();
                 let requester = self.batch_requester.clone();
@@ -561,6 +559,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReaderImpl<T> {
                     } else {
                         // Quorum store metrics
                         counters::MISSED_BATCHES_COUNT.inc();
+                        let subscriber_rx = batch_store.subscribe(*batch_info.digest());
                         let payload = requester
                             .request_batch(
                                 batch_digest,
