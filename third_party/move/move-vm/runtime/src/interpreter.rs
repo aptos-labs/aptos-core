@@ -51,6 +51,7 @@ use move_vm_types::{
     loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
     natives::function::NativeResult,
     resolver::ResourceResolver,
+    ty_interner::TypeContext,
     values::{
         self, AbstractFunction, Closure, GlobalValue, IntegerValue, Locals, Reference, SignerRef,
         Struct, StructRef, VMValueCast, Value, Vector, VectorRef,
@@ -61,7 +62,7 @@ use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
     cmp::min,
-    collections::{btree_map, BTreeSet, VecDeque},
+    collections::{BTreeSet, VecDeque},
     fmt::{Debug, Write},
     rc::Rc,
     str::FromStr,
@@ -144,6 +145,8 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     call_stack: CallStack,
     /// VM configuration used by the interpreter.
     vm_config: &'ctx VMConfig,
+    /// Context for type interning.
+    ty_ctx: &'ctx TypeContext,
     /// The access control state.
     access_control: AccessControlState,
     /// Reentrancy checker.
@@ -228,6 +231,7 @@ where
             operand_stack: Stack::new(),
             call_stack: CallStack::new(),
             vm_config: loader.runtime_environment().vm_config(),
+            ty_ctx: loader.runtime_environment().ty_context(),
             access_control: AccessControlState::default(),
             reentrancy_checker: ReentrancyChecker::default(),
             loader,
@@ -316,8 +320,8 @@ where
         current_frame: &Frame,
         idx: FunctionInstantiationIndex,
     ) -> VMResult<LoadedFunction> {
-        let ty_args = current_frame
-            .instantiate_generic_function(Some(gas_meter), idx)
+        let (ty_args, ty_args_id) = current_frame
+            .instantiate_generic_function(self.ty_ctx, Some(gas_meter), idx)
             .map_err(|e| set_err_info!(current_frame, e))?;
         let function = current_frame
             .build_loaded_function_from_instantiation_and_ty_args(
@@ -326,6 +330,7 @@ where
                 traversal_context,
                 idx,
                 ty_args,
+                ty_args_id,
             )
             .map_err(|e| self.set_location(e))?;
         Ok(function)
@@ -340,6 +345,7 @@ where
         current_frame: &Frame,
         fh_idx: FunctionHandleIndex,
     ) -> VMResult<LoadedFunction> {
+        let ty_args_id = self.ty_ctx.intern_ty_args(&[]);
         let function = current_frame
             .build_loaded_function_from_handle_and_ty_args(
                 self.loader,
@@ -347,6 +353,7 @@ where
                 traversal_context,
                 fh_idx,
                 vec![],
+                ty_args_id,
             )
             .map_err(|e| self.set_location(e))?;
         Ok(function)
@@ -617,39 +624,21 @@ where
                         {
                             (Rc::clone(function), Rc::clone(frame_cache))
                         } else {
-                            match current_frame_cache.generic_sub_frame_cache.entry(idx) {
-                                btree_map::Entry::Occupied(entry) => {
-                                    let entry = entry.get();
-                                    current_frame_cache.per_instruction_cache
-                                        [current_frame.pc as usize] =
-                                        PerInstructionCache::CallGeneric(
-                                            Rc::clone(&entry.0),
-                                            Rc::clone(&entry.1),
-                                        );
-
-                                    (Rc::clone(&entry.0), Rc::clone(&entry.1))
-                                },
-                                btree_map::Entry::Vacant(entry) => {
-                                    let function =
-                                        Rc::new(self.load_generic_function_no_visibility_checks(
-                                            gas_meter,
-                                            traversal_context,
-                                            &current_frame,
-                                            idx,
-                                        )?);
-                                    // TODO(caches): remove the generic sub frame cache.
-                                    let frame_cache = function_caches
-                                        .get_or_create_frame_cache_generic(&function);
-                                    entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
-                                    current_frame_cache.per_instruction_cache
-                                        [current_frame.pc as usize] =
-                                        PerInstructionCache::CallGeneric(
-                                            Rc::clone(&function),
-                                            Rc::clone(&frame_cache),
-                                        );
-                                    (function, frame_cache)
-                                },
-                            }
+                            let function =
+                                Rc::new(self.load_generic_function_no_visibility_checks(
+                                    gas_meter,
+                                    traversal_context,
+                                    &current_frame,
+                                    idx,
+                                )?);
+                            let frame_cache =
+                                function_caches.get_or_create_frame_cache_generic(&function);
+                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
+                                PerInstructionCache::CallGeneric(
+                                    Rc::clone(&function),
+                                    Rc::clone(&frame_cache),
+                                );
+                            (function, frame_cache)
                         }
                     } else {
                         let function = Rc::new(self.load_generic_function_no_visibility_checks(
@@ -1151,6 +1140,7 @@ where
             } => {
                 gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
 
+                let ty_args_id = self.ty_ctx.intern_ty_args(&ty_args);
                 let target_func = current_frame.build_loaded_function_from_name_and_ty_args(
                     self.loader,
                     gas_meter,
@@ -1158,6 +1148,7 @@ where
                     &module_name,
                     &func_name,
                     ty_args,
+                    ty_args_id,
                 )?;
 
                 RTTCheck::check_call_visibility(
@@ -2489,6 +2480,7 @@ impl Frame {
                                 .last_n(mask.captured_count() as usize)?,
                         )?;
 
+                        let ty_args_id = interpreter.ty_ctx.intern_ty_args(&[]);
                         let function = self
                             .build_loaded_function_from_handle_and_ty_args(
                                 interpreter.loader,
@@ -2496,6 +2488,7 @@ impl Frame {
                                 traversal_context,
                                 *fh_idx,
                                 vec![],
+                                ty_args_id,
                             )
                             .map(Rc::new)?;
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
@@ -2527,8 +2520,11 @@ impl Frame {
                                 .last_n(mask.captured_count() as usize)?,
                         )?;
 
-                        let ty_args =
-                            self.instantiate_generic_function(Some(gas_meter), *fi_idx)?;
+                        let (ty_args, ty_args_id) = self.instantiate_generic_function(
+                            interpreter.ty_ctx,
+                            Some(gas_meter),
+                            *fi_idx,
+                        )?;
                         let function = self
                             .build_loaded_function_from_instantiation_and_ty_args(
                                 interpreter.loader,
@@ -2536,6 +2532,7 @@ impl Frame {
                                 traversal_context,
                                 *fi_idx,
                                 ty_args,
+                                ty_args_id,
                             )
                             .map(Rc::new)?;
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;

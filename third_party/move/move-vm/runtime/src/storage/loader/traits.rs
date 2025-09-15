@@ -95,7 +95,7 @@ impl LegacyLoaderConfig {
 }
 
 /// Private helper trait common for eager and lazy loaders when instantiating a function.
-pub(crate) trait InstantiatedFunctionLoaderHelper {
+pub(crate) trait InstantiatedFunctionLoaderHelper: WithRuntimeEnvironment {
     /// Loads a single type argument for the function instantiation, converting the type tag into
     /// a runtime type instance.
     fn load_ty_arg(
@@ -132,10 +132,15 @@ pub(crate) trait InstantiatedFunctionLoaderHelper {
 
         Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module.self_id().clone())))?;
+        let ty_args_id = self
+            .runtime_environment()
+            .ty_context()
+            .intern_ty_args(&ty_args);
 
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
             ty_args,
+            ty_args_id,
             function,
         })
     }
@@ -157,10 +162,15 @@ pub(crate) trait InstantiatedFunctionLoaderHelper {
         let main = script.entry_point();
         Type::verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args)
             .map_err(|err| err.finish(Location::Script))?;
+        let ty_args_id = self
+            .runtime_environment()
+            .ty_context()
+            .intern_ty_args(&ty_args);
 
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Script(script),
             ty_args,
+            ty_args_id,
             function: main,
         })
     }

@@ -5,6 +5,7 @@ use super::{
     intern_type, single_signature_loader::load_single_signatures_for_script, Function,
     FunctionHandle, FunctionInstantiation,
 };
+use crate::loader::type_loader::intern_types;
 use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
@@ -12,10 +13,13 @@ use move_binary_format::{
     file_format::{CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex, Visibility},
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
-use move_vm_types::loaded_data::{
-    runtime_access_specifier::AccessSpecifier,
-    runtime_types::{StructIdentifier, Type},
-    struct_name_indexing::StructNameIndexMap,
+use move_vm_types::{
+    loaded_data::{
+        runtime_access_specifier::AccessSpecifier,
+        runtime_types::{StructIdentifier, Type},
+        struct_name_indexing::StructNameIndexMap,
+    },
+    ty_interner::{TypeContext, TypeVecId},
 };
 use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
@@ -44,6 +48,7 @@ impl Script {
     pub(crate) fn new(
         script: Arc<CompiledScript>,
         struct_name_index_map: &StructNameIndexMap,
+        ty_ctx: &TypeContext,
     ) -> PartialVMResult<Self> {
         let mut struct_names = vec![];
         for struct_handle in script.struct_handles() {
@@ -74,17 +79,20 @@ impl Script {
         let mut function_instantiations = vec![];
         for func_inst in script.function_instantiations() {
             let handle = function_refs[func_inst.handle.0 as usize].clone();
-            let mut instantiation = vec![];
-            for ty in &script.signature_at(func_inst.type_parameters).0 {
-                instantiation.push(intern_type(
-                    BinaryIndexedView::Script(&script),
-                    ty,
-                    &struct_names,
-                )?);
-            }
+            let (instantiation, is_fully_instantiated) = intern_types(
+                BinaryIndexedView::Script(&script),
+                &script.signature_at(func_inst.type_parameters).0,
+                &struct_names,
+            )?;
+            let ty_args_id = if is_fully_instantiated {
+                Some(ty_ctx.intern_ty_args(&instantiation))
+            } else {
+                None
+            };
             function_instantiations.push(FunctionInstantiation {
                 handle,
                 instantiation,
+                ty_args_id,
             });
         }
 
@@ -155,8 +163,9 @@ impl Script {
         &self.function_instantiations[idx as usize].handle
     }
 
-    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &[Type] {
-        &self.function_instantiations[idx as usize].instantiation
+    pub(crate) fn function_instantiation_at(&self, idx: u16) -> (&[Type], Option<TypeVecId>) {
+        let instantiation = &self.function_instantiations[idx as usize];
+        (&instantiation.instantiation, instantiation.ty_args_id)
     }
 
     pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {

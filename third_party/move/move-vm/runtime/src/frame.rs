@@ -32,6 +32,7 @@ use move_vm_types::{
         runtime_access_specifier::{AccessSpecifierEnv, AddressSpecifierFunction},
         runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
     },
+    ty_interner::{TypeContext, TypeVecId},
     values::Locals,
 };
 use std::{cell::RefCell, rc::Rc, sync::Arc};
@@ -72,6 +73,7 @@ macro_rules! build_loaded_function {
             traversal_context: &mut TraversalContext,
             idx: $idx_ty,
             verified_ty_args: Vec<Type>,
+            ty_args_id: TypeVecId,
         ) -> PartialVMResult<LoadedFunction> {
             match self.function.owner() {
                 LoadedFunctionOwner::Module(module) => {
@@ -81,6 +83,7 @@ macro_rules! build_loaded_function {
                             (Ok(LoadedFunction {
                                 owner: LoadedFunctionOwner::Module(module.clone()),
                                 ty_args: verified_ty_args,
+                                ty_args_id,
                                 function: function.clone(),
                             }))
                         },
@@ -92,6 +95,7 @@ macro_rules! build_loaded_function {
                                 module,
                                 name,
                                 verified_ty_args,
+                                ty_args_id,
                             ),
                     }
                 },
@@ -110,6 +114,7 @@ macro_rules! build_loaded_function {
                                 module,
                                 name,
                                 verified_ty_args,
+                                ty_args_id,
                             ),
                     }
                 },
@@ -471,11 +476,12 @@ impl Frame {
 
     pub(crate) fn instantiate_generic_function(
         &self,
+        ty_context: &TypeContext,
         gas_meter: Option<&mut impl GasMeter>,
         idx: FunctionInstantiationIndex,
-    ) -> PartialVMResult<Vec<Type>> {
+    ) -> PartialVMResult<(Vec<Type>, TypeVecId)> {
         use LoadedFunctionOwner::*;
-        let instantiation = match self.function.owner() {
+        let (instantiation, ty_args_id) = match self.function.owner() {
             Module(module) => module.function_instantiation_at(idx.0),
             Script(script) => script.function_instantiation_at(idx.0),
         };
@@ -492,7 +498,13 @@ impl Frame {
             .iter()
             .map(|ty| self.ty_builder.create_ty_with_subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
-        Ok(instantiation)
+        let ty_args_id = match ty_args_id {
+            Some(ty_args_id) => ty_args_id,
+            // We can hit this case where original type args were only a partial instantiation.
+            None => ty_context.intern_ty_args(&instantiation),
+        };
+
+        Ok((instantiation, ty_args_id))
     }
 
     pub(crate) fn build_loaded_function_from_name_and_ty_args(
@@ -503,6 +515,7 @@ impl Frame {
         module_id: &ModuleId,
         function_name: &IdentStr,
         verified_ty_args: Vec<Type>,
+        ty_args_id: TypeVecId,
     ) -> PartialVMResult<LoadedFunction> {
         let (module, function) = loader
             .load_function_definition(gas_meter, traversal_context, module_id, function_name)
@@ -510,6 +523,7 @@ impl Frame {
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
             ty_args: verified_ty_args,
+            ty_args_id,
             function,
         })
     }

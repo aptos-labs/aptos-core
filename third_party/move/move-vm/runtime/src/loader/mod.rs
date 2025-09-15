@@ -7,7 +7,8 @@ mod access_specifier_loader;
 mod function;
 pub use function::{Function, LoadedFunction, LoadedFunctionOwner};
 pub(crate) use function::{
-    FunctionHandle, FunctionInstantiation, LazyLoadedFunction, LazyLoadedFunctionState,
+    FunctionHandle, FunctionInstantiation, FunctionPtr, GenericFunctionPtr, LazyLoadedFunction,
+    LazyLoadedFunctionState,
 };
 
 mod modules;

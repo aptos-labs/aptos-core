@@ -611,10 +611,15 @@ fn load_constructor_function(
 
     Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
         .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
+    let ty_args_id = loader
+        .runtime_environment()
+        .ty_context()
+        .intern_ty_args(&ty_args);
 
     Ok(LoadedFunction {
         owner: LoadedFunctionOwner::Module(module),
         ty_args,
+        ty_args_id,
         function,
     })
 }
