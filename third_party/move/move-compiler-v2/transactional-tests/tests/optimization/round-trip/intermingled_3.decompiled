@@ -1,0 +1,15 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/intermingled_3.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun main() {
+        if (!(test() == 2)) abort 6;
+    }
+    fun test(): u64 {
+        let _t2 = 1 + 1;
+        2
+    }
+}
+
+
+//# run 0xc0ffee::m::main

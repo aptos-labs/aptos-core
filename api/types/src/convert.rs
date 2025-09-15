@@ -40,7 +40,6 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use bytes::Bytes;
-use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -140,11 +139,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         bytes: &[u8],
     ) -> Result<Vec<MoveResource>> {
         let resources_with_tag: Vec<(StructTag, Vec<u8>)> = bcs::from_bytes::<ResourceGroup>(bytes)
-            .map(|map| {
-                map.into_iter()
-                    .map(|(key, value)| (key, value))
-                    .collect::<Vec<_>>()
-            })?;
+            .map(|map| map.into_iter().collect::<Vec<_>>())?;
 
         resources_with_tag
             .iter()
@@ -1029,10 +1024,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         let code = self.inner.view_existing_module(&module.clone().into())? as Arc<dyn Bytecode>;
         let func = code
             .find_function(function.name.0.as_ident_str())
-            .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
+            .ok_or_else(|| format_err!("could not find view function by {}", function))?;
         ensure!(
             func.generic_type_params.len() == type_arguments.len(),
-            "expected {} type arguments for entry function {}, but got {}",
+            "expected {} type arguments for view function {}, but got {}",
             func.generic_type_params.len(),
             function,
             type_arguments.len()
@@ -1061,7 +1056,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         Ok(None)
     }
 
-    fn explain_vm_status(
+    pub fn explain_vm_status(
         &self,
         status: &ExecutionStatus,
         txn_aux_data: Option<TransactionAuxiliaryData>,
@@ -1105,10 +1100,16 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 function,
                 code_offset,
             } => {
-                let func_name = match location {
+                let func_name_and_instruction = match location {
                     AbortLocation::Module(module_id) => self
-                        .explain_function_index(module_id, function)
-                        .map(|name| format!("{}::{}", abort_location_to_str(location), name))
+                        .explain_function_and_code_index(module_id, function, code_offset)
+                        .map(|name_and_instruction| {
+                            format!(
+                                "{}::{}",
+                                abort_location_to_str(location),
+                                name_and_instruction
+                            )
+                        })
                         .unwrap_or_else(|_| {
                             format!(
                                 "{}::<#{} function>",
@@ -1120,7 +1121,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 };
                 format!(
                     "Execution failed in {} at code offset {}",
-                    func_name, code_offset
+                    func_name_and_instruction, code_offset
                 )
             },
             ExecutionStatus::MiscellaneousError(code) => {
@@ -1133,10 +1134,26 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         }
     }
 
-    fn explain_function_index(&self, module_id: &ModuleId, function: &u16) -> Result<String> {
+    fn explain_function_and_code_index(
+        &self,
+        module_id: &ModuleId,
+        function: &u16,
+        code_offset: &u16,
+    ) -> Result<String> {
         let code = self.inner.view_existing_module(module_id)?;
-        let func = code.function_handle_at(FunctionHandleIndex::new(*function));
+        let function_def = code
+            .function_defs
+            .get(*function as usize)
+            .ok_or_else(|| anyhow::anyhow!("could not find function at index {}", function))?;
+        let func = code.function_handle_at(function_def.function);
         let id = code.identifier_at(func.name);
+
+        if let Some(code) = function_def.code.as_ref() {
+            if let Some(instruction) = code.code.get(*code_offset as usize) {
+                return Ok(format!("{} (on instruction {:?})", id, instruction));
+            }
+        }
+
         Ok(id.to_string())
     }
 }

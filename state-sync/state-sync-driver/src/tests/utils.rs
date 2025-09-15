@@ -34,8 +34,9 @@ use aptos_types::{
     transaction::{
         use_case::UseCaseAwareTransaction, ExecutionStatus, RawTransaction, ReplayProtector,
         Script, SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionInfo,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionPayload, TransactionStatus, Version,
+        TransactionListWithProof, TransactionListWithProofV2, TransactionOutput,
+        TransactionOutputListWithProof, TransactionOutputListWithProofV2, TransactionPayload,
+        TransactionStatus, Version,
     },
     validator_verifier::ValidatorVerifier,
     waypoint::Waypoint,
@@ -143,14 +144,14 @@ pub fn create_ledger_info_at_version(version: Version) -> LedgerInfoWithSignatur
 }
 
 /// Creates a test transaction output list with proof
-pub fn create_output_list_with_proof() -> TransactionOutputListWithProof {
+pub fn create_output_list_with_proof() -> TransactionOutputListWithProofV2 {
     let transaction_info_list_with_proof = create_transaction_info_list_with_proof();
     let transaction_and_output = (create_transaction(), create_transaction_output());
-    TransactionOutputListWithProof::new(
+    TransactionOutputListWithProofV2::new_from_v1(TransactionOutputListWithProof::new(
         vec![transaction_and_output],
         Some(0),
         transaction_info_list_with_proof,
-    )
+    ))
 }
 
 /// Creates a random epoch ending ledger info with the specified values
@@ -241,6 +242,7 @@ pub fn create_transaction_info() -> TransactionInfo {
         Some(HashValue::random()),
         0,
         ExecutionStatus::Success,
+        Some(HashValue::random()),
     )
 }
 
@@ -252,14 +254,14 @@ pub fn create_transaction_info_list_with_proof() -> TransactionInfoListWithProof
 }
 
 /// Creates a test transaction list with proof
-pub fn create_transaction_list_with_proof() -> TransactionListWithProof {
+pub fn create_transaction_list_with_proof() -> TransactionListWithProofV2 {
     let transaction_info_list_with_proof = create_transaction_info_list_with_proof();
-    TransactionListWithProof::new(
+    TransactionListWithProofV2::new_from_v1(TransactionListWithProof::new(
         vec![create_transaction()],
         None,
         Some(0),
         transaction_info_list_with_proof,
-    )
+    ))
 }
 
 /// Creates a single test transaction output

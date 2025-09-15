@@ -134,6 +134,6 @@ Deployment
 
        $ helm install fullnode --set storage.class=gp2 .
 
-[REST API]: https://github.com/aptos-labs/aptos-core/blob/main/api/doc/v0/openapi.yaml
+[REST API]: https://github.com/aptos-labs/aptos-core/blob/main/api/doc/spec.yaml
 [values.yaml]: values.yaml
 [Aptos dockerhub]: https://hub.docker.com/r/aptoslabs/validator/tags?page=1&ordering=last_updated

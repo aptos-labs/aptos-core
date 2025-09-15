@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: parameter name `self` indicates a receiver function but the type `n::T` is declared outside of this module and new receiver functions cannot be added. Consider using a different name.
+warning: parameter name `self` indicates a receiver function but the type `0x42::n::T` is declared outside of this module and new receiver functions cannot be added. Consider using a different name.
    ┌─ tests/checking/receiver/decl_errors.move:11:9
    │
 11 │     fun receiver_for_external_type(self: T) {}
@@ -18,13 +18,13 @@ warning: parameter name `self` indicates a receiver function but the type `vecto
 17 │     fun receiver_for_external_vector(self: vector<u64>) {}
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: parameter name `self` indicates a receiver function but the type `m::G<u64, T>` must only use type parameters but instead uses `u64`. Consider using a different name.
+warning: parameter name `self` indicates a receiver function but the type `0x42::m::G<u64, T>` must only use type parameters but instead uses `u64`. Consider using a different name.
    ┌─ tests/checking/receiver/decl_errors.move:20:9
    │
 20 │     fun receiver_partial_instantiated<T>(self: G<u64, T>) {}
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: parameter name `self` indicates a receiver function but the type `m::G<T, T>` cannot use type parameter `T` more than once. Consider using a different name.
+warning: parameter name `self` indicates a receiver function but the type `0x42::m::G<T, T>` cannot use type parameter `T` more than once. Consider using a different name.
    ┌─ tests/checking/receiver/decl_errors.move:23:9
    │
 23 │     fun receiver_non_linear_instantiated<T>(self: G<T, T>) {}

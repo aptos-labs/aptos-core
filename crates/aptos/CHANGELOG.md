@@ -4,6 +4,21 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.8.1]
+- Transaction Simulatiom Session: fixed resource deserialization bug
+
+## [7.8.0]
+- New beta feature: Transaction Simulation Session
+
+## [7.7.0]
+- Turn off sharding in the local testnet
+
+## [7.6.1]
+- Mark language version 2.2 as stable.
+
+## [7.6.0]
+- Sets up confidential assets for localnet under the experimental address 0x7
+
 ## [7.5.0]
 - Fix auto-update CLI command to work with more OS's including Mac and Linux on ARM
 - Update localnet indexer processors

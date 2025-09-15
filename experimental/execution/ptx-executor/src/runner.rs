@@ -16,7 +16,7 @@ use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue, StateView},
-    transaction::signature_verified_transaction::SignatureVerifiedTransaction,
+    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo},
     write_set::TransactionWrite,
 };
 use aptos_vm::AptosVM;
@@ -271,6 +271,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                             &vm.as_move_resolver(&state_view),
                             &code_storage,
                             &log_context,
+                            &AuxiliaryInfo::default(),
                         )
                     };
                     let _post = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_post_vm"]);

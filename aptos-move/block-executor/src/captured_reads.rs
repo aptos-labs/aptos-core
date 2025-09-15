@@ -14,8 +14,8 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::{
     types::{
-        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
-        ValueWithLayout, Version,
+        Incarnation, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion,
+        TxnIndex, ValueWithLayout, Version,
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -39,11 +39,8 @@ use move_vm_types::{
 };
 use std::{
     collections::{
-        hash_map::{
-            Entry,
-            Entry::{Occupied, Vacant},
-        },
-        BTreeMap, HashMap, HashSet,
+        hash_map::Entry::{self, Occupied, Vacant},
+        BTreeMap, BTreeSet, HashMap, HashSet,
     },
     hash::Hash,
     ops::Deref,
@@ -87,20 +84,24 @@ pub(crate) enum DataRead<V> {
     /// Read resolved an aggregatorV1 delta to a value.
     /// TODO[agg_v1](cleanup): deprecate.
     Resolved(u128),
+    // CAUTION: when adding a new variant here, it must be ensured that compare
+    // data reads implements a comparison (o.w. unreachable arm will be hit).
 }
 
-// Represents the result of comparing DataReads ('self' and 'other').
-#[derive(Debug)]
-enum DataReadComparison {
-    // Information in 'self' DataRead contains information about the kind of the
-    // 'other' DataRead, and is consistent with 'other'.
-    Contains,
-    // Information in 'self' DataRead contains information about the kind of the
-    // 'other' DataRead, but is inconsistent with 'other'.
-    Inconsistent,
-    // All information about the kind of 'other' is not contained in 'self' kind.
-    // For example, exists does not provide enough information about metadata.
-    Insufficient,
+impl<V> DataRead<V> {
+    // Assigns highest rank to Versioned / Resolved, then Metadata, then Exists.
+    // (e.g. versioned read implies metadata and existence information, and
+    // metadata information implies existence information).
+    fn get_kind(&self) -> ReadKind {
+        use DataRead::*;
+        match self {
+            Versioned(_, _, _) | Resolved(_) => ReadKind::Value,
+            MetadataAndResourceSize(_, _) => ReadKind::MetadataAndResourceSize,
+            Metadata(_) => ReadKind::Metadata,
+            ResourceSize(_) => ReadKind::ResourceSize,
+            Exists(_) => ReadKind::Exists,
+        }
+    }
 }
 
 impl<V: TransactionWrite> DataRead<V> {
@@ -118,49 +119,6 @@ impl<V: TransactionWrite> DataRead<V> {
             }
         }
         false
-    }
-
-    // Assigns highest rank to Versioned / Resolved, then Metadata, then Exists.
-    // (e.g. versioned read implies metadata and existence information, and
-    // metadata information implies existence information).
-    fn get_kind(&self) -> ReadKind {
-        use DataRead::*;
-        match self {
-            Versioned(_, _, _) | Resolved(_) => ReadKind::Value,
-            MetadataAndResourceSize(_, _) => ReadKind::MetadataAndResourceSize,
-            Metadata(_) => ReadKind::Metadata,
-            ResourceSize(_) => ReadKind::ResourceSize,
-            Exists(_) => ReadKind::Exists,
-        }
-    }
-
-    // A convenience method, since the same key can be read in different modes, producing
-    // different DataRead / ReadKinds. Returns true if self has >= kind than other, i.e.
-    // contains more or equal information, and is consistent with the information in other.
-    fn contains(&self, other: &DataRead<V>) -> DataReadComparison {
-        let self_kind = self.get_kind();
-        let other_kind = other.get_kind();
-
-        if self_kind == other_kind {
-            // Optimization to avoid unnecessary clone in convert_to. Has been optimized
-            // because contains is called during validation.
-            if self == other {
-                DataReadComparison::Contains
-            } else {
-                DataReadComparison::Inconsistent
-            }
-        } else {
-            match self.convert_to(&other_kind) {
-                Some(value) => {
-                    if &value == other {
-                        DataReadComparison::Contains
-                    } else {
-                        DataReadComparison::Inconsistent
-                    }
-                },
-                None => DataReadComparison::Insufficient,
-            }
-        }
     }
 
     fn value_size(v: &Arc<V>) -> Option<u64> {
@@ -283,6 +241,149 @@ impl<V: TransactionWrite> DataRead<V> {
             ValueWithLayout::Exchanged(v, layout) => {
                 DataRead::Versioned(version, v.clone(), layout)
             },
+        }
+    }
+}
+
+// Represents the result of comparing DataReads ('self' and 'other').
+#[derive(Debug)]
+enum DataReadComparison {
+    // Information in 'self' DataRead contains information about the kind of the
+    // 'other' DataRead, and is consistent with 'other'.
+    Contains,
+    // Information in 'self' DataRead contains information about the kind of the
+    // 'other' DataRead, but is inconsistent with 'other'.
+    Inconsistent,
+    // All information about the kind of 'other' is not contained in 'self' kind.
+    // For example, exists does not provide enough information about metadata.
+    Insufficient,
+}
+
+struct DataReadComparator {
+    // If set, BlockSTM V2 is enabled.
+    blockstm_v2_incarnation: Option<Incarnation>,
+}
+
+impl DataReadComparator {
+    fn new(blockstm_v2_incarnation: Option<Incarnation>) -> Self {
+        Self {
+            blockstm_v2_incarnation,
+        }
+    }
+
+    fn data_read_equals<V: PartialEq>(&self, v1: &DataRead<V>, v2: &DataRead<V>) -> bool {
+        match (v1, v2) {
+            (
+                DataRead::Versioned(v1_version, v1_value, v1_layout),
+                DataRead::Versioned(v2_version, v2_value, v2_layout),
+            ) => {
+                if v1_version == v2_version {
+                    true
+                } else {
+                    // TODO(BlockSTMv2): Like in MVDataMap, we assume data reads are not equal if both layouts
+                    // are set, in order to avoid expensive equality checks. This should be compensated here
+                    // by the above early return if versions are equal (for both V1 and V2 BlockSTM).
+                    self.blockstm_v2_incarnation.is_some()
+                        && v1_layout.is_none()
+                        && v2_layout.is_none()
+                        && v1_value == v2_value
+                }
+            },
+            (DataRead::Metadata(v1_metadata), DataRead::Metadata(v2_metadata)) => {
+                v1_metadata == v2_metadata
+            },
+            (DataRead::Exists(v1_exists), DataRead::Exists(v2_exists)) => v1_exists == v2_exists,
+            (DataRead::Resolved(v1_resolved), DataRead::Resolved(v2_resolved)) => {
+                v1_resolved == v2_resolved
+            },
+            (
+                DataRead::MetadataAndResourceSize(v1_metadata, v1_size),
+                DataRead::MetadataAndResourceSize(v2_metadata, v2_size),
+            ) => v1_metadata == v2_metadata && v1_size == v2_size,
+            (DataRead::ResourceSize(v1_size), DataRead::ResourceSize(v2_size)) => {
+                v1_size == v2_size
+            },
+            (
+                DataRead::Versioned(_, _, _),
+                DataRead::Resolved(_)
+                | DataRead::MetadataAndResourceSize(_, _)
+                | DataRead::Metadata(_)
+                | DataRead::ResourceSize(_)
+                | DataRead::Exists(_),
+            )
+            | (
+                DataRead::Resolved(_),
+                DataRead::Versioned(_, _, _)
+                | DataRead::MetadataAndResourceSize(_, _)
+                | DataRead::Metadata(_)
+                | DataRead::ResourceSize(_)
+                | DataRead::Exists(_),
+            )
+            | (
+                DataRead::MetadataAndResourceSize(_, _),
+                DataRead::Versioned(_, _, _)
+                | DataRead::Resolved(_)
+                | DataRead::Metadata(_)
+                | DataRead::ResourceSize(_)
+                | DataRead::Exists(_),
+            )
+            | (
+                DataRead::Metadata(_),
+                DataRead::Versioned(_, _, _)
+                | DataRead::Resolved(_)
+                | DataRead::MetadataAndResourceSize(_, _)
+                | DataRead::ResourceSize(_)
+                | DataRead::Exists(_),
+            )
+            | (
+                DataRead::ResourceSize(_),
+                DataRead::Versioned(_, _, _)
+                | DataRead::Resolved(_)
+                | DataRead::MetadataAndResourceSize(_, _)
+                | DataRead::Metadata(_)
+                | DataRead::Exists(_),
+            )
+            | (
+                DataRead::Exists(_),
+                DataRead::Versioned(_, _, _)
+                | DataRead::Resolved(_)
+                | DataRead::MetadataAndResourceSize(_, _)
+                | DataRead::Metadata(_)
+                | DataRead::ResourceSize(_),
+            ) => false,
+        }
+    }
+
+    // A convenience method, since the same key can be read in different modes, producing
+    // different DataRead / ReadKinds. Returns true if self has >= kind than other, i.e.
+    // contains more or equal information, and is consistent with the information in other.
+    fn compare_data_reads<V: TransactionWrite + PartialEq>(
+        &self,
+        self_read: &DataRead<V>,
+        other_read: &DataRead<V>,
+    ) -> DataReadComparison {
+        let self_kind = self_read.get_kind();
+        let other_kind = other_read.get_kind();
+
+        if self_kind == other_kind {
+            // Optimization to avoid unnecessary clone in convert_to (because contains
+            // method is called during validation).
+            if self.data_read_equals(self_read, other_read) {
+                DataReadComparison::Contains
+            } else {
+                DataReadComparison::Inconsistent
+            }
+        } else {
+            match self_read.convert_to(&other_kind) {
+                Some(value) => {
+                    if self.data_read_equals(&value, other_read) {
+                        DataReadComparison::Contains
+                    } else {
+                        DataReadComparison::Inconsistent
+                    }
+                },
+                None => DataReadComparison::Insufficient,
+            }
         }
     }
 }
@@ -441,15 +542,13 @@ pub enum CacheRead<T> {
 /// resolution from MVHashMap/storage should be captured. This enforces an invariant that
 /// 'capture_read' will never be called with a read that can be resolved from the already
 /// captured variant (e.g. Size, Metadata, or exists if SizeAndMetadata is already captured).
-#[derive(Derivative)]
-#[derivative(Default(bound = "", new = "true"))]
 pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
     delayed_field_reads: HashMap<DelayedFieldID, DelayedFieldRead>,
+    // Captured always, but used for aggregator v1 validation in BlockSTMv2 flow.
+    aggregator_v1_reads: HashSet<T::Key>,
 
-    #[deprecated]
-    pub(crate) deprecated_module_reads: Vec<T::Key>,
     module_reads: hashbrown::HashMap<K, ModuleRead<DC, VC, S>>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an observed
@@ -462,6 +561,30 @@ pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     /// Set if the invariant on CapturedReads intended use is violated. Leads to an alert
     /// and sequential execution fallback.
     incorrect_use: bool,
+
+    data_read_comparator: DataReadComparator,
+}
+
+impl<T: Transaction, K, DC, VC, S> Default for CapturedReads<T, K, DC, VC, S> {
+    fn default() -> Self {
+        Self::new(None)
+    }
+}
+
+impl<T: Transaction, K, DC, VC, S> CapturedReads<T, K, DC, VC, S> {
+    pub(crate) fn new(blockstm_v2_incarnation: Option<Incarnation>) -> Self {
+        Self {
+            data_reads: HashMap::new(),
+            group_reads: HashMap::new(),
+            delayed_field_reads: HashMap::new(),
+            aggregator_v1_reads: HashSet::new(),
+            module_reads: hashbrown::HashMap::new(),
+            delayed_field_speculative_failure: false,
+            non_delayed_field_speculative_failure: false,
+            incorrect_use: false,
+            data_read_comparator: DataReadComparator::new(blockstm_v2_incarnation),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -481,6 +604,10 @@ where
     VC: Deref<Target = Arc<DC>>,
     S: WithSize,
 {
+    pub(crate) fn blockstm_v2_incarnation(&self) -> Option<Incarnation> {
+        self.data_read_comparator.blockstm_v2_incarnation
+    }
+
     // Return an iterator over the captured reads.
     pub(crate) fn get_read_values_with_delayed_fields<SV: TStateView<Key = T::Key>>(
         &self,
@@ -524,9 +651,10 @@ where
     // Required usage pattern: if existing entry contains enough information to
     // deduce the read, update_entry should not be called by the caller (i.e.
     // the need to cache the read must already be established).
-    fn update_entry<Q, V: TransactionWrite>(
+    fn update_entry<Q, V: TransactionWrite + PartialEq>(
         entry: Entry<Q, DataRead<V>>,
         read: DataRead<V>,
+        data_read_comparator: &DataReadComparator,
     ) -> UpdateResult {
         match entry {
             Vacant(e) => {
@@ -550,7 +678,7 @@ where
                 }
 
                 // In all other cases, new read must have more information.
-                match read.contains(existing_read) {
+                match data_read_comparator.compare_data_reads(&read, existing_read) {
                     DataReadComparison::Contains => {
                         *existing_read = read;
                         UpdateResult::Updated
@@ -618,6 +746,10 @@ where
         }
     }
 
+    pub(crate) fn capture_aggregator_v1_read(&mut self, key: T::Key) {
+        self.aggregator_v1_reads.insert(key);
+    }
+
     pub(crate) fn capture_data_read(
         &mut self,
         group_key: T::Key,
@@ -653,9 +785,17 @@ where
         let ret = match maybe_tag {
             Some(tag) => {
                 let group = self.group_reads.entry(state_key).or_default();
-                Self::update_entry(group.inner_reads.entry(tag), read)
+                Self::update_entry(
+                    group.inner_reads.entry(tag),
+                    read,
+                    &self.data_read_comparator,
+                )
             },
-            None => Self::update_entry(self.data_reads.entry(state_key), read),
+            None => Self::update_entry(
+                self.data_reads.entry(state_key),
+                read,
+                &self.data_read_comparator,
+            ),
         };
 
         match ret {
@@ -767,27 +907,29 @@ where
         self.incorrect_use
     }
 
-    pub(crate) fn validate_data_reads(
-        &self,
+    fn validate_data_reads_impl<'a>(
+        &'a self,
+        iter: impl Iterator<Item = (&'a T::Key, &'a DataRead<T::Value>)>,
         data_map: &VersionedData<T::Key, T::Value>,
         idx_to_validate: TxnIndex,
     ) -> bool {
-        if self.non_delayed_field_speculative_failure {
-            return false;
-        }
-
         use MVDataError::*;
         use MVDataOutput::*;
-        self.data_reads.iter().all(|(k, r)| {
-            match data_map.fetch_data(k, idx_to_validate) {
-                Ok(Versioned(version, v)) => {
+        for (key, read) in iter {
+            // We use fetch_data even with BlockSTMv2, because we don't want to record reads.
+            if !match data_map.fetch_data_no_record(key, idx_to_validate) {
+                Ok(Versioned(version, value)) => {
                     matches!(
-                        DataRead::from_value_with_layout(version, v).contains(r),
+                        self.data_read_comparator.compare_data_reads(
+                            &DataRead::from_value_with_layout(version, value),
+                            read
+                        ),
                         DataReadComparison::Contains
                     )
                 },
                 Ok(Resolved(value)) => matches!(
-                    DataRead::Resolved(value).contains(r),
+                    self.data_read_comparator
+                        .compare_data_reads(&DataRead::Resolved(value), read),
                     DataReadComparison::Contains
                 ),
                 // Dependency implies a validation failure, and if the original read were to
@@ -797,8 +939,72 @@ where
                 | Err(Unresolved(_))
                 | Err(DeltaApplicationFailure)
                 | Err(Uninitialized) => false,
+            } {
+                return false;
             }
-        })
+        }
+        true
+    }
+
+    pub(crate) fn validate_data_reads(
+        &self,
+        data_map: &VersionedData<T::Key, T::Value>,
+        idx_to_validate: TxnIndex,
+    ) -> bool {
+        if self.non_delayed_field_speculative_failure {
+            return false;
+        }
+
+        // This includes AggregatorV1 reads and keeps BlockSTMv1 behavior intact.
+        self.validate_data_reads_impl(self.data_reads.iter(), data_map, idx_to_validate)
+    }
+
+    // This method is only used in the BlockSTMv2 flow. BlockSTMv1 validates
+    // aggregator v1 reads as a part of data reads.
+    pub(crate) fn validate_aggregator_v1_reads(
+        &self,
+        data_map: &VersionedData<T::Key, T::Value>,
+        aggregator_write_keys: impl Iterator<Item = T::Key>,
+        idx_to_validate: TxnIndex,
+    ) -> Result<bool, PanicError> {
+        // Few aggregator v1 instances exist in the system (and legacy now, deprecated
+        // by DelayedFields), hence the efficiency of construction below is not a concern.
+        let mut aggregator_v1_iterable = Vec::with_capacity(self.aggregator_v1_reads.len());
+        for k in &self.aggregator_v1_reads {
+            match self.data_reads.get(k) {
+                Some(data_read) => aggregator_v1_iterable.push((k, data_read)),
+                None => {
+                    return Err(code_invariant_error(format!(
+                        "Aggregator v1 read {:?} not found among captured data reads",
+                        k
+                    )));
+                },
+            }
+        }
+
+        let ret = self.validate_data_reads_impl(
+            aggregator_v1_iterable.into_iter(),
+            data_map,
+            idx_to_validate,
+        );
+
+        if ret {
+            // Additional invariant check (that AggregatorV1 reads are captured for
+            // aggregator write keys). This protects against the case where aggregator v1
+            // state value read was read by a wrong interface (e.g. via resource API).
+            for key in aggregator_write_keys {
+                if self.data_reads.contains_key(&key) && !self.aggregator_v1_reads.contains(&key) {
+                    // Not assuming read-before-write here: if there was a read, it must also be
+                    // captured as an aggregator_v1 read.
+                    return Err(code_invariant_error(format!(
+                        "Captured read at aggregator key {:?} not found among AggregatorV1 reads",
+                        key
+                    )));
+                }
+            }
+        }
+
+        Ok(ret)
     }
 
     /// Records the read to global cache that spans across multiple blocks.
@@ -835,23 +1041,49 @@ where
     ///   1. Entries read from the global module cache are not overridden.
     ///   2. Entries that were not in per-block cache before are still not there.
     ///   3. Entries that were in per-block cache have the same commit index.
+    ///
+    /// maybe_updated_module_keys set to None in BlockSTMv1, in which case all module reads
+    /// are validated. BlockSTMv2 provides a set of module keys that were updated, and
+    /// validation simply checks for an intersection with the captured module reads.
     pub(crate) fn validate_module_reads(
         &self,
         global_module_cache: &GlobalModuleCache<K, DC, VC, S>,
         per_block_module_cache: &SyncModuleCache<K, DC, VC, S, Option<TxnIndex>>,
+        maybe_updated_module_keys: Option<&BTreeSet<K>>,
     ) -> bool {
         if self.non_delayed_field_speculative_failure {
             return false;
         }
 
-        self.module_reads.iter().all(|(key, read)| match read {
+        let validate = |key: &K, read: &ModuleRead<DC, VC, S>| match read {
             ModuleRead::GlobalCache(_) => global_module_cache.contains_not_overridden(key),
             ModuleRead::PerBlockCache(previous) => {
                 let current_version = per_block_module_cache.get_module_version(key);
                 let previous_version = previous.as_ref().map(|(_, version)| *version);
                 current_version == previous_version
             },
-        })
+        };
+
+        match maybe_updated_module_keys {
+            Some(updated_module_keys) if updated_module_keys.len() <= self.module_reads.len() => {
+                // When updated_module_keys is smaller, iterate over it and lookup in module_reads
+                updated_module_keys
+                    .iter()
+                    .filter(|&k| self.module_reads.contains_key(k))
+                    .all(|key| validate(key, self.module_reads.get(key).unwrap()))
+            },
+            Some(updated_module_keys) => {
+                // When module_reads is smaller, iterate over it and filter by updated_module_keys
+                self.module_reads
+                    .iter()
+                    .filter(|(k, _)| updated_module_keys.contains(k))
+                    .all(|(key, read)| validate(key, read))
+            },
+            None => self
+                .module_reads
+                .iter()
+                .all(|(key, read)| validate(key, read)),
+        }
     }
 
     pub(crate) fn validate_group_reads(
@@ -872,10 +1104,13 @@ where
             }
 
             ret && group.inner_reads.iter().all(|(tag, r)| {
-                match group_map.fetch_tagged_data(key, tag, idx_to_validate) {
+                match group_map.fetch_tagged_data_no_record(key, tag, idx_to_validate) {
                     Ok((version, v)) => {
                         matches!(
-                            DataRead::from_value_with_layout(version, v).contains(r),
+                            self.data_read_comparator.compare_data_reads(
+                                &DataRead::from_value_with_layout(version, v),
+                                r,
+                            ),
                             DataReadComparison::Contains
                         )
                     },
@@ -884,8 +1119,10 @@ where
                             Arc::<T::Value>::new(TransactionWrite::from_state_value(None));
                         assert!(sentinel_deletion.is_deletion());
                         matches!(
-                            DataRead::Versioned(Err(StorageVersion), sentinel_deletion, None)
-                                .contains(r),
+                            self.data_read_comparator.compare_data_reads(
+                                &DataRead::Versioned(Err(StorageVersion), sentinel_deletion, None),
+                                r,
+                            ),
                             DataReadComparison::Contains
                         )
                     },
@@ -980,10 +1217,6 @@ where
         }
 
         // TODO(loader_v2): Test summaries are the same.
-        #[allow(deprecated)]
-        for key in &self.deprecated_module_reads {
-            ret.insert(InputOutputKey::Resource(key.clone()));
-        }
         for key in self.module_reads.keys() {
             let key = T::Key::from_address_and_module_name(key.address(), key.name());
             ret.insert(InputOutputKey::Resource(key));
@@ -1049,7 +1282,7 @@ mod test {
     use super::*;
     use crate::{
         code_cache_global::GlobalModuleCache,
-        proptest_types::{
+        combinatorial_tests::{
             mock_executor::MockEvent,
             types::{raw_metadata, KeyType, ValueType},
         },
@@ -1068,6 +1301,7 @@ mod test {
     use test_case::test_case;
 
     // Macro to reduce code duplication for CapturedReads type parameters
+    // TODO(BlockSTMv2): Test w. BlockSTMv2 data read comparator.
     macro_rules! test_captured_reads {
         (update_entry, $entry:expr, $read:expr) => {
             CapturedReads::<
@@ -1076,7 +1310,7 @@ mod test {
                 MockDeserializedCode,
                 MockVerifiedCode,
                 MockExtension,
-            >::update_entry($entry, $read)
+            >::update_entry($entry, $read, &DataReadComparator::new(None))
         };
         (new) => {
             CapturedReads::<
@@ -1085,7 +1319,7 @@ mod test {
                 MockDeserializedCode,
                 MockVerifiedCode,
                 MockExtension,
-            >::new()
+            >::new(None)
         };
     }
 
@@ -1212,33 +1446,55 @@ mod test {
 
     macro_rules! assert_inconsistent_same_kind {
         ($x:expr, $y:expr) => {{
+            let data_read_comparator = DataReadComparator::new(None);
             assert_ne!($x, $y);
             assert_ne!($y, $x);
-            assert_matches!($x.contains(&$y), DataReadComparison::Inconsistent);
-            assert_matches!($y.contains(&$x), DataReadComparison::Inconsistent);
+            assert_matches!(
+                data_read_comparator.compare_data_reads(&$x, &$y),
+                DataReadComparison::Inconsistent
+            );
+            assert_matches!(
+                data_read_comparator.compare_data_reads(&$y, &$x),
+                DataReadComparison::Inconsistent
+            );
         }};
     }
 
     macro_rules! assert_inconsistent_downcast {
         ($x:expr, $y:expr) => {{
+            let data_read_comparator = DataReadComparator::new(None);
             assert_ne!($x, $y);
             assert_ne!($y, $x);
-            assert_matches!($x.contains(&$y), DataReadComparison::Inconsistent);
-            assert_matches!($y.contains(&$x), DataReadComparison::Insufficient);
+            assert_matches!(
+                data_read_comparator.compare_data_reads(&$x, &$y),
+                DataReadComparison::Inconsistent
+            );
+            assert_matches!(
+                data_read_comparator.compare_data_reads(&$y, &$x),
+                DataReadComparison::Insufficient
+            );
         }};
     }
 
     macro_rules! assert_contains {
         ($x:expr, $y:expr) => {{
+            let data_read_comparator = DataReadComparator::new(None);
             assert_some_eq!($x.convert_to(&$y.get_kind()), $y);
-            assert_matches!($x.contains(&$y), DataReadComparison::Contains);
+            assert_matches!(
+                data_read_comparator.compare_data_reads(&$x, &$y),
+                DataReadComparison::Contains
+            );
         }};
     }
 
     macro_rules! assert_insufficient {
         ($x:expr, $y:expr) => {{
+            let data_read_comparator = DataReadComparator::new(None);
             assert_none!($x.convert_to(&$y.get_kind()));
-            assert_matches!($x.contains(&$y), DataReadComparison::Insufficient);
+            assert_matches!(
+                data_read_comparator.compare_data_reads(&$x, &$y),
+                DataReadComparison::Insufficient
+            );
         }};
     }
 
@@ -1817,13 +2073,23 @@ mod test {
         let global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None
+        ));
         captured_reads.mark_failure(true);
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None
+        ));
         captured_reads.mark_failure(false);
-        assert!(
-            !captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache)
-        );
+        assert!(!captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None
+        ));
     }
 
     #[test]
@@ -1840,23 +2106,37 @@ mod test {
         global_module_cache.insert(1, module_1.clone());
         captured_reads.capture_global_cache_read(1, module_1);
 
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None
+        ));
 
         // Now, mark one of the entries in invalid. Validations should fail!
         global_module_cache.mark_overridden(&1);
-        let valid =
-            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+        let valid = captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None,
+        );
         assert!(!valid);
 
         // Without invalid module (and if it is not captured), validation should pass.
         assert!(global_module_cache.remove(&1));
         captured_reads.module_reads.remove(&1);
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None
+        ));
 
         // Validation fails if we captured a cross-block module which does not exist anymore.
         assert!(global_module_cache.remove(&0));
-        let valid =
-            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+        let valid = captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None,
+        );
         assert!(!valid);
     }
 
@@ -1911,7 +2191,11 @@ mod test {
         captured_reads.capture_per_block_cache_read(0, Some((a, Some(10))));
         captured_reads.capture_per_block_cache_read(1, None);
 
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None
+        ));
 
         let b = mock_deserialized_code(1, MockExtension::new(8));
         per_block_module_cache
@@ -1924,12 +2208,19 @@ mod test {
             .unwrap();
 
         // Entry did not exist before and now exists.
-        let valid =
-            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+        let valid = captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None,
+        );
         assert!(!valid);
 
         captured_reads.module_reads.remove(&1);
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None
+        ));
 
         // Version has been republished, with a higher transaction index. Should fail validation.
         let a = mock_deserialized_code(0, MockExtension::new(8));
@@ -1942,8 +2233,11 @@ mod test {
             )
             .unwrap();
 
-        let valid =
-            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+        let valid = captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None,
+        );
         assert!(!valid);
     }
 
@@ -1957,7 +2251,11 @@ mod test {
         let m = mock_verified_code(0, MockExtension::new(8));
         global_module_cache.insert(0, m.clone());
         captured_reads.capture_global_cache_read(0, m);
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None
+        ));
 
         // Assume we republish this module: validation must fail.
         let a = mock_deserialized_code(100, MockExtension::new(8));
@@ -1971,13 +2269,105 @@ mod test {
             )
             .unwrap();
 
-        let valid =
-            captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache);
+        let valid = captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None,
+        );
         assert!(!valid);
 
         // Assume we re-read the new correct version. Then validation should pass again.
         captured_reads.capture_per_block_cache_read(0, Some((a, Some(10))));
-        assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
+        assert!(captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None
+        ));
         assert!(!global_module_cache.contains_not_overridden(&0));
+    }
+
+    #[test]
+    fn test_validate_module_reads_with_maybe_updated_module_keys() {
+        let mut captured_reads = test_captured_reads!(new);
+        let mut global_module_cache = GlobalModuleCache::empty();
+        let per_block_module_cache = SyncModuleCache::empty();
+
+        // Set up multiple modules in captured reads
+        let module_0 = mock_verified_code(0, MockExtension::new(8));
+        let module_1 = mock_verified_code(1, MockExtension::new(8));
+        let module_2 = mock_verified_code(2, MockExtension::new(8));
+        let module_3 = mock_verified_code(3, MockExtension::new(8));
+
+        global_module_cache.insert(0, module_0.clone());
+        global_module_cache.insert(1, module_1.clone());
+        global_module_cache.insert(2, module_2.clone());
+        global_module_cache.insert(3, module_3.clone());
+
+        captured_reads.capture_global_cache_read(0, module_0);
+        captured_reads.capture_global_cache_read(1, module_1);
+        captured_reads.capture_global_cache_read(2, module_2);
+        captured_reads.capture_global_cache_read(3, module_3);
+
+        // All modules should validate with None
+        assert!(captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None
+        ));
+
+        // Test progressively growing BTreeSet - module_reads has 4 elements (0,1,2,3)
+        let mut test_set = BTreeSet::new();
+        for i in 0..6 {
+            // Should pass when all modules are valid.
+            assert!(captured_reads.validate_module_reads(
+                &global_module_cache,
+                &per_block_module_cache,
+                Some(&test_set)
+            ));
+            test_set.insert(i);
+        }
+
+        // Now invalidate module 1 and test selective validation with progressive sets
+        global_module_cache.mark_overridden(&1);
+
+        // Should fail with None (validates all modules)
+        assert!(!captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            None
+        ));
+
+        // Test specific cases to verify optimization branches
+        // Case 1: Small set (size 2 < 4) - triggers first branch (iterate over BTreeSet)
+        let small_set = BTreeSet::from([0, 2]); // Valid modules only
+        assert!(captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            Some(&small_set)
+        ));
+
+        // Case 2: Large set (size 6 > 4) - triggers second branch (iterate over module_reads)
+        let large_set = BTreeSet::from([0, 2, 3, 4, 5, 6]); // Valid captured modules + non-captured
+        assert!(captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            Some(&large_set)
+        ));
+
+        // Case 3: Set with invalid module in small set (size 1 < 4)
+        let invalid_small_set = BTreeSet::from([1]);
+        assert!(!captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            Some(&invalid_small_set)
+        ));
+
+        // Case 4: Set with invalid module in large set (size 6 > 4)
+        let invalid_large_set = BTreeSet::from([0, 1, 2, 3, 4, 5]);
+        assert!(!captured_reads.validate_module_reads(
+            &global_module_cache,
+            &per_block_module_cache,
+            Some(&invalid_large_set)
+        ));
     }
 }

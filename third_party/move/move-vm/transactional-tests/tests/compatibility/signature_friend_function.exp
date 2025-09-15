@@ -1,0 +1,32 @@
+processed 10 tasks
+task 0 lines 1-5:  publish --skip-check-friend-linking [module 0x66::a]
+task 1 lines 8-12:  publish --skip-check-friend-linking [module 0x66::a]
+task 2 lines 15-19:  publish --skip-check-friend-linking [module 0x66::a]
+task 3 lines 22-26:  publish --skip-check-friend-linking [module 0x66::a]
+task 4 lines 29-32:  publish --skip-check-friend-linking [module 0x66::a]
+task 5 lines 35-39:  publish [module 0x66::b]
+task 6 lines 42-46:  publish [module 0x66::b]
+task 7 lines 49-53:  publish [module 0x66::b]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::b'. Got VMError: {
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 8 lines 56-60:  publish [module 0x66::b]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::b'. Got VMError: {
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 9 lines 63-66:  publish [module 0x66::b]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::b'. Got VMError: {
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

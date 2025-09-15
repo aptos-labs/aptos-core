@@ -105,6 +105,7 @@ module 0x42::freeze_mut_ref {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::freeze_mut_ref {
+    use std::vector;
     struct G {
         f: u64,
     }

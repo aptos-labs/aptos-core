@@ -1,6 +1,5 @@
 processed 7 tasks
-
-task 0 'publish'. lines 1-77:
+task 0 lines 1-77:  publish [module 0xc0ffee::m {]
 Error: compilation errors:
  error: undeclared `_`
   ┌─ TEMPFILE:7:17
@@ -63,8 +62,7 @@ error: undeclared `_`
    │          ^
 
 
-
-task 1 'run'. lines 79-79:
+task 1 lines 79-79:  run 0xc0ffee::m::test --args 4
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -72,8 +70,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 2 'run'. lines 81-81:
+task 2 lines 81-81:  run 0xc0ffee::m::test3 --args 5
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -81,8 +78,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 3 'run'. lines 83-83:
+task 3 lines 83-83:  run 0xc0ffee::m::test4 --args 5
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -90,8 +86,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 4 'run'. lines 85-85:
+task 4 lines 85-85:  run 0xc0ffee::m::test5 --args 5
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -99,8 +94,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 5 'run'. lines 87-99:
+task 5 lines 87-99:  run 0xc0ffee::m::test6 --args 5 [// //# run 0xc0ffee::m::test7 --args 5]
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -108,8 +102,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 6 'run'. lines 101-101:
+task 6 lines 101-101:  run 0xc0ffee::m::test11
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,

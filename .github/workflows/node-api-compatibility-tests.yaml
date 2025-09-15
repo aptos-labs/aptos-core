@@ -63,7 +63,7 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         if: ${{ !inputs.SKIP_JOB }}
         with:
           node-version-file: .node-version
@@ -83,7 +83,7 @@ jobs:
         if: ${{ !inputs.SKIP_JOB }}
 
       # Build the API specs.
-      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+      - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
         if: ${{ !inputs.SKIP_JOB }}
         name: generate-yaml-spec
         with:
@@ -91,7 +91,7 @@ jobs:
           timeout_minutes: 20
           command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
 
-      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+      - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
         if: ${{ !inputs.SKIP_JOB }}
         name: generate-json-spec
         with:

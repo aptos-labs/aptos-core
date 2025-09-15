@@ -3,10 +3,10 @@
 
 use crate::{
     algebra::polynomials::shamir_secret_share,
-    pvss,
+    fiat_shamir, pvss,
     pvss::{
         contribution::{batch_verify_soks, Contribution, SoK},
-        das, encryption_dlog, fiat_shamir, schnorr, traits,
+        das, encryption_dlog, schnorr, traits,
         traits::{transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig},
         LowDegreeTest, Player, WeightedConfig,
     },
@@ -194,7 +194,7 @@ impl traits::Transcript for Transcript {
         let W = sc.get_total_weight();
 
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
-        let (f, extra) = fiat_shamir::fiat_shamir(
+        let (f, extra) = fiat_shamir::fiat_shamir_das(
             self,
             sc.get_threshold_config(),
             pp,

@@ -1,0 +1,12 @@
+processed 1 task
+task 0 lines 3-26:  publish [module 0x42::test {]
+Error: compilation errors:
+ error: cannot select field `y` since it has different types in variants of enum `E`
+   ┌─ TEMPFILE:23:33
+   │
+23 │         if (p0 is V1) _t1 = *&(&p0.y).x else if (p0 is V2) _t1 = 1u8 else abort 14566554180833181697;
+   │                                 ^^
+   │
+   = field `y` has type `S0` in variant `V2` and type `S1<u8, bool>` in variant `V1`
+
+

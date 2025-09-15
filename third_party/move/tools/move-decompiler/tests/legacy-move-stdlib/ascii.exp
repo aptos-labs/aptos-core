@@ -1,0 +1,76 @@
+module 0x1::ascii {
+    use 0x1::option;
+    struct Char has copy, drop, store {
+        byte: u8,
+    }
+    struct String has copy, drop, store {
+        bytes: vector<u8>,
+    }
+    public fun length(string: &String): u64 {
+        0x1::vector::length<u8>(as_bytes(string))
+    }
+    public fun byte(char: Char): u8 {
+        let Char{byte: _t2} = char;
+        _t2
+    }
+    public fun string(bytes: vector<u8>): String {
+        let _t1 = try_string(bytes);
+        if (!option::is_some<String>(&_t1)) abort 65536;
+        option::destroy_some<String>(_t1)
+    }
+    public fun as_bytes(string: &String): &vector<u8> {
+        &string.bytes
+    }
+    public fun all_characters_printable(string: &String): bool {
+        let _t1 = 0x1::vector::length<u8>(&string.bytes);
+        let _t2 = 0;
+        'l0: loop {
+            loop {
+                if (!(_t2 < _t1)) break 'l0;
+                if (!is_printable_char(*0x1::vector::borrow<u8>(&string.bytes, _t2))) break;
+                _t2 = _t2 + 1
+            };
+            return false
+        };
+        true
+    }
+    public fun is_printable_char(byte: u8): bool {
+        let _t1;
+        if (byte >= 32u8) _t1 = byte <= 126u8 else _t1 = false;
+        _t1
+    }
+    public fun try_string(bytes: vector<u8>): option::Option<String> {
+        let _t1 = 0x1::vector::length<u8>(&bytes);
+        let _t2 = 0;
+        'l0: loop {
+            loop {
+                if (!(_t2 < _t1)) break 'l0;
+                if (!is_valid_char(*0x1::vector::borrow<u8>(&bytes, _t2))) break;
+                _t2 = _t2 + 1
+            };
+            return option::none<String>()
+        };
+        option::some<String>(String{bytes: bytes})
+    }
+    public fun char(byte: u8): Char {
+        if (!is_valid_char(byte)) abort 65536;
+        Char{byte: byte}
+    }
+    public fun is_valid_char(b: u8): bool {
+        b <= 127u8
+    }
+    public fun into_bytes(string: String): vector<u8> {
+        let String{bytes: _t2} = string;
+        _t2
+    }
+    public fun pop_char(string: &mut String): Char {
+        Char{byte: 0x1::vector::pop_back<u8>(&mut string.bytes)}
+    }
+    public fun push_char(string: &mut String, char: Char) {
+        let _t3 = &mut string.bytes;
+        let _t6 = *&(&char).byte;
+        0x1::vector::push_back<u8>(_t3, _t6);
+    }
+}
+
+============ recompilation succeeded ========

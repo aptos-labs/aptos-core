@@ -39,12 +39,18 @@ use move_core_types::{
 use move_vm_runtime::{
     config::VMConfig,
     data_cache::TransactionDataCache,
+    dispatch_loader,
     module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsFunctionValueExtension, LoadedFunction, ModuleStorage, VerifiedModuleBundle,
+    AsFunctionValueExtension, InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction,
+    Loader, ModuleStorage, VerifiedModuleBundle,
 };
-use move_vm_types::{gas::GasMeter, value_serde::ValueSerDeContext, values::Value};
+use move_vm_types::{
+    gas::GasMeter,
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
+    values::Value,
+};
 use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
 
 pub mod respawned_session;
@@ -82,6 +88,7 @@ where
         resolver: &'r R,
     ) -> Self {
         let mut extensions = NativeContextExtensions::default();
+        let session_counter = session_id.session_counter();
         let txn_hash: [u8; 32] = session_id
             .as_uuid()
             .to_vec()
@@ -103,6 +110,7 @@ where
             session_id.into_script_hash(),
             chain_id.id(),
             maybe_user_transaction_context,
+            session_counter,
         ));
         extensions.add(NativeCodeContext::new());
         extensions.add(NativeStateStorageContext::new(resolver));
@@ -128,17 +136,26 @@ where
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let func = module_storage.load_function(module_id, function_name, &ty_args)?;
-        MoveVM::execute_loaded_function(
-            func,
-            args,
-            &mut self.data_cache,
-            gas_meter,
-            traversal_context,
-            &mut self.extensions,
-            module_storage,
-            self.resolver,
-        )
+        dispatch_loader!(module_storage, loader, {
+            let func = loader.load_instantiated_function(
+                &LegacyLoaderConfig::unmetered(),
+                gas_meter,
+                traversal_context,
+                module_id,
+                function_name,
+                &ty_args,
+            )?;
+            MoveVM::execute_loaded_function(
+                func,
+                args,
+                &mut self.data_cache,
+                gas_meter,
+                traversal_context,
+                &mut self.extensions,
+                &loader,
+                self.resolver,
+            )
+        })
     }
 
     pub fn execute_loaded_function(
@@ -147,7 +164,7 @@ where
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
-        module_storage: &impl ModuleStorage,
+        loader: &impl Loader,
     ) -> VMResult<SerializedReturnValues> {
         MoveVM::execute_loaded_function(
             func,
@@ -156,7 +173,7 @@ where
             gas_meter,
             traversal_context,
             &mut self.extensions,
-            module_storage,
+            loader,
             self.resolver,
         )
     }
@@ -176,7 +193,7 @@ where
                 // We allow serialization of native values here because we want to
                 // temporarily store native values (via encoding to ensure deterministic
                 // gas charging) in block storage.
-                ValueSerDeContext::new()
+                ValueSerDeContext::new(function_extension.max_value_nest_depth())
                     .with_delayed_fields_serde()
                     .with_func_args_deserialization(&function_extension)
                     .serialize(&value, &layout)?
@@ -184,7 +201,7 @@ where
             } else {
                 // Otherwise, there should be no native values so ensure
                 // serialization fails here if there are any.
-                ValueSerDeContext::new()
+                ValueSerDeContext::new(function_extension.max_value_nest_depth())
                     .with_func_args_deserialization(&function_extension)
                     .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), None))
@@ -357,9 +374,16 @@ where
 
             for (struct_tag, blob_op) in resources {
                 let resource_group_tag = {
+                    // INVARIANT:
+                    //   We do not need to meter metadata access here. If this resource is in data
+                    //   cache, we must have already fetched metadata for its tag.
                     let metadata = module_storage
-                        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+                        .unmetered_get_existing_module_metadata(
+                            &struct_tag.address,
+                            &struct_tag.module,
+                        )
                         .map_err(|e| e.to_partial())?;
+
                     get_resource_group_member_from_metadata(&struct_tag, &metadata)
                 };
 

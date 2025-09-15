@@ -1,0 +1,74 @@
+//**** Cross-compiled for `move` syntax from `tests/inlining/bug_9717.move`
+
+//# publish
+module 0xcafe::vectors {
+    public entry fun guess_flips(p0: vector<u8>) {
+        let _t1 = &p0;
+        let _t2 = 0;
+        loop {
+            let _t7 = 0x1::vector::length<u8>(_t1);
+            if (!(_t2 < _t7)) break;
+            if (*0x1::vector::borrow<u8>(_t1, _t2) != 0u8) break;
+            _t2 = _t2 + 1;
+            continue
+        };
+    }
+    public entry fun guess_flips_directly(p0: vector<u8>) {
+        let _t1 = 0;
+        loop {
+            let _t5 = 0x1::vector::length<u8>(&p0);
+            if (!(_t1 < _t5)) break;
+            if (*0x1::vector::borrow<u8>(&p0, _t1) != 0u8) break;
+            _t1 = _t1 + 1;
+            continue
+        };
+    }
+    public entry fun guess_with_break_without_inline(p0: vector<u8>) {
+        loops_with_break_no_inline(&p0);
+    }
+    fun loops_with_break_no_inline(p0: &vector<u8>) {
+        let _t1 = 0;
+        loop {
+            let _t5 = 0x1::vector::length<u8>(p0);
+            if (!(_t1 < _t5)) break;
+            if (*0x1::vector::borrow<u8>(p0, _t1) != 0u8) break;
+            _t1 = _t1 + 1;
+            continue
+        };
+    }
+    public entry fun guess_without_break_with_inline(p0: vector<u8>) {
+        let _t1 = &p0;
+        let _t2 = 0;
+        'l0: loop {
+            loop {
+                let _t7 = 0x1::vector::length<u8>(_t1);
+                if (!(_t2 < _t7)) break 'l0;
+                if (!(*0x1::vector::borrow<u8>(_t1, _t2) == 0u8)) break;
+                _t2 = _t2 + 1;
+                continue
+            };
+            abort 3
+        };
+    }
+    fun test_guess_directly() {
+        guess_flips_directly(vector[0u8, 0u8, 0u8, 0u8]);
+    }
+    fun test_guess_with_break_no_inline() {
+        guess_with_break_without_inline(vector[0u8, 0u8, 0u8, 0u8]);
+    }
+    fun test_guess_with_inline_break() {
+        guess_flips(vector[0u8, 0u8, 0u8, 0u8]);
+    }
+    fun test_guess_without_break() {
+        guess_without_break_with_inline(vector[0u8, 0u8, 0u8, 0u8]);
+    }
+}
+
+
+//# run 0xcafe::vectors::test_guess_with_inline_break
+
+//# run 0xcafe::vectors::test_guess_directly
+
+//# run 0xcafe::vectors::test_guess_with_break_no_inline
+
+//# run 0xcafe::vectors::test_guess_without_break

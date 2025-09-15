@@ -27,7 +27,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
     waypoint::Waypoint,
 };
 use futures::channel::oneshot;
@@ -254,7 +254,7 @@ pub(crate) struct StateValueSyncer {
     next_state_index_to_process: u64,
 
     // The transaction output (inc. info and proof) for the version we're syncing
-    transaction_output_to_sync: Option<TransactionOutputListWithProof>,
+    transaction_output_to_sync: Option<TransactionOutputListWithProofV2>,
 }
 
 impl StateValueSyncer {
@@ -275,7 +275,7 @@ impl StateValueSyncer {
     /// Sets the transaction output to sync
     pub fn set_transaction_output_to_sync(
         &mut self,
-        transaction_output_to_sync: TransactionOutputListWithProof,
+        transaction_output_to_sync: TransactionOutputListWithProofV2,
     ) {
         self.transaction_output_to_sync = Some(transaction_output_to_sync);
     }
@@ -620,7 +620,8 @@ impl<
                     .await?;
                 },
                 DataPayload::TransactionsWithProof(transactions_with_proof) => {
-                    let payload_start_version = transactions_with_proof.first_transaction_version;
+                    let payload_start_version =
+                        transactions_with_proof.get_first_transaction_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,
@@ -635,7 +636,7 @@ impl<
                 },
                 DataPayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
                     let payload_start_version =
-                        transaction_outputs_with_proof.first_transaction_output_version;
+                        transaction_outputs_with_proof.get_first_output_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,
@@ -1006,6 +1007,7 @@ impl<
 
         // Verify the chunk root hash matches the expected root hash
         let first_transaction_info = transaction_output_to_sync
+            .get_output_list_with_proof()
             .proof
             .transaction_infos
             .first()
@@ -1114,8 +1116,8 @@ impl<
     async fn process_transaction_or_output_payload(
         &mut self,
         notification_metadata: NotificationMetadata,
-        transaction_list_with_proof: Option<TransactionListWithProof>,
-        transaction_outputs_with_proof: Option<TransactionOutputListWithProof>,
+        transaction_list_with_proof: Option<TransactionListWithProofV2>,
+        transaction_outputs_with_proof: Option<TransactionOutputListWithProofV2>,
         payload_start_version: Option<Version>,
     ) -> Result<(), Error> {
         // Verify that we're expecting transaction or output payloads
@@ -1266,7 +1268,7 @@ impl<
     async fn verify_transaction_info_to_sync(
         &mut self,
         notification_id: NotificationId,
-        transaction_outputs_with_proof: Option<TransactionOutputListWithProof>,
+        transaction_outputs_with_proof: Option<TransactionOutputListWithProofV2>,
         payload_start_version: Option<Version>,
     ) -> Result<(), Error> {
         // Verify the payload starting version
@@ -1283,7 +1285,13 @@ impl<
         // Verify the payload proof (the ledger info has already been verified)
         // and save the transaction output with proof.
         if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
-            if transaction_outputs_with_proof.proof.transaction_infos.len() == 1 {
+            if transaction_outputs_with_proof
+                .get_output_list_with_proof()
+                .proof
+                .transaction_infos
+                .len()
+                == 1
+            {
                 match transaction_outputs_with_proof.verify(
                     ledger_info_to_sync.ledger_info(),
                     Some(expected_start_version),
@@ -1368,16 +1376,14 @@ impl<
         &mut self,
         notification_id: NotificationId,
         payload_start_version: Version,
-        transaction_list_with_proof: Option<&TransactionListWithProof>,
-        transaction_outputs_with_proof: Option<&TransactionOutputListWithProof>,
+        transaction_list_with_proof: Option<&TransactionListWithProofV2>,
+        transaction_outputs_with_proof: Option<&TransactionOutputListWithProofV2>,
     ) -> Result<Option<LedgerInfoWithSignatures>, Error> {
         // Calculate the payload end version
         let num_versions = match self.get_bootstrapping_mode() {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
-                    transaction_outputs_with_proof
-                        .transactions_and_outputs
-                        .len()
+                    transaction_outputs_with_proof.get_num_outputs()
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
@@ -1391,7 +1397,7 @@ impl<
             },
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
-                    transaction_list_with_proof.transactions.len()
+                    transaction_list_with_proof.get_num_transactions()
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
@@ -1405,9 +1411,9 @@ impl<
             },
             BootstrappingMode::ExecuteOrApplyFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
-                    transaction_list_with_proof.transactions.len()
+                    transaction_list_with_proof.get_num_transactions()
                 } else if let Some(output_list_with_proof) = transaction_outputs_with_proof {
-                    output_list_with_proof.transactions_and_outputs.len()
+                    output_list_with_proof.get_num_outputs()
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
@@ -1497,7 +1503,9 @@ impl<
     }
 
     /// Returns the transaction output to sync
-    fn get_transaction_output_to_sync(&mut self) -> Result<TransactionOutputListWithProof, Error> {
+    fn get_transaction_output_to_sync(
+        &mut self,
+    ) -> Result<TransactionOutputListWithProofV2, Error> {
         self.state_value_syncer
             .transaction_output_to_sync
             .clone()

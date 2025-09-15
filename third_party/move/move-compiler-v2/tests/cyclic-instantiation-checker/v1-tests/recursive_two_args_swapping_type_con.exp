@@ -1,9 +1,9 @@
 
 Diagnostics:
-error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
   ┌─ tests/cyclic-instantiation-checker/v1-tests/recursive_two_args_swapping_type_con.move:7:9
   │
 7 │     fun f<T1, T2>(a: T1, x: T2) {
   │         ^
   │
-  = `f<T1, T2>` calls `f<S<T2>, T1>` at tests/cyclic-instantiation-checker/v1-tests/recursive_two_args_swapping_type_con.move:8
+  = `f<T1, T2>` uses `f<S<T2>, T1>` at tests/cyclic-instantiation-checker/v1-tests/recursive_two_args_swapping_type_con.move:8

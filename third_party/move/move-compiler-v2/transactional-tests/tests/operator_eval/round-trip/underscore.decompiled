@@ -1,0 +1,25 @@
+//**** Cross-compiled for `move` syntax from `tests/operator_eval/underscore.move`
+
+//# run 0xc0ffee::m::test --args 4
+
+//# run 0xc0ffee::m::test3 --args 5
+
+//# run 0xc0ffee::m::test4 --args 5
+
+//# run 0xc0ffee::m::test5 --args 5
+
+//# run 0xc0ffee::m::test6 --args 5
+
+//# run 0xc0ffee::m::test7 --args 5
+
+//# run 0xc0ffee::m::test8 --args 5
+
+//# run 0xc0ffee::m::test9
+
+//# run 0xc0ffee::m::test10a
+
+//# run 0xc0ffee::m::test10b
+
+//# run 0xc0ffee::m::test10c
+
+//# run 0xc0ffee::m::test11

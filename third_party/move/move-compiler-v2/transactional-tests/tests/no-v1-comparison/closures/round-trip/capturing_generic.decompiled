@@ -1,0 +1,28 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/capturing_generic.move`
+
+//# publish
+module 0x42::test {
+    struct S has copy, drop {
+        f: u64,
+    }
+    fun eq_with<T0: drop>(p0: T0): |T0|(bool) {
+        |arg0| lambda__1__eq_with<T0>(p0, arg0)
+    }
+    fun lambda__1__eq_with<T0: drop>(p0: T0, p1: T0): bool {
+        p0 == p1
+    }
+    public fun test_S(p0: u64): bool {
+        let _t2 = S{f: p0};
+        let _t5 = eq_with<S>(S{f: 2});
+        _t5(_t2)
+    }
+    public fun test_u64(p0: u64): bool {
+        let _t1 = eq_with<u64>(2);
+        _t1(p0)
+    }
+}
+
+
+//# run 0x42::test::test_u64 --args 3
+
+//# run 0x42::test::test_S --args 2

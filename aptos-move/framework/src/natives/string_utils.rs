@@ -9,8 +9,10 @@ use aptos_native_interface::{
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_std::iterable::Iterable;
+use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     account_address::AccountAddress,
+    function::ClosureMask,
     language_storage::TypeTag,
     u256,
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET},
@@ -18,7 +20,6 @@ use move_core_types::{
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    value_serde::FunctionValueExtension,
     values::{Closure, Reference, Struct, Value, Vector, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
@@ -123,6 +124,59 @@ fn format_vector<'a>(
         native_format_impl(context, ty.get_layout(), val, depth + 1, out)?;
     }
     print_space_or_newline(newline, out, depth);
+    Ok(())
+}
+
+fn format_closure_captured_arguments(
+    context: &mut FormatContext,
+    mask: ClosureMask,
+    mut captured_layouts: impl Iterator<Item = impl MoveLayout>,
+    mut captured_arguments: impl Iterator<Item = Value>,
+    depth: usize,
+    newline: bool,
+    out: &mut String,
+) -> SafeNativeResult<()> {
+    if depth >= context.max_depth {
+        write!(out, " .. ").unwrap();
+        return Ok(());
+    }
+
+    let mut i = 0;
+    let mut mask = mask.bits();
+
+    while mask != 0 {
+        if i > 0 {
+            out.push(',');
+            print_space_or_newline(newline, out, depth + 1);
+        }
+        if i >= context.max_len {
+            write!(out, "..").unwrap();
+            break;
+        }
+
+        if mask & 0x1 != 0 {
+            let layout = captured_layouts.next().ok_or_else(|| {
+                PartialVMError::new_invariant_violation("Captured layout must exist")
+            })?;
+            layout.write_name(out);
+
+            let value = captured_arguments.next().ok_or_else(|| {
+                PartialVMError::new_invariant_violation("Captured argument must exist")
+            })?;
+            native_format_impl(context, layout.get_layout(), value, depth + 1, out)?;
+        } else {
+            write!(out, "_").unwrap();
+        }
+        mask >>= 1;
+        i += 1;
+    }
+
+    if i < context.max_len {
+        out.push(',');
+        print_space_or_newline(newline, out, depth + 1);
+        write!(out, "..").unwrap();
+    }
+
     Ok(())
 }
 
@@ -363,19 +417,26 @@ fn native_format_impl(
             // avoiding potential loading of the function to get full
             // decorated type information.
             let (fun, args) = val.value_as::<Closure>()?.unpack();
-            let data = context
+            let captured_layouts = context
                 .context
-                .function_value_extension()
-                .get_serialization_data(fun.as_ref())?;
+                .loader_context()
+                .get_captured_layouts_for_string_utils(fun.as_ref())?
+                .ok_or_else(|| SafeNativeError::Abort {
+                    abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
+                })?;
             out.push_str(&fun.to_canonical_string());
-            format_vector(
-                context,
-                data.captured_layouts.iter(),
-                args.collect(),
-                depth,
-                !context.single_line,
-                out,
-            )?;
+            out.push('(');
+            if !captured_layouts.is_empty() {
+                format_closure_captured_arguments(
+                    context,
+                    fun.closure_mask(),
+                    captured_layouts.into_iter(),
+                    args,
+                    depth,
+                    !context.single_line,
+                    out,
+                )?;
+            }
             out.push(')');
         },
 
@@ -399,17 +460,12 @@ pub(crate) fn native_format_debug(
     ty: &Type,
     v: Value,
 ) -> SafeNativeResult<String> {
-    // TODO[agg_v2](cleanup): Shift this to annotated layout computation.
-    let (_, has_identifier_mappings) = context
-        .deref()
-        .type_to_type_layout_with_identifier_mappings(ty)?;
-    if has_identifier_mappings {
-        return Err(SafeNativeError::Abort {
-            abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
-        });
-    }
-
-    let layout = context.deref().type_to_fully_annotated_layout(ty)?;
+    let layout =
+        context
+            .type_to_fully_annotated_layout(ty)?
+            .ok_or_else(|| SafeNativeError::Abort {
+                abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
+            })?;
     let mut format_context = FormatContext {
         context,
         should_charge_gas: false,
@@ -432,19 +488,11 @@ fn native_format(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
 
-    // TODO[agg_v2](cleanup): Shift this to annotated layout computation.
-    let (_, has_identifier_mappings) = context
-        .deref()
-        .type_to_type_layout_with_identifier_mappings(&ty_args[0])?;
-    if has_identifier_mappings {
-        return Err(SafeNativeError::Abort {
-            abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
-        });
-    }
-
     let ty = context
-        .deref()
-        .type_to_fully_annotated_layout(&ty_args[0])?;
+        .type_to_fully_annotated_layout(&ty_args[0])?
+        .ok_or_else(|| SafeNativeError::Abort {
+            abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
+        })?;
     let include_int_type = safely_pop_arg!(arguments, bool);
     let single_line = safely_pop_arg!(arguments, bool);
     let canonicalize = safely_pop_arg!(arguments, bool);
@@ -530,16 +578,11 @@ fn native_format_list(
                 val = it.next().unwrap();
                 list_ty = &ty_args[1];
 
-                // TODO[agg_v2](cleanup): Shift this to annotated layout computation.
-                let (_, has_identifier_mappings) = context
-                    .deref()
-                    .type_to_type_layout_with_identifier_mappings(&ty_args[0])?;
-                if has_identifier_mappings {
-                    return Err(SafeNativeError::Abort {
+                let ty = context
+                    .type_to_fully_annotated_layout(&ty_args[0])?
+                    .ok_or_else(|| SafeNativeError::Abort {
                         abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
-                    });
-                }
-                let ty = context.type_to_fully_annotated_layout(&ty_args[0])?;
+                    })?;
 
                 let mut format_context = FormatContext {
                     context,

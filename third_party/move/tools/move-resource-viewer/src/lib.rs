@@ -12,7 +12,7 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError},
     file_format::{
-        CompiledScript, FieldDefinition, SignatureToken, StructDefinitionIndex,
+        CompiledScript, FieldDefinition, Signature, SignatureToken, StructDefinitionIndex,
         StructFieldInformation, StructHandleIndex,
     },
     views::FunctionHandleView,
@@ -24,7 +24,7 @@ use move_core_types::{
     account_address::AccountAddress,
     function::{ClosureMask, MoveClosure},
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{FunctionParamOrReturnTag, ModuleId, StructTag, TypeTag},
     transaction_argument::{convert_txn_args, TransactionArgument},
     u256,
     value::{MoveStruct, MoveTypeLayout, MoveValue},
@@ -143,7 +143,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
         let args_bytes = convert_txn_args(args);
-        self.view_arguments_impl(&param_tys, ty_args, &args_bytes, &mut limit)
+        self.view_arguments_or_returns(&param_tys, ty_args, &args_bytes, &mut limit)
     }
 
     pub fn view_function_arguments(
@@ -155,10 +155,22 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
     ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
         let mut limit = Limiter::default();
         let param_tys = self.resolve_function_arguments(module, function, &mut limit)?;
-        self.view_arguments_impl(&param_tys, ty_args, args, &mut limit)
+        self.view_arguments_or_returns(&param_tys, ty_args, args, &mut limit)
     }
 
-    fn view_arguments_impl(
+    pub fn view_function_returns(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+        ty_args: &[TypeTag],
+        returns: &[Vec<u8>],
+    ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
+        let mut limit = Limiter::default();
+        let return_tys = self.resolve_function_returns(module, function, &mut limit)?;
+        self.view_arguments_or_returns(&return_tys, ty_args, returns, &mut limit)
+    }
+
+    fn view_arguments_or_returns(
         &self,
         param_tys: &[FatType],
         ty_args: &[TypeTag],
@@ -208,20 +220,23 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             .collect::<anyhow::Result<Vec<AnnotatedMoveValue>>>()
     }
 
-    fn resolve_function_arguments(
+    fn resolve_function_types<F>(
         &self,
         module: &ModuleId,
         function: &IdentStr,
         limit: &mut Limiter,
-    ) -> anyhow::Result<Vec<FatType>> {
+        selector: F,
+    ) -> anyhow::Result<Vec<FatType>>
+    where
+        F: Fn(FunctionHandleView<CompiledModule>) -> &Signature,
+    {
         let m = self.view_existing_module(module)?;
         let m = m.borrow();
         for def in m.function_defs.iter() {
             let fhandle = m.function_handle_at(def.function);
             let fhandle_view = FunctionHandleView::new(m, fhandle);
             if fhandle_view.name() == function {
-                return fhandle_view
-                    .parameters()
+                return selector(fhandle_view)
                     .0
                     .iter()
                     .map(|signature| {
@@ -231,6 +246,24 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             }
         }
         Err(anyhow!("Function {:?} not found in {:?}", function, module))
+    }
+
+    fn resolve_function_arguments(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<Vec<FatType>> {
+        self.resolve_function_types(module, function, limit, |fh| fh.parameters())
+    }
+
+    fn resolve_function_returns(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<Vec<FatType>> {
+        self.resolve_function_types(module, function, limit, |fh| fh.return_())
     }
 
     pub fn view_resource(
@@ -372,11 +405,6 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         sig: &SignatureToken,
         limit: &mut Limiter,
     ) -> anyhow::Result<FatType> {
-        let resolve_slice = |toks: &[SignatureToken], limit: &mut Limiter| {
-            toks.iter()
-                .map(|tok| self.resolve_signature(module, tok, limit))
-                .collect::<anyhow::Result<Vec<_>>>()
-        };
         Ok(match sig {
             SignatureToken::Bool => FatType::Bool,
             SignatureToken::U8 => FatType::U8,
@@ -391,6 +419,39 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 FatType::Vector(Box::new(self.resolve_signature(module, ty, limit)?))
             },
             SignatureToken::Function(args, results, abilities) => {
+                let resolve_slice = |toks: &[SignatureToken], limit: &mut Limiter| {
+                    toks.iter()
+                        .map(|tok| {
+                            // Function type can have references as immediate argument or return
+                            // types.
+                            Ok(match tok {
+                                SignatureToken::Reference(t) => FatType::Reference(Box::new(
+                                    self.resolve_signature(module, t, limit)?,
+                                )),
+                                SignatureToken::MutableReference(t) => FatType::MutableReference(
+                                    Box::new(self.resolve_signature(module, t, limit)?),
+                                ),
+                                SignatureToken::Bool
+                                | SignatureToken::U8
+                                | SignatureToken::U64
+                                | SignatureToken::U128
+                                | SignatureToken::Address
+                                | SignatureToken::Signer
+                                | SignatureToken::Vector(_)
+                                | SignatureToken::Function(_, _, _)
+                                | SignatureToken::Struct(_)
+                                | SignatureToken::StructInstantiation(_, _)
+                                | SignatureToken::TypeParameter(_)
+                                | SignatureToken::U16
+                                | SignatureToken::U32
+                                | SignatureToken::U256 => {
+                                    self.resolve_signature(module, tok, limit)?
+                                },
+                            })
+                        })
+                        .collect::<anyhow::Result<Vec<_>>>()
+                };
+
                 FatType::Function(Box::new(FatFunctionType {
                     args: resolve_slice(args, limit)?,
                     results: resolve_slice(results, limit)?,
@@ -402,7 +463,10 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             },
             SignatureToken::StructInstantiation(idx, toks) => {
                 let struct_ty = self.resolve_struct_handle(module, *idx, limit)?;
-                let args = resolve_slice(toks, limit)?;
+                let args = toks
+                    .iter()
+                    .map(|tok| self.resolve_signature(module, tok, limit))
+                    .collect::<anyhow::Result<Vec<_>>>()?;
                 FatType::Struct(Box::new(
                     struct_ty
                         .subst(&args, limit)
@@ -456,9 +520,28 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             TypeTag::U256 => FatType::U256,
             TypeTag::U128 => FatType::U128,
             TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type_impl(ty, limit)?)),
-            TypeTag::Function(..) => {
-                // TODO(#15664) implement functions for fat types"
-                todo!("functions for fat types")
+            TypeTag::Function(function_tag) => {
+                let mut convert_tags = |tags: &[FunctionParamOrReturnTag]| {
+                    tags.iter()
+                        .map(|t| {
+                            use FunctionParamOrReturnTag::*;
+                            Ok(match t {
+                                Reference(t) => {
+                                    FatType::Reference(Box::new(self.resolve_type_impl(t, limit)?))
+                                },
+                                MutableReference(t) => FatType::MutableReference(Box::new(
+                                    self.resolve_type_impl(t, limit)?,
+                                )),
+                                Value(t) => self.resolve_type_impl(t, limit)?,
+                            })
+                        })
+                        .collect::<anyhow::Result<Vec<_>>>()
+                };
+                FatType::Function(Box::new(FatFunctionType {
+                    args: convert_tags(&function_tag.args)?,
+                    results: convert_tags(&function_tag.results)?,
+                    abilities: function_tag.abilities,
+                }))
             },
         })
     }

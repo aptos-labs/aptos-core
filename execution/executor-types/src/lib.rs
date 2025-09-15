@@ -6,8 +6,12 @@
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_scratchpad::SparseMerkleTree;
+use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 use aptos_types::{
-    account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
+    account_config::{
+        randomness_event::RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_MOVE_TYPE_TAG,
+        NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
+    },
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     contract_event::ContractEvent,
     dkg::DKG_START_EVENT_MOVE_TYPE_TAG,
@@ -15,8 +19,8 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_key::StateKey,
     transaction::{
-        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
-        Version,
+        PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionListWithProofV2,
+        TransactionOutputListWithProofV2, Version,
     },
     write_set::WriteSet,
 };
@@ -47,7 +51,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
     #[cfg(any(test, feature = "fuzzing"))]
     fn execute_chunk(
         &self,
-        txn_list_with_proof: TransactionListWithProof,
+        txn_list_with_proof: TransactionListWithProofV2,
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
@@ -62,7 +66,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
     #[cfg(any(test, feature = "fuzzing"))]
     fn apply_chunk(
         &self,
-        txn_output_list_with_proof: TransactionOutputListWithProof,
+        txn_output_list_with_proof: TransactionOutputListWithProofV2,
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
@@ -82,7 +86,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
     /// transaction accumulator.
     fn enqueue_chunk_by_execution(
         &self,
-        txn_list_with_proof: TransactionListWithProof,
+        txn_list_with_proof: TransactionListWithProofV2,
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
@@ -92,7 +96,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
     /// transaction outputs directly to get the executed result.
     fn enqueue_chunk_by_transaction_outputs(
         &self,
-        txn_output_list_with_proof: TransactionOutputListWithProof,
+        txn_output_list_with_proof: TransactionOutputListWithProofV2,
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
@@ -170,6 +174,8 @@ pub trait BlockExecutorTrait: Send + Sync {
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
+
+    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView>;
 }
 
 #[derive(Clone)]
@@ -248,6 +254,7 @@ pub trait TransactionReplayer: Send {
     fn enqueue_chunks(
         &self,
         transactions: Vec<Transaction>,
+        persisted_info: Vec<PersistedAuxiliaryInfo>,
         transaction_infos: Vec<TransactionInfo>,
         write_sets: Vec<WriteSet>,
         event_vecs: Vec<Vec<ContractEvent>>,
@@ -272,6 +279,7 @@ pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
         || type_tag == DKG_START_EVENT_MOVE_TYPE_TAG.deref()
         || type_tag == NEW_EPOCH_EVENT_MOVE_TYPE_TAG.deref()
         || type_tag == NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.deref()
+        || type_tag == RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG.deref()
 }
 
 #[cfg(feature = "bench")]

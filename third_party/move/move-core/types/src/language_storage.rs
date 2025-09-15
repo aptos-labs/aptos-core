@@ -6,6 +6,7 @@ use crate::{
     ability::AbilitySet,
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
+    language_storage::FunctionParamOrReturnTag::{MutableReference, Reference, Value},
     parser::{parse_module_id, parse_struct_tag, parse_type_tag},
     safe_serialize,
 };
@@ -137,8 +138,13 @@ impl<'a> Iterator for TypeTagPreorderTraversalIter<'a> {
                     Struct(struct_tag) => self.stack.extend(struct_tag.type_args.iter().rev()),
                     Function(fun_tag) => {
                         let FunctionTag { args, results, .. } = fun_tag.as_ref();
-                        self.stack
-                            .extend(results.iter().rev().chain(args.iter().rev()))
+                        self.stack.extend(
+                            results
+                                .iter()
+                                .map(|t| t.inner_tag())
+                                .rev()
+                                .chain(args.iter().map(|t| t.inner_tag()).rev()),
+                        )
                     },
                 }
                 Some(ty)
@@ -257,8 +263,8 @@ impl FromStr for StructTag {
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
 pub struct FunctionTag {
-    pub args: Vec<TypeTag>,
-    pub results: Vec<TypeTag>,
+    pub args: Vec<FunctionParamOrReturnTag>,
+    pub results: Vec<FunctionParamOrReturnTag>,
     pub abilities: AbilitySet,
 }
 
@@ -267,7 +273,7 @@ impl FunctionTag {
     ///
     /// INVARIANT: If two function tags are different, they must have different canonical strings.
     pub fn to_canonical_string(&self) -> String {
-        let fmt_list = |l: &[TypeTag]| -> String {
+        let fmt_list = |l: &[FunctionParamOrReturnTag]| -> String {
             l.iter()
                 .map(|t| t.to_canonical_string())
                 .collect::<Vec<_>>()
@@ -287,6 +293,42 @@ impl FunctionTag {
             fmt_list(&self.results),
             self.abilities.display_postfix()
         )
+    }
+}
+
+/// Represents an argument or return tag for [FunctionTag]. This is needed because function tags
+/// carry information about return and argument types which can be references. So direct return
+/// or paramter tags can be references, but not the inner tags.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+pub enum FunctionParamOrReturnTag {
+    Reference(TypeTag),
+    MutableReference(TypeTag),
+    Value(TypeTag),
+}
+
+impl FunctionParamOrReturnTag {
+    /// Returns a canonical string representation of function tag's argument or return tag. If any
+    /// two tags are different, their canonical representation must be also different.
+    pub fn to_canonical_string(&self) -> String {
+        use FunctionParamOrReturnTag::*;
+        match self {
+            Reference(tag) => format!("&{}", tag.to_canonical_string()),
+            MutableReference(tag) => format!("&mut {}", tag.to_canonical_string()),
+            Value(tag) => tag.to_canonical_string(),
+        }
+    }
+
+    /// Returns the inner tag for this argument or return tag.
+    pub fn inner_tag(&self) -> &TypeTag {
+        match self {
+            Reference(tag) | MutableReference(tag) | Value(tag) => tag,
+        }
     }
 }
 
@@ -311,11 +353,16 @@ impl From<ModuleId> for (AccountAddress, Identifier) {
 }
 
 static SCRIPT_MODULE_ID: Lazy<ModuleId> = Lazy::new(|| ModuleId {
+    // [TODO #17369]: Replace `AccountAddress::MAX_ADDRESS` with the value below for `address`
+    // Currently, this is blocked by performance benchmarking in CI
+    /*
     address: AccountAddress::from_str_strict(
-        // This is generated using sha256sum on 10k of bytes from /dev/urandom
-        "0x8bd18359a7ebb84407b6defa7bc5da9aca34a3d1ce764ddfb4d0adcc663430b4",
+       // This is generated using sha256sum on 10k of bytes from /dev/urandom
+         "0x8bd18359a7ebb84407b6defa7bc5da9aca34a3d1ce764ddfb4d0adcc663430b4",
     )
     .expect("parsing of script address constant"),
+    */
+    address: AccountAddress::MAX_ADDRESS,
     name: Identifier::new("__script__").expect("valid identifier for script"),
 });
 
@@ -423,8 +470,8 @@ mod tests {
     }
 
     fn make_function_tag(
-        args: Vec<TypeTag>,
-        results: Vec<TypeTag>,
+        args: Vec<FunctionParamOrReturnTag>,
+        results: Vec<FunctionParamOrReturnTag>,
         abilities: AbilitySet,
     ) -> TypeTag {
         TypeTag::Function(Box::new(FunctionTag {
@@ -436,6 +483,7 @@ mod tests {
 
     #[test]
     fn test_to_canonical_string() {
+        use FunctionParamOrReturnTag::*;
         use TypeTag::*;
 
         let data = [
@@ -467,25 +515,33 @@ mod tests {
             ),
             (make_function_tag(vec![], vec![], AbilitySet::EMPTY), "||()"),
             (
-                make_function_tag(vec![], vec![U8, U64], AbilitySet::EMPTY),
-                "||(u8, u64)",
+                make_function_tag(
+                    vec![],
+                    vec![MutableReference(U8), Value(U64)],
+                    AbilitySet::EMPTY,
+                ),
+                "||(&mut u8, u64)",
             ),
             (
-                make_function_tag(vec![U8, U64], vec![], AbilitySet::EMPTY),
-                "|u8, u64|()",
+                make_function_tag(vec![Reference(U8), Value(U64)], vec![], AbilitySet::EMPTY),
+                "|&u8, u64|()",
             ),
             (
                 make_struct_tag(AccountAddress::ONE, "a", "A", vec![make_function_tag(
-                    vec![make_function_tag(
-                        vec![make_function_tag(
+                    vec![Value(make_function_tag(
+                        vec![Value(make_function_tag(
                             vec![],
                             vec![],
                             AbilitySet::singleton(Ability::Copy),
-                        )],
+                        ))],
                         vec![],
                         AbilitySet::EMPTY,
-                    )],
-                    vec![make_function_tag(vec![], vec![], AbilitySet::ALL)],
+                    ))],
+                    vec![FunctionParamOrReturnTag::Value(make_function_tag(
+                        vec![],
+                        vec![],
+                        AbilitySet::ALL,
+                    ))],
                     AbilitySet::EMPTY,
                 )]),
                 "0x1::a::A<||||() has copy|()|(||() has copy + drop + store + key)>",

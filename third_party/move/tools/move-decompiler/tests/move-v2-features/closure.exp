@@ -1,0 +1,202 @@
+module 0x99::basic_enum {
+    enum FV<T> has key {
+        V1 {
+            v1: |&mut T|(T) has copy + store,
+        }
+    }
+    #[persistent]
+    fun increment_by_one(x: &mut u64): u64 {
+        *x = *x + 1;
+        *x
+    }
+    fun test_fun_vec(s: &signer) {
+        let _t1 = FV::V1<u64>{v1: |arg0| increment_by_one(arg0)};
+        move_to<FV<u64>>(s, _t1);
+    }
+}
+module 0x99::basic_struct {
+    struct Wrapper<T> has key {
+        fv: T,
+    }
+    fun add_resource_with_struct(acc: &signer, f: |&||(u64)|(u64) has copy + drop + store) {
+        let _t4 = Wrapper<|&||(u64)|(u64) has copy + drop + store>{fv: f};
+        move_to<Wrapper<|&||(u64)|(u64) has copy + drop + store>>(acc, _t4);
+    }
+    #[persistent]
+    fun test(f: &||(u64)): u64 {
+        let _t1;
+        if (f == f) _t1 = 1 else _t1 = 2;
+        _t1
+    }
+    public fun test_driver(acc: &signer) {
+        let _t1: |&||(u64)|(u64) has copy + drop + store = |arg0| test(arg0);
+        add_resource_with_struct(acc, _t1);
+    }
+}
+module 0x99::lambda_arg {
+    public fun test(): u64 {
+        foo(|arg0| lambda__1__test(arg0), 10)
+    }
+    fun lambda__1__test(param_0: u64): u64 {
+        3
+    }
+    fun foo(f: |u64|(u64), x: u64): u64 {
+        f(x)
+    }
+    public fun main() {
+        if (!(test() == 3)) abort 5;
+    }
+}
+module 0x99::lambda_basic {
+    fun map(x: u64, f: |u64|(u64) has drop): u64 {
+        f(x)
+    }
+    fun no_name_clash(x: u64, c: u64): u64 {
+        let _t4: |u64|u64 has copy + drop = |arg0| lambda__1__no_name_clash(c, arg0);
+        map(x, _t4)
+    }
+    fun lambda__1__no_name_clash(c: u64, y: u64): u64 {
+        y + c
+    }
+    fun with_name_clash1(x: u64, c: u64): u64 {
+        let _t4: |u64|u64 has copy + drop = |arg0| lambda__1__with_name_clash1(c, arg0);
+        map(x, _t4)
+    }
+    fun lambda__1__with_name_clash1(c: u64, x: u64): u64 {
+        x + c
+    }
+    fun with_name_clash2(x: u64, c: u64): u64 {
+        let _t4: |u64|u64 has copy + drop = |arg0| lambda__1__with_name_clash2(c, arg0);
+        map(x, _t4)
+    }
+    fun lambda__1__with_name_clash2(c: u64, x: u64): u64 {
+        c + 1 + x
+    }
+}
+module 0x99::lambda_fun_wrapper {
+    struct Work has drop {
+        _0: |u64|(u64) has drop,
+    }
+    fun t1(): bool {
+        let _t1 = Work{_0: |arg0| lambda__1__t1(arg0)};
+        let _t3 = Work{_0: |arg0| lambda__2__t1(arg0)};
+        _t1 == _t3
+    }
+    fun lambda__1__t1(x: u64): u64 {
+        x + 1
+    }
+    fun lambda__2__t1(x: u64): u64 {
+        x + 2
+    }
+    fun t2() {
+        take_work(Work{_0: |arg0| lambda__1__t2(arg0)});
+    }
+    fun lambda__1__t2(x: u64): u64 {
+        x + 1
+    }
+    fun take_work(_work: Work) {
+        ()
+    }
+}
+module 0x99::lambda_generics {
+    struct S<T> has drop {
+        x: T,
+    }
+    fun id<T>(self: S<T>): S<T> {
+        self
+    }
+    fun inlined<T: drop>(f: |S<T>|(S<T>), s: S<T>) {
+        let _t4 = f(s);
+    }
+    fun test_receiver_inference(s: S<u64>) {
+        inlined<u64>(|arg0| id<u64>(arg0), s);
+    }
+}
+module 0x99::lambda_inline {
+    fun g() {
+        ()
+    }
+}
+module 0x99::lambda_inline1 {
+    public fun test() {
+        let _t2 = 1 + 1;
+        let _t11 = 100 + 1;
+        let _t0 = 1000 + 1;
+        let _t1 = _t11;
+        let _t17 = _t2 * _t0;
+        _t2 = _t2 + 1;
+        _t1 = _t1 + 1;
+        _t0 = _t0 + 1;
+        let _t28 = _t17 + _t1;
+        let _t31 = 3 * _t2;
+        let _t32 = _t28 + _t31;
+        let _t35 = 5 * _t1;
+        let _t36 = _t32 + _t35;
+        let _t39 = 7 * _t0;
+        _t2 = _t36 + _t39;
+        if (!(_t2 == 9637)) abort _t2;
+    }
+}
+module 0x99::lambda_no_param {
+    public fun test() {
+        ()
+    }
+}
+module 0x99::lambda_no_param1 {
+    public fun test() {
+        let _t0: |u64, u64|u64 has copy + drop = |arg0,arg1| lambda__1__test(arg0, arg1);
+        let _t1: |u64, u64|u64 has copy + drop = |arg0,arg1| lambda__2__test(arg0, arg1);
+        if (!(foo(_t0, _t1, 10, 100) == 110)) abort 0;
+    }
+    fun lambda__1__test(x: u64, param_1: u64): u64 {
+        x
+    }
+    fun foo(f: |u64, u64|(u64), g: |u64, u64|(u64), x: u64, _y: u64): u64 {
+        let _t7 = f(x, _y);
+        let _t11 = g(x, _y);
+        _t7 + _t11
+    }
+    fun lambda__2__test(param_0: u64, y: u64): u64 {
+        y
+    }
+}
+module 0x99::lambda_pattern {
+    struct S<T> {
+        x: T,
+    }
+    fun consume<T>(s: S<T>, x: T, f: |S<T>, T|(T)): T {
+        f(s, x)
+    }
+    fun pattern(s: S<u64>, x: u64): u64 {
+        let _t4: |S<u64>, u64|u64 has copy + drop = |arg0,arg1| lambda__1__pattern(arg0, arg1);
+        consume<u64>(s, x, _t4)
+    }
+    fun lambda__1__pattern(param_0: S<u64>, _y: u64): u64 {
+        let S<u64>{x: _t4} = param_0;
+        _y = _t4;
+        _y + _y
+    }
+}
+module 0x99::nested_lambda {
+    fun map1(x: u64, f: |u64|(u64)): u64 {
+        f(x)
+    }
+    fun map2(x: u8, f: |u8|(u8)): u8 {
+        f(x)
+    }
+    fun nested(x: u64, c: u64): u64 {
+        let _t4: |u64|u64 has copy + drop = |arg0| lambda__2__nested(c, arg0);
+        map1(x, _t4)
+    }
+    fun lambda__2__nested(c: u64, y: u64): u64 {
+        let _t5 = (y - c) as u8;
+        let _t7: |u8|u8 has copy + drop = |arg0| lambda__1__nested(c, arg0);
+        map2(_t5, _t7) as u64
+    }
+    fun lambda__1__nested(c: u64, y: u8): u8 {
+        let _t4 = c as u8;
+        y + _t4
+    }
+}
+
+============ recompilation succeeded ========

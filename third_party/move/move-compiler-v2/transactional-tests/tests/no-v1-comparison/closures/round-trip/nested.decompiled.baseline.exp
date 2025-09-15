@@ -1,0 +1,26 @@
+processed 3 tasks
+task 0 lines 3-27:  publish [module 0x42::test {]
+Error: compilation errors:
+ error: cannot return `(|u64|u64, u64)` from a function with result type `(|u64|u64 has copy + drop, integer)`
+  ┌─ TEMPFILE:8:9
+  │
+8 │         _t1(_t3, 1)
+  │         ^^^^^^^^^^^
+
+
+task 1 lines 30-30:  run 0x42::test::nested --args 3
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 32-32:  run 0x42::test::nested_capture --args 4
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

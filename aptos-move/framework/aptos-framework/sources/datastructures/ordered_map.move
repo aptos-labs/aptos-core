@@ -245,6 +245,16 @@ module aptos_std::ordered_map {
                 if (ord.is_eq()) {
                     // we skip the entries one, and below put in the result one from other.
                     overwritten.push_back(self.entries.pop_back());
+
+                    if (cur_i == 0) {
+                        // make other_entries empty, and rest in entries.
+                        // TODO cannot use mem::swap until it is public/released
+                        // mem::swap(&mut self.entries, &mut other_entries);
+                        self.entries.append(other_entries);
+                        break;
+                    } else {
+                        cur_i -= 1;
+                    };
                 };
 
                 reverse_result.push_back(other_entries.pop_back());
@@ -678,7 +688,7 @@ module aptos_std::ordered_map {
     // }
 
     spec module {
-        pragma verify = false;
+        pragma verify = true;
     }
 
     // ================= Section for tests =====================
@@ -1227,6 +1237,39 @@ module aptos_std::ordered_map {
         map.new_begin_iter().iter_next(&map).iter_add(&mut map, 3, 25);
     }
 
+    #[test]
+	public fun test_ordered_map_append_2() {
+        let map = new_from(vector[1, 2], vector[10, 20]);
+        let other = new_from(vector[1, 2], vector[100, 200]);
+        map.append(other);
+        assert!(map == new_from(vector[1, 2], vector[100, 200]));
+    }
+
+    #[test]
+	public fun test_ordered_map_append_3() {
+        let map = new_from(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]);
+        let other = new_from(vector[2, 4], vector[200, 400]);
+        map.append(other);
+        assert!(map == new_from(vector[1, 2, 3, 4, 5], vector[10, 200, 30, 400, 50]));
+    }
+
+    #[test]
+	public fun test_ordered_map_append_4() {
+        let map = new_from(vector[3, 4, 5, 6, 7], vector[30, 40, 50, 60, 70]);
+        let other = new_from(vector[1, 2, 4, 6], vector[100, 200, 400, 600]);
+        map.append(other);
+        assert!(map == new_from(vector[1, 2, 3, 4, 5, 6, 7], vector[100, 200, 30, 400, 50, 600, 70]));
+    }
+
+    #[test]
+	public fun test_ordered_map_append_5() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        let other = new_from(vector[0, 2, 4, 6], vector[0, 200, 400, 600]);
+        map.append(other);
+        aptos_std::debug::print(&map);
+        assert!(map == new_from(vector[0, 1, 2, 3, 4, 5, 6], vector[0, 10, 200, 30, 400, 50, 600]));
+    }
+
     #[test_only]
     public fun large_dataset(): vector<u64> {
         vector[383, 886, 777, 915, 793, 335, 386, 492, 649, 421, 362, 27, 690, 59, 763, 926, 540, 426, 172, 736, 211, 368, 567, 429, 782, 530, 862, 123, 67, 135, 929, 802, 22, 58, 69, 167, 393, 456, 11, 42, 229, 373, 421, 919, 784, 537, 198, 324, 315, 370, 413, 526, 91, 980, 956, 873, 862, 170, 996, 281, 305, 925, 84, 327, 336, 505, 846, 729, 313, 857, 124, 895, 582, 545, 814, 367, 434, 364, 43, 750, 87, 808, 276, 178, 788, 584, 403, 651, 754, 399, 932, 60, 676, 368, 739, 12, 226, 586, 94, 539, 795, 570, 434, 378, 467, 601, 97, 902, 317, 492, 652, 756, 301, 280, 286, 441, 865, 689, 444, 619, 440, 729, 31, 117, 97, 771, 481, 675, 709, 927, 567, 856, 497, 353, 586, 965, 306, 683, 219, 624, 528, 871, 732, 829, 503, 19, 270, 368, 708, 715, 340, 149, 796, 723, 618, 245, 846, 451, 921, 555, 379, 488, 764, 228, 841, 350, 193, 500, 34, 764, 124, 914, 987, 856, 743, 491, 227, 365, 859, 936, 432, 551, 437, 228, 275, 407, 474, 121, 858, 395, 29, 237, 235, 793, 818, 428, 143, 11, 928, 529]
@@ -1276,4 +1319,155 @@ module aptos_std::ordered_map {
 
         map.destroy_empty();
     }
+
+    #[verify_only]
+    fun test_verify_borrow_front_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let (key, value) = map.borrow_front();
+        spec {
+            assert keys[0] == 1;
+            assert vector::spec_contains(keys, 1);
+            assert spec_contains_key(map, key);
+            assert spec_get(map, key) == value;
+            assert key == (1 as u64);
+        };
+    }
+
+    #[verify_only]
+    fun test_verify_borrow_back_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let (key, value) = map.borrow_back();
+        spec {
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, key);
+            assert spec_get(map, key) == value;
+            assert key == (3 as u64);
+        };
+    }
+
+    #[verify_only]
+    fun test_verify_upsert() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        spec {
+            assert spec_len(map) == 3;
+        };
+        let (_key, _value) = map.borrow_back();
+        let result_1 = map.upsert(4, 5);
+        spec {
+            assert spec_contains_key(map, 4);
+            assert spec_get(map, 4) == 5;
+            assert option::spec_is_none(result_1);
+            assert spec_len(map) == 4;
+        };
+        let result_2 = map.upsert(4, 6);
+        spec {
+            assert spec_contains_key(map, 4);
+            assert spec_get(map, 4) == 6;
+            assert option::spec_is_some(result_2);
+            assert option::spec_borrow(result_2) == 5;
+        };
+        spec {
+            assert keys[0] == 1;
+            assert spec_contains_key(map, 1);
+            assert spec_get(map, 1) == 4;
+        };
+        let v = map.remove(&1);
+        spec {
+            assert v == 4;
+        };
+        map.remove(&2);
+        map.remove(&3);
+        map.remove(&4);
+        spec {
+            assert !spec_contains_key(map, 1);
+            assert !spec_contains_key(map, 2);
+            assert !spec_contains_key(map, 3);
+            assert !spec_contains_key(map, 4);
+            assert spec_len(map) == 0;
+        };
+        map.destroy_empty();
+    }
+
+    #[verify_only]
+    fun test_verify_next_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let result_1 = map.next_key(&3);
+        spec {
+            assert option::spec_is_none(result_1);
+        };
+        let result_2 = map.next_key(&1);
+        spec {
+            assert keys[0] == 1;
+            assert spec_contains_key(map, 1);
+            assert keys[1] == 2;
+            assert spec_contains_key(map, 2);
+            assert option::spec_is_some(result_2);
+            assert option::spec_borrow(result_2) == 2;
+        };
+    }
+
+    #[verify_only]
+    fun test_verify_prev_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let result_1 = map.prev_key(&1);
+        spec {
+            assert option::spec_is_none(result_1);
+        };
+        let result_2 = map.prev_key(&3);
+        spec {
+            assert keys[0] == 1;
+            assert spec_contains_key(map, 1);
+            assert keys[1] == 2;
+            assert spec_contains_key(map, 2);
+            assert option::spec_is_some(result_2);
+        };
+    }
+
+     #[verify_only]
+     fun test_aborts_if_new_from_1(): OrderedMap<u64, u64> {
+        let keys: vector<u64> = vector[1, 2, 3, 1];
+        let values: vector<u64> = vector[4, 5, 6, 7];
+        spec {
+            assert keys[0] == 1;
+            assert keys[3] == 1;
+        };
+        let map = new_from(keys, values);
+        map
+     }
+
+     spec test_aborts_if_new_from_1 {
+        aborts_if true;
+     }
+
+     #[verify_only]
+     fun test_aborts_if_new_from_2(keys: vector<u64>, values: vector<u64>): OrderedMap<u64, u64> {
+        let map = new_from(keys, values);
+        map
+     }
+
+     spec test_aborts_if_new_from_2 {
+        aborts_if exists i in 0..len(keys), j in 0..len(keys) where i != j : keys[i] == keys[j];
+        aborts_if len(keys) != len(values);
+     }
+
+     #[verify_only]
+     fun test_aborts_if_remove(map: &mut OrderedMap<u64, u64>) {
+        map.remove(&1);
+     }
+
+     spec test_aborts_if_remove {
+        aborts_if !spec_contains_key(map, 1);
+     }
+
 }

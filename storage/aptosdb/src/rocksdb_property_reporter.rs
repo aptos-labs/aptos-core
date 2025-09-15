@@ -18,8 +18,9 @@ use crate::{
 use anyhow::Result;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{ColumnFamilyName, DB};
-use aptos_storage_interface::state_store::NUM_STATE_SHARDS;
+use aptos_types::state_store::NUM_STATE_SHARDS;
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
@@ -104,9 +105,7 @@ fn update_rocksdb_properties(
     state_merkle_db: &StateMerkleDb,
     state_kv_db: &StateKvDb,
 ) -> Result<()> {
-    let _timer = OTHER_TIMERS_SECONDS
-        .with_label_values(&["update_rocksdb_properties"])
-        .start_timer();
+    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["update_rocksdb_properties"]);
 
     let enable_storage_sharding = state_kv_db.enabled_sharding();
 
@@ -143,7 +142,7 @@ fn update_rocksdb_properties(
             for cf in state_kv_db_new_key_column_families() {
                 set_property(cf, state_kv_db.metadata_db())?;
                 for shard in 0..NUM_STATE_SHARDS {
-                    set_shard_property(cf, state_kv_db.db_shard(shard as u8), shard)?;
+                    set_shard_property(cf, state_kv_db.db_shard(shard), shard)?;
                 }
             }
         }
@@ -157,7 +156,7 @@ fn update_rocksdb_properties(
         set_property(cf_name, state_merkle_db.metadata_db())?;
         if state_merkle_db.sharding_enabled() {
             for shard in 0..NUM_STATE_SHARDS {
-                set_shard_property(cf_name, state_merkle_db.db_shard(shard as u8), shard)?;
+                set_shard_property(cf_name, state_merkle_db.db_shard(shard), shard)?;
             }
         }
     }

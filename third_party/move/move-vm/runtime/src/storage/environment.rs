@@ -6,7 +6,7 @@ use crate::{
     native_functions::{NativeFunction, NativeFunctions},
     storage::{
         ty_tag_converter::{TypeTagCache, TypeTagConverter},
-        verified_module_cache::VERIFIED_MODULES_V2,
+        verified_module_cache::VERIFIED_MODULES_CACHE,
     },
     Module, Script,
 };
@@ -25,7 +25,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use move_vm_metrics::{Timer, VM_TIMER};
+use move_vm_metrics::{Timer, VERIFIED_MODULE_CACHE_SIZE, VM_TIMER};
 #[cfg(any(test, feature = "testing"))]
 use move_vm_types::loaded_data::{
     runtime_types::StructIdentifier, struct_name_indexing::StructNameIndex,
@@ -122,6 +122,7 @@ impl RuntimeEnvironment {
         immediate_dependencies: &[Arc<Module>],
     ) -> VMResult<Script> {
         dependencies::verify_script(
+            &self.vm_config.verifier_config,
             locally_verified_script.0.as_ref(),
             immediate_dependencies
                 .iter()
@@ -140,10 +141,9 @@ impl RuntimeEnvironment {
         module_size: usize,
         module_hash: &[u8; 32],
     ) -> VMResult<LocallyVerifiedModule> {
-        if !VERIFIED_MODULES_V2.contains(module_hash) {
-            let _timer = VM_TIMER.timer_with_label(
-                "LoaderV2::build_locally_verified_module [verification cache miss]",
-            );
+        if !VERIFIED_MODULES_CACHE.contains(module_hash) {
+            let _timer =
+                VM_TIMER.timer_with_label("move_bytecode_verifier::verify_module_with_config");
 
             // For regular execution, we cache already verified modules. Note that this even caches
             // verification for the published modules. This should be ok because as long as the
@@ -154,7 +154,7 @@ impl RuntimeEnvironment {
                 compiled_module.as_ref(),
             )?;
             check_natives(compiled_module.as_ref())?;
-            VERIFIED_MODULES_V2.put(*module_hash);
+            VERIFIED_MODULES_CACHE.put(*module_hash);
         }
 
         Ok(LocallyVerifiedModule(compiled_module, module_size))
@@ -162,12 +162,13 @@ impl RuntimeEnvironment {
 
     /// Creates a verified module by running dependency verification pass for a locally verified
     /// module. The caller must provide verified module dependencies.
-    pub fn build_verified_module(
+    pub(crate) fn build_verified_module_with_linking_checks(
         &self,
         locally_verified_module: LocallyVerifiedModule,
         immediate_dependencies: &[Arc<Module>],
     ) -> VMResult<Module> {
         dependencies::verify_module(
+            &self.vm_config.verifier_config,
             locally_verified_module.0.as_ref(),
             immediate_dependencies
                 .iter()
@@ -182,6 +183,21 @@ impl RuntimeEnvironment {
 
         // Note: loader V1 implementation does not set locations for this error.
         result.map_err(|e| e.finish(Location::Undefined))
+    }
+
+    /// Creates a verified module for a locally verified module. Does not perform linking checks
+    /// for module's verified dependencies.
+    pub(crate) fn build_verified_module_skip_linking_checks(
+        &self,
+        locally_verified_module: LocallyVerifiedModule,
+    ) -> VMResult<Module> {
+        Module::new(
+            &self.natives,
+            locally_verified_module.1,
+            locally_verified_module.0,
+            self.struct_name_index_map(),
+        )
+        .map_err(|err| err.finish(Location::Undefined))
     }
 
     /// Deserializes bytes into a compiled module.
@@ -299,6 +315,18 @@ impl RuntimeEnvironment {
     pub fn flush_struct_name_and_tag_caches(&self) {
         self.ty_tag_cache.flush();
         self.struct_name_index_map.flush();
+    }
+
+    /// Flushes the global verified module cache. Should be used when verifier configuration has
+    /// changed.
+    pub fn flush_verified_module_cache() {
+        VERIFIED_MODULES_CACHE.flush();
+    }
+
+    /// Logs the size of the verified module cache.
+    pub fn log_verified_cache_size() {
+        let size = VERIFIED_MODULES_CACHE.size();
+        VERIFIED_MODULE_CACHE_SIZE.set(size as i64);
     }
 
     /// Test-only function to be able to populate [StructNameIndexMap] outside of this crate.

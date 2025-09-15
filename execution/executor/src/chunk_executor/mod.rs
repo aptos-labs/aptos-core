@@ -22,7 +22,7 @@ use aptos_executor_types::{
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
-use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
+use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
         state::State, state_summary::ProvableStateSummary,
@@ -39,9 +39,11 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, Transaction,
-        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionStatus, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
+        PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        TransactionListWithProof, TransactionListWithProofV2, TransactionOutput,
+        TransactionOutputListWithProof, TransactionOutputListWithProofV2, TransactionStatus,
+        Version,
     },
     write_set::WriteSet,
 };
@@ -112,7 +114,7 @@ impl<V: VMBlockExecutor> ChunkExecutor<V> {
 impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
     fn enqueue_chunk_by_execution(
         &self,
-        txn_list_with_proof: TransactionListWithProof,
+        txn_list_with_proof: TransactionListWithProofV2,
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
@@ -126,10 +128,11 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         if !cfg!(feature = "consensus-only-perf-test") {
             txn_list_with_proof.verify(
                 verified_target_li.ledger_info(),
-                txn_list_with_proof.first_transaction_version,
+                txn_list_with_proof.get_first_transaction_version(),
             )?;
         }
 
+        let (txn_list_with_proof, persisted_aux_info) = txn_list_with_proof.into_parts();
         // Compose enqueue_chunk parameters.
         let TransactionListWithProof {
             transactions,
@@ -140,6 +143,7 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
 
         let chunk = ChunkToExecute {
             transactions,
+            persisted_aux_info,
             first_version: v.ok_or_else(|| anyhow!("first version is None"))?,
         };
         let chunk_verifier = Arc::new(StateSyncChunkVerifier {
@@ -154,7 +158,7 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
 
     fn enqueue_chunk_by_transaction_outputs(
         &self,
-        txn_output_list_with_proof: TransactionOutputListWithProof,
+        txn_output_list_with_proof: TransactionOutputListWithProofV2,
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
@@ -166,21 +170,24 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
             let _timer = CHUNK_OTHER_TIMERS.timer_with(&["apply_chunk__verify"]);
             txn_output_list_with_proof.verify(
                 verified_target_li.ledger_info(),
-                txn_output_list_with_proof.first_transaction_output_version,
+                txn_output_list_with_proof.get_first_output_version(),
             )
         })?;
 
+        let (txn_output_list_with_proof, persisted_aux_info) =
+            txn_output_list_with_proof.into_parts();
         // Compose enqueue_chunk parameters.
         let TransactionOutputListWithProof {
             transactions_and_outputs,
             first_transaction_output_version: v,
             proof: txn_infos_with_proof,
         } = txn_output_list_with_proof;
-        let (transactions, transaction_outputs) = transactions_and_outputs.into_iter().unzip();
-
+        let (transactions, transaction_outputs): (Vec<_>, Vec<_>) =
+            transactions_and_outputs.into_iter().unzip();
         let chunk = ChunkToApply {
             transactions,
             transaction_outputs,
+            persisted_aux_info,
             first_version: v.ok_or_else(|| anyhow!("first version is None"))?,
         };
         let chunk_verifier = Arc::new(StateSyncChunkVerifier {
@@ -407,6 +414,7 @@ impl<V: VMBlockExecutor> TransactionReplayer for ChunkExecutor<V> {
     fn enqueue_chunks(
         &self,
         transactions: Vec<Transaction>,
+        persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
         transaction_infos: Vec<TransactionInfo>,
         write_sets: Vec<WriteSet>,
         event_vecs: Vec<Vec<ContractEvent>>,
@@ -421,6 +429,7 @@ impl<V: VMBlockExecutor> TransactionReplayer for ChunkExecutor<V> {
             .expect("not reset")
             .enqueue_chunks(
                 transactions,
+                persisted_aux_info,
                 transaction_infos,
                 write_sets,
                 event_vecs,
@@ -439,6 +448,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     fn enqueue_chunks(
         &self,
         mut transactions: Vec<Transaction>,
+        mut persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
         mut transaction_infos: Vec<TransactionInfo>,
         mut write_sets: Vec<WriteSet>,
         mut event_vecs: Vec<Vec<ContractEvent>>,
@@ -468,6 +478,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         for (begin, end) in epochs {
             chunks_enqueued += self.remove_and_replay_epoch(
                 &mut transactions,
+                &mut persisted_aux_info,
                 &mut transaction_infos,
                 &mut write_sets,
                 &mut event_vecs,
@@ -508,6 +519,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     fn remove_and_replay_epoch(
         &self,
         transactions: &mut Vec<Transaction>,
+        persisted_aux_info: &mut Vec<PersistedAuxiliaryInfo>,
         transaction_infos: &mut Vec<TransactionInfo>,
         write_sets: &mut Vec<WriteSet>,
         event_vecs: &mut Vec<Vec<ContractEvent>>,
@@ -530,6 +542,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
                 // batch_end is a known broken version that won't pass execution verification
                 self.remove_and_apply(
                     transactions,
+                    persisted_aux_info,
                     transaction_infos,
                     write_sets,
                     event_vecs,
@@ -550,6 +563,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             let next_begin = if verify_execution_mode.should_verify() {
                 self.verify_execution(
                     transactions,
+                    persisted_aux_info,
                     transaction_infos,
                     write_sets,
                     event_vecs,
@@ -562,6 +576,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             };
             self.remove_and_apply(
                 transactions,
+                persisted_aux_info,
                 transaction_infos,
                 write_sets,
                 event_vecs,
@@ -578,6 +593,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     fn verify_execution(
         &self,
         transactions: &[Transaction],
+        persisted_aux_info: &[PersistedAuxiliaryInfo],
         transaction_infos: &[TransactionInfo],
         write_sets: &[WriteSet],
         event_vecs: &[Vec<ContractEvent>],
@@ -595,9 +611,11 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .map(|t| t.into())
             .collect::<Vec<SignatureVerifiedTransaction>>();
 
-        let mut auxiliary_info = Vec::new();
-        // TODO(grao): Pass in persisted auxiliary info.
-        auxiliary_info.resize(txns.len(), AuxiliaryInfo::new_empty());
+        let auxiliary_info = persisted_aux_info
+            .iter()
+            .take((end_version - begin_version) as usize)
+            .map(|persisted_aux_info| AuxiliaryInfo::new(*persisted_aux_info, None))
+            .collect::<Vec<_>>();
         // State sync executor shouldn't have block gas limit.
         let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
@@ -639,6 +657,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     fn remove_and_apply(
         &self,
         transactions: &mut Vec<Transaction>,
+        persisted_aux_info: &mut Vec<PersistedAuxiliaryInfo>,
         transaction_infos: &mut Vec<TransactionInfo>,
         write_sets: &mut Vec<WriteSet>,
         event_vecs: &mut Vec<Vec<ContractEvent>>,
@@ -647,15 +666,17 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     ) -> Result<()> {
         let num_txns = (end_version - begin_version) as usize;
         let txn_infos: Vec<_> = transaction_infos.drain(..num_txns).collect();
-        let (transactions, transaction_outputs) = multizip((
+        let (transactions, persisted_aux_info, transaction_outputs) = multizip((
             transactions.drain(..num_txns),
+            persisted_aux_info.drain(..num_txns),
             txn_infos.iter(),
             write_sets.drain(..num_txns),
             event_vecs.drain(..num_txns),
         ))
-        .map(|(txn, txn_info, write_set, events)| {
+        .map(|(txn, persisted_aux_info, txn_info, write_set, events)| {
             (
                 txn,
+                persisted_aux_info,
                 TransactionOutput::new(
                     write_set,
                     events,
@@ -665,11 +686,12 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
                 ),
             )
         })
-        .unzip();
+        .multiunzip();
 
         let chunk = ChunkToApply {
             transactions,
             transaction_outputs,
+            persisted_aux_info,
             first_version: begin_version,
         };
         let chunk_verifier = Arc::new(ReplayChunkVerifier {

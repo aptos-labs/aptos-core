@@ -297,8 +297,11 @@ module aptos_std::big_ordered_map {
 
     /// Returns true iff the BigOrderedMap is empty.
     public fun is_empty<K: store, V: store>(self: &BigOrderedMap<K, V>): bool {
-        let node = self.borrow_node(self.min_leaf_index);
-        node.children.is_empty()
+        if (self.root.is_leaf) {
+            self.root.children.is_empty()
+        } else {
+            false
+        }
     }
 
     /// Returns the number of elements in the BigOrderedMap.
@@ -572,11 +575,17 @@ module aptos_std::big_ordered_map {
 
     // TODO: Temporary friend implementaiton, until for_each_ref can be made efficient.
     public(friend) inline fun for_each_ref_friend<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, f: |&K, &V|) {
-        self.for_each_leaf_node_ref(|node| {
-            node.children.for_each_ref_friend(|k: &K, v: &Child<V>| {
-                f(k, &v.value);
-            });
-        })
+        let iter = self.new_begin_iter();
+        while (!iter.iter_is_end(self)) {
+            f(iter.iter_borrow_key(), iter.iter_borrow(self));
+            iter = iter.iter_next(self);
+        };
+
+        // self.for_each_leaf_node_ref(|node| {
+        //     node.children.for_each_ref_friend(|k: &K, v: &Child<V>| {
+        //         f(k, &v.value);
+        //     });
+        // })
     }
 
     /// Apply the function to a mutable reference of each key-value pair in the map.
@@ -1435,6 +1444,7 @@ module aptos_std::big_ordered_map {
     #[test_only]
     fun validate_iteration<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>) {
         let expected_num_elements = self.compute_length();
+        assert!((expected_num_elements == 0) == self.is_empty(), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
         let num_elements = 0;
         let it = self.new_begin_iter();
         while (!it.iter_is_end(self)) {
@@ -2271,4 +2281,219 @@ module aptos_std::big_ordered_map {
     // fun test_large_data_set_order_32_true() {
     //     test_large_data_set_helper(32, 32, true);
     // }
+
+    #[verify_only]
+    fun test_verify_borrow_front_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let (_key, _value) = map.borrow_front();
+        spec {
+            assert keys[0] == 1;
+            assert vector::spec_contains(keys, 1);
+            assert spec_contains_key(map, _key);
+            assert spec_get(map, _key) == _value;
+            assert _key == (1 as u64);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_borrow_front_key {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_borrow_back_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let (key, value) = map.borrow_back();
+        spec {
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, key);
+            assert spec_get(map, key) == value;
+            assert key == (3 as u64);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_borrow_back_key {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_upsert() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let (_key, _value) = map.borrow_back();
+        let result_1 = map.upsert(4, 5);
+        spec {
+            assert spec_contains_key(map, 4);
+            assert spec_get(map, 4) == 5;
+            assert option::spec_is_none(result_1);
+        };
+        let result_2 = map.upsert(4, 6);
+        spec {
+            assert spec_contains_key(map, 4);
+            assert spec_get(map, 4) == 6;
+            assert option::spec_is_some(result_2);
+            assert option::spec_borrow(result_2) == 5;
+        };
+        spec {
+            assert keys[0] == 1;
+            assert spec_contains_key(map, 1);
+            assert spec_get(map, 1) == 4;
+        };
+        let v = map.remove(&1);
+        spec {
+            assert v == 4;
+        };
+        map.remove(&2);
+        map.remove(&3);
+        map.remove(&4);
+        spec {
+            assert !spec_contains_key(map, 1);
+            assert !spec_contains_key(map, 2);
+            assert !spec_contains_key(map, 3);
+            assert !spec_contains_key(map, 4);
+            assert spec_len(map) == 0;
+        };
+        map.destroy_empty();
+    }
+
+    spec test_verify_upsert {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_next_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let result_1 = map.next_key(&3);
+        spec {
+            assert option::spec_is_none(result_1);
+        };
+        let result_2 = map.next_key(&1);
+        spec {
+            assert keys[0] == 1;
+            assert spec_contains_key(map, 1);
+            assert keys[1] == 2;
+            assert spec_contains_key(map, 2);
+            assert option::spec_is_some(result_2);
+            assert option::spec_borrow(result_2) == 2;
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_next_key {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_prev_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let result_1 = map.prev_key(&1);
+        spec {
+            assert option::spec_is_none(result_1);
+        };
+        let result_2 = map.prev_key(&3);
+        spec {
+            assert keys[0] == 1;
+            assert spec_contains_key(map, 1);
+            assert keys[1] == 2;
+            assert spec_contains_key(map, 2);
+            assert option::spec_is_some(result_2);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_prev_key {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_remove() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        spec {
+            assert keys[1] == 2;
+            assert vector::spec_contains(keys, 2);
+            assert spec_contains_key(map, 2);
+            assert spec_get(map, 2) == 5;
+            assert spec_len(map) == 3;
+        };
+        let v = map.remove(&1);
+        spec {
+            assert v == 4;
+            assert spec_contains_key(map, 2);
+            assert spec_get(map, 2) == 5;
+            assert spec_len(map) == 2;
+            assert !spec_contains_key(map, 1);
+        };
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_remove {
+        pragma verify = true;
+    }
+
+     #[verify_only]
+     fun test_aborts_if_new_from_1(): BigOrderedMap<u64, u64> {
+        let keys: vector<u64> = vector[1, 2, 3, 1];
+        let values: vector<u64> = vector[4, 5, 6, 7];
+        spec {
+            assert keys[0] == 1;
+            assert keys[3] == 1;
+        };
+        let map = new_from(keys, values);
+        map
+     }
+
+     spec test_aborts_if_new_from_1 {
+        pragma verify = true;
+        aborts_if true;
+     }
+
+     #[verify_only]
+     fun test_aborts_if_new_from_2(keys: vector<u64>, values: vector<u64>): BigOrderedMap<u64, u64> {
+        let map = new_from(keys, values);
+        map
+     }
+
+     spec test_aborts_if_new_from_2 {
+        pragma verify = true;
+        aborts_if exists i in 0..len(keys), j in 0..len(keys) where i != j : keys[i] == keys[j];
+        aborts_if len(keys) != len(values);
+     }
+
+     #[verify_only]
+     fun test_aborts_if_remove(map: &mut BigOrderedMap<u64, u64>) {
+        map.remove(&1);
+     }
+
+     spec test_aborts_if_remove {
+        pragma verify = true;
+        aborts_if !spec_contains_key(map, 1);
+     }
+
 }

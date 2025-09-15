@@ -58,7 +58,10 @@ use crate::{
 use anyhow::{anyhow, bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{ConsensusConfig, DagConsensusConfig, ExecutionConfig, NodeConfig};
+use aptos_config::config::{
+    BatchTransactionFilterConfig, BlockTransactionFilterConfig, ConsensusConfig,
+    DagConsensusConfig, NodeConfig,
+};
 use aptos_consensus_types::{
     block_retrieval::BlockRetrievalRequest,
     common::{Author, Round},
@@ -116,9 +119,9 @@ use std::{
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
 const PROPOSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
-/// Number of rounds we expect storage to be ahead of the proposer round,
+/// Number of rounds we expect storage to be behind the proposer round,
 /// used for fetching data from DB.
-const PROPOSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 10;
+const PROPOSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 30;
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {
@@ -131,8 +134,6 @@ pub enum LivenessStorageData {
 pub struct EpochManager<P: OnChainConfigProvider> {
     author: Author,
     config: ConsensusConfig,
-    #[allow(unused)]
-    execution_config: ExecutionConfig,
     randomness_override_seq_num: u64,
     time_service: Arc<dyn TimeService>,
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
@@ -175,6 +176,9 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
     key_storage: PersistentSafetyStorage,
+
+    consensus_txn_filter_config: BlockTransactionFilterConfig,
+    quorum_store_txn_filter_config: BatchTransactionFilterConfig,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -198,15 +202,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
-        let execution_config = node_config.execution.clone();
         let dag_config = node_config.dag_consensus.clone();
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
         let key_storage = safety_rules_manager::storage(sr_config);
+        let consensus_txn_filter_config = node_config.transaction_filters.consensus_filter.clone();
+        let quorum_store_txn_filter_config =
+            node_config.transaction_filters.quorum_store_filter.clone();
+
         Self {
             author,
             config,
-            execution_config,
             randomness_override_seq_num: node_config.randomness_override_seq_num,
             time_service,
             self_sender,
@@ -246,6 +252,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             consensus_publisher,
             pending_blocks: Arc::new(Mutex::new(PendingBlocks::new())),
             key_storage,
+            consensus_txn_filter_config,
+            quorum_store_txn_filter_config,
         }
     }
 
@@ -565,7 +573,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let (request_tx, mut request_rx) = aptos_channel::new::<_, IncomingBlockRetrievalRequest>(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
         );
         let task = async move {
@@ -677,7 +685,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let (recovery_manager_tx, recovery_manager_rx) = aptos_channel::new(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(recovery_manager_tx);
@@ -727,6 +735,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.author,
                 epoch_state.verifier.len() as u64,
                 quorum_store_config,
+                self.quorum_store_txn_filter_config.clone(),
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
@@ -931,13 +940,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
 
         let (buffered_proposal_tx, buffered_proposal_rx) = aptos_channel::new(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
 
@@ -961,6 +970,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.storage.clone(),
             onchain_consensus_config,
             buffered_proposal_tx,
+            self.consensus_txn_filter_config.clone(),
             self.config.clone(),
             onchain_randomness_config,
             onchain_jwk_consensus_config,
@@ -1256,7 +1266,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             None,
         );
 

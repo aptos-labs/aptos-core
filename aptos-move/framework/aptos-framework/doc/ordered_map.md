@@ -82,6 +82,50 @@ allowing cleaner iterator APIs.
 -  [Function `new_iter`](#0x1_ordered_map_new_iter)
 -  [Function `binary_search`](#0x1_ordered_map_binary_search)
 -  [Specification](#@Specification_1)
+    -  [Enum `OrderedMap`](#@Specification_1_OrderedMap)
+    -  [Function `new`](#@Specification_1_new)
+    -  [Function `new_from`](#@Specification_1_new_from)
+    -  [Function `length`](#@Specification_1_length)
+    -  [Function `is_empty`](#@Specification_1_is_empty)
+    -  [Function `add`](#@Specification_1_add)
+    -  [Function `upsert`](#@Specification_1_upsert)
+    -  [Function `remove`](#@Specification_1_remove)
+    -  [Function `contains`](#@Specification_1_contains)
+    -  [Function `borrow`](#@Specification_1_borrow)
+    -  [Function `borrow_mut`](#@Specification_1_borrow_mut)
+    -  [Function `replace_key_inplace`](#@Specification_1_replace_key_inplace)
+    -  [Function `add_all`](#@Specification_1_add_all)
+    -  [Function `upsert_all`](#@Specification_1_upsert_all)
+    -  [Function `append`](#@Specification_1_append)
+    -  [Function `append_disjoint`](#@Specification_1_append_disjoint)
+    -  [Function `append_impl`](#@Specification_1_append_impl)
+    -  [Function `trim`](#@Specification_1_trim)
+    -  [Function `borrow_front`](#@Specification_1_borrow_front)
+    -  [Function `borrow_back`](#@Specification_1_borrow_back)
+    -  [Function `pop_front`](#@Specification_1_pop_front)
+    -  [Function `pop_back`](#@Specification_1_pop_back)
+    -  [Function `prev_key`](#@Specification_1_prev_key)
+    -  [Function `next_key`](#@Specification_1_next_key)
+    -  [Function `lower_bound`](#@Specification_1_lower_bound)
+    -  [Function `find`](#@Specification_1_find)
+    -  [Function `new_begin_iter`](#@Specification_1_new_begin_iter)
+    -  [Function `new_end_iter`](#@Specification_1_new_end_iter)
+    -  [Function `iter_next`](#@Specification_1_iter_next)
+    -  [Function `iter_prev`](#@Specification_1_iter_prev)
+    -  [Function `iter_is_begin`](#@Specification_1_iter_is_begin)
+    -  [Function `iter_is_begin_from_non_empty`](#@Specification_1_iter_is_begin_from_non_empty)
+    -  [Function `iter_is_end`](#@Specification_1_iter_is_end)
+    -  [Function `iter_borrow_key`](#@Specification_1_iter_borrow_key)
+    -  [Function `iter_borrow`](#@Specification_1_iter_borrow)
+    -  [Function `iter_borrow_mut`](#@Specification_1_iter_borrow_mut)
+    -  [Function `iter_remove`](#@Specification_1_iter_remove)
+    -  [Function `iter_replace`](#@Specification_1_iter_replace)
+    -  [Function `iter_add`](#@Specification_1_iter_add)
+    -  [Function `destroy_empty`](#@Specification_1_destroy_empty)
+    -  [Function `keys`](#@Specification_1_keys)
+    -  [Function `values`](#@Specification_1_values)
+    -  [Function `to_vec_pair`](#@Specification_1_to_vec_pair)
+    -  [Function `binary_search`](#@Specification_1_binary_search)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/cmp.md#0x1_cmp">0x1::cmp</a>;
@@ -762,6 +806,16 @@ Takes all elements from <code>other</code> and adds them to <code>self</code>, r
             <b>if</b> (ord.is_eq()) {
                 // we skip the entries one, and below put in the result one from other.
                 overwritten.push_back(self.entries.<a href="ordered_map.md#0x1_ordered_map_pop_back">pop_back</a>());
+
+                <b>if</b> (cur_i == 0) {
+                    // make other_entries empty, and rest in entries.
+                    // TODO cannot <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/mem.md#0x1_mem_swap">mem::swap</a> until it is <b>public</b>/released
+                    // <a href="../../aptos-stdlib/../move-stdlib/doc/mem.md#0x1_mem_swap">mem::swap</a>(&<b>mut</b> self.entries, &<b>mut</b> other_entries);
+                    self.entries.<a href="ordered_map.md#0x1_ordered_map_append">append</a>(other_entries);
+                    <b>break</b>;
+                } <b>else</b> {
+                    cur_i -= 1;
+                };
             };
 
             reverse_result.push_back(other_entries.<a href="ordered_map.md#0x1_ordered_map_pop_back">pop_back</a>());
@@ -1607,7 +1661,7 @@ using lambdas to destroy the individual keys and values.
 Apply the function to each key-value pair in the map, consuming it.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each">for_each</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |(K, V)|)
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each">for_each</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |K, V|)
 </code></pre>
 
 
@@ -1639,7 +1693,7 @@ Current implementation is O(n * log(n)). After function values will be optimized
 to O(n).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_ref">for_each_ref</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |(&K, &V)|)
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_ref">for_each_ref</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |&K, &V|)
 </code></pre>
 
 
@@ -1691,7 +1745,7 @@ to O(n).
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_ref_friend">for_each_ref_friend</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |(&K, &V)|)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_ref_friend">for_each_ref_friend</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |&K, &V|)
 </code></pre>
 
 
@@ -1723,7 +1777,7 @@ Current implementation is O(n * log(n)). After function values will be optimized
 to O(n).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_mut">for_each_mut</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |(&K, &<b>mut</b> V)|)
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_mut">for_each_mut</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |&K, &<b>mut</b> V|)
 </code></pre>
 
 
@@ -1841,7 +1895,877 @@ to O(n).
 
 
 
+<pre><code><b>pragma</b> verify = <b>true</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_OrderedMap"></a>
+
+### Enum `OrderedMap`
+
+
+<pre><code>enum <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt; <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<dl>
+
+<details>
+<summary>SortedVectorMap</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="ordered_map.md#0x1_ordered_map_Entry">ordered_map::Entry</a>&lt;K, V&gt;&gt;</code>
+</dt>
+<dd>
+ List of entries, sorted by key.
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+</dl>
+
+
+
+<pre><code><b>pragma</b> intrinsic = map,
+    map_new = new,
+    map_len = length,
+    map_destroy_empty = destroy_empty,
+    map_has_key = contains,
+    map_add_no_override = add,
+    map_borrow = borrow,
+    map_borrow_mut = borrow_mut,
+    map_spec_get = spec_get,
+    map_spec_set = spec_set,
+    map_spec_del = spec_remove,
+    map_spec_len = spec_len,
+    map_spec_has_key = spec_contains_key,
+    map_is_empty = is_empty;
+</code></pre>
+
+
+
+
+<a id="0x1_ordered_map_spec_len"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>&lt;K, V&gt;(t: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): num;
+</code></pre>
+
+
+
+
+<a id="0x1_ordered_map_spec_contains_key"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>&lt;K, V&gt;(t: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, k: K): bool;
+</code></pre>
+
+
+
+
+<a id="0x1_ordered_map_spec_set"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_spec_set">spec_set</a>&lt;K, V&gt;(t: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, k: K, v: V): <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_ordered_map_spec_remove"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_spec_remove">spec_remove</a>&lt;K, V&gt;(t: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, k: K): <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_ordered_map_spec_get"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>&lt;K, V&gt;(t: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, k: K): V;
+</code></pre>
+
+
+
+<a id="@Specification_1_new"></a>
+
+### Function `new`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new">new</a>&lt;K, V&gt;(): <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_new_from"></a>
+
+### Function `new_from`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_from">new_from</a>&lt;K, V&gt;(keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;): <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> [abstract] <b>exists</b> i in 0..len(keys), j in 0..len(keys) <b>where</b> i != j : keys[i] == keys[j];
+<b>aborts_if</b> [abstract] len(keys) != len(values);
+<b>ensures</b> [abstract] <b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(result, k)} : <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(keys,k) &lt;==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(result, k);
+<b>ensures</b> [abstract] <b>forall</b> i in 0..len(keys) : <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(result, keys[i]) == values[i];
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(result) == len(keys);
+</code></pre>
+
+
+
+<a id="@Specification_1_length"></a>
+
+### Function `length`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_length">length</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_empty"></a>
+
+### Function `is_empty`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_is_empty">is_empty</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_add"></a>
+
+### Function `add`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_add">add</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: K, value: V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_upsert"></a>
+
+### Function `upsert`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_upsert">upsert</a>&lt;K: drop, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: K, value: V): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;V&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>ensures</b> [abstract] !<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(result);
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, key);
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(self, key) == value;
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; ((<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(result)) && (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result) == <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(<b>old</b>(
+    self), key)));
+<b>ensures</b> [abstract] !<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(<b>old</b>(self)) + 1 == <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(self);
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(<b>old</b>(self)) == <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(self);
+<b>ensures</b> [abstract] <b>forall</b> k: K: <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), k) && k != key ==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(<b>old</b>(self), k) == <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(self, k);
+<b>ensures</b> [abstract] <b>forall</b> k: K: <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), k) ==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k);
+</code></pre>
+
+
+
+<a id="@Specification_1_remove"></a>
+
+### Function `remove`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_remove">remove</a>&lt;K: drop, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> [abstract] !<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, key);
+<b>ensures</b> [abstract] !<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, key);
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(<b>old</b>(self), key) == result;
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(<b>old</b>(self)) == <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(self) + 1;
+<b>ensures</b> [abstract] <b>forall</b> k: K <b>where</b> k != key: <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) ==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(self, k) == <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(<b>old</b>(self), k);
+<b>ensures</b> [abstract] <b>forall</b> k: K <b>where</b> k != key: <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), k) == <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k);
+</code></pre>
+
+
+
+<a id="@Specification_1_contains"></a>
+
+### Function `contains`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_contains">contains</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow"></a>
+
+### Function `borrow`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_borrow">borrow</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): &V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow_mut"></a>
+
+### Function `borrow_mut`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_borrow_mut">borrow_mut</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): &<b>mut</b> V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_replace_key_inplace"></a>
+
+### Function `replace_key_inplace`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_replace_key_inplace">replace_key_inplace</a>&lt;K: drop, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, old_key: &K, new_key: K)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_add_all"></a>
+
+### Function `add_all`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_add_all">add_all</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_upsert_all"></a>
+
+### Function `upsert_all`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_upsert_all">upsert_all</a>&lt;K: drop, V: drop&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_append"></a>
+
+### Function `append`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_append">append</a>&lt;K: drop, V: drop&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, other: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_append_disjoint"></a>
+
+### Function `append_disjoint`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_append_disjoint">append_disjoint</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, other: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_append_impl"></a>
+
+### Function `append_impl`
+
+
+<pre><code><b>fun</b> <a href="ordered_map.md#0x1_ordered_map_append_impl">append_impl</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, other: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="ordered_map.md#0x1_ordered_map_Entry">ordered_map::Entry</a>&lt;K, V&gt;&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_trim"></a>
+
+### Function `trim`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_trim">trim</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, at: u64): <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow_front"></a>
+
+### Function `borrow_front`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_borrow_front">borrow_front</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): (&K, &V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, result_1);
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(self, result_1) == result_2;
+<b>ensures</b> [abstract] <b>forall</b> k: K <b>where</b> k != result_1: <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) ==&gt;
+std::cmp::compare(result_1, k) == std::cmp::Ordering::Less;
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow_back"></a>
+
+### Function `borrow_back`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_borrow_back">borrow_back</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): (&K, &V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, result_1);
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(self, result_1) == result_2;
+<b>ensures</b> [abstract] <b>forall</b> k: K <b>where</b> k != result_1: <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) ==&gt;
+std::cmp::compare(result_1, k) == std::cmp::Ordering::Greater;
+</code></pre>
+
+
+
+<a id="@Specification_1_pop_front"></a>
+
+### Function `pop_front`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_pop_front">pop_front</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): (K, V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_pop_back"></a>
+
+### Function `pop_back`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_pop_back">pop_back</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): (K, V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_prev_key"></a>
+
+### Function `prev_key`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_prev_key">prev_key</a>&lt;K: <b>copy</b>, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;K&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>ensures</b> [abstract] result == std::option::spec_none() &lt;==&gt;
+(<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)
+&& k != key: std::cmp::compare(key, k) == std::cmp::Ordering::Less);
+<b>ensures</b> [abstract] result.is_some() &lt;==&gt;
+    <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result)) &&
+    (std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), key) == std::cmp::Ordering::Less)
+    && (<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k), std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), k), std::cmp::compare(key, k)} <b>where</b> k != <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result): ((<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) &&
+    std::cmp::compare(k, key) == std::cmp::Ordering::Less)) ==&gt;
+    std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), k) == std::cmp::Ordering::Greater);
+</code></pre>
+
+
+
+<a id="@Specification_1_next_key"></a>
+
+### Function `next_key`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_next_key">next_key</a>&lt;K: <b>copy</b>, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;K&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>ensures</b> [abstract] result == std::option::spec_none() &lt;==&gt;
+(<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) && k != key:
+std::cmp::compare(key, k) == std::cmp::Ordering::Greater);
+<b>ensures</b> [abstract] result.is_some() &lt;==&gt;
+    <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result)) &&
+    (std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), key) == std::cmp::Ordering::Greater)
+    && (<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> k != <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result): ((<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) &&
+    std::cmp::compare(k, key) == std::cmp::Ordering::Greater)) ==&gt;
+    std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), k) == std::cmp::Ordering::Less);
+</code></pre>
+
+
+
+<a id="@Specification_1_lower_bound"></a>
+
+### Function `lower_bound`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_lower_bound">lower_bound</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_find"></a>
+
+### Function `find`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_find">find</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_new_begin_iter"></a>
+
+### Function `new_begin_iter`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_begin_iter">new_begin_iter</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_new_end_iter"></a>
+
+### Function `new_end_iter`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_end_iter">new_end_iter</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_next"></a>
+
+### Function `iter_next`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_prev"></a>
+
+### Function `iter_prev`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_prev">iter_prev</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_is_begin"></a>
+
+### Function `iter_is_begin`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_is_begin_from_non_empty"></a>
+
+### Function `iter_is_begin_from_non_empty`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin_from_non_empty">iter_is_begin_from_non_empty</a>(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_is_end"></a>
+
+### Function `iter_is_end`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, _map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_borrow_key"></a>
+
+### Function `iter_borrow_key`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): &K
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_borrow"></a>
+
+### Function `iter_borrow`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow">iter_borrow</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): &V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_borrow_mut"></a>
+
+### Function `iter_borrow_mut`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow_mut">iter_borrow_mut</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): &<b>mut</b> V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_remove"></a>
+
+### Function `iter_remove`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_remove">iter_remove</a>&lt;K: drop, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_replace"></a>
+
+### Function `iter_replace`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_replace">iter_replace</a>&lt;K: <b>copy</b>, drop, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, value: V): V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_add"></a>
+
+### Function `iter_add`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_add">iter_add</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: K, value: V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_destroy_empty"></a>
+
+### Function `destroy_empty`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_destroy_empty">destroy_empty</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_keys"></a>
+
+### Function `keys`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_keys">keys</a>&lt;K: <b>copy</b>, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;
+</code></pre>
+
+
+
+
 <pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+<b>ensures</b> [abstract] <b>forall</b> k: K: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(result, k) &lt;==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k);
+</code></pre>
+
+
+
+<a id="@Specification_1_values"></a>
+
+### Function `values`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_values">values</a>&lt;K, V: <b>copy</b>&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_to_vec_pair"></a>
+
+### Function `to_vec_pair`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_to_vec_pair">to_vec_pair</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_binary_search"></a>
+
+### Function `binary_search`
+
+
+<pre><code><b>fun</b> <a href="ordered_map.md#0x1_ordered_map_binary_search">binary_search</a>&lt;K, V&gt;(key: &K, entries: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="ordered_map.md#0x1_ordered_map_Entry">ordered_map::Entry</a>&lt;K, V&gt;&gt;, start: u64, end: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

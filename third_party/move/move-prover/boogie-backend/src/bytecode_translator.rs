@@ -7,14 +7,15 @@
 use crate::{
     boogie_helpers::{
         boogie_address, boogie_address_blob, boogie_bv_type, boogie_byte_blob,
-        boogie_constant_blob, boogie_debug_track_abort, boogie_debug_track_local,
-        boogie_debug_track_return, boogie_equality_for_type, boogie_field_sel, boogie_field_update,
-        boogie_function_bv_name, boogie_function_name, boogie_make_vec_from_strings,
-        boogie_modifies_memory_name, boogie_num_literal, boogie_num_type_base,
-        boogie_num_type_string_capital, boogie_reflection_type_info, boogie_reflection_type_name,
-        boogie_resource_memory_name, boogie_struct_name, boogie_struct_variant_name, boogie_temp,
-        boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field, boogie_type_param,
-        boogie_type_suffix, boogie_type_suffix_bv, boogie_type_suffix_for_struct,
+        boogie_closure_pack_name, boogie_constant_blob, boogie_debug_track_abort,
+        boogie_debug_track_local, boogie_debug_track_return, boogie_equality_for_type,
+        boogie_field_sel, boogie_field_update, boogie_fun_apply_name, boogie_function_bv_name,
+        boogie_function_name, boogie_make_vec_from_strings, boogie_modifies_memory_name,
+        boogie_num_literal, boogie_num_type_base, boogie_num_type_string_capital,
+        boogie_reflection_type_info, boogie_reflection_type_name, boogie_resource_memory_name,
+        boogie_struct_name, boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix,
+        boogie_type, boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix,
+        boogie_type_suffix_bv, boogie_type_suffix_for_struct,
         boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
         boogie_well_formed_check, boogie_well_formed_expr_bv, field_bv_flag_global_state,
         TypeIdentToken,
@@ -43,6 +44,7 @@ use move_model::{
 };
 use move_prover_bytecode_pipeline::{
     mono_analysis,
+    mono_analysis::ClosureInfo,
     number_operation::{
         FuncOperationMap, GlobalNumberOperationState, NumOperation,
         NumOperation::{Bitwise, Bottom},
@@ -148,6 +150,51 @@ impl<'env> BoogieTranslator<'env> {
         } else {
             true
         }
+    }
+
+    #[allow(clippy::literal_string_with_formatting_args)]
+    fn emit_function(&self, writer: &CodeWriter, signature: &str, body_fn: impl Fn()) {
+        self.emit_function_with_attr(writer, "{:inline} ", signature, body_fn)
+    }
+
+    #[allow(clippy::literal_string_with_formatting_args)]
+    fn emit_procedure(&self, writer: &CodeWriter, signature: &str, body_fn: impl Fn()) {
+        self.emit_procedure_with_attr(writer, "{:inline 1} ", signature, body_fn)
+    }
+
+    fn emit_with_attr(
+        &self,
+        writer: &CodeWriter,
+        sig: &str,
+        attr: &str,
+        signature: &str,
+        body_fn: impl Fn(),
+    ) {
+        emitln!(writer, "{} {}{} {{", sig, attr, signature);
+        writer.indent();
+        body_fn();
+        writer.unindent();
+        emitln!(writer, "}");
+    }
+
+    fn emit_function_with_attr(
+        &self,
+        writer: &CodeWriter,
+        attr: &str,
+        signature: &str,
+        body_fn: impl Fn(),
+    ) {
+        self.emit_with_attr(writer, "function", attr, signature, body_fn)
+    }
+
+    fn emit_procedure_with_attr(
+        &self,
+        writer: &CodeWriter,
+        attr: &str,
+        signature: &str,
+        body_fn: impl Fn(),
+    ) {
+        self.emit_with_attr(writer, "procedure", attr, signature, body_fn)
     }
 
     #[allow(clippy::literal_string_with_formatting_args)]
@@ -257,6 +304,39 @@ impl<'env> BoogieTranslator<'env> {
 
             // declare the memory variable for this type
             emitln!(writer, "var {}_$memory: $Memory {};", suffix, param_type);
+
+            // If cmp module is included, emit cmp functions for generic types
+            if env
+                .get_modules()
+                .any(|m| m.get_full_name_str() == "0x1::cmp")
+            {
+                self.emit_function(
+                    writer,
+                    &format!(
+                        "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                        suffix, param_type, param_type
+                    ),
+                    || {
+                        emitln!(
+                            writer,
+                            "if $IsEqual'{}'(v1, v2) then $1_cmp_Ordering_Equal()",
+                            suffix
+                        );
+                        emitln!(writer, "else $Arbitrary_value_of'$1_cmp_Ordering'()");
+                    },
+                );
+
+                self.emit_procedure(
+                    writer,
+                    &format!(
+                        "$1_cmp_compare'{}'(v1: {}, v2: {}) returns ($ret0: $1_cmp_Ordering)",
+                        suffix, param_type, param_type
+                    ),
+                    || {
+                        emitln!(writer, "$ret0 := $1_cmp_$compare'{}'(v1, v2);", suffix);
+                    },
+                );
+            }
         }
         emitln!(writer);
 
@@ -264,6 +344,7 @@ impl<'env> BoogieTranslator<'env> {
             .translate_axioms(env, mono_info.as_ref());
 
         let mut translated_types = BTreeSet::new();
+        let mut translated_memory = vec![];
         let mut translated_funs = BTreeSet::new();
         let mut verified_functions_count = 0;
         info!("generating verification conditions");
@@ -285,6 +366,13 @@ impl<'env> BoogieTranslator<'env> {
                     let struct_name = boogie_struct_name(struct_env, type_inst);
                     if !translated_types.insert(struct_name) {
                         continue;
+                    }
+                    if struct_env.has_memory() {
+                        translated_memory.push(boogie_resource_memory_name(
+                            env,
+                            &struct_env.get_qualified_id().instantiate(type_inst.clone()),
+                            &None,
+                        ))
                     }
                     StructTranslator {
                         parent: self,
@@ -383,6 +471,12 @@ impl<'env> BoogieTranslator<'env> {
                 }
             }
         }
+
+        // Emit function types and closures
+        for (fun_type, closure_infos) in &mono_info.fun_infos {
+            self.translate_fun_type(fun_type, closure_infos, &translated_memory)
+        }
+
         // Emit any finalization items required by spec translation.
         self.spec_translator.finalize();
         let shard_info = if let Some(shard) = self.for_shard {
@@ -394,6 +488,140 @@ impl<'env> BoogieTranslator<'env> {
             "{} verification conditions{}",
             verified_functions_count, shard_info
         );
+    }
+
+    fn translate_fun_type(
+        &self,
+        fun_type: &Type,
+        closure_infos: &BTreeSet<ClosureInfo>,
+        memory: &[String],
+    ) {
+        emitln!(
+            self.writer,
+            "// Function type `{}`",
+            fun_type.display(&self.env.get_type_display_ctx())
+        );
+
+        // Create data type for the function type.
+        let fun_ty_boogie_name = boogie_type(self.env, fun_type);
+        emitln!(self.writer, "datatype {} {{", fun_ty_boogie_name);
+        self.writer.indent();
+        for info in closure_infos {
+            emitln!(
+                self.writer,
+                "// Closure from function `{}`, capture mask 0b{}",
+                self.env.display(&info.fun),
+                info.mask
+            );
+            emit!(
+                self.writer,
+                "{}(",
+                boogie_closure_pack_name(self.env, &info.fun, info.mask)
+            );
+            let fun_env = self.env.get_function(info.fun.to_qualified_id());
+            let param_tys = Type::instantiate_vec(fun_env.get_parameter_types(), &info.fun.inst);
+            for (pos, captured_ty) in info.mask.extract(&param_tys, true).iter().enumerate() {
+                if pos > 0 {
+                    emit!(self.writer, ", ")
+                }
+                emit!(
+                    self.writer,
+                    "p{}: {}",
+                    pos,
+                    boogie_type(self.env, captured_ty)
+                )
+            }
+            emitln!(self.writer, "),")
+        }
+        // Last variant for unknown value.
+        emitln!(
+            self.writer,
+            "// Value to represent some arbitrary unknown function"
+        );
+        emitln!(
+            self.writer,
+            "$unknown_function'{}'(id: int)",
+            boogie_type_suffix(self.env, fun_type),
+        );
+        self.writer.unindent();
+        emitln!(self.writer, "}");
+        emitln!(
+            self.writer,
+            "function $IsValid'{}'(x: {}): bool {{ true }}",
+            boogie_type_suffix(self.env, fun_type),
+            fun_ty_boogie_name
+        );
+
+        // Create an apply procedure.
+        emit!(
+            self.writer,
+            "procedure {{:inline 1}} {}(",
+            boogie_fun_apply_name(self.env, fun_type),
+        );
+        let Type::Fun(params, results, _abilities) = fun_type else {
+            panic!("expected function type")
+        };
+        let params = params.clone().flatten();
+        for (pos, ty) in params.iter().enumerate() {
+            if pos > 0 {
+                emit!(self.writer, ", ")
+            }
+            emit!(self.writer, "p{}: {}", pos, boogie_type(self.env, ty))
+        }
+        if !params.is_empty() {
+            emit!(self.writer, ", ")
+        }
+        emit!(self.writer, "fun: {}", fun_ty_boogie_name);
+        emit!(self.writer, ") returns (");
+        let mut result_locals = vec![];
+        for (pos, ty) in results.clone().flatten().iter().enumerate() {
+            if pos > 0 {
+                emit!(self.writer, ",")
+            }
+            let local_name = format!("r{}", pos);
+            emit!(self.writer, "{}: {}", local_name, boogie_type(self.env, ty));
+            result_locals.push(local_name)
+        }
+        emitln!(self.writer, ") {");
+        self.writer.indent();
+        let result_str = result_locals.iter().cloned().join(", ");
+        for info in closure_infos {
+            let ctor_name = boogie_closure_pack_name(self.env, &info.fun, info.mask);
+            emitln!(self.writer, "if (fun is {}) {{", ctor_name);
+            self.writer.indent();
+            let fun_env = &self.env.get_function(info.fun.to_qualified_id());
+            let fun_name = boogie_function_name(fun_env, &info.fun.inst);
+            let args = (0..info.mask.captured_count())
+                .map(|pos| format!("fun->p{}", pos))
+                .chain((0..params.len()).map(|pos| format!("p{}", pos)))
+                .join(", ");
+            let call_prefix = if result_str.is_empty() {
+                String::new()
+            } else {
+                format!("{result_str} := ")
+            };
+            emitln!(self.writer, "call {}{}({});", call_prefix, fun_name, args);
+            self.writer.unindent();
+            emitln!(self.writer, "} else ");
+        }
+        if !closure_infos.is_empty() {
+            emitln!(self.writer, "{");
+            self.writer.indent();
+        }
+        emitln!(
+            self.writer,
+            "// Havoc memory and abort_flag since the unknown function could modify anything."
+        );
+        emitln!(self.writer, "havoc $abort_flag;");
+        for mem in memory {
+            emitln!(self.writer, "havoc {};", mem)
+        }
+        if !closure_infos.is_empty() {
+            self.writer.unindent();
+            emitln!(self.writer, "}");
+        }
+        self.writer.unindent();
+        emitln!(self.writer, "}");
     }
 }
 
@@ -511,7 +739,8 @@ impl StructTranslator<'_> {
         }
 
         // Emit $IsValid function for `variant`.
-        self.emit_function_with_attr(
+        self.parent.emit_function_with_attr(
+            writer,
             "", // not inlined!
             &format!("$IsValid'{}'(s: {}): bool", suffix_variant, struct_name),
             || {
@@ -538,7 +767,8 @@ impl StructTranslator<'_> {
     // Emit $IsValid function for struct.
     fn emit_is_valid_struct(&self, struct_env: &StructEnv, struct_name: &str, emit_fn: impl Fn()) {
         let writer = self.parent.writer;
-        self.emit_function_with_attr(
+        self.parent.emit_function_with_attr(
+            writer,
             "", // not inlined!
             &format!("$IsValid'{}'(s: {}): bool", struct_name, struct_name),
             || {
@@ -640,6 +870,121 @@ impl StructTranslator<'_> {
             sep = "";
         }
         emitln!(writer, "else false");
+    }
+
+    /// Emit the function cmp::compare for enum
+    fn emit_cmp_for_enum(&self, struct_env: &StructEnv, struct_name: &str) {
+        let writer = self.parent.writer;
+        let suffix: String = boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
+        self.emit_function(
+            &format!(
+                "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                suffix, struct_name, struct_name
+            ),
+            || {
+                let mut else_symbol = "";
+                for (pos_1, v1) in struct_env.get_variants().collect_vec().iter().enumerate() {
+                    for (pos_2, v2) in struct_env.get_variants().collect_vec().iter().enumerate() {
+                        if pos_2 <= pos_1 {
+                            continue;
+                        }
+                        let struct_variant_name_1 =
+                            boogie_struct_variant_name(struct_env, self.type_inst, *v1);
+                        let struct_variant_name_2 =
+                            boogie_struct_variant_name(struct_env, self.type_inst, *v2);
+                        let cmp_order_less = format!(
+                            "{} if v1 is {} && v2 is {} then $1_cmp_Ordering_Less()",
+                            else_symbol, struct_variant_name_1, struct_variant_name_2
+                        );
+                        let cmp_order_greater = format!(
+                            "else if v1 is {} && v2 is {} then $1_cmp_Ordering_Greater()",
+                            struct_variant_name_2, struct_variant_name_1
+                        );
+                        if else_symbol.is_empty() {
+                            else_symbol = "else";
+                        }
+                        emitln!(writer, "{}", cmp_order_less);
+                        emitln!(writer, "{}", cmp_order_greater);
+                    }
+                }
+                for variant in struct_env.get_variants().collect_vec().iter() {
+                    let struct_variant_name_1 =
+                        boogie_struct_variant_name(struct_env, self.type_inst, *variant);
+                    let suffix_variant =
+                        boogie_type_suffix_for_struct_variant(struct_env, self.type_inst, variant);
+                    let cmp_order = format!(
+                        "{} if v1 is {} && v2 is {} then $1_cmp_$compare'{}'(v1, v2)",
+                        else_symbol, struct_variant_name_1, struct_variant_name_1, suffix_variant
+                    );
+                    emitln!(writer, "{}", cmp_order);
+                }
+                emitln!(writer, "else $Arbitrary_value_of'$1_cmp_Ordering'()");
+            },
+        );
+        for variant in struct_env.get_variants().collect_vec().iter() {
+            self.emit_cmp_for_enum_variant(struct_env, *variant, struct_name);
+        }
+    }
+
+    /// Emit the function cmp::compare for each enum variant
+    fn emit_cmp_for_enum_variant(
+        &self,
+        struct_env: &StructEnv,
+        variant: Symbol,
+        struct_name: &str,
+    ) {
+        let writer = self.parent.writer;
+        let suffix_variant =
+            boogie_type_suffix_for_struct_variant(struct_env, self.type_inst, &variant);
+        self.emit_function(
+            &format!(
+                "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                suffix_variant, struct_name, struct_name
+            ),
+            || {
+                if struct_env
+                    .get_fields_of_variant(variant)
+                    .collect_vec()
+                    .is_empty()
+                {
+                    emitln!(writer, "$1_cmp_Ordering_Equal()");
+                } else {
+                    for (pos, field) in struct_env.get_fields_of_variant(variant).enumerate() {
+                        let bv_flag = self.field_bv_flag(&field);
+                        let field_type_name = boogie_type_suffix_bv(
+                            self.parent.env,
+                            &self.inst(&field.get_type()),
+                            bv_flag,
+                        );
+                        let cmp_field_call = format!(
+                            "$1_cmp_$compare'{}'(v1->{}, v2->{})",
+                            field_type_name,
+                            boogie_field_sel(&field),
+                            boogie_field_sel(&field)
+                        );
+                        let cmp_field_call_less =
+                            format!("{} == $1_cmp_Ordering_Less()", cmp_field_call);
+                        let cmp_field_call_greater =
+                            format!("{} == $1_cmp_Ordering_Greater()", cmp_field_call);
+                        emitln!(writer, "if {}", cmp_field_call_less);
+                        emitln!(writer, "then $1_cmp_Ordering_Less()");
+                        emitln!(writer, "else if {}", cmp_field_call_greater);
+                        emitln!(writer, "then $1_cmp_Ordering_Greater()");
+                        if pos
+                            < struct_env
+                                .get_fields_of_variant(variant)
+                                .collect_vec()
+                                .len()
+                                - 1
+                        {
+                            emitln!(writer, "else");
+                        } else {
+                            emitln!(writer, "else $1_cmp_Ordering_Equal()");
+                        }
+                    }
+                }
+            },
+        );
     }
 
     /// Return whether a field involves bitwise operations
@@ -805,21 +1150,90 @@ impl StructTranslator<'_> {
             emitln!(writer, "var {}: $Memory {};", memory_name, struct_name);
         }
 
+        // Emit compare function and procedure
+        let cmp_struct_types = self.parent.env.cmp_types.borrow();
+        for cmp_struct_type in cmp_struct_types.iter() {
+            if let Some((cur_struct, inst)) = cmp_struct_type.get_struct(env) {
+                if cur_struct.get_id() == struct_env.get_id() && inst == self.type_inst {
+                    if !struct_env.has_variants() {
+                        let suffix =
+                            boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
+                        self.emit_function(
+                            &format!(
+                                "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                                suffix, struct_name, struct_name
+                            ),
+                            || {
+                                for (pos, field) in struct_env.get_fields().enumerate() {
+                                    let bv_flag = self.field_bv_flag(&field);
+                                    let suffix_ty = boogie_type_suffix_bv(
+                                        self.parent.env,
+                                        &self.inst(&field.get_type()),
+                                        bv_flag,
+                                    );
+                                    let cmp_field_call = format!(
+                                        "$1_cmp_$compare'{}'(v1->{}, v2->{})",
+                                        suffix_ty,
+                                        boogie_field_sel(&field),
+                                        boogie_field_sel(&field)
+                                    );
+                                    let cmp_field_call_less =
+                                        format!("{} == $1_cmp_Ordering_Less()", cmp_field_call);
+                                    let cmp_field_call_greater =
+                                        format!("{} == $1_cmp_Ordering_Greater()", cmp_field_call);
+                                    emitln!(writer, "if {}", cmp_field_call_less);
+                                    emitln!(writer, "then $1_cmp_Ordering_Less()");
+                                    emitln!(writer, "else if {}", cmp_field_call_greater);
+                                    emitln!(writer, "then $1_cmp_Ordering_Greater()");
+                                    if pos < struct_env.get_field_count() - 1 {
+                                        emitln!(writer, "else");
+                                    } else {
+                                        emitln!(writer, "else $1_cmp_Ordering_Equal()");
+                                    }
+                                }
+                            },
+                        );
+                        self.emit_procedure(
+                            &format!(
+                            "$1_cmp_compare'{}'(v1: {}, v2: {}) returns ($ret0: $1_cmp_Ordering)",
+                            suffix, struct_name, struct_name
+                        ),
+                            || {
+                                emitln!(writer, "$ret0 := $1_cmp_$compare'{}'(v1, v2);", suffix);
+                            },
+                        );
+                    } else {
+                        self.emit_cmp_for_enum(struct_env, &struct_name);
+                        let suffix: String =
+                            boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
+                        self.emit_procedure(
+                            &format!(
+                            "$1_cmp_compare'{}'(v1: {}, v2: {}) returns ($ret0: $1_cmp_Ordering)",
+                            suffix, struct_name, struct_name
+                        ),
+                            || {
+                                emitln!(writer, "$ret0 := $1_cmp_$compare'{}'(v1, v2);", suffix);
+                            },
+                        );
+                    }
+                    break;
+                }
+            }
+        }
+
         emitln!(writer);
     }
 
     #[allow(clippy::literal_string_with_formatting_args)]
     fn emit_function(&self, signature: &str, body_fn: impl Fn()) {
-        self.emit_function_with_attr("{:inline} ", signature, body_fn)
+        self.parent
+            .emit_function(self.parent.writer, signature, body_fn);
     }
 
-    fn emit_function_with_attr(&self, attr: &str, signature: &str, body_fn: impl Fn()) {
-        let writer = self.parent.writer;
-        emitln!(writer, "function {}{} {{", attr, signature);
-        writer.indent();
-        body_fn();
-        writer.unindent();
-        emitln!(writer, "}");
+    #[allow(clippy::literal_string_with_formatting_args)]
+    fn emit_procedure(&self, signature: &str, body_fn: impl Fn()) {
+        self.parent
+            .emit_procedure(self.parent.writer, signature, body_fn);
     }
 }
 
@@ -1403,10 +1817,6 @@ impl FunctionTranslator<'_> {
             Call(_, dests, oper, srcs, aa) => {
                 use Operation::*;
                 match oper {
-                    Closure(..) | Invoke => {
-                        // TODO(#15664): implement closures for prover
-                        panic!("closures not yet supported")
-                    },
                     TestVariant(mid, sid, variant, inst) => {
                         let inst = &self.inst_slice(inst);
                         let src_type = self.get_local_type(srcs[0]);
@@ -1514,7 +1924,7 @@ impl FunctionTranslator<'_> {
                             str_local(value),
                         );
                     },
-                    Function(mid, fid, inst) => {
+                    Function(mid, fid, inst) | Closure(mid, fid, inst, _) => {
                         let inst = &self.inst_slice(inst);
                         let module_env = env.get_module(*mid);
                         let callee_env = module_env.get_function(*fid);
@@ -1536,6 +1946,20 @@ impl FunctionTranslator<'_> {
 
                         if self.try_reflection_call(writer, env, inst, &callee_env, &dest_str) {
                             // Special case of reflection call, code is generated
+                        } else if let Closure(_, _, _, mask) = oper {
+                            // Special case of closure construction
+                            let closure_ctor_name = boogie_closure_pack_name(
+                                env,
+                                &mid.qualified_inst(*fid, inst.clone()),
+                                *mask,
+                            );
+                            emitln!(
+                                writer,
+                                "{} := {}({});",
+                                dest_str,
+                                closure_ctor_name,
+                                args_str
+                            )
                         } else {
                             // regular path
                             let targeted = self.fun_target.module_env().is_target();
@@ -1622,6 +2046,11 @@ impl FunctionTranslator<'_> {
                             } else {
                                 let dest_bv_flag = !dests.is_empty() && compute_flag(dests[0]);
                                 let bv_flag = !srcs.is_empty() && compute_flag(srcs[0]);
+                                if module_env.is_cmp() {
+                                    fun_name = boogie_function_bv_name(&callee_env, inst, &[
+                                        bv_flag || dest_bv_flag,
+                                    ]);
+                                }
                                 // Handle the case where the return value of length is assigned to a bv int because
                                 // length always returns a non-bv result
                                 if module_env.is_std_vector() {
@@ -1700,6 +2129,31 @@ impl FunctionTranslator<'_> {
                         // Clear the last track location after function call, as the call inserted
                         // location tracks before it returns.
                         *last_tracked_loc = None;
+                    },
+                    Invoke => {
+                        // Function is last argument
+                        let fun_type = self.inst(fun_target.get_local_type(*srcs.last().unwrap()));
+                        let args_str = srcs.iter().cloned().map(str_local).join(", ");
+                        let dest_str = dests
+                            .iter()
+                            .cloned()
+                            .map(str_local)
+                            // Add implict dest returns for &mut srcs:
+                            //  f(x) --> x := f(x)  if type(x) = &mut_
+                            .chain(
+                                srcs.iter()
+                                    .filter(|idx| self.get_local_type(**idx).is_mutable_reference())
+                                    .cloned()
+                                    .map(str_local),
+                            )
+                            .join(",");
+                        let apply_fun = boogie_fun_apply_name(env, &fun_type);
+                        let call_prefix = if dest_str.is_empty() {
+                            String::new()
+                        } else {
+                            format!("{dest_str} := ")
+                        };
+                        emitln!(writer, "call {}{}({});", call_prefix, apply_fun, args_str);
                     },
                     Pack(mid, sid, inst) => {
                         let inst = &self.inst_slice(inst);

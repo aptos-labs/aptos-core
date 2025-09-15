@@ -6,6 +6,7 @@ use crate::{
     common::{
         init::Network,
         local_simulation,
+        transactions::ReplayProtectionType,
         utils::{
             check_if_file_exists, create_dir_if_not_exist, deserialize_address_str,
             deserialize_material_with_prefix, dir_default_to_current, get_account_with_state,
@@ -42,11 +43,15 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{HardwareWalletAccount, HardwareWalletType, LocalAccount, TransactionSigner},
 };
+use aptos_transaction_simulation::SimulationStateStore;
+use aptos_transaction_simulation_session::Session;
 use aptos_types::{
+    account_config::AccountResource,
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationKey, EntryFunction, MultisigTransactionPayload, Script,
-        SignedTransaction, TransactionArgument, TransactionPayload, TransactionStatus,
+        authenticator::AuthenticationKey, EntryFunction, MultisigTransactionPayload,
+        ReplayProtector, Script, SignedTransaction, TransactionArgument, TransactionPayload,
+        TransactionStatus,
     },
 };
 use aptos_vm_types::output::VMOutput;
@@ -72,7 +77,7 @@ use std::{
     convert::TryFrom,
     fmt::{Debug, Display, Formatter},
     fs::OpenOptions,
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -1497,6 +1502,8 @@ pub struct TransactionSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sequence_number: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub replay_protector: Option<ReplayProtector>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub success: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp_us: Option<u64>,
@@ -1518,7 +1525,11 @@ impl From<&Transaction> for TransactionSummary {
                 transaction_hash: txn.hash,
                 pending: Some(true),
                 sender: Some(*txn.request.sender.inner()),
-                sequence_number: Some(txn.request.sequence_number.0),
+                sequence_number: match txn.request.replay_protector() {
+                    ReplayProtector::SequenceNumber(sequence_number) => Some(sequence_number),
+                    _ => None,
+                },
+                replay_protector: Some(txn.request.replay_protector()),
                 gas_used: None,
                 gas_unit_price: None,
                 success: None,
@@ -1534,7 +1545,11 @@ impl From<&Transaction> for TransactionSummary {
                 success: Some(txn.info.success),
                 version: Some(txn.info.version.0),
                 vm_status: Some(txn.info.vm_status.clone()),
-                sequence_number: Some(txn.request.sequence_number.0),
+                sequence_number: match txn.request.replay_protector() {
+                    ReplayProtector::SequenceNumber(sequence_number) => Some(sequence_number),
+                    _ => None,
+                },
+                replay_protector: Some(txn.request.replay_protector()),
                 timestamp_us: Some(txn.timestamp.0),
                 pending: None,
             },
@@ -1548,6 +1563,7 @@ impl From<&Transaction> for TransactionSummary {
                 gas_unit_price: None,
                 pending: None,
                 sequence_number: None,
+                replay_protector: None,
                 timestamp_us: None,
             },
             Transaction::BlockMetadataTransaction(txn) => TransactionSummary {
@@ -1561,6 +1577,7 @@ impl From<&Transaction> for TransactionSummary {
                 gas_unit_price: None,
                 pending: None,
                 sequence_number: None,
+                replay_protector: None,
             },
             Transaction::StateCheckpointTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
@@ -1573,6 +1590,7 @@ impl From<&Transaction> for TransactionSummary {
                 gas_unit_price: None,
                 pending: None,
                 sequence_number: None,
+                replay_protector: None,
             },
             Transaction::BlockEpilogueTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
@@ -1585,6 +1603,7 @@ impl From<&Transaction> for TransactionSummary {
                 gas_unit_price: None,
                 pending: None,
                 sequence_number: None,
+                replay_protector: None,
             },
             Transaction::ValidatorTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.transaction_info().hash,
@@ -1593,6 +1612,7 @@ impl From<&Transaction> for TransactionSummary {
                 pending: None,
                 sender: None,
                 sequence_number: None,
+                replay_protector: None,
                 success: Some(txn.transaction_info().success),
                 timestamp_us: Some(txn.timestamp().0),
                 version: Some(txn.transaction_info().version.0),
@@ -1781,6 +1801,18 @@ pub struct TransactionOptions {
     /// flamegraphs that reflect the gas usage.
     #[clap(long)]
     pub(crate) profile_gas: bool,
+
+    /// If this option is set, simulate the transaction using a local session.
+    #[clap(long)]
+    pub(crate) session: Option<PathBuf>,
+
+    /// Replay protection mechanism to use when generating the transaction.
+    ///
+    /// When "nonce" is chosen, the transaction will be an orderless transaction and contains a replay protection nonce.
+    ///
+    /// When "seqnum" is chosen, the transaction will contain a sequence number that matches with the sender's onchain sequence number.
+    #[clap(long, default_value_t = ReplayProtectionType::Seqnum)]
+    pub(crate) replay_protection_type: ReplayProtectionType,
 }
 
 impl TransactionOptions {
@@ -1855,11 +1887,26 @@ impl TransactionOptions {
     }
 
     pub async fn view(&self, payload: ViewFunction) -> CliTypedResult<Vec<serde_json::Value>> {
-        let client = self.rest_client()?;
-        Ok(client
-            .view_bcs_with_json_response(&payload, None)
-            .await?
-            .into_inner())
+        match &self.session {
+            None => {
+                let client = self.rest_client()?;
+                Ok(client
+                    .view_bcs_with_json_response(&payload, None)
+                    .await?
+                    .into_inner())
+            },
+
+            Some(session_path) => {
+                let mut sess = Session::load(session_path)?;
+                let output = sess.execute_view_function(
+                    payload.module,
+                    payload.function,
+                    payload.ty_args,
+                    payload.args,
+                )?;
+                Ok(output)
+            },
+        }
     }
 
     /// Submit a transaction
@@ -1915,12 +1962,21 @@ impl TransactionOptions {
             let transaction_factory =
                 TransactionFactory::new(chain_id).with_gas_unit_price(gas_unit_price);
 
-            let unsigned_transaction = transaction_factory
+            let txn_builder = transaction_factory
                 .payload(payload.clone())
                 .sender(sender_address)
                 .sequence_number(sequence_number)
-                .expiration_timestamp_secs(expiration_time_secs)
-                .build();
+                .expiration_timestamp_secs(expiration_time_secs);
+
+            let unsigned_transaction = if self.replay_protection_type == ReplayProtectionType::Nonce
+            {
+                let mut rng = rand::thread_rng();
+                txn_builder
+                    .upgrade_payload_with_rng(&mut rng, true, true)
+                    .build()
+            } else {
+                txn_builder.build()
+            };
 
             let signed_transaction = SignedTransaction::new(
                 unsigned_transaction,
@@ -1972,7 +2028,12 @@ impl TransactionOptions {
                 let (private_key, _) = self.get_key_and_address()?;
                 let sender_account =
                     &mut LocalAccount::new(sender_address, private_key, sequence_number);
-                sender_account.sign_with_transaction_builder(transaction_factory.payload(payload))
+                let mut txn_builder = transaction_factory.payload(payload);
+                if self.replay_protection_type == ReplayProtectionType::Nonce {
+                    let mut rng = rand::thread_rng();
+                    txn_builder = txn_builder.upgrade_payload_with_rng(&mut rng, true, true);
+                };
+                sender_account.sign_with_transaction_builder(txn_builder)
             },
             Ok(AccountType::HardwareWallet) => {
                 let sender_account = &mut HardwareWalletAccount::new(
@@ -1985,8 +2046,12 @@ impl TransactionOptions {
                     HardwareWalletType::Ledger,
                     sequence_number,
                 );
-                sender_account
-                    .sign_with_transaction_builder(transaction_factory.payload(payload))?
+                let mut txn_builder = transaction_factory.payload(payload);
+                if self.replay_protection_type == ReplayProtectionType::Nonce {
+                    let mut rng = rand::thread_rng();
+                    txn_builder = txn_builder.upgrade_payload_with_rng(&mut rng, true, true);
+                };
+                sender_account.sign_with_transaction_builder(txn_builder)?
             },
             Err(err) => return Err(err),
         };
@@ -2054,6 +2119,7 @@ impl TransactionOptions {
         const DEFAULT_MAX_GAS: u64 = 2_000_000;
 
         let (sender_key, sender_address) = self.get_key_and_address()?;
+        // TODO: Consider fetching the min gas unit price from the chain
         let gas_unit_price = self
             .gas_options
             .gas_unit_price
@@ -2100,10 +2166,81 @@ impl TransactionOptions {
             gas_unit_price: Some(gas_unit_price),
             pending: None,
             sender: Some(sender_address),
-            sequence_number: None, // The transaction is not comitted so there is no new sequence number.
+            sequence_number: None,
+            replay_protector: None, // The transaction is not comitted so there is no new sequence number.
             success,
             timestamp_us: None,
             version: Some(version), // The transaction is not comitted so there is no new version.
+            vm_status: Some(vm_status.to_string()),
+        };
+
+        Ok(summary)
+    }
+
+    pub async fn simulate_using_session(
+        &self,
+        session_path: &Path,
+        payload: TransactionPayload,
+    ) -> CliTypedResult<TransactionSummary> {
+        let mut sess = Session::load(session_path)?;
+
+        let state_store = sess.state_store();
+
+        // Fetch the chain states required for the simulation
+        const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
+        const DEFAULT_MAX_GAS: u64 = 2_000_000;
+
+        let (sender_key, sender_address) = self.get_key_and_address()?;
+
+        // TODO: Support orderless transactions
+        let account = state_store.get_resource::<AccountResource>(sender_address)?;
+        let seq_num = match account {
+            Some(account) => account.sequence_number,
+            None => 0,
+        };
+
+        // TODO: Consider fetching the min gas unit price from the chain
+        let gas_unit_price = self
+            .gas_options
+            .gas_unit_price
+            .unwrap_or(DEFAULT_GAS_UNIT_PRICE);
+
+        let balance = state_store.get_apt_balance(sender_address)?;
+        let max_gas = self.gas_options.max_gas.unwrap_or_else(|| {
+            if gas_unit_price == 0 {
+                DEFAULT_MAX_GAS
+            } else {
+                std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
+            }
+        });
+
+        let transaction_factory = TransactionFactory::new(state_store.get_chain_id()?)
+            .with_gas_unit_price(gas_unit_price)
+            .with_max_gas_amount(max_gas)
+            .with_transaction_expiration_time(self.gas_options.expiration_secs);
+        let sender_account = &mut LocalAccount::new(sender_address, sender_key, seq_num);
+        let transaction =
+            sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
+        let hash = transaction.committed_hash();
+
+        let (vm_status, txn_output) = sess.execute_transaction(transaction)?;
+
+        let success = match txn_output.status() {
+            TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
+            TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
+        };
+
+        let summary = TransactionSummary {
+            transaction_hash: hash.into(),
+            gas_used: Some(txn_output.gas_used()),
+            gas_unit_price: Some(gas_unit_price),
+            pending: None,
+            sender: Some(sender_address),
+            sequence_number: Some(seq_num),
+            replay_protector: None,
+            success,
+            timestamp_us: None,
+            version: None,
             vm_status: Some(vm_status.to_string()),
         };
 

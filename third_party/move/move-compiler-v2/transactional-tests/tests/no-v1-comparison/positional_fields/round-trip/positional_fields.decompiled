@@ -1,0 +1,19 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/positional_fields/positional_fields.move`
+
+//# publish
+module 0x42::test {
+    struct Tup<T0, T1> {
+        _0: T0,
+        _1: T1,
+    }
+    fun baz(p0: u64, p1: u64): u64 {
+        let Tup<u64,u64>{_0: _t5, _1: _t6} = Tup<u64,u64>{_0: p0, _1: p1};
+        _t5 - _t6
+    }
+    fun test_ok() {
+        if (!(baz(2, 1) == 1)) abort 42;
+    }
+}
+
+
+//# run --verbose -- 0x42::test::test_ok

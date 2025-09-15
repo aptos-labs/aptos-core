@@ -389,9 +389,11 @@ impl BufferManager {
         } = ordered_blocks;
 
         info!(
-            "Receive {} ordered block ends with {}, the queue size is {}",
+            "Receive {} ordered block ends with [epoch: {}, round: {}, id: {}], the queue size is {}",
             ordered_blocks.len(),
-            ordered_proof.commit_info(),
+            ordered_proof.commit_info().epoch(),
+            ordered_proof.commit_info().round(),
+            ordered_proof.commit_info().id(),
             self.buffer.len() + 1,
         );
 
@@ -438,9 +440,12 @@ impl BufferManager {
             // Schedule retry.
             self.execution_root
         } else {
-            info!(
-                "Advance execution root from {:?} to {:?}",
-                cursor, self.execution_root
+            sample!(
+                SampleRate::Frequency(2),
+                info!(
+                    "Advance execution root from {:?} to {:?}",
+                    cursor, self.execution_root
+                )
             );
             // Otherwise do nothing, because the execution wait phase is driven by the response of
             // the execution schedule phase, which is in turn fed as soon as the ordered blocks
@@ -458,9 +463,12 @@ impl BufferManager {
             .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
                 item.is_executed()
             });
-        info!(
-            "Advance signing root from {:?} to {:?}",
-            cursor, self.signing_root
+        sample!(
+            SampleRate::Frequency(2),
+            info!(
+                "Advance signing root from {:?} to {:?}",
+                cursor, self.signing_root
+            )
         );
         if self.signing_root.is_some() {
             let item = self.buffer.get(&self.signing_root);
@@ -506,11 +514,6 @@ impl BufferManager {
                 // As all the validators broadcast commit votes directly to all other validators,
                 // the proposer do not have to broadcast commit decision again.
                 let commit_proof = aggregated_item.commit_proof.clone();
-                if commit_proof.ledger_info().ends_epoch() {
-                    // the epoch ends, reset to avoid executing more blocks, execute after
-                    // this persisting request will result in BlockNotFound
-                    self.reset().await;
-                }
                 if let Some(consensus_publisher) = &self.consensus_publisher {
                     let message =
                         ConsensusObserverMessage::new_commit_decision_message(commit_proof.clone());
@@ -527,6 +530,11 @@ impl BufferManager {
                     }))
                     .await
                     .expect("Failed to send persist request");
+                if commit_proof.ledger_info().ends_epoch() {
+                    // the epoch ends, reset to avoid executing more blocks, execute after
+                    // this persisting request will result in BlockNotFound
+                    self.reset().await;
+                }
                 info!("Advance head to {:?}", self.buffer.head_cursor());
                 self.previous_commit_time = Instant::now();
                 return;
@@ -557,7 +565,13 @@ impl BufferManager {
         self.previous_commit_time = Instant::now();
         self.commit_proof_rb_handle.take();
         // purge the incoming blocks queue
-        while let Ok(Some(_)) = self.block_rx.try_next() {}
+        while let Ok(Some(blocks)) = self.block_rx.try_next() {
+            for b in blocks.ordered_blocks {
+                if let Some(futs) = b.abort_pipeline() {
+                    futs.wait_until_finishes().await;
+                }
+            }
+        }
         // Wait for ongoing tasks to finish before sending back ack.
         while self.ongoing_tasks.load(Ordering::SeqCst) > 0 {
             tokio::time::sleep(Duration::from_millis(10)).await;

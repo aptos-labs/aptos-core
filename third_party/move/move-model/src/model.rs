@@ -52,7 +52,6 @@ pub use move_binary_format::file_format::Visibility;
 use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess,
-    binary_views::BinaryIndexedView,
     file_format::{
         Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex, FunctionDefinitionIndex,
         FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken, StructDefinitionIndex,
@@ -61,7 +60,7 @@ use move_binary_format::{
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
     CompiledModule,
 };
-use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
+use move_bytecode_source_map::source_map::SourceMap;
 use move_command_line_common::{
     address::NumericalAddress, env::read_bool_env_var, files::FileHash,
 };
@@ -72,7 +71,6 @@ use move_core_types::{
     language_storage,
     value::MoveValue,
 };
-use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use num::ToPrimitive;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -607,6 +605,8 @@ pub struct GlobalEnv {
     /// Whether the v2 compiler has generated this model.
     /// TODO: replace with a proper version number once we have this in file format
     pub(crate) generated_by_v2: bool,
+    /// A set of types that are instantiated in cmp module.
+    pub cmp_types: RefCell<BTreeSet<Type>>,
 }
 
 /// A helper type for implementing fmt::Display depending on GlobalEnv
@@ -668,6 +668,7 @@ impl GlobalEnv {
             address_alias_map: Default::default(),
             everything_is_target: Default::default(),
             generated_by_v2: false,
+            cmp_types: RefCell::new(Default::default()),
         }
     }
 
@@ -1281,25 +1282,18 @@ impl GlobalEnv {
     // Comparison of Diagnostic values that tries to match program ordering so we
     // can display them to the user in a more natural order.
     fn cmp_diagnostic(diag1: &Diagnostic<FileId>, diag2: &Diagnostic<FileId>) -> Ordering {
-        let labels_ordering = GlobalEnv::cmp_labels(&diag1.labels, &diag2.labels);
-        if Ordering::Equal == labels_ordering {
-            let sev_ordering = diag1
+        GlobalEnv::cmp_labels(&diag1.labels, &diag2.labels).then_with(|| {
+            diag1
                 .severity
                 .partial_cmp(&diag2.severity)
-                .expect("Severity provides a total ordering for valid severity enum values");
-            if Ordering::Equal == sev_ordering {
-                let message_ordering = diag1.message.cmp(&diag2.message);
-                if Ordering::Equal == message_ordering {
-                    diag1.code.cmp(&diag2.code)
-                } else {
-                    message_ordering
-                }
-            } else {
-                sev_ordering
-            }
-        } else {
-            labels_ordering
-        }
+                .expect("Severity provides a total ordering for valid severity enum values")
+                .then_with(|| {
+                    diag1
+                        .message
+                        .cmp(&diag2.message)
+                        .then_with(|| diag1.code.cmp(&diag2.code))
+                })
+        })
     }
 
     // Label comparison that tries to match program ordering.  `FileId` is already set in visitation
@@ -1307,25 +1301,13 @@ impl GlobalEnv {
     // marking nested regions, we want the innermost region, so we order first by end of labelled
     // code region, then in reverse by start of region.
     fn cmp_label(label1: &Label<FileId>, label2: &Label<FileId>) -> Ordering {
-        let file_ordering = label1.file_id.cmp(&label2.file_id);
-        if Ordering::Equal == file_ordering {
-            // First order by end of region.
-            let end1 = label1.range.end;
-            let end2 = label2.range.end;
-            let end_ordering = end1.cmp(&end2);
-            if Ordering::Equal == end_ordering {
-                let start1 = label1.range.start;
-                let start2 = label2.range.start;
-
-                // For nested regions with same end, show inner-most region first.
-                // Swap 1 and 2 in comparing starts.
-                start2.cmp(&start1)
-            } else {
-                end_ordering
-            }
-        } else {
-            file_ordering
-        }
+        label1.file_id.cmp(&label2.file_id).then_with(|| {
+            label1
+                .range
+                .end
+                .cmp(&label2.range.end)
+                .then_with(|| label2.range.start.cmp(&label1.range.start))
+        })
     }
 
     // Label comparison within a list of labels for a given diagnostic, which orders by priority
@@ -1346,12 +1328,14 @@ impl GlobalEnv {
     fn cmp_labels(labels1: &[Label<FileId>], labels2: &[Label<FileId>]) -> Ordering {
         let mut sorted_labels1 = labels1.iter().collect_vec();
         sorted_labels1.sort_by(|l1, l2| GlobalEnv::cmp_label_priority(l1, l2));
+        let sorted_labels1_len = sorted_labels1.len();
         let mut sorted_labels2 = labels2.iter().collect_vec();
         sorted_labels2.sort_by(|l1, l2| GlobalEnv::cmp_label_priority(l1, l2));
+        let sorted_labels2_len = sorted_labels2.len();
         std::iter::zip(sorted_labels1, sorted_labels2)
             .map(|(l1, l2)| GlobalEnv::cmp_label(l1, l2))
-            .find(|r| Ordering::Equal != *r)
-            .unwrap_or(Ordering::Equal)
+            .fold(Ordering::Equal, Ordering::then)
+            .then_with(|| sorted_labels1_len.cmp(&sorted_labels2_len))
     }
 
     /// Writes accumulated diagnostics that pass through `filter`
@@ -1362,12 +1346,8 @@ impl GlobalEnv {
     {
         let mut shown = BTreeSet::new();
         self.diags.borrow_mut().sort_by(|a, b| {
-            let reported_ordering = a.1.cmp(&b.1);
-            if Ordering::Equal == reported_ordering {
-                GlobalEnv::cmp_diagnostic(&a.0, &b.0)
-            } else {
-                reported_ordering
-            }
+            a.1.cmp(&b.1)
+                .then_with(|| GlobalEnv::cmp_diagnostic(&a.0, &b.0))
         });
         for (diag, reported) in self.diags.borrow_mut().iter_mut().filter(|(d, reported)| {
             !reported
@@ -1728,11 +1708,104 @@ impl GlobalEnv {
         }
         let used_modules = self.get_used_modules_from_bytecode(&module);
         let friend_modules = self.get_friend_modules_from_bytecode(&module);
+
+        // If use decls decls are empty, let's propagage them from the CompiledModule with aliases assigned
+        let use_decls = if self.module_data[module_id.0 as usize].use_decls.is_empty() {
+            // Map to keep track of aliases for used modules
+            // key: module name (without address)
+            // value: [module address -> module alias]
+            let mut aliases = BTreeMap::new();
+            let mut make_alias = |address: Address, module_name: Symbol| {
+                // module name does not exist: alias not needed but keep track of it
+                let addr_alias_map = aliases.entry(module_name).or_insert_with(|| {
+                    let mut inner_map = BTreeMap::new();
+                    inner_map.insert(address.clone(), module_name);
+                    inner_map
+                });
+                // The module name exists and the address has not been recorded, we need to make an alias for this module name at this address
+                if addr_alias_map.get(&address).is_none() {
+                    let module_alias = format!(
+                        "{}_{}",
+                        module_name.display(&self.symbol_pool),
+                        addr_alias_map.len()
+                    );
+                    let alias = self.symbol_pool.make(&module_alias);
+                    addr_alias_map.insert(address, alias);
+                    return Some(alias);
+                }
+                None
+            };
+            used_modules
+                .iter()
+                .map(|mid| {
+                    let module_env = self.get_module(*mid);
+                    let name = module_env.get_name();
+                    UseDecl {
+                        loc: Loc::default(),
+                        module_name: name.clone(),
+                        module_id: Some(*mid),
+                        alias: make_alias(name.addr().clone(), name.name()),
+                        members: vec![],
+                    }
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+        // If friend decls are empty, let's propagage them from the CompiledModule
+        // Different from use decls, we allow friend modules that have not been added to the GlobalEnv
+        // - why: use decls are ensured to be added when `with_dep_closure` is set, which is not the case for friend decls
+        let friend_decls = if self.module_data[module_id.0 as usize]
+            .friend_decls
+            .is_empty()
+        {
+            module
+                .immediate_friends_iter()
+                .map(|(ff_addr, ff_name)| {
+                    let addr = Address::Numerical(*ff_addr);
+                    let name = self.symbol_pool.make(ff_name.as_str());
+                    let module_name = ModuleName::new(addr, name);
+                    let module_id = self
+                        .find_module(&module_name)
+                        .map(|module_env| module_env.get_id());
+                    FriendDecl {
+                        loc: Loc::default(),
+                        module_name,
+                        module_id,
+                    }
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+
         let mod_data = &mut self.module_data[module_id.0 as usize];
         mod_data.used_modules = used_modules;
+        mod_data.use_decls = use_decls;
         mod_data.friend_modules = friend_modules;
+        mod_data.friend_decls = friend_decls;
         mod_data.compiled_module = Some(module);
         mod_data.source_map = Some(source_map);
+    }
+
+    /// Updates modules previously loaded into the environment
+    pub fn update_loaded_modules(&mut self) {
+        // update friend modules that are not ready when loading a module
+        let friend_modules_vec: Vec<Option<BTreeSet<ModuleId>>> =
+            self.module_data
+                .iter()
+                .map(|mod_data| {
+                    mod_data.compiled_module.as_ref().map(|compiled_module| {
+                        self.get_friend_modules_from_bytecode(compiled_module)
+                    })
+                })
+                .collect();
+
+        for (mod_data, friend_modules_opt) in self.module_data.iter_mut().zip(friend_modules_vec) {
+            if let Some(friend_modules) = friend_modules_opt {
+                mod_data.friend_modules = friend_modules;
+            }
+        }
     }
 
     fn get_used_funs_from_bytecode(
@@ -2207,6 +2280,16 @@ impl GlobalEnv {
     /// Return the `StructEnv` for `str`
     pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv {
         self.get_module(str.module_id).into_struct(str.id)
+    }
+
+    /// Return the `Option<StructEnv>` for `str`
+    pub fn get_struct_opt(&self, str: QualifiedId<StructId>) -> Option<StructEnv> {
+        self.get_module_opt(str.module_id).and_then(|module| {
+            module.data.struct_data.get(&str.id).map(|data| StructEnv {
+                module_env: module,
+                data,
+            })
+        })
     }
 
     // Gets the number of modules in this environment.
@@ -3534,20 +3617,10 @@ impl<'env> ModuleEnv<'env> {
 
     /// Disassemble the module bytecode, if it is available.
     pub fn disassemble(&self) -> Option<String> {
-        let view = BinaryIndexedView::Module(self.get_verified_module()?);
-        let smap = self.data.source_map.as_ref().expect("source map").clone();
-        let disas = Disassembler::new(SourceMapping::new(smap, view), DisassemblerOptions {
-            only_externally_visible: false,
-            print_code: true,
-            print_basic_blocks: true,
-            print_locals: true,
-            print_bytecode_stats: false,
-        });
+        let module = self.get_verified_module()?;
         Some(
-            disas
-                .disassemble()
-                // Failure here is fatal and should not happen
-                .expect("Failed to disassemble a verified module"),
+            move_asm::disassembler::disassemble_module(String::new(), module)
+                .expect("disassemble succeeds"),
         )
     }
 
@@ -3605,6 +3678,10 @@ impl<'env> ModuleEnv<'env> {
             || self.is_module_in_std("smart_table")
             || self.is_module_in_ext("table")
             || self.is_module_in_ext("table_with_length")
+    }
+
+    pub fn is_cmp(&self) -> bool {
+        self.is_module_in_std("cmp")
     }
 }
 

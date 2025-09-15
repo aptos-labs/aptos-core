@@ -22,7 +22,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{DependencyGasMeter, GasMeter, NativeGasMeter, SimpleInstruction},
+    gas::{DependencyGasMeter, DependencyKind, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 
@@ -53,7 +53,7 @@ where
     #[inline]
     fn charge_dependency(
         &mut self,
-        _is_new: bool,
+        _kind: DependencyKind,
         addr: &AccountAddress,
         _name: &IdentStr,
         size: NumBytes,
@@ -286,7 +286,7 @@ where
             .vm_gas_params()
             .misc
             .abs_val
-            .abstract_value_size_stack_and_heap(val, self.feature_version());
+            .abstract_value_size_stack_and_heap(val, self.feature_version())?;
 
         // Note(Gas): this makes a deep copy so we need to charge for the full value size
         self.algebra
@@ -340,12 +340,30 @@ where
     }
 
     #[inline]
+    fn charge_pack_closure(
+        &mut self,
+        is_generic: bool,
+        args: impl ExactSizeIterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
+        let num_args = NumArgs::new(args.len() as u64);
+
+        match is_generic {
+            false => self
+                .algebra
+                .charge_execution(PACK_CLOSURE_BASE + PACK_CLOSURE_PER_ARG * num_args),
+            true => self.algebra.charge_execution(
+                PACK_CLOSURE_GENERIC_BASE + PACK_CLOSURE_GENERIC_PER_ARG * num_args,
+            ),
+        }
+    }
+
+    #[inline]
     fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()> {
         let (stack_size, heap_size) = self
             .vm_gas_params()
             .misc
             .abs_val
-            .abstract_value_size_stack_and_heap(val, self.feature_version());
+            .abstract_value_size_stack_and_heap(val, self.feature_version())?;
 
         // Note(Gas): this makes a deep copy so we need to charge for the full value size
         self.algebra
@@ -367,8 +385,9 @@ where
 
         let cost = EQ_BASE
             + EQ_PER_ABS_VAL_UNIT
-                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())
-                    + abs_val_params.abstract_value_size_dereferenced(rhs, self.feature_version()));
+                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())?
+                    + abs_val_params
+                        .abstract_value_size_dereferenced(rhs, self.feature_version())?);
 
         self.algebra.charge_execution(cost)
     }
@@ -379,8 +398,9 @@ where
 
         let cost = NEQ_BASE
             + NEQ_PER_ABS_VAL_UNIT
-                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())
-                    + abs_val_params.abstract_value_size_dereferenced(rhs, self.feature_version()));
+                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())?
+                    + abs_val_params
+                        .abstract_value_size_dereferenced(rhs, self.feature_version())?);
 
         self.algebra.charge_execution(cost)
     }

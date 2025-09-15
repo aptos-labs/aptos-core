@@ -1,6 +1,6 @@
 processed 3 tasks
-
-task 2 'publish'. lines 19-43:
+task 1 lines 4-17:  publish --private-key alice [module alice::randomness_user {]
+task 2 lines 19-43:  publish --private-key alice [module alice::randomness_test {]
 Error: extended checks failed:
 
 error: public function exposes functionality of the `randomness` module which can be unsafe. Consult the randomness documentation for an explanation of this error. To skip this check, add attribute `#[lint::allow_unsafe_randomness]`.

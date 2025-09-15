@@ -11,16 +11,16 @@ use crate::{
             db_state_view::DbStateView,
             hot_state_view::{EmptyHotState, HotStateView},
         },
-        NUM_STATE_SHARDS,
     },
     DbReader,
 };
 use anyhow::Result;
-use aptos_metrics_core::{IntCounterHelper, TimerHelper};
+use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_types::{
     state_store::{
-        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateViewId, StateViewResult, TStateView,
+        hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
+        state_storage_usage::StateStorageUsage, StateViewId, StateViewResult, TStateView,
+        NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
@@ -59,8 +59,8 @@ impl ShardedStateCache {
         }
     }
 
-    fn shard(&self, shard_id: u8) -> &StateCacheShard {
-        &self.shards[shard_id as usize]
+    fn shard(&self, shard_id: usize) -> &StateCacheShard {
+        &self.shards[shard_id]
     }
 
     pub fn get_cloned(&self, state_key: &StateKey) -> Option<StateSlot> {
@@ -83,6 +83,14 @@ impl ShardedStateCache {
             },
         };
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PrimingPolicy {
+    /// Prime cache for all keys in the write sets.
+    All,
+    /// Only prime cache for the keys that are prepared for hot state promotion.
+    MakeHotOnly,
 }
 
 /// `CachedStateView` is like a snapshot of the global state comprised of state view at two
@@ -168,25 +176,36 @@ impl CachedStateView {
         )
     }
 
-    pub fn prime_cache(&self, updates: &StateUpdateRefs) -> Result<()> {
+    pub fn prime_cache(&self, updates: &StateUpdateRefs, policy: PrimingPolicy) -> Result<()> {
         let _timer = TIMER.timer_with(&["prime_state_cache"]);
 
         IO_POOL.install(|| {
-            if let Some(updates) = &updates.for_last_checkpoint {
-                self.prime_cache_for_batched_updates(updates)?;
+            if let Some(updates) = updates.for_last_checkpoint_batched() {
+                self.prime_cache_for_batched_updates(updates, policy)?;
             }
-            if let Some(updates) = &updates.for_latest {
-                self.prime_cache_for_batched_updates(updates)?;
+            if let Some(updates) = updates.for_latest_batched() {
+                self.prime_cache_for_batched_updates(updates, policy)?;
             }
             Ok(())
         })
     }
 
-    fn prime_cache_for_batched_updates(&self, updates: &BatchedStateUpdateRefs) -> Result<()> {
-        updates
-            .shards
-            .par_iter()
-            .try_for_each(|shard| self.prime_cache_for_keys(shard.keys().cloned()))
+    fn prime_cache_for_batched_updates(
+        &self,
+        updates: &BatchedStateUpdateRefs,
+        policy: PrimingPolicy,
+    ) -> Result<()> {
+        updates.shards.par_iter().try_for_each(|shard| {
+            self.prime_cache_for_keys(
+                shard
+                    .iter()
+                    .filter_map(|(k, u)| match policy {
+                        PrimingPolicy::MakeHotOnly if u.state_op.is_value_write_op() => None,
+                        _ => Some(k),
+                    })
+                    .cloned(),
+            )
+        })
     }
 
     fn prime_cache_for_keys<'a, T: IntoIterator<Item = &'a StateKey> + Send>(
@@ -218,7 +237,7 @@ impl CachedStateView {
         let ret = if let Some(slot) = self.speculative.get_state_slot(state_key) {
             COUNTER.inc_with(&["sv_hit_speculative"]);
             slot
-        } else if let Some(slot) = self.hot.get_state_slot(state_key)? {
+        } else if let Some(slot) = self.hot.get_state_slot(state_key) {
             COUNTER.inc_with(&["sv_hit_hot"]);
             slot
         } else if let Some(base_version) = self.base_version() {
@@ -259,7 +278,7 @@ impl TStateView for CachedStateView {
     }
 
     fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateSlot> {
-        let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
+        let _timer = TIMER.timer_with(&["get_state_value"]);
         COUNTER.inc_with(&["sv_total_get"]);
 
         // First check if requested key is already memorized.
@@ -281,11 +300,56 @@ impl TStateView for CachedStateView {
     fn next_version(&self) -> Version {
         self.speculative.next_version()
     }
+
+    fn contains_hot_state_value(&self, state_key: &StateKey) -> bool {
+        if let Some(slot) = self.speculative.get_state_slot(state_key) {
+            // Most likely the slot we get from `self.speculative` is hot, because it is recently
+            // written to. However, this is not guaranteed because there could be rules, for
+            // example, one that prevents large state values from going into the hot state. So we
+            // need to check whether it's hot explicitly.
+            //
+            // Same for `get_next_old_key` below.
+            return slot.is_hot();
+        }
+
+        self.hot.get_state_slot(state_key).is_some()
+    }
+
+    fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
+        self.speculative.num_free_hot_slots()
+    }
+
+    fn get_shard_id(&self, state_key: &StateKey) -> usize {
+        state_key.get_shard_id()
+    }
+
+    fn get_next_old_key(
+        &self,
+        shard_id: usize,
+        state_key: Option<&StateKey>,
+    ) -> Option<Option<StateKey>> {
+        let key = match state_key {
+            Some(k) => {
+                assert_eq!(k.get_shard_id(), shard_id);
+                k
+            },
+            None => return Some(self.speculative.oldest_hot_key(shard_id)),
+        };
+
+        if let Some(slot) = self.speculative.get_state_slot(key) {
+            slot.is_hot().then(|| slot.next().cloned())
+        } else if let Some(slot) = self.hot.get_state_slot(key) {
+            assert!(slot.is_hot());
+            Some(slot.next().cloned())
+        } else {
+            None
+        }
+    }
 }
 
 pub struct CachedDbStateView {
     db_state_view: DbStateView,
-    state_cache: RwLock<HashMap<StateKey, Option<StateValue>>>,
+    state_cache: RwLock<HashMap<StateKey, StateSlot>>,
 }
 
 impl From<DbStateView> for CachedDbStateView {
@@ -304,18 +368,16 @@ impl TStateView for CachedDbStateView {
         self.db_state_view.id()
     }
 
-    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
+    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
         // First check if the cache has the state value.
         if let Some(val_opt) = self.state_cache.read().get(state_key) {
             // This can return None, which means the value has been deleted from the DB.
             return Ok(val_opt.clone());
         }
-        let state_value_option = self.db_state_view.get_state_value(state_key)?;
+        let state_slot = self.db_state_view.get_state_slot(state_key)?;
         // Update the cache if still empty
         let mut cache = self.state_cache.write();
-        let new_value = cache
-            .entry(state_key.clone())
-            .or_insert_with(|| state_value_option);
+        let new_value = cache.entry(state_key.clone()).or_insert_with(|| state_slot);
         Ok(new_value.clone())
     }
 

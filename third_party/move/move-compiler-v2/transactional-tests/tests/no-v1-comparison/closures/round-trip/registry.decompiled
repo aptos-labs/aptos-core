@@ -1,0 +1,58 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/registry.move`
+
+//# publish
+module 0x66::registry {
+    use 0x1::signer;
+    struct R<T0> has key {
+        _0: T0,
+    }
+    public fun remove<T0: store>(p0: &signer): T0
+        acquires R
+    {
+        let _t2 = signer::address_of(p0);
+        let R<T0>{_0: _t4} = move_from<R<T0>>(_t2);
+        _t4
+    }
+    public fun store<T0: store>(p0: &signer, p1: T0) {
+        let _t4 = R<T0>{_0: p1};
+        move_to<R<T0>>(p0, _t4);
+    }
+}
+
+
+//# publish
+module 0x66::delayed_work {
+    use 0x66::registry;
+    struct Work has store {
+        _0: |u64|(u64) has store,
+    }
+    entry fun add(p0: &signer, p1: u64) {
+        let _t4 = registry::remove<Work>(p0);
+        let _t2 = Work{_0: |arg0| more_work(_t4, p1, arg0)};
+        registry::store<Work>(p0, _t2);
+    }
+    public fun more_work(p0: Work, p1: u64, p2: u64): u64 {
+        let Work{_0: _t5} = p0;
+        _t5(p1) + p2
+    }
+    entry fun eval(p0: &signer, p1: u64, p2: u64) {
+        let Work{_0: _t6} = registry::remove<Work>(p0);
+        if (!(_t6(p1) == p2)) abort 14566554180833181696;
+    }
+    public fun id_fun(p0: u64): u64 {
+        p0
+    }
+    entry fun initialize(p0: &signer) {
+        let _t3 = Work{_0: |arg0| id_fun(arg0)};
+        registry::store<Work>(p0, _t3);
+    }
+}
+
+
+//# run 0x66::delayed_work::initialize --signers 0x66
+
+//# run 0x66::delayed_work::add --signers 0x66 --args 5
+
+//# run 0x66::delayed_work::add --signers 0x66 --args 7
+
+//# run 0x66::delayed_work::eval --signers 0x66 --args 3 15

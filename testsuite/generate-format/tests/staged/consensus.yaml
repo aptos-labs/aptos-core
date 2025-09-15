@@ -1,19 +1,25 @@
 ---
 AbilitySet:
   NEWTYPESTRUCT: U8
-AbstractionAuthData:
+AbstractAuthenticationData:
   ENUM:
     0:
       V1:
         STRUCT:
           - signing_message_digest: BYTES
-          - authenticator: BYTES
+          - abstract_signature: BYTES
     1:
       DerivableV1:
         STRUCT:
           - signing_message_digest: BYTES
           - abstract_signature: BYTES
           - abstract_public_key: BYTES
+AbstractAuthenticator:
+  STRUCT:
+    - function_info:
+        TYPENAME: FunctionInfo
+    - auth_data:
+        TYPENAME: AbstractAuthenticationData
 AccessPath:
   STRUCT:
     - address:
@@ -53,12 +59,10 @@ AccountAuthenticator:
     4:
       NoAccountAuthenticator: UNIT
     5:
-      Abstraction:
+      Abstract:
         STRUCT:
-          - function_info:
-              TYPENAME: FunctionInfo
-          - auth_data:
-              TYPENAME: AbstractionAuthData
+          - authenticator:
+              TYPENAME: AbstractAuthenticator
 AggregateSignature:
   STRUCT:
     - validator_bitmask:
@@ -614,14 +618,28 @@ FunctionInfo:
         TYPENAME: AccountAddress
     - module_name: STR
     - function_name: STR
+FunctionParamOrReturnTag:
+  ENUM:
+    0:
+      Reference:
+        NEWTYPE:
+          TYPENAME: TypeTag
+    1:
+      MutableReference:
+        NEWTYPE:
+          TYPENAME: TypeTag
+    2:
+      Value:
+        NEWTYPE:
+          TYPENAME: TypeTag
 FunctionTag:
   STRUCT:
     - args:
         SEQ:
-          TYPENAME: TypeTag
+          TYPENAME: FunctionParamOrReturnTag
     - results:
         SEQ:
-          TYPENAME: TypeTag
+          TYPENAME: FunctionParamOrReturnTag
     - abilities:
         TYPENAME: AbilitySet
 G1Bytes:

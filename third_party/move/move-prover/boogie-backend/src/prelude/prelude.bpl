@@ -3,7 +3,7 @@ Copyright (c) The Diem Core Contributors
 SPDX-License-Identifier: Apache-2.0
 
 This files contains a Tera Rust template for the prover's Boogie prelude.
-(See https://tera.netlify.app/docs).
+(See https://docs.rs/tera/latest/tera/).
 
 The following variables and filters are bound in the template context:
 
@@ -32,7 +32,9 @@ options provided to the prover.
 {%- set S = "'" ~ instance.suffix ~ "'" -%}
 {%- set T = instance.name -%}
 
+{%-if S != "'$1_cmp_Ordering'" %}
 function $Arbitrary_value_of{{S}}(): {{T}};
+{% endif %}
 
 {% endfor %}
 
@@ -404,8 +406,6 @@ function {:inline} $ResourceCopy<T>(m: $Memory T, s: $Memory T, a: int): $Memory
             m->contents[a := s->contents[a]])
 }
 
-
-
 // ============================================================================================
 // Abort Handling
 
@@ -674,7 +674,7 @@ procedure {:inline 1} $CastBv{{instance}}to{{impl.base}}(src: bv{{instance}}) re
 function $castBv{{instance}}to{{impl.base}}(src: bv{{instance}}) returns (bv{{impl.base}})
 {
     {%- if base_diff < 0 %}
-    if ($Gt'Bv{{instance}}'(src, {{impl.max}}bv{{instance}})) then 
+    if ($Gt'Bv{{instance}}'(src, {{impl.max}}bv{{instance}})) then
         $Arbitrary_value_of'bv{{impl.base}}'()
     {%- endif %}
     {%- if base_diff < 0 %}
@@ -1203,6 +1203,18 @@ procedure {:inline 1} $1_Signature_ed25519_verify(
 // Native BCS implementation for element type `{{instance.suffix}}`
 
 {{ native::bcs_module(instance=instance) -}}
+{%- endfor %}
+
+
+// ==================================================================================
+// Native from_bcs::from_bytes
+
+{%- for instance in from_bcs_instances %}
+
+// ----------------------------------------------------------------------------------
+// Native FROM_BCS implementation for element type `{{instance.suffix}}`
+
+{{ native::from_bcs_module(instance=instance) -}}
 {%- endfor %}
 
 

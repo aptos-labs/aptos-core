@@ -21,8 +21,8 @@ use aptos_logger::{debug, sample, sample::SampleRate, trace, warn};
 use aptos_network::protocols::wire::handshake::v1::ProtocolId;
 use aptos_storage_service_types::{
     requests::{
-        DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest,
-        StorageServiceRequest, TransactionOutputsWithProofRequest,
+        DataRequest, EpochEndingLedgerInfoRequest, GetTransactionDataWithProofRequest,
+        StateValuesWithProofRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
         TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     responses::{
@@ -101,6 +101,20 @@ impl<T: StorageReaderInterface> Handler<T> {
             peer_network_id.network_id(),
             request.get_label(),
         );
+
+        // If the request is for transaction v2 data, only process it
+        // if the server supports it. Otherwise, drop the request.
+        if request.data_request.is_transaction_data_v2_request()
+            && !storage_service_config.enable_transaction_data_v2
+        {
+            warn!(LogSchema::new(LogEntry::StorageServiceError)
+                .error(&Error::InvalidRequest(format!(
+                    "Received a v2 data request ({}), which is not supported!",
+                    request.get_label()
+                )))
+                .peer_network_id(&peer_network_id));
+            return;
+        }
 
         // Handle any optimistic fetch requests
         if request.data_request.is_optimistic_fetch() {
@@ -409,6 +423,9 @@ impl<T: StorageReaderInterface> Handler<T> {
             DataRequest::GetTransactionsOrOutputsWithProof(request) => {
                 self.get_transactions_or_outputs_with_proof(request)
             },
+            DataRequest::GetTransactionDataWithProof(request) => {
+                self.get_transaction_data_with_proof(request)
+            },
             _ => Err(Error::UnexpectedErrorEncountered(format!(
                 "Received an unexpected request: {:?}",
                 request
@@ -494,14 +511,17 @@ impl<T: StorageReaderInterface> Handler<T> {
         &self,
         request: &TransactionOutputsWithProofRequest,
     ) -> aptos_storage_service_types::Result<DataResponse, Error> {
-        let transaction_output_list_with_proof = self.storage.get_transaction_outputs_with_proof(
+        let response = self.storage.get_transaction_outputs_with_proof(
             request.proof_version,
             request.start_version,
             request.end_version,
         )?;
 
         Ok(DataResponse::TransactionOutputsWithProof(
-            transaction_output_list_with_proof,
+            response
+                .transaction_output_list_with_proof
+                .unwrap()
+                .consume_output_list_with_proof(),
         ))
     }
 
@@ -509,33 +529,51 @@ impl<T: StorageReaderInterface> Handler<T> {
         &self,
         request: &TransactionsWithProofRequest,
     ) -> aptos_storage_service_types::Result<DataResponse, Error> {
-        let transactions_with_proof = self.storage.get_transactions_with_proof(
+        let response = self.storage.get_transactions_with_proof(
             request.proof_version,
             request.start_version,
             request.end_version,
             request.include_events,
         )?;
 
-        Ok(DataResponse::TransactionsWithProof(transactions_with_proof))
+        Ok(DataResponse::TransactionsWithProof(
+            response
+                .transaction_list_with_proof
+                .unwrap()
+                .consume_transaction_list_with_proof(),
+        ))
     }
 
     fn get_transactions_or_outputs_with_proof(
         &self,
         request: &TransactionsOrOutputsWithProofRequest,
     ) -> aptos_storage_service_types::Result<DataResponse, Error> {
-        let (transactions_with_proof, outputs_with_proof) =
-            self.storage.get_transactions_or_outputs_with_proof(
-                request.proof_version,
-                request.start_version,
-                request.end_version,
-                request.include_events,
-                request.max_num_output_reductions,
-            )?;
+        let response = self.storage.get_transactions_or_outputs_with_proof(
+            request.proof_version,
+            request.start_version,
+            request.end_version,
+            request.include_events,
+            request.max_num_output_reductions,
+        )?;
 
         Ok(DataResponse::TransactionsOrOutputsWithProof((
-            transactions_with_proof,
-            outputs_with_proof,
+            response
+                .transaction_list_with_proof
+                .map(|t| t.consume_transaction_list_with_proof()),
+            response
+                .transaction_output_list_with_proof
+                .map(|t| t.consume_output_list_with_proof()),
         )))
+    }
+
+    fn get_transaction_data_with_proof(
+        &self,
+        request: &GetTransactionDataWithProofRequest,
+    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+        let transaction_data_with_proof = self.storage.get_transaction_data_with_proof(request)?;
+        Ok(DataResponse::TransactionDataWithProof(
+            transaction_data_with_proof,
+        ))
     }
 }
 

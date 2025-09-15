@@ -8,7 +8,9 @@ use itertools::Itertools;
 use libtest_mimic::{Arguments, Trial};
 use move_compiler_v2::{logging, Experiment};
 use move_model::metadata::LanguageVersion;
-use move_transactional_test_runner::{vm_test_harness, vm_test_harness::TestRunConfig};
+use move_transactional_test_runner::{
+    tasks::SyntaxChoice, vm_test_harness, vm_test_harness::TestRunConfig,
+};
 use std::{
     path::{Path, PathBuf},
     string::ToString,
@@ -27,7 +29,17 @@ struct TestConfig {
     /// Path substrings for tests to exclude (applied after the include filter).
     /// If empty, no additional tests are excluded.
     exclude: &'static [&'static str],
+    /// Cross compile or not
+    cross_compile: bool,
 }
+
+/// Set of exclusions that apply when using `include: &[]` in TestConfig.
+const COMMON_EXCLUSIONS: &[&str] = &[
+    "/operator_eval/",
+    "/no-recursive-check/",
+    "/no-access-check/",
+    "/no-recursive-type-check/",
+];
 
 /// Note that any config which has different output for a test directory
 /// *must* be added to the `SEPARATE_BASELINE` array below, so that a
@@ -40,8 +52,9 @@ const TEST_CONFIGS: &[TestConfig] = &[
         runner: |p| run(p, get_config_by_name("baseline")),
         experiments: &[],
         language_version: LanguageVersion::latest(),
-        include: &[],
-        exclude: &["/operator_eval/", "/no-recursive-check/"],
+        include: &[], // all tests except those excluded below
+        exclude: COMMON_EXCLUSIONS,
+        cross_compile: true,
     },
     // Test optimize/no-optimize/etc., except for `/access_control/`
     TestConfig {
@@ -53,7 +66,8 @@ const TEST_CONFIGS: &[TestConfig] = &[
         ],
         language_version: LanguageVersion::latest(),
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/", "/no-recursive-check/"],
+        exclude: COMMON_EXCLUSIONS,
+        cross_compile: false,
     },
     TestConfig {
         name: "no-optimize",
@@ -61,7 +75,8 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[(Experiment::OPTIMIZE, false)],
         language_version: LanguageVersion::latest(),
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/", "/no-recursive-check/"],
+        exclude: COMMON_EXCLUSIONS,
+        cross_compile: false,
     },
     // Test `/operator_eval/` with language version 1 and 2
     TestConfig {
@@ -71,6 +86,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         language_version: LanguageVersion::V1,
         include: &["/operator_eval/"],
         exclude: &[],
+        cross_compile: false,
     },
     TestConfig {
         name: "operator-eval-lang-2",
@@ -79,6 +95,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         language_version: LanguageVersion::latest(),
         include: &["/operator_eval/"],
         exclude: &[],
+        cross_compile: true,
     },
     TestConfig {
         name: "no-recursive-check",
@@ -87,6 +104,25 @@ const TEST_CONFIGS: &[TestConfig] = &[
         language_version: LanguageVersion::latest(),
         include: &["/no-recursive-check/"],
         exclude: &[],
+        cross_compile: false,
+    },
+    TestConfig {
+        name: "no-access-check",
+        runner: |p| run(p, get_config_by_name("no-access-check")),
+        experiments: &[(Experiment::ACCESS_CHECK, false)],
+        language_version: LanguageVersion::latest(),
+        include: &["/no-access-check/"],
+        exclude: &[],
+        cross_compile: false,
+    },
+    TestConfig {
+        name: "no-recursive-type-check",
+        runner: |p| run(p, get_config_by_name("no-recursive-type-check")),
+        experiments: &[(Experiment::RECURSIVE_TYPE_CHECK, false)],
+        language_version: LanguageVersion::latest(),
+        include: &["/no-recursive-type-check/"],
+        exclude: &[],
+        cross_compile: false,
     },
 ];
 
@@ -121,6 +157,8 @@ const SEPARATE_BASELINE: &[&str] = &[
     "optimization/bug_14223_unused_non_droppable.move",
     // Flaky redundant unused assignment error
     "no-v1-comparison/enum/enum_scoping.move",
+    // Different error messages depending on optimizations or not
+    "no-v1-comparison/fv_as_keys.move",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {
@@ -132,7 +170,7 @@ fn get_config_by_name(name: &str) -> TestConfig {
 }
 
 fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
-    logging::setup_logging_for_testing();
+    logging::setup_logging_for_testing(None);
     let p = path.to_str().unwrap_or_default();
     let exp_suffix = if SEPARATE_BASELINE.iter().any(|s| p.contains(s)) {
         Some(format!("{}.exp", config.name))
@@ -145,8 +183,18 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         .map(|(s, v)| (s.to_string(), *v))
         .collect_vec();
     let language_version = config.language_version;
-    let vm_test_config = TestRunConfig::compiler_v2(language_version, experiments);
-
+    // For cross compilation, we need to always append the config name as a part of the outcome file suffix, as optimizations affect the generated code!
+    let vm_test_config = if config.cross_compile {
+        TestRunConfig::new(language_version, experiments).cross_compile_into(
+            SyntaxChoice::Source,
+            true,
+            exp_suffix
+                .clone()
+                .or_else(|| Some(format!("{}.exp", config.name))),
+        )
+    } else {
+        TestRunConfig::new(language_version, experiments)
+    };
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)
 }
 

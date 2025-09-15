@@ -4,10 +4,13 @@
 use anyhow::ensure;
 use aptos_consensus_types::{
     common::{BatchPayload, TxnSummaryWithExpiration},
-    proof_of_store::{BatchId, BatchInfo},
+    proof_of_store::BatchInfo,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction, PeerId};
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures, quorum_store::BatchId, transaction::SignedTransaction,
+    validator_verifier::ValidatorVerifier, PeerId,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
@@ -287,7 +290,12 @@ impl BatchMsg {
         Self { batches }
     }
 
-    pub fn verify(&self, peer_id: PeerId, max_num_batches: usize) -> anyhow::Result<()> {
+    pub fn verify(
+        &self,
+        peer_id: PeerId,
+        max_num_batches: usize,
+        verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
         ensure!(!self.batches.is_empty(), "Empty message");
         ensure!(
             self.batches.len() <= max_num_batches,
@@ -295,7 +303,14 @@ impl BatchMsg {
             self.batches.len(),
             max_num_batches
         );
+        let epoch_authors = verifier.address_to_validator_index();
         for batch in self.batches.iter() {
+            ensure!(
+                epoch_authors.contains_key(&batch.author()),
+                "Invalid author {} for batch {} in current epoch",
+                batch.author(),
+                batch.digest()
+            );
             ensure!(
                 batch.author() == peer_id,
                 "Batch author doesn't match sender"

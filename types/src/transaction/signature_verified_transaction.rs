@@ -4,7 +4,10 @@
 use crate::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
-    transaction::{BlockExecutableTransaction, Transaction},
+    transaction::{
+        BlockEndInfo, BlockExecutableTransaction, FeeDistribution, SignedTransaction,
+        TBlockEndInfoExt, Transaction,
+    },
     write_set::WriteOp,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -97,6 +100,29 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
             },
             _ => 0,
         }
+    }
+
+    fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
+        match self {
+            SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)) => Some(txn),
+            _ => None,
+        }
+    }
+
+    fn state_checkpoint(block_id: HashValue) -> Self {
+        Transaction::StateCheckpoint(block_id).into()
+    }
+
+    fn block_epilogue_v0(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
+        Transaction::block_epilogue_v0(block_id, block_end_info).into()
+    }
+
+    fn block_epilogue_v1(
+        block_id: HashValue,
+        block_end_info: TBlockEndInfoExt<Self::Key>,
+        fee_distribution: FeeDistribution,
+    ) -> Self {
+        Transaction::block_epilogue_v1(block_id, block_end_info, fee_distribution).into()
     }
 }
 

@@ -1,4 +1,4 @@
 processed 2 tasks
-
-task 1 'run'. lines 12-12:
+task 0 lines 1-10:  publish [module 0x42::Test {]
+task 1 lines 12-12:  run 0x42::Test::main
 return values: 110

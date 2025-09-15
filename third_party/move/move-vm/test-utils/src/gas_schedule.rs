@@ -30,7 +30,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{DependencyGasMeter, GasMeter, NativeGasMeter, SimpleInstruction},
+    gas::{DependencyGasMeter, DependencyKind, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 use once_cell::sync::Lazy;
@@ -198,7 +198,7 @@ impl GasStatus {
 impl DependencyGasMeter for GasStatus {
     fn charge_dependency(
         &mut self,
-        _is_new: bool,
+        _kind: DependencyKind,
         _addr: &AccountAddress,
         _name: &IdentStr,
         _size: NumBytes,
@@ -339,6 +339,24 @@ impl GasMeter for GasStatus {
                 Opcodes::UNPACK_GENERIC
             } else {
                 Opcodes::UNPACK
+            },
+            args.fold(field_count, |acc, val| {
+                acc + val.legacy_abstract_memory_size()
+            }),
+        )
+    }
+
+    fn charge_pack_closure(
+        &mut self,
+        is_generic: bool,
+        args: impl ExactSizeIterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
+        let field_count = AbstractMemorySize::new(args.len() as u64);
+        self.charge_instr_with_size(
+            if is_generic {
+                Opcodes::PACK_CLOSURE_GENERIC
+            } else {
+                Opcodes::PACK_CLOSURE
             },
             args.fold(field_count, |acc, val| {
                 acc + val.legacy_abstract_memory_size()

@@ -78,28 +78,8 @@ pub fn run_prover_for_pkg(
 }
 
 #[test]
-fn move_framework_prover_tests_shard1() {
-    run_prover_for_pkg("aptos-framework", 5, Some(1));
-}
-
-#[test]
-fn move_framework_prover_tests_shard2() {
-    run_prover_for_pkg("aptos-framework", 5, Some(2));
-}
-
-#[test]
-fn move_framework_prover_tests_shard3() {
-    run_prover_for_pkg("aptos-framework", 5, Some(3));
-}
-
-#[test]
-fn move_framework_prover_tests_shard4() {
-    run_prover_for_pkg("aptos-framework", 5, Some(4));
-}
-
-#[test]
-fn move_framework_prover_tests_shard5() {
-    run_prover_for_pkg("aptos-framework", 5, Some(5));
+fn move_framework_prover_tests() {
+    run_prover_for_pkg("aptos-framework", 1, None);
 }
 
 #[test]

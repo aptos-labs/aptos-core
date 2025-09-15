@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::views::{TypeView, ValueView};
+use ambassador::delegatable_trait;
 use move_binary_format::{
     errors::PartialVMResult, file_format::CodeOffset, file_format_common::Opcodes,
 };
@@ -138,15 +139,25 @@ impl SimpleInstruction {
     }
 }
 
+/// Represents a kind of dependency gas can be charged for.
+#[derive(Debug, Copy, Clone)]
+pub enum DependencyKind {
+    /// New dependency, typically charged on publish.
+    New,
+    /// Existing module dependency, charged typically on module load.
+    Existing,
+}
+
 /// Metering API for module or script dependencies. Defined as a stand-alone trait so it can be
 /// used in native context.
 ///
 /// Note: because native functions are trait objects, it is not possible to make [GasMeter] a trait
 /// object as well as it has APIs that are generic.
+#[delegatable_trait]
 pub trait DependencyGasMeter {
     fn charge_dependency(
         &mut self,
-        is_new: bool,
+        kind: DependencyKind,
         addr: &AccountAddress,
         name: &IdentStr,
         size: NumBytes,
@@ -239,6 +250,12 @@ pub trait GasMeter: NativeGasMeter {
         // Currently mapped to pack, can be specialized if needed
         self.charge_unpack(is_generic, args)
     }
+
+    fn charge_pack_closure(
+        &mut self,
+        is_generic: bool,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+    ) -> PartialVMResult<()>;
 
     fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()>;
 
@@ -367,7 +384,7 @@ pub struct UnmeteredGasMeter;
 impl DependencyGasMeter for UnmeteredGasMeter {
     fn charge_dependency(
         &mut self,
-        _is_new: bool,
+        _kind: DependencyKind,
         _addr: &AccountAddress,
         _name: &IdentStr,
         _size: NumBytes,
@@ -468,6 +485,14 @@ impl GasMeter for UnmeteredGasMeter {
     }
 
     fn charge_unpack(
+        &mut self,
+        _is_generic: bool,
+        _args: impl ExactSizeIterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_pack_closure(
         &mut self,
         _is_generic: bool,
         _args: impl ExactSizeIterator<Item = impl ValueView>,

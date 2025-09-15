@@ -17,7 +17,7 @@ use aptos_types::{
         config::BlockExecutorConfigFromOnchain,
         transaction_slice_metadata::TransactionSliceMetadata,
     },
-    transaction::{AuxiliaryInfo, Transaction, TransactionOutput, Version},
+    transaction::{AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version},
 };
 use aptos_vm::VMBlockExecutor;
 use once_cell::sync::Lazy;
@@ -52,6 +52,7 @@ pub trait TransactionChunk {
 
 pub struct ChunkToExecute {
     pub transactions: Vec<Transaction>,
+    pub persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
     pub first_version: Version,
 }
 
@@ -71,8 +72,15 @@ impl TransactionChunk for ChunkToExecute {
     ) -> Result<ExecutionOutput> {
         let ChunkToExecute {
             transactions,
+            persisted_aux_info,
             first_version: _,
         } = self;
+
+        assert_eq!(
+            transactions.len(),
+            persisted_aux_info.len(),
+            "transactions and persisted_aux_info must have the same length"
+        );
 
         // TODO(skedia) In the chunk executor path, we ideally don't need to verify the signature
         // as only transactions with verified signatures are committed to the storage.
@@ -90,13 +98,13 @@ impl TransactionChunk for ChunkToExecute {
         };
 
         let _timer = VM_EXECUTE_CHUNK.start_timer();
-        let mut auxiliary_info = Vec::new();
-        // TODO(grao): Pass in persisted auxiliary info.
-        auxiliary_info.resize(sig_verified_txns.len(), AuxiliaryInfo::new_empty());
         DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             sig_verified_txns.into(),
-            auxiliary_info,
+            persisted_aux_info
+                .into_iter()
+                .map(|info| AuxiliaryInfo::new(info, None))
+                .collect(),
             parent_state,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
@@ -108,6 +116,7 @@ impl TransactionChunk for ChunkToExecute {
 pub struct ChunkToApply {
     pub transactions: Vec<Transaction>,
     pub transaction_outputs: Vec<TransactionOutput>,
+    pub persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
     pub first_version: Version,
 }
 
@@ -128,12 +137,17 @@ impl TransactionChunk for ChunkToApply {
         let Self {
             transactions,
             transaction_outputs,
+            persisted_aux_info,
             first_version: _,
         } = self;
 
         DoGetExecutionOutput::by_transaction_output(
             transactions,
             transaction_outputs,
+            persisted_aux_info
+                .into_iter()
+                .map(|info| AuxiliaryInfo::new(info, None))
+                .collect(),
             parent_state,
             state_view,
         )

@@ -192,7 +192,10 @@ impl VMStatus {
 
     /// Returns `Ok` with a recorded status if it should be kept, `Err` of the error code if it
     /// should be discarded
-    pub fn keep_or_discard(self) -> Result<KeptVMStatus, DiscardedVMStatus> {
+    pub fn keep_or_discard(
+        self,
+        function_values_enabled: bool,
+    ) -> Result<KeptVMStatus, DiscardedVMStatus> {
         match self {
             VMStatus::Executed => Ok(KeptVMStatus::Executed),
             VMStatus::MoveAbort(location, code) => Ok(KeptVMStatus::MoveAbort(location, code)),
@@ -205,12 +208,24 @@ impl VMStatus {
                 ..
             } => Ok(KeptVMStatus::OutOfGas),
 
+            // Note: this is feature gated because the status was not propagated out before and was
+            // mapped to execution error at function ... at offset ..., etc.
+            VMStatus::ExecutionFailure {
+                status_code: StatusCode::VM_MAX_VALUE_DEPTH_REACHED,
+                ..
+            }
+            | VMStatus::Error {
+                status_code: StatusCode::VM_MAX_VALUE_DEPTH_REACHED,
+                ..
+            } if function_values_enabled => Ok(KeptVMStatus::MiscellaneousError),
+
             VMStatus::ExecutionFailure {
                 status_code:
                     StatusCode::EXECUTION_LIMIT_REACHED
                     | StatusCode::IO_LIMIT_REACHED
                     | StatusCode::STORAGE_LIMIT_REACHED
-                    | StatusCode::TOO_MANY_DELAYED_FIELDS,
+                    | StatusCode::TOO_MANY_DELAYED_FIELDS
+                    | StatusCode::UNABLE_TO_CAPTURE_DELAYED_FIELDS,
                 ..
             }
             | VMStatus::Error {
@@ -218,7 +233,8 @@ impl VMStatus {
                     StatusCode::EXECUTION_LIMIT_REACHED
                     | StatusCode::IO_LIMIT_REACHED
                     | StatusCode::STORAGE_LIMIT_REACHED
-                    | StatusCode::TOO_MANY_DELAYED_FIELDS,
+                    | StatusCode::TOO_MANY_DELAYED_FIELDS
+                    | StatusCode::UNABLE_TO_CAPTURE_DELAYED_FIELDS,
                 ..
             } => Ok(KeptVMStatus::MiscellaneousError),
 
@@ -758,12 +774,15 @@ pub enum StatusCode {
     CLOSURE_CALL_REQUIRES_FUNCTION = 1133,
     // Returned if init_module function is not valid during code publishing.
     INVALID_INIT_MODULE = 1134,
+    // When publishing a module bundle, all friends declared there must be in this bundle. If it is
+    // not the case, an error with this status code is returned.
+    FRIEND_NOT_FOUND_IN_MODULE_BUNDLE = 1135,
 
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_1 = 1135,
-    RESERVED_VERIFICATION_ERROR_2 = 1136,
-    RESERVED_VERIFICATION_ERROR_3 = 1137,
-    RESERVED_VERIFICATION_ERROR_4 = 1138,
+    RESERVED_VERIFICATION_ERROR_1 = 1136,
+    RESERVED_VERIFICATION_ERROR_2 = 1137,
+    RESERVED_VERIFICATION_ERROR_3 = 1138,
+    RESERVED_VERIFICATION_ERROR_4 = 1139,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.
@@ -884,12 +903,17 @@ pub enum StatusCode {
     STRUCT_VARIANT_MISMATCH = 4038,
     // An unimplemented functionality in the VM.
     UNIMPLEMENTED_FUNCTIONALITY = 4039,
+    // Modules are cyclic (module A uses module B which uses module A). Detected at runtime in case
+    // module loading is performed lazily.
+    RUNTIME_CYCLIC_MODULE_DEPENDENCY = 4040,
+    // Returned when a function value is trying to capture a delayed field. This is not allowed
+    // because layouts for values with delayed fields are not serializable.
+    UNABLE_TO_CAPTURE_DELAYED_FIELDS = 4041,
 
     // Reserved error code for future use. Always keep this buffer of well-defined new codes.
-    RESERVED_RUNTIME_ERROR_1 = 4040,
-    RESERVED_RUNTIME_ERROR_2 = 4041,
-    RESERVED_RUNTIME_ERROR_3 = 4042,
-    RESERVED_RUNTIME_ERROR_4 = 4043,
+    RESERVED_RUNTIME_ERROR_1 = 4042,
+    RESERVED_RUNTIME_ERROR_2 = 4043,
+    RESERVED_RUNTIME_ERROR_3 = 4044,
 
     // A reserved status to represent an unknown vm status.
     // this is u64::MAX, but we can't pattern match on that, so put the hardcoded value in

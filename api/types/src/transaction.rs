@@ -27,8 +27,9 @@ use aptos_types::{
     keyless,
     transaction::{
         authenticator::{
-            AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey, MultiKeyAuthenticator,
-            SingleKeyAuthenticator, TransactionAuthenticator, MAX_NUM_OF_SIGS,
+            AbstractAuthenticator, AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey,
+            MultiKeyAuthenticator, SingleKeyAuthenticator, TransactionAuthenticator,
+            MAX_NUM_OF_SIGS,
         },
         webauthn::{PartialAuthenticatorAssertionResponse, MAX_WEBAUTHN_SIGNATURE_BYTES},
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
@@ -43,7 +44,6 @@ use std::{
     convert::{From, Into, TryFrom, TryInto},
     fmt,
     str::FromStr,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 static DUMMY_GUID: Lazy<EventGuid> = Lazy::new(|| EventGuid {
@@ -489,15 +489,6 @@ pub struct UserTransactionRequestInner {
 
 impl VerifyInput for UserTransactionRequestInner {
     fn verify(&self) -> anyhow::Result<()> {
-        if let Ok(now) = SystemTime::now().duration_since(UNIX_EPOCH) {
-            if self.expiration_timestamp_secs.0 <= now.as_secs() {
-                bail!(
-                    "Expiration time for transaction is in the past, {}",
-                    self.expiration_timestamp_secs.0
-                )
-            }
-        }
-
         self.payload.verify()
     }
 }
@@ -514,6 +505,16 @@ pub struct UserTransactionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<TransactionSignature>,
     pub replay_protection_nonce: Option<U64>,
+}
+
+impl UserTransactionRequest {
+    pub fn replay_protector(&self) -> aptos_types::transaction::ReplayProtector {
+        if let Some(nonce) = self.replay_protection_nonce {
+            aptos_types::transaction::ReplayProtector::Nonce(nonce.0)
+        } else {
+            aptos_types::transaction::ReplayProtector::SequenceNumber(self.sequence_number.0)
+        }
+    }
 }
 
 /// Request to create signing messages
@@ -1815,6 +1816,27 @@ pub struct MultiKeySignature {
 
 impl VerifyInput for MultiKeySignature {
     fn verify(&self) -> anyhow::Result<()> {
+        if self.public_keys.is_empty() {
+            bail!("MultiKey signature has no public keys")
+        } else if self.signatures.is_empty() {
+            bail!("MultiKey signature has no signatures")
+        } else if self.public_keys.len() > MAX_NUM_OF_KEYS {
+            bail!(
+                "MultiKey signature has over the maximum number of public keys {}",
+                MAX_NUM_OF_KEYS
+            )
+        } else if self.signatures.len() > MAX_NUM_OF_SIGS {
+            bail!(
+                "MultiKey signature has over the maximum number of signatures {}",
+                MAX_NUM_OF_SIGS
+            )
+        } else if self.signatures.len() != self.signatures_required as usize {
+            bail!("MultiKey signature does not the number of signatures required")
+        } else if self.signatures_required == 0 {
+            bail!("MultiKey signature threshold must be greater than 0")
+        } else if self.signatures_required > MAX_NUM_OF_SIGS as u8 {
+            bail!("MultiKey signature threshold is greater than the maximum number of signatures")
+        }
         let _: AccountAuthenticator = self.try_into()?;
         Ok(())
     }
@@ -1921,12 +1943,12 @@ impl VerifyInput for NoAccountSignature {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct AbstractionSignature {
+pub struct AbstractSignature {
     pub function_info: String,
     pub auth_data: HexEncodedBytes,
 }
 
-impl VerifyInput for AbstractionSignature {
+impl VerifyInput for AbstractSignature {
     fn verify(&self) -> anyhow::Result<()> {
         Ok(())
     }
@@ -1949,13 +1971,15 @@ impl TryFrom<&NoAccountSignature> for AccountAuthenticator {
     }
 }
 
-impl TryFrom<&AbstractionSignature> for AccountAuthenticator {
+impl TryFrom<&AbstractSignature> for AccountAuthenticator {
     type Error = anyhow::Error;
 
-    fn try_from(value: &AbstractionSignature) -> Result<Self, Self::Error> {
-        Ok(AccountAuthenticator::Abstraction {
-            function_info: FunctionInfo::from_str(&value.function_info)?,
-            auth_data: bcs::from_bytes(value.auth_data.inner())?,
+    fn try_from(value: &AbstractSignature) -> Result<Self, Self::Error> {
+        Ok(AccountAuthenticator::Abstract {
+            authenticator: AbstractAuthenticator::new(
+                FunctionInfo::from_str(&value.function_info)?,
+                bcs::from_bytes(value.auth_data.inner())?,
+            ),
         })
     }
 }
@@ -1976,7 +2000,7 @@ pub enum AccountSignature {
     SingleKeySignature(SingleKeySignature),
     MultiKeySignature(MultiKeySignature),
     NoAccountSignature(NoAccountSignature),
-    AbstractionSignature(AbstractionSignature),
+    AbstractSignature(AbstractSignature),
 }
 
 impl VerifyInput for AccountSignature {
@@ -1987,7 +2011,7 @@ impl VerifyInput for AccountSignature {
             AccountSignature::SingleKeySignature(inner) => inner.verify(),
             AccountSignature::MultiKeySignature(inner) => inner.verify(),
             AccountSignature::NoAccountSignature(inner) => inner.verify(),
-            AccountSignature::AbstractionSignature(inner) => inner.verify(),
+            AccountSignature::AbstractSignature(inner) => inner.verify(),
         }
     }
 }
@@ -2002,7 +2026,7 @@ impl TryFrom<&AccountSignature> for AccountAuthenticator {
             AccountSignature::SingleKeySignature(s) => s.try_into()?,
             AccountSignature::MultiKeySignature(s) => s.try_into()?,
             AccountSignature::NoAccountSignature(s) => s.try_into()?,
-            AccountSignature::AbstractionSignature(s) => s.try_into()?,
+            AccountSignature::AbstractSignature(s) => s.try_into()?,
         })
     }
 }
@@ -2161,12 +2185,9 @@ impl From<&AccountAuthenticator> for AccountSignature {
                 })
             },
             NoAccountAuthenticator => AccountSignature::NoAccountSignature(NoAccountSignature),
-            Abstraction {
-                function_info,
-                auth_data,
-            } => Self::AbstractionSignature(AbstractionSignature {
-                function_info: function_info.to_string(),
-                auth_data: to_bytes(auth_data)
+            Abstract { authenticator } => Self::AbstractSignature(AbstractSignature {
+                function_info: authenticator.function_info().to_string(),
+                auth_data: to_bytes(authenticator.auth_data())
                     .expect("bcs serialization cannot fail")
                     .into(),
             }),

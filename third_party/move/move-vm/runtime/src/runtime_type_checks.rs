@@ -79,6 +79,18 @@ pub(crate) trait RuntimeTypeCheck {
         }
     }
 
+    /// Checks if the caller can pack a function as a closure.
+    fn check_pack_closure_visibility(
+        caller: &LoadedFunction,
+        function: &LoadedFunction,
+    ) -> PartialVMResult<()> {
+        if caller.module_id() == function.module_id() {
+            return Ok(());
+        }
+        // Same visibility rules as for regular cross-contract calls should apply.
+        Self::check_cross_module_regular_call_visibility(caller, function)
+    }
+
     /// Performs a runtime check of the caller is allowed to call a cross-module callee. Applies
     /// only on regular static calls (no dynamic dispatch!), with caller and callee being coming
     /// from different modules.
@@ -137,7 +149,7 @@ pub fn verify_pack_closure(
         AbilitySet::PRIVATE_FUNCTIONS
     };
     // Verify that captured arguments are assignable against types in the function
-    // signature.
+    // signature, and that they are no references.
     let expected_capture_tys = mask.extract(func.param_tys(), true);
 
     let given_capture_tys = operand_stack.popn_tys(expected_capture_tys.len() as u16)?;
@@ -145,6 +157,7 @@ pub fn verify_pack_closure(
         .into_iter()
         .zip(given_capture_tys.into_iter())
     {
+        expected.paranoid_check_is_no_ref("Captured argument type")?;
         with_instantiation(ty_builder, func, expected, |expected| {
             // Intersect the captured type with the accumulated abilities
             abilities = abilities.intersect(given.abilities()?);

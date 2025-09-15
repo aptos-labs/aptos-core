@@ -7,11 +7,12 @@ use crate::{
         state_delta::StateDelta,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_view::{
-            cached_state_view::{CachedStateView, ShardedStateCache, StateCacheShard},
+            cached_state_view::{
+                CachedStateView, PrimingPolicy, ShardedStateCache, StateCacheShard,
+            },
             hot_state_view::HotStateView,
         },
         versioned_state_value::StateUpdateRef,
-        NUM_STATE_SHARDS,
     },
     DbReader,
 };
@@ -21,7 +22,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        StateViewId,
+        StateViewId, NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
@@ -30,6 +31,23 @@ use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::{collections::HashMap, sync::Arc};
+
+#[derive(Clone, Debug)]
+pub struct HotStateMetadata {
+    latest: Option<StateKey>,
+    oldest: Option<StateKey>,
+    num_items: usize,
+}
+
+impl HotStateMetadata {
+    fn new() -> Self {
+        Self {
+            latest: None,
+            oldest: None,
+            num_items: 0,
+        }
+    }
+}
 
 /// Represents the blockchain state at a given version.
 /// n.b. the state can be either persisted or speculative.
@@ -42,6 +60,7 @@ pub struct State {
     ///       between this and a `base_version` to list the updates or create a
     ///       new `State` at a descendant version.
     shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+    hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
     /// The total usage of the state at the current version.
     usage: StateStorageUsage,
 }
@@ -50,11 +69,13 @@ impl State {
     pub fn new_with_updates(
         version: Option<Version>,
         shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+        hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
         usage: StateStorageUsage,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
             shards,
+            hot_state_metadata,
             usage,
         }
     }
@@ -63,6 +84,7 @@ impl State {
         Self::new_with_updates(
             version,
             Arc::new(arr![MapLayer::new_family("state"); 16]),
+            arr![HotStateMetadata::new(); 16],
             usage,
         )
     }
@@ -104,6 +126,18 @@ impl State {
         self.shards[0].is_descendant_of(&rhs.shards[0])
     }
 
+    pub(crate) fn latest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
+        self.hot_state_metadata[shard_id].latest.clone()
+    }
+
+    pub(crate) fn oldest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
+        self.hot_state_metadata[shard_id].oldest.clone()
+    }
+
+    pub(crate) fn num_hot_items(&self, shard_id: usize) -> usize {
+        self.hot_state_metadata[shard_id].num_items
+    }
+
     pub fn update(
         &self,
         persisted: &State,
@@ -137,7 +171,12 @@ impl State {
             .map(|(cache, overlay, updates)| {
                 let new_items = updates
                     .iter()
-                    .map(|(k, u)| ((*k).clone(), u.to_result_slot()))
+                    .map(|(k, u)| {
+                        let slot = u
+                            .to_result_slot()
+                            .unwrap_or_else(|| Self::expect_old_slot(overlay, cache, k));
+                        ((*k).clone(), slot)
+                    })
                     .collect_vec();
 
                 (
@@ -150,7 +189,9 @@ impl State {
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let usage = self.update_usage(usage_delta_per_shard);
 
-        State::new_with_updates(updates.last_version(), shards, usage)
+        // TODO(HotState): compute new hot state metadata.
+        let hot_state_metadata = arr![HotStateMetadata::new(); 16];
+        State::new_with_updates(updates.last_version(), shards, hot_state_metadata, usage)
     }
 
     fn update_usage(&self, usage_delta_per_shard: Vec<(i64, i64)>) -> StateStorageUsage {
@@ -173,25 +214,43 @@ impl State {
         let mut items_delta: i64 = 0;
         let mut bytes_delta: i64 = 0;
         for (k, v) in updates {
+            let state_value_opt = match v.state_op.as_state_value_opt() {
+                Some(value_opt) => value_opt,
+                None => continue,
+            };
+
             let key_size = k.size();
-            if let Some(value) = v.state_op.as_state_value_opt() {
+            if let Some(value) = state_value_opt {
                 items_delta += 1;
                 bytes_delta += (key_size + value.size()) as i64;
             }
 
-            // TODO(aldenhu): avoid cloning the state value (by not using DashMap)
             // n.b. all updated state items must be read and recorded in the state cache,
             // otherwise we can't calculate the correct usage.
-            let old_slot = overlay
-                .get(k)
-                .or_else(|| cache.get(k).map(|entry| entry.value().clone()))
-                .expect("Must cache read");
+            let old_slot = Self::expect_old_slot(overlay, cache, k);
             if old_slot.is_occupied() {
                 items_delta -= 1;
                 bytes_delta -= (key_size + old_slot.size()) as i64;
             }
         }
         (items_delta, bytes_delta)
+    }
+
+    fn expect_old_slot(
+        overlay: &LayeredMap<StateKey, StateSlot>,
+        cache: &StateCacheShard,
+        key: &StateKey,
+    ) -> StateSlot {
+        if let Some(slot) = overlay.get(key) {
+            return slot;
+        }
+
+        // TODO(aldenhu): avoid cloning the state value (by not using DashMap)
+        cache
+            .get(key)
+            .unwrap_or_else(|| panic!("Key {:?} must exist in the cache.", key))
+            .value()
+            .clone()
     }
 }
 
@@ -240,18 +299,18 @@ impl LedgerState {
     ) -> LedgerState {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
 
-        let last_checkpoint = if let Some(updates) = &updates.for_last_checkpoint {
+        let last_checkpoint = if let Some(updates) = updates.for_last_checkpoint_batched() {
             self.latest().update(persisted_snapshot, updates, reads)
         } else {
             self.last_checkpoint.clone()
         };
 
-        let base_of_latest = if updates.for_last_checkpoint.is_none() {
+        let base_of_latest = if updates.for_last_checkpoint_batched().is_none() {
             self.latest()
         } else {
             &last_checkpoint
         };
-        let latest = if let Some(updates) = &updates.for_latest {
+        let latest = if let Some(updates) = updates.for_latest_batched() {
             base_of_latest.update(persisted_snapshot, updates, reads)
         } else {
             base_of_latest.clone()
@@ -276,7 +335,7 @@ impl LedgerState {
             persisted_snapshot.clone(),
             self.latest().clone(),
         );
-        state_view.prime_cache(updates)?;
+        state_view.prime_cache(updates, PrimingPolicy::All)?;
 
         let updated = self.update_with_memorized_reads(
             persisted_snapshot,

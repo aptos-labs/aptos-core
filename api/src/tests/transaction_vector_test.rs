@@ -16,7 +16,7 @@
  **************************************************************************************/
 
 use super::new_test_context;
-use aptos_api_test_context::current_function_name;
+use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     SigningKey, Uniform,
@@ -240,17 +240,28 @@ fn byte_array_to_hex(v: &mut serde_json::Value) -> serde_json::Value {
     serde_json::Value::String(hex::encode(byte_array))
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_entry_function_payload() {
+async fn entry_function_payload(context: &mut TestContext) -> Vec<serde_json::Value> {
     // The purpose of patches is to convert bytes arrays to hex-coded strings.
     // Patches the serde_json result is easier comparing to implement a customized serializer.
-    fn patch(raw_txn_json: &mut serde_json::Value) {
-        let args = visit_json_field(raw_txn_json, &[
-            "raw_txn",
-            "payload",
-            "EntryFunction",
-            "args",
-        ]);
+    fn patch(raw_txn_json: &mut serde_json::Value, use_txn_payload_v2_format: bool) {
+        let args = if use_txn_payload_v2_format {
+            visit_json_field(raw_txn_json, &[
+                "raw_txn",
+                "payload",
+                "Payload",
+                "V1",
+                "executable",
+                "EntryFunction",
+                "args",
+            ])
+        } else {
+            visit_json_field(raw_txn_json, &[
+                "raw_txn",
+                "payload",
+                "EntryFunction",
+                "args",
+            ])
+        };
 
         let mut hex_args: Vec<serde_json::Value> = vec![];
         for arg in args.as_array_mut().unwrap() {
@@ -259,8 +270,6 @@ async fn test_entry_function_payload() {
 
         *args = json!(hex_args);
     }
-
-    let mut context = new_test_context(current_function_name!());
 
     let mut value_gen = ValueGenerator::deterministic();
     let mut txns = vec![];
@@ -274,23 +283,56 @@ async fn test_entry_function_payload() {
             .max_gas_amount(gen_u64(&mut value_gen))
             .gas_unit_price(gen_u64(&mut value_gen))
             .chain_id(ChainId::new(gen_chain_id(&mut value_gen)))
+            .upgrade_payload_with_rng(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            )
             .build();
         let mut signed_txn = sign_transaction(raw_txn);
-        patch(&mut signed_txn);
+        patch(&mut signed_txn, context.use_txn_payload_v2_format);
         txns.push(signed_txn);
     }
-
-    context.check_golden_output(json!(txns));
+    txns
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_script_payload() {
-    fn patch(raw_txn_json: &mut serde_json::Value) {
-        let code = visit_json_field(raw_txn_json, &["raw_txn", "payload", "Script", "code"]);
+async fn test_entry_function_payload() {
+    let mut context = new_test_context(current_function_name!());
+    let txns = entry_function_payload(&mut context).await;
+    context.check_golden_output(json!(txns));
+}
+
+async fn script_payload(context: &mut TestContext) -> Vec<serde_json::Value> {
+    fn patch(raw_txn_json: &mut serde_json::Value, use_txn_payload_v2_format: bool) {
+        let code = if use_txn_payload_v2_format {
+            visit_json_field(raw_txn_json, &[
+                "raw_txn",
+                "payload",
+                "Payload",
+                "V1",
+                "executable",
+                "Script",
+                "code",
+            ])
+        } else {
+            visit_json_field(raw_txn_json, &["raw_txn", "payload", "Script", "code"])
+        };
         *code = byte_array_to_hex(code);
 
-        let args = visit_json_field(raw_txn_json, &["raw_txn", "payload", "Script", "args"]);
-
+        let args = if use_txn_payload_v2_format {
+            visit_json_field(raw_txn_json, &[
+                "raw_txn",
+                "payload",
+                "Payload",
+                "V1",
+                "executable",
+                "Script",
+                "args",
+            ])
+        } else {
+            visit_json_field(raw_txn_json, &["raw_txn", "payload", "Script", "args"])
+        };
         for arg in args.as_array_mut().unwrap() {
             let arg_obj = arg.as_object_mut().unwrap();
 
@@ -299,8 +341,6 @@ async fn test_script_payload() {
             }
         }
     }
-
-    let mut context = new_test_context(current_function_name!());
 
     let mut value_gen = ValueGenerator::deterministic();
     let mut txns = vec![];
@@ -314,11 +354,22 @@ async fn test_script_payload() {
             .max_gas_amount(gen_u64(&mut value_gen))
             .gas_unit_price(gen_u64(&mut value_gen))
             .chain_id(ChainId::new(gen_chain_id(&mut value_gen)))
+            .upgrade_payload_with_rng(
+                &mut context.rng,
+                context.use_txn_payload_v2_format,
+                context.use_orderless_transactions,
+            )
             .build();
         let mut signed_txn = sign_transaction(raw_txn);
-        patch(&mut signed_txn);
+        patch(&mut signed_txn, context.use_txn_payload_v2_format);
         txns.push(signed_txn);
     }
+    txns
+}
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_script_payload() {
+    let mut context = new_test_context(current_function_name!());
+    let txns = script_payload(&mut context).await;
     context.check_golden_output(json!(txns));
 }

@@ -3,10 +3,14 @@
 
 use move_binary_format::deserializer::DeserializerConfig;
 use move_bytecode_verifier::VerifierConfig;
-use move_vm_types::loaded_data::runtime_types::TypeBuilder;
+use move_vm_types::{
+    loaded_data::runtime_types::TypeBuilder, values::DEFAULT_MAX_VM_VALUE_NESTED_DEPTH,
+};
 use serde::Serialize;
 
-/// Dynamic config options for the Move VM.
+/// Dynamic config options for the Move VM. Always add new fields to the end, as we rely on the
+/// hash or serialized bytes of config to detect if it has changed (e.g., new feature flag was
+/// enabled). Also, do not delete existing fields, or change the type of existing field.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct VMConfig {
     pub verifier_config: VerifierConfig,
@@ -29,6 +33,7 @@ pub struct VMConfig {
     pub ty_builder: TypeBuilder,
     pub use_call_tree_and_instruction_cache: bool,
     pub enable_lazy_loading: bool,
+    pub enable_depth_checks: bool,
 }
 
 impl Default for VMConfig {
@@ -38,8 +43,8 @@ impl Default for VMConfig {
             deserializer_config: DeserializerConfig::default(),
             paranoid_type_checks: false,
             check_invariant_in_swap_loc: true,
-            max_value_nest_depth: Some(128),
-            layout_max_size: 256,
+            max_value_nest_depth: Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
+            layout_max_size: 512,
             layout_max_depth: 128,
             type_max_cost: 0,
             type_base_cost: 0,
@@ -47,7 +52,8 @@ impl Default for VMConfig {
             delayed_field_optimization_enabled: false,
             ty_builder: TypeBuilder::with_limits(128, 20),
             use_call_tree_and_instruction_cache: true,
-            enable_lazy_loading: false,
+            enable_lazy_loading: true,
+            enable_depth_checks: true,
         }
     }
 }

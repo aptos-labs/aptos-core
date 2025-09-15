@@ -7,14 +7,13 @@
 
 use crate::state_store::{
     state_key::StateKey,
-    state_slot::StateSlot,
     state_value::{PersistedStateValueMetadata, StateValue, StateValueMetadata},
 };
 use anyhow::{bail, ensure, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_std::iterable::Iterable;
 use bytes::Bytes;
-use itertools::Either;
+use itertools::{EitherOrBoth, Itertools};
 use once_cell::sync::Lazy;
 use ref_cast::RefCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -22,6 +21,7 @@ use std::{
     collections::{btree_map, BTreeMap},
     fmt::{Debug, Formatter},
 };
+use strum_macros::AsRefStr;
 
 // Note: in case this changes in the future, it doesn't have to be a constant, and can be read from
 // genesis directly if necessary.
@@ -46,7 +46,7 @@ pub enum WriteOpKind {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename = "WriteOp")]
-enum PersistedWriteOp {
+pub enum PersistedWriteOp {
     Creation(Bytes),
     Modification(Bytes),
     Deletion,
@@ -83,22 +83,22 @@ impl PersistedWriteOp {
 }
 
 /// Shared in memory representation between the (value) WriteOp and the (hotness) HotStateOp
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, AsRefStr)]
 pub enum BaseStateOp {
     Creation(StateValue),
     Modification(StateValue),
     Deletion(StateValueMetadata),
-    MakeHot { prev_slot: StateSlot },
+    MakeHot,
 }
 
 impl BaseStateOp {
-    pub fn as_state_value_opt(&self) -> Option<&StateValue> {
+    pub fn as_state_value_opt(&self) -> Option<Option<&StateValue>> {
         use BaseStateOp::*;
 
         match self {
-            Creation(val) | Modification(val) => Some(val),
-            Deletion(_) => None,
-            MakeHot { prev_slot } => prev_slot.as_state_value_opt(),
+            Creation(val) | Modification(val) => Some(Some(val)),
+            Deletion(_) => Some(None),
+            MakeHot => None,
         }
     }
 
@@ -107,7 +107,7 @@ impl BaseStateOp {
 
         match self {
             Creation(_) | Modification(_) | Deletion(_) => Some(WriteOp::ref_cast(self)),
-            MakeHot { .. } => None,
+            MakeHot => None,
         }
     }
 
@@ -120,7 +120,7 @@ impl BaseStateOp {
 
         match self {
             Creation(_) | Modification(_) | Deletion(_) => true,
-            MakeHot { .. } => false,
+            MakeHot => false,
         }
     }
 }
@@ -131,7 +131,7 @@ impl BaseStateOp {
 pub struct WriteOp(BaseStateOp);
 
 impl WriteOp {
-    fn to_persistable(&self) -> PersistedWriteOp {
+    pub fn to_persistable(&self) -> PersistedWriteOp {
         use PersistedWriteOp::*;
 
         let metadata = self.metadata().clone().into_persistable();
@@ -140,7 +140,7 @@ impl WriteOp {
                 BaseStateOp::Creation(v) => Creation(v.bytes().clone()),
                 BaseStateOp::Modification(v) => Modification(v.bytes().clone()),
                 BaseStateOp::Deletion { .. } => Deletion,
-                BaseStateOp::MakeHot { .. } => unreachable!("malformed write op"),
+                BaseStateOp::MakeHot => unreachable!("malformed write op"),
             },
             Some(metadata) => match &self.0 {
                 BaseStateOp::Creation(v) => CreationWithMetadata {
@@ -152,7 +152,7 @@ impl WriteOp {
                     metadata,
                 },
                 BaseStateOp::Deletion { .. } => DeletionWithMetadata { metadata },
-                BaseStateOp::MakeHot { .. } => unreachable!("malformed write op"),
+                BaseStateOp::MakeHot => unreachable!("malformed write op"),
             },
         }
     }
@@ -165,7 +165,7 @@ impl WriteOp {
         use BaseStateOp::*;
 
         match (&mut op.0, other.0) {
-            (MakeHot {..}, ..) | (.., MakeHot {..}) => unreachable!("malformed write op"),
+            (MakeHot, ..) | (.., MakeHot) => unreachable!("malformed write op"),
             (Modification { .. } | Creation { .. }, Creation { .. }) // create existing
             | (Deletion { .. }, Modification { .. } | Deletion { .. }) // delete or modify already deleted
             => {
@@ -218,7 +218,7 @@ impl WriteOp {
     }
 
     pub fn as_state_value_opt(&self) -> Option<&StateValue> {
-        self.0.as_state_value_opt()
+        self.0.as_state_value_opt().expect("malformed write op")
     }
 
     pub fn bytes(&self) -> Option<&Bytes> {
@@ -236,7 +236,7 @@ impl WriteOp {
         match &self.0 {
             Creation(v) | Modification(v) => v.metadata(),
             Deletion(meta) => meta,
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 
@@ -246,7 +246,7 @@ impl WriteOp {
         match &mut self.0 {
             Creation(v) | Modification(v) => v.metadata_mut(),
             Deletion(meta) => meta,
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 
@@ -256,7 +256,7 @@ impl WriteOp {
         match self.0 {
             Creation(v) | Modification(v) => v.into_metadata(),
             Deletion(meta) => meta,
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 
@@ -306,7 +306,7 @@ impl WriteOp {
                 write_len: get_size().expect("Modification must have size"),
             },
             Deletion { .. } => WriteOpSize::Deletion,
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 
@@ -324,7 +324,7 @@ impl WriteOp {
         match &self.0 {
             Creation(_) | Modification(_) => false,
             Deletion(_) => true,
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 }
@@ -422,7 +422,7 @@ pub trait TransactionWrite: Debug {
             Modification => WriteOpSize::Modification {
                 write_len: self.bytes().unwrap().len() as u64,
             },
-            Deletion { .. } => WriteOpSize::Deletion,
+            Deletion => WriteOpSize::Deletion,
         }
     }
 }
@@ -455,7 +455,7 @@ impl TransactionWrite for WriteOp {
             BaseStateOp::Creation { .. } => Creation,
             BaseStateOp::Modification { .. } => Modification,
             BaseStateOp::Deletion { .. } => Deletion,
-            BaseStateOp::MakeHot { .. } => unreachable!("malformed write op"),
+            BaseStateOp::MakeHot => unreachable!("malformed write op"),
         }
     }
 
@@ -465,7 +465,7 @@ impl TransactionWrite for WriteOp {
         match &mut self.0 {
             Creation(v) | Modification(v) => v.set_bytes(bytes),
             Deletion { .. } => (),
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 }
@@ -497,7 +497,7 @@ impl Debug for WriteOp {
             Deletion(metadata) => {
                 write!(f, "Deletion(metadata:{:?})", metadata,)
             },
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot => unreachable!("malformed write op"),
         }
     }
 }
@@ -520,8 +520,8 @@ impl Default for ValueWriteSet {
 pub struct HotStateOp(BaseStateOp);
 
 impl HotStateOp {
-    pub fn make_hot(prev_slot: StateSlot) -> Self {
-        Self(BaseStateOp::MakeHot { prev_slot })
+    pub fn make_hot() -> Self {
+        Self(BaseStateOp::MakeHot)
     }
 
     pub fn as_base_op(&self) -> &BaseStateOp {
@@ -538,9 +538,7 @@ impl Debug for HotStateOp {
         use BaseStateOp::*;
 
         match &self.0 {
-            MakeHot { prev_slot } => {
-                write!(f, "MakeHot(prev_slot:{:?})", prev_slot)
-            },
+            MakeHot => write!(f, "MakeHot"),
             Creation(_) | Modification(_) | Deletion(_) => {
                 unreachable!("malformed hot state op")
             },
@@ -548,17 +546,11 @@ impl Debug for HotStateOp {
     }
 }
 
-#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq)]
-pub enum WriteSet {
-    Value(ValueWriteSet),
-    /// TODO(HotState): this variant silently serializes to an empty ValueWriteSet for now.
-    Hotness(BTreeMap<StateKey, HotStateOp>),
-}
-
-impl Default for WriteSet {
-    fn default() -> Self {
-        Self::Value(ValueWriteSet::default())
-    }
+#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Default, Eq, PartialEq)]
+pub struct WriteSet {
+    value: ValueWriteSet,
+    /// TODO(HotState): this field is not serialized for now.
+    hotness: BTreeMap<StateKey, HotStateOp>,
 }
 
 impl Serialize for WriteSet {
@@ -566,10 +558,7 @@ impl Serialize for WriteSet {
     where
         S: Serializer,
     {
-        match self {
-            WriteSet::Value(ws) => ws.serialize(serializer),
-            WriteSet::Hotness(_hot_state_ops) => ValueWriteSet::default().serialize(serializer),
-        }
+        self.value.serialize(serializer)
     }
 }
 
@@ -578,38 +567,35 @@ impl<'de> Deserialize<'de> for WriteSet {
     where
         D: Deserializer<'de>,
     {
-        let ws = ValueWriteSet::deserialize(deserializer)?;
-        Ok(WriteSet::Value(ws))
+        let value = ValueWriteSet::deserialize(deserializer)?;
+        Ok(Self {
+            value,
+            hotness: BTreeMap::new(),
+        })
     }
 }
 
 impl WriteSet {
-    pub fn expect_into_v0(self) -> WriteSetV0 {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => ws,
-            // TODO(HotState):
-            WriteSet::Hotness(_) => panic!("hot state ops touched unexpectedly"),
+    fn into_v0(self) -> WriteSetV0 {
+        match self.value {
+            ValueWriteSet::V0(ws) => ws,
         }
     }
 
-    pub fn expect_v0(&self) -> &WriteSetV0 {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => ws,
-            // TODO(HotState):
-            WriteSet::Hotness(_) => panic!("hot state ops touched unexpectedly"),
+    pub fn as_v0(&self) -> &WriteSetV0 {
+        match &self.value {
+            ValueWriteSet::V0(ws) => ws,
         }
     }
 
-    pub fn expect_v0_mut(&mut self) -> &mut WriteSetV0 {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => ws,
-            // TODO(HotState):
-            WriteSet::Hotness(_) => panic!("hot state ops touched unexpectedly"),
+    fn as_v0_mut(&mut self) -> &mut WriteSetV0 {
+        match &mut self.value {
+            ValueWriteSet::V0(ws) => ws,
         }
     }
 
     pub fn into_mut(self) -> WriteSetMut {
-        self.expect_into_v0().0
+        self.into_v0().0
     }
 
     pub fn new(write_ops: impl IntoIterator<Item = (StateKey, WriteOp)>) -> Result<Self> {
@@ -629,7 +615,7 @@ impl WriteSet {
     }
 
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
-        self.expect_v0()
+        self.as_v0()
             .iter()
             .map(|(key, op)| (key, op.as_state_value_opt()))
     }
@@ -642,62 +628,62 @@ impl WriteSet {
     }
 
     pub fn update_total_supply(&mut self, value: u128) {
-        self.expect_v0_mut().update_total_supply(value);
+        self.as_v0_mut().update_total_supply(value);
     }
 
     pub fn get_write_op(&self, state_key: &StateKey) -> Option<&WriteOp> {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => ws.get(state_key),
-            WriteSet::Hotness(_) => None,
-        }
+        self.as_v0().get(state_key)
     }
 
     pub fn get_total_supply(&self) -> Option<u128> {
-        self.expect_v0().get_total_supply()
+        self.as_v0().get_total_supply()
     }
 
     pub fn is_empty(&self) -> bool {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => ws.is_empty(),
-            WriteSet::Hotness(ws) => ws.is_empty(),
-        }
+        self.as_v0().is_empty() && self.hotness.is_empty()
     }
 
     pub fn expect_into_write_op_iter(self) -> impl IntoIterator<Item = (StateKey, WriteOp)> {
-        self.expect_into_v0().0.write_set
+        self.into_v0().0.write_set
     }
 
     pub fn expect_write_op_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
-        self.expect_v0().0.write_set.iter()
+        self.as_v0().0.write_set.iter()
     }
 
     pub fn write_op_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
-        const EMPTY: &[(&StateKey, &WriteOp)] = &[];
-
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => Either::Left(ws.iter()),
-            WriteSet::Hotness(_) => Either::Right(EMPTY.iter().copied()),
-        }
+        self.as_v0().iter()
     }
 
     pub fn into_write_op_iter(self) -> impl Iterator<Item = (StateKey, WriteOp)> {
-        const EMPTY: &[(StateKey, WriteOp)] = &[];
-
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => Either::Left(ws.into_write_op_iter()),
-            WriteSet::Hotness(_) => Either::Right(EMPTY.iter().cloned()),
-        }
+        self.into_v0().into_write_op_iter()
     }
 
     pub fn base_op_iter(&self) -> impl Iterator<Item = (&StateKey, &BaseStateOp)> {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => {
-                Either::Left(ws.iter().map(|(key, op)| (key, op.as_base_op())))
-            },
-            WriteSet::Hotness(ws) => {
-                Either::Right(ws.iter().map(|(key, op)| (key, op.as_base_op())))
-            },
-        }
+        self.as_v0()
+            .iter()
+            .map(|(key, op)| (key, op.as_base_op()))
+            .merge_join_by(
+                self.hotness.iter().map(|(key, op)| (key, op.as_base_op())),
+                |a, b| a.0.cmp(b.0),
+            )
+            .map(|entry| {
+                // It seems like it's possible to have a key that is both in `value` and `hotness`
+                // (possibly due to inaccurate read write summary). If this happens we discard the
+                // hotness change, since the recently written keys will be made hot anyway.
+                match entry {
+                    EitherOrBoth::Left(e) | EitherOrBoth::Right(e) => e,
+                    EitherOrBoth::Both(e, _) => e,
+                }
+            })
+    }
+
+    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
+        assert!(
+            self.hotness.is_empty(),
+            "hotness should only be initialized once."
+        );
+        self.hotness = hotness;
     }
 }
 
@@ -797,7 +783,10 @@ impl WriteSetMut {
 
     pub fn freeze(self) -> Result<WriteSet> {
         // TODO: add structural validation
-        Ok(WriteSet::Value(ValueWriteSet::V0(WriteSetV0(self))))
+        Ok(WriteSet {
+            value: ValueWriteSet::V0(WriteSetV0(self)),
+            hotness: BTreeMap::new(),
+        })
     }
 
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {

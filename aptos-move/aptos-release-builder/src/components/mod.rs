@@ -397,8 +397,10 @@ impl ReleaseEntry {
 
                     let execution_hash = get_execution_hash(result);
                     let mut hash_string = "vector[".to_string();
-                    for b in execution_hash.iter() {
-                        hash_string.push_str(format!("{}u8,", b).as_str());
+                    if let Some(execution_hash) = execution_hash {
+                        for b in execution_hash.iter() {
+                            hash_string.push_str(format!("{}u8,", b).as_str());
+                        }
                     }
                     hash_string.push(']');
 
@@ -693,6 +695,7 @@ impl ReleaseConfig {
 
             let mut metadata_path = base_path.to_path_buf();
             metadata_path.push("metadata");
+            metadata_path.push(&self.name);
             metadata_path.push(proposal.name.as_str());
             metadata_path.set_extension("json");
 

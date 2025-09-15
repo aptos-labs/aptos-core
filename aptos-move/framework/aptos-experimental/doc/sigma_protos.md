@@ -348,8 +348,8 @@ as the value encrypted by the ciphertext obtained by subtracting withdraw_ct fro
     comm_amount: &pedersen::Commitment,
     sender_new_balance_comm: &pedersen::Commitment,
     sender_curr_balance_ct: &elgamal::Ciphertext,
-    proof: &<a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a>)
-{
+    proof: &<a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a>
+) {
     <b>let</b> h = pedersen::randomness_base_for_bulletproof();
     <b>let</b> sender_pk_point = elgamal::pubkey_to_point(sender_pk);
     <b>let</b> recipient_pk_point = elgamal::pubkey_to_point(recipient_pk);
@@ -360,18 +360,32 @@ as the value encrypted by the ciphertext obtained by subtracting withdraw_ct fro
     <b>let</b> bar_c = pedersen::commitment_as_point(sender_new_balance_comm);
 
     // TODO: Can be optimized so we don't re-serialize the proof for Fiat-Shamir
-    <b>let</b> rho = <a href="sigma_protos.md#0x7_sigma_protos_fiat_shamir_transfer_subproof_challenge">fiat_shamir_transfer_subproof_challenge</a>(
-        sender_pk, recipient_pk,
-        withdraw_ct, deposit_ct, comm_amount,
-        sender_curr_balance_ct, sender_new_balance_comm,
-        &proof.x1, &proof.x2, &proof.x3, &proof.x4,
-        &proof.x5, &proof.x6, &proof.x7);
+    <b>let</b> rho =
+        <a href="sigma_protos.md#0x7_sigma_protos_fiat_shamir_transfer_subproof_challenge">fiat_shamir_transfer_subproof_challenge</a>(
+            sender_pk,
+            recipient_pk,
+            withdraw_ct,
+            deposit_ct,
+            comm_amount,
+            sender_curr_balance_ct,
+            sender_new_balance_comm,
+            &proof.x1,
+            &proof.x2,
+            &proof.x3,
+            &proof.x4,
+            &proof.x5,
+            &proof.x6,
+            &proof.x7
+        );
 
     <b>let</b> g_alpha2 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint_mul">ristretto255::basepoint_mul</a>(&proof.alpha2);
     // \rho * D + X1 =? \alpha_2 * g
     <b>let</b> d_acc = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul">ristretto255::point_mul</a>(big_d, &rho);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> d_acc, &proof.x1);
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&d_acc, &g_alpha2), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>));
+    <b>assert</b>!(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&d_acc, &g_alpha2),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>)
+    );
 
     <b>let</b> g_alpha1 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint_mul">ristretto255::basepoint_mul</a>(&proof.alpha1);
     // \rho * C + X2 =? \alpha_1 * g + \alpha_2 * y
@@ -379,14 +393,20 @@ as the value encrypted by the ciphertext obtained by subtracting withdraw_ct fro
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> big_c_acc, &proof.x2);
     <b>let</b> y_alpha2 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul">ristretto255::point_mul</a>(&sender_pk_point, &proof.alpha2);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> y_alpha2, &g_alpha1);
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&big_c_acc, &y_alpha2), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>));
+    <b>assert</b>!(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&big_c_acc, &y_alpha2),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>)
+    );
 
     // \rho * \bar{C} + X3 =? \alpha_1 * g + \alpha_2 * \bar{y}
     <b>let</b> big_bar_c_acc = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul">ristretto255::point_mul</a>(bar_big_c, &rho);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> big_bar_c_acc, &proof.x3);
     <b>let</b> y_bar_alpha2 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul">ristretto255::point_mul</a>(&recipient_pk_point, &proof.alpha2);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> y_bar_alpha2, &g_alpha1);
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&big_bar_c_acc, &y_bar_alpha2), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>));
+    <b>assert</b>!(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&big_bar_c_acc, &y_bar_alpha2),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>)
+    );
 
     <b>let</b> g_alpha3 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint_mul">ristretto255::basepoint_mul</a>(&proof.alpha3);
     // \rho * (C_1 - C) + X_4 =? \alpha_3 * g + \alpha_5 * (C_2 - D)
@@ -397,7 +417,10 @@ as the value encrypted by the ciphertext obtained by subtracting withdraw_ct fro
     <b>let</b> big_c2_acc = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_sub">ristretto255::point_sub</a>(c2, big_d);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul_assign">ristretto255::point_mul_assign</a>(&<b>mut</b> big_c2_acc, &proof.alpha5);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> big_c2_acc, &g_alpha3);
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&big_c1_acc, &big_c2_acc), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>));
+    <b>assert</b>!(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&big_c1_acc, &big_c2_acc),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>)
+    );
 
     // \rho * c + X_5 =? \alpha_1 * g + \alpha_2 * h
     <b>let</b> c_acc = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul">ristretto255::point_mul</a>(c, &rho);
@@ -405,7 +428,10 @@ as the value encrypted by the ciphertext obtained by subtracting withdraw_ct fro
 
     <b>let</b> h_alpha2_acc = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul">ristretto255::point_mul</a>(&h, &proof.alpha2);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> h_alpha2_acc, &g_alpha1);
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&c_acc, &h_alpha2_acc), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>));
+    <b>assert</b>!(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&c_acc, &h_alpha2_acc),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>)
+    );
 
     // \rho * \bar{c} + X_6 =? \alpha_3 * g + \alpha_4 * h
     <b>let</b> bar_c_acc = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul">ristretto255::point_mul</a>(bar_c, &rho);
@@ -413,14 +439,20 @@ as the value encrypted by the ciphertext obtained by subtracting withdraw_ct fro
 
     <b>let</b> h_alpha4_acc = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul">ristretto255::point_mul</a>(&h, &proof.alpha4);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> h_alpha4_acc, &g_alpha3);
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&bar_c_acc, &h_alpha4_acc), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>));
+    <b>assert</b>!(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&bar_c_acc, &h_alpha4_acc),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>)
+    );
 
     // \rho * Y + X_7 =? \alpha_5 * G
     <b>let</b> y_acc = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul">ristretto255::point_mul</a>(&sender_pk_point, &rho);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> y_acc, &proof.x7);
 
     <b>let</b> g_alpha5 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint_mul">ristretto255::basepoint_mul</a>(&proof.alpha5);
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&y_acc, &g_alpha5), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>));
+    <b>assert</b>!(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&y_acc, &g_alpha5),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>)
+    );
 }
 </code></pre>
 
@@ -452,21 +484,23 @@ ElGamal-encrypted in the ciphertext obtained by subtracting the ciphertext (vG, 
     sender_curr_balance_ct: &elgamal::Ciphertext,
     sender_new_balance_comm: &pedersen::Commitment,
     amount: &Scalar,
-    proof: &<a href="sigma_protos.md#0x7_sigma_protos_WithdrawalSubproof">WithdrawalSubproof</a>)
-{
+    proof: &<a href="sigma_protos.md#0x7_sigma_protos_WithdrawalSubproof">WithdrawalSubproof</a>
+) {
     <b>let</b> h = pedersen::randomness_base_for_bulletproof();
     <b>let</b> (big_c1, big_c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
     <b>let</b> c = pedersen::commitment_as_point(sender_new_balance_comm);
     <b>let</b> sender_pk_point = elgamal::pubkey_to_point(sender_pk);
 
-    <b>let</b> rho = <a href="sigma_protos.md#0x7_sigma_protos_fiat_shamir_withdrawal_subproof_challenge">fiat_shamir_withdrawal_subproof_challenge</a>(
-        sender_pk,
-        sender_curr_balance_ct,
-        sender_new_balance_comm,
-        amount,
-        &proof.x1,
-        &proof.x2,
-        &proof.x3);
+    <b>let</b> rho =
+        <a href="sigma_protos.md#0x7_sigma_protos_fiat_shamir_withdrawal_subproof_challenge">fiat_shamir_withdrawal_subproof_challenge</a>(
+            sender_pk,
+            sender_curr_balance_ct,
+            sender_new_balance_comm,
+            amount,
+            &proof.x1,
+            &proof.x2,
+            &proof.x3
+        );
 
     <b>let</b> g_alpha1 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint_mul">ristretto255::basepoint_mul</a>(&proof.alpha1);
     // \rho * (C_1 - v * g) + X_1 =? \alpha_1 * g + \alpha_3 * C_2
@@ -477,7 +511,10 @@ ElGamal-encrypted in the ciphertext obtained by subtracting the ciphertext (vG, 
 
     <b>let</b> big_c2_acc = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul">ristretto255::point_mul</a>(big_c2, &proof.alpha3);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> big_c2_acc, &g_alpha1);
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&big_c1_acc, &big_c2_acc), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>));
+    <b>assert</b>!(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&big_c1_acc, &big_c2_acc),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>)
+    );
 
     // \rho * c + X_2 =? \alpha_1 * g + \alpha_2 * h
     <b>let</b> c_acc = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul">ristretto255::point_mul</a>(c, &rho);
@@ -485,14 +522,20 @@ ElGamal-encrypted in the ciphertext obtained by subtracting the ciphertext (vG, 
 
     <b>let</b> h_alpha2_acc = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul">ristretto255::point_mul</a>(&h, &proof.alpha2);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> h_alpha2_acc, &g_alpha1);
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&c_acc, &h_alpha2_acc), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>));
+    <b>assert</b>!(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&c_acc, &h_alpha2_acc),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>)
+    );
 
     // \rho * Y + X_3 =? \alpha_3 * g
     <b>let</b> y_acc = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_mul">ristretto255::point_mul</a>(&sender_pk_point, &rho);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> y_acc, &proof.x3);
 
     <b>let</b> g_alpha3 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint_mul">ristretto255::basepoint_mul</a>(&proof.alpha3);
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&y_acc, &g_alpha3), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>));
+    <b>assert</b>!(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&y_acc, &g_alpha3),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protos.md#0x7_sigma_protos_ESIGMA_PROTOCOL_VERIFY_FAILED">ESIGMA_PROTOCOL_VERIFY_FAILED</a>)
+    );
 }
 </code></pre>
 
@@ -516,31 +559,33 @@ Deserializes and returns an <code><a href="sigma_protos.md#0x7_sigma_protos_With
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protos.md#0x7_sigma_protos_deserialize_withdrawal_subproof">deserialize_withdrawal_subproof</a>(proof_bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="sigma_protos.md#0x7_sigma_protos_WithdrawalSubproof">WithdrawalSubproof</a>&gt; {
-    <b>if</b> (proof_bytes.length::&lt;u8&gt;() != 192) {
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protos.md#0x7_sigma_protos_deserialize_withdrawal_subproof">deserialize_withdrawal_subproof</a>(
+    proof_bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+): Option&lt;<a href="sigma_protos.md#0x7_sigma_protos_WithdrawalSubproof">WithdrawalSubproof</a>&gt; {
+    <b>if</b> (proof_bytes.length() != 192) {
         <b>return</b> std::option::none&lt;<a href="sigma_protos.md#0x7_sigma_protos_WithdrawalSubproof">WithdrawalSubproof</a>&gt;()
     };
 
     <b>let</b> x1_bytes = cut_vector&lt;u8&gt;(&<b>mut</b> proof_bytes, 32);
     <b>let</b> x1 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(x1_bytes);
-    <b>if</b> (!x1.is_some::&lt;RistrettoPoint&gt;()) {
+    <b>if</b> (!x1.is_some()) {
         <b>return</b> std::option::none&lt;<a href="sigma_protos.md#0x7_sigma_protos_WithdrawalSubproof">WithdrawalSubproof</a>&gt;()
     };
-    <b>let</b> x1 = x1.extract::&lt;RistrettoPoint&gt;();
+    <b>let</b> x1 = x1.extract();
 
     <b>let</b> x2_bytes = cut_vector&lt;u8&gt;(&<b>mut</b> proof_bytes, 32);
     <b>let</b> x2 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(x2_bytes);
-    <b>if</b> (!x2.is_some::&lt;RistrettoPoint&gt;()) {
+    <b>if</b> (!x2.is_some()) {
         <b>return</b> std::option::none&lt;<a href="sigma_protos.md#0x7_sigma_protos_WithdrawalSubproof">WithdrawalSubproof</a>&gt;()
     };
-    <b>let</b> x2 = x2.extract::&lt;RistrettoPoint&gt;();
+    <b>let</b> x2 = x2.extract();
 
     <b>let</b> x3_bytes = cut_vector&lt;u8&gt;(&<b>mut</b> proof_bytes, 32);
     <b>let</b> x3 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(x3_bytes);
-    <b>if</b> (!x3.is_some::&lt;RistrettoPoint&gt;()) {
+    <b>if</b> (!x3.is_some()) {
         <b>return</b> std::option::none&lt;<a href="sigma_protos.md#0x7_sigma_protos_WithdrawalSubproof">WithdrawalSubproof</a>&gt;()
     };
-    <b>let</b> x3 = x3.extract::&lt;RistrettoPoint&gt;();
+    <b>let</b> x3 = x3.extract();
 
     <b>let</b> alpha1_bytes = cut_vector&lt;u8&gt;(&<b>mut</b> proof_bytes, 32);
     <b>let</b> alpha1 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_scalar_from_bytes">ristretto255::new_scalar_from_bytes</a>(alpha1_bytes);
@@ -563,9 +608,9 @@ Deserializes and returns an <code><a href="sigma_protos.md#0x7_sigma_protos_With
     };
     <b>let</b> alpha3 = alpha3.extract();
 
-    std::option::some(<a href="sigma_protos.md#0x7_sigma_protos_WithdrawalSubproof">WithdrawalSubproof</a> {
-        x1, x2, x3, alpha1, alpha2, alpha3
-    })
+    std::option::some(
+        <a href="sigma_protos.md#0x7_sigma_protos_WithdrawalSubproof">WithdrawalSubproof</a> { x1, x2, x3, alpha1, alpha2, alpha3 }
+    )
 }
 </code></pre>
 
@@ -589,59 +634,60 @@ Deserializes and returns a <code><a href="sigma_protos.md#0x7_sigma_protos_Trans
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protos.md#0x7_sigma_protos_deserialize_transfer_subproof">deserialize_transfer_subproof</a>(proof_bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a>&gt; {
-    <b>if</b> (proof_bytes.length::&lt;u8&gt;() != 384) {
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protos.md#0x7_sigma_protos_deserialize_transfer_subproof">deserialize_transfer_subproof</a>(proof_bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;):
+    Option&lt;<a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a>&gt; {
+    <b>if</b> (proof_bytes.length() != 384) {
         <b>return</b> std::option::none&lt;<a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a>&gt;()
     };
 
     <b>let</b> x1_bytes = cut_vector&lt;u8&gt;(&<b>mut</b> proof_bytes, 32);
     <b>let</b> x1 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(x1_bytes);
-    <b>if</b> (!x1.is_some::&lt;RistrettoPoint&gt;()) {
+    <b>if</b> (!x1.is_some()) {
         <b>return</b> std::option::none&lt;<a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a>&gt;()
     };
-    <b>let</b> x1 = x1.extract::&lt;RistrettoPoint&gt;();
+    <b>let</b> x1 = x1.extract();
 
     <b>let</b> x2_bytes = cut_vector&lt;u8&gt;(&<b>mut</b> proof_bytes, 32);
     <b>let</b> x2 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(x2_bytes);
-    <b>if</b> (!x2.is_some::&lt;RistrettoPoint&gt;()) {
+    <b>if</b> (!x2.is_some()) {
         <b>return</b> std::option::none&lt;<a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a>&gt;()
     };
-    <b>let</b> x2 = x2.extract::&lt;RistrettoPoint&gt;();
+    <b>let</b> x2 = x2.extract();
 
     <b>let</b> x3_bytes = cut_vector&lt;u8&gt;(&<b>mut</b> proof_bytes, 32);
     <b>let</b> x3 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(x3_bytes);
-    <b>if</b> (!x3.is_some::&lt;RistrettoPoint&gt;()) {
+    <b>if</b> (!x3.is_some()) {
         <b>return</b> std::option::none&lt;<a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a>&gt;()
     };
-    <b>let</b> x3 = x3.extract::&lt;RistrettoPoint&gt;();
+    <b>let</b> x3 = x3.extract();
 
     <b>let</b> x4_bytes = cut_vector&lt;u8&gt;(&<b>mut</b> proof_bytes, 32);
     <b>let</b> x4 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(x4_bytes);
-    <b>if</b> (!x4.is_some::&lt;RistrettoPoint&gt;()) {
+    <b>if</b> (!x4.is_some()) {
         <b>return</b> std::option::none&lt;<a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a>&gt;()
     };
-    <b>let</b> x4 = x4.extract::&lt;RistrettoPoint&gt;();
+    <b>let</b> x4 = x4.extract();
 
     <b>let</b> x5_bytes = cut_vector&lt;u8&gt;(&<b>mut</b> proof_bytes, 32);
     <b>let</b> x5 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(x5_bytes);
-    <b>if</b> (!x5.is_some::&lt;RistrettoPoint&gt;()) {
+    <b>if</b> (!x5.is_some()) {
         <b>return</b> std::option::none&lt;<a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a>&gt;()
     };
-    <b>let</b> x5 = x5.extract::&lt;RistrettoPoint&gt;();
+    <b>let</b> x5 = x5.extract();
 
     <b>let</b> x6_bytes = cut_vector&lt;u8&gt;(&<b>mut</b> proof_bytes, 32);
     <b>let</b> x6 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(x6_bytes);
-    <b>if</b> (!x6.is_some::&lt;RistrettoPoint&gt;()) {
+    <b>if</b> (!x6.is_some()) {
         <b>return</b> std::option::none&lt;<a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a>&gt;()
     };
-    <b>let</b> x6 = x6.extract::&lt;RistrettoPoint&gt;();
+    <b>let</b> x6 = x6.extract();
 
     <b>let</b> x7_bytes = cut_vector&lt;u8&gt;(&<b>mut</b> proof_bytes, 32);
     <b>let</b> x7 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(x7_bytes);
-    <b>if</b> (!x7.is_some::&lt;RistrettoPoint&gt;()) {
+    <b>if</b> (!x7.is_some()) {
         <b>return</b> std::option::none&lt;<a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a>&gt;()
     };
-    <b>let</b> x7 = x7.extract::&lt;RistrettoPoint&gt;();
+    <b>let</b> x7 = x7.extract();
 
     <b>let</b> alpha1_bytes = cut_vector&lt;u8&gt;(&<b>mut</b> proof_bytes, 32);
     <b>let</b> alpha1 = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_scalar_from_bytes">ristretto255::new_scalar_from_bytes</a>(alpha1_bytes);
@@ -678,9 +724,22 @@ Deserializes and returns a <code><a href="sigma_protos.md#0x7_sigma_protos_Trans
     };
     <b>let</b> alpha5 = alpha5.extract();
 
-    std::option::some(<a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a> {
-        x1, x2, x3, x4, x5, x6, x7, alpha1, alpha2, alpha3, alpha4, alpha5
-    })
+    std::option::some(
+        <a href="sigma_protos.md#0x7_sigma_protos_TransferSubproof">TransferSubproof</a> {
+            x1,
+            x2,
+            x3,
+            x4,
+            x5,
+            x6,
+            x7,
+            alpha1,
+            alpha2,
+            alpha3,
+            alpha4,
+            alpha5
+        }
+    )
 }
 </code></pre>
 
@@ -712,26 +771,41 @@ $\Sigma$-protocol.
     amount: &Scalar,
     x1: &RistrettoPoint,
     x2: &RistrettoPoint,
-    x3: &RistrettoPoint): Scalar
-{
+    x3: &RistrettoPoint
+): Scalar {
     <b>let</b> (c1, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
     <b>let</b> c = pedersen::commitment_as_point(sender_new_balance_comm);
     <b>let</b> y = elgamal::pubkey_to_compressed_point(sender_pk);
 
     <b>let</b> bytes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
 
-    bytes.append::&lt;u8&gt;(<a href="sigma_protos.md#0x7_sigma_protos_FIAT_SHAMIR_SIGMA_DST">FIAT_SHAMIR_SIGMA_DST</a>);
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint_compressed">ristretto255::basepoint_compressed</a>()));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(
-        &<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&pedersen::randomness_base_for_bulletproof())));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&y));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(c1)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(c2)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(c)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_scalar_to_bytes">ristretto255::scalar_to_bytes</a>(amount));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x1)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x2)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x3)));
+    bytes.append(<a href="sigma_protos.md#0x7_sigma_protos_FIAT_SHAMIR_SIGMA_DST">FIAT_SHAMIR_SIGMA_DST</a>);
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint_compressed">ristretto255::basepoint_compressed</a>())
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(
+            &<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&pedersen::randomness_base_for_bulletproof())
+        )
+    );
+    bytes.append(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&y));
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(c1))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(c2))
+    );
+    bytes.append(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(c)));
+    bytes.append(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_scalar_to_bytes">ristretto255::scalar_to_bytes</a>(amount));
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x1))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x2))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x3))
+    );
 
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_scalar_from_sha2_512">ristretto255::new_scalar_from_sha2_512</a>(bytes)
 }
@@ -772,8 +846,8 @@ Computes a Fiat-Shamir challenge <code>rho = H(G, H, Y, Y', C, D, c, c_1, c_2, \
     x4: &RistrettoPoint,
     x5: &RistrettoPoint,
     x6: &RistrettoPoint,
-    x7: &RistrettoPoint): Scalar
-{
+    x7: &RistrettoPoint
+): Scalar {
     <b>let</b> y = elgamal::pubkey_to_compressed_point(sender_pk);
     <b>let</b> y_prime = elgamal::pubkey_to_compressed_point(recipient_pk);
     <b>let</b> (big_c, big_d) = elgamal::ciphertext_as_points(withdraw_ct);
@@ -784,26 +858,57 @@ Computes a Fiat-Shamir challenge <code>rho = H(G, H, Y, Y', C, D, c, c_1, c_2, \
 
     <b>let</b> bytes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
 
-    bytes.append::&lt;u8&gt;(<a href="sigma_protos.md#0x7_sigma_protos_FIAT_SHAMIR_SIGMA_DST">FIAT_SHAMIR_SIGMA_DST</a>);
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint_compressed">ristretto255::basepoint_compressed</a>()));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(
-        &<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&pedersen::randomness_base_for_bulletproof())));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&y));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&y_prime));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(big_c)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(big_c_prime)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(big_d)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(c)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(c1)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(c2)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(bar_c)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x1)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x2)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x3)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x4)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x5)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x6)));
-    bytes.append::&lt;u8&gt;(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x7)));
+    bytes.append(<a href="sigma_protos.md#0x7_sigma_protos_FIAT_SHAMIR_SIGMA_DST">FIAT_SHAMIR_SIGMA_DST</a>);
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint_compressed">ristretto255::basepoint_compressed</a>())
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(
+            &<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&pedersen::randomness_base_for_bulletproof())
+        )
+    );
+    bytes.append(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&y));
+    bytes.append(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&y_prime));
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(big_c))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(big_c_prime))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(big_d))
+    );
+    bytes.append(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(c)));
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(c1))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(c2))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(bar_c))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x1))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x2))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x3))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x4))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x5))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x6))
+    );
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(x7))
+    );
 
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_scalar_from_sha2_512">ristretto255::new_scalar_from_sha2_512</a>(bytes)
 }

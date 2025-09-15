@@ -32,6 +32,11 @@ pub const TXN_COMMIT_FAILED_LABEL: &str = "failed";
 pub const TXN_COMMIT_FAILED_DUPLICATE_LABEL: &str = "failed_duplicate";
 /// Transaction commit failed (will not be retried) because it expired
 pub const TXN_COMMIT_FAILED_EXPIRED_LABEL: &str = "failed_expired";
+/// Transaction commit failed (will not be retried) because the nonce is already used in a previous transaction
+pub const TXN_COMMIT_FAILED_NONCE_ALREADY_USED_LABEL: &str = "failed_nonce_already_used";
+/// Transaction commit failed (will not be retried) because the transaction expiration time is too far in the future
+pub const TXN_COMMIT_FAILED_TXN_EXPIRATION_TOO_FAR_IN_FUTURE_LABEL: &str =
+    "failed_txn_expiration_too_far_in_future";
 /// Transaction commit was unsuccessful, but will be retried
 pub const TXN_COMMIT_RETRY_LABEL: &str = "retry";
 
@@ -49,6 +54,16 @@ fn gas_buckets() -> Vec<f64> {
 /// Monitor counters, used by monitor! macro
 pub static OP_COUNTERS: Lazy<aptos_metrics_core::op_counters::OpMetrics> =
     Lazy::new(|| aptos_metrics_core::op_counters::OpMetrics::new_and_registered("consensus"));
+
+/// Count of the total number of blocks of whether randomness is required
+pub static RAND_BLOCK: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_rand_block_count",
+        "Count of the total number of blocks of whether randomness is required",
+        &["type"]
+    )
+    .unwrap()
+});
 
 /// Counts the total number of errors
 pub static ERROR_COUNT: Lazy<IntGauge> = Lazy::new(|| {
@@ -1254,6 +1269,15 @@ pub static UNEXPECTED_PROPOSAL_EXT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the number of rejected proposals due to denied inline transactions
+pub static REJECTED_PROPOSAL_DENY_TXN_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_rejected_proposal_deny_txn_count",
+        "Count of the number of rejected proposals due to denied inline transactions"
+    )
+    .unwrap()
+});
+
 /// Histogram for the number of txns to be executed in a block.
 pub static MAX_TXNS_FROM_BLOCK_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
@@ -1303,7 +1327,7 @@ pub fn update_counters_for_block(block: &Block) {
     if failed_rounds > 0 {
         COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
     }
-    quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.payload_size() as f64);
+    quorum_store::counters::update_batch_stats(block);
 }
 
 pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
@@ -1320,6 +1344,10 @@ pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
                     TXN_COMMIT_FAILED_DUPLICATE_LABEL
                 } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
                     TXN_COMMIT_FAILED_EXPIRED_LABEL
+                } else if *reason == DiscardedVMStatus::NONCE_ALREADY_USED {
+                    TXN_COMMIT_FAILED_NONCE_ALREADY_USED_LABEL
+                } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE {
+                    TXN_COMMIT_FAILED_TXN_EXPIRATION_TOO_FAR_IN_FUTURE_LABEL
                 } else {
                     TXN_COMMIT_FAILED_LABEL
                 }

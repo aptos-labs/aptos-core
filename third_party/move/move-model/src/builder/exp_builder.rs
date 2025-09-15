@@ -580,7 +580,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         "previously declared here".to_string(),
                     )],
                 );
-                return;
             }
             self.type_params.push((name, ty, kind, loc.clone()));
         } else if report_errors {
@@ -1069,11 +1068,11 @@ impl ExpTranslator<'_, '_, '_> {
                         vec![self.translate_function_param_or_return_type(result)]
                     },
                 };
-                Type::function(
-                    Type::tuple(arg_tys),
-                    Type::tuple(result_tys),
-                    self.parent.translate_abilities(abilities),
-                )
+                let ability_set = self.parent.translate_abilities(abilities);
+                if ability_set.has_key() {
+                    self.error(loc, "function types cannot have `key` ability");
+                }
+                Type::function(Type::tuple(arg_tys), Type::tuple(result_tys), ability_set)
             },
             Unit => Type::Tuple(vec![]),
             Multiple(vst) => {
@@ -3749,7 +3748,7 @@ impl ExpTranslator<'_, '_, '_> {
 
             return ExpData::Call(
                 id,
-                Operation::Closure(module_id, fun_id, ClosureMask::new_for_leading(0)),
+                Operation::Closure(module_id, fun_id, ClosureMask::empty()),
                 vec![],
             );
         }

@@ -49,6 +49,10 @@ use tokio::runtime::Handle;
 //  broadcast_coordinator tasks  //
 // ============================== //
 
+// The sample rate for broadcast events and errors
+const BROADCAST_ERROR_LOG_SAMPLE_SECS: u64 = 1;
+const BROADCAST_EVENT_LOG_SAMPLE_SECS: u64 = 5;
+
 /// Attempts broadcast to `peer` and schedules the next broadcast.
 pub(crate) async fn execute_broadcast<NetworkClient, TransactionValidator>(
     peer: PeerNetworkId,
@@ -61,35 +65,45 @@ pub(crate) async fn execute_broadcast<NetworkClient, TransactionValidator>(
     TransactionValidator: TransactionValidation,
 {
     let network_interface = &smp.network_interface.clone();
+    counters::shared_mempool_broadcast_event_inc(counters::RUNNING_LABEL, peer.network_id());
+
     // If there's no connection, don't bother to broadcast
     if network_interface.sync_states_exists(&peer) {
         if let Err(err) = network_interface
             .execute_broadcast(peer, backoff, smp)
             .await
         {
+            counters::shared_mempool_broadcast_event_inc(err.get_label(), peer.network_id());
             match err {
-                BroadcastError::NetworkError(peer, error) => warn!(LogSchema::event_log(
-                    LogEntry::BroadcastTransaction,
-                    LogEvent::NetworkSendFail
-                )
-                .peer(&peer)
-                .error(&error)),
-                BroadcastError::NoTransactions(_) | BroadcastError::PeerNotPrioritized(_, _) => {
+                BroadcastError::NoTransactions(_) => {
                     sample!(
-                        SampleRate::Duration(Duration::from_secs(60)),
-                        trace!("{:?}", err)
+                        SampleRate::Duration(Duration::from_secs(BROADCAST_EVENT_LOG_SAMPLE_SECS)),
+                        debug!("No transactions to broadcast: {:?}", err)
+                    );
+                },
+                BroadcastError::PeerNotPrioritized(_, _) => {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(BROADCAST_EVENT_LOG_SAMPLE_SECS)),
+                        debug!(
+                            "Peer {} not prioritized. Skipping broadcast: {:?}",
+                            peer, err
+                        )
                     );
                 },
                 _ => {
                     sample!(
-                        SampleRate::Duration(Duration::from_secs(60)),
-                        debug!("{:?}", err)
+                        SampleRate::Duration(Duration::from_secs(BROADCAST_ERROR_LOG_SAMPLE_SECS)),
+                        warn!("Execute broadcast for peer {} failed: {:?}", peer, err)
                     );
                 },
             }
         }
     } else {
         // Drop the scheduled broadcast, we're not connected anymore
+        counters::shared_mempool_broadcast_event_inc(
+            counters::DROP_BROADCAST_LABEL,
+            peer.network_id(),
+        );
         return;
     }
     let schedule_backoff = network_interface.is_backoff_mode(&peer);
@@ -406,7 +420,7 @@ fn filter_transactions(
     Option<BroadcastPeerPriority>,
 )> {
     // If the filter is not enabled, return early
-    if !transaction_filter_config.enable_mempool_filter {
+    if !transaction_filter_config.is_enabled() {
         return transactions;
     }
 
@@ -420,8 +434,8 @@ fn filter_transactions(
         .into_iter()
         .filter_map(|(transaction, account_sequence_number, priority)| {
             if transaction_filter_config
-                .transaction_filter
-                .allows(&transaction)
+                .transaction_filter()
+                .allows_transaction(&transaction)
             {
                 Some((transaction, account_sequence_number, priority))
             } else {
@@ -784,7 +798,7 @@ pub(crate) async fn process_config_update<V, P>(
 mod test {
     use super::*;
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
-    use aptos_transactions_filter::transaction_matcher::Filter;
+    use aptos_transaction_filters::transaction_filter::TransactionFilter;
     use aptos_types::{
         chain_id::ChainId,
         transaction::{RawTransaction, Script, TransactionPayload},
@@ -800,14 +814,10 @@ mod test {
         }
 
         // Create a config with filtering enabled (the first and last transactions will be rejected)
-        let filter = Filter::empty()
+        let transaction_filter = TransactionFilter::empty()
             .add_sender_filter(false, transactions[0].0.sender())
             .add_sender_filter(false, transactions[9].0.sender());
-        let transaction_filter_config = TransactionFilterConfig {
-            enable_mempool_filter: true,
-            transaction_filter: filter,
-            ..TransactionFilterConfig::default()
-        };
+        let transaction_filter_config = TransactionFilterConfig::new(true, transaction_filter);
 
         // Filter the transactions
         let mut statuses = vec![];
@@ -839,12 +849,8 @@ mod test {
         }
 
         // Create a config with filtering disabled
-        let filter = Filter::empty().add_all_filter(false); // Reject all transactions
-        let transaction_filter_config = TransactionFilterConfig {
-            enable_mempool_filter: false,
-            transaction_filter: filter,
-            ..TransactionFilterConfig::default()
-        };
+        let transaction_filter = TransactionFilter::empty().add_all_filter(false); // Reject all transactions
+        let transaction_filter_config = TransactionFilterConfig::new(false, transaction_filter);
 
         // Filter the transactions
         let mut statuses = vec![];
@@ -873,12 +879,8 @@ mod test {
         }
 
         // Create a config with filtering enabled (the filter is empty, so no transactions will be rejected)
-        let filter = Filter::empty();
-        let transaction_filter_config = TransactionFilterConfig {
-            enable_mempool_filter: true,
-            transaction_filter: filter,
-            ..TransactionFilterConfig::default()
-        };
+        let transaction_filter = TransactionFilter::empty(); // Allow all transactions
+        let transaction_filter_config = TransactionFilterConfig::new(true, transaction_filter);
 
         // Filter the transactions
         let mut statuses = vec![];

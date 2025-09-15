@@ -120,7 +120,7 @@ module aptos_experimental::sigma_protos {
     //
 
     /// The domain separation tag (DST) used in the Fiat-Shamir transform of our $\Sigma$-protocol.
-    const FIAT_SHAMIR_SIGMA_DST : vector<u8> = b"AptosVeiledCoin/WithdrawalSubproofFiatShamir";
+    const FIAT_SHAMIR_SIGMA_DST: vector<u8> = b"AptosVeiledCoin/WithdrawalSubproofFiatShamir";
 
     //
     // Structs
@@ -134,7 +134,7 @@ module aptos_experimental::sigma_protos {
         x3: RistrettoPoint,
         alpha1: Scalar,
         alpha2: Scalar,
-        alpha3: Scalar,
+        alpha3: Scalar
     }
 
     /// A $\Sigma$-protocol proof used during a veiled transfer. This proof encompasses the $\Sigma$-protocol from
@@ -151,7 +151,7 @@ module aptos_experimental::sigma_protos {
         alpha2: Scalar,
         alpha3: Scalar,
         alpha4: Scalar,
-        alpha5: Scalar,
+        alpha5: Scalar
     }
 
     //
@@ -174,8 +174,8 @@ module aptos_experimental::sigma_protos {
         comm_amount: &pedersen::Commitment,
         sender_new_balance_comm: &pedersen::Commitment,
         sender_curr_balance_ct: &elgamal::Ciphertext,
-        proof: &TransferSubproof)
-    {
+        proof: &TransferSubproof
+    ) {
         let h = pedersen::randomness_base_for_bulletproof();
         let sender_pk_point = elgamal::pubkey_to_point(sender_pk);
         let recipient_pk_point = elgamal::pubkey_to_point(recipient_pk);
@@ -186,18 +186,32 @@ module aptos_experimental::sigma_protos {
         let bar_c = pedersen::commitment_as_point(sender_new_balance_comm);
 
         // TODO: Can be optimized so we don't re-serialize the proof for Fiat-Shamir
-        let rho = fiat_shamir_transfer_subproof_challenge(
-            sender_pk, recipient_pk,
-            withdraw_ct, deposit_ct, comm_amount,
-            sender_curr_balance_ct, sender_new_balance_comm,
-            &proof.x1, &proof.x2, &proof.x3, &proof.x4,
-            &proof.x5, &proof.x6, &proof.x7);
+        let rho =
+            fiat_shamir_transfer_subproof_challenge(
+                sender_pk,
+                recipient_pk,
+                withdraw_ct,
+                deposit_ct,
+                comm_amount,
+                sender_curr_balance_ct,
+                sender_new_balance_comm,
+                &proof.x1,
+                &proof.x2,
+                &proof.x3,
+                &proof.x4,
+                &proof.x5,
+                &proof.x6,
+                &proof.x7
+            );
 
         let g_alpha2 = ristretto255::basepoint_mul(&proof.alpha2);
         // \rho * D + X1 =? \alpha_2 * g
         let d_acc = ristretto255::point_mul(big_d, &rho);
         ristretto255::point_add_assign(&mut d_acc, &proof.x1);
-        assert!(ristretto255::point_equals(&d_acc, &g_alpha2), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+        assert!(
+            ristretto255::point_equals(&d_acc, &g_alpha2),
+            error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)
+        );
 
         let g_alpha1 = ristretto255::basepoint_mul(&proof.alpha1);
         // \rho * C + X2 =? \alpha_1 * g + \alpha_2 * y
@@ -205,14 +219,20 @@ module aptos_experimental::sigma_protos {
         ristretto255::point_add_assign(&mut big_c_acc, &proof.x2);
         let y_alpha2 = ristretto255::point_mul(&sender_pk_point, &proof.alpha2);
         ristretto255::point_add_assign(&mut y_alpha2, &g_alpha1);
-        assert!(ristretto255::point_equals(&big_c_acc, &y_alpha2), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+        assert!(
+            ristretto255::point_equals(&big_c_acc, &y_alpha2),
+            error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)
+        );
 
         // \rho * \bar{C} + X3 =? \alpha_1 * g + \alpha_2 * \bar{y}
         let big_bar_c_acc = ristretto255::point_mul(bar_big_c, &rho);
         ristretto255::point_add_assign(&mut big_bar_c_acc, &proof.x3);
         let y_bar_alpha2 = ristretto255::point_mul(&recipient_pk_point, &proof.alpha2);
         ristretto255::point_add_assign(&mut y_bar_alpha2, &g_alpha1);
-        assert!(ristretto255::point_equals(&big_bar_c_acc, &y_bar_alpha2), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+        assert!(
+            ristretto255::point_equals(&big_bar_c_acc, &y_bar_alpha2),
+            error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)
+        );
 
         let g_alpha3 = ristretto255::basepoint_mul(&proof.alpha3);
         // \rho * (C_1 - C) + X_4 =? \alpha_3 * g + \alpha_5 * (C_2 - D)
@@ -223,7 +243,10 @@ module aptos_experimental::sigma_protos {
         let big_c2_acc = ristretto255::point_sub(c2, big_d);
         ristretto255::point_mul_assign(&mut big_c2_acc, &proof.alpha5);
         ristretto255::point_add_assign(&mut big_c2_acc, &g_alpha3);
-        assert!(ristretto255::point_equals(&big_c1_acc, &big_c2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+        assert!(
+            ristretto255::point_equals(&big_c1_acc, &big_c2_acc),
+            error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)
+        );
 
         // \rho * c + X_5 =? \alpha_1 * g + \alpha_2 * h
         let c_acc = ristretto255::point_mul(c, &rho);
@@ -231,7 +254,10 @@ module aptos_experimental::sigma_protos {
 
         let h_alpha2_acc = ristretto255::point_mul(&h, &proof.alpha2);
         ristretto255::point_add_assign(&mut h_alpha2_acc, &g_alpha1);
-        assert!(ristretto255::point_equals(&c_acc, &h_alpha2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+        assert!(
+            ristretto255::point_equals(&c_acc, &h_alpha2_acc),
+            error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)
+        );
 
         // \rho * \bar{c} + X_6 =? \alpha_3 * g + \alpha_4 * h
         let bar_c_acc = ristretto255::point_mul(bar_c, &rho);
@@ -239,14 +265,20 @@ module aptos_experimental::sigma_protos {
 
         let h_alpha4_acc = ristretto255::point_mul(&h, &proof.alpha4);
         ristretto255::point_add_assign(&mut h_alpha4_acc, &g_alpha3);
-        assert!(ristretto255::point_equals(&bar_c_acc, &h_alpha4_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+        assert!(
+            ristretto255::point_equals(&bar_c_acc, &h_alpha4_acc),
+            error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)
+        );
 
         // \rho * Y + X_7 =? \alpha_5 * G
         let y_acc = ristretto255::point_mul(&sender_pk_point, &rho);
         ristretto255::point_add_assign(&mut y_acc, &proof.x7);
 
         let g_alpha5 = ristretto255::basepoint_mul(&proof.alpha5);
-        assert!(ristretto255::point_equals(&y_acc, &g_alpha5), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+        assert!(
+            ristretto255::point_equals(&y_acc, &g_alpha5),
+            error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)
+        );
     }
 
     /// Verifies the $\Sigma$-protocol proof necessary to ensure correctness of a veiled-to-unveiled transfer.
@@ -258,21 +290,23 @@ module aptos_experimental::sigma_protos {
         sender_curr_balance_ct: &elgamal::Ciphertext,
         sender_new_balance_comm: &pedersen::Commitment,
         amount: &Scalar,
-        proof: &WithdrawalSubproof)
-    {
+        proof: &WithdrawalSubproof
+    ) {
         let h = pedersen::randomness_base_for_bulletproof();
         let (big_c1, big_c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
         let c = pedersen::commitment_as_point(sender_new_balance_comm);
         let sender_pk_point = elgamal::pubkey_to_point(sender_pk);
 
-        let rho = fiat_shamir_withdrawal_subproof_challenge(
-            sender_pk,
-            sender_curr_balance_ct,
-            sender_new_balance_comm,
-            amount,
-            &proof.x1,
-            &proof.x2,
-            &proof.x3);
+        let rho =
+            fiat_shamir_withdrawal_subproof_challenge(
+                sender_pk,
+                sender_curr_balance_ct,
+                sender_new_balance_comm,
+                amount,
+                &proof.x1,
+                &proof.x2,
+                &proof.x3
+            );
 
         let g_alpha1 = ristretto255::basepoint_mul(&proof.alpha1);
         // \rho * (C_1 - v * g) + X_1 =? \alpha_1 * g + \alpha_3 * C_2
@@ -283,7 +317,10 @@ module aptos_experimental::sigma_protos {
 
         let big_c2_acc = ristretto255::point_mul(big_c2, &proof.alpha3);
         ristretto255::point_add_assign(&mut big_c2_acc, &g_alpha1);
-        assert!(ristretto255::point_equals(&big_c1_acc, &big_c2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+        assert!(
+            ristretto255::point_equals(&big_c1_acc, &big_c2_acc),
+            error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)
+        );
 
         // \rho * c + X_2 =? \alpha_1 * g + \alpha_2 * h
         let c_acc = ristretto255::point_mul(c, &rho);
@@ -291,14 +328,20 @@ module aptos_experimental::sigma_protos {
 
         let h_alpha2_acc = ristretto255::point_mul(&h, &proof.alpha2);
         ristretto255::point_add_assign(&mut h_alpha2_acc, &g_alpha1);
-        assert!(ristretto255::point_equals(&c_acc, &h_alpha2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+        assert!(
+            ristretto255::point_equals(&c_acc, &h_alpha2_acc),
+            error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)
+        );
 
         // \rho * Y + X_3 =? \alpha_3 * g
         let y_acc = ristretto255::point_mul(&sender_pk_point, &rho);
         ristretto255::point_add_assign(&mut y_acc, &proof.x3);
 
         let g_alpha3 = ristretto255::basepoint_mul(&proof.alpha3);
-        assert!(ristretto255::point_equals(&y_acc, &g_alpha3), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+        assert!(
+            ristretto255::point_equals(&y_acc, &g_alpha3),
+            error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)
+        );
     }
 
     //
@@ -306,31 +349,33 @@ module aptos_experimental::sigma_protos {
     //
 
     /// Deserializes and returns an `WithdrawalSubproof` given its byte representation.
-    public fun deserialize_withdrawal_subproof(proof_bytes: vector<u8>): Option<WithdrawalSubproof> {
-        if (proof_bytes.length::<u8>() != 192) {
+    public fun deserialize_withdrawal_subproof(
+        proof_bytes: vector<u8>
+    ): Option<WithdrawalSubproof> {
+        if (proof_bytes.length() != 192) {
             return std::option::none<WithdrawalSubproof>()
         };
 
         let x1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x1 = ristretto255::new_point_from_bytes(x1_bytes);
-        if (!x1.is_some::<RistrettoPoint>()) {
+        if (!x1.is_some()) {
             return std::option::none<WithdrawalSubproof>()
         };
-        let x1 = x1.extract::<RistrettoPoint>();
+        let x1 = x1.extract();
 
         let x2_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x2 = ristretto255::new_point_from_bytes(x2_bytes);
-        if (!x2.is_some::<RistrettoPoint>()) {
+        if (!x2.is_some()) {
             return std::option::none<WithdrawalSubproof>()
         };
-        let x2 = x2.extract::<RistrettoPoint>();
+        let x2 = x2.extract();
 
         let x3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x3 = ristretto255::new_point_from_bytes(x3_bytes);
-        if (!x3.is_some::<RistrettoPoint>()) {
+        if (!x3.is_some()) {
             return std::option::none<WithdrawalSubproof>()
         };
-        let x3 = x3.extract::<RistrettoPoint>();
+        let x3 = x3.extract();
 
         let alpha1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let alpha1 = ristretto255::new_scalar_from_bytes(alpha1_bytes);
@@ -353,65 +398,66 @@ module aptos_experimental::sigma_protos {
         };
         let alpha3 = alpha3.extract();
 
-        std::option::some(WithdrawalSubproof {
-            x1, x2, x3, alpha1, alpha2, alpha3
-        })
+        std::option::some(
+            WithdrawalSubproof { x1, x2, x3, alpha1, alpha2, alpha3 }
+        )
     }
 
     /// Deserializes and returns a `TransferSubproof` given its byte representation.
-    public fun deserialize_transfer_subproof(proof_bytes: vector<u8>): Option<TransferSubproof> {
-        if (proof_bytes.length::<u8>() != 384) {
+    public fun deserialize_transfer_subproof(proof_bytes: vector<u8>):
+        Option<TransferSubproof> {
+        if (proof_bytes.length() != 384) {
             return std::option::none<TransferSubproof>()
         };
 
         let x1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x1 = ristretto255::new_point_from_bytes(x1_bytes);
-        if (!x1.is_some::<RistrettoPoint>()) {
+        if (!x1.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x1 = x1.extract::<RistrettoPoint>();
+        let x1 = x1.extract();
 
         let x2_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x2 = ristretto255::new_point_from_bytes(x2_bytes);
-        if (!x2.is_some::<RistrettoPoint>()) {
+        if (!x2.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x2 = x2.extract::<RistrettoPoint>();
+        let x2 = x2.extract();
 
         let x3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x3 = ristretto255::new_point_from_bytes(x3_bytes);
-        if (!x3.is_some::<RistrettoPoint>()) {
+        if (!x3.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x3 = x3.extract::<RistrettoPoint>();
+        let x3 = x3.extract();
 
         let x4_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x4 = ristretto255::new_point_from_bytes(x4_bytes);
-        if (!x4.is_some::<RistrettoPoint>()) {
+        if (!x4.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x4 = x4.extract::<RistrettoPoint>();
+        let x4 = x4.extract();
 
         let x5_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x5 = ristretto255::new_point_from_bytes(x5_bytes);
-        if (!x5.is_some::<RistrettoPoint>()) {
+        if (!x5.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x5 = x5.extract::<RistrettoPoint>();
+        let x5 = x5.extract();
 
         let x6_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x6 = ristretto255::new_point_from_bytes(x6_bytes);
-        if (!x6.is_some::<RistrettoPoint>()) {
+        if (!x6.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x6 = x6.extract::<RistrettoPoint>();
+        let x6 = x6.extract();
 
         let x7_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x7 = ristretto255::new_point_from_bytes(x7_bytes);
-        if (!x7.is_some::<RistrettoPoint>()) {
+        if (!x7.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x7 = x7.extract::<RistrettoPoint>();
+        let x7 = x7.extract();
 
         let alpha1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let alpha1 = ristretto255::new_scalar_from_bytes(alpha1_bytes);
@@ -448,9 +494,22 @@ module aptos_experimental::sigma_protos {
         };
         let alpha5 = alpha5.extract();
 
-        std::option::some(TransferSubproof {
-            x1, x2, x3, x4, x5, x6, x7, alpha1, alpha2, alpha3, alpha4, alpha5
-        })
+        std::option::some(
+            TransferSubproof {
+                x1,
+                x2,
+                x3,
+                x4,
+                x5,
+                x6,
+                x7,
+                alpha1,
+                alpha2,
+                alpha3,
+                alpha4,
+                alpha5
+            }
+        )
     }
 
     //
@@ -466,26 +525,41 @@ module aptos_experimental::sigma_protos {
         amount: &Scalar,
         x1: &RistrettoPoint,
         x2: &RistrettoPoint,
-        x3: &RistrettoPoint): Scalar
-    {
+        x3: &RistrettoPoint
+    ): Scalar {
         let (c1, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
         let c = pedersen::commitment_as_point(sender_new_balance_comm);
         let y = elgamal::pubkey_to_compressed_point(sender_pk);
 
         let bytes = vector::empty<u8>();
 
-        bytes.append::<u8>(FIAT_SHAMIR_SIGMA_DST);
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::basepoint_compressed()));
-        bytes.append::<u8>(ristretto255::point_to_bytes(
-            &ristretto255::point_compress(&pedersen::randomness_base_for_bulletproof())));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&y));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(c1)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(c2)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(c)));
-        bytes.append::<u8>(ristretto255::scalar_to_bytes(amount));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x1)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x2)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x3)));
+        bytes.append(FIAT_SHAMIR_SIGMA_DST);
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::basepoint_compressed())
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(
+                &ristretto255::point_compress(&pedersen::randomness_base_for_bulletproof())
+            )
+        );
+        bytes.append(ristretto255::point_to_bytes(&y));
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(c1))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(c2))
+        );
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c)));
+        bytes.append(ristretto255::scalar_to_bytes(amount));
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(x1))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(x2))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(x3))
+        );
 
         ristretto255::new_scalar_from_sha2_512(bytes)
     }
@@ -506,8 +580,8 @@ module aptos_experimental::sigma_protos {
         x4: &RistrettoPoint,
         x5: &RistrettoPoint,
         x6: &RistrettoPoint,
-        x7: &RistrettoPoint): Scalar
-    {
+        x7: &RistrettoPoint
+    ): Scalar {
         let y = elgamal::pubkey_to_compressed_point(sender_pk);
         let y_prime = elgamal::pubkey_to_compressed_point(recipient_pk);
         let (big_c, big_d) = elgamal::ciphertext_as_points(withdraw_ct);
@@ -518,26 +592,57 @@ module aptos_experimental::sigma_protos {
 
         let bytes = vector::empty<u8>();
 
-        bytes.append::<u8>(FIAT_SHAMIR_SIGMA_DST);
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::basepoint_compressed()));
-        bytes.append::<u8>(ristretto255::point_to_bytes(
-            &ristretto255::point_compress(&pedersen::randomness_base_for_bulletproof())));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&y));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&y_prime));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(big_c)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(big_c_prime)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(big_d)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(c)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(c1)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(c2)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(bar_c)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x1)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x2)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x3)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x4)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x5)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x6)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x7)));
+        bytes.append(FIAT_SHAMIR_SIGMA_DST);
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::basepoint_compressed())
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(
+                &ristretto255::point_compress(&pedersen::randomness_base_for_bulletproof())
+            )
+        );
+        bytes.append(ristretto255::point_to_bytes(&y));
+        bytes.append(ristretto255::point_to_bytes(&y_prime));
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(big_c))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(big_c_prime))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(big_d))
+        );
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c)));
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(c1))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(c2))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(bar_c))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(x1))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(x2))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(x3))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(x4))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(x5))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(x6))
+        );
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(x7))
+        );
 
         ristretto255::new_scalar_from_sha2_512(bytes)
     }
@@ -556,8 +661,8 @@ module aptos_experimental::sigma_protos {
         sender_new_balance_comm: &pedersen::Commitment,
         new_balance_val: &Scalar,
         amount_val: &Scalar,
-        new_balance_comm_rand: &Scalar): WithdrawalSubproof
-    {
+        new_balance_comm_rand: &Scalar
+    ): WithdrawalSubproof {
         let x1 = ristretto255::random_scalar();
         let x2 = ristretto255::random_scalar();
         let x3 = ristretto255::random_scalar();
@@ -576,14 +681,16 @@ module aptos_experimental::sigma_protos {
         // X3 <- x3 * g
         let big_x3 = ristretto255::basepoint_mul(&x3);
 
-        let rho = fiat_shamir_withdrawal_subproof_challenge(
-            sender_pk,
-            sender_curr_balance_ct,
-            sender_new_balance_comm,
-            amount_val,
-            &big_x1,
-            &big_x2,
-            &big_x3);
+        let rho =
+            fiat_shamir_withdrawal_subproof_challenge(
+                sender_pk,
+                sender_curr_balance_ct,
+                sender_new_balance_comm,
+                amount_val,
+                &big_x1,
+                &big_x2,
+                &big_x3
+            );
 
         // X3 <- x3 * g
         let big_x3 = ristretto255::basepoint_mul(&x3);
@@ -600,14 +707,7 @@ module aptos_experimental::sigma_protos {
         let alpha3 = ristretto255::scalar_mul(&rho, sender_sk);
         ristretto255::scalar_add_assign(&mut alpha3, &x3);
 
-        WithdrawalSubproof {
-            x1: big_x1,
-            x2: big_x2,
-            x3: big_x3,
-            alpha1,
-            alpha2,
-            alpha3,
-        }
+        WithdrawalSubproof { x1: big_x1, x2: big_x2, x3: big_x3, alpha1, alpha2, alpha3 }
     }
 
     #[test_only]
@@ -625,8 +725,8 @@ module aptos_experimental::sigma_protos {
         amount_rand: &Scalar,
         amount_val: &Scalar,
         new_balance_comm_rand: &Scalar,
-        new_balance_val: &Scalar): TransferSubproof
-    {
+        new_balance_val: &Scalar
+    ): TransferSubproof {
         let x1 = ristretto255::random_scalar();
         let x2 = ristretto255::random_scalar();
         let x3 = ristretto255::random_scalar();
@@ -667,12 +767,23 @@ module aptos_experimental::sigma_protos {
         // X7 <- x5 * g
         let big_x7 = ristretto255::basepoint_mul(&x5);
 
-        let rho = fiat_shamir_transfer_subproof_challenge(
-            sender_pk, recipient_pk,
-            withdraw_ct, deposit_ct, comm_amount,
-            sender_curr_balance_ct, sender_new_balance_comm,
-            &big_x1, &big_x2, &big_x3, &big_x4,
-            &big_x5, &big_x6, &big_x7);
+        let rho =
+            fiat_shamir_transfer_subproof_challenge(
+                sender_pk,
+                recipient_pk,
+                withdraw_ct,
+                deposit_ct,
+                comm_amount,
+                sender_curr_balance_ct,
+                sender_new_balance_comm,
+                &big_x1,
+                &big_x2,
+                &big_x3,
+                &big_x4,
+                &big_x5,
+                &big_x6,
+                &big_x7
+            );
 
         // alpha_1 <- x1 + rho * v
         let alpha1 = ristretto255::scalar_mul(&rho, amount_val);
@@ -706,7 +817,7 @@ module aptos_experimental::sigma_protos {
             alpha2,
             alpha3,
             alpha4,
-            alpha5,
+            alpha5
         }
     }
 
@@ -715,20 +826,23 @@ module aptos_experimental::sigma_protos {
     public fun serialize_withdrawal_subproof(proof: &WithdrawalSubproof): vector<u8> {
         // Reverse-iterates through the fields of the `WithdrawalSubproof` struct, serializes each field, and appends
         // it into a vector of bytes which is returned at the end.
-        let x1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x1));
-        let x2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x2));
-        let x3_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x3));
+        let x1_bytes =
+            ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x1));
+        let x2_bytes =
+            ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x2));
+        let x3_bytes =
+            ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x3));
         let alpha1_bytes = ristretto255::scalar_to_bytes(&proof.alpha1);
         let alpha2_bytes = ristretto255::scalar_to_bytes(&proof.alpha2);
         let alpha3_bytes = ristretto255::scalar_to_bytes(&proof.alpha3);
 
         let bytes = vector::empty<u8>();
-        bytes.append::<u8>(alpha3_bytes);
-        bytes.append::<u8>(alpha2_bytes);
-        bytes.append::<u8>(alpha1_bytes);
-        bytes.append::<u8>(x3_bytes);
-        bytes.append::<u8>(x2_bytes);
-        bytes.append::<u8>(x1_bytes);
+        bytes.append(alpha3_bytes);
+        bytes.append(alpha2_bytes);
+        bytes.append(alpha1_bytes);
+        bytes.append(x3_bytes);
+        bytes.append(x2_bytes);
+        bytes.append(x1_bytes);
 
         bytes
     }
@@ -738,13 +852,20 @@ module aptos_experimental::sigma_protos {
     public fun serialize_transfer_subproof(proof: &TransferSubproof): vector<u8> {
         // Reverse-iterates through the fields of the `TransferSubproof` struct, serializes each field, and appends
         // it into a vector of bytes which is returned at the end.
-        let x1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x1));
-        let x2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x2));
-        let x3_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x3));
-        let x4_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x4));
-        let x5_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x5));
-        let x6_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x6));
-        let x7_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x7));
+        let x1_bytes =
+            ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x1));
+        let x2_bytes =
+            ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x2));
+        let x3_bytes =
+            ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x3));
+        let x4_bytes =
+            ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x4));
+        let x5_bytes =
+            ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x5));
+        let x6_bytes =
+            ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x6));
+        let x7_bytes =
+            ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x7));
         let alpha1_bytes = ristretto255::scalar_to_bytes(&proof.alpha1);
         let alpha2_bytes = ristretto255::scalar_to_bytes(&proof.alpha2);
         let alpha3_bytes = ristretto255::scalar_to_bytes(&proof.alpha3);
@@ -752,18 +873,18 @@ module aptos_experimental::sigma_protos {
         let alpha5_bytes = ristretto255::scalar_to_bytes(&proof.alpha5);
 
         let bytes = vector::empty<u8>();
-        bytes.append::<u8>(alpha5_bytes);
-        bytes.append::<u8>(alpha4_bytes);
-        bytes.append::<u8>(alpha3_bytes);
-        bytes.append::<u8>(alpha2_bytes);
-        bytes.append::<u8>(alpha1_bytes);
-        bytes.append::<u8>(x7_bytes);
-        bytes.append::<u8>(x6_bytes);
-        bytes.append::<u8>(x5_bytes);
-        bytes.append::<u8>(x4_bytes);
-        bytes.append::<u8>(x3_bytes);
-        bytes.append::<u8>(x2_bytes);
-        bytes.append::<u8>(x1_bytes);
+        bytes.append(alpha5_bytes);
+        bytes.append(alpha4_bytes);
+        bytes.append(alpha3_bytes);
+        bytes.append(alpha2_bytes);
+        bytes.append(alpha1_bytes);
+        bytes.append(x7_bytes);
+        bytes.append(x6_bytes);
+        bytes.append(x5_bytes);
+        bytes.append(x4_bytes);
+        bytes.append(x3_bytes);
+        bytes.append(x2_bytes);
+        bytes.append(x1_bytes);
 
         bytes
     }
@@ -773,8 +894,7 @@ module aptos_experimental::sigma_protos {
     //
 
     #[test_only]
-    fun verify_transfer_subproof_test(maul_proof: bool)
-    {
+    fun verify_transfer_subproof_test(maul_proof: bool) {
         // Pick a keypair for the sender, and one for the recipient
         let (sender_sk, sender_pk) = generate_elgamal_keypair();
         let (_, recipient_pk) = generate_elgamal_keypair();
@@ -784,34 +904,46 @@ module aptos_experimental::sigma_protos {
         let amount_rand = ristretto255::random_scalar();
 
         // Encrypt the amount under the sender's PK
-        let withdraw_ct = elgamal::new_ciphertext_with_basepoint(&amount_val, &amount_rand, &sender_pk);
+        let withdraw_ct =
+            elgamal::new_ciphertext_with_basepoint(&amount_val, &amount_rand, &sender_pk);
         // Encrypt the amount under the recipient's PK
-        let deposit_ct = elgamal::new_ciphertext_with_basepoint(&amount_val, &amount_rand, &recipient_pk);
+        let deposit_ct =
+            elgamal::new_ciphertext_with_basepoint(
+                &amount_val, &amount_rand, &recipient_pk
+            );
         // Commit to the amount
-        let comm_amount = pedersen::new_commitment_for_bulletproof(&amount_val, &amount_rand);
+        let comm_amount =
+            pedersen::new_commitment_for_bulletproof(&amount_val, &amount_rand);
 
         // Set sender's new balance after the transaction to 100
         let curr_balance_val = ristretto255::new_scalar_from_u32(150);
         let new_balance_val = ristretto255::new_scalar_from_u32(100);
         let new_balance_rand = ristretto255::random_scalar();
-        let curr_balance_ct = elgamal::new_ciphertext_with_basepoint(&curr_balance_val, &new_balance_rand, &sender_pk);
+        let curr_balance_ct =
+            elgamal::new_ciphertext_with_basepoint(
+                &curr_balance_val, &new_balance_rand, &sender_pk
+            );
 
-        let new_balance_comm = pedersen::new_commitment_for_bulletproof(&new_balance_val, &new_balance_rand);
+        let new_balance_comm =
+            pedersen::new_commitment_for_bulletproof(
+                &new_balance_val, &new_balance_rand
+            );
 
-        let sigma_proof = prove_transfer(
-            &sender_pk,
-            &sender_sk,
-            &recipient_pk,
-            &withdraw_ct,           // withdrawn amount, encrypted under sender PK
-            &deposit_ct,            // deposited amount, encrypted under recipient PK (same plaintext as `withdraw_ct`)
-            &comm_amount,            // commitment to transfer amount to prevent range proof forgery
-            &curr_balance_ct,    // sender's balance before the transaction goes through, encrypted under sender PK
-            &new_balance_comm,  // commitment to sender's balance to prevent range proof forgery
-            &amount_rand,           // encryption randomness for `withdraw_ct` and `deposit_ct`
-            &amount_val,            // transferred amount
-            &new_balance_rand,  // encryption randomness for updated balance ciphertext
-            &new_balance_val,   // sender's balance after the transfer
-        );
+        let sigma_proof =
+            prove_transfer(
+                &sender_pk,
+                &sender_sk,
+                &recipient_pk,
+                &withdraw_ct, // withdrawn amount, encrypted under sender PK
+                &deposit_ct, // deposited amount, encrypted under recipient PK (same plaintext as `withdraw_ct`)
+                &comm_amount, // commitment to transfer amount to prevent range proof forgery
+                &curr_balance_ct, // sender's balance before the transaction goes through, encrypted under sender PK
+                &new_balance_comm, // commitment to sender's balance to prevent range proof forgery
+                &amount_rand, // encryption randomness for `withdraw_ct` and `deposit_ct`
+                &amount_val, // transferred amount
+                &new_balance_rand, // encryption randomness for updated balance ciphertext
+                &new_balance_val // sender's balance after the transfer
+            );
 
         if (maul_proof) {
             // This should fail the proof verification below
@@ -838,14 +970,12 @@ module aptos_experimental::sigma_protos {
 
     #[test]
     #[expected_failure(abort_code = 0x10001, location = Self)]
-    fun verify_transfer_subproof_fails_test()
-    {
+    fun verify_transfer_subproof_fails_test() {
         verify_transfer_subproof_test(true);
     }
 
     #[test_only]
-    fun verify_withdrawal_subproof_test(maul_proof: bool)
-    {
+    fun verify_withdrawal_subproof_test(maul_proof: bool) {
         // Pick a keypair for the sender
         let (sender_sk, sender_pk) = generate_elgamal_keypair();
 
@@ -856,19 +986,22 @@ module aptos_experimental::sigma_protos {
         let rand = ristretto255::random_scalar();
 
         // Encrypt the amount under the sender's PK
-        let curr_balance_ct = elgamal::new_ciphertext_with_basepoint(&curr_balance, &rand, &sender_pk);
+        let curr_balance_ct =
+            elgamal::new_ciphertext_with_basepoint(&curr_balance, &rand, &sender_pk);
         // Commit to the amount
-        let new_balance_comm = pedersen::new_commitment_for_bulletproof(&new_balance, &rand);
+        let new_balance_comm =
+            pedersen::new_commitment_for_bulletproof(&new_balance, &rand);
 
-        let sigma_proof = prove_withdrawal(
-            &sender_sk,
-            &sender_pk,
-            &curr_balance_ct,
-            &new_balance_comm,
-            &new_balance,
-            &amount_withdrawn,
-            &rand,
-        );
+        let sigma_proof =
+            prove_withdrawal(
+                &sender_sk,
+                &sender_pk,
+                &curr_balance_ct,
+                &new_balance_comm,
+                &new_balance,
+                &amount_withdrawn,
+                &rand
+            );
 
         if (maul_proof) {
             // This should fail the proof verification below
@@ -901,38 +1034,51 @@ module aptos_experimental::sigma_protos {
     //
 
     #[test]
-    fun serialize_transfer_subproof_test()
-    {
+    fun serialize_transfer_subproof_test() {
         let (sender_sk, sender_pk) = generate_elgamal_keypair();
         let amount_val = ristretto255::new_scalar_from_u32(50);
         let (_, recipient_pk) = generate_elgamal_keypair();
         let amount_rand = ristretto255::random_scalar();
-        let withdraw_ct = elgamal::new_ciphertext_with_basepoint(&amount_val, &amount_rand, &sender_pk);
-        let deposit_ct = elgamal::new_ciphertext_with_basepoint(&amount_val, &amount_rand, &recipient_pk);
-        let comm_amount = pedersen::new_commitment_for_bulletproof(&amount_val, &amount_rand);
+        let withdraw_ct =
+            elgamal::new_ciphertext_with_basepoint(&amount_val, &amount_rand, &sender_pk);
+        let deposit_ct =
+            elgamal::new_ciphertext_with_basepoint(
+                &amount_val, &amount_rand, &recipient_pk
+            );
+        let comm_amount =
+            pedersen::new_commitment_for_bulletproof(&amount_val, &amount_rand);
         let curr_balance_val = ristretto255::new_scalar_from_u32(150);
         let new_balance_val = ristretto255::new_scalar_from_u32(100);
         let new_balance_rand = ristretto255::random_scalar();
-        let curr_balance_ct = elgamal::new_ciphertext_with_basepoint(&curr_balance_val, &new_balance_rand, &sender_pk);
-        let new_balance_comm = pedersen::new_commitment_for_bulletproof(&new_balance_val, &new_balance_rand);
+        let curr_balance_ct =
+            elgamal::new_ciphertext_with_basepoint(
+                &curr_balance_val, &new_balance_rand, &sender_pk
+            );
+        let new_balance_comm =
+            pedersen::new_commitment_for_bulletproof(
+                &new_balance_val, &new_balance_rand
+            );
 
-        let sigma_proof = prove_transfer(
-            &sender_pk,
-            &sender_sk,
-            &recipient_pk,
-            &withdraw_ct,
-            &deposit_ct,
-            &comm_amount,
-            &curr_balance_ct,
-            &new_balance_comm,
-            &amount_rand,
-            &amount_val,
-            &new_balance_rand,
-            &new_balance_val);
+        let sigma_proof =
+            prove_transfer(
+                &sender_pk,
+                &sender_sk,
+                &recipient_pk,
+                &withdraw_ct,
+                &deposit_ct,
+                &comm_amount,
+                &curr_balance_ct,
+                &new_balance_comm,
+                &amount_rand,
+                &amount_val,
+                &new_balance_rand,
+                &new_balance_val
+            );
 
         let sigma_proof_bytes = serialize_transfer_subproof(&sigma_proof);
 
-        let deserialized_proof = deserialize_transfer_subproof(sigma_proof_bytes).extract::<TransferSubproof>();
+        let deserialized_proof =
+            deserialize_transfer_subproof(sigma_proof_bytes).extract();
 
         assert!(ristretto255::point_equals(&sigma_proof.x1, &deserialized_proof.x1), 1);
         assert!(ristretto255::point_equals(&sigma_proof.x2, &deserialized_proof.x2), 1);
@@ -940,10 +1086,35 @@ module aptos_experimental::sigma_protos {
         assert!(ristretto255::point_equals(&sigma_proof.x4, &deserialized_proof.x4), 1);
         assert!(ristretto255::point_equals(&sigma_proof.x5, &deserialized_proof.x5), 1);
         assert!(ristretto255::point_equals(&sigma_proof.x6, &deserialized_proof.x6), 1);
-        assert!(ristretto255::scalar_equals(&sigma_proof.alpha1, &deserialized_proof.alpha1), 1);
-        assert!(ristretto255::scalar_equals(&sigma_proof.alpha2, &deserialized_proof.alpha2), 1);
-        assert!(ristretto255::scalar_equals(&sigma_proof.alpha3, &deserialized_proof.alpha3), 1);
-        assert!(ristretto255::scalar_equals(&sigma_proof.alpha4, &deserialized_proof.alpha4), 1);
-        assert!(ristretto255::scalar_equals(&sigma_proof.alpha5, &deserialized_proof.alpha5), 1);
+        assert!(
+            ristretto255::scalar_equals(
+                &sigma_proof.alpha1, &deserialized_proof.alpha1
+            ),
+            1
+        );
+        assert!(
+            ristretto255::scalar_equals(
+                &sigma_proof.alpha2, &deserialized_proof.alpha2
+            ),
+            1
+        );
+        assert!(
+            ristretto255::scalar_equals(
+                &sigma_proof.alpha3, &deserialized_proof.alpha3
+            ),
+            1
+        );
+        assert!(
+            ristretto255::scalar_equals(
+                &sigma_proof.alpha4, &deserialized_proof.alpha4
+            ),
+            1
+        );
+        assert!(
+            ristretto255::scalar_equals(
+                &sigma_proof.alpha5, &deserialized_proof.alpha5
+            ),
+            1
+        );
     }
 }

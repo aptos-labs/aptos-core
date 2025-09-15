@@ -274,7 +274,11 @@ fn setup_state_sync_storage_service(
     let storage_service_runtime = aptos_runtimes::spawn_named_runtime("stor-server".into(), None);
 
     // Spawn the state sync storage service servers on the runtime
-    let storage_reader = StorageReader::new(config.storage_service, Arc::clone(&db_rw.reader));
+    let storage_reader = StorageReader::new(
+        config.storage_service,
+        Arc::clone(&db_rw.reader),
+        TimeService::real(),
+    );
     let service = StorageServiceServer::new(
         config,
         storage_service_runtime.handle().clone(),

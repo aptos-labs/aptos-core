@@ -54,7 +54,9 @@ const TABLE_ARRAY_THEORY: &[u8] = include_bytes!("prelude/table-array-theory.bpl
 
 // TODO use named addresses
 const BCS_MODULE: &str = "0x1::bcs";
+const FROM_BCS_MODULE: &str = "0x1::from_bcs";
 const EVENT_MODULE: &str = "0x1::event";
+const CMP_MODULE: &str = "0x1::cmp";
 
 mod boogie_helpers;
 pub mod boogie_wrapper;
@@ -208,7 +210,6 @@ pub fn add_prelude(
         .into_iter()
         .collect_vec();
     all_types.append(&mut bv_all_types);
-    context.insert("uninterpreted_instances", &all_types);
 
     // obtain bv number types appearing in the program, which is currently used to generate cast functions for bv types
     let number_types = mono_info
@@ -318,8 +319,72 @@ pub fn add_prelude(
 
     let bcs_instances = filter_native_ensure_one_inst(BCS_MODULE);
     context.insert("bcs_instances", &bcs_instances);
+    let from_bcs_instances = filter_native_ensure_one_inst(FROM_BCS_MODULE);
+    context.insert("from_bcs_instances", &from_bcs_instances);
     let event_instances = filter_native_ensure_one_inst(EVENT_MODULE);
     context.insert("event_instances", &event_instances);
+
+    // handle cmp module
+    let filter_native_with_contained_types_with_bv_flag = |module: &str, bv_flag: bool| {
+        mono_info
+            .native_inst
+            .iter()
+            .filter(|(id, _)| env.get_module(**id).get_full_name_str() == module)
+            .flat_map(|(_, insts)| {
+                insts.iter().map(|inst| {
+                    inst.iter()
+                        .flat_map(|i| i.get_all_contained_types_with_skip_reference(env))
+                        .map(|i| (i.clone(), TypeInfo::new(env, options, &i, bv_flag)))
+                        .collect::<Vec<_>>()
+                })
+            })
+            .sorted()
+            .collect_vec()
+    };
+    let filter_native_with_contained_types = |module: &str| {
+        let mut filtered = filter_native_with_contained_types_with_bv_flag(module, false);
+        let mut filtered_bv = filter_native_with_contained_types_with_bv_flag(module, true);
+        filtered.append(&mut filtered_bv);
+        filtered.into_iter().flatten().collect_vec()
+    };
+    let mut cmp_instances = filter_native_with_contained_types(CMP_MODULE);
+    cmp_instances.sort();
+    cmp_instances.dedup();
+    let mut cmp_struct_types = vec![];
+    let mut cmp_int_types = all_types
+        .clone()
+        .into_iter()
+        .filter(|ty| ty.name == "int")
+        .collect_vec();
+    for (ty, ty_info) in &cmp_instances {
+        if ty.is_struct() {
+            cmp_struct_types.push(ty.clone());
+        }
+        if ty.is_number() && !ty_info.suffix.contains("bv") && !cmp_int_types.contains(ty_info) {
+            cmp_int_types.push(ty_info.clone());
+        }
+    }
+    cmp_int_types.sort();
+    cmp_int_types.dedup();
+    cmp_struct_types.sort();
+    cmp_struct_types.dedup();
+    context.insert("cmp_int_instances", &cmp_int_types);
+    env.cmp_types.borrow_mut().extend(cmp_struct_types);
+
+    let filter_cmp_instances_with_name_prefix = |name_prefix: &str| {
+        cmp_instances
+            .clone()
+            .into_iter()
+            .filter(|ty| ty.1.name.starts_with(name_prefix))
+            .map(|ty| ty.1)
+            .collect_vec()
+    };
+    let cmp_vector_instances = filter_cmp_instances_with_name_prefix("Vec");
+    context.insert("cmp_vector_instances", &cmp_vector_instances);
+    let cmp_table_instances = filter_cmp_instances_with_name_prefix("Table");
+    context.insert("cmp_table_instances", &cmp_table_instances);
+
+    context.insert("uninterpreted_instances", &all_types);
 
     // TODO: we have defined {{std}} for adaptable resolution of stdlib addresses but
     //   not used it yet in the templates.

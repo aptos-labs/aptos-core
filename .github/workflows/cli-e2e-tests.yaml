@@ -52,7 +52,7 @@ jobs:
           poetry_version: 2.1.2
 
       # Run CLI tests against local testnet built from devnet branch.
-      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+      - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
         if: ${{ !inputs.SKIP_JOB }}
         name: devnet-tests
         with:
@@ -61,7 +61,7 @@ jobs:
           command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network devnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-devnet
 
       # Run CLI tests against local testnet built from testnet branch.
-      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+      - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
         if: ${{ !inputs.SKIP_JOB }}
         name: testnet-tests
         with:
@@ -70,7 +70,7 @@ jobs:
           command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network testnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-testnet
 
       # Run CLI tests against local testnet built from mainnet branch.
-      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+      - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
         if: ${{ !inputs.SKIP_JOB }}
         name: mainnet-tests
         with:

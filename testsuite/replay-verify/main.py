@@ -20,6 +20,7 @@ from testsuite import forge
 from archive_disk_utils import (
     TESTNET_SNAPSHOT_NAME,
     MAINNET_SNAPSHOT_NAME,
+    create_replay_verify_pvcs_from_existing,
     create_replay_verify_pvcs_from_snapshot,
     get_kubectl_credentials,
 )
@@ -93,17 +94,17 @@ def get_env_var(name: str, default_value: str = "") -> str:
 class ReplayConfig:
     def __init__(self, network: Network) -> None:
         if network == Network.TESTNET:
-            self.concurrent_replayer = 20
-            self.pvc_number = 5
+            self.concurrent_replayer = 35
+            self.pvc_number = 35
             self.min_range_size = 10_000
             self.range_size = 5_000_000
-            self.timeout_secs = 5400
+            self.timeout_secs = 9000
         else:
-            self.concurrent_replayer = 20
-            self.pvc_number = 7
+            self.concurrent_replayer = 35
+            self.pvc_number = 49
             self.min_range_size = 10_000
             self.range_size = 2_000_000
-            self.timeout_secs = 3600
+            self.timeout_secs = 9000
 
 
 class WorkerPod:
@@ -241,9 +242,6 @@ class WorkerPod:
             and self.end_version < 6800000000
         ):
             pod_manifest["spec"]["containers"][0]["resources"]["requests"][
-                "memory"
-            ] = "180Gi"
-            pod_manifest["spec"]["containers"][0]["resources"]["limits"][
                 "memory"
             ] = "180Gi"
 
@@ -481,13 +479,60 @@ class ReplayScheduler:
         )
         # Because PVCs can be shared among multiple replay-verify runs, a more correct TTL
         # would be computed from the number of shards and the expected run time of the replay-verify
+        # run. However, for simplicity, we set the TTL to 9 hours.
+        pvc_ttl = 9 * 60 * 60  # 9 hours
+        pvcs = create_replay_verify_pvcs_from_snapshot(
+            self.id,
+            snapshot_name,
+            self.namespace,
+            self.config.pvc_number,
+            self.get_label(),
+            pvc_ttl,
+        )
+        assert len(pvcs) == self.config.pvc_number, "failed to create all pvcs"
+        self.pvcs = pvcs
+
+    def create_all_required_pvcs(self) -> None:
+        snapshot_name = (
+            TESTNET_SNAPSHOT_NAME
+            if self.network == Network.TESTNET
+            else MAINNET_SNAPSHOT_NAME
+        )
+        pvc = self.create_one_pvc_from_snapshot(snapshot_name)
+        self.pvcs = [pvc]
+        # Wait for the PVC to be bound before creating other PVCs
+        logger.info(f"Waiting for the PVC {pvc} to be bound...")
+        bound_status = self.get_pvc_bound_status()
+        while not self.get_pvc_bound_status()[0]:
+            time.sleep(QUERY_DELAY)
+        logger.info(f"PVC {pvc} has been bound...")
+        self.create_pvc_from_existing(snapshot_name, pvc)
+
+    def create_one_pvc_from_snapshot(self, snapshot_name: str) -> str:
+        # Because PVCs can be shared among multiple replay-verify runs, a more correct TTL
+        # would be computed from the number of shards and the expected run time of the replay-verify
         # run. However, for simplicity, we set the TTL to 3 hours.
         pvc_ttl = 5 * 60 * 60  # 3 hours
         pvcs = create_replay_verify_pvcs_from_snapshot(
             self.id,
             snapshot_name,
             self.namespace,
+            1,  # only create one PVC
+            self.get_label(),
+            pvc_ttl,
+        )
+        assert len(pvcs) == 1, "failed to create the PVC"
+        return pvcs[0]
+
+    # Creates a pvc by cloning an existing pvc
+    def create_pvc_from_existing(self, original_snapshot_name: str, existing_pvc: str):
+        pvc_ttl = 5 * 60 * 60
+        pvcs = create_replay_verify_pvcs_from_existing(
+            self.id,
+            original_snapshot_name,
+            existing_pvc,
             self.config.pvc_number,
+            self.namespace,
             self.get_label(),
             pvc_ttl,
         )
@@ -555,9 +600,9 @@ class ReplayScheduler:
                 if self.current_workers[i] is not None:
                     try:
                         phase = self.current_workers[i].get_phase()
-                        logger.info(
-                            f"Checking worker {i}: {self.current_workers[i].name}: {phase}"
-                        )
+                        # logger.info(
+                        #     f"Checking worker {i}: {self.current_workers[i].name}: {phase}"
+                        # )
                     except Exception as e:
                         logger.error(f"Failed to get pod status: {e}")
                         self.reschedule_pod(self.current_workers[i], i)
@@ -713,7 +758,7 @@ if __name__ == "__main__":
     run_id = f"{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}-{image[-5:]}"
     network = Network.from_string(args.network)
     config = ReplayConfig(network)
-    worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 7
+    worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number
     range_size = args.range_size if args.range_size else config.range_size
 
     if args.start is not None:
@@ -743,7 +788,7 @@ if __name__ == "__main__":
         scheduler.cleanup()
         exit(0)
     else:
-        scheduler.create_pvc_from_snapshot()
+        scheduler.create_all_required_pvcs()
         try:
             start_time = time.time()
             scheduler.schedule(from_scratch=True)

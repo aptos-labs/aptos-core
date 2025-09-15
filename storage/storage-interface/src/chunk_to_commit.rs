@@ -8,12 +8,15 @@ use crate::state_store::{
     state_view::cached_state_view::ShardedStateCache,
     state_with_summary::{LedgerStateWithSummary, StateWithSummary},
 };
-use aptos_types::transaction::{Transaction, TransactionInfo, TransactionOutput, Version};
+use aptos_types::transaction::{
+    PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionOutput, Version,
+};
 
 #[derive(Clone)]
 pub struct ChunkToCommit<'a> {
     pub first_version: Version,
     pub transactions: &'a [Transaction],
+    pub persisted_auxiliary_infos: &'a [PersistedAuxiliaryInfo],
     pub transaction_outputs: &'a [TransactionOutput],
     pub transaction_infos: &'a [TransactionInfo],
     pub state: &'a LedgerState,
@@ -55,13 +58,11 @@ impl ChunkToCommit<'_> {
     pub fn estimated_total_state_updates(&self) -> usize {
         let for_last_checkpoint = self
             .state_update_refs
-            .for_last_checkpoint
-            .as_ref()
+            .for_last_checkpoint_batched()
             .map_or(0, |x| x.len());
         let for_latest = self
             .state_update_refs
-            .for_latest
-            .as_ref()
+            .for_latest_batched()
             .map_or(0, |x| x.len());
 
         for_latest + for_last_checkpoint

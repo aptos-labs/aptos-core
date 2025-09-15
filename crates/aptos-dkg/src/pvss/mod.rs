@@ -9,7 +9,6 @@ pub mod dealt_secret_key;
 pub(crate) mod dealt_secret_key_share;
 pub mod encryption_dlog;
 pub(crate) mod encryption_elgamal;
-mod fiat_shamir;
 pub mod input_secret;
 pub mod insecure_field;
 mod low_degree_test;

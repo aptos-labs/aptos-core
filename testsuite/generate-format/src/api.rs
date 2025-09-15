@@ -97,6 +97,7 @@ pub fn get_registry() -> Result<Registry> {
     // 2. Trace the main entry point(s) + every enum separately.
     // stdlib types
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
+    tracer.trace_type::<language_storage::FunctionParamOrReturnTag>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
     tracer.trace_type::<ValidatorTransaction>(&samples)?;
     tracer.trace_type::<BlockMetadataExt>(&samples)?;
@@ -120,7 +121,8 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
     tracer.trace_type::<transaction::webauthn::AssertionSignature>(&samples)?;
     tracer.trace_type::<aptos_types::keyless::EphemeralCertificate>(&samples)?;
-    tracer.trace_type::<transaction::authenticator::AbstractionAuthData>(&samples)?;
+    tracer.trace_type::<transaction::authenticator::AbstractAuthenticationData>(&samples)?;
+    tracer.trace_type::<transaction::authenticator::AbstractAuthenticator>(&samples)?;
 
     // events
     tracer.trace_type::<WithdrawEvent>(&samples)?;

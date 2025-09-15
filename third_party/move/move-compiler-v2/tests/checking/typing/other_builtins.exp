@@ -26,8 +26,8 @@ module 0x8675309::M {
         abort 0
     }
     fun foo(x: &mut u64) {
-        /*freeze*/x;
-        /*freeze*/&mut any<vector<bool>>();
+        freeze(x);
+        freeze(&mut any<vector<bool>>());
         if (true && false) () else abort *x;
         if (true || false) () else abort 0u8 as u64;
     }

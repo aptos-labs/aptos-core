@@ -9,16 +9,16 @@ use crate::{
     transaction_shuffler::TransactionShuffler, txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
+use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::common::Round;
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
-use aptos_transactions_filter::transaction_filter::TransactionFilter;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    validator_signer::ValidatorSigner,
+    on_chain_config::OnChainConsensusConfig, validator_signer::ValidatorSigner,
 };
 use fail::fail_point;
 use std::{boxed::Box, sync::Arc, time::Duration};
@@ -44,7 +44,8 @@ struct MutableState {
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     transaction_deduper: Arc<dyn TransactionDeduper>,
     is_randomness_enabled: bool,
-    order_vote_enabled: bool,
+    consensus_onchain_config: OnChainConsensusConfig,
+    persisted_auxiliary_info_version: u8,
 }
 
 /// Basic communication with the Execution module;
@@ -54,7 +55,7 @@ pub struct ExecutionProxy {
     txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     write_mutex: AsyncMutex<LogicalTime>,
-    transaction_filter: Arc<TransactionFilter>,
+    txn_filter_config: Arc<BlockTransactionFilterConfig>,
     state: RwLock<Option<MutableState>>,
     enable_pre_commit: bool,
 }
@@ -64,7 +65,7 @@ impl ExecutionProxy {
         executor: Arc<dyn BlockExecutorTrait>,
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-        txn_filter: TransactionFilter,
+        txn_filter_config: BlockTransactionFilterConfig,
         enable_pre_commit: bool,
     ) -> Self {
         Self {
@@ -72,7 +73,7 @@ impl ExecutionProxy {
             txn_notifier,
             state_sync_notifier,
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
-            transaction_filter: Arc::new(txn_filter),
+            txn_filter_config: Arc::new(txn_filter_config),
             state: RwLock::new(None),
             enable_pre_commit,
         }
@@ -86,7 +87,8 @@ impl ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled,
-            order_vote_enabled,
+            consensus_onchain_config,
+            persisted_auxiliary_info_version,
         } = self
             .state
             .read()
@@ -96,7 +98,7 @@ impl ExecutionProxy {
 
         let block_preparer = Arc::new(BlockPreparer::new(
             payload_manager.clone(),
-            self.transaction_filter.clone(),
+            self.txn_filter_config.clone(),
             transaction_deduper.clone(),
             transaction_shuffler.clone(),
         ));
@@ -111,7 +113,8 @@ impl ExecutionProxy {
             payload_manager,
             self.txn_notifier.clone(),
             self.enable_pre_commit,
-            order_vote_enabled,
+            &consensus_onchain_config,
+            persisted_auxiliary_info_version,
         )
     }
 }
@@ -230,7 +233,8 @@ impl StateComputer for ExecutionProxy {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
-        order_vote_enabled: bool,
+        consensus_onchain_config: OnChainConsensusConfig,
+        persisted_auxiliary_info_version: u8,
     ) {
         *self.state.write() = Some(MutableState {
             validators: epoch_state
@@ -243,7 +247,8 @@ impl StateComputer for ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled: randomness_enabled,
-            order_vote_enabled,
+            consensus_onchain_config,
+            persisted_auxiliary_info_version,
         });
     }
 

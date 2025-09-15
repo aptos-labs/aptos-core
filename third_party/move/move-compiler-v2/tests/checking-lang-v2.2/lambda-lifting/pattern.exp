@@ -3,7 +3,7 @@ module 0xcafe::m {
     struct S<T> {
         x: T,
     }
-    private fun consume<T>(s: S<T>,x: T,f: |(S<T>, T)|T): T {
+    private fun consume<T>(s: S<T>,x: T,f: |S<T>, T|T): T {
         (f)(s, x)
     }
     private fun pattern(s: S<u64>,x: u64): u64 {
@@ -25,14 +25,14 @@ module 0xcafe::m {
     struct S<T> {
         x: T,
     }
-    fun consume<T>(s: S<T>, x: T, f: |(S<T>, T)|T): T {
+    fun consume<T>(s: S<T>, x: T, f: |S<T>, T|T): T {
         f(s, x)
     }
     fun pattern(s: S<u64>, x: u64): u64 {
-        consume<u64>(s, x, |(arg0,arg1)| __lambda__1__pattern(arg0, arg1))
+        consume<u64>(s, x, |arg0,arg1| lambda__1__pattern(arg0, arg1))
     }
-    fun __lambda__1__pattern(param$0: S<u64>, _y: u64): u64 {
-        let S<u64>{x: x} = param$0;
+    fun lambda__1__pattern(param_0: S<u64>, _y: u64): u64 {
+        let S<u64>{x: x} = param_0;
         let y = x;
         x + y
     }

@@ -14,7 +14,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
-    state_store::{state_key::StateKey, MoveResourceExt, StateView},
+    state_store::{state_key::StateKey, MoveResourceExt, StateView, StateViewId, TStateView},
     transaction::{SignedTransaction, VMValidatorResult},
     vm::modules::AptosModuleExtension,
 };
@@ -29,8 +29,8 @@ use move_binary_format::{
 use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::{
-    code::{ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache, WithHash},
-    module_storage_error, sha3_256,
+    code::{ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache},
+    module_storage_error,
 };
 use rand::{thread_rng, Rng};
 use std::sync::{Arc, Mutex};
@@ -55,7 +55,7 @@ pub trait TransactionValidation: Send + Sync + Clone {
 /// Represents the state used for validation. Stores raw data, module cache and the execution
 /// runtime environment. Note that the state can get out-of-date, and it is the responsibility of
 /// the owner of the struct to ensure it is up-to-date.
-struct ValidationState<S> {
+pub struct ValidationState<S> {
     /// The raw snapshot of the state used for validation.
     state_view: S,
     /// Stores configs needed for execution.
@@ -69,7 +69,7 @@ struct ValidationState<S> {
 impl<S: StateView> ValidationState<S> {
     /// Creates a new state based on the state view snapshot, with empty module cache and VM
     /// initialized based on configs from the state.
-    fn new(state_view: S) -> Self {
+    pub fn new(state_view: S) -> Self {
         info!(
             AdapterLogSchema::new(state_view.id(), 0),
             "Validation environment and module cache created"
@@ -84,13 +84,18 @@ impl<S: StateView> ValidationState<S> {
 
     /// Resets the state view snapshot to the new one. Does not invalidate the module cache, nor
     /// the VM.
-    fn reset_state_view(&mut self, state_view: S) {
+    pub fn reset_state_view(&mut self, state_view: S) {
         self.state_view = state_view;
+    }
+
+    ///  Returns the current state view ID for the caller to decide whether it's compatible with other state views.
+    pub fn state_view_id(&self) -> StateViewId {
+        self.state_view.id()
     }
 
     /// Resets the state to the new one, empties module cache, and resets the VM based on the new
     /// state view snapshot.
-    fn reset_all(&mut self, state_view: S) {
+    pub fn reset_all(&mut self, state_view: S) {
         self.state_view = state_view;
         self.environment = AptosEnvironment::new(&self.state_view);
         self.module_cache = UnsyncModuleCache::empty();
@@ -156,28 +161,28 @@ impl<S: StateView> ModuleCache for ValidationState<S> {
         };
 
         // Get the state value that exists in the actual state and compute the hash.
-        let state_value = self
+        let state_slot = self
             .state_view
-            .get_state_value(&StateKey::module_id(key))
-            .map_err(|err| module_storage_error!(key.address(), key.name(), err))?
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!(
-                        "Module {}::{} cannot be found in storage, but exists in cache",
-                        key.address(),
-                        key.name()
-                    ))
-                    .finish(Location::Undefined)
-            })?;
-        let hash = sha3_256(state_value.bytes());
-
-        // If hash is the same - we can use the same module from cache. If the hash is different,
-        // then the state contains a newer version of the code. We deserialize the state value and
-        // replace the old cache entry with the new code.
-        // TODO(loader_v2):
-        //   Ideally, commit notification should specify if new modules should be added to the
-        //   cache instead of checking the state view bytes. Revisit.
-        Ok(if module.extension().hash() == &hash {
+            .get_state_slot(&StateKey::module_id(key))
+            .map_err(|err| module_storage_error!(key.address(), key.name(), err))?;
+        let (value_version, state_value) = match state_slot.into_state_value_and_version_opt() {
+            Some((value_version, state_value)) => (value_version as usize, state_value),
+            None => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!(
+                            "Module {}::{} cannot be found in storage, but exists in cache",
+                            key.address(),
+                            key.name()
+                        ))
+                        .finish(Location::Undefined),
+                )
+            },
+        };
+        // deserialize only relies on local config, so only need to detect changes on module bytes
+        // if we want to support verified modules, we need
+        // to detect changes on aptos environment too.
+        Ok(if version == value_version {
             Some((module, version))
         } else {
             let compiled_module = self
@@ -186,7 +191,7 @@ impl<S: StateView> ModuleCache for ValidationState<S> {
                 .deserialize_into_compiled_module(state_value.bytes())?;
             let extension = Arc::new(AptosModuleExtension::new(state_value));
 
-            let new_version = version + 1;
+            let new_version = value_version;
             let new_module_code = self.module_cache.insert_deserialized_module(
                 key.clone(),
                 compiled_module,
@@ -267,7 +272,25 @@ impl VMValidator {
         let db_state_view = self.db_state_view();
 
         // On commit, we need to update the state view so that we can see the latest resources.
-        self.state.reset_state_view(db_state_view.into());
+        let base_view_id = self.state.state_view_id();
+        let new_view_id = db_state_view.id();
+        match (base_view_id, new_view_id) {
+            (
+                StateViewId::TransactionValidation {
+                    base_version: old_version,
+                },
+                StateViewId::TransactionValidation {
+                    base_version: new_version,
+                },
+            ) => {
+                // if the state view forms a linear history, just update the state view
+                if old_version <= new_version {
+                    self.state.reset_state_view(db_state_view.into());
+                }
+            },
+            // if the version is incompatible, we flush the cache
+            _ => self.state.reset_all(db_state_view.into()),
+        }
     }
 }
 
@@ -355,7 +378,7 @@ impl TransactionValidation for PooledVMValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aptos_types::state_store::{state_value::StateValue, MockStateView};
+    use aptos_types::state_store::{state_slot::StateSlot, state_value::StateValue, MockStateView};
     use move_binary_format::file_format::empty_module_with_dependencies_and_friends;
     use move_core_types::ident_str;
     use move_vm_runtime::ModuleStorage;
@@ -395,13 +418,13 @@ mod tests {
         assert_eq!(state.module_cache.num_modules(), 0);
 
         assert!(state
-            .fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("d"))
+            .unmetered_get_deserialized_module(&AccountAddress::ZERO, ident_str!("d"))
             .unwrap()
             .is_none());
         assert_eq!(
             &a,
             state
-                .fetch_deserialized_module(a.self_addr(), a.self_name())
+                .unmetered_get_deserialized_module(a.self_addr(), a.self_name())
                 .unwrap()
                 .unwrap()
                 .as_ref()
@@ -409,7 +432,7 @@ mod tests {
         assert_eq!(
             &c,
             state
-                .fetch_deserialized_module(c.self_addr(), c.self_name())
+                .unmetered_get_deserialized_module(c.self_addr(), c.self_name())
                 .unwrap()
                 .unwrap()
                 .as_ref()
@@ -427,24 +450,24 @@ mod tests {
             .set_default_version();
         assert_ne!(&a, &a_new);
 
-        let new_state_view = MockStateView::new(HashMap::from([
+        let new_state_view = MockStateView::new_with_state_slot(HashMap::from([
             // New code:
             (
                 StateKey::module_id(&a_new.self_id()),
-                module_state_value(a_new.clone()),
+                StateSlot::from_db_get(Some((1, module_state_value(a_new.clone())))),
             ),
             (
                 StateKey::module_id(&d.self_id()),
-                module_state_value(d.clone()),
+                StateSlot::from_db_get(Some((0, module_state_value(d.clone())))),
             ),
             // Old code:
             (
                 StateKey::module_id(&b.self_id()),
-                module_state_value(b.clone()),
+                StateSlot::from_db_get(Some((0, module_state_value(b.clone())))),
             ),
             (
                 StateKey::module_id(&c.self_id()),
-                module_state_value(c.clone()),
+                StateSlot::from_db_get(Some((0, module_state_value(c.clone())))),
             ),
         ]));
         state.reset_state_view(new_state_view);
@@ -453,7 +476,7 @@ mod tests {
         assert_eq!(
             &a_new,
             state
-                .fetch_deserialized_module(a_new.self_addr(), a_new.self_name())
+                .unmetered_get_deserialized_module(a_new.self_addr(), a_new.self_name())
                 .unwrap()
                 .unwrap()
                 .as_ref()
@@ -461,7 +484,7 @@ mod tests {
         assert_eq!(
             &d,
             state
-                .fetch_deserialized_module(d.self_addr(), d.self_name())
+                .unmetered_get_deserialized_module(d.self_addr(), d.self_name())
                 .unwrap()
                 .unwrap()
                 .as_ref()
@@ -474,7 +497,7 @@ mod tests {
 
         // Get verified module, to load the transitive closure (modules "b" and "c") as well.
         assert!(state
-            .fetch_verified_module(a_new.self_addr(), a_new.self_name())
+            .unmetered_get_eagerly_verified_module(a_new.self_addr(), a_new.self_name())
             .unwrap()
             .is_some());
         assert_eq!(state.module_cache.num_modules(), 4);

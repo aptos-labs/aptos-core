@@ -9,19 +9,25 @@ use crate::{
         taskify, InitCommand, PrintBytecodeCommand, PrintBytecodeInputChoice, PublishCommand,
         RunCommand, SyntaxChoice, TaskCommand, TaskInput, ViewCommand,
     },
-    vm_test_harness::{PrecompiledFilesModules, TestRunConfig},
+    vm_test_harness::{CrossCompileTarget, PrecompiledFilesModules, TestRunConfig},
 };
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
+use either::Either;
 use legacy_move_compiler::{compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress};
+use move_asm::assembler;
 use move_binary_format::{
     binary_views::BinaryIndexedView,
     file_format::{CompiledModule, CompiledScript},
+    file_format_common::VERSION_MAX,
 };
 use move_bytecode_source_map::mapping::SourceMapping;
 use move_command_line_common::{
     address::ParsedAddress,
-    files::{MOVE_EXTENSION, MOVE_IR_EXTENSION},
+    files::{
+        DECOMPILED_EXTENSION, DISASSEMBLED_EXTENSION, MOVE_ASM_EXTENSION, MOVE_EXTENSION,
+        MOVE_IR_EXTENSION,
+    },
     testing::{add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT},
     types::ParsedType,
     values::{ParsableValue, ParsedValue},
@@ -38,11 +44,14 @@ use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_symbol_pool::Symbol;
 use move_vm_runtime::move_vm::SerializedReturnValues;
 use move_vm_types::values::Value;
+use regex::Regex;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt::{Debug, Write as FmtWrite},
+    fs,
     io::Write,
-    path::Path,
+    path::{Path, PathBuf},
+    str::FromStr,
 };
 use tempfile::NamedTempFile;
 
@@ -59,6 +68,7 @@ pub struct CompiledState<'a> {
     default_named_address_mapping: Option<NumericalAddress>,
     modules: BTreeMap<ModuleId, ProcessedModule>,
     temp_file_mapping: BTreeMap<String, String>,
+    cross_compiled: BTreeMap<SyntaxChoice, Vec<String>>,
 }
 
 impl CompiledState<'_> {
@@ -120,7 +130,7 @@ pub trait MoveTestAdapter<'a>: Sized {
     fn default_syntax(&self) -> SyntaxChoice;
     fn known_attributes(&self) -> &BTreeSet<String>;
     fn run_config(&self) -> TestRunConfig {
-        TestRunConfig::compiler_v2(LanguageVersion::default(), vec![])
+        TestRunConfig::new(LanguageVersion::default(), vec![])
     }
     fn init(
         default_syntax: SyntaxChoice,
@@ -209,21 +219,47 @@ pub trait MoveTestAdapter<'a>: Sized {
         let state = self.compiled_state();
         let (named_addr_opt, module, opt_model, warnings_opt) = match syntax {
             SyntaxChoice::Source => {
-                let (unit, opt_model, warnings_opt) = match run_config {
+                // It is possible that a module gets republished. In this case, we need to filter
+                // existing pre-compiled dependencies to remove old module. Because we do not know
+                // in advance the module we are compiling, we need to see if the module matches the
+                // one already compiled. This special case is sufficient for testing, and in case
+                // match is not found, compiler should complain when seeing a duplicate symbol.
+                let deps = state
+                    .source_files()
+                    .filter_map(|(dep_id, path)| {
+                        let re =
+                            Regex::new(r"module\s+(0x[0-9a-fA-F]+::[A-Za-z]\w*)\s*\{").unwrap();
+                        let code = std::fs::read_to_string(data_path).unwrap();
+                        if let Some(id) = re
+                            .captures(code.trim())
+                            .and_then(|c| ModuleId::from_str(&c[1]).ok())
+                        {
+                            id.ne(dep_id).then(|| path.to_owned())
+                        } else {
+                            Some(path.to_owned())
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                let (unit, opt_model, warnings_opt) = {
                     // Run the V2 compiler if requested
-                    TestRunConfig::CompilerV2 {
+                    let TestRunConfig {
                         language_version,
                         experiments,
                         vm_config: _,
-                    } => compile_source_unit_v2(
+                        use_masm: _,
+                        echo: _,
+                        cross_compilation_targets: _,
+                    } = run_config;
+                    compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
-                        &state.source_files().cloned().collect::<Vec<_>>(),
+                        &deps,
                         data_path.to_owned(),
                         self.known_attributes(),
                         language_version,
                         experiments,
-                    )?,
+                    )?
                 };
                 let (named_addr_opt, module) = match unit {
                     AnnotatedCompiledUnit::Module(annot_module) => {
@@ -243,6 +279,10 @@ pub trait MoveTestAdapter<'a>: Sized {
             },
             SyntaxChoice::IR => {
                 let module = compile_ir_module(state.dep_modules(), data_path)?;
+                (None, module, None, None)
+            },
+            SyntaxChoice::ASM => {
+                let module = compile_asm_module(state.dep_modules(), data_path)?;
                 (None, module, None, None)
             },
         };
@@ -281,21 +321,29 @@ pub trait MoveTestAdapter<'a>: Sized {
         let state = self.compiled_state();
         let (script, opt_model, warning_opt) = match syntax {
             SyntaxChoice::Source => {
-                let (unit, opt_model, warning_opt) = match run_config {
+                let (unit, opt_model, warning_opt) = {
                     // Run the V2 compiler.
-                    TestRunConfig::CompilerV2 {
+                    let TestRunConfig {
                         language_version,
                         experiments: v2_experiments,
                         vm_config: _,
-                    } => compile_source_unit_v2(
+                        use_masm: _,
+                        echo: _,
+                        cross_compilation_targets: _,
+                    } = run_config;
+                    compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
-                        &state.source_files().cloned().collect::<Vec<_>>(),
+                        &state
+                            .source_files()
+                            .map(|(_, path)| path)
+                            .cloned()
+                            .collect::<Vec<_>>(),
                         data_path.to_owned(),
                         self.known_attributes(),
                         language_version,
                         v2_experiments,
-                    )?,
+                    )?
                 };
                 match unit {
                     AnnotatedCompiledUnit::Script(annot_script) => (annot_script.named_script.script, opt_model, warning_opt),
@@ -307,6 +355,10 @@ pub trait MoveTestAdapter<'a>: Sized {
             },
             SyntaxChoice::IR => {
                 let script = compile_ir_script(state.dep_modules(), data_path)?;
+                (script, None, None)
+            },
+            SyntaxChoice::ASM => {
+                let script = compile_asm_script(state.dep_modules(), data_path)?;
                 (script, None, None)
             },
         };
@@ -329,6 +381,7 @@ pub trait MoveTestAdapter<'a>: Sized {
             command,
             name,
             number,
+            source,
             start_line,
             command_lines_stop,
             stop_line,
@@ -337,6 +390,7 @@ pub trait MoveTestAdapter<'a>: Sized {
         if let Some(data) = &data {
             self.register_temp_filename(data);
         }
+        // Record task for cross-compilation targets
         match command {
             TaskCommand::Init { .. } => {
                 panic!("The 'init' command is optional. But if used, it must be the first command")
@@ -347,12 +401,28 @@ pub trait MoveTestAdapter<'a>: Sized {
                     PrintBytecodeInputChoice::Script => {
                         let (script, _warning_opt) =
                             self.compile_script(syntax, data, start_line, command_lines_stop)?;
-                        disassembler_for_view(BinaryIndexedView::Script(&script)).disassemble()?
+                        self.cross_compile_task(&source);
+                        self.cross_compile_script(&script)
+                            .unwrap_or_else(|e| panic!("cross-compilation failed: {}", e));
+                        if self.run_config().using_masm() {
+                            move_asm::disassembler::disassemble_script(String::new(), &script)?
+                        } else {
+                            disassembler_for_view(BinaryIndexedView::Script(&script))
+                                .disassemble()?
+                        }
                     },
                     PrintBytecodeInputChoice::Module => {
                         let (_data, _named_addr_opt, module, _warnings_opt) =
                             self.compile_module(syntax, data, start_line, command_lines_stop)?;
-                        disassembler_for_view(BinaryIndexedView::Module(&module)).disassemble()?
+                        self.cross_compile_task(&source);
+                        self.cross_compile_module(&module)
+                            .unwrap_or_else(|e| panic!("cross-compilation failed: {}", e));
+                        if self.run_config().using_masm() {
+                            move_asm::disassembler::disassemble_module(String::new(), &module)?
+                        } else {
+                            disassembler_for_view(BinaryIndexedView::Module(&module))
+                                .disassemble()?
+                        }
                     },
                 };
                 Ok(Some(result))
@@ -369,15 +439,23 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let (data, named_addr_opt, module, warnings_opt) =
                     self.compile_module(syntax, data, start_line, command_lines_stop)?;
                 self.register_temp_filename(&data);
+                // If bytecode printing is enabled, call the disassembler.
                 let printed = if print_bytecode {
-                    let disassembler = disassembler_for_view(BinaryIndexedView::Module(&module));
+                    let out = if self.run_config().using_masm() {
+                        move_asm::disassembler::disassemble_module(String::new(), &module)?
+                    } else {
+                        disassembler_for_view(BinaryIndexedView::Module(&module)).disassemble()?
+                    };
                     Some(format!(
                         "\n== BEGIN Bytecode ==\n{}\n== END Bytecode ==",
-                        disassembler.disassemble()?
+                        out
                     ))
                 } else {
                     None
                 };
+                self.cross_compile_task(&source);
+                self.cross_compile_module(&module)
+                    .unwrap_or_else(|e| panic!("cross-compilation failed: {}", e));
                 let (mut output, module) = self.publish_module(
                     module,
                     named_addr_opt.map(|s| Identifier::new(s.as_str()).unwrap()),
@@ -389,11 +467,9 @@ pub trait MoveTestAdapter<'a>: Sized {
                 }
                 let data_path = data.path().to_str().unwrap();
                 match syntax {
-                    SyntaxChoice::Source => self.compiled_state().add_with_source_file(
-                        named_addr_opt,
-                        module,
-                        (data_path.to_owned(), data),
-                    ),
+                    SyntaxChoice::Source | SyntaxChoice::ASM => self
+                        .compiled_state()
+                        .add_with_source_file(named_addr_opt, module, (data_path.to_owned(), data)),
                     SyntaxChoice::IR => {
                         self.compiled_state()
                             .add_and_generate_interface_file(module);
@@ -417,14 +493,21 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let (script, warning_opt) =
                     self.compile_script(syntax, data, start_line, command_lines_stop)?;
                 let printed = if print_bytecode {
-                    let disassembler = disassembler_for_view(BinaryIndexedView::Script(&script));
+                    let out = if self.run_config().using_masm() {
+                        move_asm::disassembler::disassemble_script(String::new(), &script)?
+                    } else {
+                        disassembler_for_view(BinaryIndexedView::Script(&script)).disassemble()?
+                    };
                     Some(format!(
                         "\n== BEGIN Bytecode ==\n{}\n== END Bytecode ==",
-                        disassembler.disassemble()?
+                        out
                     ))
                 } else {
                     None
                 };
+                self.cross_compile_task(&source);
+                self.cross_compile_script(&script)
+                    .unwrap_or_else(|e| panic!("cross-compilation failed: {}", e));
                 let args = self.compiled_state().resolve_args(args)?;
                 let type_args = self.compiled_state().resolve_type_args(type_args)?;
                 let mut output =
@@ -450,6 +533,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     syntax.is_none(),
                     "syntax flag meaningless with function execution"
                 );
+                self.cross_compile_task(&source);
                 let addr = self.compiled_state().resolve_address(&raw_addr);
                 let module_id = ModuleId::new(addr, module_name);
                 let type_args = self.compiled_state().resolve_type_args(type_args)?;
@@ -467,6 +551,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 Ok(merge_output(output, rendered_return_value))
             },
             TaskCommand::View(ViewCommand { address, resource }) => {
+                self.cross_compile_task(&source);
                 let state: &CompiledState<'a> = self.compiled_state();
                 let StructTag {
                     address: module_addr,
@@ -485,16 +570,114 @@ pub trait MoveTestAdapter<'a>: Sized {
                     type_arguments,
                 )?))
             },
-            TaskCommand::Subcommand(c) => self.handle_subcommand(TaskInput {
-                command: c,
-                name,
-                number,
-                start_line,
-                command_lines_stop,
-                stop_line,
-                data,
-            }),
+            TaskCommand::Subcommand(c) => {
+                self.cross_compile_task(&source);
+                self.handle_subcommand(TaskInput {
+                    command: c,
+                    name,
+                    number,
+                    source,
+                    start_line,
+                    command_lines_stop,
+                    stop_line,
+                    data,
+                })
+            },
         }
+    }
+
+    fn cross_compile_task(&mut self, source: &str) {
+        // Record task for cross-compilation targets
+        for target in &self.run_config().cross_compilation_targets {
+            // Cleanup source of logging comment
+            let cleaned_source = if let Some(i) = source.find("[") {
+                source[0..i].trim()
+            } else {
+                source.trim()
+            };
+            let cleaned_source = cleaned_source
+                .replace("--syntax=mvir", "")
+                .replace("--syntax=move", "")
+                .replace("--syntax=masm", "");
+
+            let lines = self
+                .compiled_state()
+                .cross_compiled
+                .entry(target.syntax)
+                .or_default();
+            if lines.last().map(|l| !l.is_empty()).unwrap_or(false) {
+                lines.push("".to_string())
+            }
+            lines.push(format!("//# {}", cleaned_source))
+        }
+    }
+
+    fn cross_compile_module(&mut self, module: &CompiledModule) -> Result<()> {
+        for target in &self.run_config().cross_compilation_targets {
+            let source = match target.syntax {
+                SyntaxChoice::Source => {
+                    let options = move_decompiler::Options {
+                        language_version: Some(LanguageVersion::latest()),
+                        script: false,
+                        ..move_decompiler::Options::default()
+                    };
+                    let mut decompiler = move_decompiler::Decompiler::new(options);
+                    let mut pseudo_source_bytes = vec![]; // required for source-map
+                    module.serialize_for_version(Some(VERSION_MAX), &mut pseudo_source_bytes)?;
+                    let empty_source_map =
+                        decompiler.empty_source_map("cross-compile", &pseudo_source_bytes);
+                    decompiler.decompile_module(module.clone(), empty_source_map)?
+                },
+                SyntaxChoice::ASM => {
+                    let mut out = String::new();
+                    move_asm::disassembler::disassemble_module(&mut out, module)?;
+                    out
+                },
+                SyntaxChoice::IR => {
+                    bail!("cross compilation into MVIR not supported")
+                },
+            };
+            self.compiled_state()
+                .cross_compiled
+                .entry(target.syntax)
+                .or_default()
+                .push(source);
+        }
+        Ok(())
+    }
+
+    fn cross_compile_script(&mut self, script: &CompiledScript) -> Result<()> {
+        for target in &self.run_config().cross_compilation_targets {
+            let source = match target.syntax {
+                SyntaxChoice::Source => {
+                    let options = move_decompiler::Options {
+                        language_version: Some(LanguageVersion::latest()),
+                        script: true,
+                        ..move_decompiler::Options::default()
+                    };
+                    let mut decompiler = move_decompiler::Decompiler::new(options);
+                    let mut pseudo_source_bytes = vec![]; // required for source-map
+                    script.serialize_for_version(Some(VERSION_MAX), &mut pseudo_source_bytes)?;
+                    let empty_source_map =
+                        decompiler.empty_source_map("cross-compile", &pseudo_source_bytes);
+                    decompiler.decompile_script(script.clone(), empty_source_map)?
+                },
+                SyntaxChoice::ASM => {
+                    let mut out = String::new();
+                    move_asm::disassembler::disassemble_script(&mut out, script)?;
+                    out
+                },
+                SyntaxChoice::IR => {
+                    bail!("cross compilation into MVIR not supported")
+                },
+            };
+            self.compiled_state()
+                .cross_compiled
+                .entry(target.syntax)
+                .or_default()
+                .push(source);
+        }
+        Ok(())
     }
 
     fn register_temp_filename(&mut self, data: &NamedTempFile) {
@@ -574,7 +757,6 @@ pub trait MoveTestAdapter<'a>: Sized {
         }
     }
 }
-
 fn disassembler_for_view(view: BinaryIndexedView) -> Disassembler {
     let source_mapping =
         SourceMapping::new_from_view(view, Spanned::unsafe_no_loc(()).loc).expect("source mapping");
@@ -606,6 +788,7 @@ impl<'a> CompiledState<'a> {
             named_address_mapping,
             default_named_address_mapping,
             temp_file_mapping: BTreeMap::new(),
+            cross_compiled: BTreeMap::new(),
         };
         for annot_module in pre_compiled_deps_v2.get_pre_compiled_modules() {
             let (named_addr_opt, _id) = annot_module.module_id();
@@ -621,10 +804,10 @@ impl<'a> CompiledState<'a> {
         self.modules.values().map(|pmod| &pmod.module)
     }
 
-    pub fn source_files(&self) -> impl Iterator<Item = &String> {
+    pub fn source_files(&self) -> impl Iterator<Item = (&ModuleId, &String)> {
         self.modules
             .iter()
-            .filter_map(|(_, pmod)| Some(&pmod.source_file.as_ref()?.0))
+            .filter_map(|(id, pmod)| Some((id, &pmod.source_file.as_ref()?.0)))
     }
 
     pub fn add_with_source_file(
@@ -643,6 +826,25 @@ impl<'a> CompiledState<'a> {
         let processed = ProcessedModule {
             module,
             source_file: Some(source_file),
+        };
+        self.modules.insert(id, processed);
+    }
+
+    pub fn add_without_source_file(
+        &mut self,
+        named_addr_opt: Option<Symbol>,
+        module: CompiledModule,
+    ) {
+        let id = module.self_id();
+        self.check_not_precompiled(&id);
+        if let Some(named_addr) = named_addr_opt {
+            self.compiled_module_named_address_mapping
+                .insert(id.clone(), named_addr);
+        }
+
+        let processed = ProcessedModule {
+            module,
+            source_file: None,
         };
         self.modules.insert(id, processed);
     }
@@ -790,8 +992,40 @@ fn compile_ir_script<'a>(
     Ok(script)
 }
 
+fn compile_asm_module<'a>(
+    deps: impl Iterator<Item = &'a CompiledModule>,
+    path: &str,
+) -> Result<CompiledModule> {
+    if let Either::Left(m) = compile_asm(deps, path)? {
+        Ok(m)
+    } else {
+        bail!("expected a module but found a script")
+    }
+}
+
+fn compile_asm_script<'a>(
+    deps: impl Iterator<Item = &'a CompiledModule>,
+    path: &str,
+) -> Result<CompiledScript> {
+    if let Either::Right(s) = compile_asm(deps, path)? {
+        Ok(s)
+    } else {
+        bail!("expected a script but found a module")
+    }
+}
+
+fn compile_asm<'a>(
+    deps: impl Iterator<Item = &'a CompiledModule>,
+    path: &str,
+) -> Result<assembler::ModuleOrScript> {
+    let options = assembler::Options::default();
+    let source = fs::read_to_string(path)?;
+    assembler::assemble(&options, &source, deps)
+        .map_err(|diags| anyhow!(assembler::diag_to_string("test", &source, diags)))
+}
+
 pub fn run_test_impl<'a, Adapter>(
-    config: TestRunConfig,
+    mut config: TestRunConfig,
     path: &Path,
     pre_compiled_deps_v2: &'a PrecompiledFilesModules,
     exp_suffix: &Option<String>,
@@ -805,11 +1039,13 @@ where
     Adapter::Subcommand: Debug,
 {
     let extension = path.extension().unwrap().to_str().unwrap();
-    let default_syntax = if extension == MOVE_IR_EXTENSION {
-        SyntaxChoice::IR
-    } else {
-        assert!(extension == MOVE_EXTENSION);
-        SyntaxChoice::Source
+    let default_syntax = match extension {
+        MOVE_EXTENSION | DECOMPILED_EXTENSION => SyntaxChoice::Source,
+        MOVE_IR_EXTENSION => SyntaxChoice::IR,
+        MOVE_ASM_EXTENSION | DISASSEMBLED_EXTENSION => SyntaxChoice::ASM,
+        _ => {
+            panic!("unexpected extensions `{}`", extension)
+        },
     };
 
     let mut output = String::new();
@@ -834,14 +1070,20 @@ where
     )
     .unwrap();
     let first_task = tasks.pop_front().unwrap();
-    let init_opt = match &first_task.command {
-        TaskCommand::Init(_, _) => Some(first_task.map(|known| match known {
-            TaskCommand::Init(command, extra_args) => (command, extra_args),
-            _ => unreachable!(),
-        })),
+    let (init_opt, init_task_source_opt) = match &first_task.command {
+        TaskCommand::Init(_, _) => {
+            let source = first_task.source.clone();
+            (
+                Some(first_task.map(|known| match known {
+                    TaskCommand::Init(command, extra_args) => (command, extra_args),
+                    _ => unreachable!(),
+                })),
+                Some(source),
+            )
+        },
         _ => {
             tasks.push_front(first_task);
-            None
+            (None, None)
         },
     };
     let (mut adapter, result_opt) = Adapter::init(
@@ -850,6 +1092,9 @@ where
         pre_compiled_deps_v2,
         init_opt,
     );
+    if let Some(source) = init_task_source_opt {
+        adapter.cross_compile_task(&source)
+    }
     if let Some(result) = result_opt {
         writeln!(output, "\ninit:\n{}", result)?;
     }
@@ -858,6 +1103,26 @@ where
     }
 
     handle_expected_output(path, output, exp_suffix)?;
+
+    config.cross_compilation_targets.clear();
+    for target in &adapter.run_config().cross_compilation_targets {
+        let source_lines = adapter
+            .compiled_state()
+            .cross_compiled
+            .remove(&target.syntax)
+            .unwrap_or_default();
+        if !source_lines.is_empty() {
+            let exp_suffix = if exp_suffix.is_some() {
+                exp_suffix
+            } else {
+                &target.suffix
+            };
+            let path = handle_cross_compiled_output(path, target, &source_lines)?;
+            if target.run_after {
+                run_test_impl::<Adapter>(config.clone(), &path, pre_compiled_deps_v2, exp_suffix)?
+            }
+        }
+    }
     Ok(())
 }
 
@@ -881,6 +1146,14 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
     if let Some(data) = &task.data {
         adapter.register_temp_filename(data);
     }
+    if adapter.run_config().echo {
+        writeln!(
+            output,
+            "task {} lines {}-{}: {}",
+            task_number, start_line, stop_line, task.source
+        )
+        .unwrap();
+    }
     let result = adapter.handle_command(task);
     let result_string = match result {
         Ok(None) => return,
@@ -889,12 +1162,52 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
     };
     let result_string = adapter.rewrite_temp_filenames(result_string);
     assert!(!result_string.is_empty());
-    writeln!(
-        output,
-        "\ntask {} '{}'. lines {}-{}:\n{}",
-        task_number, task_name, start_line, stop_line, result_string
-    )
-    .unwrap();
+    if !adapter.run_config().echo {
+        // Print this only if echo is off. With
+        // echo this info is already printed.
+        write!(
+            output,
+            "\ntask {} '{}'. lines {}-{}:\n",
+            task_number, task_name, start_line, stop_line
+        )
+        .unwrap();
+    }
+    writeln!(output, "{}", result_string).unwrap();
+}
+
+fn handle_cross_compiled_output(
+    test_path: &Path,
+    target: &CrossCompileTarget,
+    output: &[String],
+) -> Result<PathBuf> {
+    let ending = match target.syntax {
+        SyntaxChoice::Source => DECOMPILED_EXTENSION,
+        SyntaxChoice::ASM => DISASSEMBLED_EXTENSION,
+        SyntaxChoice::IR => {
+            unreachable!()
+        },
+    };
+    let file_name = test_path
+        .with_extension(ending)
+        .file_name()
+        .expect("file name")
+        .to_string_lossy()
+        .to_string();
+    let mut path = test_path.parent().expect("parent_directory").to_path_buf();
+    path.push("round-trip");
+    path.push(file_name);
+    let mut text = output.join("\n");
+    text.insert_str(
+        0,
+        &format!(
+            "//**** Cross-compiled for `{}` syntax from `{}`\n\n",
+            target.syntax,
+            test_path.display()
+        ),
+    );
+    let _ = fs::create_dir_all(path.parent().expect("parent path"));
+    fs::write(&path, &text)?;
+    Ok(path)
 }
 
 fn handle_expected_output(
@@ -904,11 +1217,7 @@ fn handle_expected_output(
 ) -> Result<()> {
     let output = output.as_ref();
     assert!(!output.is_empty());
-    let exp_path = if let Some(suffix) = exp_suffix {
-        test_path.with_extension(suffix)
-    } else {
-        test_path.with_extension(EXP_EXT)
-    };
+    let exp_path = add_exp_suffix(test_path, exp_suffix);
 
     if read_env_update_baseline() {
         std::fs::write(exp_path, output).unwrap();
@@ -924,11 +1233,25 @@ fn handle_expected_output(
         .replace('\r', "\n");
     if output != expected_output {
         let msg = format!(
-            "Expected errors differ from actual errors:\n{}",
+            "Expected errors differ from actual errors (for `{}`):\n{}",
+            test_path.display(),
             format_diff(expected_output, output),
         );
         anyhow::bail!(add_update_baseline_fix(msg))
     } else {
         Ok(())
+    }
+}
+
+fn add_exp_suffix(path: &Path, suffix: &Option<String>) -> PathBuf {
+    // Only replace move, masm, or mvir extension, otherwise add suffix.
+    // So for paths resulting from cross-compilation, like `foo.decompiled`,
+    // we won't generate `foo.exp` but `foo.decompiled.exp`.
+    let suffix = suffix.as_ref().map(|s| s.as_str()).unwrap_or(EXP_EXT);
+    let path_str = path.display().to_string();
+    if path_str.ends_with(".move") || path_str.ends_with(".mvir") || path_str.ends_with(".masm") {
+        path.with_extension(suffix)
+    } else {
+        PathBuf::from(format!("{}.{}", path.display(), suffix))
     }
 }

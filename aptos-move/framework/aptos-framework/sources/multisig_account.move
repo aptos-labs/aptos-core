@@ -1251,7 +1251,7 @@ module aptos_framework::multisig_account {
 
     ////////////////////////// Private functions ///////////////////////////////
 
-    inline fun transaction_execution_cleanup_common(executor: address, multisig_account: address): u64 acquires MultisigAccount {
+    inline fun transaction_execution_cleanup_common(executor: address, multisig_account: address): u64 {
         let sequence_number = last_resolved_sequence_number(multisig_account) + 1;
         let implicit_approval = !has_voted_for_approval(multisig_account, sequence_number, executor);
 
@@ -1364,7 +1364,7 @@ module aptos_framework::multisig_account {
         );
     }
 
-    inline fun assert_is_owner(owner: &signer, multisig_account: address) acquires MultisigAccount {
+    inline fun assert_is_owner(owner: &signer, multisig_account: address) {
         let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
         assert_is_owner_internal(owner, multisig_account_resource);
     }
@@ -1387,18 +1387,18 @@ module aptos_framework::multisig_account {
         (num_approvals, num_rejections)
     }
 
-    inline fun num_approvals_and_rejections(multisig_account: address, sequence_number: u64): (u64, u64) acquires MultisigAccount {
+    inline fun num_approvals_and_rejections(multisig_account: address, sequence_number: u64): (u64, u64) {
         let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
         let transaction = table::borrow(&multisig_account_resource.transactions, sequence_number);
         num_approvals_and_rejections_internal(&multisig_account_resource.owners, transaction)
     }
 
-    inline fun has_voted_for_approval(multisig_account: address, sequence_number: u64, owner: address): bool acquires MultisigAccount {
+    inline fun has_voted_for_approval(multisig_account: address, sequence_number: u64, owner: address): bool {
         let (voted, vote) = vote(multisig_account, sequence_number, owner);
         voted && vote
     }
 
-    inline fun has_voted_for_rejection(multisig_account: address, sequence_number: u64, owner: address): bool acquires MultisigAccount {
+    inline fun has_voted_for_rejection(multisig_account: address, sequence_number: u64, owner: address): bool {
         let (voted, vote) = vote(multisig_account, sequence_number, owner);
         voted && !vote
     }
@@ -1407,7 +1407,7 @@ module aptos_framework::multisig_account {
         assert!(exists<MultisigAccount>(multisig_account), error::invalid_state(EACCOUNT_NOT_MULTISIG));
     }
 
-    inline fun assert_valid_sequence_number(multisig_account: address, sequence_number: u64) acquires MultisigAccount {
+    inline fun assert_valid_sequence_number(multisig_account: address, sequence_number: u64) {
         let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
         assert!(
             sequence_number > 0 && sequence_number < multisig_account_resource.next_sequence_number,
@@ -1415,7 +1415,7 @@ module aptos_framework::multisig_account {
         );
     }
 
-    inline fun assert_transaction_exists(multisig_account: address, sequence_number: u64) acquires MultisigAccount {
+    inline fun assert_transaction_exists(multisig_account: address, sequence_number: u64) {
         let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
         assert!(
             table::contains(&multisig_account_resource.transactions, sequence_number),

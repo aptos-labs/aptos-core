@@ -101,6 +101,44 @@ allowing cleaner iterator APIs.
 -  [Function `update_key`](#0x1_big_ordered_map_update_key)
 -  [Function `remove_at`](#0x1_big_ordered_map_remove_at)
 -  [Specification](#@Specification_1)
+    -  [Enum `BigOrderedMap`](#@Specification_1_BigOrderedMap)
+    -  [Function `new`](#@Specification_1_new)
+    -  [Function `new_with_reusable`](#@Specification_1_new_with_reusable)
+    -  [Function `new_with_type_size_hints`](#@Specification_1_new_with_type_size_hints)
+    -  [Function `new_with_config`](#@Specification_1_new_with_config)
+    -  [Function `new_from`](#@Specification_1_new_from)
+    -  [Function `destroy_empty`](#@Specification_1_destroy_empty)
+    -  [Function `allocate_spare_slots`](#@Specification_1_allocate_spare_slots)
+    -  [Function `is_empty`](#@Specification_1_is_empty)
+    -  [Function `compute_length`](#@Specification_1_compute_length)
+    -  [Function `add`](#@Specification_1_add)
+    -  [Function `upsert`](#@Specification_1_upsert)
+    -  [Function `remove`](#@Specification_1_remove)
+    -  [Function `add_all`](#@Specification_1_add_all)
+    -  [Function `pop_front`](#@Specification_1_pop_front)
+    -  [Function `pop_back`](#@Specification_1_pop_back)
+    -  [Function `lower_bound`](#@Specification_1_lower_bound)
+    -  [Function `find`](#@Specification_1_find)
+    -  [Function `contains`](#@Specification_1_contains)
+    -  [Function `borrow`](#@Specification_1_borrow)
+    -  [Function `borrow_mut`](#@Specification_1_borrow_mut)
+    -  [Function `borrow_front`](#@Specification_1_borrow_front)
+    -  [Function `borrow_back`](#@Specification_1_borrow_back)
+    -  [Function `prev_key`](#@Specification_1_prev_key)
+    -  [Function `next_key`](#@Specification_1_next_key)
+    -  [Function `keys`](#@Specification_1_keys)
+    -  [Function `new_begin_iter`](#@Specification_1_new_begin_iter)
+    -  [Function `new_end_iter`](#@Specification_1_new_end_iter)
+    -  [Function `iter_is_begin`](#@Specification_1_iter_is_begin)
+    -  [Function `iter_is_end`](#@Specification_1_iter_is_end)
+    -  [Function `iter_borrow_key`](#@Specification_1_iter_borrow_key)
+    -  [Function `iter_borrow`](#@Specification_1_iter_borrow)
+    -  [Function `iter_borrow_mut`](#@Specification_1_iter_borrow_mut)
+    -  [Function `iter_next`](#@Specification_1_iter_next)
+    -  [Function `iter_prev`](#@Specification_1_iter_prev)
+    -  [Function `validate_dynamic_size_and_init_max_degrees`](#@Specification_1_validate_dynamic_size_and_init_max_degrees)
+    -  [Function `validate_static_size_and_init_max_degrees`](#@Specification_1_validate_static_size_and_init_max_degrees)
+    -  [Function `validate_size_and_init_max_degrees`](#@Specification_1_validate_size_and_init_max_degrees)
     -  [Function `add_at`](#@Specification_1_add_at)
     -  [Function `remove_at`](#@Specification_1_remove_at)
 
@@ -867,8 +905,11 @@ Returns true iff the BigOrderedMap is empty.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): bool {
-    <b>let</b> node = self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>(self.min_leaf_index);
-    node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()
+    <b>if</b> (self.root.is_leaf) {
+        self.root.children.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()
+    } <b>else</b> {
+        <b>false</b>
+    }
 }
 </code></pre>
 
@@ -1478,7 +1519,7 @@ Current implementation is O(n * log(n)). After function values will be optimized
 to O(n).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_and_clear">for_each_and_clear</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |(K, V)|)
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_and_clear">for_each_and_clear</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |K, V|)
 </code></pre>
 
 
@@ -1511,7 +1552,7 @@ Current implementation is O(n * log(n)). After function values will be optimized
 to O(n).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each">for_each</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |(K, V)|)
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each">for_each</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |K, V|)
 </code></pre>
 
 
@@ -1542,7 +1583,7 @@ Current implementation is O(n * log(n)). After function values will be optimized
 to O(n).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref">for_each_ref</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |(&K, &V)|)
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref">for_each_ref</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |&K, &V|)
 </code></pre>
 
 
@@ -1586,7 +1627,7 @@ to O(n).
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref_friend">for_each_ref_friend</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |(&K, &V)|)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref_friend">for_each_ref_friend</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |&K, &V|)
 </code></pre>
 
 
@@ -1596,11 +1637,17 @@ to O(n).
 
 
 <pre><code><b>public</b>(<b>friend</b>) inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref_friend">for_each_ref_friend</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, f: |&K, &V|) {
-    self.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_leaf_node_ref">for_each_leaf_node_ref</a>(|node| {
-        node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref_friend">for_each_ref_friend</a>(|k: &K, v: &<a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;| {
-            f(k, &v.value);
-        });
-    })
+    <b>let</b> iter = self.<a href="big_ordered_map.md#0x1_big_ordered_map_new_begin_iter">new_begin_iter</a>();
+    <b>while</b> (!iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(self)) {
+        f(iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_key">iter_borrow_key</a>(), iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow">iter_borrow</a>(self));
+        iter = iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_next">iter_next</a>(self);
+    };
+
+    // self.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_leaf_node_ref">for_each_leaf_node_ref</a>(|node| {
+    //     node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref_friend">for_each_ref_friend</a>(|k: &K, v: &<a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;| {
+    //         f(k, &v.value);
+    //     });
+    // })
 }
 </code></pre>
 
@@ -1618,7 +1665,7 @@ Current implementation is O(n * log(n)). After function values will be optimized
 to O(n).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_mut">for_each_mut</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |(&K, &<b>mut</b> V)|)
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_mut">for_each_mut</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |&K, &<b>mut</b> V|)
 </code></pre>
 
 
@@ -3048,6 +3095,812 @@ Given a path to node (excluding the node itself), which is currently stored unde
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_BigOrderedMap"></a>
+
+### Enum `BigOrderedMap`
+
+
+<pre><code>enum <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K: store, V: store&gt; <b>has</b> store
+</code></pre>
+
+
+
+<dl>
+
+<details>
+<summary>BPlusTreeMap</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>root: <a href="big_ordered_map.md#0x1_big_ordered_map_Node">big_ordered_map::Node</a>&lt;K, V&gt;</code>
+</dt>
+<dd>
+ Root node. It is stored directly in the resource itself, unlike all other nodes.
+</dd>
+<dt>
+<code>nodes: <a href="../../aptos-stdlib/doc/storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;<a href="big_ordered_map.md#0x1_big_ordered_map_Node">big_ordered_map::Node</a>&lt;K, V&gt;&gt;</code>
+</dt>
+<dd>
+ Storage of all non-root nodes. They are stored in separate storage slots.
+</dd>
+<dt>
+<code>min_leaf_index: u64</code>
+</dt>
+<dd>
+ The node index of the leftmost node.
+</dd>
+<dt>
+<code>max_leaf_index: u64</code>
+</dt>
+<dd>
+ The node index of the rightmost node.
+</dd>
+<dt>
+<code>constant_kv_size: bool</code>
+</dt>
+<dd>
+ Whether Key and Value have constant serialized size, and if so,
+ optimize out size checks on every insert.
+</dd>
+<dt>
+<code>inner_max_degree: u16</code>
+</dt>
+<dd>
+ The max number of children an inner node can have.
+</dd>
+<dt>
+<code>leaf_max_degree: u16</code>
+</dt>
+<dd>
+ The max number of children a leaf node can have.
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+</dl>
+
+
+
+<pre><code><b>pragma</b> intrinsic = map,
+    map_new = new,
+    map_destroy_empty = destroy_empty,
+    map_has_key = contains,
+    map_add_no_override = add,
+    map_borrow = borrow,
+    map_borrow_mut = borrow_mut,
+    map_spec_get = spec_get,
+    map_spec_set = spec_set,
+    map_spec_del = spec_remove,
+    map_spec_len = spec_len,
+    map_spec_has_key = spec_contains_key,
+    map_is_empty = is_empty;
+</code></pre>
+
+
+
+
+<a id="0x1_big_ordered_map_spec_len"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_spec_len">spec_len</a>&lt;K, V&gt;(t: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): num;
+</code></pre>
+
+
+
+
+<a id="0x1_big_ordered_map_spec_contains_key"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>&lt;K, V&gt;(t: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, k: K): bool;
+</code></pre>
+
+
+
+
+<a id="0x1_big_ordered_map_spec_set"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_spec_set">spec_set</a>&lt;K, V&gt;(t: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, k: K, v: V): <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_big_ordered_map_spec_remove"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_spec_remove">spec_remove</a>&lt;K, V&gt;(t: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, k: K): <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_big_ordered_map_spec_get"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_spec_get">spec_get</a>&lt;K, V&gt;(t: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, k: K): V;
+</code></pre>
+
+
+
+<a id="@Specification_1_new"></a>
+
+### Function `new`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new">new</a>&lt;K: store, V: store&gt;(): <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_new_with_reusable"></a>
+
+### Function `new_with_reusable`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_reusable">new_with_reusable</a>&lt;K: store, V: store&gt;(): <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_new_with_type_size_hints"></a>
+
+### Function `new_with_type_size_hints`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_type_size_hints">new_with_type_size_hints</a>&lt;K: store, V: store&gt;(avg_key_bytes: u64, max_key_bytes: u64, avg_value_bytes: u64, max_value_bytes: u64): <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_new_with_config"></a>
+
+### Function `new_with_config`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">new_with_config</a>&lt;K: store, V: store&gt;(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool): <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_new_from"></a>
+
+### Function `new_from`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_from">new_from</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> [abstract] <b>exists</b> i in 0..len(keys), j in 0..len(keys) <b>where</b> i != j : keys[i] == keys[j];
+<b>aborts_if</b> [abstract] len(keys) != len(values);
+<b>ensures</b> [abstract] <b>forall</b> k: K {<a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(result, k)} : <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(keys,k) &lt;==&gt; <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(result, k);
+<b>ensures</b> [abstract] <b>forall</b> i in 0..len(keys) : <a href="big_ordered_map.md#0x1_big_ordered_map_spec_get">spec_get</a>(result, keys[i]) == values[i];
+<b>ensures</b> [abstract] <a href="big_ordered_map.md#0x1_big_ordered_map_spec_len">spec_len</a>(result) == len(keys);
+</code></pre>
+
+
+
+<a id="@Specification_1_destroy_empty"></a>
+
+### Function `destroy_empty`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_destroy_empty">destroy_empty</a>&lt;K: store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_allocate_spare_slots"></a>
+
+### Function `allocate_spare_slots`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_allocate_spare_slots">allocate_spare_slots</a>&lt;K: store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, num_to_allocate: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_empty"></a>
+
+### Function `is_empty`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_compute_length"></a>
+
+### Function `compute_length`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_compute_length">compute_length</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+<b>ensures</b> [abstract] result == <a href="big_ordered_map.md#0x1_big_ordered_map_spec_len">spec_len</a>(self);
+</code></pre>
+
+
+
+<a id="@Specification_1_add"></a>
+
+### Function `add`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_add">add</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: K, value: V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_upsert"></a>
+
+### Function `upsert`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_upsert">upsert</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: K, value: V): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;V&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>ensures</b> [abstract] !<a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(result);
+<b>ensures</b> [abstract] <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, key);
+<b>ensures</b> [abstract] <a href="big_ordered_map.md#0x1_big_ordered_map_spec_get">spec_get</a>(self, key) == value;
+<b>ensures</b> [abstract] <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; ((<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(result)) && (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result) == <a href="big_ordered_map.md#0x1_big_ordered_map_spec_get">spec_get</a>(<b>old</b>(
+    self), key)));
+<b>ensures</b> [abstract] !<a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="big_ordered_map.md#0x1_big_ordered_map_spec_len">spec_len</a>(<b>old</b>(self)) + 1 == <a href="big_ordered_map.md#0x1_big_ordered_map_spec_len">spec_len</a>(self);
+<b>ensures</b> [abstract] <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="big_ordered_map.md#0x1_big_ordered_map_spec_len">spec_len</a>(<b>old</b>(self)) == <a href="big_ordered_map.md#0x1_big_ordered_map_spec_len">spec_len</a>(self);
+<b>ensures</b> [abstract] <b>forall</b> k: K: <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), k) && k != key ==&gt; <a href="big_ordered_map.md#0x1_big_ordered_map_spec_get">spec_get</a>(<b>old</b>(self), k) == <a href="big_ordered_map.md#0x1_big_ordered_map_spec_get">spec_get</a>(self, k);
+<b>ensures</b> [abstract] <b>forall</b> k: K: <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), k) ==&gt; <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k);
+</code></pre>
+
+
+
+<a id="@Specification_1_remove"></a>
+
+### Function `remove`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_remove">remove</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> [abstract] !<a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, key);
+<b>ensures</b> [abstract] !<a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, key);
+<b>ensures</b> [abstract] <a href="big_ordered_map.md#0x1_big_ordered_map_spec_get">spec_get</a>(<b>old</b>(self), key) == result;
+<b>ensures</b> [abstract] <a href="big_ordered_map.md#0x1_big_ordered_map_spec_len">spec_len</a>(<b>old</b>(self)) == <a href="big_ordered_map.md#0x1_big_ordered_map_spec_len">spec_len</a>(self) + 1;
+<b>ensures</b> [abstract] <b>forall</b> k: K <b>where</b> k != key: <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) ==&gt; <a href="big_ordered_map.md#0x1_big_ordered_map_spec_get">spec_get</a>(self, k) == <a href="big_ordered_map.md#0x1_big_ordered_map_spec_get">spec_get</a>(<b>old</b>(self), k);
+<b>ensures</b> [abstract] <b>forall</b> k: K <b>where</b> k != key: <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), k) == <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k);
+</code></pre>
+
+
+
+<a id="@Specification_1_add_all"></a>
+
+### Function `add_all`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_add_all">add_all</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_pop_front"></a>
+
+### Function `pop_front`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_pop_front">pop_front</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): (K, V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_pop_back"></a>
+
+### Function `pop_back`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_pop_back">pop_back</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): (K, V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_lower_bound"></a>
+
+### Function `lower_bound`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_lower_bound">lower_bound</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_find"></a>
+
+### Function `find`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_find">find</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_contains"></a>
+
+### Function `contains`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_contains">contains</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow"></a>
+
+### Function `borrow`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow">borrow</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): &V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow_mut"></a>
+
+### Function `borrow_mut`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): &<b>mut</b> V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow_front"></a>
+
+### Function `borrow_front`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow_front">borrow_front</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): (K, &V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>ensures</b> [abstract] <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, result_1);
+<b>ensures</b> [abstract] <a href="big_ordered_map.md#0x1_big_ordered_map_spec_get">spec_get</a>(self, result_1) == result_2;
+<b>ensures</b> [abstract] <b>forall</b> k: K <b>where</b> k != result_1: <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) ==&gt;
+std::cmp::compare(result_1, k) == std::cmp::Ordering::Less;
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow_back"></a>
+
+### Function `borrow_back`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_borrow_back">borrow_back</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): (K, &V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>ensures</b> [abstract] <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, result_1);
+<b>ensures</b> [abstract] <a href="big_ordered_map.md#0x1_big_ordered_map_spec_get">spec_get</a>(self, result_1) == result_2;
+<b>ensures</b> [abstract] <b>forall</b> k: K <b>where</b> k != result_1: <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) ==&gt;
+std::cmp::compare(result_1, k) == std::cmp::Ordering::Greater;
+</code></pre>
+
+
+
+<a id="@Specification_1_prev_key"></a>
+
+### Function `prev_key`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_prev_key">prev_key</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;K&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>ensures</b> [abstract] result == std::option::spec_none() &lt;==&gt;
+(<b>forall</b> k: K {<a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)
+&& k != key: std::cmp::compare(key, k) == std::cmp::Ordering::Less);
+<b>ensures</b> [abstract] result.is_some() &lt;==&gt;
+    <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result)) &&
+    (std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), key) == std::cmp::Ordering::Less)
+    && (<b>forall</b> k: K {<a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k), std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), k), std::cmp::compare(key, k)} <b>where</b> k != <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result): ((<a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) &&
+    std::cmp::compare(k, key) == std::cmp::Ordering::Less)) ==&gt;
+    std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), k) == std::cmp::Ordering::Greater);
+</code></pre>
+
+
+
+<a id="@Specification_1_next_key"></a>
+
+### Function `next_key`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_next_key">next_key</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;K&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>ensures</b> [abstract] result == std::option::spec_none() &lt;==&gt;
+(<b>forall</b> k: K {<a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) && k != key:
+std::cmp::compare(key, k) == std::cmp::Ordering::Greater);
+<b>ensures</b> [abstract] result.is_some() &lt;==&gt;
+    <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result)) &&
+    (std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), key) == std::cmp::Ordering::Greater)
+    && (<b>forall</b> k: K {<a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> k != <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result): ((<a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) &&
+    std::cmp::compare(k, key) == std::cmp::Ordering::Greater)) ==&gt;
+    std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), k) == std::cmp::Ordering::Less);
+</code></pre>
+
+
+
+<a id="@Specification_1_keys"></a>
+
+### Function `keys`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_keys">keys</a>&lt;K: <b>copy</b>, drop, store, V: <b>copy</b>, store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+<b>ensures</b> [abstract] <b>forall</b> k: K: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(result, k) &lt;==&gt; <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k);
+</code></pre>
+
+
+
+<a id="@Specification_1_new_begin_iter"></a>
+
+### Function `new_begin_iter`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_begin_iter">new_begin_iter</a>&lt;K: <b>copy</b>, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_new_end_iter"></a>
+
+### Function `new_end_iter`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>&lt;K: <b>copy</b>, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_is_begin"></a>
+
+### Function `iter_is_begin`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_is_end"></a>
+
+### Function `iter_is_end`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;, _map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_borrow_key"></a>
+
+### Function `iter_borrow_key`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_key">iter_borrow_key</a>&lt;K&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;): &K
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_borrow"></a>
+
+### Function `iter_borrow`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow">iter_borrow</a>&lt;K: drop, store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): &V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_borrow_mut"></a>
+
+### Function `iter_borrow_mut`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_mut">iter_borrow_mut</a>&lt;K: drop, store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;, map: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): &<b>mut</b> V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_next"></a>
+
+### Function `iter_next`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_next">iter_next</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_iter_prev"></a>
+
+### Function `iter_prev`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_validate_dynamic_size_and_init_max_degrees"></a>
+
+### Function `validate_dynamic_size_and_init_max_degrees`
+
+
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_validate_dynamic_size_and_init_max_degrees">validate_dynamic_size_and_init_max_degrees</a>&lt;K: store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K, value: &V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_validate_static_size_and_init_max_degrees"></a>
+
+### Function `validate_static_size_and_init_max_degrees`
+
+
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_validate_static_size_and_init_max_degrees">validate_static_size_and_init_max_degrees</a>&lt;K: store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_validate_size_and_init_max_degrees"></a>
+
+### Function `validate_size_and_init_max_degrees`
+
+
+<pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_validate_size_and_init_max_degrees">validate_size_and_init_max_degrees</a>&lt;K: store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key_size: u64, value_size: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
 </code></pre>
 
 

@@ -56,7 +56,9 @@ pub struct SingleRunResults {
 }
 
 pub fn default_benchmark_features() -> Features {
-    Features::default()
+    let mut features = Features::default();
+    features.disable(FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION);
+    features
 }
 
 pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
@@ -514,7 +516,14 @@ pub enum SingleRunMode {
         /// If your workflow has an end (generats no transactions after some point),
         /// you can set a large number, and test will stop by itself.
         run_for_blocks: Option<usize>,
+        additional_configs: Option<SingleRunAdditionalConfigs>,
     },
+}
+
+// Optional more detailed configuration.
+pub struct SingleRunAdditionalConfigs {
+    pub num_generator_workers: usize,
+    pub split_stages: bool,
 }
 
 pub fn run_single_with_default_params(
@@ -565,6 +574,32 @@ pub fn run_single_with_default_params(
             (approx_tps / 4).clamp(10, 10000)
         },
     };
+    let num_generator_workers = match mode {
+        SingleRunMode::TEST
+        | SingleRunMode::BENCHMARK {
+            additional_configs: None,
+            ..
+        } => 4,
+        SingleRunMode::BENCHMARK {
+            additional_configs:
+                Some(SingleRunAdditionalConfigs {
+                    num_generator_workers,
+                    ..
+                }),
+            ..
+        } => num_generator_workers,
+    };
+    let split_stages = match mode {
+        SingleRunMode::TEST
+        | SingleRunMode::BENCHMARK {
+            additional_configs: None,
+            ..
+        } => false,
+        SingleRunMode::BENCHMARK {
+            additional_configs: Some(SingleRunAdditionalConfigs { split_stages, .. }),
+            ..
+        } => split_stages,
+    };
 
     let num_main_signer_accounts = num_accounts / 5;
     let num_dst_pool_accounts = num_accounts / 2;
@@ -603,6 +638,8 @@ pub fn run_single_with_default_params(
         generate_then_execute: true,
         num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
         print_transactions,
+        num_generator_workers,
+        split_stages,
         ..Default::default()
     };
 
@@ -658,7 +695,7 @@ mod tests {
         state_store::state_key::inner::StateKeyInner,
         transaction::{
             signature_verified_transaction::into_signature_verified_block, Transaction,
-            TransactionPayload,
+            TransactionOutput, TransactionPayload,
         },
     };
     use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
@@ -804,7 +841,7 @@ mod tests {
         let other_txn_output = &other_to_commit.transaction_outputs[0];
         let other_cp_txn_output = &other_to_commit.transaction_outputs[1];
 
-        assert_eq!(vm_cp_txn_output, other_cp_txn_output);
+        assert_equal_transaction_outputs(vm_cp_txn_output, other_cp_txn_output);
 
         let vm_event_types = vm_txn_output
             .events()
@@ -877,6 +914,16 @@ mod tests {
         if values_match {
             assert_eq!(vm_txn_output, other_txn_output);
         }
+    }
+
+    // TODO(HotState): hotness computation not implemented in all VMs, so their hotness part of the
+    // write set might be different.
+    fn assert_equal_transaction_outputs(output1: &TransactionOutput, output2: &TransactionOutput) {
+        assert_eq!(output1.write_set().as_v0(), output2.write_set().as_v0());
+        assert_eq!(output1.events(), output2.events());
+        assert_eq!(output1.gas_used(), output2.gas_used());
+        assert_eq!(output1.status(), output2.status());
+        assert_eq!(output1.auxiliary_data(), output2.auxiliary_data());
     }
 
     fn test_generic_benchmark<E>(
@@ -966,6 +1013,18 @@ mod tests {
         NativeConfig::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVMBlockExecutor>(
             Some(TransactionTypeArg::ModifyGlobalMilestoneAggV2),
+            true,
+        );
+    }
+
+    #[test]
+    fn test_benchmark_orderless_transaction() {
+        AptosVM::set_num_shards_once(4);
+        AptosVM::set_concurrency_level_once(4);
+        AptosVM::set_processed_transactions_detailed_counters();
+        NativeConfig::set_concurrency_level_once(4);
+        test_generic_benchmark::<AptosVMBlockExecutor>(
+            Some(TransactionTypeArg::NoOpOrderless),
             true,
         );
     }

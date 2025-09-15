@@ -6,11 +6,12 @@ use crate::{
     data_notification::{DataClientRequest, EpochEndingLedgerInfosRequest},
     error::Error,
     stream_engine::{DataStreamEngine, EpochEndingStreamEngine, StreamEngine},
-    streaming_client::{GetAllEpochEndingLedgerInfosRequest, StreamRequest},
-    tests::{
-        utils,
-        utils::{create_ledger_info, initialize_logger},
+    streaming_client::{
+        ContinuouslyStreamTransactionOutputsRequest,
+        ContinuouslyStreamTransactionsOrOutputsRequest, ContinuouslyStreamTransactionsRequest,
+        GetAllEpochEndingLedgerInfosRequest, StreamRequest,
     },
+    tests::{utils, utils::initialize_logger},
 };
 use aptos_config::config::DataStreamingServiceConfig;
 use aptos_data_client::{
@@ -19,6 +20,7 @@ use aptos_data_client::{
 };
 use aptos_id_generator::U64IdGenerator;
 use aptos_storage_service_types::responses::CompleteDataRange;
+use aptos_types::transaction::Version;
 use claims::{assert_matches, assert_ok};
 use std::{cmp, sync::Arc};
 
@@ -247,6 +249,91 @@ fn test_epoch_ending_stream_engine() {
 }
 
 #[test]
+fn test_invalid_continuous_transactions_stream_engine() {
+    // Create a continuous transaction stream request with an invalid target
+    let known_version = 100;
+    let known_epoch = 5;
+    let target = utils::create_ledger_info(known_version - 1, known_epoch, false);
+    let stream_request =
+        StreamRequest::ContinuouslyStreamTransactions(ContinuouslyStreamTransactionsRequest {
+            known_version,
+            known_epoch,
+            include_events: false,
+            target: Some(target),
+        });
+
+    // Create a global data summary with non-zero advertised data
+    let global_data_summary = create_global_data_summary_for_transactions(known_version);
+
+    // Try to create a stream engine and verify an error is returned (the
+    // target version is already known, so there is no new data to fetch).
+    let data_streaming_config = DataStreamingServiceConfig::default();
+    let result = StreamEngine::new(
+        data_streaming_config,
+        &stream_request,
+        &global_data_summary.advertised_data,
+    );
+    assert_matches!(result, Err(Error::UnexpectedErrorEncountered(_)));
+}
+
+#[test]
+fn test_invalid_continuous_transactions_or_outputs_stream_engine() {
+    // Create a continuous transactions or outputs stream request with an invalid target
+    let known_version = 100;
+    let known_epoch = 5;
+    let target = utils::create_ledger_info(known_version - 2, known_epoch, false);
+    let stream_request = StreamRequest::ContinuouslyStreamTransactionsOrOutputs(
+        ContinuouslyStreamTransactionsOrOutputsRequest {
+            known_version,
+            known_epoch,
+            include_events: false,
+            target: Some(target),
+        },
+    );
+
+    // Create a global data summary with non-zero advertised data
+    let global_data_summary = create_global_data_summary_for_transactions(known_version);
+
+    // Try to create a stream engine and verify an error is returned (the
+    // target version is already known, so there is no new data to fetch).
+    let data_streaming_config = DataStreamingServiceConfig::default();
+    let result = StreamEngine::new(
+        data_streaming_config,
+        &stream_request,
+        &global_data_summary.advertised_data,
+    );
+    assert_matches!(result, Err(Error::UnexpectedErrorEncountered(_)));
+}
+
+#[test]
+fn test_invalid_continuous_outputs_stream_engine() {
+    // Create a continuous outputs stream request with an invalid target
+    let known_version = 100;
+    let known_epoch = 5;
+    let target = utils::create_ledger_info(known_version, known_epoch, false);
+    let stream_request = StreamRequest::ContinuouslyStreamTransactionOutputs(
+        ContinuouslyStreamTransactionOutputsRequest {
+            known_version,
+            known_epoch,
+            target: Some(target),
+        },
+    );
+
+    // Create a global data summary with non-zero advertised data
+    let global_data_summary = create_global_data_summary_for_transactions(known_version);
+
+    // Try to create a stream engine and verify an error is returned (the
+    // target version is already known, so there is no new data to fetch).
+    let data_streaming_config = DataStreamingServiceConfig::default();
+    let result = StreamEngine::new(
+        data_streaming_config,
+        &stream_request,
+        &global_data_summary.advertised_data,
+    );
+    assert_matches!(result, Err(Error::UnexpectedErrorEncountered(_)));
+}
+
+#[test]
 fn test_update_epoch_ending_stream_progress() {
     // Create a new data stream engine
     let mut stream_engine = create_epoch_ending_stream_engine(0, 1000);
@@ -279,7 +366,7 @@ fn test_update_epoch_ending_stream_panic() {
 
     // Update the engine with a valid notification
     let client_response_payload =
-        ResponsePayload::EpochEndingLedgerInfos(vec![create_ledger_info(0, 0, true)]);
+        ResponsePayload::EpochEndingLedgerInfos(vec![utils::create_ledger_info(0, 0, true)]);
     let _ = stream_engine
         .transform_client_response_into_notification(
             &DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
@@ -362,4 +449,13 @@ fn create_epoch_ending_ledger_info_payload(start_epoch: u64, end_epoch: u64) -> 
         .map(|i| utils::create_ledger_info(i, i, true))
         .collect();
     ResponsePayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos)
+}
+
+/// Creates a global data summary with advertised transactions and transaction outputs
+fn create_global_data_summary_for_transactions(known_version: Version) -> GlobalDataSummary {
+    let mut global_data_summary = GlobalDataSummary::empty();
+    let complete_data_range = CompleteDataRange::new(0, known_version * 2).unwrap();
+    global_data_summary.advertised_data.transactions = vec![complete_data_range];
+    global_data_summary.advertised_data.transaction_outputs = vec![complete_data_range];
+    global_data_summary
 }

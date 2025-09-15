@@ -20,7 +20,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     native_functions,
-    native_functions::{NativeContext, NativeFunction, NativeFunctionTable},
+    native_functions::{LoaderContext, NativeContext, NativeFunction, NativeFunctionTable},
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -215,15 +215,21 @@ impl TableData {
     /// the table, like the type layout for keys and values.
     fn get_or_create_table(
         &mut self,
-        context: &NativeContext,
+        loader_context: &mut LoaderContext,
         handle: TableHandle,
         key_ty: &Type,
         value_ty: &Type,
     ) -> PartialVMResult<&mut Table> {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
-                let key_layout = context.type_to_type_layout(key_ty)?;
-                let value_layout = context.type_to_type_layout(value_ty)?;
+                let key_layout = loader_context
+                    .type_to_type_layout_with_delayed_fields(key_ty)?
+                    .into_layout_when_has_no_delayed_fields()
+                    .expect("Move extension has no delayed fields");
+                let value_layout = loader_context
+                    .type_to_type_layout_with_delayed_fields(value_ty)?
+                    .into_layout_when_has_no_delayed_fields()
+                    .expect("Move extension has no delayed fields");
                 let table = Table {
                     handle,
                     key_layout,
@@ -400,8 +406,8 @@ fn native_add_box(
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 3);
 
-    let function_value_extension = context.function_value_extension();
-    let table_context = context.extensions().get::<NativeTableContext>();
+    let (extensions, mut loader_context) = context.extensions_with_loader_context();
+    let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
     let val = args.pop_back().unwrap();
@@ -410,8 +416,10 @@ fn native_add_box(
 
     let mut cost = gas_params.base;
 
-    let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    let table =
+        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
+    let function_value_extension = loader_context.function_value_extension();
     let key_bytes = serialize(&function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
@@ -452,17 +460,19 @@ fn native_borrow_box(
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 2);
 
-    let function_value_extension = context.function_value_extension();
-    let table_context = context.extensions().get::<NativeTableContext>();
+    let (extensions, mut loader_context) = context.extensions_with_loader_context();
+    let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&pop_arg!(args, StructRef))?;
 
-    let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    let table =
+        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
     let mut cost = gas_params.base;
 
+    let function_value_extension = loader_context.function_value_extension();
     let key_bytes = serialize(&function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
@@ -503,17 +513,19 @@ fn native_contains_box(
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 2);
 
-    let function_value_extension = context.function_value_extension();
-    let table_context = context.extensions().get::<NativeTableContext>();
+    let (extensions, mut loader_context) = context.extensions_with_loader_context();
+    let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&pop_arg!(args, StructRef))?;
 
-    let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    let table =
+        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
     let mut cost = gas_params.base;
 
+    let function_value_extension = loader_context.function_value_extension();
     let key_bytes = serialize(&function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
@@ -553,17 +565,19 @@ fn native_remove_box(
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 2);
 
-    let function_value_extension = context.function_value_extension();
-    let table_context = context.extensions().get::<NativeTableContext>();
+    let (extensions, mut loader_context) = context.extensions_with_loader_context();
+    let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&pop_arg!(args, StructRef))?;
 
-    let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    let table =
+        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
     let mut cost = gas_params.base;
 
+    let function_value_extension = loader_context.function_value_extension();
     let key_bytes = serialize(&function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
@@ -602,12 +616,13 @@ fn native_destroy_empty_box(
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 1);
 
-    let table_context = context.extensions().get::<NativeTableContext>();
+    let (extensions, mut loader_context) = context.extensions_with_loader_context();
+    let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
     let handle = get_table_handle(&pop_arg!(args, StructRef))?;
     // TODO: Can the following line be removed?
-    table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
     assert!(table_data.removed_tables.insert(handle));
 
@@ -708,7 +723,8 @@ fn serialize(
     layout: &MoveTypeLayout,
     val: &Value,
 ) -> PartialVMResult<Vec<u8>> {
-    ValueSerDeContext::new()
+    let max_value_nest_depth = function_value_extension.max_value_nest_depth();
+    ValueSerDeContext::new(max_value_nest_depth)
         .with_func_args_deserialization(function_value_extension)
         .serialize(val, layout)?
         .ok_or_else(|| partial_extension_error("cannot serialize table key or value"))
@@ -719,7 +735,8 @@ fn deserialize(
     bytes: &[u8],
     layout: &MoveTypeLayout,
 ) -> PartialVMResult<Value> {
-    ValueSerDeContext::new()
+    let max_value_nest_depth = function_value_extension.max_value_nest_depth();
+    ValueSerDeContext::new(max_value_nest_depth)
         .with_func_args_deserialization(function_value_extension)
         .deserialize(bytes, layout)
         .ok_or_else(|| partial_extension_error("cannot deserialize table key or value"))

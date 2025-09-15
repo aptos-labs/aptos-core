@@ -64,7 +64,7 @@ module 0x42::test {
     fun baz() {
         E1::V1{};
         E1::V2{};
-        E1::V3(42u8,true);
+        E1::V3(42u8, true);
     }
     fun foo(x: S2) {
         x.0;

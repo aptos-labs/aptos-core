@@ -91,349 +91,381 @@ fn test_data_summary_service_epoch_ending_ledger_infos() {
 
 #[test]
 fn test_data_summary_service_optimistic_fetch() {
-    // Create a data client config with the specified max optimistic fetch lag
-    let max_optimistic_fetch_lag_secs = 50;
-    let data_client_config = AptosDataClientConfig {
-        max_optimistic_fetch_lag_secs,
-        ..Default::default()
-    };
+    // Test both v1 and v2 transaction requests
+    for use_request_v2 in [false, true] {
+        // Create a data client config with the specified max optimistic fetch lag
+        let max_optimistic_fetch_lag_secs = 50;
+        let data_client_config = AptosDataClientConfig {
+            max_optimistic_fetch_lag_secs,
+            ..Default::default()
+        };
 
-    // Create a mock time service and get the current timestamp
-    let time_service = TimeService::mock();
-    let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
+        // Create a mock time service and get the current timestamp
+        let time_service = TimeService::mock();
+        let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
 
-    // Create a data summary with the specified synced ledger info
-    let highest_synced_version = 10_000;
-    let data_summary = DataSummary {
-        synced_ledger_info: Some(create_ledger_info_at_version_and_timestamp(
-            highest_synced_version,
-            timestamp_usecs,
-        )),
-        ..Default::default()
-    };
+        // Create a data summary with the specified synced ledger info
+        let highest_synced_version = 10_000;
+        let data_summary = DataSummary {
+            synced_ledger_info: Some(create_ledger_info_at_version_and_timestamp(
+                highest_synced_version,
+                timestamp_usecs,
+            )),
+            ..Default::default()
+        };
 
-    // Elapse the time service by half the max optimistic fetch lag
-    time_service
-        .clone()
-        .into_mock()
-        .advance_secs(max_optimistic_fetch_lag_secs / 2);
+        // Elapse the time service by half the max optimistic fetch lag
+        time_service
+            .clone()
+            .into_mock()
+            .advance_secs(max_optimistic_fetch_lag_secs / 2);
 
-    // Verify that optimistic fetch requests can be serviced
-    for compression in [true, false] {
-        let known_versions = vec![0, 1, highest_synced_version, highest_synced_version * 2];
-        verify_can_service_optimistic_fetch_requests(
-            &data_client_config,
-            &data_summary,
-            time_service.clone(),
-            compression,
-            known_versions,
-            true,
-        );
-    }
+        // Verify that optimistic fetch requests can be serviced
+        for compression in [true, false] {
+            let known_versions = vec![0, 1, highest_synced_version, highest_synced_version * 2];
+            verify_can_service_optimistic_fetch_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                time_service.clone(),
+                compression,
+                known_versions,
+                true,
+            );
+        }
 
-    // Elapse the time service by the max optimistic fetch lag
-    time_service
-        .clone()
-        .into_mock()
-        .advance_secs(max_optimistic_fetch_lag_secs);
+        // Elapse the time service by the max optimistic fetch lag
+        time_service
+            .clone()
+            .into_mock()
+            .advance_secs(max_optimistic_fetch_lag_secs);
 
-    // Verify that optimistic fetch requests can no longer be serviced
-    // (as the max lag has been exceeded for the given data summary).
-    for compression in [true, false] {
-        let known_versions = vec![0, 1, highest_synced_version, highest_synced_version * 2];
-        verify_can_service_optimistic_fetch_requests(
-            &data_client_config,
-            &data_summary,
-            time_service.clone(),
-            compression,
-            known_versions,
-            false,
-        );
+        // Verify that optimistic fetch requests can no longer be serviced
+        // (as the max lag has been exceeded for the given data summary).
+        for compression in [true, false] {
+            let known_versions = vec![0, 1, highest_synced_version, highest_synced_version * 2];
+            verify_can_service_optimistic_fetch_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                time_service.clone(),
+                compression,
+                known_versions,
+                false,
+            );
+        }
     }
 }
 
 #[test]
 fn test_data_summary_service_subscription() {
-    // Create a data client config with the specified max subscription lag
-    let max_subscription_lag_secs = 100;
-    let data_client_config = AptosDataClientConfig {
-        max_subscription_lag_secs,
-        ..Default::default()
-    };
+    // Test both v1 and v2 transaction requests
+    for use_request_v2 in [false, true] {
+        // Create a data client config with the specified max subscription lag
+        let max_subscription_lag_secs = 100;
+        let data_client_config = AptosDataClientConfig {
+            max_subscription_lag_secs,
+            ..Default::default()
+        };
 
-    // Create a mock time service and get the current timestamp
-    let time_service = TimeService::mock();
-    let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
+        // Create a mock time service and get the current timestamp
+        let time_service = TimeService::mock();
+        let timestamp_usecs = time_service.now_unix_time().as_micros() as u64;
 
-    // Create a data summary with the specified synced ledger info
-    let highest_synced_version = 50_000;
-    let data_summary = DataSummary {
-        synced_ledger_info: Some(create_ledger_info_at_version_and_timestamp(
-            highest_synced_version,
-            timestamp_usecs,
-        )),
-        ..Default::default()
-    };
+        // Create a data summary with the specified synced ledger info
+        let highest_synced_version = 50_000;
+        let data_summary = DataSummary {
+            synced_ledger_info: Some(create_ledger_info_at_version_and_timestamp(
+                highest_synced_version,
+                timestamp_usecs,
+            )),
+            ..Default::default()
+        };
 
-    // Elapse the time service by half the max subscription lag
-    time_service
-        .clone()
-        .into_mock()
-        .advance_secs(max_subscription_lag_secs / 2);
+        // Elapse the time service by half the max subscription lag
+        time_service
+            .clone()
+            .into_mock()
+            .advance_secs(max_subscription_lag_secs / 2);
 
-    // Verify that subscription requests can be serviced
-    for compression in [true, false] {
-        let known_versions = vec![0, 1, highest_synced_version, highest_synced_version * 2];
-        verify_can_service_subscription_requests(
-            &data_client_config,
-            &data_summary,
-            time_service.clone(),
-            compression,
-            known_versions,
-            true,
-        );
-    }
+        // Verify that subscription requests can be serviced
+        for compression in [true, false] {
+            let known_versions = vec![0, 1, highest_synced_version, highest_synced_version * 2];
+            verify_can_service_subscription_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                time_service.clone(),
+                compression,
+                known_versions,
+                true,
+            );
+        }
 
-    // Elapse the time service by the max subscription lag
-    time_service
-        .clone()
-        .into_mock()
-        .advance_secs(max_subscription_lag_secs);
+        // Elapse the time service by the max subscription lag
+        time_service
+            .clone()
+            .into_mock()
+            .advance_secs(max_subscription_lag_secs);
 
-    // Verify that subscription requests can no longer be serviced
-    // (as the max lag has been exceeded for the given data summary).
-    for compression in [true, false] {
-        let known_versions = vec![0, 1, highest_synced_version, highest_synced_version * 2];
-        verify_can_service_subscription_requests(
-            &data_client_config,
-            &data_summary,
-            time_service.clone(),
-            compression,
-            known_versions,
-            false,
-        );
+        // Verify that subscription requests can no longer be serviced
+        // (as the max lag has been exceeded for the given data summary).
+        for compression in [true, false] {
+            let known_versions = vec![0, 1, highest_synced_version, highest_synced_version * 2];
+            verify_can_service_subscription_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                time_service.clone(),
+                compression,
+                known_versions,
+                false,
+            );
+        }
     }
 }
 
 #[test]
 fn test_data_summary_service_transactions() {
-    // Create a data client config and data summary
-    let data_client_config = AptosDataClientConfig::default();
-    let data_summary = DataSummary {
-        synced_ledger_info: Some(create_ledger_info_at_version(250)),
-        transactions: Some(create_data_range(100, 200)),
-        ..Default::default()
-    };
+    // Test both v1 and v2 transaction requests
+    for use_request_v2 in [false, true] {
+        // Create a data client config and data summary
+        let data_client_config = AptosDataClientConfig::default();
+        let data_summary = DataSummary {
+            synced_ledger_info: Some(create_ledger_info_at_version(250)),
+            transactions: Some(create_data_range(100, 200)),
+            ..Default::default()
+        };
 
-    // Verify the different requests that can be serviced
-    for compression in [true, false] {
-        // Test the valid data ranges and proofs
-        let valid_ranges_and_proofs = vec![
-            (100, 200, 225),
-            (125, 175, 225),
-            (100, 100, 225),
-            (150, 150, 225),
-            (200, 200, 225),
-            (200, 200, 250),
-        ];
-        verify_can_service_transaction_requests(
-            &data_client_config,
-            &data_summary,
-            compression,
-            valid_ranges_and_proofs,
-            true,
-        );
+        // Verify the different requests that can be serviced
+        for compression in [true, false] {
+            // Test the valid data ranges and proofs
+            let valid_ranges_and_proofs = vec![
+                (100, 200, 225),
+                (125, 175, 225),
+                (100, 100, 225),
+                (150, 150, 225),
+                (200, 200, 225),
+                (200, 200, 250),
+            ];
+            verify_can_service_transaction_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                compression,
+                valid_ranges_and_proofs,
+                true,
+            );
 
-        // Test the missing data ranges and proofs
-        let missing_data_ranges = vec![
-            (99, 200, 225),
-            (100, 201, 225),
-            (50, 250, 225),
-            (50, 150, 225),
-            (150, 250, 225),
-        ];
-        verify_can_service_transaction_requests(
-            &data_client_config,
-            &data_summary,
-            compression,
-            missing_data_ranges,
-            false,
-        );
+            // Test the missing data ranges and proofs
+            let missing_data_ranges = vec![
+                (99, 200, 225),
+                (100, 201, 225),
+                (50, 250, 225),
+                (50, 150, 225),
+                (150, 250, 225),
+            ];
+            verify_can_service_transaction_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                compression,
+                missing_data_ranges,
+                false,
+            );
 
-        // Test the invalid data ranges and proofs
-        let invalid_proof_versions = vec![
-            (100, 200, 300),
-            (125, 175, 300),
-            (100, 100, 300),
-            (150, 150, 300),
-            (200, 200, 300),
-            (200, 200, 251),
-        ];
-        verify_can_service_transaction_requests(
-            &data_client_config,
-            &data_summary,
-            compression,
-            invalid_proof_versions,
-            false,
-        );
+            // Test the invalid data ranges and proofs
+            let invalid_proof_versions = vec![
+                (100, 200, 300),
+                (125, 175, 300),
+                (100, 100, 300),
+                (150, 150, 300),
+                (200, 200, 300),
+                (200, 200, 251),
+            ];
+            verify_can_service_transaction_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                compression,
+                invalid_proof_versions,
+                false,
+            );
+        }
     }
 }
 
 #[test]
 fn test_data_summary_service_transaction_outputs() {
-    // Create a data client config and data summary
-    let data_client_config = AptosDataClientConfig::default();
-    let data_summary = DataSummary {
-        synced_ledger_info: Some(create_ledger_info_at_version(250)),
-        transaction_outputs: Some(create_data_range(100, 200)),
-        ..Default::default()
-    };
+    // Test both v1 and v2 transaction requests
+    for use_request_v2 in [false, true] {
+        // Create a data client config and data summary
+        let data_client_config = AptosDataClientConfig::default();
+        let data_summary = DataSummary {
+            synced_ledger_info: Some(create_ledger_info_at_version(250)),
+            transaction_outputs: Some(create_data_range(100, 200)),
+            ..Default::default()
+        };
 
-    // Verify the different requests that can be serviced
-    for compression in [true, false] {
-        // Test the valid data ranges and proofs
-        let valid_ranges_and_proofs = vec![
-            (100, 200, 225),
-            (125, 175, 225),
-            (100, 100, 225),
-            (150, 150, 225),
-            (200, 200, 225),
-            (200, 200, 250),
-        ];
-        verify_can_service_output_requests(
-            &data_client_config,
-            &data_summary,
-            compression,
-            valid_ranges_and_proofs,
-            true,
-        );
+        // Verify the different requests that can be serviced
+        for compression in [true, false] {
+            // Test the valid data ranges and proofs
+            let valid_ranges_and_proofs = vec![
+                (100, 200, 225),
+                (125, 175, 225),
+                (100, 100, 225),
+                (150, 150, 225),
+                (200, 200, 225),
+                (200, 200, 250),
+            ];
+            verify_can_service_output_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                compression,
+                valid_ranges_and_proofs,
+                true,
+            );
 
-        // Test the missing data ranges and proofs
-        let missing_data_ranges = vec![
-            (99, 200, 225),
-            (100, 201, 225),
-            (50, 250, 225),
-            (50, 150, 225),
-            (150, 250, 225),
-        ];
-        verify_can_service_output_requests(
-            &data_client_config,
-            &data_summary,
-            compression,
-            missing_data_ranges,
-            false,
-        );
+            // Test the missing data ranges and proofs
+            let missing_data_ranges = vec![
+                (99, 200, 225),
+                (100, 201, 225),
+                (50, 250, 225),
+                (50, 150, 225),
+                (150, 250, 225),
+            ];
+            verify_can_service_output_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                compression,
+                missing_data_ranges,
+                false,
+            );
 
-        // Test the valid data ranges and invalid proofs
-        let invalid_proof_versions = vec![
-            (100, 200, 300),
-            (125, 175, 300),
-            (100, 100, 300),
-            (150, 150, 300),
-            (200, 200, 300),
-            (200, 200, 251),
-        ];
-        verify_can_service_output_requests(
-            &data_client_config,
-            &data_summary,
-            compression,
-            invalid_proof_versions,
-            false,
-        );
+            // Test the valid data ranges and invalid proofs
+            let invalid_proof_versions = vec![
+                (100, 200, 300),
+                (125, 175, 300),
+                (100, 100, 300),
+                (150, 150, 300),
+                (200, 200, 300),
+                (200, 200, 251),
+            ];
+            verify_can_service_output_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                compression,
+                invalid_proof_versions,
+                false,
+            );
 
-        // Test the invalid data ranges and proofs
-        let invalid_ranges = vec![(175, 125, 225), (201, 200, 201), (202, 200, 200)];
-        verify_can_service_output_requests(
-            &data_client_config,
-            &data_summary,
-            compression,
-            invalid_ranges,
-            false,
-        );
+            // Test the invalid data ranges and proofs
+            let invalid_ranges = vec![(175, 125, 225), (201, 200, 201), (202, 200, 200)];
+            verify_can_service_output_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                compression,
+                invalid_ranges,
+                false,
+            );
+        }
     }
 }
 
 #[test]
 fn test_data_summary_service_transactions_or_outputs() {
-    // Create a data client config and data summary
-    let data_client_config = AptosDataClientConfig::default();
-    let data_summary = DataSummary {
-        synced_ledger_info: Some(create_ledger_info_at_version(250)),
-        transactions: Some(create_data_range(50, 200)),
-        transaction_outputs: Some(create_data_range(100, 250)),
-        ..Default::default()
-    };
+    // Test both v1 and v2 transaction requests
+    for use_request_v2 in [false, true] {
+        // Create a data client config and data summary
+        let data_client_config = AptosDataClientConfig::default();
+        let data_summary = DataSummary {
+            synced_ledger_info: Some(create_ledger_info_at_version(250)),
+            transactions: Some(create_data_range(50, 200)),
+            transaction_outputs: Some(create_data_range(100, 250)),
+            ..Default::default()
+        };
 
-    // Verify the different requests that can be serviced
-    for compression in [true, false] {
-        // Test the valid data ranges and proofs
-        let valid_ranges_and_proofs = vec![
-            (100, 200, 225),
-            (125, 175, 225),
-            (100, 100, 225),
-            (150, 150, 225),
-            (200, 200, 225),
-            (200, 200, 250),
-        ];
-        verify_can_service_transaction_or_output_requests(
-            &data_client_config,
-            &data_summary,
-            compression,
-            valid_ranges_and_proofs,
-            true,
-        );
+        // Verify the different requests that can be serviced
+        for compression in [true, false] {
+            // Test the valid data ranges and proofs
+            let valid_ranges_and_proofs = vec![
+                (100, 200, 225),
+                (125, 175, 225),
+                (100, 100, 225),
+                (150, 150, 225),
+                (200, 200, 225),
+                (200, 200, 250),
+            ];
+            verify_can_service_transaction_or_output_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                compression,
+                valid_ranges_and_proofs,
+                true,
+            );
 
-        // Test the missing output ranges and proofs
-        let missing_output_ranges = vec![(51, 200, 225), (99, 100, 225), (51, 71, 225)];
-        verify_can_service_transaction_or_output_requests(
-            &data_client_config,
-            &data_summary,
-            compression,
-            missing_output_ranges,
-            false,
-        );
+            // Test the missing output ranges and proofs
+            let missing_output_ranges = vec![(51, 200, 225), (99, 100, 225), (51, 71, 225)];
+            verify_can_service_transaction_or_output_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                compression,
+                missing_output_ranges,
+                false,
+            );
 
-        // Test the missing transaction ranges and proofs
-        let missing_transaction_ranges = vec![(200, 202, 225), (150, 201, 225), (201, 225, 225)];
-        verify_can_service_transaction_or_output_requests(
-            &data_client_config,
-            &data_summary,
-            compression,
-            missing_transaction_ranges,
-            false,
-        );
+            // Test the missing transaction ranges and proofs
+            let missing_transaction_ranges =
+                vec![(200, 202, 225), (150, 201, 225), (201, 225, 225)];
+            verify_can_service_transaction_or_output_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                compression,
+                missing_transaction_ranges,
+                false,
+            );
 
-        // Test the valid data ranges and invalid proofs
-        let invalid_proof_versions = vec![
-            (100, 200, 300),
-            (125, 175, 300),
-            (100, 100, 300),
-            (150, 150, 300),
-            (200, 200, 300),
-            (200, 200, 251),
-        ];
-        verify_can_service_transaction_or_output_requests(
-            &data_client_config,
-            &data_summary,
-            compression,
-            invalid_proof_versions,
-            false,
-        );
+            // Test the valid data ranges and invalid proofs
+            let invalid_proof_versions = vec![
+                (100, 200, 300),
+                (125, 175, 300),
+                (100, 100, 300),
+                (150, 150, 300),
+                (200, 200, 300),
+                (200, 200, 251),
+            ];
+            verify_can_service_transaction_or_output_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                compression,
+                invalid_proof_versions,
+                false,
+            );
 
-        // Test the invalid data ranges and proofs
-        let invalid_ranges = vec![(175, 125, 225), (201, 200, 201), (202, 200, 200)];
-        verify_can_service_transaction_or_output_requests(
-            &data_client_config,
-            &data_summary,
-            compression,
-            invalid_ranges,
-            false,
-        );
+            // Test the invalid data ranges and proofs
+            let invalid_ranges = vec![(175, 125, 225), (201, 200, 201), (202, 200, 200)];
+            verify_can_service_transaction_or_output_requests(
+                use_request_v2,
+                &data_client_config,
+                &data_summary,
+                compression,
+                invalid_ranges,
+                false,
+            );
+        }
     }
 }
 
 #[test]
-fn test_data_summary_can_service_state_chunk_request() {
+fn test_data_summary_service_state_chunk_request() {
     // Create a data client config and data summary
     let data_client_config = AptosDataClientConfig::default();
     let data_summary = DataSummary {
@@ -489,6 +521,39 @@ fn test_protocol_metadata_service() {
         assert!(metadata.can_service(&create_epoch_ending_request(100, 10000, compression)));
         assert!(metadata.can_service(&create_outputs_request(200, 100, 9999989, compression)));
         assert!(metadata.can_service(&create_state_values_request(200, 100, 200, compression)));
+    }
+}
+
+#[test]
+fn test_is_transaction_data_v2_request() {
+    // Create transaction data v1 requests
+    let transactions_request = create_transactions_request(200, 100, 101, false);
+    let outputs_request = create_outputs_request(200, 100, 101, false);
+    let transactions_or_outputs_request =
+        create_transactions_or_outputs_request(200, 100, 101, false);
+
+    // Verify that none of them are v2 requests
+    for request in [
+        transactions_request,
+        outputs_request,
+        transactions_or_outputs_request,
+    ] {
+        assert!(!request.data_request.is_transaction_data_v2_request());
+    }
+
+    // Create transaction data v2 requests
+    let transactions_request_v2 = create_transactions_request_v2(200, 100, 101, false);
+    let outputs_request_v2 = create_outputs_request_v2(200, 100, 101, false);
+    let transactions_or_outputs_request_v2 =
+        create_transactions_or_outputs_request_v2(200, 100, 101, false);
+
+    // Verify that all of them are v2 requests
+    for request in [
+        transactions_request_v2,
+        outputs_request_v2,
+        transactions_or_outputs_request_v2,
+    ] {
+        assert!(request.data_request.is_transaction_data_v2_request());
     }
 }
 
@@ -579,6 +644,39 @@ fn create_optimistic_fetch_request(
     StorageServiceRequest::new(data_request, use_compression)
 }
 
+/// Creates a new optimistic request (v2)
+fn create_optimistic_fetch_request_v2(
+    known_version: u64,
+    use_compression: bool,
+) -> StorageServiceRequest {
+    // Generate a random number
+    let random_number = get_random_u64();
+
+    // Determine the data request type based on the random number
+    let data_request = if random_number % 3 == 0 {
+        DataRequest::get_new_transaction_data_with_proof(
+            known_version,
+            get_random_u64(),
+            false,
+            get_random_u64(),
+        )
+    } else if random_number % 3 == 1 {
+        DataRequest::get_new_transaction_output_data_with_proof(
+            known_version,
+            get_random_u64(),
+            get_random_u64(),
+        )
+    } else {
+        DataRequest::get_new_transaction_or_output_data_with_proof(
+            known_version,
+            get_random_u64(),
+            false,
+            get_random_u64(),
+        )
+    };
+    StorageServiceRequest::new(data_request, use_compression)
+}
+
 /// Creates a request for transaction outputs
 fn create_outputs_request(
     proof_version: Version,
@@ -592,6 +690,22 @@ fn create_outputs_request(
             start_version,
             end_version,
         });
+    StorageServiceRequest::new(data_request, use_compression)
+}
+
+/// Creates a request for transaction outputs (v2)
+fn create_outputs_request_v2(
+    proof_version: Version,
+    start_version: Version,
+    end_version: Version,
+    use_compression: bool,
+) -> StorageServiceRequest {
+    let data_request = DataRequest::get_transaction_output_data_with_proof(
+        proof_version,
+        start_version,
+        end_version,
+        get_random_u64(),
+    );
     StorageServiceRequest::new(data_request, use_compression)
 }
 
@@ -634,37 +748,111 @@ fn create_subscription_request(known_version: u64, use_compression: bool) -> Sto
     StorageServiceRequest::new(data_request, use_compression)
 }
 
+/// Creates a new subscription request (v2)
+fn create_subscription_request_v2(
+    known_version: u64,
+    use_compression: bool,
+) -> StorageServiceRequest {
+    // Create a new subscription stream metadata
+    let subscription_stream_metadata = SubscriptionStreamMetadata {
+        known_version_at_stream_start: known_version,
+        known_epoch_at_stream_start: get_random_u64(),
+        subscription_stream_id: get_random_u64(),
+    };
+
+    // Generate a random number
+    let random_number = get_random_u64();
+
+    // Determine the data request type based on the random number
+    let data_request = if random_number % 3 == 0 {
+        DataRequest::subscribe_transaction_data_with_proof(
+            subscription_stream_metadata,
+            get_random_u64(),
+            false,
+            get_random_u64(),
+        )
+    } else if random_number % 3 == 1 {
+        DataRequest::subscribe_transaction_output_data_with_proof(
+            subscription_stream_metadata,
+            get_random_u64(),
+            get_random_u64(),
+        )
+    } else {
+        DataRequest::subscribe_transaction_or_output_data_with_proof(
+            subscription_stream_metadata,
+            get_random_u64(),
+            false,
+            get_random_u64(),
+        )
+    };
+    StorageServiceRequest::new(data_request, use_compression)
+}
+
 /// Creates a request for transactions
 fn create_transactions_request(
-    proof: Version,
-    start: Version,
-    end: Version,
+    proof_version: Version,
+    start_version: Version,
+    end_version: Version,
     use_compression: bool,
 ) -> StorageServiceRequest {
     let data_request = DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-        proof_version: proof,
-        start_version: start,
-        end_version: end,
+        proof_version,
+        start_version,
+        end_version,
         include_events: true,
     });
     StorageServiceRequest::new(data_request, use_compression)
 }
 
+/// Creates a request for transactions (v2)
+fn create_transactions_request_v2(
+    proof_version: Version,
+    start_version: Version,
+    end_version: Version,
+    use_compression: bool,
+) -> StorageServiceRequest {
+    let data_request = DataRequest::get_transaction_data_with_proof(
+        proof_version,
+        start_version,
+        end_version,
+        true,
+        get_random_u64(),
+    );
+    StorageServiceRequest::new(data_request, use_compression)
+}
+
 /// Creates a request for transactions or outputs
 fn create_transactions_or_outputs_request(
-    proof: Version,
-    start: Version,
-    end: Version,
+    proof_version: Version,
+    start_version: Version,
+    end_version: Version,
     use_compression: bool,
 ) -> StorageServiceRequest {
     let data_request =
         DataRequest::GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
-            proof_version: proof,
-            start_version: start,
-            end_version: end,
+            proof_version,
+            start_version,
+            end_version,
             include_events: true,
             max_num_output_reductions: 3,
         });
+    StorageServiceRequest::new(data_request, use_compression)
+}
+
+/// Creates a request for transactions or outputs (v2)
+fn create_transactions_or_outputs_request_v2(
+    proof_version: Version,
+    start_version: Version,
+    end_version: Version,
+    use_compression: bool,
+) -> StorageServiceRequest {
+    let data_request = DataRequest::get_transaction_or_output_data_with_proof(
+        proof_version,
+        start_version,
+        end_version,
+        false,
+        get_random_u64(),
+    );
     StorageServiceRequest::new(data_request, use_compression)
 }
 
@@ -725,6 +913,7 @@ fn verify_can_service_epoch_ending_requests(
 /// the specified data summary. If `expect_service` is true, then the
 /// request should be serviceable.
 fn verify_can_service_optimistic_fetch_requests(
+    use_request_v2: bool,
     data_client_config: &AptosDataClientConfig,
     data_summary: &DataSummary,
     time_service: TimeService,
@@ -734,7 +923,11 @@ fn verify_can_service_optimistic_fetch_requests(
 ) {
     for known_version in known_versions {
         // Create the optimistic fetch request
-        let request = create_optimistic_fetch_request(known_version, compression);
+        let request = if use_request_v2 {
+            create_optimistic_fetch_request_v2(known_version, compression)
+        } else {
+            create_optimistic_fetch_request(known_version, compression)
+        };
 
         // Verify the serviceability of the request
         verify_serviceability(
@@ -776,6 +969,7 @@ fn verify_can_service_state_chunk_requests(
 /// the specified data summary. If `expect_service` is true, then the
 /// request should be serviceable.
 fn verify_can_service_subscription_requests(
+    use_request_v2: bool,
     data_client_config: &AptosDataClientConfig,
     data_summary: &DataSummary,
     time_service: TimeService,
@@ -785,7 +979,11 @@ fn verify_can_service_subscription_requests(
 ) {
     for known_version in known_versions {
         // Create the subscription request
-        let request = create_subscription_request(known_version, compression);
+        let request = if use_request_v2 {
+            create_subscription_request_v2(known_version, compression)
+        } else {
+            create_subscription_request(known_version, compression)
+        };
 
         // Verify the serviceability of the request
         verify_serviceability(
@@ -802,6 +1000,7 @@ fn verify_can_service_subscription_requests(
 /// the specified data summary. If `expect_service` is true, then the
 /// request should be serviceable.
 fn verify_can_service_transaction_requests(
+    use_request_v2: bool,
     data_client_config: &AptosDataClientConfig,
     data_summary: &DataSummary,
     use_compression: bool,
@@ -810,8 +1009,16 @@ fn verify_can_service_transaction_requests(
 ) {
     for (start_version, end_version, proof_version) in transaction_ranges {
         // Create the transaction request
-        let request =
-            create_transactions_request(proof_version, start_version, end_version, use_compression);
+        let request = if use_request_v2 {
+            create_transactions_request_v2(
+                proof_version,
+                start_version,
+                end_version,
+                use_compression,
+            )
+        } else {
+            create_transactions_request(proof_version, start_version, end_version, use_compression)
+        };
 
         // Verify the serviceability of the request
         verify_serviceability(
@@ -828,6 +1035,7 @@ fn verify_can_service_transaction_requests(
 /// ranges against the specified data summary. If `expect_service` is
 /// true, then the request should be serviceable.
 fn verify_can_service_transaction_or_output_requests(
+    use_request_v2: bool,
     data_client_config: &AptosDataClientConfig,
     data_summary: &DataSummary,
     use_compression: bool,
@@ -836,12 +1044,21 @@ fn verify_can_service_transaction_or_output_requests(
 ) {
     for (start_version, end_version, proof_version) in transaction_ranges {
         // Create the transaction or output request
-        let request = create_transactions_or_outputs_request(
-            proof_version,
-            start_version,
-            end_version,
-            use_compression,
-        );
+        let request = if use_request_v2 {
+            create_transactions_or_outputs_request_v2(
+                proof_version,
+                start_version,
+                end_version,
+                use_compression,
+            )
+        } else {
+            create_transactions_or_outputs_request(
+                proof_version,
+                start_version,
+                end_version,
+                use_compression,
+            )
+        };
 
         // Verify the serviceability of the request
         verify_serviceability(
@@ -858,6 +1075,7 @@ fn verify_can_service_transaction_or_output_requests(
 /// the specified data summary. If `expect_service` is true, then the
 /// request should be serviceable.
 fn verify_can_service_output_requests(
+    use_request_v2: bool,
     data_client_config: &AptosDataClientConfig,
     data_summary: &DataSummary,
     use_compression: bool,
@@ -866,8 +1084,11 @@ fn verify_can_service_output_requests(
 ) {
     for (start_version, end_version, proof_version) in output_ranges {
         // Create the output request
-        let request =
-            create_outputs_request(proof_version, start_version, end_version, use_compression);
+        let request = if use_request_v2 {
+            create_outputs_request_v2(proof_version, start_version, end_version, use_compression)
+        } else {
+            create_outputs_request(proof_version, start_version, end_version, use_compression)
+        };
 
         // Verify the serviceability of the request
         verify_serviceability(

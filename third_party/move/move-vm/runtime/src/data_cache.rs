@@ -3,9 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    module_traversal::TraversalContext,
     storage::{
+        loader::traits::{ModuleMetadataLoader, StructDefinitionLoader},
         module_storage::FunctionValueExtensionAdapter,
-        ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+        ty_layout_converter::LayoutConverter,
     },
     ModuleStorage,
 };
@@ -20,9 +22,10 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
+    gas::DependencyGasMeter,
     loaded_data::runtime_types::Type,
     resolver::ResourceResolver,
-    value_serde::ValueSerDeContext,
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::{BTreeMap, Entry};
@@ -77,7 +80,8 @@ impl TransactionDataCache {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
                 let function_value_extension = FunctionValueExtensionAdapter { module_storage };
-                ValueSerDeContext::new()
+                let max_value_nest_depth = function_value_extension.max_value_nest_depth();
+                ValueSerDeContext::new(max_value_nest_depth)
                     .with_func_args_deserialization(&function_value_extension)
                     .serialize(&value, &layout)?
                     .map(Into::into)
@@ -128,6 +132,10 @@ impl TransactionDataCache {
     /// Also returns the size of the loaded resource in bytes. This method does not add the entry
     /// to the cache - it is the caller's responsibility to add it there.
     pub(crate) fn create_data_cache_entry(
+        metadata_loader: &impl ModuleMetadataLoader,
+        layout_converter: &LayoutConverter<impl StructDefinitionLoader>,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
         module_storage: &dyn ModuleStorage,
         resource_resolver: &dyn ResourceResolver,
         addr: &AccountAddress,
@@ -141,17 +149,18 @@ impl TransactionDataCache {
             },
         };
 
-        // TODO(Gas): Shall we charge for this?
-        let (layout, contains_delayed_fields) = StorageLayoutConverter::new(module_storage)
-            .type_to_type_layout_with_identifier_mappings(ty)?;
+        let layout_with_delayed_fields = layout_converter.type_to_type_layout_with_delayed_fields(
+            gas_meter,
+            traversal_context,
+            ty,
+        )?;
 
         let (data, bytes_loaded) = {
-            let metadata = module_storage
-                .fetch_existing_module_metadata(
-                    &struct_tag.address,
-                    struct_tag.module.as_ident_str(),
-                )
-                .map_err(|err| err.to_partial())?;
+            let metadata = metadata_loader.load_module_metadata(
+                gas_meter,
+                traversal_context,
+                &struct_tag.module_id(),
+            )?;
 
             // If we need to process delayed fields, we pass type layout to remote storage. Remote
             // storage, in turn ensures that all delayed field values are pre-processed.
@@ -159,18 +168,16 @@ impl TransactionDataCache {
                 addr,
                 &struct_tag,
                 &metadata,
-                if contains_delayed_fields {
-                    Some(&layout)
-                } else {
-                    None
-                },
+                layout_with_delayed_fields.layout_when_contains_delayed_fields(),
             )?
         };
 
         let function_value_extension = FunctionValueExtensionAdapter { module_storage };
+        let (layout, contains_delayed_fields) = layout_with_delayed_fields.unpack();
         let value = match data {
             Some(blob) => {
-                let val = ValueSerDeContext::new()
+                let max_value_nest_depth = function_value_extension.max_value_nest_depth();
+                let val = ValueSerDeContext::new(max_value_nest_depth)
                     .with_func_args_deserialization(&function_value_extension)
                     .with_delayed_fields_serde()
                     .deserialize(&blob, &layout)

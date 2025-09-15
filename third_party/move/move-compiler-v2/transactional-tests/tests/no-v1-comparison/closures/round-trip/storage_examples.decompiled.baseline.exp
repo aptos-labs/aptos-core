@@ -1,0 +1,12 @@
+processed 3 tasks
+task 0 lines 3-24:  publish [module 0xc0ffee::m {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE:14:13
+   │
+14 │     fun foo(p0: &signer): u64 {
+   │             ^^
+
+
+task 1 lines 27-27:  run 0xc0ffee::m::init --signers 0xc0ffee
+task 2 lines 29-29:  run 0xc0ffee::m::fetch_and_run --signers 0xc0ffee
+return values: 7

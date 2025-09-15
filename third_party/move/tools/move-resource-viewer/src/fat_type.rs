@@ -9,7 +9,7 @@ use move_core_types::{
     ability::AbilitySet,
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{FunctionTag, StructTag, TypeTag},
+    language_storage::{FunctionParamOrReturnTag, FunctionTag, StructTag, TypeTag},
     value::{MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -218,7 +218,17 @@ impl FatFunctionType {
     pub fn fun_tag(&self, limiter: &mut Limiter) -> PartialVMResult<FunctionTag> {
         let tag_slice = |limiter: &mut Limiter, tys: &[FatType]| {
             tys.iter()
-                .map(|ty| ty.type_tag(limiter))
+                .map(|ty| {
+                    Ok(match ty {
+                        FatType::Reference(ty) => {
+                            FunctionParamOrReturnTag::Reference(ty.type_tag(limiter)?)
+                        },
+                        FatType::MutableReference(ty) => {
+                            FunctionParamOrReturnTag::MutableReference(ty.type_tag(limiter)?)
+                        },
+                        ty => FunctionParamOrReturnTag::Value(ty.type_tag(limiter)?),
+                    })
+                })
                 .collect::<PartialVMResult<Vec<_>>>()
         };
         Ok(FunctionTag {
@@ -366,8 +376,19 @@ impl FatType {
                     .map(|tys| Self::from_layout_slice(tys, limit))
                     .collect::<PartialVMResult<Vec<Vec<_>>>>()?,
             ),
-            // TODO(#15664): get rid of fat type to support captured functions.
-            Native(..) | Struct(_) | Function => {
+            Function => {
+                // We cannot derive the actual type from layout, however, a dummy
+                // function type will do since annotation of closures is not depending
+                // actually on their type, but only their (hidden) captured arguments.
+                // Currently, `from_runtime_layout` is only used to annotate captured arguments
+                // of closures.
+                FatType::Function(Box::new(FatFunctionType {
+                    args: vec![],
+                    results: vec![],
+                    abilities: AbilitySet::EMPTY,
+                }))
+            },
+            Native(..) | Struct(_) => {
                 return Err(PartialVMError::new_invariant_violation(format!(
                     "cannot derive fat type for {:?}",
                     layout
@@ -424,9 +445,24 @@ impl From<&StructTag> for FatStructType {
     }
 }
 
+impl From<&FunctionParamOrReturnTag> for FatType {
+    fn from(tag: &FunctionParamOrReturnTag) -> FatType {
+        use FatType::*;
+        match tag {
+            FunctionParamOrReturnTag::Reference(tag) => Reference(Box::new(tag.into())),
+            FunctionParamOrReturnTag::MutableReference(tag) => {
+                MutableReference(Box::new(tag.into()))
+            },
+            FunctionParamOrReturnTag::Value(tag) => tag.into(),
+        }
+    }
+}
+
 impl From<&FunctionTag> for FatFunctionType {
     fn from(fun_tag: &FunctionTag) -> FatFunctionType {
-        let into_slice = |tys: &[TypeTag]| tys.iter().map(|ty| ty.into()).collect::<Vec<FatType>>();
+        let into_slice = |tys: &[FunctionParamOrReturnTag]| {
+            tys.iter().map(|ty| ty.into()).collect::<Vec<FatType>>()
+        };
         FatFunctionType {
             args: into_slice(&fun_tag.args),
             results: into_slice(&fun_tag.results),

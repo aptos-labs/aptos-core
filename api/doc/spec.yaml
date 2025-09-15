@@ -11361,7 +11361,7 @@ paths:
       operationId: view
 components:
   schemas:
-    AbstractionSignature:
+    AbstractSignature:
       type: object
       required:
       - function_info
@@ -11401,7 +11401,7 @@ components:
       - $ref: '#/components/schemas/AccountSignature_SingleKeySignature'
       - $ref: '#/components/schemas/AccountSignature_MultiKeySignature'
       - $ref: '#/components/schemas/AccountSignature_NoAccountSignature'
-      - $ref: '#/components/schemas/AccountSignature_AbstractionSignature'
+      - $ref: '#/components/schemas/AccountSignature_AbstractSignature'
       discriminator:
         propertyName: type
         mapping:
@@ -11410,8 +11410,8 @@ components:
           single_key_signature: '#/components/schemas/AccountSignature_SingleKeySignature'
           multi_key_signature: '#/components/schemas/AccountSignature_MultiKeySignature'
           no_account_signature: '#/components/schemas/AccountSignature_NoAccountSignature'
-          abstraction_signature: '#/components/schemas/AccountSignature_AbstractionSignature'
-    AccountSignature_AbstractionSignature:
+          abstract_signature: '#/components/schemas/AccountSignature_AbstractSignature'
+    AccountSignature_AbstractSignature:
       allOf:
       - type: object
         required:
@@ -11420,9 +11420,9 @@ components:
           type:
             type: string
             enum:
-            - abstraction_signature
-            example: abstraction_signature
-      - $ref: '#/components/schemas/AbstractionSignature'
+            - abstract_signature
+            example: abstract_signature
+      - $ref: '#/components/schemas/AbstractSignature'
     AccountSignature_Ed25519Signature:
       allOf:
       - type: object

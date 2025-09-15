@@ -1,2 +1,1 @@
-spec aptos_experimental::confidential_asset {
-}
+spec aptos_experimental::confidential_asset {}

@@ -1,1 +1,4 @@
 processed 3 tasks
+task 0 lines 1-5:  publish [module 0x42.Hash {]
+task 1 lines 7-10:  publish [module 0x43.Hash {]
+task 2 lines 12-15:  publish [module 0x44.Hash {]

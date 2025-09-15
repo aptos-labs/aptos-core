@@ -1,4 +1,4 @@
 processed 2 tasks
-
-task 1 'run'. lines 24-24:
+task 0 lines 1-22:  publish [module 0xCAFE::Module1 {]
+task 1 lines 24-24:  run 0xCAFE::Module1::function6
 return values: { 21859, 1399722001, 154, 1399722001, 1399722001 }
