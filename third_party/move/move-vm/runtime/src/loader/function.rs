@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    interpreter_caches::TyArgsFingerprint,
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
@@ -639,9 +640,11 @@ impl Function {
 // A function instantiation.
 #[derive(Clone, Debug)]
 pub(crate) struct FunctionInstantiation {
-    // index to `ModuleCache::functions` global table
     pub(crate) handle: FunctionHandle,
     pub(crate) instantiation: Vec<Type>,
+    // Unique ID for type arg instantiation. If type arguments are non-generic, is set. For generic
+    // type arguments kept not set.
+    pub(crate) fingerprint: Option<TyArgsFingerprint>,
 }
 
 #[derive(Clone, Debug)]
