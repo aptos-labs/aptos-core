@@ -212,7 +212,7 @@ impl DB {
             .map_err(Into::into)
     }
 
-    pub fn new_native_batch(&self) -> NativeBatch {
+    pub fn new_native_batch(&self) -> NativeBatch<'_> {
         NativeBatch::new(self)
     }
 
@@ -236,7 +236,7 @@ impl DB {
         &self,
         opts: ReadOptions,
         direction: ScanDirection,
-    ) -> DbResult<SchemaIterator<S>> {
+    ) -> DbResult<SchemaIterator<'_, S>> {
         let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
         Ok(SchemaIterator::new(
             self.inner.raw_iterator_cf_opt(cf_handle, opts),
@@ -245,22 +245,25 @@ impl DB {
     }
 
     /// Returns a forward [`SchemaIterator`] on a certain schema.
-    pub fn iter<S: Schema>(&self) -> DbResult<SchemaIterator<S>> {
+    pub fn iter<S: Schema>(&self) -> DbResult<SchemaIterator<'_, S>> {
         self.iter_with_opts(ReadOptions::default())
     }
 
     /// Returns a forward [`SchemaIterator`] on a certain schema, with non-default ReadOptions
-    pub fn iter_with_opts<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
+    pub fn iter_with_opts<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<'_, S>> {
         self.iter_with_direction::<S>(opts, ScanDirection::Forward)
     }
 
     /// Returns a backward [`SchemaIterator`] on a certain schema.
-    pub fn rev_iter<S: Schema>(&self) -> DbResult<SchemaIterator<S>> {
+    pub fn rev_iter<S: Schema>(&self) -> DbResult<SchemaIterator<'_, S>> {
         self.rev_iter_with_opts(ReadOptions::default())
     }
 
     /// Returns a backward [`SchemaIterator`] on a certain schema, with non-default ReadOptions
-    pub fn rev_iter_with_opts<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
+    pub fn rev_iter_with_opts<S: Schema>(
+        &self,
+        opts: ReadOptions,
+    ) -> DbResult<SchemaIterator<'_, S>> {
         self.iter_with_direction::<S>(opts, ScanDirection::Backward)
     }
 

@@ -236,7 +236,7 @@ impl TwoChainTimeoutWithPartialSignatures {
 
     /// Returns the signatures certifying the round
     pub fn signers(&self) -> impl Iterator<Item = &Author> {
-        self.signatures.signatures().iter().map(|(k, _)| k)
+        self.signatures.signatures().keys()
     }
 
     /// Add a new timeout message from author, the timeout should already be verified in upper layer.

@@ -26,6 +26,8 @@ xclippy = [
   "-Aclippy::obfuscated-if-else",
   "-Aclippy::unnecessary-map-or",
   "-Aclippy::nonminimal-bool",
+  "-Aclippy::unnecessary-unwrap",
+  "-Aclippy::large-enum-variant",
 ]
 x = "run --package aptos-cargo-cli --bin aptos-cargo-cli --"
 

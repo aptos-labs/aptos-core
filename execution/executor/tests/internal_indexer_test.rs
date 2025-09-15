@@ -127,7 +127,7 @@ pub fn create_test_db() -> (Arc<AptosDB>, LocalAccount) {
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
         .unwrap();
-    let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, &[signer.clone()]);
+    let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, std::slice::from_ref(&signer));
     executor.commit_blocks(vec![block1_id], li1).unwrap();
     (aptos_db, core_resources_account)
 }
