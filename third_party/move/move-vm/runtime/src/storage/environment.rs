@@ -30,7 +30,10 @@ use move_vm_metrics::{Timer, VERIFIED_MODULE_CACHE_SIZE, VM_TIMER};
 use move_vm_types::loaded_data::{
     runtime_types::StructIdentifier, struct_name_indexing::StructNameIndex,
 };
-use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap};
+use move_vm_types::{
+    loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap},
+    ty_interner::TypeContext,
+};
 use std::sync::Arc;
 
 const OPTION_MODULE_BYTES: &[u8] = include_bytes!("option.mv");
@@ -60,6 +63,9 @@ pub struct RuntimeEnvironment {
     /// Caches struct tags for instantiated types. This cache can be used concurrently and
     /// speculatively because type tag information does not change with module publishes.
     ty_tag_cache: Arc<TypeTagCache>,
+
+    /// Context for interning type representation. Same lifetime as struct index map.
+    ty_context: Arc<TypeContext>,
 }
 
 impl RuntimeEnvironment {
@@ -98,12 +104,18 @@ impl RuntimeEnvironment {
             natives,
             struct_name_index_map: Arc::new(StructNameIndexMap::empty()),
             ty_tag_cache: Arc::new(TypeTagCache::empty()),
+            ty_context: Arc::new(TypeContext::new()),
         }
     }
 
     /// Returns the config currently used by this runtime environment.
     pub fn vm_config(&self) -> &VMConfig {
         &self.vm_config
+    }
+
+    /// Returns the type context for interning that is currently used by this runtime environment.
+    pub fn ty_context(&self) -> &TypeContext {
+        &self.ty_context
     }
 
     /// Enables delayed field optimization for this environment.
@@ -139,8 +151,12 @@ impl RuntimeEnvironment {
                 .iter()
                 .map(|module| module.as_ref().as_ref()),
         )?;
-        Script::new(locally_verified_script.0, self.struct_name_index_map())
-            .map_err(|err| err.finish(Location::Script))
+        Script::new(
+            locally_verified_script.0,
+            self.struct_name_index_map(),
+            self.ty_context(),
+        )
+        .map_err(|err| err.finish(Location::Script))
     }
 
     /// Creates a locally verified compiled module by running:
@@ -190,6 +206,7 @@ impl RuntimeEnvironment {
             locally_verified_module.1,
             locally_verified_module.0,
             self.struct_name_index_map(),
+            self.ty_context(),
         );
 
         // Note: loader V1 implementation does not set locations for this error.
@@ -207,6 +224,7 @@ impl RuntimeEnvironment {
             locally_verified_module.1,
             locally_verified_module.0,
             self.struct_name_index_map(),
+            self.ty_context(),
         )
         .map_err(|err| err.finish(Location::Undefined))
     }
@@ -323,9 +341,10 @@ impl RuntimeEnvironment {
 
     /// Flushes the global caches with struct name indices and struct tags. Note that when calling
     /// this function, modules that still store indices into struct name cache must also be flushed.
-    pub fn flush_struct_name_and_tag_caches(&self) {
+    pub fn flush_all_caches(&self) {
         self.ty_tag_cache.flush();
         self.struct_name_index_map.flush();
+        self.ty_context.flush();
     }
 
     /// Flushes the global verified module cache. Should be used when verifier configuration has
@@ -384,6 +403,7 @@ impl Clone for RuntimeEnvironment {
             natives: self.natives.clone(),
             struct_name_index_map: Arc::clone(&self.struct_name_index_map),
             ty_tag_cache: Arc::clone(&self.ty_tag_cache),
+            ty_context: Arc::clone(&self.ty_context),
         }
     }
 }
