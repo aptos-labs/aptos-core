@@ -1,0 +1,28 @@
+processed 1 task
+task 0 lines 2-14:  print-bytecode --input=module [module 0xc0ffee::m {]
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun id_mut<T0>(l0: &mut T0): &mut T0
+    move_loc l0
+    ret
+
+// Function definition at index 1
+fun t0()
+    local l0: u64
+    local l1: &mut u64
+    ld_u64 0
+    st_loc l0
+    mut_borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    // @5
+    read_ref
+    pop
+    move_loc l1
+    read_ref
+    pop
+    // @10
+    ret
+
+
