@@ -28,12 +28,12 @@ use std::collections::BTreeSet;
 /// [TODO]: tune the heuristic limits below
 /// A conservative heuristic limit posed by the inlining optimization on how
 /// large a caller function can grow to due to inlining.
-const MAX_CALLER_CODE_SIZE: usize = 4096;
+const MAX_CALLER_CODE_SIZE: usize = 512;
 /// A conservative heuristic limit posed by the inlining optimization on how
 /// large a callee function can be for it to be considered for inlining.
-const MAX_CALLEE_CODE_SIZE: usize = 256;
+const MAX_CALLEE_CODE_SIZE: usize = 64;
 /// Number of times we want to apply "unrolling" of functions with inlining.
-const UNROLL_DEPTH: usize = 10;
+const UNROLL_DEPTH: usize = 4;
 
 /// Optimize functions in target modules by applying inlining transformations.
 /// With inlining, a call site of the form:
@@ -61,13 +61,13 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
             let function = env.get_function(*function_id);
             // We will consider inlining the callees in a function on if it satisfies all of:
             // - is not a part of a cycle in the call graph
-            // - is in a primary target module
+            // - [as a hack, this is currently turned off] is in a primary target module
             // - is not in a script module
             // - is not a test only function
             // - is not a native function
             // - is not an inline function
             !skip_functions.contains(function_id)
-                && function.module_env.is_primary_target()
+                // && function.module_env.is_primary_target()
                 && !function.module_env.is_script_module()
                 && !function.is_test_only()
                 && !function.is_native()

@@ -109,12 +109,12 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::INLINING_OPTIMIZATION.to_string(),
             description: "Turns on or off inlining optimizations".to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::ACROSS_PACKAGE_INLINING.to_string(),
             description: "Turns on or off inlining across package boundaries".to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::SPEC_CHECK.to_string(),
@@ -221,7 +221,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             name: Experiment::AST_SIMPLIFY_FULL.to_string(),
             description: "Whether to run the ast simplifier, including code elimination"
                 .to_string(),
-            default: Inherited(Experiment::OPTIMIZE_EXTRA.to_string()),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::ATTACH_COMPILED_MODULE.to_string(),

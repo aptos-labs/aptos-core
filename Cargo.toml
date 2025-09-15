@@ -525,7 +525,7 @@ version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
-blst = "0.3.15"
+blst = "0.3.11"
 # The __private_bench feature exposes the Fp12 type which we need to implement a multi-threaded multi-pairing.
 blstrs = { version = "0.7.1", features = ["serde", "__private_bench"] }
 bollard = "0.15"
