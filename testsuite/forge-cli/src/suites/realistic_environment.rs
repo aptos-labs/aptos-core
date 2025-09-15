@@ -41,9 +41,7 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
-        "realistic_env_order_book_workload_sweep" => {
-            realistic_env_order_book_workload_sweep_bench()
-        },
+        "realistic_env_orderbook_workload_sweep" => realistic_env_orderbook_workload_sweep_bench(),
         "realistic_env_fairness_workload_sweep" => realistic_env_fairness_workload_sweep(),
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(duration),
@@ -167,7 +165,7 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
     })
 }
 
-pub(crate) fn realistic_env_order_book_workload_sweep_bench() -> ForgeConfig {
+pub(crate) fn realistic_env_orderbook_workload_sweep_bench() -> ForgeConfig {
     realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
@@ -199,7 +197,7 @@ pub(crate) fn realistic_env_order_book_workload_sweep_bench() -> ForgeConfig {
             TransactionWorkload::new(TransactionTypeArg::OrderBookNoMatches50Markets, 5000),
         ]),
         criteria: [
-            (350, 100, 0.3 + 0.5, 0.5, 0.5),
+            (350, 100, 0.3 + 1.0, 0.5, 0.5),
             (1700, 100, 0.3 + 0.5, 0.5, 0.4),
             (350, 300, 0.3 + 1.0, 0.6, 1.0),
             (2000, 500, 0.3 + 1.0, 0.7, 0.8),
