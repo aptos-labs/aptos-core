@@ -1,6 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(unsafe_op_in_unsafe_fn)]
+#![allow(clippy::mut_from_ref)]
+
 pub mod hashing;
 pub mod in_mem;
 mod metrics;
