@@ -2346,6 +2346,7 @@ module aptos_std::big_ordered_map {
             assert spec_get(map, 4) == 6;
             assert option::spec_is_some(result_2);
             assert option::spec_borrow(result_2) == 5;
+            assert !spec_contains_key(map, 10);
         };
         spec {
             assert keys[0] == 1;

@@ -3429,6 +3429,7 @@ Given a path to node (excluding the node itself), which is currently stored unde
 <b>ensures</b> [abstract] <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="big_ordered_map.md#0x1_big_ordered_map_spec_len">spec_len</a>(<b>old</b>(self)) == <a href="big_ordered_map.md#0x1_big_ordered_map_spec_len">spec_len</a>(self);
 <b>ensures</b> [abstract] <b>forall</b> k: K: <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), k) && k != key ==&gt; <a href="big_ordered_map.md#0x1_big_ordered_map_spec_get">spec_get</a>(<b>old</b>(self), k) == <a href="big_ordered_map.md#0x1_big_ordered_map_spec_get">spec_get</a>(self, k);
 <b>ensures</b> [abstract] <b>forall</b> k: K: <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), k) ==&gt; <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k);
+<b>ensures</b> [abstract] <b>forall</b> k: K: <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) ==&gt; (k == key || <a href="big_ordered_map.md#0x1_big_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), k));
 </code></pre>
 
 
