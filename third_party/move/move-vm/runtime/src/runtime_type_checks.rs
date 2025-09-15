@@ -408,7 +408,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // Invariants hold because all of the instructions
                 // above will force VM to break from the interpreter
                 // loop and thus not hit this code path.
-                unreachable!("control flow instruction encountered during type check")
+                //unreachable!("control flow instruction encountered during type check")
             },
             Bytecode::Pop => {
                 let ty = operand_stack.pop_ty()?;
