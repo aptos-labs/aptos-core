@@ -129,6 +129,7 @@ impl Script {
             access_specifier: AccessSpecifier::Any,
             is_persistent: false,
             has_module_reentrancy_lock: false,
+            is_fast_callable: false, // TODO(FASTCALL): fastcall for script functions
         });
 
         let single_signature_token_map = load_single_signatures_for_script(&script, &struct_names)?;

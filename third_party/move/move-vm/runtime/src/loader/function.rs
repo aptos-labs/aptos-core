@@ -55,6 +55,7 @@ pub struct Function {
     pub(crate) access_specifier: AccessSpecifier,
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
+    pub(crate) is_fast_callable: bool,
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
@@ -499,6 +500,117 @@ impl Debug for Function {
     }
 }
 
+fn is_fast_callable(_module: &CompiledModule, code: &[Bytecode]) -> bool {
+    use Bytecode::*;
+
+    // Check if the function only contains allowed instructions
+    for instruction in code {
+        match instruction {
+            // Disallowed instructions
+            CallClosure(_)
+            | Pack(_)
+            | PackVariant(_)
+            | PackGeneric(_)
+            | PackVariantGeneric(_)
+            | PackClosure(_, _)
+            | PackClosureGeneric(_, _)
+            | MutBorrowGlobal(_)
+            | ImmBorrowGlobal(_)
+            | MutBorrowGlobalGeneric(_)
+            | ImmBorrowGlobalGeneric(_)
+            | Exists(_)
+            | ExistsGeneric(_)
+            | MoveFrom(_)
+            | MoveFromGeneric(_)
+            | MoveTo(_)
+            | MoveToGeneric(_)
+            | VecPack(_, _) => {
+                return false;
+            },
+            // Disallowed for now, but may be allowed in the future
+            Call(_) | CallGeneric(_) => {
+                return false;
+            },
+
+            // Allowed instructions
+            Pop
+            | Ret
+            | BrTrue(_)
+            | BrFalse(_)
+            | Branch(_)
+            | LdU8(_)
+            | LdU16(_)
+            | LdU32(_)
+            | LdU64(_)
+            | LdU128(_)
+            | LdU256(_)
+            | LdConst(_)
+            | CastU8
+            | CastU16
+            | CastU32
+            | CastU64
+            | CastU128
+            | CastU256
+            | LdTrue
+            | LdFalse
+            | CopyLoc(_)
+            | MoveLoc(_)
+            | StLoc(_)
+            | Unpack(_)
+            | UnpackGeneric(_)
+            | ReadRef
+            | WriteRef
+            | FreezeRef
+            | MutBorrowLoc(_)
+            | ImmBorrowLoc(_)
+            | ImmBorrowField(_)
+            | ImmBorrowFieldGeneric(_)
+            | MutBorrowField(_)
+            | MutBorrowFieldGeneric(_)
+            | MutBorrowVariantField(_)
+            | MutBorrowVariantFieldGeneric(_)
+            | ImmBorrowVariantField(_)
+            | ImmBorrowVariantFieldGeneric(_)
+            | UnpackVariant(_)
+            | UnpackVariantGeneric(_)
+            | TestVariant(_)
+            | TestVariantGeneric(_)
+            | Add
+            | Sub
+            | Mul
+            | Mod
+            | Div
+            | BitOr
+            | BitAnd
+            | Xor
+            | Or
+            | And
+            | Not
+            | Eq
+            | Neq
+            | Lt
+            | Gt
+            | Le
+            | Ge
+            | Abort
+            | Nop
+            | Shl
+            | Shr
+            | VecLen(_)
+            | VecImmBorrow(_)
+            | VecMutBorrow(_)
+            | VecPushBack(_)
+            | VecPopBack(_)
+            | VecUnpack(_, _)
+            | VecSwap(_) => {
+                continue;
+            },
+        }
+    }
+
+    true
+}
+
 impl Function {
     pub(crate) fn new(
         natives: &NativeFunctions,
@@ -545,6 +657,8 @@ impl Function {
             &handle.access_specifiers,
         )?;
 
+        let is_fast_callable = !is_native && is_fast_callable(module, &code);
+
         Ok(Self {
             file_format_version: module.version(),
             index,
@@ -561,6 +675,7 @@ impl Function {
             access_specifier,
             is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
             has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
+            is_fast_callable,
         })
     }
 

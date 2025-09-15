@@ -452,6 +452,13 @@ impl ValueImpl {
     }
 }
 
+impl Value {
+    #[inline(always)]
+    pub fn copy_value(&self) -> PartialVMResult<Self> {
+        Ok(Self(self.0.copy_value(1, Some(128))?))
+    }
+}
+
 impl Container {
     #[inline(always)]
     fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
@@ -1857,6 +1864,11 @@ impl Value {
     }
 
     #[inline(always)]
+    pub fn invalid() -> Self {
+        Self(ValueImpl::Invalid)
+    }
+
+    #[inline(always)]
     pub fn u8(x: u8) -> Self {
         Self(ValueImpl::U8(x))
     }
@@ -2851,7 +2863,10 @@ impl VectorRef {
             Container::VecBool(r) => r.borrow().len(),
             Container::VecAddress(r) => r.borrow().len(),
             Container::Vec(r) => r.borrow().len(),
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                println!("{:?}", c);
+                unreachable!()
+            }
         };
         Ok(len)
     }
