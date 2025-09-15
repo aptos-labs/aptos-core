@@ -30,7 +30,7 @@ use move_vm_types::{
     gas::DependencyGasMeter,
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
-        runtime_types::{StructIdentifier, Type},
+        runtime_types::{MaybeGenericType, StructIdentifier, Type},
     },
     values::{AbstractFunction, SerializedFunctionData},
 };
@@ -49,9 +49,9 @@ pub struct Function {
     pub(crate) visibility: Visibility,
     pub(crate) is_entry: bool,
     pub(crate) name: Identifier,
-    pub(crate) return_tys: Vec<Type>,
-    pub(crate) local_tys: Vec<Type>,
-    pub(crate) param_tys: Vec<Type>,
+    pub(crate) return_tys: Vec<MaybeGenericType>,
+    pub(crate) local_tys: Vec<MaybeGenericType>,
+    pub(crate) param_tys: Vec<MaybeGenericType>,
     pub(crate) access_specifier: AccessSpecifier,
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
@@ -218,19 +218,21 @@ impl LazyLoadedFunction {
         mask.extract(fun.param_tys(), true)
             .into_iter()
             .map(|ty| {
-                let layout = if fun.ty_args.is_empty() {
-                    layout_converter.type_to_type_layout_with_delayed_fields(
-                        gas_meter,
-                        traversal_context,
-                        ty,
-                    )?
-                } else {
-                    let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
-                    layout_converter.type_to_type_layout_with_delayed_fields(
-                        gas_meter,
-                        traversal_context,
-                        &ty,
-                    )?
+                let layout = match ty {
+                    MaybeGenericType::NeedsInstantiation(ty) => {
+                        let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
+                        layout_converter.type_to_type_layout_with_delayed_fields(
+                            gas_meter,
+                            traversal_context,
+                            &ty,
+                        )?
+                    },
+                    MaybeGenericType::Instantiated(ty) => layout_converter
+                        .type_to_type_layout_with_delayed_fields(
+                            gas_meter,
+                            traversal_context,
+                            ty,
+                        )?,
                 };
 
                 // Do not allow delayed fields to be serialized.
@@ -431,12 +433,12 @@ impl LoadedFunction {
     }
 
     /// Returns parameter types from the function's definition signature.
-    pub fn param_tys(&self) -> &[Type] {
+    pub fn param_tys(&self) -> &[MaybeGenericType] {
         self.function.param_tys()
     }
 
     /// Returns return types from the function's definition signature.
-    pub fn return_tys(&self) -> &[Type] {
+    pub fn return_tys(&self) -> &[MaybeGenericType] {
         self.function.return_tys()
     }
 
@@ -446,7 +448,7 @@ impl LoadedFunction {
     }
 
     /// Returns types of locals, defined by this function.
-    pub fn local_tys(&self) -> &[Type] {
+    pub fn local_tys(&self) -> &[MaybeGenericType] {
         self.function.local_tys()
     }
 
@@ -502,7 +504,7 @@ impl Function {
         natives: &NativeFunctions,
         index: FunctionDefinitionIndex,
         module: &CompiledModule,
-        signature_table: &[Vec<Type>],
+        signature_table: &[Vec<MaybeGenericType>],
         struct_names: &[StructIdentifier],
     ) -> PartialVMResult<Self> {
         let def = module.function_def_at(index);
@@ -588,15 +590,15 @@ impl Function {
         self.ty_param_abilities.len()
     }
 
-    pub(crate) fn local_tys(&self) -> &[Type] {
+    pub(crate) fn local_tys(&self) -> &[MaybeGenericType] {
         &self.local_tys
     }
 
-    pub fn return_tys(&self) -> &[Type] {
+    pub fn return_tys(&self) -> &[MaybeGenericType] {
         &self.return_tys
     }
 
-    pub fn param_tys(&self) -> &[Type] {
+    pub fn param_tys(&self) -> &[MaybeGenericType] {
         &self.param_tys
     }
 
@@ -641,7 +643,7 @@ impl Function {
 pub(crate) struct FunctionInstantiation {
     // index to `ModuleCache::functions` global table
     pub(crate) handle: FunctionHandle,
-    pub(crate) instantiation: Vec<Type>,
+    pub(crate) instantiation: Vec<MaybeGenericType>,
 }
 
 #[derive(Clone, Debug)]

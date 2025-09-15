@@ -12,6 +12,7 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use move_vm_runtime::Function;
+use move_vm_types::loaded_data::runtime_types::MaybeGenericType;
 
 fn is_signer_or_signer_reference(token: &SignatureToken) -> bool {
     match token {
@@ -85,7 +86,10 @@ pub(crate) fn verify_init_module_function(function: &Function) -> Result<(), VMS
         ));
     }
 
-    let arg_ty = &param_tys[0];
+    let arg_ty = match &param_tys[0] {
+        MaybeGenericType::NeedsInstantiation(_) => unreachable!(),
+        MaybeGenericType::Instantiated(ty) => ty,
+    };
     if !arg_ty.is_signer_or_signer_ref() {
         return err(
             "init_module function expects a single signer or &signer parameter, \

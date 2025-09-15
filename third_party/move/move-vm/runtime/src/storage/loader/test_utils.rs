@@ -13,7 +13,9 @@ use move_core_types::{
 use move_vm_types::{
     gas::DependencyGasMeter,
     loaded_data::{
-        runtime_types::{AbilityInfo, StructIdentifier, StructLayout, StructType, Type},
+        runtime_types::{
+            AbilityInfo, MaybeGenericType, StructIdentifier, StructLayout, StructType, Type,
+        },
         struct_name_indexing::StructNameIndex,
     },
 };
@@ -23,7 +25,7 @@ use std::{cell::RefCell, collections::HashMap, str::FromStr, sync::Arc};
 /// Creates a dummy struct definition.
 pub(crate) fn struct_definition(
     idx: StructNameIndex,
-    fields: Vec<(Identifier, Type)>,
+    fields: Vec<(Identifier, MaybeGenericType)>,
 ) -> StructType {
     StructType {
         idx,
@@ -38,7 +40,7 @@ pub(crate) fn struct_definition(
 /// Creates a dummy enum definition.
 pub(crate) fn enum_definition(
     idx: StructNameIndex,
-    variants: Vec<(Identifier, Vec<(Identifier, Type)>)>,
+    variants: Vec<(Identifier, Vec<(Identifier, MaybeGenericType)>)>,
 ) -> StructType {
     StructType {
         idx,
@@ -104,7 +106,7 @@ impl MockStructDefinitionLoader {
             .into_iter()
             .map(|(name, field_ty)| {
                 let field_name = Identifier::from_str(name).unwrap();
-                (field_name, field_ty)
+                (field_name, MaybeGenericType::NeedsInstantiation(field_ty))
             })
             .collect();
 
@@ -131,7 +133,7 @@ impl MockStructDefinitionLoader {
                     .into_iter()
                     .map(|(name, field_ty)| {
                         let field_name = Identifier::from_str(name).unwrap();
-                        (field_name, field_ty)
+                        (field_name, MaybeGenericType::NeedsInstantiation(field_ty))
                     })
                     .collect::<Vec<_>>();
                 (variant_name, fields)

@@ -17,7 +17,7 @@ use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::DependencyGasMeter,
     loaded_data::{
-        runtime_types::{StructIdentifier, StructLayout, Type},
+        runtime_types::{MaybeGenericType, StructIdentifier, StructLayout, Type},
         struct_name_indexing::StructNameIndex,
     },
 };
@@ -417,13 +417,18 @@ where
     /// Apples type substitution to struct or variant fields.
     fn apply_subst_for_field_tys(
         &self,
-        field_tys: &[(Identifier, Type)],
+        field_tys: &[(Identifier, MaybeGenericType)],
         ty_args: &[Type],
     ) -> PartialVMResult<Vec<Type>> {
         let ty_builder = &self.vm_config().ty_builder;
         field_tys
             .iter()
-            .map(|(_, ty)| ty_builder.create_ty_with_subst(ty, ty_args))
+            .map(|(_, ty)| match ty {
+                MaybeGenericType::NeedsInstantiation(ty) => {
+                    ty_builder.create_ty_with_subst(ty, ty_args)
+                },
+                MaybeGenericType::Instantiated(ty) => Ok(ty.clone()),
+            })
             .collect::<PartialVMResult<Vec<_>>>()
     }
 }

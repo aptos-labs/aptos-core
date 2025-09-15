@@ -11,7 +11,7 @@ use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::DependencyGasMeter,
     loaded_data::{
-        runtime_types::{DepthFormula, StructIdentifier, StructLayout, Type},
+        runtime_types::{DepthFormula, MaybeGenericType, StructIdentifier, StructLayout, Type},
         struct_name_indexing::StructNameIndex,
     },
 };
@@ -235,6 +235,10 @@ where
             StructLayout::Single(fields) => fields
                 .iter()
                 .map(|(_, field_ty)| {
+                    let field_ty = match field_ty {
+                        MaybeGenericType::NeedsInstantiation(field_ty) => field_ty,
+                        MaybeGenericType::Instantiated(field_ty) => field_ty,
+                    };
                     self.calculate_type_depth_formula(
                         gas_meter,
                         traversal_context,
@@ -247,6 +251,10 @@ where
                 .iter()
                 .flat_map(|variant| variant.1.iter().map(|(_, ty)| ty))
                 .map(|field_ty| {
+                    let field_ty = match field_ty {
+                        MaybeGenericType::NeedsInstantiation(field_ty) => field_ty,
+                        MaybeGenericType::Instantiated(field_ty) => field_ty,
+                    };
                     self.calculate_type_depth_formula(
                         gas_meter,
                         traversal_context,

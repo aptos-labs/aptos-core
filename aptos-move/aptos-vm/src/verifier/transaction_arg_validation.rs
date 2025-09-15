@@ -37,6 +37,7 @@ use std::{
     collections::BTreeMap,
     io::{Cursor, Read},
 };
+use move_vm_types::loaded_data::runtime_types::MaybeGenericType;
 
 pub(crate) struct FunctionId {
     module_id: ModuleId,
@@ -127,6 +128,10 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     let mut signer_param_cnt = 0;
     // find all signer params at the beginning
     for ty in func.param_tys() {
+        let ty = match ty {
+            MaybeGenericType::NeedsInstantiation(ty) => ty,
+            MaybeGenericType::Instantiated(ty) => ty,
+        };
         if ty.is_signer_or_signer_ref() {
             signer_param_cnt += 1;
         }
@@ -137,7 +142,11 @@ pub(crate) fn validate_combine_signer_and_txn_args(
 
     // Need to keep this here to ensure we return the historic correct error code for replay
     for ty in func.param_tys()[signer_param_cnt..].iter() {
-        let subst_res = ty_builder.create_ty_with_subst(ty, func.ty_args());
+        let subst_res = match ty {
+            MaybeGenericType::NeedsInstantiation(ty) => ty_builder.create_ty_with_subst(ty, func.ty_args()),
+            MaybeGenericType::Instantiated(ty) => Ok(ty.clone()),
+        };
+
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
         let valid = is_valid_txn_arg(loader.runtime_environment(), &ty, allowed_structs);
         if !valid {
@@ -232,7 +241,7 @@ pub(crate) fn construct_args(
     loader: &impl Loader,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
-    types: &[Type],
+    types: &[MaybeGenericType],
     args: Vec<Vec<u8>>,
     ty_args: &[Type],
     allowed_structs: &ConstructorMap,
@@ -246,7 +255,10 @@ pub(crate) fn construct_args(
 
     let ty_builder = &loader.runtime_environment().vm_config().ty_builder;
     for (ty, arg) in types.iter().zip(args) {
-        let subst_res = ty_builder.create_ty_with_subst(ty, ty_args);
+        let subst_res = match ty {
+            MaybeGenericType::NeedsInstantiation(ty) => ty_builder.create_ty_with_subst(ty, ty_args),
+            MaybeGenericType::Instantiated(ty) => Ok(ty.clone()),
+        };
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
         let arg = construct_arg(
             session,
@@ -480,9 +492,14 @@ fn validate_and_construct(
     let ty_builder = &loader.runtime_environment().vm_config().ty_builder;
     for param_ty in function.param_tys() {
         let mut arg = vec![];
-        let arg_ty = ty_builder
-            .create_ty_with_subst(param_ty, function.ty_args())
-            .unwrap();
+        let arg_ty = match param_ty {
+            MaybeGenericType::NeedsInstantiation(param_ty) => {
+                ty_builder
+                    .create_ty_with_subst(param_ty, function.ty_args())
+                    .unwrap()
+            }
+            MaybeGenericType::Instantiated(param_ty) => param_ty.clone(),
+        };
 
         recursively_construct_arg(
             session,
@@ -591,7 +608,12 @@ fn load_constructor_function(
     }
 
     let mut map = TypeParamMap::default();
-    if !map.match_ty(&function.return_tys()[0], expected_return_ty) {
+    let return_ty = match &function.return_tys()[0] {
+        MaybeGenericType::NeedsInstantiation(ty) => ty,
+        MaybeGenericType::Instantiated(ty) => ty,
+    };
+
+    if !map.match_ty(return_ty, expected_return_ty) {
         // For functions that are marked constructor this should not happen.
         return Err(
             PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)

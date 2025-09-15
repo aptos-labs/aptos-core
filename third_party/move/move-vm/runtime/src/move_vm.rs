@@ -21,7 +21,7 @@ use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::Type,
+    loaded_data::runtime_types::{MaybeGenericType, Type},
     resolver::ResourceResolver,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{Locals, Reference, VMValueCast, Value},
@@ -73,10 +73,15 @@ impl MoveVM {
         let layout_converter = LayoutConverter::new(loader);
         let ty_depth_checker = TypeDepthChecker::new(loader);
 
-        let create_ty_with_subst = |tys: &[Type]| -> VMResult<Vec<Type>> {
+        let create_ty_with_subst = |tys: &[MaybeGenericType]| -> VMResult<Vec<Type>> {
             let ty_builder = &vm_config.ty_builder;
             tys.iter()
-                .map(|ty| ty_builder.create_ty_with_subst(ty, function.ty_args()))
+                .map(|ty| match ty {
+                    MaybeGenericType::NeedsInstantiation(ty) => {
+                        ty_builder.create_ty_with_subst(ty, function.ty_args())
+                    },
+                    MaybeGenericType::Instantiated(ty) => Ok(ty.clone()),
+                })
                 .collect::<PartialVMResult<Vec<_>>>()
                 .map_err(|err| err.finish(Location::Undefined))
         };

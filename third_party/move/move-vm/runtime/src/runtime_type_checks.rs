@@ -11,7 +11,7 @@ use move_core_types::{
     function::ClosureMask,
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use move_vm_types::loaded_data::runtime_types::{Type, TypeBuilder};
+use move_vm_types::loaded_data::runtime_types::{MaybeGenericType, Type, TypeBuilder};
 
 pub(crate) trait RuntimeTypeCheck {
     /// Paranoid type checks to perform before instruction execution.
@@ -157,8 +157,8 @@ pub fn verify_pack_closure(
         .into_iter()
         .zip(given_capture_tys.into_iter())
     {
-        expected.paranoid_check_is_no_ref("Captured argument type")?;
         with_instantiation(ty_builder, func, expected, |expected| {
+            expected.paranoid_check_is_no_ref("Captured argument type")?;
             // Intersect the captured type with the accumulated abilities
             abilities = abilities.intersect(given.abilities()?);
             given.paranoid_check_assignable(expected)
@@ -187,26 +187,28 @@ pub fn verify_pack_closure(
 fn with_instantiation<R>(
     ty_builder: &TypeBuilder,
     func: &LoadedFunction,
-    ty: &Type,
+    ty: &MaybeGenericType,
     action: impl FnOnce(&Type) -> PartialVMResult<R>,
 ) -> PartialVMResult<R> {
-    if func.ty_args().is_empty() {
-        action(ty)
-    } else {
-        action(&ty_builder.create_ty_with_subst(ty, func.ty_args())?)
+    match ty {
+        MaybeGenericType::NeedsInstantiation(ty) => {
+            action(&ty_builder.create_ty_with_subst(ty, func.ty_args())?)
+        },
+        MaybeGenericType::Instantiated(ty) => action(ty),
     }
 }
 
 fn with_owned_instantiation<R>(
     ty_builder: &TypeBuilder,
     func: &LoadedFunction,
-    ty: &Type,
+    ty: &MaybeGenericType,
     action: impl FnOnce(Type) -> PartialVMResult<R>,
 ) -> PartialVMResult<R> {
-    if func.ty_args().is_empty() {
-        action(ty.clone())
-    } else {
-        action(ty_builder.create_ty_with_subst(ty, func.ty_args())?)
+    match ty {
+        MaybeGenericType::NeedsInstantiation(ty) => {
+            action(ty_builder.create_ty_with_subst(ty, func.ty_args())?)
+        },
+        MaybeGenericType::Instantiated(ty) => action(ty.clone()),
     }
 }
 
@@ -503,7 +505,10 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let ty = operand_stack.pop_ty()?;
                 let expected_ty = frame.create_struct_ty(&field_info.definition_struct_type);
                 ty.paranoid_check_ref_eq(&expected_ty, is_mut)?;
-                let field_ty = &field_info.uninstantiated_field_ty;
+                let field_ty = match &field_info.uninstantiated_field_ty {
+                    MaybeGenericType::NeedsInstantiation(_) => unreachable!(),
+                    MaybeGenericType::Instantiated(ty) => ty,
+                };
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
@@ -524,7 +529,10 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             Bytecode::Pack(idx) => {
                 let field_count = frame.field_count(*idx);
                 let args_ty = frame.get_struct(*idx);
-                let field_tys = args_ty.fields(None)?.iter().map(|(_, ty)| ty);
+                let field_tys = args_ty.fields(None)?.iter().map(|(_, ty)| match ty {
+                    MaybeGenericType::NeedsInstantiation(_) => unreachable!(),
+                    MaybeGenericType::Instantiated(ty) => ty,
+                });
                 let output_ty = frame.get_struct_ty(*idx);
                 verify_pack(operand_stack, field_count, field_tys, output_ty)?;
             },
@@ -556,7 +564,12 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 struct_ty.paranoid_check_eq(&frame.get_struct_ty(*idx))?;
                 let struct_decl = frame.get_struct(*idx);
                 for (_name, ty) in struct_decl.fields(None)?.iter() {
-                    operand_stack.push_ty(ty.clone())?;
+                    match ty {
+                        MaybeGenericType::NeedsInstantiation(_) => unreachable!(),
+                        MaybeGenericType::Instantiated(ty) => {
+                            operand_stack.push_ty(ty.clone())?;
+                        },
+                    }
                 }
             },
             Bytecode::UnpackGeneric(idx) => {
@@ -575,7 +588,10 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     .definition_struct_type
                     .fields(Some(info.variant))?
                     .iter()
-                    .map(|(_, ty)| ty);
+                    .map(|(_, ty)| match ty {
+                        MaybeGenericType::NeedsInstantiation(_) => unreachable!(),
+                        MaybeGenericType::Instantiated(ty) => ty,
+                    });
                 let output_ty = frame.create_struct_ty(&info.definition_struct_type);
                 verify_pack(operand_stack, info.field_count, field_tys, output_ty)?;
             },
@@ -600,7 +616,12 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     .fields(Some(info.variant))?
                     .iter()
                 {
-                    operand_stack.push_ty(ty.clone())?;
+                    match ty {
+                        MaybeGenericType::NeedsInstantiation(_) => unreachable!(),
+                        MaybeGenericType::Instantiated(ty) => {
+                            operand_stack.push_ty(ty.clone())?;
+                        },
+                    }
                 }
             },
             Bytecode::UnpackVariantGeneric(idx) => {

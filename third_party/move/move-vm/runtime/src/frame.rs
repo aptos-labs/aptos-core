@@ -30,7 +30,7 @@ use move_vm_types::{
     gas::GasMeter,
     loaded_data::{
         runtime_access_specifier::{AccessSpecifierEnv, AddressSpecifierFunction},
-        runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
+        runtime_types::{AbilityInfo, MaybeGenericType, StructType, Type, TypeBuilder},
     },
     values::Locals,
 };
@@ -141,21 +141,32 @@ impl Frame {
     ) -> PartialVMResult<Frame> {
         let ty_args = function.ty_args();
         for ty in function.local_tys() {
-            gas_meter
-                .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
+            match ty {
+                MaybeGenericType::NeedsInstantiation(ty) => {
+                    gas_meter.charge_create_ty(NumTypeNodes::new(
+                        ty.num_nodes_in_subst(ty_args)? as u64,
+                    ))?;
+                },
+                MaybeGenericType::Instantiated(ty) => {
+                    gas_meter.charge_create_ty(NumTypeNodes::new(
+                        ty.num_nodes_in_subst(ty_args)? as u64,
+                    ))?;
+                },
+            }
         }
 
         let ty_builder = vm_config.ty_builder.clone();
         let local_tys = if RTTCheck::should_perform_checks() {
-            if ty_args.is_empty() {
-                function.local_tys().to_vec()
-            } else {
-                function
-                    .local_tys()
-                    .iter()
-                    .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
-                    .collect::<PartialVMResult<Vec<_>>>()?
-            }
+            function
+                .local_tys()
+                .iter()
+                .map(|ty| match ty {
+                    MaybeGenericType::NeedsInstantiation(ty) => {
+                        ty_builder.create_ty_with_subst(ty, ty_args)
+                    },
+                    MaybeGenericType::Instantiated(ty) => Ok(ty.clone()),
+                })
+                .collect::<PartialVMResult<Vec<_>>>()?
         } else {
             vec![]
         };
@@ -254,7 +265,12 @@ impl Frame {
         match self.function.owner() {
             Module(module) => {
                 let handle = &module.field_handles[idx.0 as usize];
-                Ok(&handle.field_ty)
+                match &handle.field_ty {
+                    MaybeGenericType::NeedsInstantiation(_) => {
+                        unreachable!("Field cannot be generic")
+                    },
+                    MaybeGenericType::Instantiated(ty) => Ok(ty),
+                }
             },
             Script(_) => unreachable!("Scripts cannot have type instructions"),
         }
@@ -275,17 +291,24 @@ impl Frame {
 
     pub(crate) fn instantiate_ty(
         &self,
-        ty: &Type,
-        instantiation_tys: &[Type],
+        ty: &MaybeGenericType,
+        instantiation_tys: &[MaybeGenericType],
     ) -> PartialVMResult<Type> {
-        let instantiation_tys = instantiation_tys
-            .iter()
-            .map(|inst_ty| {
-                self.ty_builder
-                    .create_ty_with_subst(inst_ty, self.function.ty_args())
-            })
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        self.ty_builder.create_ty_with_subst(ty, &instantiation_tys)
+        match ty {
+            MaybeGenericType::NeedsInstantiation(ty) => {
+                let instantiation_tys = instantiation_tys
+                    .iter()
+                    .map(|inst_ty| match inst_ty {
+                        MaybeGenericType::NeedsInstantiation(ty) => self
+                            .ty_builder
+                            .create_ty_with_subst(ty, self.function.ty_args()),
+                        MaybeGenericType::Instantiated(ty) => Ok(ty.clone()),
+                    })
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                self.ty_builder.create_ty_with_subst(ty, &instantiation_tys)
+            },
+            MaybeGenericType::Instantiated(ty) => Ok(ty.clone()),
+        }
     }
 
     pub(crate) fn variant_field_info_at(&self, idx: VariantFieldHandleIndex) -> &VariantFieldInfo {
@@ -349,27 +372,31 @@ impl Frame {
         &self,
         struct_ty: &Arc<StructType>,
         variant: Option<VariantIndex>,
-        instantiation: &[Type],
+        instantiation: &[MaybeGenericType],
     ) -> PartialVMResult<Vec<Type>> {
         let instantiation_tys = instantiation
             .iter()
-            .map(|inst_ty| {
-                self.ty_builder
-                    .create_ty_with_subst(inst_ty, self.function.ty_args())
+            .map(|inst_ty| match inst_ty {
+                MaybeGenericType::NeedsInstantiation(ty) => self
+                    .ty_builder
+                    .create_ty_with_subst(ty, self.function.ty_args()),
+                MaybeGenericType::Instantiated(ty) => Ok(ty.clone()),
             })
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         struct_ty
             .fields(variant)?
             .iter()
-            .map(|(_, inst_ty)| {
-                self.ty_builder
-                    .create_ty_with_subst(inst_ty, &instantiation_tys)
+            .map(|(_, inst_ty)| match inst_ty {
+                MaybeGenericType::NeedsInstantiation(ty) => {
+                    self.ty_builder.create_ty_with_subst(ty, &instantiation_tys)
+                },
+                MaybeGenericType::Instantiated(ty) => Ok(ty.clone()),
             })
             .collect::<PartialVMResult<Vec<_>>>()
     }
 
-    fn single_type_at(&self, idx: SignatureIndex) -> &Type {
+    fn single_type_at(&self, idx: SignatureIndex) -> &MaybeGenericType {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
             Module(module) => module.single_type_at(idx),
@@ -378,13 +405,12 @@ impl Frame {
     }
 
     pub(crate) fn instantiate_single_type(&self, idx: SignatureIndex) -> PartialVMResult<Type> {
-        let ty = self.single_type_at(idx);
-        let ty_args = self.function.ty_args();
-        if !ty_args.is_empty() {
-            self.ty_builder.create_ty_with_subst(ty, ty_args)
-        } else {
-            Ok(ty.clone())
-        }
+        Ok(match self.single_type_at(idx) {
+            MaybeGenericType::NeedsInstantiation(ty) => self
+                .ty_builder
+                .create_ty_with_subst(ty, self.function.ty_args())?,
+            MaybeGenericType::Instantiated(ty) => ty.clone(),
+        })
     }
 
     pub(crate) fn create_struct_ty(&self, struct_ty: &Arc<StructType>) -> Type {
@@ -395,7 +421,7 @@ impl Frame {
     pub(crate) fn create_struct_instantiation_ty(
         &self,
         struct_ty: &Arc<StructType>,
-        ty_params: &[Type],
+        ty_params: &[MaybeGenericType],
     ) -> PartialVMResult<Type> {
         self.ty_builder.create_struct_instantiation_ty(
             struct_ty,
@@ -478,14 +504,29 @@ impl Frame {
         let ty_args = self.function.ty_args();
         if let Some(gas_meter) = gas_meter {
             for ty in instantiation {
-                gas_meter
-                    .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
+                match ty {
+                    MaybeGenericType::NeedsInstantiation(ty) => {
+                        gas_meter.charge_create_ty(NumTypeNodes::new(
+                            ty.num_nodes_in_subst(ty_args)? as u64,
+                        ))?;
+                    },
+                    MaybeGenericType::Instantiated(ty) => {
+                        gas_meter.charge_create_ty(NumTypeNodes::new(
+                            ty.num_nodes_in_subst(ty_args)? as u64,
+                        ))?;
+                    },
+                }
             }
         }
 
         let instantiation = instantiation
             .iter()
-            .map(|ty| self.ty_builder.create_ty_with_subst(ty, ty_args))
+            .map(|ty| match ty {
+                MaybeGenericType::NeedsInstantiation(ty) => {
+                    self.ty_builder.create_ty_with_subst(ty, ty_args)
+                },
+                MaybeGenericType::Instantiated(ty) => Ok(ty.clone()),
+            })
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok(instantiation)
     }

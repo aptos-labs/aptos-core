@@ -13,13 +13,13 @@ use move_vm_types::loaded_data::{
         AccessSpecifier, AccessSpecifierClause, AddressSpecifier, AddressSpecifierFunction,
         ResourceSpecifier,
     },
-    runtime_types::{StructIdentifier, Type},
+    runtime_types::{MaybeGenericType, StructIdentifier},
 };
 
 /// Loads an access specifier from the file format into the runtime representation.
 pub fn load_access_specifier(
     module: BinaryIndexedView,
-    signature_table: &[Vec<Type>],
+    signature_table: &[Vec<MaybeGenericType>],
     struct_names: &[StructIdentifier],
     specifier: &Option<Vec<FF::AccessSpecifier>>,
 ) -> PartialVMResult<AccessSpecifier> {
@@ -49,7 +49,7 @@ pub fn load_access_specifier(
 
 fn load_resource_specifier(
     module: BinaryIndexedView,
-    signature_table: &[Vec<Type>],
+    signature_table: &[Vec<MaybeGenericType>],
     struct_names: &[StructIdentifier],
     spec: &FF::ResourceSpecifier,
 ) -> PartialVMResult<ResourceSpecifier> {
@@ -68,10 +68,19 @@ fn load_resource_specifier(
         Resource(str_idx) => Ok(ResourceSpecifier::Resource(
             access_table(struct_names, str_idx.0)?.clone(),
         )),
-        ResourceInstantiation(str_idx, ty_idx) => Ok(ResourceSpecifier::ResourceInstantiation(
-            access_table(struct_names, str_idx.0)?.clone(),
-            access_table(signature_table, ty_idx.0)?.clone(),
-        )),
+        ResourceInstantiation(str_idx, ty_idx) => {
+            let tys = access_table(signature_table, ty_idx.0)?
+                .iter()
+                .map(|ty| match ty {
+                    MaybeGenericType::NeedsInstantiation(ty) => ty.clone(),
+                    MaybeGenericType::Instantiated(ty) => ty.clone(),
+                })
+                .collect();
+            Ok(ResourceSpecifier::ResourceInstantiation(
+                access_table(struct_names, str_idx.0)?.clone(),
+                tys,
+            ))
+        },
     }
 }
 

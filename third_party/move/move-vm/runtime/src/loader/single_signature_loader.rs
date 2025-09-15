@@ -9,7 +9,9 @@ use move_binary_format::{
     file_format::{Bytecode, CodeUnit, CompiledModule, CompiledScript, SignatureIndex},
 };
 use move_core_types::vm_status::StatusCode;
-use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
+use move_vm_types::loaded_data::{
+    runtime_types::MaybeGenericType, struct_name_indexing::StructNameIndex,
+};
 use std::collections::BTreeMap;
 
 /// Maps indices of single signatures to their types. For example, vector bytecode instruction
@@ -19,7 +21,7 @@ struct SingleSignatureMap<'a> {
     /// Script or a module.
     view: BinaryIndexedView<'a>,
     /// The map from single signature index to its runtime type.
-    index_to_type: BTreeMap<SignatureIndex, Type>,
+    index_to_type: BTreeMap<SignatureIndex, MaybeGenericType>,
     /// Interned struct names as indices. The caller is responsible for ensuring that all names
     /// are interned and included here.
     struct_idxs: &'a [StructNameIndex],
@@ -33,7 +35,7 @@ struct SingleSignatureMap<'a> {
 pub(crate) fn load_single_signatures_for_script(
     script: &CompiledScript,
     struct_idxs: &[StructNameIndex],
-) -> PartialVMResult<BTreeMap<SignatureIndex, Type>> {
+) -> PartialVMResult<BTreeMap<SignatureIndex, MaybeGenericType>> {
     let mut map = SingleSignatureMap {
         view: BinaryIndexedView::Script(script),
         index_to_type: BTreeMap::new(),
@@ -52,7 +54,7 @@ pub(crate) fn load_single_signatures_for_script(
 pub(crate) fn load_single_signatures_for_module(
     module: &CompiledModule,
     struct_idxs: &[StructNameIndex],
-) -> PartialVMResult<BTreeMap<SignatureIndex, Type>> {
+) -> PartialVMResult<BTreeMap<SignatureIndex, MaybeGenericType>> {
     let mut map = SingleSignatureMap {
         view: BinaryIndexedView::Module(module),
         index_to_type: BTreeMap::new(),

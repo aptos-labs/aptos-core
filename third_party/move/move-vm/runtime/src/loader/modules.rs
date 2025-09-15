@@ -28,7 +28,7 @@ use move_core_types::{
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::loaded_data::{
-    runtime_types::{StructIdentifier, StructLayout, StructType, Type},
+    runtime_types::{MaybeGenericType, StructIdentifier, StructLayout, StructType},
     struct_name_indexing::{StructNameIndex, StructNameIndexMap},
 };
 use std::{
@@ -92,7 +92,7 @@ pub struct Module {
     // Single-token signatures are usually indexed by the `SignatureIndex` in bytecode. For example,
     // `VecMutBorrow(SignatureIndex)`, the `SignatureIndex` maps to a single `SignatureToken`, and
     // hence, a single type.
-    pub(crate) single_signature_token_map: BTreeMap<SignatureIndex, Type>,
+    pub(crate) single_signature_token_map: BTreeMap<SignatureIndex, MaybeGenericType>,
 
     // Friends of this module. Needed for re-entrancy visibility checks if lazy loading is enabled.
     // Particularly, if a callee has friend visibility, the caller's module must be in this set.
@@ -109,7 +109,7 @@ pub(crate) struct StructDef {
 pub(crate) struct StructInstantiation {
     pub(crate) field_count: u16,
     pub(crate) definition_struct_type: Arc<StructType>,
-    pub(crate) instantiation: Vec<Type>,
+    pub(crate) instantiation: Vec<MaybeGenericType>,
 }
 
 #[derive(Clone, Debug)]
@@ -117,14 +117,14 @@ pub(crate) struct StructVariantInfo {
     pub(crate) field_count: u16,
     pub(crate) variant: VariantIndex,
     pub(crate) definition_struct_type: Arc<StructType>,
-    pub(crate) instantiation: Vec<Type>,
+    pub(crate) instantiation: Vec<MaybeGenericType>,
 }
 
 // A field handle. The offset is the only used information when operating on a field
 #[derive(Clone, Debug)]
 pub(crate) struct FieldHandle {
     pub(crate) offset: usize,
-    pub(crate) field_ty: Type,
+    pub(crate) field_ty: MaybeGenericType,
     pub(crate) definition_struct_type: Arc<StructType>,
 }
 
@@ -132,19 +132,19 @@ pub(crate) struct FieldHandle {
 #[derive(Clone, Debug)]
 pub(crate) struct FieldInstantiation {
     pub(crate) offset: usize,
-    pub(crate) uninstantiated_field_ty: Type,
+    pub(crate) uninstantiated_field_ty: MaybeGenericType,
     pub(crate) definition_struct_type: Arc<StructType>,
-    pub(crate) instantiation: Vec<Type>,
+    pub(crate) instantiation: Vec<MaybeGenericType>,
 }
 
 // Information about to support both generic and non-generic variant fields.
 #[derive(Clone, Debug)]
 pub(crate) struct VariantFieldInfo {
     pub(crate) offset: usize,
-    pub(crate) uninstantiated_field_ty: Type,
+    pub(crate) uninstantiated_field_ty: MaybeGenericType,
     pub(crate) variants: Vec<VariantIndex>,
     pub(crate) definition_struct_type: Arc<StructType>,
-    pub(crate) instantiation: Vec<Type>,
+    pub(crate) instantiation: Vec<MaybeGenericType>,
 }
 
 impl Module {
@@ -434,25 +434,24 @@ impl Module {
         let layout = match &struct_def.field_information {
             StructFieldInformation::Native => unreachable!("native structs have been removed"),
             StructFieldInformation::Declared(fields) => {
-                let fields: PartialVMResult<Vec<(Identifier, Type)>> = fields
+                let fields: PartialVMResult<Vec<_>> = fields
                     .iter()
                     .map(|f| Self::make_field(module, f, struct_name_table))
                     .collect();
                 StructLayout::Single(fields?)
             },
             StructFieldInformation::DeclaredVariants(variants) => {
-                let variants: PartialVMResult<Vec<(Identifier, Vec<(Identifier, Type)>)>> =
-                    variants
-                        .iter()
-                        .map(|v| {
-                            let fields: PartialVMResult<Vec<(Identifier, Type)>> = v
-                                .fields
-                                .iter()
-                                .map(|f| Self::make_field(module, f, struct_name_table))
-                                .collect();
-                            fields.map(|fields| (module.identifier_at(v.name).to_owned(), fields))
-                        })
-                        .collect();
+                let variants: PartialVMResult<Vec<(Identifier, Vec<_>)>> = variants
+                    .iter()
+                    .map(|v| {
+                        let fields: PartialVMResult<Vec<_>> = v
+                            .fields
+                            .iter()
+                            .map(|f| Self::make_field(module, f, struct_name_table))
+                            .collect();
+                        fields.map(|fields| (module.identifier_at(v.name).to_owned(), fields))
+                    })
+                    .collect();
                 StructLayout::Variants(variants?)
             },
         };
@@ -474,7 +473,7 @@ impl Module {
         module: &CompiledModule,
         field: &FieldDefinition,
         struct_name_table: &[StructNameIndex],
-    ) -> PartialVMResult<(Identifier, Type)> {
+    ) -> PartialVMResult<(Identifier, MaybeGenericType)> {
         let ty = intern_type(
             BinaryIndexedView::Module(module),
             &field.signature.0,
@@ -510,7 +509,7 @@ impl Module {
         &self.function_refs[idx as usize]
     }
 
-    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &[Type] {
+    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &[MaybeGenericType] {
         &self.function_instantiations[idx as usize].instantiation
     }
 
@@ -545,7 +544,7 @@ impl Module {
         &self.variant_field_instantiation_infos[idx.0 as usize]
     }
 
-    pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
+    pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &MaybeGenericType {
         self.single_signature_token_map.get(&idx).unwrap()
     }
 

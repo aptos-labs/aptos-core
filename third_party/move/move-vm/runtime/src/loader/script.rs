@@ -14,7 +14,7 @@ use move_binary_format::{
 use move_core_types::{ident_str, language_storage::ModuleId};
 use move_vm_types::loaded_data::{
     runtime_access_specifier::AccessSpecifier,
-    runtime_types::{StructIdentifier, Type},
+    runtime_types::{MaybeGenericType, StructIdentifier},
     struct_name_indexing::StructNameIndexMap,
 };
 use std::{collections::BTreeMap, ops::Deref, sync::Arc};
@@ -37,7 +37,7 @@ pub struct Script {
     pub(crate) main: Arc<Function>,
 
     // a map of single-token signature indices to type
-    pub(crate) single_signature_token_map: BTreeMap<SignatureIndex, Type>,
+    pub(crate) single_signature_token_map: BTreeMap<SignatureIndex, MaybeGenericType>,
 }
 
 impl Script {
@@ -154,11 +154,11 @@ impl Script {
         &self.function_instantiations[idx as usize].handle
     }
 
-    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &[Type] {
+    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &[MaybeGenericType] {
         &self.function_instantiations[idx as usize].instantiation
     }
 
-    pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
+    pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &MaybeGenericType {
         self.single_signature_token_map.get(&idx).unwrap()
     }
 }

@@ -44,7 +44,10 @@ use move_core_types::{
 use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
-    loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
+    loaded_data::{
+        runtime_access_specifier::AccessInstance,
+        runtime_types::{MaybeGenericType, Type},
+    },
     natives::function::NativeResult,
     resolver::ResourceResolver,
     values::{
@@ -695,15 +698,17 @@ where
         }
         let given_ret_tys = self.operand_stack.last_n_tys(expected_ret_tys.len())?;
         for (expected, given) in expected_ret_tys.iter().zip(given_ret_tys) {
-            let ty_args = current_frame.function.ty_args();
-            if ty_args.is_empty() {
-                given.paranoid_check_assignable(expected)?;
-            } else {
-                let expected_inst = self
-                    .vm_config
-                    .ty_builder
-                    .create_ty_with_subst(expected, current_frame.function.ty_args())?;
-                given.paranoid_check_assignable(&expected_inst)?;
+            match expected {
+                MaybeGenericType::NeedsInstantiation(expected) => {
+                    let expected_inst = self
+                        .vm_config
+                        .ty_builder
+                        .create_ty_with_subst(expected, current_frame.function.ty_args())?;
+                    given.paranoid_check_assignable(&expected_inst)?;
+                },
+                MaybeGenericType::Instantiated(expected) => {
+                    given.paranoid_check_assignable(expected)?;
+                },
             }
         }
 
@@ -789,16 +794,19 @@ where
                 // Captured arguments are already verified against function signature.
                 let ty = self.operand_stack.pop_ty()?;
                 let expected_ty = &function.local_tys()[i];
-                if !ty_args.is_empty() {
-                    let expected_ty = self
-                        .vm_config
-                        .ty_builder
-                        .create_ty_with_subst(expected_ty, ty_args)?;
-                    // For parameter to argument, use assignability
-                    ty.paranoid_check_assignable(&expected_ty)?;
-                } else {
-                    // Directly check against the expected type to save a clone here.
-                    ty.paranoid_check_assignable(expected_ty)?;
+                match expected_ty {
+                    MaybeGenericType::NeedsInstantiation(expected_ty) => {
+                        let expected_ty = self
+                            .vm_config
+                            .ty_builder
+                            .create_ty_with_subst(expected_ty, ty_args)?;
+                        // For parameter to argument, use assignability
+                        ty.paranoid_check_assignable(&expected_ty)?;
+                    },
+                    MaybeGenericType::Instantiated(expected_ty) => {
+                        // Directly check against the expected type to save a clone here.
+                        ty.paranoid_check_assignable(expected_ty)?;
+                    },
                 }
             }
         }
@@ -890,15 +898,26 @@ where
                 if !mask.is_captured(i) {
                     let ty = self.operand_stack.pop_ty()?;
                     // For param type to argument, use assignability
-                    if !ty_args.is_empty() {
-                        let expected_ty = ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
-                        ty.paranoid_check_assignable(&expected_ty)?;
-                    } else {
-                        ty.paranoid_check_assignable(expected_ty)?;
+                    match expected_ty {
+                        MaybeGenericType::NeedsInstantiation(expected_ty) => {
+                            let expected_ty =
+                                ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
+                            ty.paranoid_check_assignable(&expected_ty)?;
+                        },
+                        MaybeGenericType::Instantiated(expected_ty) => {
+                            ty.paranoid_check_assignable(expected_ty)?;
+                        },
                     }
                     arg_tys.push_front(ty);
                 } else {
-                    arg_tys.push_front(expected_ty.clone())
+                    match expected_ty {
+                        MaybeGenericType::NeedsInstantiation(_) => {
+                            unreachable!("Should be instantiated if captured")
+                        },
+                        MaybeGenericType::Instantiated(expected_ty) => {
+                            arg_tys.push_front(expected_ty.clone())
+                        },
+                    }
                 }
             }
         }
@@ -948,7 +967,12 @@ where
 
                 if RTTCheck::should_perform_checks() {
                     for ty in function.return_tys() {
-                        let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
+                        let ty = match ty {
+                            MaybeGenericType::NeedsInstantiation(ty) => {
+                                ty_builder.create_ty_with_subst(ty, ty_args)?
+                            },
+                            MaybeGenericType::Instantiated(ty) => ty.clone(),
+                        };
                         self.operand_stack.push_ty(ty)?;
                     }
                 }
