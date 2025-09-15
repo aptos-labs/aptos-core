@@ -5,7 +5,7 @@ use crate::{frame::Frame, LoadedFunction};
 use move_binary_format::{
     errors::*,
     file_format::{
-        FieldInstantiationIndex, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
+        FieldInstantiationIndex, FunctionInstantiationIndex, SignatureIndex,
         StructDefInstantiationIndex, StructVariantInstantiationIndex,
         VariantFieldInstantiationIndex,
     },
@@ -14,7 +14,6 @@ use move_core_types::gas_algebra::NumTypeNodes;
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
-#[allow(dead_code)]
 pub(crate) trait RuntimeCacheTraits {
     fn caches_enabled() -> bool;
 }
@@ -38,7 +37,6 @@ impl RuntimeCacheTraits for AllRuntimeCaches {
 /// that the memory footprint of each variant is small. This is an
 /// enum that is expected to grow in the future.
 #[derive(Clone)]
-#[allow(dead_code)]
 pub(crate) enum PerInstructionCache {
     Nothing,
     Pack(u16),
@@ -72,8 +70,6 @@ pub(crate) struct FrameTypeCache {
     /// structures stored in that function's frame cache do not change.
     pub(crate) generic_sub_frame_cache:
         BTreeMap<FunctionInstantiationIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
-    pub(crate) sub_frame_cache:
-        BTreeMap<FunctionHandleIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
     /// Stores a variant for each individual instruction in the
     /// function's bytecode. We keep the size of the variant to be
     /// small. The caches are indexed by the index of the given
