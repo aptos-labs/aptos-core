@@ -20,13 +20,13 @@ macro_rules! panic_error {
 /// Represents a unique identifier for the struct name. Note that this index has no public
 /// constructor - the only way to construct it is via [StructNameIndexMap].
 #[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct StructNameIndex(usize);
+pub struct StructNameIndex(u32);
 
 impl StructNameIndex {
     /// Creates a new index for testing purposes only. For production, indices must always be
     /// created by the data structure that uses them to intern struct names.
     #[cfg(any(test, feature = "testing"))]
-    pub fn new(idx: usize) -> Self {
+    pub fn new(idx: u32) -> Self {
         Self(idx)
     }
 }
@@ -39,7 +39,7 @@ impl std::fmt::Display for StructNameIndex {
 
 #[derive(Clone)]
 struct IndexMap<T: Clone + Ord> {
-    forward_map: BTreeMap<T, usize>,
+    forward_map: BTreeMap<T, u32>,
     backward_map: Vec<Arc<T>>,
 }
 
@@ -89,7 +89,7 @@ impl StructNameIndexMap {
                 return Ok(StructNameIndex(*idx));
             }
 
-            let idx = index_map.backward_map.len();
+            let idx = index_map.backward_map.len() as u32;
             index_map.backward_map.push(backward_value);
             index_map.forward_map.insert(forward_key, idx);
             idx
@@ -102,7 +102,7 @@ impl StructNameIndexMap {
         index_map: &'a parking_lot::RwLockReadGuard<IndexMap<StructIdentifier>>,
         idx: StructNameIndex,
     ) -> PartialVMResult<&'a Arc<StructIdentifier>> {
-        index_map.backward_map.get(idx.0).ok_or_else(|| {
+        index_map.backward_map.get(idx.0 as usize).ok_or_else(|| {
             let msg = format!(
                 "Index out of bounds when accessing struct name reference \
                      at index {}, backward map length: {}",
