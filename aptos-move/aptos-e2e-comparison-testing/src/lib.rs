@@ -69,12 +69,11 @@ impl IndexWriter {
     pub fn new(root: &Path) -> Self {
         let create_file = |file_name: &str| -> File {
             let path = root.to_path_buf().join(file_name);
-            let file = if !path.exists() {
+            if !path.exists() {
                 File::create(path).expect("Error encountered while creating file!")
             } else {
                 OpenOptions::new().append(true).open(path).unwrap()
-            };
-            file
+            }
         };
         let index_file = create_file(INDEX_FILE);
         let err_log = create_file(ERR_LOG);

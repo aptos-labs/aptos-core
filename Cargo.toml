@@ -285,7 +285,7 @@ default-members = [
 # for package declarations.
 [workspace.package]
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-edition = "2021"
+edition = "2024"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
