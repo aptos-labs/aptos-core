@@ -1593,7 +1593,7 @@ mod unit_tests {
 
         let ty = Vector(TriompheArc::new(Vector(TriompheArc::new(TyParam(0)))));
         let ty_arg = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
-        assert_ok!(ty_builder.create_ty_with_subst(&ty, &[ty_arg.clone()]));
+        assert_ok!(ty_builder.create_ty_with_subst(&ty, std::slice::from_ref(&ty_arg)));
 
         let ty_arg = Vector(TriompheArc::new(ty_arg));
         let err = assert_err!(ty_builder.create_ty_with_subst(&ty, &[ty_arg]));

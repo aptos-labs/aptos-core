@@ -72,7 +72,7 @@ impl BackupServiceClient {
                 THROUGHPUT_COUNTER.inc_with_by(&[endpoint], bytes.len() as u64);
                 bytes
             })
-            .map_err(|e| futures::io::Error::new(futures::io::ErrorKind::Other, e))
+            .map_err(futures::io::Error::other)
             .into_async_read()
             .compat();
 

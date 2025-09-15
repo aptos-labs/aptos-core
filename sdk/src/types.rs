@@ -513,7 +513,7 @@ impl LocalAccount {
         }
     }
 
-    pub fn auth(&self) -> Auth {
+    pub fn auth(&self) -> Auth<'_> {
         match &self.auth {
             LocalAccountAuthenticator::PrivateKey(key) => Auth::Ed25519(key.private_key()),
             LocalAccountAuthenticator::Keyless(_) => todo!(),

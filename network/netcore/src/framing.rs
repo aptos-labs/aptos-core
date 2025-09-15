@@ -49,7 +49,7 @@ where
     let len = buf
         .len()
         .try_into()
-        .map_err(|_e| std::io::Error::new(std::io::ErrorKind::Other, "Too big"))?;
+        .map_err(|_e| std::io::Error::other("Too big"))?;
     write_u16frame_len(&mut stream, len).await?;
     stream.write_all(buf).await?;
 

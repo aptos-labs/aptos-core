@@ -591,7 +591,7 @@ impl Eq for LanguageVersion {}
 
 impl PartialOrd<LanguageVersion> for LanguageVersion {
     fn partial_cmp(&self, other: &LanguageVersion) -> Option<std::cmp::Ordering> {
-        Some(self.to_ordinal().cmp(&other.to_ordinal()))
+        Some(self.cmp(other))
     }
 }
 
