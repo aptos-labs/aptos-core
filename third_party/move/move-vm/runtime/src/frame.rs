@@ -31,6 +31,7 @@ use move_vm_types::{
     loaded_data::{
         runtime_access_specifier::{AccessSpecifierEnv, AddressSpecifierFunction},
         runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
+        ty_args_fingerprint::TyArgsFingerprint,
     },
     values::Locals,
 };
@@ -130,6 +131,21 @@ impl Frame {
         FunctionInstantiationIndex,
         function_instantiation_handle_at
     );
+
+    pub(crate) fn get_or_compute_fingerprint(
+        &self,
+        idx: FunctionInstantiationIndex,
+        ty_args: &[Type],
+    ) -> TyArgsFingerprint {
+        let maybe_fingerprint = match self.function.owner() {
+            LoadedFunctionOwner::Script(script) => script.function_instantiation_fingerprint(idx.0),
+            LoadedFunctionOwner::Module(module) => module.function_instantiation_fingerprint(idx.0),
+        };
+        match maybe_fingerprint {
+            None => TyArgsFingerprint::from_ty_args(ty_args),
+            Some(fingerprint) => fingerprint,
+        }
+    }
 
     pub(crate) fn make_new_frame<RTTCheck: RuntimeTypeCheck>(
         gas_meter: &mut impl GasMeter,

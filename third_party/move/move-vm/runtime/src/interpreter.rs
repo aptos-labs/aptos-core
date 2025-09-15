@@ -60,7 +60,7 @@ use move_vm_types::{
 use std::{
     cell::RefCell,
     cmp::min,
-    collections::{btree_map, VecDeque},
+    collections::VecDeque,
     fmt::{Debug, Write},
     rc::Rc,
 };
@@ -571,39 +571,23 @@ where
                         {
                             (Rc::clone(function), Rc::clone(frame_cache))
                         } else {
-                            match current_frame_cache.generic_sub_frame_cache.entry(idx) {
-                                btree_map::Entry::Occupied(entry) => {
-                                    let entry = entry.get();
-                                    current_frame_cache.per_instruction_cache
-                                        [current_frame.pc as usize] =
-                                        PerInstructionCache::CallGeneric(
-                                            Rc::clone(&entry.0),
-                                            Rc::clone(&entry.1),
-                                        );
-
-                                    (Rc::clone(&entry.0), Rc::clone(&entry.1))
-                                },
-                                btree_map::Entry::Vacant(entry) => {
-                                    let function =
-                                        Rc::new(self.load_generic_function_no_visibility_checks(
-                                            gas_meter,
-                                            traversal_context,
-                                            &current_frame,
-                                            idx,
-                                        )?);
-                                    // TODO(caches): remove the generic sub frame cache.
-                                    let frame_cache = function_caches
-                                        .get_or_create_frame_cache_generic(&function);
-                                    entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
-                                    current_frame_cache.per_instruction_cache
-                                        [current_frame.pc as usize] =
-                                        PerInstructionCache::CallGeneric(
-                                            Rc::clone(&function),
-                                            Rc::clone(&frame_cache),
-                                        );
-                                    (function, frame_cache)
-                                },
-                            }
+                            let function =
+                                Rc::new(self.load_generic_function_no_visibility_checks(
+                                    gas_meter,
+                                    traversal_context,
+                                    &current_frame,
+                                    idx,
+                                )?);
+                            let fingerprint =
+                                current_frame.get_or_compute_fingerprint(idx, function.ty_args());
+                            let frame_cache = function_caches
+                                .get_or_create_frame_cache_generic(&function, fingerprint);
+                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
+                                PerInstructionCache::CallGeneric(
+                                    Rc::clone(&function),
+                                    Rc::clone(&frame_cache),
+                                );
+                            (function, frame_cache)
                         }
                     } else {
                         let function = Rc::new(self.load_generic_function_no_visibility_checks(

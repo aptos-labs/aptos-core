@@ -5,9 +5,8 @@ use crate::{frame::Frame, LoadedFunction};
 use move_binary_format::{
     errors::*,
     file_format::{
-        FieldInstantiationIndex, FunctionInstantiationIndex, SignatureIndex,
-        StructDefInstantiationIndex, StructVariantInstantiationIndex,
-        VariantFieldInstantiationIndex,
+        FieldInstantiationIndex, SignatureIndex, StructDefInstantiationIndex,
+        StructVariantInstantiationIndex, VariantFieldInstantiationIndex,
     },
 };
 use move_core_types::gas_algebra::NumTypeNodes;
@@ -63,13 +62,6 @@ pub(crate) struct FrameTypeCache {
     variant_field_instantiation:
         BTreeMap<VariantFieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
     single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
-    /// Recursive frame cache for a function that is called from the
-    /// current frame. It is indexed by FunctionInstantiationIndex or
-    /// FunctionHandleIndex for non-generic functions. Note that
-    /// whenever a function with the same `index` is called, the
-    /// structures stored in that function's frame cache do not change.
-    pub(crate) generic_sub_frame_cache:
-        BTreeMap<FunctionInstantiationIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
     /// Stores a variant for each individual instruction in the
     /// function's bytecode. We keep the size of the variant to be
     /// small. The caches are indexed by the index of the given

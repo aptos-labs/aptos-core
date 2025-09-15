@@ -31,6 +31,7 @@ use move_vm_types::{
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
+        ty_args_fingerprint::TyArgsFingerprint,
     },
     values::{AbstractFunction, SerializedFunctionData},
 };
@@ -668,9 +669,11 @@ impl Function {
 // A function instantiation.
 #[derive(Clone, Debug)]
 pub(crate) struct FunctionInstantiation {
-    // index to `ModuleCache::functions` global table
     pub(crate) handle: FunctionHandle,
     pub(crate) instantiation: Vec<Type>,
+    // Unique ID for type arg instantiation. If type arguments are non-generic, is set. For generic
+    // type arguments kept not set.
+    pub(crate) fingerprint: Option<TyArgsFingerprint>,
 }
 
 #[derive(Clone, Debug)]

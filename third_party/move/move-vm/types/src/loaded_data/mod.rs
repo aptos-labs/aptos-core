@@ -10,3 +10,4 @@ pub mod runtime_access_specifier;
 mod runtime_access_specifiers_prop_tests;
 pub mod runtime_types;
 pub mod struct_name_indexing;
+pub mod ty_args_fingerprint;
