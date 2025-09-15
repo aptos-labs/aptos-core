@@ -1,7 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::type_loader::intern_type;
+use super::type_loader::convert_tok_to_type;
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
@@ -99,7 +99,7 @@ impl<'a> SingleSignatureMap<'a> {
             );
         }
 
-        let ty = intern_type(self.view, &sig_toks[0], self.struct_idxs)?;
+        let ty = convert_tok_to_type(self.view, &sig_toks[0], self.struct_idxs)?;
         self.index_to_type.insert(idx, ty);
         Ok(())
     }

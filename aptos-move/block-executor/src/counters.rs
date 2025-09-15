@@ -403,3 +403,19 @@ pub static HOT_STATE_OP_ACCUMULATOR_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| 
     )
     .unwrap()
 });
+
+pub static NUM_INTERNED_TYPES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "num_interned_types",
+        "Number of interned types cached in execution environment"
+    )
+    .unwrap()
+});
+
+pub static NUM_INTERNED_TYPE_VECS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "num_interned_type_vecs",
+        "Number of interned type vectors cached in execution environment"
+    )
+    .unwrap()
+});

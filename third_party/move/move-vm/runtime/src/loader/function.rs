@@ -32,12 +32,14 @@ use move_vm_types::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
     },
+    ty_interner::TypeVecId,
     values::{AbstractFunction, SerializedFunctionData},
 };
 use std::{
     cell::RefCell,
     cmp::Ordering,
     fmt::{Debug, Formatter},
+    hash::{Hash, Hasher},
     mem,
     rc::Rc,
     sync::Arc,
@@ -95,6 +97,8 @@ pub struct LoadedFunction {
     // A set of verified type arguments provided for this definition. If
     // function is not generic, an empty vector.
     pub ty_args: Vec<Type>,
+    // Unique identifier for type arguments.
+    pub ty_args_id: TypeVecId,
     // Definition of the loaded function.
     pub function: Arc<Function>,
 }
@@ -133,6 +137,37 @@ impl LoadedFunction {
                 Err(err)
             },
         }
+    }
+}
+
+/// Stable pointer identity for a non-generic [Function] within a single interpreter invocation.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub(crate) struct FunctionPtr(*const Function);
+
+impl FunctionPtr {
+    pub(crate) fn from_loaded_function(function: &LoadedFunction) -> Self {
+        // Pointer identity can be used since the loader guarantees that any loaded function has
+        // exactly one `Arc<Function>`.
+        Self(Arc::as_ptr(&function.function))
+    }
+}
+
+impl Hash for FunctionPtr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_usize(self.0 as usize);
+    }
+}
+
+/// Stable pointer identity for a generic [Function] within a single interpreter invocation.
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub(crate) struct GenericFunctionPtr(FunctionPtr, TypeVecId);
+
+impl GenericFunctionPtr {
+    pub(crate) fn from_loaded_function(function: &LoadedFunction) -> Self {
+        Self(
+            FunctionPtr::from_loaded_function(function),
+            function.ty_args_id,
+        )
     }
 }
 
@@ -671,9 +706,11 @@ impl Function {
 // A function instantiation.
 #[derive(Clone, Debug)]
 pub(crate) struct FunctionInstantiation {
-    // index to `ModuleCache::functions` global table
     pub(crate) handle: FunctionHandle,
     pub(crate) instantiation: Vec<Type>,
+    // Unique ID for type arg instantiation. If type arguments are non-generic, is set. For generic
+    // type arguments kept not set.
+    pub(crate) ty_args_id: Option<TypeVecId>,
 }
 
 #[derive(Clone, Debug)]
