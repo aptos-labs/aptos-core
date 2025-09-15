@@ -5,17 +5,21 @@ use crate::{
     external_resources::{
         groth16_vk::OnChainGroth16VerificationKey, keyless_config::OnChainKeylessConfiguration,
     },
-    utils,
+    metrics, utils,
 };
 use aptos_infallible::RwLock;
-use aptos_logger::{info, warn};
+use aptos_logger::{info, prelude::SampleRate, sample, warn};
 use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};
+use tokio::time::Instant;
 
 // Cached resource constants
 const ENV_ONCHAIN_KEYLESS_CONFIG_URL: &str = "ONCHAIN_KEYLESS_CONFIG_URL";
 const ENV_ONCHAIN_GROTH16_VK_URL: &str = "ONCHAIN_GROTH16_VK_URL";
+const ONCHAIN_KEYLESS_CONFIG_RESOURCE_NAME: &str = "onchain_keyless_configuration";
+const ONCHAIN_GROTH16_VK_RESOURCE_NAME: &str = "onchain_groth16_verification_key";
 const RESOURCE_FETCH_INTERVAL_SECS: u64 = 10;
+const RESOURCE_FETCH_LOG_INTERVAL_SECS: u64 = 60;
 
 /// A struct that holds the cached resources and their refresh logic
 #[derive(Clone, Debug, Default)]
@@ -31,6 +35,7 @@ impl CachedResources {
         match utils::read_environment_variable(ENV_ONCHAIN_KEYLESS_CONFIG_URL) {
             Ok(url) => {
                 start_external_resource_refresh_loop(
+                    ONCHAIN_KEYLESS_CONFIG_RESOURCE_NAME.into(),
                     url,
                     self.on_chain_keyless_configuration.clone(),
                 );
@@ -46,7 +51,11 @@ impl CachedResources {
         // Start the Groth16 VK fetcher
         match utils::read_environment_variable(ENV_ONCHAIN_GROTH16_VK_URL) {
             Ok(url) => {
-                start_external_resource_refresh_loop(url, self.groth16_vk.clone());
+                start_external_resource_refresh_loop(
+                    ONCHAIN_GROTH16_VK_RESOURCE_NAME.into(),
+                    url,
+                    self.groth16_vk.clone(),
+                );
             },
             Err(error) => {
                 warn!(
@@ -87,6 +96,7 @@ impl CachedResources {
 
 /// Starts a background task that periodically fetches and caches the resource from the given URL
 fn start_external_resource_refresh_loop<T: DeserializeOwned + Send + Sync + 'static>(
+    resource_name: String,
     resource_url: String,
     local_cache: Arc<RwLock<Option<T>>>,
 ) {
@@ -106,32 +116,53 @@ fn start_external_resource_refresh_loop<T: DeserializeOwned + Send + Sync + 'sta
             tokio::time::sleep(refresh_interval).await;
 
             // Fetch the resource from the URL
-            let response = match client.get(resource_url.clone()).send().await {
-                Ok(response) => response,
+            let time_now = Instant::now();
+            let fetch_result = client.get(resource_url.clone()).send().await;
+            let fetch_time = time_now.elapsed();
+
+            // Update the fetch metrics
+            metrics::update_external_resource_fetch_metrics(
+                &resource_name,
+                fetch_result.is_ok(),
+                fetch_time,
+            );
+
+            // Process the fetch result
+            match fetch_result {
+                Ok(response) => {
+                    // Log the successful fetch
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(RESOURCE_FETCH_LOG_INTERVAL_SECS)),
+                        info!(
+                            "Successfully fetched resource {} from {} in {:?}",
+                            resource_name, resource_url, fetch_time
+                        )
+                    );
+
+                    // Parse the response into the expected resource
+                    let resource = match response.json::<T>().await {
+                        Ok(resource) => resource,
+                        Err(error) => {
+                            warn!(
+                                "Failed to parse resource from {}! Error: {}",
+                                resource_url, error
+                            );
+                            continue; // Retry in the next loop
+                        },
+                    };
+
+                    // Update the cache
+                    let mut cache = local_cache.write();
+                    *cache = Some(resource);
+                },
                 Err(error) => {
                     warn!(
-                        "Failed to fetch resource from {}! Error: {}",
-                        resource_url, error
+                        "Failed to fetch resource from {} in {:?}! Error: {}",
+                        resource_url, fetch_time, error
                     );
                     continue; // Retry in the next loop
                 },
-            };
-
-            // Parse the response into the expected resource
-            let resource = match response.json::<T>().await {
-                Ok(resource) => resource,
-                Err(error) => {
-                    warn!(
-                        "Failed to parse resource from {}! Error: {}",
-                        resource_url, error
-                    );
-                    continue; // Retry in the next loop
-                },
-            };
-
-            // Update the local cache
-            let mut cache = local_cache.write();
-            *cache = Some(resource);
+            }
         }
     });
 }

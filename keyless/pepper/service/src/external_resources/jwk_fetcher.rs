@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{metrics::JWK_FETCH_SECONDS, utils};
+use crate::{metrics, utils};
 use anyhow::{anyhow, Result};
 use aptos_infallible::Mutex;
 use aptos_keyless_pepper_common::jwt::parse;
-use aptos_logger::{info, warn};
+use aptos_logger::{info, prelude::SampleRate, sample, warn};
 use aptos_types::{jwks::rsa::RSA_JWK, keyless::test_utils::get_sample_iss};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -23,6 +23,9 @@ const JWK_URL_GOOGLE: &str = "https://www.googleapis.com/oauth2/v3/certs";
 
 // The interval (in seconds) at which to refresh the JWKs
 const JWK_REFRESH_INTERVAL_SECS: u64 = 10;
+
+// The interval (in seconds) at which to log the JWK refresh status
+const JWK_REFRESH_LOG_INTERVAL_SECS: u64 = 60;
 
 // Useful type declarations
 pub type Issuer = String;
@@ -196,12 +199,16 @@ fn start_jwk_refresh_loop(issuer: String, jwk_url: String, jwk_cache: JWKCache) 
             match &fetch_result {
                 Ok(key_set) => {
                     // Log the successful fetch
-                    info!(
-                        issuer = issuer,
-                        jwk_url = jwk_url,
-                        "Successfully fetched the JWK! Issuer: {}, Key set: {:?}",
-                        issuer,
-                        key_set
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(JWK_REFRESH_LOG_INTERVAL_SECS)),
+                        info!(
+                            issuer = issuer,
+                            jwk_url = jwk_url,
+                            "Successfully fetched the JWK in {:?}! Issuer: {}, Key set: {:?}",
+                            fetch_time,
+                            issuer,
+                            key_set
+                        )
                     );
 
                     // Update the cache
@@ -211,7 +218,8 @@ fn start_jwk_refresh_loop(issuer: String, jwk_url: String, jwk_cache: JWKCache) 
                     warn!(
                         issuer = issuer,
                         jwk_url = jwk_url,
-                        "Failed to fetch the JWK! Issuer: {}, Error: {}",
+                        "Failed to fetch the JWK in {:?}! Issuer: {}, Error: {}",
+                        fetch_time,
                         issuer,
                         error
                     );
@@ -219,10 +227,7 @@ fn start_jwk_refresh_loop(issuer: String, jwk_url: String, jwk_cache: JWKCache) 
             }
 
             // Update the fetch metrics
-            let succeeded = fetch_result.is_ok();
-            JWK_FETCH_SECONDS
-                .with_label_values(&[&issuer, &succeeded.to_string()])
-                .observe(fetch_time.as_secs_f64());
+            metrics::update_jwk_fetch_metrics(&issuer, fetch_result.is_ok(), fetch_time);
 
             // Sleep until the next refresh interval
             let refresh_interval = Duration::from_secs(JWK_REFRESH_INTERVAL_SECS);
