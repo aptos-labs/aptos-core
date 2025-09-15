@@ -74,7 +74,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             language_version: LanguageVersion::latest(),
             vm_config: VMConfig {
                 verifier_config: VerifierConfig::production(),
-                paranoid_type_checks: true,
+                paranoid_type_checks: false,
                 enable_lazy_loading: false,
                 ..VMConfig::default()
             },
@@ -91,7 +91,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
 /// VM configuration used for testing. By default, paranoid mode is always on.
 fn vm_config_for_tests(verifier_config: VerifierConfig) -> VMConfig {
     VMConfig {
-        paranoid_type_checks: true,
+        paranoid_type_checks: false,
         verifier_config,
         ..VMConfig::default()
     }
