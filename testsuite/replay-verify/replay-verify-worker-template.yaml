@@ -21,6 +21,8 @@ spec:
         #  value: "http://localhost:9091"
         - name: RUST_LOG
           value: "info"
+        - name: RUST_BACKTRACE
+          value: "1"
       resources:
         requests:
           memory: "100Gi"
