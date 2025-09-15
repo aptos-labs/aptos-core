@@ -63,6 +63,7 @@ pub struct Function {
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
     pub(crate) is_trusted: bool,
+    pub(crate) is_type_independent: bool,
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
@@ -547,6 +548,28 @@ impl Function {
             Some(code) => code.code.clone(),
             None => vec![],
         };
+
+        // Determine whether function is type dependent. This is currently abbreviated by a
+        // heuristic check on the code. For calls to other functions, its assumed they are
+        // type dependent.
+        let is_type_independent = if !is_trusted || is_native {
+            false
+        } else {
+            code.iter().all(|bc| {
+                use Bytecode::*;
+                match bc {
+                    MutBorrowGlobal(..)
+                    | ImmBorrowGlobal(..)
+                    | CallGeneric(..)
+                    | PackGeneric(..)
+                    | PackVariantGeneric(..)
+                    | VecPack(..)
+                    | PackClosureGeneric(..) => false,
+                    _ => true,
+                }
+            })
+        };
+
         let ty_param_abilities = handle.type_parameters.clone();
         let return_tys = signature_table[handle.return_.0 as usize].clone();
         let local_tys = if let Some(code) = &def.code {
@@ -582,6 +605,7 @@ impl Function {
             is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
             has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
             is_trusted,
+            is_type_independent,
         })
     }
 
@@ -633,6 +657,14 @@ impl Function {
 
     pub fn is_native(&self) -> bool {
         self.is_native
+    }
+
+    pub fn is_trusted(&self) -> bool {
+        self.is_trusted
+    }
+
+    pub fn is_type_independent(&self) -> bool {
+        self.is_type_independent
     }
 
     pub fn is_public(&self) -> bool {

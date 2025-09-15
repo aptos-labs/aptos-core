@@ -65,24 +65,32 @@ impl AccessSpecifierEnv for Frame {
 
 macro_rules! build_loaded_function {
     ($function_name:ident, $idx_ty:ty, $get_function_handle:ident) => {
-        pub(crate) fn $function_name(
+        pub(crate) fn $function_name<GM>(
             &self,
             loader: &impl FunctionDefinitionLoader,
-            gas_meter: &mut impl GasMeter,
+            gas_meter: &mut GM,
             traversal_context: &mut TraversalContext,
             idx: $idx_ty,
-            verified_ty_args: Vec<Type>,
-        ) -> PartialVMResult<LoadedFunction> {
+            verified_ty_args_fun: impl FnOnce(&mut GM) -> PartialVMResult<Vec<Type>>,
+        ) -> PartialVMResult<LoadedFunction>
+        where
+            GM: GasMeter,
+        {
             match self.function.owner() {
                 LoadedFunctionOwner::Module(module) => {
                     let handle = module.$get_function_handle(idx.0);
                     match handle {
                         FunctionHandle::Local(function) => {
-                            (Ok(LoadedFunction {
+                            let verified_ty_args = if function.is_type_independent {
+                                vec![]
+                            } else {
+                                verified_ty_args_fun(gas_meter)?
+                            };
+                            Ok(LoadedFunction {
                                 owner: LoadedFunctionOwner::Module(module.clone()),
                                 ty_args: verified_ty_args,
                                 function: function.clone(),
-                            }))
+                            })
                         },
                         FunctionHandle::Remote { module, name } => self
                             .build_loaded_function_from_name_and_ty_args(
@@ -91,7 +99,7 @@ macro_rules! build_loaded_function {
                                 traversal_context,
                                 module,
                                 name,
-                                verified_ty_args,
+                                verified_ty_args_fun,
                             ),
                     }
                 },
@@ -109,7 +117,7 @@ macro_rules! build_loaded_function {
                                 traversal_context,
                                 module,
                                 name,
-                                verified_ty_args,
+                                verified_ty_args_fun,
                             ),
                     }
                 },
@@ -494,18 +502,26 @@ impl Frame {
         Ok(instantiation)
     }
 
-    pub(crate) fn build_loaded_function_from_name_and_ty_args(
+    pub(crate) fn build_loaded_function_from_name_and_ty_args<GM>(
         &self,
         loader: &impl FunctionDefinitionLoader,
-        gas_meter: &mut impl GasMeter,
+        gas_meter: &mut GM,
         traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
         function_name: &IdentStr,
-        verified_ty_args: Vec<Type>,
-    ) -> PartialVMResult<LoadedFunction> {
+        verified_ty_args_fun: impl FnOnce(&mut GM) -> PartialVMResult<Vec<Type>>,
+    ) -> PartialVMResult<LoadedFunction>
+    where
+        GM: GasMeter,
+    {
         let (module, function) = loader
             .load_function_definition(gas_meter, traversal_context, module_id, function_name)
             .map_err(|err| err.to_partial())?;
+        let verified_ty_args = if function.is_type_independent() {
+            vec![]
+        } else {
+            verified_ty_args_fun(gas_meter)?
+        };
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
             ty_args: verified_ty_args,
