@@ -25,6 +25,7 @@ use move_vm_types::{
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, env, fs, sync::Arc};
+use move_vm_runtime::config::VMConfig;
 
 /// For profiling, we can use scripts or "run" entry functions.
 enum Entrypoint {
@@ -161,7 +162,10 @@ fn main() -> Result<()> {
         &mut builder,
     ));
 
-    let runtime_environment = RuntimeEnvironment::new(natives);
+    let runtime_environment = RuntimeEnvironment::new_with_config(natives, VMConfig {
+        paranoid_type_checks: false,
+        ..VMConfig::default()
+    });
     let mut storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
 
     let test_modules = compile_test_modules();
