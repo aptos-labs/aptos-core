@@ -404,7 +404,9 @@ impl StateByVersion {
             .iter()
             .flat_map(|shard| shard.iter())
             .filter_map(|(key, slot)| slot.maybe_update_jmt(key, last_snapshot.next_version()))
-            .map(|(key_hash, value_opt)| (key_hash, value_opt.map(|(val_hash, _key)| val_hash)))
+            .map(|(key_hash, _key, value_opt)| {
+                (key_hash, value_opt.map(|(val_hash, _key)| val_hash))
+            })
             .collect_vec();
 
         let base_kv_hashes: HashSet<_> = base_state.summary.leaves.iter().collect();
@@ -597,7 +599,7 @@ fn send_to_state_buffer(
             last_snapshot.version()
         );
         if let Some(checkpoint_version) = snapshot.version() {
-            if checkpoint_version % 7 == 0 && Some(checkpoint_version) != last_snapshot.version() {
+            if checkpoint_version % 1 == 0 && Some(checkpoint_version) != last_snapshot.version() {
                 state_by_version.assert_jmt_updates(&last_snapshot, snapshot);
 
                 last_snapshot = snapshot.clone();
