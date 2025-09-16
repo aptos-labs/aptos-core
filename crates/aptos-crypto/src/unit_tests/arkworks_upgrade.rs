@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use ark_bls12_381::G1Projective as G1New;
-use ark_bls12_381_old::G1Projective as G1Old;
-use ark_ec::PrimeGroup;
-use ark_ec_old::Group;
+use ark_bls12_381::{Bls12_381 as Bls12_381New, G1Projective as G1New, G2Projective as G2New};
+use ark_bls12_381_old::{Bls12_381 as Bls12_381Old, G1Projective as G1Old, G2Projective as G2Old};
+use ark_ec::{pairing::Pairing as PairingNew, CurveGroup, PrimeGroup};
+use ark_ec_old::{pairing::Pairing as PairingOld, CurveGroup as CurveGroupOld, Group};
 use ark_ff::{BigInt as BigIntNew, BigInteger, Field, PrimeField, UniformRand};
 use ark_ff_old::{
     BigInt as BigIntOld, BigInteger as BigIntegerOld, Field as OldField,
@@ -163,5 +163,30 @@ fn test_fr_operations_consistency() {
                 roundtrip_new_to_old(&a_new.inverse().unwrap())
             );
         }
+    }
+}
+
+#[test]
+fn test_pairing_consistency() {
+    let mut rng = test_rng();
+
+    // Random pairing checks
+    for _ in 0..10 {
+        let a_old = G1Old::rand(&mut rng);
+        let b_old = G2Old::rand(&mut rng);
+
+        let a_new = roundtrip_old_to_new::<_, G1New>(&a_old);
+        let b_new = roundtrip_old_to_new::<_, G2New>(&b_old);
+
+        let e_old = <Bls12_381Old as PairingOld>::pairing(a_old.into_affine(), b_old.into_affine());
+        let e_new = <Bls12_381New as PairingNew>::pairing(a_new.into_affine(), b_new.into_affine());
+
+        let mut buf_old = Vec::new();
+        e_old.serialize_compressed(&mut buf_old).unwrap();
+
+        let mut buf_new = Vec::new();
+        e_new.serialize_compressed(&mut buf_new).unwrap();
+
+        assert_eq!(buf_old, buf_new, "Pairing mismatch on random inputs");
     }
 }
