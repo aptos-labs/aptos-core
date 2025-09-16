@@ -2,4 +2,4 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod handlers;
-pub mod process_common;
+pub mod pepper_request;
