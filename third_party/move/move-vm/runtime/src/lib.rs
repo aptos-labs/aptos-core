@@ -43,6 +43,7 @@ pub use storage::{
         unsync_code_storage::{AsUnsyncCodeStorage, UnsyncCodeStorage},
         unsync_module_storage::{AsUnsyncModuleStorage, BorrowedOrOwned, UnsyncModuleStorage},
     },
+    layout_cache::{LayoutCache, LayoutCacheEntry, LayoutCacheHit},
     loader::{
         eager::EagerLoader,
         lazy::LazyLoader,
@@ -56,6 +57,7 @@ pub use storage::{
         ModuleStorage,
     },
     publishing::{StagingModuleStorage, VerifiedModuleBundle},
+    ty_layout_converter::LayoutWithDelayedFields,
 };
 
 // TODO(lazy-loading): revisit this macro in favour of a callback or an enum.

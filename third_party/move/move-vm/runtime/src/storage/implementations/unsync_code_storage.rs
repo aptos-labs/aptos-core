@@ -12,16 +12,22 @@ use crate::{
         implementations::unsync_module_storage::{AsUnsyncModuleStorage, UnsyncModuleStorage},
         module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
     },
+    LayoutCache, LayoutCacheEntry, LayoutCacheHit,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
-use move_binary_format::{errors::VMResult, file_format::CompiledScript, CompiledModule};
+use move_binary_format::{
+    errors::{PartialVMResult, VMResult},
+    file_format::CompiledScript,
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata,
 };
-use move_vm_types::code::{
-    ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ScriptCache, UnsyncScriptCache,
+use move_vm_types::{
+    code::{ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ScriptCache, UnsyncScriptCache},
+    loaded_data::struct_name_indexing::StructNameIndex,
 };
 use std::sync::Arc;
 
@@ -37,6 +43,20 @@ use std::sync::Arc;
 pub struct UnsyncCodeStorage<M> {
     script_cache: UnsyncScriptCache<[u8; 32], CompiledScript, Script>,
     module_storage: M,
+}
+
+impl<M> LayoutCache for UnsyncCodeStorage<M> {
+    fn get_non_generic_struct_layout(&self, _idx: &StructNameIndex) -> Option<LayoutCacheHit> {
+        None
+    }
+
+    fn store_non_generic_struct_layout(
+        &self,
+        _idx: &StructNameIndex,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
 }
 
 impl<M: ModuleStorage> UnsyncCodeStorage<M> {
