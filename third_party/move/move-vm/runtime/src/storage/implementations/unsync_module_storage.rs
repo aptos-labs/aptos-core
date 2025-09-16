@@ -7,11 +7,14 @@ use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
     loader::Module,
     storage::environment::{RuntimeEnvironment, WithRuntimeEnvironment},
-    ModuleStorage,
+    LayoutCache, LayoutCacheEntry, LayoutCacheHit, ModuleStorage,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
-use move_binary_format::{errors::VMResult, CompiledModule};
+use move_binary_format::{
+    errors::{PartialVMResult, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata,
@@ -21,6 +24,7 @@ use move_vm_types::{
         ambassador_impl_ModuleCache, ModuleBytesStorage, ModuleCache, ModuleCode,
         ModuleCodeBuilder, UnsyncModuleCache, WithBytes, WithHash,
     },
+    loaded_data::struct_name_indexing::StructNameIndex,
     sha3_256,
 };
 use std::{borrow::Borrow, ops::Deref, sync::Arc};
@@ -149,6 +153,20 @@ where
     }
 }
 
+impl<Ctx> LayoutCache for UnsyncModuleStorageImpl<'_, Ctx> {
+    fn get_non_generic_struct_layout(&self, _idx: &StructNameIndex) -> Option<LayoutCacheHit> {
+        None
+    }
+
+    fn store_non_generic_struct_layout(
+        &self,
+        _idx: &StructNameIndex,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+}
+
 /// Implementation of (not thread-safe) module storage used for Move unit tests, and externally.
 #[derive(Delegate)]
 #[delegate(
@@ -160,6 +178,20 @@ where
     where = "Ctx: ModuleBytesStorage + WithRuntimeEnvironment"
 )]
 pub struct UnsyncModuleStorage<'ctx, Ctx>(UnsyncModuleStorageImpl<'ctx, Ctx>);
+
+impl<Ctx> LayoutCache for UnsyncModuleStorage<'_, Ctx> {
+    fn get_non_generic_struct_layout(&self, _idx: &StructNameIndex) -> Option<LayoutCacheHit> {
+        None
+    }
+
+    fn store_non_generic_struct_layout(
+        &self,
+        _idx: &StructNameIndex,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+}
 
 impl<'ctx, Ctx> UnsyncModuleStorage<'ctx, Ctx>
 where

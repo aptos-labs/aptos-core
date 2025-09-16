@@ -5,14 +5,15 @@
 
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, AsUnsyncModuleStorage,
-    Module, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage, WithRuntimeEnvironment,
+    LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, ModuleStorage, RuntimeEnvironment,
+    UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
-    errors::{verification_error, Location, PartialVMError, VMResult},
+    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule, IndexKind,
 };
 use move_core_types::{
@@ -22,7 +23,10 @@ use move_core_types::{
     metadata::Metadata,
     vm_status::StatusCode,
 };
-use move_vm_types::{code::ModuleBytesStorage, module_linker_error, sha3_256};
+use move_vm_types::{
+    code::ModuleBytesStorage, loaded_data::struct_name_indexing::StructNameIndex,
+    module_linker_error, sha3_256,
+};
 use std::{
     collections::{btree_map, BTreeMap},
     sync::Arc,
@@ -86,6 +90,22 @@ impl<M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'_, M> {
 #[delegate(ModuleStorage, where = "M: ModuleStorage")]
 pub struct StagingModuleStorage<'a, M> {
     storage: UnsyncModuleStorage<'a, StagingModuleBytesStorage<'a, M>>,
+}
+
+// Very important: no caching for staging module storage so that any speculative updates are not
+// accidentally cached.
+impl<M> LayoutCache for StagingModuleStorage<'_, M> {
+    fn get_non_generic_struct_layout(&self, _idx: &StructNameIndex) -> Option<LayoutCacheHit> {
+        None
+    }
+
+    fn store_non_generic_struct_layout(
+        &self,
+        _idx: &StructNameIndex,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
 }
 
 impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {

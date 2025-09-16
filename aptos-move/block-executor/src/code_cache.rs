@@ -27,10 +27,16 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
 };
-use move_vm_runtime::{Module, RuntimeEnvironment, Script, WithRuntimeEnvironment};
-use move_vm_types::code::{
-    ambassador_impl_ScriptCache, Code, ModuleCache, ModuleCode, ModuleCodeBuilder, ScriptCache,
-    WithBytes,
+use move_vm_runtime::{
+    LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, RuntimeEnvironment, Script,
+    WithRuntimeEnvironment,
+};
+use move_vm_types::{
+    code::{
+        ambassador_impl_ScriptCache, Code, ModuleCache, ModuleCode, ModuleCodeBuilder, ScriptCache,
+        WithBytes,
+    },
+    loaded_data::struct_name_indexing::StructNameIndex,
 };
 use std::sync::Arc;
 
@@ -238,5 +244,63 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> LatestView<'_, T, S> {
             ViewState::Sync(state) => state.versioned_map.module_cache(),
             ViewState::Unsync(state) => state.unsync_map.module_cache(),
         }
+    }
+}
+
+impl<T: Transaction, S: TStateView<Key = T::Key>> LayoutCache for LatestView<'_, T, S> {
+    fn get_non_generic_struct_layout(&self, idx: &StructNameIndex) -> Option<LayoutCacheHit> {
+        match &self.latest_view {
+            ViewState::Sync(state) => {
+                // If in captured reads, this layout must have been charged and all modules that
+                // defined it were added to the read-set.
+                if let CacheRead::Hit(layout) = state
+                    .captured_reads
+                    .borrow()
+                    .get_non_generic_struct_layout(idx)
+                {
+                    return Some(LayoutCacheHit::Charged(layout));
+                }
+
+                // If not yet in captured reads, try to get it from the layout cache.
+                let entry = self
+                    .global_module_cache
+                    .get_non_generic_struct_layout_entry(idx)?;
+                state
+                    .captured_reads
+                    .borrow_mut()
+                    .capture_non_generic_struct_layout_read(idx, entry.layout());
+                Some(entry.into_cache_hit())
+            },
+            ViewState::Unsync(_) => {
+                let entry = self
+                    .global_module_cache
+                    .get_non_generic_struct_layout_entry(idx)?;
+                Some(entry.into_cache_hit())
+            },
+        }
+    }
+
+    fn store_non_generic_struct_layout(
+        &self,
+        idx: &StructNameIndex,
+        entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        match &self.latest_view {
+            ViewState::Sync(state) => {
+                // Record the layout in read-set, so we can resolve later reads to the same one.
+                state
+                    .captured_reads
+                    .borrow_mut()
+                    .capture_non_generic_struct_layout_read(idx, entry.layout());
+                // Insert into global cache.
+                self.global_module_cache
+                    .store_non_generic_struct_layout_entry(idx, entry)?;
+            },
+            ViewState::Unsync(_) => {
+                self.global_module_cache
+                    .store_non_generic_struct_layout_entry(idx, entry)?;
+            },
+        }
+        Ok(())
     }
 }

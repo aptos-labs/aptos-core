@@ -7,11 +7,15 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_types::module_write_set::ModuleWrite;
+use dashmap::DashMap;
 use hashbrown::HashMap;
-use move_binary_format::CompiledModule;
+use move_binary_format::{errors::PartialVMResult, CompiledModule};
 use move_core_types::language_storage::ModuleId;
-use move_vm_runtime::{Module, RuntimeEnvironment};
-use move_vm_types::code::{ModuleCache, ModuleCode, WithSize};
+use move_vm_runtime::{LayoutCacheEntry, Module, RuntimeEnvironment};
+use move_vm_types::{
+    code::{ModuleCache, ModuleCode, WithSize},
+    loaded_data::struct_name_indexing::StructNameIndex,
+};
 use std::{
     hash::Hash,
     ops::Deref,
@@ -73,6 +77,8 @@ pub struct GlobalModuleCache<K, D, V, E> {
     module_cache: HashMap<K, Entry<D, V, E>>,
     /// Sum of serialized sizes (in bytes) of all cached modules.
     size: usize,
+
+    non_generic_struct_layouts: DashMap<StructNameIndex, LayoutCacheEntry>,
 }
 
 impl<K, D, V, E> GlobalModuleCache<K, D, V, E>
@@ -86,6 +92,7 @@ where
         Self {
             module_cache: HashMap::new(),
             size: 0,
+            non_generic_struct_layouts: DashMap::new(),
         }
     }
 
@@ -125,10 +132,38 @@ where
         self.size
     }
 
-    /// Flushes the module cache.
+    /// Flushes all caches.
     pub fn flush(&mut self) {
         self.module_cache.clear();
         self.size = 0;
+        self.non_generic_struct_layouts.clear();
+    }
+
+    /// Flushes only layout caches.
+    pub fn flush_layout_cache(&self) {
+        // TODO(layouts):
+        //   Flushing is only needed because of enums. Once we refactor layouts to store a single
+        //   variant instead, this can be removed.
+        self.non_generic_struct_layouts.clear();
+    }
+
+    /// Returns layout entry if it exists in global cache.
+    pub(crate) fn get_non_generic_struct_layout_entry(
+        &self,
+        idx: &StructNameIndex,
+    ) -> Option<LayoutCacheEntry> {
+        Some(self.non_generic_struct_layouts.get(idx)?.deref().clone())
+    }
+
+    pub(crate) fn store_non_generic_struct_layout_entry(
+        &self,
+        idx: &StructNameIndex,
+        entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        if let dashmap::Entry::Vacant(e) = self.non_generic_struct_layouts.entry(*idx) {
+            e.insert(entry);
+        }
+        Ok(())
     }
 
     /// Inserts modules into the cache.
