@@ -194,6 +194,7 @@ pub fn aptos_prod_vm_config(
         paranoid_ref_checks,
         enable_capture_option,
         enable_enum_option,
+        enable_layout_caches: features.are_layout_caches_enabled(),
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this
