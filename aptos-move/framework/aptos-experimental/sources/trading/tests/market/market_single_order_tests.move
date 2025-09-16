@@ -5,6 +5,7 @@ module aptos_experimental::market_single_order_tests {
     use std::signer;
     use std::vector;
     use aptos_framework::timestamp;
+    use aptos_experimental::order_placement::place_market_order;
     use aptos_experimental::event_utils::latest_emitted_events;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::clearinghouse_test::{
@@ -19,8 +20,8 @@ module aptos_experimental::market_single_order_tests {
         verify_cancel_event,
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::market_types::{order_status_open};
-    use aptos_experimental::market::{OrderEvent};
+    use aptos_experimental::market_types::{order_status_open, get_order_id_from_event};
+    use aptos_experimental::market_types::{OrderEvent};
     use aptos_experimental::order_book_types::OrderIdType;
     use aptos_experimental::order_book_types::{good_till_cancelled};
 
@@ -185,7 +186,8 @@ module aptos_experimental::market_single_order_tests {
     ) {
         let market = setup_market(admin, market_signer);
         let event_store = event_utils::new_event_store();
-        market.place_market_order(
+        place_market_order(
+            &mut market,
             taker,
             1000000,
             false, // is_buy
@@ -198,18 +200,18 @@ module aptos_experimental::market_single_order_tests {
 
         let events = latest_emitted_events<OrderEvent>(&mut event_store, option::some(1));
         let order_place_event = events[0];
-        let order_id = order_place_event.get_order_id_from_event();
+        let order_id = get_order_id_from_event(order_place_event);
         order_place_event.verify_order_event(
             order_id,
-            option::none(), // client_order_id
-            market.get_market(),
+            option::none(),
+            market.get_market_address(),
             signer::address_of(taker),
             1000000,
             1000000,
             1000000,
-            1, // price
+            1,
             false,
-            false, // Even if it's a market order, it won't cross.
+            false,
             order_status_open()
         );
         verify_cancel_event(
