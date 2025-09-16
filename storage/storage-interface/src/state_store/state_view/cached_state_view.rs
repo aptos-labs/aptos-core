@@ -104,7 +104,7 @@ pub struct CachedStateView {
     speculative: StateDelta,
 
     /// Persisted hot state. To be fetched if a key isn't in `speculative`.
-    hot: Arc<dyn HotStateView>,
+    pub hot: Arc<dyn HotStateView>,
 
     /// Persisted base state. To be fetched if a key isn't in either `speculative` or `hot_state`.
     /// `self.speculative.base_version()` is targeted in db fetches.
