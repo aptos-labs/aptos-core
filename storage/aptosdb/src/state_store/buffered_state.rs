@@ -26,7 +26,7 @@ use std::{
 };
 
 pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
-pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 100_000;
+pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 0;
 
 /// BufferedState manages a range of recent state checkpoints and asynchronously commits
 /// the updates in batches.
@@ -97,6 +97,11 @@ impl BufferedState {
     /// If a commit is needed, it sends a CommitMessage::Data message to the StateSnapshotCommitter thread to commit the data.
     /// If sync_commit is true, it also sends a CommitMessage::Sync message to ensure that the commit is completed before returning.
     fn maybe_commit(&mut self, checkpoint: Option<StateWithSummary>, sync_commit: bool) {
+        println!(
+            "maybe_commit. sync_commit: {}. version: {:?}",
+            sync_commit,
+            checkpoint.as_ref().map(|s| s.next_version())
+        );
         if let Some(checkpoint) = checkpoint {
             if !checkpoint.is_the_same(&self.last_snapshot)
                 && (sync_commit
