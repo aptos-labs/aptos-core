@@ -67,7 +67,11 @@ impl HexyView {
                 for (updated_child_position, updated_child_hash) in updated_children.into_iter() {
                     let updated_child = updated_child_position.index_in_siblings();
                     for child in next_child..updated_child {
-                        hasher.add_child(&self.unsafe_expect_hash(parent_position.child(child)))?;
+                        unsafe {
+                            hasher.add_child(
+                                &self.unsafe_expect_hash(parent_position.child(child)),
+                            )?;
+                        }
                     }
                     // n.b. There's the rule of "16 placeholders hash to the placeholder", and
                     // it seems a waste to detect that.
@@ -76,7 +80,9 @@ impl HexyView {
                     next_child = updated_child + 1;
                 }
                 for child in next_child..ARITY {
-                    hasher.add_child(&self.unsafe_expect_hash(parent_position.child(child)))?;
+                    unsafe {
+                        hasher.add_child(&self.unsafe_expect_hash(parent_position.child(child)))?;
+                    }
                 }
                 this_level_updates.push((parent_position, hasher.finish()?))
             } // end for children per parent
@@ -134,7 +140,7 @@ impl HexyView {
     unsafe fn unsafe_expect_hash(&self, position: NodePosition) -> HashValue {
         match self.overlay.get(&position) {
             Some(hash) => hash,
-            None => self.base.unsafe_expect_hash(position),
+            None => unsafe { self.base.unsafe_expect_hash(position) },
         }
     }
 }
