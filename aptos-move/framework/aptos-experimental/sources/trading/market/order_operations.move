@@ -3,7 +3,6 @@
 /// and reducing the size of existing orders.
 module aptos_experimental::order_operations {
     use std::option;
-    use std::signer;
     use aptos_experimental::market_types::{
         MarketClearinghouseCallbacks,
         Market,
@@ -34,13 +33,13 @@ module aptos_experimental::order_operations {
     /// - callbacks: The market clearinghouse callbacks for cleanup operations
     public fun cancel_order_with_client_id<M: store + copy + drop>(
         market: &mut Market<M>,
-        user: &signer,
+        user: address,
         client_order_id: u64,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let order =
             market.get_order_book_mut().try_cancel_order_with_client_order_id(
-                signer::address_of(user), client_order_id
+                user, client_order_id
             );
         if (order.is_some()) {
             // Order is already placed in the order book, so we can cancel it
@@ -63,11 +62,10 @@ module aptos_experimental::order_operations {
     /// - callbacks: The market clearinghouse callbacks for cleanup operations
     public fun cancel_order<M: store + copy + drop>(
         market: &mut Market<M>,
-        user: &signer,
+        account: address,
         order_id: OrderIdType,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
-        let account = signer::address_of(user);
         let order = market.get_order_book_mut().cancel_order(account, order_id);
         assert!(account == order.get_account(), ENOT_ORDER_CREATOR);
         cancel_single_order_helper(market, order, callbacks);
@@ -85,12 +83,11 @@ module aptos_experimental::order_operations {
     /// - callbacks: The market clearinghouse callbacks for cleanup operations
     public fun decrease_order_size<M: store + copy + drop>(
         market: &mut Market<M>,
-        user: &signer,
+        account: address,
         order_id: OrderIdType,
         size_delta: u64,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
-        let account = signer::address_of(user);
         let order_book = market.get_order_book_mut();
         order_book.decrease_order_size(account, order_id, size_delta);
         let maybe_order = order_book.get_order(order_id);

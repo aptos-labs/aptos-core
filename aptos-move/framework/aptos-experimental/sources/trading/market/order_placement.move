@@ -637,7 +637,9 @@ module aptos_experimental::order_placement {
         let is_taker_order =
             market.get_order_book().is_taker_order(limit_price, is_bid, trigger_condition);
 
-        if (emit_taker_order_open) {
+        if (emit_taker_order_open && trigger_condition.is_none()) {
+            // We don't emit order open events for orders with trigger conditions as they are not
+            // actually placed in the order book until they are triggered.
             market.emit_event_for_order(
                 order_id,
                 client_order_id,

@@ -6,13 +6,14 @@
 /// which means specify that this order with a client order id is cancelled even before the order is placed.
 /// This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 module aptos_experimental::pre_cancellation_tracker {
-    use std::signer;
     use aptos_std::big_ordered_map;
     use aptos_std::big_ordered_map::BigOrderedMap;
     use aptos_experimental::order_book_types::{
         AccountClientOrderId,
         new_account_client_order_id
     };
+    #[test_only]
+    use std::signer;
     #[test_only]
     use std::vector;
     #[test_only]
@@ -45,11 +46,11 @@ module aptos_experimental::pre_cancellation_tracker {
 
     public(package) fun pre_cancel_order_for_tracker(
         tracker: &mut PreCancellationTracker,
-        account: &signer,
+        account: address,
         client_order_id: u64
     ) {
         garbage_collect(tracker);
-        let account_order_id = new_account_client_order_id(signer::address_of(account), client_order_id);
+        let account_order_id = new_account_client_order_id(account, client_order_id);
         if (tracker.account_order_ids.contains(&account_order_id)) {
             // If the account_order_id already exists with a previously set expiration time,
             // we update the expiration time.
@@ -139,7 +140,7 @@ module aptos_experimental::pre_cancellation_tracker {
         assert!(!is_cancelled);
 
         // Pre-cancel the order
-        pre_cancel_order_for_tracker(&mut tracker, account, client_order_id);
+        pre_cancel_order_for_tracker(&mut tracker, signer::address_of(account), client_order_id);
 
         // Now it should be marked as pre-cancelled
         let is_cancelled = is_pre_cancelled(&mut tracker, signer::address_of(account), client_order_id);
@@ -161,7 +162,7 @@ module aptos_experimental::pre_cancellation_tracker {
         let client_order_id = 99;
 
         // Pre-cancel the order
-        pre_cancel_order_for_tracker(&mut tracker, account, client_order_id);
+        pre_cancel_order_for_tracker(&mut tracker, signer::address_of(account), client_order_id);
         let initial_time = timestamp::now_seconds();
         timestamp::update_global_time_for_test_secs(initial_time + 5);
         // Should be considered pre-cancelled before expiration
@@ -195,7 +196,7 @@ module aptos_experimental::pre_cancellation_tracker {
         let i = 0;
         while (i < ids.length()) {
             let id = ids[i];
-            pre_cancel_order_for_tracker(&mut tracker, account, id);
+            pre_cancel_order_for_tracker(&mut tracker, signer::address_of(account), id);
             i += 1;
         };
 
