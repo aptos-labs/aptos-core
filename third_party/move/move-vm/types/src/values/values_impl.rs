@@ -41,6 +41,7 @@ use std::{
     iter, mem,
     rc::Rc,
 };
+use triomphe::Arc as TriompheArc;
 
 /// Values can be recursive, and so it is important that we do not use recursive algorithms over
 /// deeply nested values as it can cause stack overflow. Since it is not always possible to avoid
@@ -3487,8 +3488,8 @@ impl GlobalValue {
 
     pub fn into_effect_with_layout(
         self,
-        layout: MoveTypeLayout,
-    ) -> Option<Op<(Value, MoveTypeLayout)>> {
+        layout: TriompheArc<MoveTypeLayout>,
+    ) -> Option<Op<(Value, TriompheArc<MoveTypeLayout>)>> {
         self.0
             .into_effect()
             .map(|op| op.map(|v| (Value(v), layout)))

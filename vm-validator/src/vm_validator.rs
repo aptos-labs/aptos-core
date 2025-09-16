@@ -27,7 +27,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
+use move_vm_runtime::{Module, NoOpLayoutCache, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache},
     module_storage_error,
@@ -101,6 +101,8 @@ impl<S: StateView> ValidationState<S> {
         self.module_cache = UnsyncModuleCache::empty();
     }
 }
+
+impl<S: StateView> NoOpLayoutCache for ValidationState<S> {}
 
 impl<S> WithRuntimeEnvironment for ValidationState<S> {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
