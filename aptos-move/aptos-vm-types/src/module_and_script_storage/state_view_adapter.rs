@@ -25,11 +25,12 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage,
-    Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage, UnsyncModuleStorage,
-    WithRuntimeEnvironment,
+    LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, ModuleStorage, RuntimeEnvironment,
+    Script, UnsyncCodeStorage, UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_types::{
     code::{ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ModuleCode, ScriptCache},
+    loaded_data::struct_name_indexing::StructNameIndex,
     module_storage_error,
 };
 use std::{ops::Deref, sync::Arc};
@@ -89,6 +90,20 @@ where
 #[delegate(ModuleStorage, where = "S: StateView, E: WithRuntimeEnvironment")]
 pub struct AptosCodeStorageAdapter<'ctx, S, E> {
     storage: UnsyncCodeStorage<UnsyncModuleStorage<'ctx, StateViewAdapter<'ctx, S, E>>>,
+}
+
+impl<'ctx, S, E> LayoutCache for AptosCodeStorageAdapter<'ctx, S, E> {
+    fn get_non_generic_struct_layout(&self, _idx: &StructNameIndex) -> Option<LayoutCacheHit> {
+        None
+    }
+
+    fn store_non_generic_struct_layout(
+        &self,
+        _idx: &StructNameIndex,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
 }
 
 #[delegate_to_methods]

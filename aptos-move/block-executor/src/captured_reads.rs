@@ -33,9 +33,11 @@ use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::value::MoveTypeLayout;
+use move_vm_runtime::LayoutWithDelayedFields;
 use move_vm_types::{
     code::{ModuleCode, SyncModuleCache, WithAddress, WithName, WithSize},
     delayed_values::delayed_field_id::DelayedFieldID,
+    loaded_data::struct_name_indexing::StructNameIndex,
 };
 use std::{
     collections::{
@@ -550,6 +552,7 @@ pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     aggregator_v1_reads: HashSet<T::Key>,
 
     module_reads: hashbrown::HashMap<K, ModuleRead<DC, VC, S>>,
+    non_generic_struct_layout_reads: HashMap<StructNameIndex, LayoutWithDelayedFields>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an observed
     /// inconsistency), the transaction output is irrelevant (must be discarded and transaction
@@ -579,6 +582,7 @@ impl<T: Transaction, K, DC, VC, S> CapturedReads<T, K, DC, VC, S> {
             delayed_field_reads: HashMap::new(),
             aggregator_v1_reads: HashSet::new(),
             module_reads: hashbrown::HashMap::new(),
+            non_generic_struct_layout_reads: HashMap::new(),
             delayed_field_speculative_failure: false,
             non_delayed_field_speculative_failure: false,
             incorrect_use: false,
@@ -1035,6 +1039,27 @@ where
             },
             None => CacheRead::Miss,
         }
+    }
+
+    pub(crate) fn get_non_generic_struct_layout(
+        &self,
+        idx: &StructNameIndex,
+    ) -> CacheRead<LayoutWithDelayedFields> {
+        match self.non_generic_struct_layout_reads.get(idx) {
+            Some(l) => CacheRead::Hit(l.clone()),
+            None => CacheRead::Miss,
+        }
+    }
+
+    pub(crate) fn capture_non_generic_struct_layout_read(
+        &mut self,
+        idx: &StructNameIndex,
+        layout: &LayoutWithDelayedFields,
+    ) {
+        let prev = self
+            .non_generic_struct_layout_reads
+            .insert(*idx, layout.clone());
+        assert!(prev.is_none());
     }
 
     /// For every module read that was captured, checks if the reads are still the same:

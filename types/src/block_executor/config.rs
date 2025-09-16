@@ -18,6 +18,9 @@ pub struct BlockExecutorModuleCacheLocalConfig {
     /// The maximum size (in terms of entries) of struct name re-indexing map stored in the runtime
     /// environment.
     pub max_struct_name_index_map_num_entries: usize,
+
+    /// The maximum number of layout entries.
+    pub max_non_generic_layout_cache_size: usize,
 }
 
 impl Default for BlockExecutorModuleCacheLocalConfig {
@@ -28,6 +31,7 @@ impl Default for BlockExecutorModuleCacheLocalConfig {
             // of writing this comment, 13.11.24).
             max_module_cache_size_in_bytes: 1024 * 1024 * 1024,
             max_struct_name_index_map_num_entries: 1_000_000,
+            max_non_generic_layout_cache_size: 1_000_000,
         }
     }
 }

@@ -15,7 +15,8 @@ use crate::{
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
     },
-    Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+    LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, ModuleStorage, RuntimeEnvironment,
+    WithRuntimeEnvironment,
 };
 use ambassador::delegate_to_methods;
 use bytes::Bytes;
@@ -34,7 +35,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, DependencyKind, NativeGasMeter},
-    loaded_data::runtime_types::Type,
+    loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex},
     natives::function::NativeResult,
     resolver::ResourceResolver,
     values::{AbstractFunction, Value},
@@ -178,7 +179,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     /// Returns the runtime layout of a type that can be used to (de)serialize the value.
     ///
     /// NOTE: use with caution as this ignores the flag if layout contains delayed fields or not.
-    pub fn type_to_type_layout(&mut self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+    pub fn type_to_type_layout(&mut self, ty: &Type) -> PartialVMResult<Arc<MoveTypeLayout>> {
         let layout = self
             .loader_context()
             .type_to_type_layout_with_delayed_fields(ty)?
@@ -202,7 +203,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     pub fn type_to_type_layout_check_no_delayed_fields(
         &mut self,
         ty: &Type,
-    ) -> PartialVMResult<MoveTypeLayout> {
+    ) -> PartialVMResult<Arc<MoveTypeLayout>> {
         let layout = self
             .loader_context()
             .type_to_type_layout_with_delayed_fields(ty)?;
@@ -219,7 +220,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     pub fn type_to_fully_annotated_layout(
         &mut self,
         ty: &Type,
-    ) -> PartialVMResult<Option<MoveTypeLayout>> {
+    ) -> PartialVMResult<Option<Arc<MoveTypeLayout>>> {
         self.loader_context().type_to_fully_annotated_layout(ty)
     }
 
@@ -408,7 +409,7 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
     fn type_to_fully_annotated_layout(
         &mut self,
         ty: &Type,
-    ) -> PartialVMResult<Option<MoveTypeLayout>> {
+    ) -> PartialVMResult<Option<Arc<MoveTypeLayout>>> {
         let layout = dispatch_loader!(&self.module_storage, loader, {
             LayoutConverter::new(&loader).type_to_annotated_type_layout_with_delayed_fields(
                 &mut self.gas_meter,
@@ -423,6 +424,21 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
 // Wrappers to use trait objects where static dispatch is expected.
 struct ModuleStorageWrapper<'a> {
     module_storage: &'a dyn ModuleStorage,
+}
+
+impl<'a> LayoutCache for ModuleStorageWrapper<'a> {
+    fn get_non_generic_struct_layout(&self, idx: &StructNameIndex) -> Option<LayoutCacheHit> {
+        self.module_storage.get_non_generic_struct_layout(idx)
+    }
+
+    fn store_non_generic_struct_layout(
+        &self,
+        idx: &StructNameIndex,
+        entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        self.module_storage
+            .store_non_generic_struct_layout(idx, entry)
+    }
 }
 
 #[delegate_to_methods]

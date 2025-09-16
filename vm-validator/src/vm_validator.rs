@@ -23,13 +23,17 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
 use move_binary_format::{
-    errors::{Location, PartialVMError, VMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
 };
 use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
+use move_vm_runtime::{
+    LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, RuntimeEnvironment,
+    WithRuntimeEnvironment,
+};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache},
+    loaded_data::struct_name_indexing::StructNameIndex,
     module_storage_error,
 };
 use rand::{thread_rng, Rng};
@@ -99,6 +103,20 @@ impl<S: StateView> ValidationState<S> {
         self.state_view = state_view;
         self.environment = AptosEnvironment::new(&self.state_view);
         self.module_cache = UnsyncModuleCache::empty();
+    }
+}
+
+impl<S: StateView> LayoutCache for ValidationState<S> {
+    fn get_non_generic_struct_layout(&self, _idx: &StructNameIndex) -> Option<LayoutCacheHit> {
+        None
+    }
+
+    fn store_non_generic_struct_layout(
+        &self,
+        _idx: &StructNameIndex,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        Ok(())
     }
 }
 

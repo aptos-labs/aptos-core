@@ -4,8 +4,11 @@
 use crate::{
     config::VMConfig,
     module_traversal::TraversalContext,
-    storage::{loader::traits::StructDefinitionLoader, ty_tag_converter::TypeTagConverter},
-    RuntimeEnvironment,
+    storage::{
+        layout_cache::DefiningModules, loader::traits::StructDefinitionLoader,
+        ty_tag_converter::TypeTagConverter,
+    },
+    LayoutCacheEntry, RuntimeEnvironment,
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
@@ -32,16 +35,16 @@ static OPTION_MODULE_ID: Lazy<ModuleId> =
 static OPTION_STRUCT_NAME: Lazy<Identifier> = Lazy::new(|| Identifier::from(ident_str!("Option")));
 
 /// Stores type layout as well as a flag if it contains any delayed fields.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LayoutWithDelayedFields {
-    layout: MoveTypeLayout,
+    layout: Arc<MoveTypeLayout>,
     contains_delayed_fields: bool,
 }
 
 impl LayoutWithDelayedFields {
     /// If layout contains delayed fields, returns [None]. If there are no delayed fields, the
     /// layout is returned.
-    pub fn into_layout_when_has_no_delayed_fields(self) -> Option<MoveTypeLayout> {
+    pub fn into_layout_when_has_no_delayed_fields(self) -> Option<Arc<MoveTypeLayout>> {
         (!self.contains_delayed_fields).then_some(self.layout)
     }
 
@@ -52,7 +55,7 @@ impl LayoutWithDelayedFields {
     }
 
     /// Unpacks and returns the layout and delayed fields flag for the caller to handle.
-    pub fn unpack(self) -> (MoveTypeLayout, bool) {
+    pub fn unpack(self) -> (Arc<MoveTypeLayout>, bool) {
         (self.layout, self.contains_delayed_fields)
     }
 }
@@ -87,9 +90,33 @@ where
         ty: &Type,
         check_option_type: bool,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
+        if let Type::Struct { idx, .. } = ty {
+            if let Some(result) = self
+                .struct_definition_loader
+                .load_non_generic_struct_layout_from_cache(gas_meter, traversal_context, idx)
+            {
+                return result;
+            }
+
+            // Otherwise a cache miss, compute the result and store it.
+            let mut modules = DefiningModules::new();
+            let layout = self.type_to_type_layout_with_delayed_fields_impl::<false>(
+                gas_meter,
+                traversal_context,
+                &mut modules,
+                ty,
+                check_option_type,
+            )?;
+            let cache_entry = LayoutCacheEntry::new(layout.clone(), modules);
+            self.struct_definition_loader
+                .store_non_generic_struct_layout_to_cache(idx, cache_entry)?;
+            return Ok(layout);
+        }
+
         self.type_to_type_layout_with_delayed_fields_impl::<false>(
             gas_meter,
             traversal_context,
+            &mut DefiningModules::new(),
             ty,
             check_option_type,
         )
@@ -107,6 +134,7 @@ where
         self.type_to_type_layout_with_delayed_fields_impl::<true>(
             gas_meter,
             traversal_context,
+            &mut DefiningModules::new(),
             ty,
             false,
         )
@@ -181,6 +209,7 @@ where
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
+        modules: &mut DefiningModules,
         ty: &Type,
         check_option_type: bool,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
@@ -190,13 +219,14 @@ where
         let (layout, contains_delayed_fields) = self.type_to_type_layout_impl::<ANNOTATED>(
             gas_meter,
             traversal_context,
+            modules,
             ty,
             &mut count,
             1,
             check_option_type,
         )?;
         Ok(LayoutWithDelayedFields {
-            layout,
+            layout: Arc::new(layout),
             contains_delayed_fields,
         })
     }
@@ -208,6 +238,7 @@ where
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
+        modules: &mut DefiningModules,
         ty: &Type,
         count: &mut u64,
         depth: u64,
@@ -230,6 +261,7 @@ where
                 .type_to_type_layout_impl::<ANNOTATED>(
                     gas_meter,
                     traversal_context,
+                    modules,
                     ty,
                     count,
                     depth + 1,
@@ -242,6 +274,7 @@ where
             Type::Struct { idx, .. } => self.struct_to_type_layout::<ANNOTATED>(
                 gas_meter,
                 traversal_context,
+                modules,
                 idx,
                 &[],
                 count,
@@ -252,6 +285,7 @@ where
                 .struct_to_type_layout::<ANNOTATED>(
                     gas_meter,
                     traversal_context,
+                    modules,
                     idx,
                     ty_args,
                     count,
@@ -273,6 +307,7 @@ where
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
+        modules: &mut DefiningModules,
         tys: &[Type],
         count: &mut u64,
         depth: u64,
@@ -286,6 +321,7 @@ where
                     .type_to_type_layout_impl::<ANNOTATED>(
                         gas_meter,
                         traversal_context,
+                        modules,
                         ty,
                         count,
                         depth,
@@ -310,6 +346,7 @@ where
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
+        modules: &mut DefiningModules,
         idx: &StructNameIndex,
         ty_args: &[Type],
         count: &mut u64,
@@ -321,12 +358,14 @@ where
             traversal_context,
             idx,
         )?;
+        let struct_identifier = self
+            .struct_definition_loader
+            .runtime_environment()
+            .struct_name_index_map()
+            .idx_to_struct_name_ref(*idx)?;
+        modules.insert(&struct_identifier.module);
 
         if check_option_type && !self.runtime_environment().vm_config().enable_capture_option {
-            let struct_identifier = self
-                .runtime_environment()
-                .struct_name_index_map()
-                .idx_to_struct_name(*idx)?;
             if struct_identifier.module == *OPTION_MODULE_ID
                 && struct_identifier.name == *OPTION_STRUCT_NAME
             {
@@ -352,6 +391,7 @@ where
                             self.types_to_type_layouts::<false>(
                                 gas_meter,
                                 traversal_context,
+                                modules,
                                 &self.apply_subst_for_field_tys(&variant.1, ty_args)?,
                                 count,
                                 depth,
@@ -378,6 +418,7 @@ where
                     .types_to_type_layouts::<ANNOTATED>(
                         gas_meter,
                         traversal_context,
+                        modules,
                         &self.apply_subst_for_field_tys(fields, ty_args)?,
                         count,
                         depth,
@@ -519,7 +560,7 @@ mod tests {
     fn test_layout_with_delayed_fields(contains_delayed_fields: bool) {
         let layout = LayoutWithDelayedFields {
             // Dummy layout.
-            layout: MoveTypeLayout::U8,
+            layout: Arc::new(MoveTypeLayout::U8),
             contains_delayed_fields,
         };
         assert_eq!(
@@ -567,7 +608,7 @@ mod tests {
             let layout = assert_ok!(result);
 
             assert!(!layout.contains_delayed_fields);
-            assert_eq!(&layout.layout, &expected_layout);
+            assert_eq!(layout.layout.as_ref(), &expected_layout);
         }
     }
 
@@ -668,7 +709,7 @@ mod tests {
                 false
             ));
             let layout = assert_some!(layout.into_layout_when_has_no_delayed_fields());
-            assert_eq!(layout, runtime_layout(vec![]));
+            assert_eq!(layout.as_ref(), &runtime_layout(vec![]));
 
             let layout = assert_ok!(construct_layout_for_test(
                 &layout_converter,
@@ -676,7 +717,7 @@ mod tests {
                 true
             ));
             let layout = assert_some!(layout.into_layout_when_has_no_delayed_fields());
-            assert_eq!(layout, annotated_layout(name, vec![]));
+            assert_eq!(layout.as_ref(), &annotated_layout(name, vec![]));
         }
 
         let layout = assert_ok!(construct_layout_for_test(
@@ -685,7 +726,10 @@ mod tests {
             false
         ));
         let layout = assert_some!(layout.into_layout_when_has_no_delayed_fields());
-        assert_eq!(layout, runtime_layout(vec![runtime_layout(vec![])]));
+        assert_eq!(
+            layout.as_ref(),
+            &runtime_layout(vec![runtime_layout(vec![])])
+        );
 
         let layout = assert_ok!(construct_layout_for_test(
             &layout_converter,
@@ -694,8 +738,8 @@ mod tests {
         ));
         let layout = assert_some!(layout.into_layout_when_has_no_delayed_fields());
         assert_eq!(
-            layout,
-            annotated_layout("B", vec![MoveFieldLayout::new(
+            layout.as_ref(),
+            &annotated_layout("B", vec![MoveFieldLayout::new(
                 Identifier::from_str("c").unwrap(),
                 annotated_layout("C", vec![])
             )])
