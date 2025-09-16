@@ -4,10 +4,12 @@
 use crate::utils::{
     parallel_multi_pairing::parallel_multi_pairing_slice, random::random_scalar_from_uniform_bytes,
 };
+use ark_bn254::Fr; // TODO: Move this elsewhere
+use ark_ec::AdditiveGroup;
 use blstrs::{
-    pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt, Scalar,
+    pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt,
+    Scalar as ScalarOld,
 };
-use ff::Field;
 use group::{Curve, Group};
 use pairing::{MillerLoopResult, MultiMillerLoop};
 use rayon::ThreadPool;
@@ -29,7 +31,7 @@ pub fn is_power_of_two(n: usize) -> bool {
 /// (Same design as in `curve25519-dalek` explained here <https://crypto.stackexchange.com/questions/88002/how-to-map-output-of-hash-algorithm-to-a-finite-field>)
 ///
 /// NOTE: Domain separation from other SHA3-512 calls in our system is left up to the caller.
-pub fn hash_to_scalar(msg: &[u8], dst: &[u8]) -> Scalar {
+pub fn hash_to_scalar(msg: &[u8], dst: &[u8]) -> ScalarOld {
     // First, hash the DST as `dst_hash = H(dst)`
     let mut hasher = sha3::Sha3_512::new();
     hasher.update(dst);
@@ -52,7 +54,7 @@ pub fn hash_to_scalar(msg: &[u8], dst: &[u8]) -> Scalar {
 }
 
 /// Works around the `blst_hell` bug (see README.md).
-pub fn g1_multi_exp(bases: &[G1Projective], scalars: &[Scalar]) -> G1Projective {
+pub fn g1_multi_exp(bases: &[G1Projective], scalars: &[ScalarOld]) -> G1Projective {
     if bases.len() != scalars.len() {
         panic!(
             "blstrs's multiexp has heisenbugs when the # of bases != # of scalars ({} != {})",
@@ -69,7 +71,7 @@ pub fn g1_multi_exp(bases: &[G1Projective], scalars: &[Scalar]) -> G1Projective 
 }
 
 /// Works around the `blst_hell` bug (see README.md).
-pub fn g2_multi_exp(bases: &[G2Projective], scalars: &[Scalar]) -> G2Projective {
+pub fn g2_multi_exp(bases: &[G2Projective], scalars: &[ScalarOld]) -> G2Projective {
     if bases.len() != scalars.len() {
         panic!(
             "blstrs's multiexp has heisenbugs when the # of bases != # of scalars ({} != {})",
@@ -154,9 +156,9 @@ pub fn pairing_g2_g1(lhs: &G2Affine, rhs: &G1Affine) -> Gt {
 }
 
 pub trait HasMultiExp: for<'a> Sized + Clone {
-    fn multi_exp_slice(bases: &[Self], scalars: &[Scalar]) -> Self;
+    fn multi_exp_slice(bases: &[Self], scalars: &[ScalarOld]) -> Self;
 
-    fn multi_exp_iter<'a, 'b, I>(bases: I, scalars: impl Iterator<Item = &'b Scalar>) -> Self
+    fn multi_exp_iter<'a, 'b, I>(bases: I, scalars: impl Iterator<Item = &'b ScalarOld>) -> Self
     where
         I: Iterator<Item = &'a Self>,
         Self: 'a,
@@ -164,19 +166,19 @@ pub trait HasMultiExp: for<'a> Sized + Clone {
         // TODO(Perf): blstrs does not work with iterators, which leads to unnecessary cloning here.
         Self::multi_exp_slice(
             bases.cloned().collect::<Vec<Self>>().as_slice(),
-            scalars.cloned().collect::<Vec<Scalar>>().as_slice(),
+            scalars.cloned().collect::<Vec<ScalarOld>>().as_slice(),
         )
     }
 }
 
 impl HasMultiExp for G2Projective {
-    fn multi_exp_slice(points: &[Self], scalars: &[Scalar]) -> Self {
+    fn multi_exp_slice(points: &[Self], scalars: &[ScalarOld]) -> Self {
         g2_multi_exp(points, scalars)
     }
 }
 
 impl HasMultiExp for G1Projective {
-    fn multi_exp_slice(points: &[Self], scalars: &[Scalar]) -> Self {
+    fn multi_exp_slice(points: &[Self], scalars: &[ScalarOld]) -> Self {
         g1_multi_exp(points, scalars)
     }
 }
@@ -188,8 +190,8 @@ impl HasMultiExp for G1Projective {
 ///   so the vector is padded to length 3 (no change).
 /// - If `scalars.len() == 5`, then `len + 1 = 6`, next power of two is 8,
 ///   so the vector is padded to length 7.
-pub(crate) fn pad_to_pow2_len_minus_one(mut scalars: Vec<Scalar>) -> Vec<Scalar> {
+pub(crate) fn pad_to_pow2_len_minus_one(mut scalars: Vec<Fr>) -> Vec<Fr> {
     let target_len = (scalars.len() + 1).next_power_of_two() - 1;
-    scalars.resize(target_len, Scalar::ZERO);
+    scalars.resize(target_len, Fr::ZERO);
     scalars
 }

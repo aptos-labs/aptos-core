@@ -1,11 +1,26 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_dkg::range_proof::{batch_prove, batch_verify, commit, setup, DST};
+use aptos_dkg::range_proofs::univariate_range_proof::{
+    batch_prove, batch_verify, commit, setup, DST,
+};
 use blstrs::Scalar;
 use criterion::{criterion_group, criterion_main, Criterion};
-use rand::thread_rng;
-use rand_core::RngCore;
+use ark_std::rand::{thread_rng, RngCore};
+
+use ark_bn254::{
+    // TODO: move this elsewhere
+    g1::Config as G1Config,
+    Bn254 as PairingSetting,
+    Config,
+    Fq,
+    Fq12,
+    Fr,
+    G1Affine,
+    G1Projective,
+    G2Affine,
+    G2Projective,
+};
 
 pub fn bench_groups(c: &mut Criterion) {
     let mut group = c.benchmark_group("range_proof");
@@ -25,10 +40,10 @@ pub fn bench_groups(c: &mut Criterion) {
             || {
                 let mut rng = thread_rng();
                 let pp = setup(ell, n);
-                let zz: Vec<Scalar> = (0..n)
+                let zz: Vec<Fr> = (0..n)
                     .map(|_| {
-                        let val = rng.next_u64() >> (64 - ell);
-                        Scalar::from(val)
+                        let val = rng.next_u64() >> (64 - ell); // Keep lowest ell bits
+                        Fr::from(val)
                     })
                     .collect();
                 let (cc, r) = commit(&pp, &zz, &mut rng);
@@ -46,10 +61,10 @@ pub fn bench_groups(c: &mut Criterion) {
             || {
                 let mut rng = thread_rng();
                 let pp = setup(ell, n);
-                let zz: Vec<Scalar> = (0..n)
+                let zz: Vec<Fr> = (0..n)
                     .map(|_| {
-                        let val = rng.next_u64() >> (64 - ell);
-                        Scalar::from(val)
+                        let val = rng.next_u64() >> (64 - ell); // Keep lowest ell bits
+                        Fr::from(val)
                     })
                     .collect();
                 let (cc, r) = commit(&pp, &zz, &mut rng);

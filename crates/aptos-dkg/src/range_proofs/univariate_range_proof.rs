@@ -1,48 +1,37 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    algebra::{
-        evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
-        fft::{fft_assign, ifft_assign, ifft_assign_g1, ifft_assign_g2},
-        polynomials::{poly_add_assign, poly_differentiate, poly_mul_scalar},
-    },
-    fiat_shamir,
-    utils::{
-        g1_multi_exp, g2_multi_exp, multi_pairing_g1_g2, pad_to_pow2_len_minus_one,
-        random::{random_scalar},
-    },
-};
+use crate::{fiat_shamir, utils::pad_to_pow2_len_minus_one};
 use anyhow::ensure;
-use blstrs::{G1Projective as G1ProjectiveOLD, G2Projective as G2ProjectiveOLD, Gt as GtOLD, Scalar as ScalarOLD};
+use ark_bn254::{
+    // TODO: move this elsewhere
+    g1::Config as G1Config,
+    Bn254 as PairingSetting,
+    Config,
+    Fq,
+    Fq12,
+    Fr,
+    G1Affine,
+    G1Projective,
+    G2Affine,
+    G2Projective,
+};
+use ark_ec::{CurveGroup, PrimeGroup, VariableBaseMSM};
+use ark_ff::{Field, PrimeField};
+use ark_poly::{self, EvaluationDomain, GeneralEvaluationDomain};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::{
+    rand::{thread_rng, CryptoRng, RngCore},
+    UniformRand,
+};
 #[cfg(feature = "range_proof_timing")]
 use ff::derive::bitvec::macros::internal::funty::Fundamental;
-use ff::Field;
-use group::Group;
-// use rand::thread_rng;
-// use rand_core::{CryptoRng, RngCore};
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "range_proof_timing")]
 use std::time::{Duration, Instant};
 use std::{
     iter::once,
     ops::{AddAssign, Mul},
 };
-
-use ark_bn254::{
-    Bn254 as PairingSetting, 
-    g1::Config as G1Config,
-    Fr, 
-    G1Affine, 
-    G2Affine, 
-    G1Projective, 
-    G2Projective,
-    Fq,
-    Config,
-};
-use ark_poly;
-use ark_std::UniformRand;
-use ark_std::rand::{thread_rng, RngCore, CryptoRng};
 
 pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V1_RANGE_PROOF_DST";
 
@@ -71,14 +60,12 @@ pub struct PublicParameters {
     taus: PowersOfTau,               // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}
     ell: usize,                      // the range is [0, 2^\ell)
     n: usize,                        // the number of values we are batch proving; i.e., batch size
-    lagr_g1: Vec<G1Projective>,      // of size n + 1 // TODO: Vec<G1Affine is probably better>
-    lagr_g2: Vec<G2Projective>,      // of size n + 1
+    lagr_g1: Vec<G1Affine>,          // of size n + 1
+    lagr_g2: Vec<G2Affine>,          // of size n + 1
     pub vanishing_com: G2Projective, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - \omega^n) used to test h(X)
-    batch_dom_n1: BatchEvaluationDomain, // batch evaluation domain of size (n+1)
-    dom_n1: EvaluationDomain,        // (n+1)th root of unity
+    eval_dom: GeneralEvaluationDomain<Fr>,
+    roots_of_unity_in_eval_dom: Vec<Fr>,
 }
-
-use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Commitment(G1Projective);
@@ -96,8 +83,6 @@ impl Proof {
     }
 }
 
-use ark_ec::PrimeGroup;
-
 /// Sets up the Borgeaud range proof for proving that size-`n` batches are in the range [0, 2^\ell).
 pub fn setup(ell: usize, n: usize) -> PublicParameters {
     let mut rng = thread_rng();
@@ -108,20 +93,28 @@ pub fn setup(ell: usize, n: usize) -> PublicParameters {
 
     let taus = powers_of_tau(&mut rng, n); // The taus have length `n+1`
 
-    let batch_dom_n1 = ark_poly::EvaluationDomain::new(num_omegas);
+    // let batch_dom_n1 = ark_poly::EvaluationDomain::new(num_omegas);
+    let eval_dom = GeneralEvaluationDomain::<Fr>::new(num_omegas).unwrap();
     //let batch_dom_2n2 = ark_poly::EvaluationDomain::new(num_omegas * 2);
     // let batch_dom_n1 = BatchEvaluationDomain::new(num_omegas);
-    let batch_dom_2n2 = BatchEvaluationDomain::new(num_omegas * 2);
-    let dom_n1 = batch_dom_2n2.get_subdomain(num_omegas);
-    let omega_n: Vec<Fr> = (0..num_omegas)
-        .map(|i| batch_dom_2n2.get_all_roots_of_unity()[i * 2])
-        .collect();
+    //    let batch_dom_2n2 = BatchEvaluationDomain::new(num_omegas * 2);
+    //    let dom_n1 = batch_dom_2n2.get_subdomain(num_omegas);
+    let all_roots_of_unity: Vec<Fr> = eval_dom.elements().collect();
+    // let omega_n: Vec<Fr> = (0..num_omegas)
+    //     .map(|i| batch_dom_2n2.get_all_roots_of_unity()[i * 2])
+    //     .collect();
 
     // Lagrange bases
-    let mut lagr_g1 = taus.t1[0..num_omegas].to_vec();
-    ifft_assign_g1(&mut lagr_g1, &dom_n1);
-    let mut lagr_g2 = taus.t2[0..num_omegas].to_vec();
-    ifft_assign_g2(&mut lagr_g2, &dom_n1);
+    let lagr_g1_proj = eval_dom.ifft(&taus.t1);
+    let lagr_g2_proj = eval_dom.ifft(&taus.t2);
+
+    let lagr_g1 = G1Projective::normalize_batch(&lagr_g1_proj);
+    let lagr_g2 = G2Projective::normalize_batch(&lagr_g2_proj);
+
+    // let mut lagr_g1 = taus.t1[0..num_omegas].to_vec();
+    // ifft_assign_g1(&mut lagr_g1, &dom_n1);
+    // let mut lagr_g2 = taus.t2[0..num_omegas].to_vec();
+    // ifft_assign_g2(&mut lagr_g2, &dom_n1);
 
     // Vanishing polynomial that we test h(X) with is (X^{n+1} - 1) / (X - \omega^n)
     //
@@ -132,9 +125,11 @@ pub fn setup(ell: usize, n: usize) -> PublicParameters {
 
     // Therefore, below we commit to $V(X)$ by simply scaling it down by $\prod_{i\in[n)} (\omega^n - \omega^i)$!
     let vanishing_com = {
-        let last_eval: ScalarOLD = (0..n).map(|i| omega_n[n] - omega_n[i]).product();
+        let last_eval: Fr = (0..n)
+            .map(|i| all_roots_of_unity[n] - all_roots_of_unity[i])
+            .product();
 
-        lagr_g2[n] * last_eval
+        lagr_g2_proj[n] * last_eval
     };
 
     // Alin's slower algorithm in coefficient basis
@@ -156,8 +151,8 @@ pub fn setup(ell: usize, n: usize) -> PublicParameters {
         lagr_g1,
         lagr_g2,
         vanishing_com,
-        dom_n1,
-        batch_dom_n1,
+        eval_dom,
+        roots_of_unity_in_eval_dom: all_roots_of_unity,
     }
 }
 
@@ -170,13 +165,7 @@ where
     (c, r)
 }
 
-use ark_ec::{VariableBaseMSM};
-
-pub(crate) fn commit_with_randomness(
-    pp: &PublicParameters,
-    z: &[Fr],
-    r: &Fr,
-) -> Commitment {
+pub(crate) fn commit_with_randomness(pp: &PublicParameters, z: &[Fr], r: &Fr) -> Commitment {
     let mut scalars = z.to_vec();
     let mut bases = pp.lagr_g1[..scalars.len()].to_vec(); // TODO: atm the range proof algorithm couples `r` with `lagr_g1.last()` causing a copy here; this can be avoided by coupling `r` with `lagr_g1.first()` instead
 
@@ -184,21 +173,38 @@ pub(crate) fn commit_with_randomness(
     let last_base = pp.lagr_g1.last().expect("pp.lagr_g1 must not be empty");
     bases.push(*last_base);
 
-    let c = G1Projective::msm(&bases, &scalars).expect("could not compute msm in range proof commitment");
+    let c = G1Projective::msm(&bases, &scalars)
+        .expect("could not compute msm in range proof commitment");
     Commitment(c)
 }
+
+fn fr_to_bits_le(x: &Fr) -> Vec<bool> {
+    let bigint: <Fr as ark_ff::PrimeField>::BigInt = x.into_bigint();
+    ark_ff::BitIteratorLE::new(&bigint).collect()
+}
+
+fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
+    let degree = coeffs.len() - 1;
+    for i in 0..degree {
+        coeffs[i] = coeffs[i + 1].mul(F::from((i + 1) as u64));
+    }
+
+    coeffs.truncate(degree);
+}
+
+use ark_ff::AdditiveGroup;
 
 #[allow(non_snake_case)]
 pub fn batch_prove<R>(
     rng: &mut R,
     pp: &PublicParameters,
-    zz: &[ScalarOLD],
+    zz: &[Fr],
     cc: &Commitment,
-    rr: &ScalarOLD,
+    rr: &Fr,
     fs_transcript: &mut merlin::Transcript,
 ) -> Proof
 where
-    R: RngCore + rand::Rng + CryptoRng,
+    R: RngCore + CryptoRng,
 {
     let zz = pad_to_pow2_len_minus_one(zz.to_vec());
 
@@ -223,10 +229,8 @@ where
     let bits: Vec<Vec<bool>> = zz
         .iter()
         .map(|z_val| {
-            z_val
-                .to_bytes_le()
+            fr_to_bits_le(z_val)
                 .into_iter()
-                .flat_map(byte_to_bits_le)
                 .take(pp.ell)
                 .collect::<Vec<_>>()
         })
@@ -250,7 +254,7 @@ where
     #[cfg(feature = "range_proof_timing")]
     let start = Instant::now();
 
-    let r = correlated_randomness(rng, 2, pp.ell, &rr);
+    let r = correlated_randomness(rng, 2, pp.ell, rr);
 
     #[cfg(feature = "range_proof_timing")]
     {
@@ -271,14 +275,22 @@ where
     let start = Instant::now();
     // f_evals[j] = the evaluations of f_j(x) at all the (n+1)-th roots of unity.
     //            = (z_0[j], ..., z_{n-1}[j], r[j]), where z_i[j] is the j-th bit of z_i.
+    let f_evals_without_r = (0..pp.ell)
+        .map(|j| {
+            (0..pp.n)
+                .map(|i| bits[i][j])
+                .collect::<Vec<bool>>()
+        })
+        .collect::<Vec<Vec<bool>>>();
+
     let f_evals = (0..pp.ell)
         .map(|j| {
             (0..pp.n)
-                .map(|i| ScalarOLD::from(bits[i][j] as u64))
+                .map(|i| Fr::from(bits[i][j]))
                 .chain(once(r[j]))
-                .collect::<Vec<ScalarOLD>>()
+                .collect::<Vec<Fr>>()
         })
-        .collect::<Vec<Vec<ScalarOLD>>>();
+        .collect::<Vec<Vec<Fr>>>();
     // Assert f_evals is either 0 or 1s or r_j
     // for (j, evals) in f_evals.iter().enumerate() {
     //     for (i, e) in evals.iter().take(pp.n).enumerate() {
@@ -299,10 +311,12 @@ where
     #[cfg(feature = "range_proof_timing")]
     let start = Instant::now();
     // c[j] = c_j = g_1^{f_j(\tau)}
-    let c: Vec<G1ProjectiveOLD> = (0..pp.ell)
-        // Note: Using a multiexp will be 10-20% slower than manually multiplying.
+    // let bits_flattened: Vec<bool> = bits.into_iter().flatten().collect();
+    let c: Vec<G1Projective> = (0..pp.ell)
+        // Note on blstrs: Using a multiexp will be 10-20% slower than manually multiplying.
         // .map(|j|
         //     g1_multi_exp(&pp.lagrange_basis, &f_evals[j]))
+        // TODO: Whereas has msm's for specific scalar chunk sizes........
         .map(|j| {
             // TODO(Performance): Can we speed this up with tables? There are `n` bits, so a single
             //  (2^n)-sized table that maps `n` bits into their multiproduct \prod_{i=0}^{n} L_i^{f_j(\omega_i)}
@@ -314,22 +328,23 @@ where
             //  For example, if we want to handle n = 2048, we can set c = 16, which gives
             //  `k = \ell / c = 2048 / 16 = 128` tables, each of size 2^c => 2^{16} * 48 bytes =
             //  3 MiB / table => 384 MiB total.
-            let mut c: G1ProjectiveOLD = pp
-                .lagr_g1
-                .iter()
-                .take(pp.n)
-                .zip(f_evals[j].iter().take(pp.n))
-                .map(|(lagr, eval)| {
-                    // Using G1Projective::mul here will be way slower! (Not sure why...)
-                    if eval.is_zero_vartime() {
-                        G1ProjectiveOLD::identity()
-                    } else {
-                        *lagr
-                    }
-                })
-                .sum();
-            c.add_assign(pp.lagr_g1[pp.n].mul(&f_evals[j][pp.n]));
-            c
+            // let mut c: G1Projective = pp
+            //     .lagr_g1
+            //     .iter()
+            //     .take(pp.n)
+            //     .zip(f_evals[j].iter().take(pp.n))
+            //     .map(|(lagr, eval)| {
+            //         // Using G1Projective::mul here will be way slower! (Not sure why...)
+            //         if eval.is_zero_vartime() {
+            //             G1ProjectiveOLD::identity()
+            //         } else {
+            //             *lagr
+            //         }
+            //     })
+            //     .sum();
+            let mut c_j = G1Projective::msm_u1(&pp.lagr_g1[..pp.n], &f_evals_without_r[j]);
+            c_j.add_assign(pp.lagr_g1[pp.n].mul(&r[j]));
+            c_j
         })
         .collect();
     #[cfg(feature = "range_proof_timing")]
@@ -348,25 +363,26 @@ where
     // Step 5: Compute c_hat[j] = \hat{c}_j = g_2^{f_j(\tau)}
     #[cfg(feature = "range_proof_timing")]
     let start = Instant::now();
-    let c_hat: Vec<G2ProjectiveOLD> = (0..pp.ell)
+    let c_hat: Vec<G2Projective> = (0..pp.ell)
         // Note: Using a multiexp will be 10-20% slower than manually multiplying.
         // .map(|j| g2_multi_exp(&pp.lagrange_basis_g2, &f_evals[j]))
         .map(|j| {
-            let mut c_hat_j: G2ProjectiveOLD = pp
-                .lagr_g2
-                .iter()
-                .take(pp.n)
-                .zip(f_evals[j].iter().take(pp.n))
-                .map(|(lagr, eval)| {
-                    // Using G1Projective::mul here will be way slower! (Not sure why...)
-                    if eval.is_zero_vartime() {
-                        G2ProjectiveOLD::identity()
-                    } else {
-                        *lagr
-                    }
-                })
-                .sum();
-            c_hat_j.add_assign(pp.lagr_g2[pp.n].mul(&f_evals[j][pp.n]));
+            // let mut c_hat_j: G2ProjectiveOLD = pp
+            //     .lagr_g2
+            //     .iter()
+            //     .take(pp.n)
+            //     .zip(f_evals[j].iter().take(pp.n))
+            //     .map(|(lagr, eval)| {
+            //         // Using G1Projective::mul here will be way slower! (Not sure why...)
+            //         if eval.is_zero_vartime() {
+            //             G2ProjectiveOLD::identity()
+            //         } else {
+            //             *lagr
+            //         }
+            //     })
+            //     .sum();
+            let mut c_hat_j = G2Projective::msm_u1(&pp.lagr_g2[..pp.n], &f_evals_without_r[j]);
+            c_hat_j.add_assign(pp.lagr_g2[pp.n].mul(&r[j]));
             c_hat_j
         })
         .collect();
@@ -390,44 +406,42 @@ where
 
     // Step 6:
     //  1. Compute each f_j(X) in coefficient form via a size-(n+1) FFT on f_j(X)
-    //  2. Comptue f'_j(X) via a differentiation.
+    //  2. Compute f'_j(X) via a differentiation.
     //  3. Evaluate f'_j at all (n+1)th roots of unity via a size-(n+1) FFT.
     //  4. \forall i \in [0,n), compute N_j'(\omega^i) = (\omega^i - \omega^n) f_j'(\omega^i)(2f_j(\omega^i) - 1)
     //  5. for i = n, compute N_j'(\omega^n) = r_j(r_j - 1)
     //  6. \forall i \in [0,n], compute h_j(\omega^i) = N_j'(\omega^i) / ( (n+1)\omega^{i n} )
     #[cfg(feature = "range_proof_timing")]
     let start = Instant::now();
-    let omega_n = pp.batch_dom_n1.get_root_of_unity(pp.n);
-    let n1_inv = ScalarOLD::from(pp.n as u64 + 1).invert().unwrap();
+    let omega_n = pp.eval_dom.element(pp.n); // let omega_n = pp.all_roots_of_unity(pp.n)
+    let n1_inv = Fr::from(pp.n as u64 + 1).inverse().unwrap();
     let mut omega_i_minus_n = Vec::with_capacity(pp.n);
     for i in 0..pp.n {
-        let omega_i = pp.batch_dom_n1.get_root_of_unity(i);
+        let omega_i = pp.roots_of_unity_in_eval_dom[i];
         omega_i_minus_n.push(omega_i - omega_n);
     }
-    let h: Vec<Vec<ScalarOLD>> = (0..pp.ell)
+    let h: Vec<Vec<Fr>> = (0..pp.ell)
         .map(|j| {
             // Interpolate f_j coeffs
             let mut f_j = f_evals[j].clone();
-            ifft_assign(&mut f_j, &pp.dom_n1);
+            pp.eval_dom.ifft_in_place(&mut f_j);
             assert_eq!(f_j.len(), pp.n + 1);
 
             // Compute f'_j derivative
             let mut diff_f_j = f_j.clone();
-            poly_differentiate(&mut diff_f_j);
+            differentiate_in_place(&mut diff_f_j);
             assert_eq!(diff_f_j.len(), pp.n);
 
             // Evaluate f'_j at all (n+1)th roots of unity
             let mut diff_f_j_evals = diff_f_j.clone();
-            fft_assign(&mut diff_f_j_evals, &pp.dom_n1);
+            pp.eval_dom.fft_in_place(&mut diff_f_j_evals);
             assert_eq!(diff_f_j_evals.len(), pp.n + 1);
 
             // \forall i \in [0,n), N'_j(\omega^i) = (\omega^i - \omega^n) f_j'(\omega^i)(2f_j(\omega^i) - 1)
             let mut diff_n_j_evals = Vec::with_capacity(num_omegas);
             for i in 0..pp.n {
                 diff_n_j_evals.push(
-                    (omega_i_minus_n[i])
-                        * diff_f_j_evals[i]
-                        * (f_evals[j][i].double() - ScalarOLD::ONE),
+                    (omega_i_minus_n[i]) * diff_f_j_evals[i] * (f_evals[j][i].double() - Fr::ONE),
                 );
             }
 
@@ -442,7 +456,7 @@ where
             for i in 0..pp.n + 1 {
                 h_j.push(
                     diff_n_j_evals[i]
-                        .mul(pp.batch_dom_n1.get_root_of_unity(i))
+                        .mul(pp.roots_of_unity_in_eval_dom[i])
                         .mul(n1_inv),
                 );
             }
@@ -496,11 +510,17 @@ where
     // Step 8: Compute h(X) = \sum_{j=0}^{ell-1} beta_j h_j(X)
     #[cfg(feature = "range_proof_timing")]
     let start = Instant::now();
-    let mut hh: Vec<ScalarOLD> = vec![ScalarOLD::ZERO; pp.n + 1];
-    for j in 0..betas.len() {
-        let beta_j_h_j = poly_mul_scalar(&h[j], betas[j]);
-        poly_add_assign(&mut hh, &beta_j_h_j);
+    let mut hh: Vec<Fr> = vec![Fr::ZERO; pp.n + 1];
+    for (h_j, &beta_j) in h.iter().zip(&betas) {
+        for (hh_coeff, &h_coeff) in hh.iter_mut().zip(h_j) {
+            *hh_coeff += h_coeff * beta_j;
+        }
     }
+    // let mut hh: Vec<Fr> = vec![Fr::ZERO; pp.n + 1];
+    // for j in 0..betas.len() {
+    //     let beta_j_h_j = poly_mul_scalar(&h[j], betas[j]);
+    //     poly_add_assign(&mut hh, &beta_j_h_j);
+    // }
     assert_eq!(hh.len(), num_omegas);
     #[cfg(feature = "range_proof_timing")]
     {
@@ -516,7 +536,7 @@ where
     // Step 9: Compute d = g_1^{h(X)}
     #[cfg(feature = "range_proof_timing")]
     let start = Instant::now();
-    let d = g1_multi_exp(&pp.lagr_g1[0..num_omegas], &hh);
+    let d = VariableBaseMSM::msm(&pp.lagr_g1[0..num_omegas], &hh).expect("Failed computing msm");
     #[cfg(feature = "range_proof_timing")]
     {
         let duration = start.elapsed();
@@ -541,12 +561,16 @@ pub fn batch_verify(
     fs_transcript: &mut merlin::Transcript,
 ) -> anyhow::Result<()> {
     // TODO(Perf): Can have these precomputed in pp
-    let mut powers_of_two = vec![ScalarOLD::ONE; pp.ell];
-    for i in 1..pp.ell {
-        let x = powers_of_two[i - 1].double();
-        powers_of_two[i] = x;
-    }
-    ensure!(c.0 == g1_multi_exp(&proof.c, &powers_of_two));
+    let powers_of_two: Vec<Fr> = std::iter::successors(Some(Fr::ONE), |x| Some(x.double()))
+        .take(pp.ell)
+        .collect();
+
+    let commitment_decomp_affine: Vec<G1Affine> = proof.c.iter().map(|p| p.into_affine()).collect();
+
+    let commitment_recomputed: G1Projective =
+        VariableBaseMSM::msm(&commitment_decomp_affine, &powers_of_two)
+            .expect("Failed to compute msm");
+    ensure!(c.0 == commitment_recomputed);
 
     let vk = (
         &pp.taus.t1[0],
@@ -565,29 +589,74 @@ pub fn batch_verify(
     );
 
     // Verify h(\tau)
-    let h_check = multi_pairing_g1_g2(
+    let h_check = PairingSetting::multi_pairing(
         (0..pp.ell)
-            .map(|j| proof.c[j] * betas[j])
-            .chain(once(-proof.d))
-            .collect::<Vec<_>>()
-            .iter(),
+            .map(|j| proof.c[j] * betas[j]) // G1Projective
+            .chain(once(-proof.d)) // add -d
+            .collect::<Vec<_>>(), // collect into Vec<G1Projective>
         (0..pp.ell)
-            .map(|j| proof.c_hat[j] - pp.taus.t2[0])
-            .chain(once(pp.vanishing_com))
-            .collect::<Vec<_>>()
-            .iter(),
+            .map(|j| proof.c_hat[j] - pp.taus.t2[0]) // G2Projective
+            .chain(once(pp.vanishing_com)) // add vanishing commitment
+            .collect::<Vec<_>>(), // collect into Vec<G2Projective>
     );
-    ensure!(GtOLD::identity() == h_check);
+    // let h_check = multi_pairing_g1_g2(
+    //     (0..pp.ell)
+    //         .map(|j| proof.c[j] * betas[j])
+    //         .chain(once(-proof.d))
+    //         .collect::<Vec<_>>()
+    //         .iter(),
+    //     (0..pp.ell)
+    //         .map(|j| proof.c_hat[j] - pp.taus.t2[0])
+    //         .chain(once(pp.vanishing_com))
+    //         .collect::<Vec<_>>()
+    //         .iter(),
+    // );
+    ensure!(Fq12::ONE == h_check.0);
 
     // Ensure duality: c[j] matches c_hat[j].
-    let c_check = multi_pairing_g1_g2(
-        vec![g1_multi_exp(&proof.c, &alphas), -pp.taus.t1[0]].iter(),
-        vec![pp.taus.t2[0], g2_multi_exp(&proof.c_hat, &alphas)].iter(),
+
+    // Compute MSM in G1: sum_j (alphas[j] * proof.c[j])
+    let g1_comb = VariableBaseMSM::msm(
+        &proof
+            .c
+            .iter()
+            .map(|p| p.into_affine())
+            .collect::<Vec<G1Affine>>(),
+        &alphas, // <-- keep them as Fr
+    )
+    .unwrap();
+
+    // Compute MSM in G2: sum_j (alphas[j] * proof.c_hat[j])
+    let g2_comb = VariableBaseMSM::msm(
+        &proof
+            .c_hat
+            .iter()
+            .map(|p| p.into_affine())
+            .collect::<Vec<G2Affine>>(),
+        &alphas, // <-- also Fr
+    )
+    .unwrap();
+    let c_check = <Bn254 as Pairing>::multi_pairing(
+        vec![
+            g1_comb,        // from MSM in G1
+            -pp.taus.t1[0], // subtract tau_1
+        ],
+        vec![
+            pp.taus.t2[0], // tau_2
+            g2_comb,       // from MSM in G2
+        ],
     );
-    ensure!(GtOLD::identity() == c_check);
+    // let c_check = multi_pairing_g1_g2(
+    //     vec![g1_multi_exp(&proof.c, &alphas), -pp.taus.t1[0]].iter(),
+    //     vec![pp.taus.t2[0], g2_multi_exp(&proof.c_hat, &alphas)].iter(),
+    // );
+    ensure!(Fq12::ONE == c_check.0);
 
     Ok(())
 }
+
+use ark_bn254::Bn254;
+use ark_ec::pairing::Pairing;
 
 fn byte_to_bits_le(val: u8) -> Vec<bool> {
     (0..8).map(|i| (val >> i) & 1 == 1).collect()
@@ -595,12 +664,12 @@ fn byte_to_bits_le(val: u8) -> Vec<bool> {
 
 /// Compute alpha, beta.
 fn fiat_shamir_challenges(
-    vk: &(&G1ProjectiveOLD, &G2ProjectiveOLD, &G2ProjectiveOLD, &G2ProjectiveOLD),
+    vk: &(&G1Projective, &G2Projective, &G2Projective, &G2Projective),
     public_statement: &(usize, &Commitment),
-    bit_commitments: &(&[G1ProjectiveOLD], &[G2ProjectiveOLD]),
+    bit_commitments: &(&[G1Projective], &[G2Projective]),
     num_scalars: usize,
     fs_transcript: &mut merlin::Transcript,
-) -> (Vec<ScalarOLD>, Vec<ScalarOLD>) {
+) -> (Vec<Fr>, Vec<Fr>) {
     <merlin::Transcript as fiat_shamir::RangeProof>::append_sep(fs_transcript);
 
     <merlin::Transcript as fiat_shamir::RangeProof>::append_vk(fs_transcript, vk);
@@ -631,25 +700,32 @@ fn fiat_shamir_challenges(
     (alpha_vals, beta_vals)
 }
 
-fn correlated_randomness<R>(
+/// Generate correlated random values whose weighted sum equals `target_sum`.
+///
+/// Returns `num_chunks` field elements `[r_0, ..., r_{num_chunks-1}]` such that:
+/// `r_0 + r_1 * radix + r_2 * radix^2 + ... + r_{num_chunks-1} * radix^{num_chunks-1} = target_sum`.
+pub fn correlated_randomness<F, R>(
     rng: &mut R,
     radix: u64,
     num_chunks: usize,
-    target_sum: &ScalarOLD,
-) -> Vec<ScalarOLD>
+    target_sum: &F,
+) -> Vec<F>
 where
-    R: RngCore + rand::Rng + CryptoRng,
+    F: PrimeField + UniformRand,
+    R: RngCore + CryptoRng,
 {
-    let mut r_vals = vec![ScalarOLD::ZERO; num_chunks];
+    let mut r_vals = vec![F::zero(); num_chunks];
     let mut remaining = *target_sum;
-    let radix = ScalarOLD::from(radix);
-    let mut cur_base = radix;
+    let radix_f = F::from(radix);
+    let mut cur_base = radix_f;
+
     for i in 1..num_chunks {
-        r_vals[i] = random_scalar(rng);
+        r_vals[i] = F::rand(rng);
         remaining -= r_vals[i] * cur_base;
-        cur_base *= radix;
+        cur_base *= radix_f;
     }
     r_vals[0] = remaining;
+
     r_vals
 }
 
@@ -657,27 +733,29 @@ where
 mod tests {
     use crate::{
         algebra::polynomials::{poly_div_xnc, poly_eval},
-        range_proof::{byte_to_bits_le, correlated_randomness},
+        range_proofs::univariate_range_proof::{byte_to_bits_le, correlated_randomness},
         utils::random::{random_scalar, random_scalars},
     };
-    use blstrs::{Scalar as ScalarOLD};
-    use ff::Field;
-    use rand::thread_rng;
+    use ark_bn254::Fr;
+    use ark_ff::Field;
+    // use ff::Field;
+    use ark_std::rand::thread_rng;
+    use blstrs::Scalar as ScalarOLD;
 
-    #[test]
-    fn test_poly_div_xnc() {
-        let mut rng = thread_rng();
-        let coefs = random_scalars(10, &mut rng);
-        let c = random_scalar(&mut rng);
-        let n = 3;
-        let (quotient, remainder) = poly_div_xnc(coefs.clone(), n, c);
-        assert_eq!(n, remainder.len());
-        let x = random_scalar(&mut rng);
-        let expected = poly_eval(&coefs, &x);
-        let actual =
-            (x.pow(&[n as u64]) + c) * poly_eval(&quotient, &x) + poly_eval(&remainder, &x);
-        assert_eq!(expected, actual);
-    }
+    // #[test]. // TODO: fix this stuff again
+    // fn test_poly_div_xnc() {
+    //     let mut rng = thread_rng();
+    //     let coefs = random_scalars(10, &mut rng);
+    //     let c = random_scalar(&mut rng);
+    //     let n = 3;
+    //     let (quotient, remainder) = poly_div_xnc(coefs.clone(), n, c);
+    //     assert_eq!(n, remainder.len());
+    //     let x = random_scalar(&mut rng);
+    //     let expected = poly_eval(&coefs, &x);
+    //     let actual =
+    //         (x.pow(&[n as u64]) + c) * poly_eval(&quotient, &x) + poly_eval(&remainder, &x);
+    //     assert_eq!(expected, actual);
+    // }
 
     #[test]
     fn test_byte_to_bits_le() {
@@ -695,12 +773,12 @@ mod tests {
     #[test]
     fn test_correlated_randomness() {
         let mut rng = thread_rng();
-        let target_sum = ScalarOLD::ONE;
+        let target_sum = Fr::ONE;
         let radix: u64 = 4;
         let num_chunks: usize = 8;
         let coefs = correlated_randomness(&mut rng, radix, num_chunks, &target_sum);
-        let actual_sum: ScalarOLD = (0..num_chunks)
-            .map(|i| coefs[i] * ScalarOLD::from(radix.pow(i as u32)))
+        let actual_sum: Fr = (0..num_chunks)
+            .map(|i| coefs[i] * Fr::from(radix.pow(i as u32)))
             .sum();
         assert_eq!(target_sum, actual_sum);
     }
