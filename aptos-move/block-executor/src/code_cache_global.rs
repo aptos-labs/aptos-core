@@ -1,16 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters::GLOBAL_LAYOUT_CACHE_MISSES;
+use aptos_metrics_core::IntCounterVecHelper;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     error::PanicError, transaction::BlockExecutableTransaction, vm::modules::AptosModuleExtension,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::module_write_set::ModuleWrite;
+use dashmap::DashMap;
 use hashbrown::HashMap;
-use move_binary_format::CompiledModule;
+use move_binary_format::{errors::PartialVMResult, CompiledModule};
 use move_core_types::language_storage::ModuleId;
-use move_vm_runtime::{Module, RuntimeEnvironment};
+use move_vm_runtime::{LayoutCacheEntry, Module, RuntimeEnvironment, StructKey};
 use move_vm_types::code::{ModuleCache, ModuleCode, WithSize};
 use std::{
     hash::Hash,
@@ -73,6 +76,9 @@ pub struct GlobalModuleCache<K, D, V, E> {
     module_cache: HashMap<K, Entry<D, V, E>>,
     /// Sum of serialized sizes (in bytes) of all cached modules.
     size: usize,
+    /// Cached layouts of structs or enums. This cache stores roots only and is invalidated when
+    /// modules are published.
+    struct_layouts: DashMap<StructKey, LayoutCacheEntry>,
 }
 
 impl<K, D, V, E> GlobalModuleCache<K, D, V, E>
@@ -86,6 +92,7 @@ where
         Self {
             module_cache: HashMap::new(),
             size: 0,
+            struct_layouts: DashMap::new(),
         }
     }
 
@@ -120,15 +127,51 @@ where
         self.module_cache.len()
     }
 
+    /// Returns the number of layout entries in the cache.
+    pub fn num_cached_layouts(&self) -> usize {
+        self.struct_layouts.len()
+    }
+
     /// Returns the sum of serialized sizes of modules stored in cache.
     pub fn size_in_bytes(&self) -> usize {
         self.size
     }
 
-    /// Flushes the module cache.
+    /// Flushes all caches.
     pub fn flush(&mut self) {
         self.module_cache.clear();
         self.size = 0;
+        self.struct_layouts.clear();
+    }
+
+    /// Flushes only layout caches.
+    pub fn flush_layout_cache(&self) {
+        // TODO(layouts):
+        //   Flushing is only needed because of enums. Once we refactor layouts to store a single
+        //   variant instead, this can be removed.
+        self.struct_layouts.clear();
+    }
+
+    /// Returns layout entry if it exists in global cache.
+    pub(crate) fn get_struct_layout_entry(&self, key: &StructKey) -> Option<LayoutCacheEntry> {
+        match self.struct_layouts.get(key) {
+            None => {
+                GLOBAL_LAYOUT_CACHE_MISSES.inc_with(&["non_generic"]);
+                None
+            },
+            Some(e) => Some(e.deref().clone()),
+        }
+    }
+
+    pub(crate) fn store_struct_layout_entry(
+        &self,
+        key: &StructKey,
+        entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        if let dashmap::Entry::Vacant(e) = self.struct_layouts.entry(*key) {
+            e.insert(entry);
+        }
+        Ok(())
     }
 
     /// Inserts modules into the cache.

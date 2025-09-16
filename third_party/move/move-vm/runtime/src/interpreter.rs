@@ -1543,7 +1543,12 @@ where
         // These errors mean that the code breaks some invariant, so we need to
         // remap the error.
         if err.status_type() == StatusType::Verification {
-            err.set_major_status(StatusCode::VERIFICATION_ERROR);
+            // Make sure we propagate dependency limit errors.
+            if !self.vm_config.enable_layout_caches
+                || err.major_status() != StatusCode::DEPENDENCY_LIMIT_REACHED
+            {
+                err.set_major_status(StatusCode::VERIFICATION_ERROR);
+            }
         }
 
         // We do not consider speculative invariant violations.

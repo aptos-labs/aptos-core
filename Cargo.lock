@@ -735,6 +735,7 @@ dependencies = [
  "concurrent-queue",
  "criterion",
  "crossbeam",
+ "dashmap 7.0.0-rc2",
  "derivative",
  "fail",
  "hashbrown 0.14.3",
@@ -12880,6 +12881,7 @@ dependencies = [
  "sha3 0.9.1",
  "smallvec",
  "tempfile",
+ "triomphe",
 ]
 
 [[package]]
