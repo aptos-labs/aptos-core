@@ -99,7 +99,7 @@ pub struct Session {
 
 impl Session {
     /// Returns a reference to the underlying state store.
-    pub fn state_store(&self) -> &impl SimulationStateStore {
+    pub fn state_store(&self) -> &(impl SimulationStateStore + use<>) {
         &self.state_store
     }
 

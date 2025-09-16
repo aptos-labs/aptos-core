@@ -857,7 +857,7 @@ impl TransactionPayload {
     ) -> Self {
         self.upgrade_payload_with_fn(
             use_txn_payload_v2_format,
-            use_orderless_transactions.then_some(|| rng.gen()),
+            use_orderless_transactions.then_some(|| rng.r#gen()),
         )
     }
 

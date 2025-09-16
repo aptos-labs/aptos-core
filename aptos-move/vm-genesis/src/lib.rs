@@ -1359,11 +1359,11 @@ impl TestValidator {
     pub fn new_test_set(count: Option<usize>, initial_stake: Option<u64>) -> Vec<TestValidator> {
         let mut rng = rand::SeedableRng::from_seed([1u8; 32]);
         (0..count.unwrap_or(10))
-            .map(|_| TestValidator::gen(&mut rng, initial_stake))
+            .map(|_| TestValidator::r#gen(&mut rng, initial_stake))
             .collect()
     }
 
-    fn gen(rng: &mut StdRng, initial_stake: Option<u64>) -> TestValidator {
+    fn r#gen(rng: &mut StdRng, initial_stake: Option<u64>) -> TestValidator {
         let key = Ed25519PrivateKey::generate(rng);
         let auth_key = AuthenticationKey::ed25519(&key.public_key());
         let owner_address = auth_key.account_address();

@@ -2054,7 +2054,7 @@ impl Frame {
                         let field_count = if RTCaches::caches_enabled() {
                             let cached_field_count =
                                 &frame_cache.per_instruction_cache[self.pc as usize];
-                            if let PerInstructionCache::Pack(ref field_count) = cached_field_count {
+                            if let PerInstructionCache::Pack(field_count) = cached_field_count {
                                 *field_count
                             } else {
                                 let field_count = get_field_count_charge_gas_and_check_depth()?;
@@ -2124,7 +2124,7 @@ impl Frame {
                             let cached_field_count =
                                 &frame_cache.per_instruction_cache[self.pc as usize];
 
-                            if let PerInstructionCache::PackGeneric(ref field_count) =
+                            if let PerInstructionCache::PackGeneric(field_count) =
                                 cached_field_count
                             {
                                 *field_count

@@ -84,7 +84,8 @@ fn run_test_with_modifiers(
 
 // Runs all tests under the test/test_sources directory.
 fn run_test_impl(path: &Path) -> anyhow::Result<()> {
-    std::env::set_var("NO_COLOR", "1");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("NO_COLOR", "1") };
     let update_baseline = read_env_update_baseline();
     let source_files = vec![path.to_str().unwrap().to_owned()];
     let unit_test_config = UnitTestingConfig {

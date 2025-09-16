@@ -452,7 +452,7 @@ impl EntryPointTrait for EntryPoints {
                 get_payload_void(module_id, ident_str!("nop_5_signers").to_owned())
             },
             EntryPoints::NopOrderless => get_payload_void(module_id, ident_str!("nop").to_owned())
-                .set_replay_protection_nonce(rng.expect("Must provide RNG").gen()),
+                .set_replay_protection_nonce(rng.expect("Must provide RNG").r#gen()),
             EntryPoints::Step => get_payload_void(module_id, ident_str!("step").to_owned()),
             EntryPoints::GetCounter => {
                 get_payload_void(module_id, ident_str!("get_counter").to_owned())
@@ -528,9 +528,9 @@ impl EntryPointTrait for EntryPoints {
                 max_count,
             } => {
                 let rng = rng.expect("Must provide RNG");
-                let mut offset: u64 = rng.gen();
+                let mut offset: u64 = rng.r#gen();
                 offset %= max_offset;
-                let mut count: u64 = rng.gen();
+                let mut count: u64 = rng.r#gen();
                 count %= max_count;
                 get_payload(
                     module_id,
@@ -553,7 +553,7 @@ impl EntryPointTrait for EntryPoints {
                     module_id,
                     ident_str!("modify_bounded_agg_v2").to_owned(),
                     vec![
-                        bcs::to_bytes(&rng.gen::<bool>()).unwrap(),
+                        bcs::to_bytes(&rng.r#gen::<bool>()).unwrap(),
                         bcs::to_bytes(&step).unwrap(),
                     ],
                 )
@@ -1042,7 +1042,7 @@ fn get_from_random_const(module_id: ModuleId, idx: u64) -> TransactionPayload {
 }
 
 fn set_id(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
-    let id: u64 = rng.gen();
+    let id: u64 = rng.r#gen();
     get_payload(module_id, ident_str!("set_id").to_owned(), vec![
         bcs::to_bytes(&id).unwrap(),
     ])
@@ -1083,7 +1083,7 @@ fn make_or_change(
     str_len: usize,
     data_len: usize,
 ) -> TransactionPayload {
-    let id: u64 = rng.gen();
+    let id: u64 = rng.r#gen();
     let name: String = rand_string(rng, str_len);
     let mut bytes = Vec::<u8>::with_capacity(data_len);
     rng.fill_bytes(&mut bytes);

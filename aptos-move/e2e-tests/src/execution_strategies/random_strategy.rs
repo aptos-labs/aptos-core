@@ -15,19 +15,19 @@ use rand::{
 
 #[derive(Clone)]
 pub struct RandomizedStrategy {
-    gen: StdRng,
+    r#gen: StdRng,
 }
 
 impl RandomizedStrategy {
     pub fn from_seed(seed: [u8; 32]) -> Self {
         Self {
-            gen: StdRng::from_seed(seed),
+            r#gen: StdRng::from_seed(seed),
         }
     }
 
     pub fn from_os_rng() -> Self {
         let mut seed_rng = OsRng;
-        let seed: [u8; 32] = seed_rng.gen();
+        let seed: [u8; 32] = seed_rng.r#gen();
         Self::from_seed(seed)
     }
 }
@@ -38,7 +38,7 @@ impl PartitionStrategy for RandomizedStrategy {
     fn partition(&mut self, mut block: Block<Self::Txn>) -> Vec<Block<SignedTransaction>> {
         let mut blocks = vec![];
         while !block.is_empty() {
-            let block_size = self.gen.gen_range(0, block.len());
+            let block_size = self.r#gen.gen_range(0, block.len());
             let new_block: Vec<_> = block.drain(0..block_size + 1).collect();
             blocks.push(new_block);
         }
@@ -60,7 +60,7 @@ impl RandomExecutor {
     }
 
     pub fn from_os_rng() -> Self {
-        RandomExecutor::from_seed(OsRng.gen::<[u8; 32]>())
+        RandomExecutor::from_seed(OsRng.r#gen::<[u8; 32]>())
     }
 }
 
