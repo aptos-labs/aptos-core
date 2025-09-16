@@ -16,9 +16,18 @@ module swap::coin_wrapper_tests {
         let fa = coin_wrapper::wrap(coins);
         let metadata = fungible_asset::asset_metadata(&fa);
         assert!(fungible_asset::amount(&fa) == 1000, 0);
-        assert!(fungible_asset::name(metadata) == coin::name<FakeMoney>(), 0);
-        assert!(fungible_asset::symbol(metadata) == coin::symbol<FakeMoney>(), 0);
-        assert!(fungible_asset::decimals(metadata) == coin::decimals<FakeMoney>(), 0);
+        assert!(
+            fungible_asset::name(metadata) == coin::name<FakeMoney>(),
+            0
+        );
+        assert!(
+            fungible_asset::symbol(metadata) == coin::symbol<FakeMoney>(),
+            0
+        );
+        assert!(
+            fungible_asset::decimals(metadata) == coin::decimals<FakeMoney>(),
+            0
+        );
         let coins = coin_wrapper::unwrap<FakeMoney>(fa);
         assert!(coin::value(&coins) == 1000, 0);
         coin::deposit(signer::address_of(user), coins);

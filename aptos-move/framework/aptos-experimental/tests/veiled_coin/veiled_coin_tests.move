@@ -31,7 +31,10 @@ module aptos_experimental::veiled_coin_tests {
     #[test_only]
     use aptos_experimental::helpers::generate_elgamal_keypair;
     #[test_only]
-    use aptos_experimental::sigma_protos::{serialize_withdrawal_subproof, prove_withdrawal};
+    use aptos_experimental::sigma_protos::{
+        serialize_withdrawal_subproof,
+        prove_withdrawal
+    };
     #[test_only]
     use aptos_experimental::sigma_protos;
 
