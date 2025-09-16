@@ -7,9 +7,10 @@ module aptos_experimental::order_book_types {
     friend aptos_experimental::price_time_index;
     friend aptos_experimental::single_order_book;
     friend aptos_experimental::pending_order_book_index;
-    friend aptos_experimental::market;
+    friend aptos_experimental::order_placement;
     friend aptos_experimental::order_book;
     friend aptos_experimental::single_order_types;
+    friend aptos_experimental::market_types;
     friend aptos_experimental::bulk_order_book;
     friend aptos_experimental::bulk_order_book_types;
     #[test_only]

@@ -2,6 +2,7 @@
 module aptos_experimental::pre_cancellation_tests {
     use std::option;
     use aptos_framework::timestamp;
+    use aptos_experimental::order_operations::cancel_order_with_client_id;
     use aptos_experimental::order_book_types::good_till_cancelled;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::clearinghouse_test::{
@@ -12,7 +13,7 @@ module aptos_experimental::pre_cancellation_tests {
         place_order_and_verify, verify_cancel_event,
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::market::{new_market, new_market_config};
+    use aptos_experimental::market_types::{new_market, new_market_config};
 
     const PRE_CANCEL_WINDOW_SECS: u64 = 1; // 1 second
 
@@ -32,7 +33,7 @@ module aptos_experimental::pre_cancellation_tests {
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
-        market.cancel_order_with_client_id(maker1, 1000, &test_market_callbacks());
+        cancel_order_with_client_id(&mut market, maker1, 1000, &test_market_callbacks());
         let _ =
             place_order_and_verify(
                 &mut market,
@@ -117,7 +118,7 @@ module aptos_experimental::pre_cancellation_tests {
             );
         assert!(market.get_remaining_size(order_id) == 2000000);
         // Pre-cancel the order after it has been placed
-        market.cancel_order_with_client_id(maker1, 1000, &test_market_callbacks());
+        cancel_order_with_client_id(&mut market, maker1, 1000, &test_market_callbacks());
         verify_cancel_event(
             &mut market,
             maker1,
@@ -151,7 +152,7 @@ module aptos_experimental::pre_cancellation_tests {
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
-        market.cancel_order_with_client_id(maker1, 1000, &test_market_callbacks());
+        cancel_order_with_client_id(&mut market, maker1, 1000, &test_market_callbacks());
         let _ =
             place_order_and_verify(
                 &mut market,
