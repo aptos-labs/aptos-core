@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dedicated_handlers::process_common::process_common, error::PepperServiceError, tests::utils,
+    dedicated_handlers::pepper_request::handle_pepper_request, error::PepperServiceError,
+    external_resources::resource_fetcher::CachedResources, tests::utils,
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_infallible::Mutex;
@@ -17,12 +18,11 @@ use aptos_types::{
     transaction::authenticator::EphemeralPublicKey,
 };
 use std::{collections::HashMap, ops::Deref, sync::Arc};
-use uuid::Uuid;
+
 // TODO: clean this up and add missing tests!
 
 #[tokio::test]
 async fn process_common_should_fail_if_max_exp_data_secs_overflowed() {
-    let session_id = Uuid::new_v4();
     let sk = get_sample_esk();
     let pk = Ed25519PublicKey::from(&sk);
 
@@ -38,19 +38,20 @@ async fn process_common_should_fail_if_max_exp_data_secs_overflowed() {
     let vuf_keypair = utils::create_vuf_public_private_keypair();
     let (_, vuf_private_key) = vuf_keypair.deref();
 
+    let cached_resources = CachedResources::default();
+
     let jwt = get_sample_jwt_token_from_payload(&jwt_payload);
 
-    let process_result = process_common(
+    let process_result = handle_pepper_request(
         vuf_private_key,
         jwk_cache,
-        &session_id,
+        cached_resources,
         jwt,
         EphemeralPublicKey::ed25519(pk),
         SAMPLE_EXP_DATE,
         get_sample_epk_blinder(),
         None,
         None,
-        false,
         None,
         false,
     )
