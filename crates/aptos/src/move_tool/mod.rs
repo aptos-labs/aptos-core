@@ -591,6 +591,7 @@ impl CliCommand<&'static str> for TestPackage {
                     .language_version
                     .or_else(|| Some(LanguageVersion::latest_stable())),
                 experiments: self.move_options.compute_experiments(),
+                print_errors: true,
             },
             ..Default::default()
         };
