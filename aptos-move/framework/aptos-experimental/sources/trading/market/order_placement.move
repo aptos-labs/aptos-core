@@ -83,6 +83,7 @@ module aptos_experimental::order_placement {
     const EINVALID_TAKER_POSITION_UPDATE: u64 = 10;
     const EINVALID_LIQUIDATION: u64 = 11;
     const ENOT_ORDER_CREATOR: u64 = 12;
+    const EINVALID_SETTLE_PRICE: u64 = 13;
 
     const PRE_CANCELLATION_TRACKER_KEY: u8 = 0;
     const U64_MAX: u64 = 0xffffffffffffffff;
@@ -488,7 +489,8 @@ module aptos_experimental::order_placement {
             maker_order.get_order_id_from_match_details(),
             fill_id,
             is_bid,
-            maker_order.get_price_from_match_details(), // Order is always matched at the price of the maker
+            price,
+            maker_order.get_price_from_match_details(), // Order is usually matched at the price of the maker
             maker_matched_size,
             metadata,
             // TODO(skedia) fix this to pass option to the callbacks
@@ -501,6 +503,16 @@ module aptos_experimental::order_placement {
             *remaining_size -= settled_size;
             unsettled_maker_size -= settled_size;
             fill_sizes.push_back(settled_size);
+
+            let settled_price = settle_result.get_settled_price();
+            if (is_bid) {
+                assert!(settled_price <= price, EINVALID_SETTLE_PRICE);
+                assert!(settled_price >= maker_order.get_price_from_match_details(), EINVALID_SETTLE_PRICE);
+            } else {
+                assert!(settled_price >= price, EINVALID_SETTLE_PRICE);
+                assert!(settled_price <= maker_order.get_price_from_match_details(), EINVALID_SETTLE_PRICE);
+            };
+
             // Event for taker fill
             market.emit_event_for_order(
                 order_id,
@@ -509,7 +521,7 @@ module aptos_experimental::order_placement {
                 orig_size,
                 *remaining_size,
                 settled_size,
-                maker_order.get_price_from_match_details(),
+                settled_price,
                 is_bid,
                 true,
                 market_types::order_status_filled(),
@@ -527,7 +539,7 @@ module aptos_experimental::order_placement {
                 maker_order.get_orig_size_from_match_details(),
                 maker_order.get_remaining_size_from_match_details() + unsettled_maker_size,
                 settled_size,
-                maker_order.get_price_from_match_details(),
+                settled_price,
                 !is_bid,
                 false,
                 market_types::order_status_filled(),
