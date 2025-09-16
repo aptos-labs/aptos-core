@@ -64,6 +64,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
+        hot_state::HotStateConfig,
         state_key::{prefix::StateKeyPrefix, StateKey},
         state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
@@ -330,12 +331,16 @@ impl StateStore {
             state_kv_pruner,
             skip_usage,
         });
-        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty()));
+        // TODO(HotState): probably fetch onchain config from storage.
+        let hot_state_config = HotStateConfig::default();
+        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
+            hot_state_config,
+        )));
         let persisted_state = PersistedState::new_empty();
         let buffered_state = if empty_buffered_state_for_restore {
             BufferedState::new_at_snapshot(
                 &state_db,
-                StateWithSummary::new_empty(),
+                StateWithSummary::new_empty(hot_state_config),
                 buffered_state_target_items,
                 current_state.clone(),
                 persisted_state.clone(),
@@ -487,7 +492,9 @@ impl StateStore {
             state_kv_pruner,
             skip_usage: false,
         });
-        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty()));
+        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
+            HotStateConfig::default(),
+        )));
         let persisted_state = PersistedState::new_empty();
         let _ = Self::create_buffered_state_from_latest_snapshot(
             &state_db,
@@ -539,6 +546,7 @@ impl StateStore {
             *SPARSE_MERKLE_PLACEHOLDER_HASH, // TODO(HotState): for now hot state always starts from empty upon restart.
             latest_snapshot_root_hash,
             usage,
+            HotStateConfig::default(),
         );
         let mut buffered_state = BufferedState::new_at_snapshot(
             state_db,
@@ -583,20 +591,19 @@ impl StateStore {
                 .ledger_db
                 .transaction_info_db()
                 .get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
-            let last_checkpoint_index = txn_info_iter
+            let all_checkpoint_indices = txn_info_iter
                 .into_iter()
                 .collect::<Result<Vec<_>>>()?
                 .into_iter()
                 .enumerate()
-                .filter(|(_idx, txn_info)| txn_info.has_state_checkpoint_hash())
-                .next_back()
-                .map(|(idx, _)| idx);
+                .filter_map(|(idx, txn_info)| txn_info.has_state_checkpoint_hash().then_some(idx))
+                .collect();
 
             let state_update_refs = StateUpdateRefs::index_write_sets(
                 state.next_version(),
                 &write_sets,
                 write_sets.len(),
-                last_checkpoint_index,
+                all_checkpoint_indices,
             );
             let current_state = out_current_state.lock().clone();
             let (hot_state, state) = out_persisted_state.get_state();
@@ -1125,7 +1132,7 @@ impl StateStore {
 
     pub fn init_state_ignoring_summary(&self, version: Option<Version>) -> Result<()> {
         let usage = self.get_usage(version)?;
-        let state = State::new_at_version(version, usage);
+        let state = State::new_at_version(version, usage, HotStateConfig::default());
         let ledger_state = LedgerState::new(state.clone(), state);
         self.set_state_ignoring_summary(ledger_state);
 
@@ -1350,7 +1357,7 @@ mod test_only {
                     .iter()
                     .map(|updates| updates.iter().map(|(k, op)| (k, op))),
                 num_versions,
-                Some(num_versions - 1),
+                vec![num_versions - 1],
             );
 
             let mut ledger_batch = SchemaBatch::new();

@@ -418,6 +418,7 @@ impl Parser {
         )?;
 
         let result_state = parent_state.update_with_memorized_reads(
+            Arc::clone(&base_state_view.hot),
             base_state_view.persisted_state(),
             to_commit.state_update_refs(),
             base_state_view.memorized_reads(),
@@ -568,6 +569,7 @@ mod tests {
     };
     use aptos_types::{
         contract_event::ContractEvent,
+        state_store::hot_state::HotStateConfig,
         transaction::{
             AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, Transaction,
             TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
@@ -618,7 +620,7 @@ mod tests {
                 None,
             ),
         ];
-        let state = LedgerState::new_empty();
+        let state = LedgerState::new_empty(HotStateConfig::default());
         let execution_output = Parser::parse(
             0,
             txns,
