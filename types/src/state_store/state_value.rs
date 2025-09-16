@@ -179,7 +179,7 @@ impl PersistedStateValue {
     }
 }
 
-#[derive(Clone, Debug, BCSCryptoHash, CryptoHasher)]
+#[derive(Clone, BCSCryptoHash, CryptoHasher)]
 pub struct StateValue {
     data: Bytes,
     metadata: StateValueMetadata,
@@ -201,6 +201,15 @@ impl PartialEq for StateValue {
 }
 
 impl Eq for StateValue {}
+
+impl std::fmt::Debug for StateValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StateValue")
+            .field("data", &"not shown(...)")
+            .field("metadata", &self.metadata)
+            .finish()
+    }
+}
 
 pub const ARB_STATE_VALUE_MAX_SIZE: usize = 100;
 
