@@ -158,7 +158,7 @@ module aptos_experimental::market_types {
         self.taker_cancellation_reason
     }
 
-    public(friend) fun settle_trade<M: store + copy + drop>(
+    public fun settle_trade<M: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M>,
         market: &mut Market<M>,
         taker: address,
@@ -174,7 +174,7 @@ module aptos_experimental::market_types {
         (self.settle_trade_f)(market, taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size, taker_metadata, maker_metadata)
     }
 
-    public(friend) fun validate_order_placement<M: store + copy + drop>(
+    public fun validate_order_placement<M: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M>,
         account: address,
         order_id: OrderIdType,
@@ -187,7 +187,7 @@ module aptos_experimental::market_types {
         (self.validate_order_placement_f)(account, order_id, is_taker, is_bid, price, time_in_force, size, order_metadata)
     }
 
-    public(friend) fun validate_bulk_order_placement<M: store + copy + drop>(
+    public fun validate_bulk_order_placement<M: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M>,
         account: address,
         bids_prices: vector<u64>,
@@ -197,7 +197,7 @@ module aptos_experimental::market_types {
         (self.validate_bulk_order_placement_f)(account, bids_prices, bids_sizes, asks_prices, asks_sizes)
     }
 
-    public(friend) fun place_maker_order<M: store + copy + drop>(
+    public fun place_maker_order<M: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M>,
         account: address,
         order_id: OrderIdType,
@@ -208,7 +208,7 @@ module aptos_experimental::market_types {
         (self.place_maker_order_f)(account, order_id, is_bid, price, size, order_metadata)
     }
 
-    public(friend) fun cleanup_order<M: store + copy + drop>(
+    public fun cleanup_order<M: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M>,
         account: address,
         order_id: OrderIdType,
@@ -218,7 +218,7 @@ module aptos_experimental::market_types {
         (self.cleanup_order_f)(account, order_id, is_bid, remaining_size, order_metadata)
     }
 
-    public(friend) fun cleanup_bulk_orders<M: store + copy + drop>(
+    public fun cleanup_bulk_orders<M: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M>,
         account: address,
         is_bid: bool,
@@ -226,7 +226,7 @@ module aptos_experimental::market_types {
         (self.cleanup_bulk_orders_f)(account, is_bid, remaining_sizes)
     }
 
-    public(friend) fun decrease_order_size<M: store + copy + drop>(
+    public fun decrease_order_size<M: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M>,
         account: address,
         order_id: OrderIdType,
@@ -236,7 +236,7 @@ module aptos_experimental::market_types {
         (self.decrease_order_size_f)(account, order_id, is_bid, price, size)
     }
 
-    public(friend) fun get_order_metadata_bytes<M: store + copy + drop>(
+    public fun get_order_metadata_bytes<M: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M>,
         order_metadata: M): vector<u8> {
         (self.get_order_metadata_bytes)(order_metadata)
