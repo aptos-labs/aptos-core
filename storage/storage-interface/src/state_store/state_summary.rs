@@ -14,9 +14,12 @@ use aptos_crypto::{
     hash::{CryptoHash, CORRUPTION_SENTINEL},
     HashValue,
 };
+use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
-use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};
+use aptos_types::{
+    proof::SparseMerkleProofExt, state_store::state_key::StateKey, transaction::Version,
+};
 use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -69,7 +72,7 @@ impl StateSummary {
             .is_descendant_of(&other.global_state_summary)
     }
 
-    pub fn update(
+    fn update(
         &self,
         persisted: &ProvableStateSummary,
         updates: &BatchedStateUpdateRefs,
@@ -82,6 +85,15 @@ impl StateSummary {
         assert!(persisted.next_version() <= self.next_version());
         // Updates must start at exactly my version.
         assert_eq!(updates.first_version(), self.next_version());
+
+        for i in 0..16 {
+            info!(
+                "summary shard_id: {}, state summary updates len: {}",
+                i,
+                updates.shards[i].len(),
+                // updates.shards[i].keys().collect_vec()
+            );
+        }
 
         let smt_updates = updates
             .shards
@@ -104,6 +116,20 @@ impl StateSummary {
                     .collect_vec()
             })
             .collect::<Vec<_>>();
+
+        let print_smt_updates = |all: &[(&StateKey, Option<HashValue>)]| -> String {
+            let mut out = "\n".to_string();
+            for ku in all {
+                out += &format!("\t{:<125} => {:?}\n", format!("{:?}", (*ku).0), (*ku).1);
+            }
+            out
+        };
+        info!(
+            "total SMT updates (next_version from {} to {}): {}",
+            self.next_version,
+            updates.next_version(),
+            print_smt_updates(&smt_updates)
+        );
 
         let smt = self
             .global_state_summary

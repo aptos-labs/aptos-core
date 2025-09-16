@@ -82,11 +82,12 @@ impl StateSlot {
         &self,
         key: StateKey,
         min_version: Version,
-    ) -> Option<(HashValue, Option<(HashValue, StateKey)>)> {
+    ) -> Option<(HashValue, StateKey, Option<(HashValue, StateKey)>)> {
         let maybe_value_opt = self.maybe_update_cold_state(min_version);
         maybe_value_opt.map(|value_opt| {
             (
                 CryptoHash::hash(&key),
+                key.clone(),
                 value_opt.map(|v| (CryptoHash::hash(v), key)),
             )
         })
