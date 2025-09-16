@@ -2244,31 +2244,31 @@ impl Frame {
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
-                        let mut get_field_count_charge_gas_and_check_depth =
-                            || -> PartialVMResult<u16> {
-                                let field_count = self.field_count(*sd_idx);
-                                let struct_type = self.get_struct_ty(*sd_idx);
-                                interpreter.ty_depth_checker.check_depth_of_type(
-                                    gas_meter,
-                                    traversal_context,
-                                    &struct_type,
-                                )?;
-                                Ok(field_count)
-                            };
+                        let mut cache_pack = || {
+                            let field_count = self.field_count(*sd_idx);
+                            let struct_type = self.get_struct_ty(*sd_idx);
+                            interpreter.ty_depth_checker.check_depth_of_type(
+                                gas_meter,
+                                traversal_context,
+                                &struct_type,
+                            )?;
+                            Ok(field_count)
+                        };
 
                         let field_count = if RTCaches::caches_enabled() {
-                            let cached_field_count =
-                                &frame_cache.per_instruction_cache[self.pc as usize];
-                            if let PerInstructionCache::Pack(field_count) = cached_field_count {
+                            let cached_pack = frame_cache.get_instruction_cache(self.pc);
+                            if let PerInstructionCache::Pack(field_count) = cached_pack {
                                 *field_count
                             } else {
-                                let field_count = get_field_count_charge_gas_and_check_depth()?;
-                                frame_cache.per_instruction_cache[self.pc as usize] =
-                                    PerInstructionCache::Pack(field_count);
+                                let field_count = cache_pack()?;
+                                frame_cache.set_instruction_cache(
+                                    self.pc,
+                                    PerInstructionCache::Pack(field_count),
+                                );
                                 field_count
                             }
                         } else {
-                            get_field_count_charge_gas_and_check_depth()?
+                            cache_pack()?
                         };
 
                         gas_meter.charge_pack(
@@ -2281,67 +2281,78 @@ impl Frame {
                             .push(Value::struct_(Struct::pack(args)))?;
                     },
                     Bytecode::PackVariant(idx) => {
-                        let info = self.get_struct_variant_at(*idx);
-                        let struct_type = self.create_struct_ty(&info.definition_struct_type);
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            &struct_type,
-                        )?;
+                        let mut pack_variant = || {
+                            let info = self.get_struct_variant_at(*idx);
+                            let ty = self.create_struct_ty(&info.definition_struct_type);
+                            interpreter.ty_depth_checker.check_depth_of_type(
+                                gas_meter,
+                                traversal_context,
+                                &ty,
+                            )?;
+                            Ok((info.variant, info.field_count))
+                        };
+
+                        let (variant, field_count) = if RTCaches::caches_enabled() {
+                            let cached_pack_variant = frame_cache.get_instruction_cache(self.pc);
+                            if let PerInstructionCache::PackVariant(variant, field_count) =
+                                cached_pack_variant
+                            {
+                                (*variant, *field_count)
+                            } else {
+                                let (variant, field_count) = pack_variant()?;
+                                frame_cache.set_instruction_cache(
+                                    self.pc,
+                                    PerInstructionCache::PackVariant(variant, field_count),
+                                );
+                                (variant, field_count)
+                            }
+                        } else {
+                            pack_variant()?
+                        };
+
                         gas_meter.charge_pack_variant(
                             false,
-                            interpreter
-                                .operand_stack
-                                .last_n(info.field_count as usize)?,
+                            interpreter.operand_stack.last_n(field_count as usize)?,
                         )?;
-                        let args = interpreter.operand_stack.popn(info.field_count)?;
+                        let args = interpreter.operand_stack.popn(field_count)?;
                         interpreter
                             .operand_stack
-                            .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
+                            .push(Value::struct_(Struct::pack_variant(variant, args)))?;
                     },
                     Bytecode::PackGeneric(si_idx) => {
-                        // TODO: Even though the types are not needed for execution, we still
-                        //       instantiate them for gas metering.
-                        //
-                        //       This is a bit wasteful since the newly created types are
-                        //       dropped immediately.
+                        let mut pack_generic = |frame_cache: &mut FrameTypeCache| {
+                            let field_tys = frame_cache.get_struct_fields_types(*si_idx, self)?;
 
-                        let mut get_field_count_charge_gas_and_check_depth =
-                            |frame_cache: &mut FrameTypeCache| -> PartialVMResult<u16> {
-                                let field_tys =
-                                    frame_cache.get_struct_fields_types(*si_idx, self)?;
+                            for (_, ty_count) in field_tys {
+                                gas_meter.charge_create_ty(*ty_count)?;
+                            }
 
-                                for (_, ty_count) in field_tys {
-                                    gas_meter.charge_create_ty(*ty_count)?;
-                                }
-
-                                let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
-                                gas_meter.charge_create_ty(ty_count)?;
-                                interpreter.ty_depth_checker.check_depth_of_type(
-                                    gas_meter,
-                                    traversal_context,
-                                    ty,
-                                )?;
-                                Ok(self.field_instantiation_count(*si_idx))
-                            };
+                            let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                            gas_meter.charge_create_ty(ty_count)?;
+                            interpreter.ty_depth_checker.check_depth_of_type(
+                                gas_meter,
+                                traversal_context,
+                                ty,
+                            )?;
+                            Ok(self.field_instantiation_count(*si_idx))
+                        };
 
                         let field_count = if RTCaches::caches_enabled() {
-                            let cached_field_count =
-                                &frame_cache.per_instruction_cache[self.pc as usize];
-
+                            let cached_pack_generic = frame_cache.get_instruction_cache(self.pc);
                             if let PerInstructionCache::PackGeneric(field_count) =
-                                cached_field_count
+                                cached_pack_generic
                             {
                                 *field_count
                             } else {
-                                let field_count =
-                                    get_field_count_charge_gas_and_check_depth(frame_cache)?;
-                                frame_cache.per_instruction_cache[self.pc as usize] =
-                                    PerInstructionCache::PackGeneric(field_count);
+                                let field_count = pack_generic(frame_cache)?;
+                                frame_cache.set_instruction_cache(
+                                    self.pc,
+                                    PerInstructionCache::PackGeneric(field_count),
+                                );
                                 field_count
                             }
                         } else {
-                            get_field_count_charge_gas_and_check_depth(frame_cache)?
+                            pack_generic(frame_cache)?
                         };
 
                         gas_meter.charge_pack(
@@ -2354,32 +2365,54 @@ impl Frame {
                             .push(Value::struct_(Struct::pack(args)))?;
                     },
                     Bytecode::PackVariantGeneric(si_idx) => {
-                        let field_tys =
-                            frame_cache.get_struct_variant_fields_types(*si_idx, self)?;
+                        let mut pack_variant_generic = |frame_cache: &mut FrameTypeCache| {
+                            let field_tys =
+                                frame_cache.get_struct_variant_fields_types(*si_idx, self)?;
 
-                        for (_, ty_count) in field_tys {
-                            gas_meter.charge_create_ty(*ty_count)?;
-                        }
+                            for (_, ty_count) in field_tys {
+                                gas_meter.charge_create_ty(*ty_count)?;
+                            }
 
-                        let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
+                            let (ty, ty_count) =
+                                frame_cache.get_struct_variant_type(*si_idx, self)?;
+                            gas_meter.charge_create_ty(ty_count)?;
+                            interpreter.ty_depth_checker.check_depth_of_type(
+                                gas_meter,
+                                traversal_context,
+                                ty,
+                            )?;
 
-                        let info = self.get_struct_variant_instantiation_at(*si_idx);
+                            let info = self.get_struct_variant_instantiation_at(*si_idx);
+                            Ok((info.variant, info.field_count))
+                        };
+
+                        let (variant, field_count) = if RTCaches::caches_enabled() {
+                            let cached_pack_variant_generic =
+                                frame_cache.get_instruction_cache(self.pc);
+                            if let PerInstructionCache::PackVariantGeneric(variant, field_count) =
+                                cached_pack_variant_generic
+                            {
+                                (*variant, *field_count)
+                            } else {
+                                let (variant, field_count) = pack_variant_generic(frame_cache)?;
+                                frame_cache.set_instruction_cache(
+                                    self.pc,
+                                    PerInstructionCache::PackVariantGeneric(variant, field_count),
+                                );
+                                (variant, field_count)
+                            }
+                        } else {
+                            pack_variant_generic(frame_cache)?
+                        };
+
                         gas_meter.charge_pack_variant(
                             true,
-                            interpreter
-                                .operand_stack
-                                .last_n(info.field_count as usize)?,
+                            interpreter.operand_stack.last_n(field_count as usize)?,
                         )?;
-                        let args = interpreter.operand_stack.popn(info.field_count)?;
+                        let args = interpreter.operand_stack.popn(field_count)?;
                         interpreter
                             .operand_stack
-                            .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
+                            .push(Value::struct_(Struct::pack_variant(variant, args)))?;
                     },
                     Bytecode::Unpack(_sd_idx) => {
                         let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
@@ -2862,13 +2895,22 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Nop)?;
                     },
                     Bytecode::VecPack(si, num) => {
+                        let is_vec_pack_cached = matches!(
+                            frame_cache.get_instruction_cache(self.pc),
+                            PerInstructionCache::VecPack
+                        );
+
                         let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
+
+                        if !RTCaches::caches_enabled() || !is_vec_pack_cached {
+                            interpreter.ty_depth_checker.check_depth_of_type(
+                                gas_meter,
+                                traversal_context,
+                                ty,
+                            )?;
+                        };
+
                         gas_meter.charge_vec_pack(
                             make_ty!(ty),
                             interpreter.operand_stack.last_n(*num as usize)?,
@@ -2876,6 +2918,11 @@ impl Frame {
                         let elements = interpreter.operand_stack.popn(*num as u16)?;
                         let value = Vector::pack(ty, elements)?;
                         interpreter.operand_stack.push(value)?;
+
+                        if RTCaches::caches_enabled() && !is_vec_pack_cached {
+                            frame_cache
+                                .set_instruction_cache(self.pc, PerInstructionCache::VecPack);
+                        }
                     },
                     Bytecode::VecLen(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;

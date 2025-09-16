@@ -6,7 +6,7 @@ use move_binary_format::{
     errors::*,
     file_format::{
         FieldInstantiationIndex, SignatureIndex, StructDefInstantiationIndex,
-        StructVariantInstantiationIndex, VariantFieldInstantiationIndex,
+        StructVariantInstantiationIndex, VariantFieldInstantiationIndex, VariantIndex,
     },
 };
 use move_core_types::gas_algebra::NumTypeNodes;
@@ -38,8 +38,11 @@ impl RuntimeCacheTraits for AllRuntimeCaches {
 #[derive(Clone)]
 pub(crate) enum PerInstructionCache {
     Nothing,
+    VecPack,
     Pack(u16),
     PackGeneric(u16),
+    PackVariant(VariantIndex, u16),
+    PackVariantGeneric(VariantIndex, u16),
     Call(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
     CallGeneric(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
 }
@@ -235,5 +238,13 @@ impl FrameTypeCache {
             .per_instruction_cache
             .resize(function.code_size(), PerInstructionCache::Nothing);
         frame_cache
+    }
+
+    pub(crate) fn get_instruction_cache(&self, pc: u16) -> &PerInstructionCache {
+        &self.per_instruction_cache[pc as usize]
+    }
+
+    pub(crate) fn set_instruction_cache(&mut self, pc: u16, instr_cache: PerInstructionCache) {
+        self.per_instruction_cache[pc as usize] = instr_cache;
     }
 }
