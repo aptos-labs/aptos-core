@@ -312,9 +312,9 @@ impl CompiledScriptBuilder {
         name: &IdentStr,
         module: &CompiledModule,
     ) -> PartialVMResult<FunctionHandleIndex> {
-        for (idx, handle) in module.function_handles().iter().enumerate() {
-            if module.identifier_at(handle.name) == name {
-                return self.import_function_by_handle(module, FunctionHandleIndex(idx as u16));
+        for def in module.function_defs().iter() {
+            if module.identifier_at(module.function_handle_at(def.function).name) == name {
+                return self.import_function_by_handle(module, def.function);
             }
         }
         Err(PartialVMError::new(StatusCode::LOOKUP_FAILED))
