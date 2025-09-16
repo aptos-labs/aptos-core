@@ -26,7 +26,7 @@ use std::{
 };
 
 pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
-pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 100_000;
+pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 0;
 
 /// BufferedState manages a range of recent state checkpoints and asynchronously commits
 /// the updates in batches.
