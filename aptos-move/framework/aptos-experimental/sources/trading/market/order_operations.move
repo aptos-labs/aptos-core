@@ -7,6 +7,7 @@ module aptos_experimental::order_operations {
         MarketClearinghouseCallbacks,
         Market,
     };
+    use aptos_experimental::market_clearinghouse_order_info::new_clearinghouse_order_info;
     use aptos_experimental::order_book_types::{
         OrderIdType,
         single_order_book_type
@@ -107,9 +108,9 @@ module aptos_experimental::order_operations {
             time_in_force,
             metadata
         ) = order.destroy_single_order();
-        callbacks.decrease_order_size(
-            user, order_id, is_bid, price, remaining_size
-        );
+        callbacks.decrease_order_size(new_clearinghouse_order_info(
+            user, order_id, is_bid, price, remaining_size, metadata
+        ));
 
         market.emit_event_for_order(
             order_id,

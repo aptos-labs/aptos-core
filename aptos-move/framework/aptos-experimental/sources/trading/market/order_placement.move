@@ -71,6 +71,7 @@ module aptos_experimental::order_placement {
         MarketClearinghouseCallbacks,
         Market,
     };
+    use aptos_experimental::market_clearinghouse_order_info::new_clearinghouse_order_info;
 
     // Error codes
     const EINVALID_ORDER: u64 = 1;
@@ -299,14 +300,14 @@ module aptos_experimental::order_placement {
             );
         };
 
-        callbacks.place_maker_order(
+        callbacks.place_maker_order(new_clearinghouse_order_info(
             user_addr,
             order_id,
             is_bid,
             limit_price,
             remaining_size,
             metadata
-        );
+        ));
         market.get_order_book_mut().place_maker_order(
             new_single_order_request(
                 user_addr,
@@ -483,18 +484,25 @@ module aptos_experimental::order_placement {
         let fill_id = market.next_fill_id();
         let settle_result = callbacks.settle_trade(
             market,
-            user_addr,
-            order_id,
-            maker_order.get_account_from_match_details(),
-            maker_order.get_order_id_from_match_details(),
+            // taker order
+            new_clearinghouse_order_info(
+                user_addr,
+                order_id,
+                is_bid,
+                price,
+                maker_matched_size,
+                metadata,
+            ),
+            // maker order
+            new_clearinghouse_order_info(
+                maker_order.get_account_from_match_details(),
+                maker_order.get_order_id_from_match_details(),
+                !is_bid,
+                maker_order.get_price_from_match_details(),
+                maker_matched_size,
+                maker_order.get_metadata_from_match_details().destroy_some(),
+            ),
             fill_id,
-            is_bid,
-            price,
-            maker_order.get_price_from_match_details(), // Order is usually matched at the price of the maker
-            maker_matched_size,
-            option::some(metadata),
-            // TODO(skedia) fix this to pass option to the callbacks
-            maker_order.get_metadata_from_match_details()
         );
 
         let settled_price = settle_result.get_settled_price();
@@ -672,14 +680,16 @@ module aptos_experimental::order_placement {
 
         if (
             !callbacks.validate_order_placement(
-                user_addr,
-                order_id,
+                new_clearinghouse_order_info(
+                    user_addr,
+                    order_id,
+                    is_bid,
+                    limit_price,
+                    remaining_size,
+                    metadata,
+                ),
                 is_taker_order, // is_taker
-                is_bid,
-                limit_price,
                 time_in_force,
-                remaining_size,
-                metadata
             )) {
             return cancel_single_order_internal(
                 market,

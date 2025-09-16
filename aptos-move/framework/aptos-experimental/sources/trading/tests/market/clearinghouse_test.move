@@ -192,16 +192,17 @@ module aptos_experimental::clearinghouse_test {
     public(package) fun test_market_callbacks():
         MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
         new_market_clearinghouse_callbacks(
-            |_market, taker, _taker_order_id, maker, _maker_order_id, _fill_id, is_taker_long, _taker_price, maker_price, size, _taker_metadata, _maker_metadata
-            | { settle_trade(taker, maker, size, maker_price, is_taker_long) },
-            |_account, order_id, _is_taker, _is_bid, _price, _time_in_force, _size, _order_metadata| {
-                validate_order_placement(order_id)
+            |_market, taker_order, maker_order, _fill_id| {
+                settle_trade(taker_order.get_account(), maker_order.get_account(), taker_order.get_size(), maker_order.get_price(), taker_order.is_bid())
+            },
+            |order, _is_taker, _time_in_force| {
+                validate_order_placement(order.get_order_id())
             },
             |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices| {
                 validate_bulk_order_placement(account)
             },
-            |_account, order_id, _is_bid, _price, _size, _order_metadata| {
-                place_maker_order(order_id);
+            |order| {
+                place_maker_order(order.get_order_id());
             },
             |_account, _order_id, _is_bid, _remaining_size, _order_metadata| {
                 cleanup_order(_order_id);
@@ -209,7 +210,7 @@ module aptos_experimental::clearinghouse_test {
             |account, is_bid, _remaining_size| {
                 cleanup_bulk_order(account, is_bid);
             },
-            |_account, _order_id, _is_bid, _price, _size| {
+            |_order| {
                 // decrease order size is not used in this test
             },
             |order_metadata| {
