@@ -12,6 +12,7 @@ use aptos_types::{
     transaction::Version,
 };
 use derive_more::{Deref, DerefMut};
+use std::num::NonZeroUsize;
 
 #[derive(Clone, Debug, Deref)]
 pub struct StateWithSummary {
