@@ -2831,7 +2831,6 @@ dependencies = [
 name = "aptos-keyless-pepper-service"
 version = "0.1.0"
 dependencies = [
- "aes-gcm",
  "anyhow",
  "aptos-build-info",
  "aptos-crypto",
@@ -2862,7 +2861,6 @@ dependencies = [
  "sha3 0.9.1",
  "thiserror",
  "tokio",
- "uuid 1.11.0",
 ]
 
 [[package]]
