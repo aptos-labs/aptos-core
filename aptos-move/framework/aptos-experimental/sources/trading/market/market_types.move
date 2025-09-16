@@ -78,6 +78,7 @@ module aptos_experimental::market_types {
     enum SettleTradeResult has drop {
         V1 {
             settled_size: u64,
+            settled_price: u64,
             maker_cancellation_reason: Option<String>,
             taker_cancellation_reason: Option<String>,
         }
@@ -85,8 +86,8 @@ module aptos_experimental::market_types {
 
     enum MarketClearinghouseCallbacks<M: store + copy + drop> has drop {
         V1 {
-            /// settle_trade_f arguments: taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size
-            settle_trade_f:  |&mut Market<M>, address, OrderIdType, address, OrderIdType, u64, bool, u64, u64, Option<M>, Option<M>| SettleTradeResult has drop + copy,
+            /// settle_trade_f arguments: taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, taker_price, maker_price, size, taker_metadata, maker_metadata
+            settle_trade_f:  |&mut Market<M>, address, OrderIdType, address, OrderIdType, u64, bool, u64, u64, u64, Option<M>, Option<M>| SettleTradeResult has drop + copy,
             /// validate_settlement_update_f arguments: account, order_id, is_taker, is_long, price, size
             validate_order_placement_f: |address, OrderIdType, bool, bool, u64,  TimeInForce, u64, M| bool has drop + copy,
             /// Validate the bulk order placement arguments: account, bids_prices, bids_sizes, asks_prices, asks_sizes
@@ -106,19 +107,21 @@ module aptos_experimental::market_types {
 
     public fun new_settle_trade_result(
         settled_size: u64,
+        settled_price: u64,
         maker_cancellation_reason: Option<String>,
         taker_cancellation_reason: Option<String>
     ): SettleTradeResult {
         SettleTradeResult::V1 {
             settled_size,
+            settled_price,
             maker_cancellation_reason,
             taker_cancellation_reason
         }
     }
 
     public fun new_market_clearinghouse_callbacks<M: store + copy + drop>(
-        // settle_trade_f arguments: taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size
-        settle_trade_f: |&mut Market<M>, address, OrderIdType, address, OrderIdType, u64, bool, u64, u64, Option<M>, Option<M>| SettleTradeResult has drop + copy,
+        // settle_trade_f arguments: taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, taker_price, maker_price, size, taker_metadata, maker_metadata,
+        settle_trade_f: |&mut Market<M>, address, OrderIdType, address, OrderIdType, u64, bool, u64, u64, u64, Option<M>, Option<M>| SettleTradeResult has drop + copy,
         // validate_settlement_update_f arguments: account, order_id, is_taker, is_long, price, size
         validate_order_placement_f: |address, OrderIdType, bool, bool, u64,  TimeInForce, u64, M| bool has drop + copy,
         // Validate the bulk order placement
@@ -150,6 +153,10 @@ module aptos_experimental::market_types {
         self.settled_size
     }
 
+    public fun get_settled_price(self: &SettleTradeResult): u64 {
+        self.settled_price
+    }
+
     public fun get_maker_cancellation_reason(self: &SettleTradeResult): Option<String> {
         self.maker_cancellation_reason
     }
@@ -167,11 +174,12 @@ module aptos_experimental::market_types {
         maker_order_id: OrderIdType,
         fill_id: u64,
         is_taker_long: bool,
-        price: u64,
+        taker_price: u64,
+        maker_price: u64,
         size: u64,
         taker_metadata: Option<M>,
         maker_metadata: Option<M>): SettleTradeResult {
-        (self.settle_trade_f)(market, taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size, taker_metadata, maker_metadata)
+        (self.settle_trade_f)(market, taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, taker_price, maker_price, size, taker_metadata, maker_metadata)
     }
 
     public fun validate_order_placement<M: store + copy + drop>(
