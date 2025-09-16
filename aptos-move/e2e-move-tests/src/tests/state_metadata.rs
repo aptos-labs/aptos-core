@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::MoveHarness;
+use aptos_sdk::types::get_apt_primary_store_address;
 use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, FeatureFlag},
     state_store::state_value::StateValueMetadata,
@@ -16,7 +17,7 @@ fn test_metadata_tracking() {
         microseconds: 7200000001,
     };
 
-    let coin_store = parse_struct_tag("0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>").unwrap();
+    let object_group = parse_struct_tag("0x1::object::ObjectGroup").unwrap();
 
     let address1 = AccountAddress::from_hex_literal("0x100").unwrap();
     let address2 = AccountAddress::from_hex_literal("0x200").unwrap();
@@ -29,9 +30,6 @@ fn test_metadata_tracking() {
     harness.enable_features(vec![], vec![
         FeatureFlag::STORAGE_SLOT_METADATA,
         FeatureFlag::REFUNDABLE_BYTES,
-        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE,
-        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
-        FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
     ]);
     // Create and fund account2
     harness.run_transaction_payload(
@@ -41,7 +39,10 @@ fn test_metadata_tracking() {
     // Observe that metadata is not tracked for address2 resources
     assert_eq!(
         harness
-            .read_resource_metadata(&address2, coin_store.clone())
+            .read_resource_group_metadata(
+                &get_apt_primary_store_address(address2),
+                object_group.clone()
+            )
             .unwrap(),
         StateValueMetadata::none()
     );
@@ -62,7 +63,10 @@ fn test_metadata_tracking() {
 
     // Observe that metadata is tracked for address3 resources
     let meta3a = harness
-        .read_resource_metadata(&address3, coin_store.clone())
+        .read_resource_group_metadata(
+            &get_apt_primary_store_address(address3),
+            object_group.clone(),
+        )
         .unwrap();
     assert!(meta3a.slot_deposit() > 0);
     assert!(meta3a.bytes_deposit() > 0);
@@ -75,7 +79,10 @@ fn test_metadata_tracking() {
         aptos_cached_packages::aptos_stdlib::aptos_account_transfer(address3, 100),
     );
     let meta3b = harness
-        .read_resource_metadata(&address3, coin_store.clone())
+        .read_resource_group_metadata(
+            &get_apt_primary_store_address(address3),
+            object_group.clone(),
+        )
         .unwrap();
     assert_eq!(meta3a, meta3b);
 
@@ -86,7 +93,10 @@ fn test_metadata_tracking() {
     );
     assert_eq!(
         harness
-            .read_resource_metadata(&address2, coin_store.clone())
+            .read_resource_group_metadata(
+                &get_apt_primary_store_address(address2),
+                object_group.clone()
+            )
             .unwrap(),
         StateValueMetadata::new(0, 0, &CurrentTimeMicroseconds { microseconds: 0 })
     );

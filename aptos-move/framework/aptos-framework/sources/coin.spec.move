@@ -155,7 +155,7 @@ spec aptos_framework::coin {
         aborts_if false;
     }
 
-    spec is_account_registered<CoinType>(account_addr: address): bool {
+    spec is_account_registered<CoinType>(_account_addr: address): bool {
         pragma aborts_if_is_partial;
         aborts_if false;
     }
@@ -181,10 +181,11 @@ spec aptos_framework::coin {
 
     spec fun spec_is_account_registered<CoinType>(account_addr: address): bool;
 
-    spec is_account_registered<CoinType>(account_addr: address): bool {
+    spec is_account_registered<CoinType>(_account_addr: address): bool {
         pragma aborts_if_is_partial;
         aborts_if false;
-        ensures [abstract] result == spec_is_account_registered<CoinType>(account_addr);
+        ensures [abstract] result
+            == spec_is_account_registered<CoinType>(_account_addr);
     }
 
     spec schema CoinSubAbortsIf<CoinType> {

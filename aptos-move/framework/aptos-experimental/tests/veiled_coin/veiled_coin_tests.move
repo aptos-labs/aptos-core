@@ -81,7 +81,6 @@ module aptos_experimental::veiled_coin_tests {
         // store for the `sender`.
         coin::create_fake_money(
             &aptos_fx,
-            sender,
             veiled_coin::cast_u32_to_u64_amount(sender_amount + recipient_amount)
         );
         println(b"Created fake money inside @aptos_framework");
