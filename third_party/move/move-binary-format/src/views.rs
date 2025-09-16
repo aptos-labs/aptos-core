@@ -53,7 +53,7 @@ impl<'a, T: ModuleAccess> ModuleView<'a, T> {
 
     pub fn module_handles(
         &self,
-    ) -> impl DoubleEndedIterator<Item = ModuleHandleView<'a, T>> + Send {
+    ) -> impl DoubleEndedIterator<Item = ModuleHandleView<'a, T>> + Send + use<'a, T> {
         let module = self.module;
         module
             .module_handles()
@@ -63,7 +63,7 @@ impl<'a, T: ModuleAccess> ModuleView<'a, T> {
 
     pub fn struct_handles(
         &self,
-    ) -> impl DoubleEndedIterator<Item = StructHandleView<'a, T>> + Send {
+    ) -> impl DoubleEndedIterator<Item = StructHandleView<'a, T>> + Send + use<'a, T> {
         let module = self.module;
         module
             .struct_handles()
@@ -73,7 +73,7 @@ impl<'a, T: ModuleAccess> ModuleView<'a, T> {
 
     pub fn function_handles(
         &self,
-    ) -> impl DoubleEndedIterator<Item = FunctionHandleView<'a, T>> + Send {
+    ) -> impl DoubleEndedIterator<Item = FunctionHandleView<'a, T>> + Send + use<'a, T> {
         let module = self.module;
         module
             .function_handles()
@@ -81,7 +81,9 @@ impl<'a, T: ModuleAccess> ModuleView<'a, T> {
             .map(move |function_handle| FunctionHandleView::new(module, function_handle))
     }
 
-    pub fn field_handles(&self) -> impl DoubleEndedIterator<Item = FieldHandleView<'a, T>> + Send {
+    pub fn field_handles(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = FieldHandleView<'a, T>> + Send + use<'a, T> {
         let module = self.module;
         module
             .field_handles()
@@ -91,7 +93,7 @@ impl<'a, T: ModuleAccess> ModuleView<'a, T> {
 
     pub fn struct_instantiations(
         &self,
-    ) -> impl DoubleEndedIterator<Item = StructInstantiationView<'a, T>> + Send {
+    ) -> impl DoubleEndedIterator<Item = StructInstantiationView<'a, T>> + Send + use<'a, T> {
         let module = self.module;
         module
             .struct_instantiations()
@@ -101,7 +103,7 @@ impl<'a, T: ModuleAccess> ModuleView<'a, T> {
 
     pub fn function_instantiations(
         &self,
-    ) -> impl DoubleEndedIterator<Item = FunctionInstantiationView<'a, T>> + Send {
+    ) -> impl DoubleEndedIterator<Item = FunctionInstantiationView<'a, T>> + Send + use<'a, T> {
         let module = self.module;
         module
             .function_instantiations()
@@ -111,7 +113,7 @@ impl<'a, T: ModuleAccess> ModuleView<'a, T> {
 
     pub fn field_instantiations(
         &self,
-    ) -> impl DoubleEndedIterator<Item = FieldInstantiationView<'a, T>> + Send {
+    ) -> impl DoubleEndedIterator<Item = FieldInstantiationView<'a, T>> + Send + use<'a, T> {
         let module = self.module;
         module
             .field_instantiations()
@@ -119,7 +121,9 @@ impl<'a, T: ModuleAccess> ModuleView<'a, T> {
             .map(move |field_inst| FieldInstantiationView::new(module, field_inst))
     }
 
-    pub fn signatures(&self) -> impl DoubleEndedIterator<Item = SignatureView<'a, T>> + Send {
+    pub fn signatures(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = SignatureView<'a, T>> + Send + use<'a, T> {
         let module = self.module;
         module
             .signatures()
@@ -127,7 +131,9 @@ impl<'a, T: ModuleAccess> ModuleView<'a, T> {
             .map(move |signature| SignatureView::new(module, signature))
     }
 
-    pub fn structs(&self) -> impl DoubleEndedIterator<Item = StructDefinitionView<'a, T>> + Send {
+    pub fn structs(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = StructDefinitionView<'a, T>> + Send + use<'a, T> {
         let module = self.module;
         module
             .struct_defs()
@@ -137,7 +143,7 @@ impl<'a, T: ModuleAccess> ModuleView<'a, T> {
 
     pub fn functions(
         &self,
-    ) -> impl DoubleEndedIterator<Item = FunctionDefinitionView<'a, T>> + Send {
+    ) -> impl DoubleEndedIterator<Item = FunctionDefinitionView<'a, T>> + Send + use<'a, T> {
         let module = self.module;
         module
             .function_defs()
@@ -285,7 +291,9 @@ impl<'a, T: ModuleAccess> FunctionHandleView<'a, T> {
     }
 
     #[inline]
-    pub fn return_tokens(&self) -> impl DoubleEndedIterator<Item = SignatureTokenView<'a, T>> + 'a {
+    pub fn return_tokens(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = SignatureTokenView<'a, T>> + 'a + use<'a, T> {
         let module = self.module;
         let return_ = self.module.signature_at(self.function_handle.return_);
         return_
@@ -295,7 +303,9 @@ impl<'a, T: ModuleAccess> FunctionHandleView<'a, T> {
     }
 
     #[inline]
-    pub fn arg_tokens(&self) -> impl DoubleEndedIterator<Item = SignatureTokenView<'a, T>> + 'a {
+    pub fn arg_tokens(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = SignatureTokenView<'a, T>> + 'a + use<'a, T> {
         let module = self.module;
         let parameters = self.module.signature_at(self.function_handle.parameters);
         parameters
@@ -376,14 +386,15 @@ impl<'a, T: ModuleAccess> StructDefinitionView<'a, T> {
 
     pub fn fields(
         &self,
-    ) -> Option<impl DoubleEndedIterator<Item = FieldDefinitionView<'a, T>> + Send> {
+    ) -> Option<impl DoubleEndedIterator<Item = FieldDefinitionView<'a, T>> + Send + use<'a, T>>
+    {
         Some(self.fields_optional_variant(None))
     }
 
     pub fn fields_optional_variant(
         &self,
         variant: Option<VariantIndex>,
-    ) -> impl DoubleEndedIterator<Item = FieldDefinitionView<'a, T>> + Send {
+    ) -> impl DoubleEndedIterator<Item = FieldDefinitionView<'a, T>> + Send + use<'a, T> {
         let module = self.module;
         self.struct_def
             .field_information
@@ -547,11 +558,15 @@ impl<'a, T: ModuleAccess> FunctionDefinitionView<'a, T> {
         self.function_handle_view.type_parameters()
     }
 
-    pub fn return_tokens(&self) -> impl DoubleEndedIterator<Item = SignatureTokenView<'a, T>> + 'a {
+    pub fn return_tokens(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = SignatureTokenView<'a, T>> + 'a + use<'a, T> {
         self.function_handle_view.return_tokens()
     }
 
-    pub fn arg_tokens(&self) -> impl DoubleEndedIterator<Item = SignatureTokenView<'a, T>> + 'a {
+    pub fn arg_tokens(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = SignatureTokenView<'a, T>> + 'a + use<'a, T> {
         self.function_handle_view.arg_tokens()
     }
 
@@ -672,7 +687,9 @@ impl<'a, T: ModuleAccess> SignatureView<'a, T> {
     }
 
     #[inline]
-    pub fn tokens(&self) -> impl DoubleEndedIterator<Item = SignatureTokenView<'a, T>> + 'a {
+    pub fn tokens(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = SignatureTokenView<'a, T>> + 'a + use<'a, T> {
         let module = self.module;
         self.signature
             .0

@@ -188,7 +188,7 @@ pub fn create_epoch_state(epoch: u64) -> EpochState {
 /// Returns a random u64
 fn create_random_u64() -> u64 {
     let mut rng = OsRng;
-    rng.gen()
+    rng.r#gen()
 }
 
 /// Creates a test state value chunk with proof

@@ -923,11 +923,10 @@ impl CommonNativeRawTransactionExecutor for NativeValueCacheRawTransactionExecut
                     )
                 });
 
-            let total_supply_state_key = match entry.value() {
+            match entry.value() {
                 CachedResource::AptCoinInfo(coin_info) => coin_info.supply_aggregator_state_key(),
                 _ => panic!("wrong type"),
-            };
-            total_supply_state_key
+            }
         });
 
         if USE_THREAD_LOCAL_SUPPLY {

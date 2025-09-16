@@ -93,7 +93,7 @@ where
         &self,
         message: S::Message,
         aggregating: S,
-    ) -> impl Future<Output = anyhow::Result<S::Aggregated>> + 'static
+    ) -> impl Future<Output = anyhow::Result<S::Aggregated>> + 'static + use<S, Req, TBackoff, Res>
     where
         <<S as BroadcastStatus<Req, Res>>::Response as TryFrom<Res>>::Error: Debug,
     {
@@ -106,7 +106,7 @@ where
         message: S::Message,
         aggregating: S,
         receivers: Vec<Author>,
-    ) -> impl Future<Output = anyhow::Result<S::Aggregated>> + 'static
+    ) -> impl Future<Output = anyhow::Result<S::Aggregated>> + 'static + use<S, Req, TBackoff, Res>
     where
         <<S as BroadcastStatus<Req, Res>>::Response as TryFrom<Res>>::Error: Debug,
     {

@@ -275,7 +275,7 @@ impl Filterable<EntryFunctionPayload> for UserTransactionPayloadFilter {
 fn get_entry_function_payload_from_transaction_payload(
     payload: &TransactionPayload,
 ) -> Option<&EntryFunctionPayload> {
-    let z = if let Some(payload) = &payload.payload {
+    if let Some(payload) = &payload.payload {
         match payload {
             transaction_payload::Payload::EntryFunctionPayload(ef_payload) => Some(ef_payload),
             transaction_payload::Payload::MultisigPayload(ms_payload) => ms_payload
@@ -291,6 +291,5 @@ fn get_entry_function_payload_from_transaction_payload(
         }
     } else {
         None
-    };
-    z
+    }
 }
