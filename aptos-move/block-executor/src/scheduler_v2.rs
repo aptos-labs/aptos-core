@@ -3,14 +3,12 @@
 
 use crate::{
     cold_validation::{ColdValidationRequirements, ValidationRequirement},
-    counters,
     scheduler::ArmedLock,
     scheduler_status::ExecutionStatuses,
 };
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::error::{code_invariant_error, PanicError};
-use aptos_vm_logging::clear_speculative_txn_logs;
 use concurrent_queue::{ConcurrentQueue, PopError};
 use crossbeam::utils::CachePadded;
 use fail::fail_point;
@@ -647,13 +645,17 @@ impl SchedulerV2 {
                 return Ok(None);
             }
 
-            if self.committed_marker[next_to_commit_idx as usize]
-                .swap(CommitMarkerFlag::CommitStarted as u8, Ordering::Relaxed)
-                != CommitMarkerFlag::NotCommitted as u8
+            if self
+                .committed_marker
+                .get(next_to_commit_idx as usize)
+                .map_or(false, |marker| {
+                    marker.swap(CommitMarkerFlag::CommitStarted as u8, Ordering::Relaxed)
+                        != CommitMarkerFlag::NotCommitted as u8
+                })
             {
                 return Err(code_invariant_error(format!(
                     "Marking {} as PENDING_COMMIT_HOOK, but previous marker != NOT_COMMITTED",
-                    self.post_commit_processing_queue.len()
+                    next_to_commit_idx
                 )));
             }
 
@@ -793,7 +795,7 @@ impl SchedulerV2 {
     ///
     /// TODO: take worker ID, dedicate some workers to scan high priority tasks (can use armed lock).
     /// We can also have different versions (e.g. for testing) of next_task.
-    pub(crate) fn next_task(&self, worker_id: u32) -> Result<TaskKind, PanicError> {
+    pub(crate) fn next_task(&self, worker_id: u32) -> Result<TaskKind<'_>, PanicError> {
         if self.is_done() {
             return Ok(TaskKind::Done);
         }
@@ -820,6 +822,27 @@ impl SchedulerV2 {
         }
 
         Ok(TaskKind::NextTask)
+    }
+
+    /// Checks invariants and prepares the scheduler state for executing a block epilogue txn at
+    /// block_epilogue_idx. If block_epilogue_idx is not the last txn, then the block must have
+    /// been cut, and the status must be adjusted to execute the next incarnation. In particular,
+    /// the status may not be 'Executing' (PanicError returned), as even speculative execution
+    /// when the block is halted must record the execution result and notify the scheduler (or
+    /// else the speculative outputs can't be cleaned up from the shared data structures).
+    ///
+    /// Otherwise, the status must be converted to 'Executing', possibly after aborting a previous
+    /// 'Executed' incarnation.
+    pub(crate) fn prepare_for_block_epilogue(
+        &self,
+        block_epilogue_idx: TxnIndex,
+    ) -> Result<Incarnation, PanicError> {
+        if block_epilogue_idx != self.num_txns {
+            self.txn_statuses
+                .prepare_for_block_epilogue(block_epilogue_idx)
+        } else {
+            Ok(0)
+        }
     }
 
     /// Finalizes the execution of a transaction and processes its outcomes.
@@ -859,6 +882,11 @@ impl SchedulerV2 {
         abort_manager: AbortManager<'a>,
     ) -> Result<Option<BTreeSet<ModuleId>>, PanicError> {
         let (txn_idx, incarnation, invalidated_set) = abort_manager.take();
+
+        if txn_idx == self.num_txns {
+            // Must be the block epilogue txn.
+            return Ok(None);
+        }
 
         if incarnation > 0 {
             // Record aborted dependencies. Only recording for incarnations > 0 is in line with the
@@ -1047,7 +1075,7 @@ impl SchedulerV2 {
     fn handle_cold_validation_requirements(
         &self,
         worker_id: u32,
-    ) -> Result<Option<TaskKind>, PanicError> {
+    ) -> Result<Option<TaskKind<'_>>, PanicError> {
         if !self
             .cold_validation_requirements
             .is_dedicated_worker(worker_id)
@@ -1218,14 +1246,7 @@ impl SchedulerV2 {
     ///
     /// Returns the result of [ExecutionStatuses::start_abort].
     fn start_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> Result<bool, PanicError> {
-        let ret = self.txn_statuses.start_abort(txn_idx, incarnation)?;
-        if ret {
-            // Increment the counter and clear speculative logs (from the aborted execution).
-            counters::SPECULATIVE_ABORT_COUNT.inc();
-            clear_speculative_txn_logs(txn_idx as usize);
-        }
-
-        Ok(ret)
+        self.txn_statuses.start_abort(txn_idx, incarnation)
     }
 
     /// Initiates the execution of a transaction via `ExecutionStatuses`.

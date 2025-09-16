@@ -10,14 +10,18 @@ use crate::{
     gas::{check_gas, make_prod_gas_meter, ProdGasMeter},
     keyless_validation,
     move_vm_ext::{
-        session::user_transaction_sessions::{
-            abort_hook::AbortHookSession,
-            epilogue::EpilogueSession,
-            prologue::PrologueSession,
-            session_change_sets::{SystemSessionChangeSet, UserSessionChangeSet},
-            user::UserSession,
+        session::{
+            user_transaction_sessions::{
+                abort_hook::AbortHookSession,
+                epilogue::EpilogueSession,
+                prologue::PrologueSession,
+                session_change_sets::{SystemSessionChangeSet, UserSessionChangeSet},
+                user::UserSession,
+            },
+            view_with_change_set::ExecutorViewWithChangeSet,
         },
-        AptosMoveResolver, MoveVmExt, SessionExt, SessionId, UserTransactionContext,
+        AptosMoveResolver, AsExecutorView, AsResourceGroupView, MoveVmExt, SessionExt, SessionId,
+        UserTransactionContext,
     },
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
@@ -68,10 +72,10 @@ use aptos_types::{
         ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features, OnChainConfig,
         TimedFeatureFlag, TimedFeatures,
     },
-    randomness::Randomness,
-    state_store::{StateView, TStateView},
+    randomness::{PerBlockRandomness, Randomness},
+    state_store::{state_key::StateKey, StateView, TStateView},
     transaction::{
-        authenticator::{AbstractionAuthData, AnySignature, AuthenticationProof},
+        authenticator::{AbstractAuthenticationData, AnySignature, AuthenticationProof},
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
         signature_verified_transaction::SignatureVerifiedTransaction,
         AuxiliaryInfo, AuxiliaryInfoTrait, BlockOutput, EntryFunction, ExecutionError,
@@ -85,6 +89,7 @@ use aptos_types::{
         verify_module_metadata_for_module_publishing,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
+    write_set::WriteOp,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{
@@ -123,7 +128,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
     move_resource::MoveStructType,
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveTypeLayout, MoveValue},
@@ -143,10 +148,12 @@ use move_vm_runtime::{
 use move_vm_types::gas::{DependencyKind, GasMeter, UnmeteredGasMeter};
 use num_cpus;
 use once_cell::sync::OnceCell;
+use rand::RngCore;
 use std::{
     cmp::{max, min},
     collections::{BTreeMap, BTreeSet},
     marker::Sync,
+    str::FromStr,
     sync::Arc,
 };
 
@@ -1726,18 +1733,30 @@ impl AptosVM {
         let senders = transaction_data.senders();
         let proofs = transaction_data.authentication_proofs();
 
+        // Validate that the number of senders matches the number of authentication proofs
+        if senders.len() != proofs.len() {
+            return Err(VMStatus::error(
+                StatusCode::INVALID_NUMBER_OF_AUTHENTICATION_PROOFS,
+                Some(format!(
+                    "Mismatch between senders count ({}) and authentication proofs count ({})",
+                    senders.len(),
+                    proofs.len()
+                )),
+            ));
+        }
+
         // Add fee payer.
         let fee_payer_signer = if let Some(fee_payer) = transaction_data.fee_payer {
             Some(match &transaction_data.fee_payer_authentication_proof {
-                Some(AuthenticationProof::Abstraction {
+                Some(AuthenticationProof::Abstract {
                     function_info,
                     auth_data,
                 }) => {
                     let enabled = match auth_data {
-                        AbstractionAuthData::V1 { .. } => {
+                        AbstractAuthenticationData::V1 { .. } => {
                             self.features().is_account_abstraction_enabled()
                         },
-                        AbstractionAuthData::DerivableV1 { .. } => {
+                        AbstractAuthenticationData::DerivableV1 { .. } => {
                             self.features().is_derivable_account_abstraction_enabled()
                         },
                     };
@@ -1769,15 +1788,15 @@ impl AptosVM {
         };
         let sender_signers = itertools::zip_eq(senders, proofs)
             .map(|(sender, proof)| match proof {
-                AuthenticationProof::Abstraction {
+                AuthenticationProof::Abstract {
                     function_info,
                     auth_data,
                 } => {
                     let enabled = match auth_data {
-                        AbstractionAuthData::V1 { .. } => {
+                        AbstractAuthenticationData::V1 { .. } => {
                             self.features().is_account_abstraction_enabled()
                         },
-                        AbstractionAuthData::DerivableV1 { .. } => {
+                        AbstractAuthenticationData::DerivableV1 { .. } => {
                             self.features().is_derivable_account_abstraction_enabled()
                         },
                     };
@@ -3137,6 +3156,39 @@ impl VMValidator for AptosVM {
 pub struct AptosSimulationVM;
 
 impl AptosSimulationVM {
+    /// Patch the randomness seed for simulation because the seed is not being generated
+    /// when the block doesn't need it
+    fn patch_randomness_seed<'a, S: ExecutorView>(
+        base_view: &'a StorageAdapter<'a, S>,
+    ) -> ExecutorViewWithChangeSet<'a> {
+        let state_key = StateKey::resource(
+            &AccountAddress::ONE,
+            &StructTag::from_str("0x1::randomness::PerBlockRandomness").expect("should be valid"),
+        )
+        .expect("should succeed");
+        let mut seed = vec![0u8; 32];
+        rand::thread_rng().fill_bytes(&mut seed);
+        let write_op = AbstractResourceWriteOp::Write(WriteOp::legacy_creation(
+            bcs::to_bytes(&PerBlockRandomness {
+                epoch: 0,
+                round: 0,
+                seed: Some(seed),
+            })
+            .expect("should succeed")
+            .into(),
+        ));
+        let patch_change_set = VMChangeSet::new(
+            BTreeMap::from([(state_key, write_op)]),
+            vec![],
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        );
+        let executor_view = base_view.as_executor_view();
+        let group_view = base_view.as_resource_group_view();
+        ExecutorViewWithChangeSet::new(executor_view, group_view, patch_change_set)
+    }
+
     /// Simulates a signed transaction (i.e., executes it without performing
     /// signature verification) on a newly created VM instance.
     /// *Precondition:* the transaction must **not** have a valid signature.
@@ -3154,8 +3206,9 @@ impl AptosSimulationVM {
         vm.is_simulation = true;
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
-
-        let resolver = state_view.as_move_resolver();
+        let original_view = state_view.as_move_resolver();
+        let patched_view = Self::patch_randomness_seed(&original_view);
+        let resolver = vm.as_move_resolver(&patched_view);
         let code_storage = state_view.as_aptos_code_storage(&env);
 
         let (vm_status, vm_output) = vm.execute_user_transaction(
@@ -3196,7 +3249,7 @@ fn dispatchable_authenticate(
     gas_meter: &mut impl GasMeter,
     account: AccountAddress,
     function_info: FunctionInfo,
-    auth_data: &AbstractionAuthData,
+    auth_data: &AbstractAuthenticationData,
     traversal_context: &mut TraversalContext,
     module_storage: &impl ModuleStorage,
 ) -> VMResult<Vec<u8>> {

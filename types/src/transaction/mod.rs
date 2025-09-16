@@ -13,7 +13,7 @@ use crate::{
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     transaction::authenticator::{
-        AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
+        AASigningData, AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
         TransactionAuthenticator,
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
@@ -546,7 +546,7 @@ impl RawTransaction {
         self.payload
     }
 
-    pub fn executable_ref(&self) -> Result<TransactionExecutableRef> {
+    pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
         self.payload.executable_ref()
     }
 
@@ -587,8 +587,10 @@ fn gen_auth(
             AccountAuthenticator::ed25519(Ed25519PublicKey::from(private_key), sender_signature)
         },
         Auth::Abstraction(function_info, sign_function) => {
-            let digest =
-                HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
+            let digest = AASigningData::signing_message_digest(
+                signing_message(user_signed_message)?,
+                function_info.clone(),
+            )?;
             AccountAuthenticator::abstraction(
                 function_info.clone(),
                 digest.clone(),
@@ -600,8 +602,10 @@ fn gen_auth(
             account_identity,
             sign_function,
         } => {
-            let digest =
-                HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
+            let digest = AASigningData::signing_message_digest(
+                signing_message(user_signed_message)?,
+                function_info.clone(),
+            )?;
             AccountAuthenticator::derivable_abstraction(
                 function_info.clone(),
                 digest.clone(),
@@ -705,7 +709,7 @@ impl TransactionExecutable {
         matches!(self, Self::EntryFunction(_))
     }
 
-    pub fn as_ref(&self) -> TransactionExecutableRef {
+    pub fn as_ref(&self) -> TransactionExecutableRef<'_> {
         match self {
             TransactionExecutable::EntryFunction(entry_function) => {
                 TransactionExecutableRef::EntryFunction(entry_function)
@@ -792,7 +796,7 @@ impl TransactionPayload {
         }
     }
 
-    pub fn executable_ref(&self) -> Result<TransactionExecutableRef> {
+    pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
         match self {
             TransactionPayload::EntryFunction(entry_function) => {
                 Ok(TransactionExecutableRef::EntryFunction(entry_function))
@@ -1193,7 +1197,7 @@ impl SignedTransaction {
         &self.raw_txn.payload
     }
 
-    pub fn executable_ref(&self) -> Result<TransactionExecutableRef> {
+    pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
         self.raw_txn.executable_ref()
     }
 
@@ -3182,7 +3186,6 @@ impl AuxiliaryInfoTrait for AuxiliaryInfo {
     Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, CryptoHasher, BCSCryptoHash,
 )]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-
 pub enum PersistedAuxiliaryInfo {
     None,
     // The index of the transaction in a block (after shuffler, before execution).

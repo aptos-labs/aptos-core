@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.7.0"
+version = "7.8.1"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -336,6 +336,8 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-telemetry",
  "aptos-temppath",
+ "aptos-transaction-simulation",
+ "aptos-transaction-simulation-session",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
@@ -747,7 +749,6 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "rayon",
- "scopeguard",
  "test-case",
 ]
 
@@ -988,6 +989,7 @@ dependencies = [
  "mirai-annotations",
  "mockall 0.11.4",
  "move-core-types",
+ "move-vm-runtime",
  "num-derive",
  "num-traits",
  "once_cell",
@@ -1566,6 +1568,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "serde",
+ "serde_json",
  "thread_local",
  "tikv-jemallocator",
  "tokio",
@@ -2361,6 +2364,27 @@ dependencies = [
  "tokio-stream",
  "tonic 0.12.3",
  "tonic-reflection",
+]
+
+[[package]]
+name = "aptos-indexer-grpc-gateway"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-protos 1.3.1",
+ "async-trait",
+ "axum 0.7.5",
+ "clap 4.5.21",
+ "futures",
+ "http-body-util",
+ "hyper-util",
+ "jemallocator",
+ "serde",
+ "tokio",
+ "tonic 0.12.3",
+ "tracing",
+ "url",
 ]
 
 [[package]]
@@ -4140,6 +4164,7 @@ dependencies = [
  "aptos-types",
  "arr_macro",
  "bcs 0.1.4",
+ "bytes",
  "dashmap 7.0.0-rc2",
  "derive_more 0.99.17",
  "itertools 0.13.0",
@@ -4203,6 +4228,7 @@ dependencies = [
  "claims",
  "dashmap 7.0.0-rc2",
  "futures",
+ "itertools 0.13.0",
  "maplit",
  "mini-moka",
  "mockall 0.11.4",
@@ -4577,6 +4603,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-transaction-simulation-session"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-api-types",
+ "aptos-resource-viewer",
+ "aptos-rest-client",
+ "aptos-transaction-simulation",
+ "aptos-types",
+ "aptos-validator-interface",
+ "aptos-vm",
+ "aptos-vm-environment",
+ "aptos-vm-logging",
+ "aptos-vm-types",
+ "bcs 0.1.4",
+ "hex",
+ "move-core-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
@@ -4689,6 +4740,7 @@ dependencies = [
  "proptest-derive",
  "quick_cache",
  "rand 0.7.3",
+ "rapidhash",
  "rayon",
  "ref-cast",
  "reqwest 0.11.23",
@@ -6115,9 +6167,9 @@ dependencies = [
 
 [[package]]
 name = "blst"
-version = "0.3.11"
+version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c94087b935a822949d3291a9989ad2b2051ea141eda0fd4e478a75f6aa3e604b"
+checksum = "4fd49896f12ac9b6dcd7a5998466b9b58263a695a3dd1ecc1aaca2e12a90b080"
 dependencies = [
  "cc",
  "glob",
@@ -11507,8 +11559,7 @@ dependencies = [
 [[package]]
 name = "lru"
 version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86ea4e65087ff52f3862caff188d489f1fab49a0cb09e01b2e3f1a617b10aaed"
+source = "git+https://github.com/aptos-labs/lru-rs?rev=d16747e8b119c48315a1c76669f962456d06dfe7#d16747e8b119c48315a1c76669f962456d06dfe7"
 dependencies = [
  "hashbrown 0.15.3",
 ]
@@ -15385,6 +15436,12 @@ dependencies = [
  "once_cell",
  "rand 0.8.5",
 ]
+
+[[package]]
+name = "rapidhash"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9813f789f95ee4fe6b4d01834404d7cccacbc3f6c029343af910b3c2835eb9f1"
 
 [[package]]
 name = "raw-cpuid"

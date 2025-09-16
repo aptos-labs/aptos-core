@@ -37,6 +37,7 @@ num_cpus = { workspace = true }
 [features]
 assert-private-keys-not-cloneable = []
 fuzzing = []
+range_proof_timing = []
 
 [[bench]]
 name = "crypto"
@@ -48,6 +49,10 @@ harness = false
 
 [[bench]]
 name = "pvss"
+harness = false
+
+[[bench]]
+name = "range_proof"
 harness = false
 
 [[bench]]

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{cached_resources::CachedResource, utils};
+use crate::{external_resources::resource_fetcher::CachedResource, utils};
 use anyhow::{anyhow, Result};
 use aptos_types::keyless::Configuration;
 use serde::{Deserialize, Serialize};

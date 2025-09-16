@@ -1116,7 +1116,7 @@ export interface MultiKeySignature {
   signaturesRequired?: number | undefined;
 }
 
-export interface AbstractionSignature {
+export interface AbstractSignature {
   functionInfo?: string | undefined;
   signature?: Uint8Array | undefined;
 }
@@ -1134,7 +1134,7 @@ export interface AccountSignature {
   /** 4 is reserved. */
   singleKeySignature?: SingleKeySignature | undefined;
   multiKeySignature?: MultiKeySignature | undefined;
-  abstraction?: AbstractionSignature | undefined;
+  abstraction?: AbstractSignature | undefined;
 }
 
 export enum AccountSignature_Type {
@@ -10404,12 +10404,12 @@ export const MultiKeySignature = {
   },
 };
 
-function createBaseAbstractionSignature(): AbstractionSignature {
+function createBaseAbstractSignature(): AbstractSignature {
   return { functionInfo: "", signature: new Uint8Array(0) };
 }
 
-export const AbstractionSignature = {
-  encode(message: AbstractionSignature, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+export const AbstractSignature = {
+  encode(message: AbstractSignature, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.functionInfo !== undefined && message.functionInfo !== "") {
       writer.uint32(10).string(message.functionInfo);
     }
@@ -10419,10 +10419,10 @@ export const AbstractionSignature = {
     return writer;
   },
 
-  decode(input: _m0.Reader | Uint8Array, length?: number): AbstractionSignature {
+  decode(input: _m0.Reader | Uint8Array, length?: number): AbstractSignature {
     const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseAbstractionSignature();
+    const message = createBaseAbstractSignature();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -10450,47 +10450,45 @@ export const AbstractionSignature = {
   },
 
   // encodeTransform encodes a source of message objects.
-  // Transform<AbstractionSignature, Uint8Array>
+  // Transform<AbstractSignature, Uint8Array>
   async *encodeTransform(
-    source:
-      | AsyncIterable<AbstractionSignature | AbstractionSignature[]>
-      | Iterable<AbstractionSignature | AbstractionSignature[]>,
+    source: AsyncIterable<AbstractSignature | AbstractSignature[]> | Iterable<AbstractSignature | AbstractSignature[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
       if (globalThis.Array.isArray(pkt)) {
         for (const p of (pkt as any)) {
-          yield* [AbstractionSignature.encode(p).finish()];
+          yield* [AbstractSignature.encode(p).finish()];
         }
       } else {
-        yield* [AbstractionSignature.encode(pkt as any).finish()];
+        yield* [AbstractSignature.encode(pkt as any).finish()];
       }
     }
   },
 
   // decodeTransform decodes a source of encoded messages.
-  // Transform<Uint8Array, AbstractionSignature>
+  // Transform<Uint8Array, AbstractSignature>
   async *decodeTransform(
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
-  ): AsyncIterable<AbstractionSignature> {
+  ): AsyncIterable<AbstractSignature> {
     for await (const pkt of source) {
       if (globalThis.Array.isArray(pkt)) {
         for (const p of (pkt as any)) {
-          yield* [AbstractionSignature.decode(p)];
+          yield* [AbstractSignature.decode(p)];
         }
       } else {
-        yield* [AbstractionSignature.decode(pkt as any)];
+        yield* [AbstractSignature.decode(pkt as any)];
       }
     }
   },
 
-  fromJSON(object: any): AbstractionSignature {
+  fromJSON(object: any): AbstractSignature {
     return {
       functionInfo: isSet(object.functionInfo) ? globalThis.String(object.functionInfo) : "",
       signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0),
     };
   },
 
-  toJSON(message: AbstractionSignature): unknown {
+  toJSON(message: AbstractSignature): unknown {
     const obj: any = {};
     if (message.functionInfo !== undefined && message.functionInfo !== "") {
       obj.functionInfo = message.functionInfo;
@@ -10501,11 +10499,11 @@ export const AbstractionSignature = {
     return obj;
   },
 
-  create(base?: DeepPartial<AbstractionSignature>): AbstractionSignature {
-    return AbstractionSignature.fromPartial(base ?? {});
+  create(base?: DeepPartial<AbstractSignature>): AbstractSignature {
+    return AbstractSignature.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<AbstractionSignature>): AbstractionSignature {
-    const message = createBaseAbstractionSignature();
+  fromPartial(object: DeepPartial<AbstractSignature>): AbstractSignature {
+    const message = createBaseAbstractSignature();
     message.functionInfo = object.functionInfo ?? "";
     message.signature = object.signature ?? new Uint8Array(0);
     return message;
@@ -10632,7 +10630,7 @@ export const AccountSignature = {
       MultiKeySignature.encode(message.multiKeySignature, writer.uint32(50).fork()).ldelim();
     }
     if (message.abstraction !== undefined) {
-      AbstractionSignature.encode(message.abstraction, writer.uint32(58).fork()).ldelim();
+      AbstractSignature.encode(message.abstraction, writer.uint32(58).fork()).ldelim();
     }
     return writer;
   },
@@ -10684,7 +10682,7 @@ export const AccountSignature = {
             break;
           }
 
-          message.abstraction = AbstractionSignature.decode(reader, reader.uint32());
+          message.abstraction = AbstractSignature.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -10738,7 +10736,7 @@ export const AccountSignature = {
       multiKeySignature: isSet(object.multiKeySignature)
         ? MultiKeySignature.fromJSON(object.multiKeySignature)
         : undefined,
-      abstraction: isSet(object.abstraction) ? AbstractionSignature.fromJSON(object.abstraction) : undefined,
+      abstraction: isSet(object.abstraction) ? AbstractSignature.fromJSON(object.abstraction) : undefined,
     };
   },
 
@@ -10760,7 +10758,7 @@ export const AccountSignature = {
       obj.multiKeySignature = MultiKeySignature.toJSON(message.multiKeySignature);
     }
     if (message.abstraction !== undefined) {
-      obj.abstraction = AbstractionSignature.toJSON(message.abstraction);
+      obj.abstraction = AbstractSignature.toJSON(message.abstraction);
     }
     return obj;
   },
@@ -10784,7 +10782,7 @@ export const AccountSignature = {
       ? MultiKeySignature.fromPartial(object.multiKeySignature)
       : undefined;
     message.abstraction = (object.abstraction !== undefined && object.abstraction !== null)
-      ? AbstractionSignature.fromPartial(object.abstraction)
+      ? AbstractSignature.fromPartial(object.abstraction)
       : undefined;
     return message;
   },

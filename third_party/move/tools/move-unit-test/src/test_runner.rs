@@ -248,7 +248,7 @@ impl SharedTestingConfig {
         factory: &Mutex<F>,
     ) -> (
         VMResult<ChangeSet>,
-        VMResult<NativeContextExtensions>,
+        VMResult<NativeContextExtensions<'_>>,
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
     ) {

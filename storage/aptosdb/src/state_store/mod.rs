@@ -649,7 +649,7 @@ impl StateStore {
         &self.buffered_state
     }
 
-    pub fn current_state_locked(&self) -> MutexGuard<LedgerStateWithSummary> {
+    pub fn current_state_locked(&self) -> MutexGuard<'_, LedgerStateWithSummary> {
         self.current_state.lock()
     }
 
@@ -661,7 +661,7 @@ impl StateStore {
         key_prefix: &StateKeyPrefix,
         first_key_opt: Option<&StateKey>,
         desired_version: Version,
-    ) -> Result<PrefixedStateValueIterator> {
+    ) -> Result<PrefixedStateValueIterator<'_>> {
         // this can only handle non-sharded db scenario.
         // For sharded db, should look at API side using internal indexer to handle this request
         PrefixedStateValueIterator::new(
@@ -880,7 +880,12 @@ impl StateStore {
                 // TODO(aldenhu): cache changes here, should consume it.
                 let old_entry = cache
                     // TODO(HotState): Revisit: assuming every write op results in a hot slot
-                    .insert((*key).clone(), update_to_cold.to_result_slot())
+                    .insert(
+                        (*key).clone(),
+                        update_to_cold
+                            .to_result_slot()
+                            .expect("hot state ops should have been filtered out above"),
+                    )
                     .unwrap_or_else(|| {
                         // n.b. all updated state items must be read and recorded in the state cache,
                         // otherwise we can't calculate the correct usage. The is_untracked() hack
@@ -1008,20 +1013,40 @@ impl StateStore {
         first_index: usize,
         chunk_size: usize,
     ) -> Result<StateValueChunkWithProof> {
-        let result_iter = JellyfishMerkleIterator::new_by_index(
+        let state_key_values: Vec<(StateKey, StateValue)> = self
+            .get_value_chunk_iter(version, first_index, chunk_size)?
+            .collect::<Result<Vec<_>>>()?;
+        self.get_value_chunk_proof(version, first_index, state_key_values)
+    }
+
+    pub fn get_value_chunk_iter(
+        self: &Arc<Self>,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync> {
+        let store = Arc::clone(self);
+        let value_chunk_iter = JellyfishMerkleIterator::new_by_index(
             Arc::clone(&self.state_merkle_db),
             version,
             first_index,
         )?
-        .take(chunk_size);
-        let state_key_values: Vec<(StateKey, StateValue)> = result_iter
-            .into_iter()
-            .map(|res| {
-                res.and_then(|(_, (key, version))| {
-                    Ok((key.clone(), self.expect_value_by_version(&key, version)?))
-                })
+        .take(chunk_size)
+        .map(move |res| {
+            res.and_then(|(_, (key, version))| {
+                Ok((key.clone(), store.expect_value_by_version(&key, version)?))
             })
-            .collect::<Result<Vec<_>>>()?;
+        });
+
+        Ok(value_chunk_iter)
+    }
+
+    pub fn get_value_chunk_proof(
+        self: &Arc<Self>,
+        version: Version,
+        first_index: usize,
+        state_key_values: Vec<(StateKey, StateValue)>,
+    ) -> Result<StateValueChunkWithProof> {
         ensure!(
             !state_key_values.is_empty(),
             "State chunk starting at {}",
@@ -1159,7 +1184,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
                 .unwrap()
                 .statekeys_enabled()
         {
-            let keys = node_batch.iter().map(|(key, _)| key.0.clone()).collect();
+            let keys = node_batch.keys().map(|key| key.0.clone()).collect();
             self.internal_indexer_db
                 .as_ref()
                 .unwrap()

@@ -21,6 +21,7 @@ use aptos_storage_service_types::{
     },
     StorageServiceError,
 };
+use aptos_time_service::TimeService;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use arc_swap::ArcSwap;
 use futures::StreamExt;
@@ -47,7 +48,11 @@ async fn test_refresh_cached_storage_summary() {
         state_prune_window,
         highest_ledger_info.clone(),
     );
-    let storage_reader = StorageReader::new(storage_service_config, Arc::new(db_reader));
+    let storage_reader = StorageReader::new(
+        storage_service_config,
+        Arc::new(db_reader),
+        TimeService::mock(),
+    );
 
     // Create the storage summary cache
     let cached_storage_server_summary =

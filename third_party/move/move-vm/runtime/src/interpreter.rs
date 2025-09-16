@@ -1447,7 +1447,7 @@ where
         debug_writeln!(buf, "        Code:")?;
         let pc = frame.pc as usize;
         let code = function.code();
-        let before = if pc > 3 { pc - 3 } else { 0 };
+        let before = pc.saturating_sub(3);
         let after = min(code.len(), pc + 4);
         for (idx, instr) in code.iter().enumerate().take(pc).skip(before) {
             debug_writeln!(buf, "            [{}] {:?}", idx, instr)?;
@@ -2209,17 +2209,10 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                        let (_, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
-
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
-
                         gas_meter.charge_unpack(true, struct_.field_views())?;
 
                         // TODO: Whether or not we want this gas metering in the loop is
@@ -2236,17 +2229,10 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
+                        let (_, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
-
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
-
                         gas_meter.charge_unpack_variant(true, struct_.field_views())?;
 
                         let info = self.get_struct_variant_instantiation_at(*si_idx);

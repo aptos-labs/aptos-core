@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_keyless_pepper_service::{
-    account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
-    account_managers::ACCOUNT_MANAGERS,
-    cached_resources,
-    cached_resources::CachedResources,
-    jwk::{self, JWKCache},
+    accounts::{
+        account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
+        account_managers::ACCOUNT_MANAGERS,
+    },
+    external_resources::{
+        jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher, resource_fetcher::CachedResources,
+    },
     metrics,
     metrics::DEFAULT_METRICS_SERVER_PORT,
     request_handler,
@@ -35,7 +37,7 @@ async fn main() {
     info!("Retrieved the VUF public key: {:?}", vuf_public_key);
 
     // Start the cached resource fetcher
-    let cached_resources = cached_resources::start_cached_resource_fetcher();
+    let cached_resources = resource_fetcher::start_cached_resource_fetcher();
 
     // Initialize the account recovery database
     let _ = ACCOUNT_MANAGERS.deref();
@@ -44,7 +46,7 @@ async fn main() {
     }
 
     // Start the JWK fetchers
-    let jwk_cache = jwk::start_jwk_fetchers();
+    let jwk_cache = jwk_fetcher::start_jwk_fetchers();
 
     // Start the pepper service
     let vuf_keypair = Arc::new((vuf_public_key, vuf_private_key));

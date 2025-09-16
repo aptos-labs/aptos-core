@@ -1471,7 +1471,7 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
                     pattern_vec.clone(),
                 ))
             },
-            Pattern::Wildcard(_) => None,
+            Pattern::Wildcard(_) => Some(Pattern::Wildcard(new_id)),
             Pattern::Error(_) => None,
         }
     }

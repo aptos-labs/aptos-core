@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cached_resources::CachedResources, error::PepperServiceError, jwk::JWKCache, HandlerTrait,
-    V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
+    dedicated_handlers::handlers::{
+        HandlerTrait, V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
+    },
+    error::PepperServiceError,
+    external_resources::{jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
 };
 use aptos_build_info::build_information;
 use aptos_keyless_pepper_common::BadPepperRequestError;
