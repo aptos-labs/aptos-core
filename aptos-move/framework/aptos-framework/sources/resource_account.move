@@ -253,31 +253,4 @@ module aptos_framework::resource_account {
         coin::destroy_burn_cap(burn);
         coin::destroy_mint_cap(mint);
     }
-
-    #[test(framework = @0x1, user = @0x2345)]
-    #[expected_failure(abort_code = 0x60005, location = aptos_framework::coin)]
-    public entry fun without_coin(framework: signer, user: signer) acquires Container {
-        let fa_features = vector[
-            std::features::get_new_accounts_default_to_fa_store_feature(),
-            std::features::get_new_accounts_default_to_fa_apt_store_feature(),
-            std::features::get_operations_default_to_fa_apt_store_feature()
-        ];
-        std::features::change_feature_flags_for_testing(
-            &framework, vector[], fa_features
-        );
-        let user_addr = signer::address_of(&user);
-        let (burn, mint) = aptos_framework::aptos_coin::initialize_for_test(&framework);
-        aptos_framework::aptos_account::create_account(user_addr);
-
-        let seed = x"01";
-        create_resource_account(&user, copy seed, vector::empty());
-
-        let resource_addr =
-            aptos_framework::account::create_resource_address(&user_addr, seed);
-        let coin = coin::mint<AptosCoin>(100, &mint);
-        coin::deposit(resource_addr, coin);
-
-        coin::destroy_burn_cap(burn);
-        coin::destroy_mint_cap(mint);
-    }
 }

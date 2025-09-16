@@ -525,30 +525,6 @@ module aptos_framework::aptos_account {
         coin::destroy_freeze_cap(freeze_cap);
     }
 
-    #[test(from = @0x1, to = @0x12)]
-    #[expected_failure(abort_code = 0x50003, location = Self)]
-    public fun test_direct_coin_transfers_fail_if_recipient_opted_out(
-        from: &signer, to: &signer
-    ) acquires DirectTransferConfig {
-        let fa_feature = std::features::get_new_accounts_default_to_fa_store_feature();
-        std::features::change_feature_flags_for_testing(
-            from, vector[], vector[fa_feature]
-        );
-        coin::create_coin_conversion_map(from);
-        let (burn_cap, freeze_cap, mint_cap) =
-            coin::initialize<FakeCoin>(from, utf8(b"FC"), utf8(b"FC"), 10, true);
-        create_account_for_test(signer::address_of(from));
-        create_account_for_test(signer::address_of(to));
-        set_allow_direct_coin_transfers(from, false);
-        deposit_coins(signer::address_of(from), coin::mint(1000, &mint_cap));
-        // This should fail as the to account has explicitly opted out of receiving arbitrary coins.
-        transfer_coins<FakeCoin>(from, signer::address_of(to), 500);
-
-        coin::destroy_burn_cap(burn_cap);
-        coin::destroy_mint_cap(mint_cap);
-        coin::destroy_freeze_cap(freeze_cap);
-    }
-
     #[test(user = @0xcafe)]
     fun test_primary_fungible_store_address(user: &signer) {
         use aptos_framework::fungible_asset::Metadata;

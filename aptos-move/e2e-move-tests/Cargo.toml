@@ -23,6 +23,7 @@ aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
 aptos-package-builder = { workspace = true }
 aptos-rest-client = { workspace = true }
+aptos-sdk = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
 aptos-transaction-simulation = { workspace = true }
 aptos-transaction-workloads-lib = { workspace = true }

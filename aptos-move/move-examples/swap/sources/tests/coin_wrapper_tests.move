@@ -11,7 +11,7 @@ module swap::coin_wrapper_tests {
     fun test_e2e(user: &signer, deployer: &signer) {
         test_helpers::set_up(deployer);
         account::create_account_for_test(signer::address_of(user));
-        coin::create_fake_money(user, user, 1000);
+        coin::create_fake_money(user, 1000);
         let coins = coin::withdraw<FakeMoney>(user, 1000);
         let fa = coin_wrapper::wrap(coins);
         let metadata = fungible_asset::asset_metadata(&fa);
