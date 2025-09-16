@@ -4,8 +4,9 @@
 use crate::{
     code_cache_global::GlobalModuleCache,
     counters::{
-        GLOBAL_MODULE_CACHE_NUM_MODULES, GLOBAL_MODULE_CACHE_SIZE_IN_BYTES, NUM_INTERNED_TYPES,
-        NUM_INTERNED_TYPE_VECS, STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
+        GLOBAL_LAYOUT_CACHE_NUM_NON_ENTRIES, GLOBAL_MODULE_CACHE_NUM_MODULES,
+        GLOBAL_MODULE_CACHE_SIZE_IN_BYTES, NUM_INTERNED_TYPES, NUM_INTERNED_TYPE_VECS,
+        STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
     },
 };
 use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_34;
@@ -156,6 +157,12 @@ where
         // If module cache stores too many modules, flush it as well.
         if module_cache_size_in_bytes > config.max_module_cache_size_in_bytes {
             self.module_cache.flush();
+        }
+
+        let num_non_generic_layout_entries = self.module_cache.num_cached_layouts();
+        GLOBAL_LAYOUT_CACHE_NUM_NON_ENTRIES.set(num_non_generic_layout_entries as i64);
+        if num_non_generic_layout_entries > config.max_layout_cache_size {
+            self.module_cache.flush_layout_cache();
         }
 
         Ok(())
@@ -452,6 +459,7 @@ mod test {
             max_struct_name_index_map_num_entries: 2,
             max_interned_tys: 100,
             max_interned_ty_vecs: 100,
+            max_layout_cache_size: 10,
         };
 
         // Populate the cache for testing.
