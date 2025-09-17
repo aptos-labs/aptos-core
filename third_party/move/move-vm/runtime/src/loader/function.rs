@@ -77,7 +77,12 @@ impl Debug for LoadedFunctionOwner {
         match self {
             LoadedFunctionOwner::Script(_) => f.write_str("script"),
             LoadedFunctionOwner::Module(m) => {
-                write!(f, "{}:{}", m.module.address(), m.module.name())
+                write!(
+                    f,
+                    "{}::{}",
+                    m.module.address().to_hex_literal(),
+                    m.module.name()
+                )
             },
         }
     }
