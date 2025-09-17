@@ -529,7 +529,7 @@ pub fn batch_verify<E: Pairing>(
     fs_transcript: &mut merlin::Transcript,
 ) -> anyhow::Result<()> {
     let commitment_decomp_affine: Vec<E::G1Affine> = E::G1::normalize_batch(&proof.c); // proof.c.iter().map(|p| p.into_affine()).collect();
-        
+
     let commitment_recomputed: E::G1 =
         VariableBaseMSM::msm(&commitment_decomp_affine, &pp.powers_of_two)
             .expect("Failed to compute msm");
