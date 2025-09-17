@@ -23,9 +23,7 @@ use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use move_core_types::{ident_str, language_storage::ModuleId};
-#[cfg(test)]
-use rand::SeedableRng;
-use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng};
+use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
 use rayon::{
     iter::{IntoParallelRefIterator, ParallelIterator},
     ThreadPool, ThreadPoolBuilder,
@@ -828,17 +826,23 @@ impl TransactionGenerator {
 }
 
 pub(crate) fn create_block_metadata_transaction() -> Transaction {
+    // Use a static counter to ensure unique, incrementing round numbers and controlled timestamps
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static ROUND_COUNTER: AtomicU64 = AtomicU64::new(0);
+    
+    let round = ROUND_COUNTER.fetch_add(1, Ordering::SeqCst);
+    // Start from 1 second since genesis is already at timestamp 0
+    // This ensures each BlockMetadata has a strictly increasing timestamp
+    let timestamp_usecs = (round + 1) * 1_000_000; // Start at 1 second, increment by 1 second
+    
     Transaction::BlockMetadata(BlockMetadata::new(
         HashValue::random(),
-        0,
-        1,
-        validator_address(),
+        0,                     // epoch stays 0 for benchmark
+        round,                 // proper incrementing round number
+        validator_address(),   // keep existing validator address
         vec![],
         vec![],
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_micros() as u64))
+        timestamp_usecs))
 }
 
 fn validator_address() -> AccountAddress {
