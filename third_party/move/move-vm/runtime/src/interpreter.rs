@@ -193,7 +193,18 @@ where
         if interpreter.vm_config.paranoid_type_checks && !interpreter.vm_config.paranoid_ref_checks
         {
             if interpreter.vm_config.optimize_trusted_code {
-                interpreter.dispatch_execute_main::<UntrustedOnlyRuntimeTypeCheck>(
+                interpreter
+                    .dispatch_execute_main::<UntrustedOnlyRuntimeTypeCheck, NoRuntimeRefCheck>(
+                        data_cache,
+                        resource_resolver,
+                        gas_meter,
+                        traversal_context,
+                        extensions,
+                        function,
+                        args,
+                    )
+            } else {
+                interpreter.dispatch_execute_main::<FullRuntimeTypeCheck, NoRuntimeRefCheck>(
                     data_cache,
                     resource_resolver,
                     gas_meter,
@@ -202,16 +213,7 @@ where
                     function,
                     args,
                 )
-            } else {
-                interpreter.dispatch_execute_main::<FullRuntimeTypeCheck, NoRuntimeRefCheck>(
-                data_cache,
-                resource_resolver,
-                gas_meter,
-                traversal_context,
-                extensions,
-                function,
-                args,
-            )
+            }
         } else if interpreter.vm_config.paranoid_type_checks
             && interpreter.vm_config.paranoid_ref_checks
         {
@@ -228,15 +230,14 @@ where
             && !interpreter.vm_config.paranoid_ref_checks
         {
             interpreter.dispatch_execute_main::<NoRuntimeTypeCheck, NoRuntimeRefCheck>(
-                    data_cache,
-                    resource_resolver,
-                    gas_meter,
-                    traversal_context,
-                    extensions,
-                    function,
-                    args,
-                )
-            }
+                data_cache,
+                resource_resolver,
+                gas_meter,
+                traversal_context,
+                extensions,
+                function,
+                args,
+            )
         } else {
             interpreter.dispatch_execute_main::<NoRuntimeTypeCheck, FullRuntimeRefCheck>(
                 data_cache,
@@ -425,7 +426,7 @@ where
                             // The callee has pushed return types, but they aren't used by
                             // the caller, so need to be removed.
                             self.operand_stack
-                                .popn_tys(current_frame.function.return_tys().len() as u16)
+                                .remove_tys(current_frame.function.return_tys().len())
                                 .map_err(|e| set_err_info!(current_frame, e))?;
                         }
                     } else if caller_has_rt_checks {
@@ -1810,6 +1811,16 @@ impl Stack {
         Ok(args)
     }
 
+    /// Remove n types from the stack.
+    pub(crate) fn remove_tys(&mut self, n: usize) -> PartialVMResult<()> {
+        let remaining_stack_size = self.types.len().checked_sub(n).ok_or_else(|| {
+            PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
+                .with_message("runtime type stack empty")
+        })?;
+        self.types.truncate(remaining_stack_size);
+        Ok(())
+    }
+
     fn last_n_tys(&self, n: usize) -> PartialVMResult<&[Type]> {
         if self.types.len() < n {
             return Err(
@@ -2882,7 +2893,10 @@ impl Frame {
                     instruction,
                     frame_cache,
                 )?;
-                RTTCheck::check_operand_stack_balance(&self.function.function, &interpreter.operand_stack)?;
+                RTTCheck::check_operand_stack_balance(
+                    &self.function.function,
+                    &interpreter.operand_stack,
+                )?;
                 RTRCheck::post_execution_transition(
                     self,
                     instruction,
