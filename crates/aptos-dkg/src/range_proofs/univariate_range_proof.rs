@@ -82,7 +82,8 @@ pub fn setup<E: Pairing>(ell: usize, n: usize) -> PublicParameters<E> {
 
     let taus = powers_of_tau(&mut rng, n); // The taus have length `n+1`
 
-    let eval_dom = GeneralEvaluationDomain::<E::ScalarField>::new(num_omegas).unwrap();
+    let eval_dom = GeneralEvaluationDomain::<E::ScalarField>::new(num_omegas)
+        .expect("Could not construct evaluation domain");
     let roots_of_unity_in_eval_dom: Vec<E::ScalarField> = eval_dom.elements().collect(); // This is probably quite slow
 
     // Lagrange bases
