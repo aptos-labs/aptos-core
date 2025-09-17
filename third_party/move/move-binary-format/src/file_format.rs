@@ -1688,7 +1688,7 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &struct_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
         ty_stack << bool
     "#]
     TestVariant(StructVariantHandleIndex),
@@ -1821,7 +1821,7 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &struct_ty
+        assert ty == &mut struct_ty
         ty_stack << &mut field_ty
     "#]
     #[gas_type_creation_tier_0 = "struct_ty"]
@@ -1863,7 +1863,7 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &struct_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
         ty_stack << &field_ty
     "#]
     ImmBorrowField(FieldHandleIndex),
@@ -1886,8 +1886,8 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &mut struct_ty
-        ty_stack << &mut field_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
+        ty_stack << &field_ty
     "#]
     ImmBorrowVariantField(VariantFieldHandleIndex),
 
@@ -1904,7 +1904,7 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &struct_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
         ty_stack << &field_ty
     "#]
     #[gas_type_creation_tier_0 = "struct_ty"]
@@ -1929,8 +1929,8 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &mut struct_ty
-        ty_stack << &mut field_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
+        ty_stack << &field_ty
     "#]
     ImmBorrowVariantFieldGeneric(VariantFieldInstantiationIndex),
 
@@ -2435,7 +2435,7 @@ pub enum Bytecode {
     #[runtime_check_epilogue = r#"
         ty_stack >> ty1
         ty_stack >> ty2
-        assert ty2 == signer
+        assert ty2 == &signer
         assert ty1 == struct_ty
         assert struct_ty has key
     "#]
@@ -2532,7 +2532,7 @@ pub enum Bytecode {
     #[runtime_check_epilogue = r#"
         elem_ty = instantiate elem_ty
         ty_stack >> ty
-        assert ty == &elem_ty
+        assert ty == &vector<elem_ty> or ty == &mut vector<elem_ty>
         ty_stack << u64
     "#]
     #[gas_type_creation_tier_0 = "elem_ty"]
@@ -2553,7 +2553,7 @@ pub enum Bytecode {
         ty_stack >> idx_ty
         assert idx_ty == u64
         ty_stack >> ref_ty
-        assert ref_ty == &vector<elem_ty>
+        assert ref_ty == &vector<elem_ty> or ref_ty == &mut vector<elem_ty>
         ty_stack << &elem_ty
     "#]
     #[gas_type_creation_tier_0 = "elem_ty"]
@@ -2651,7 +2651,7 @@ pub enum Bytecode {
         ty_stack >> ty3
         assert ty1 == u64
         assert ty2 == u64
-        assert ty3 == &vector<elem_ty>
+        assert ty3 == &mut vector<elem_ty>
     "#]
     VecSwap(SignatureIndex),
 
