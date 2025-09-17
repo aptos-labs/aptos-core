@@ -192,6 +192,7 @@ impl Frame {
         Ok(())
     }
 
+    #[inline(always)]
     pub(crate) fn untrusted_code(&self) -> bool {
         !self.function.function.is_trusted
     }

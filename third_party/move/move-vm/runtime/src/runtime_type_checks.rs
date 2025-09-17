@@ -39,7 +39,7 @@ pub(crate) trait RuntimeTypeCheck {
     /// For any other checks are performed externally
     fn should_perform_checks(for_fun: &Function) -> bool;
 
-    /// Whethet this is a partial checker, in which some parts of the code are checked and
+    /// Whether this is a partial checker, in which some parts of the code are checked and
     /// others not. This is needed for certain info only valid in full checking.
     fn is_partial_checker() -> bool;
 
