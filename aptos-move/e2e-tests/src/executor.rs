@@ -97,7 +97,7 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
     cell::Cell,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
     env,
     fs::{self, OpenOptions},
     io::Write,
@@ -289,6 +289,26 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         };
         executor.apply_write_set(write_set);
         executor
+    }
+
+    pub fn duplicate_with_assumption(&self) -> Self {
+        let state_store = DeltaStateStore::new_with_base_and_delta(
+            EitherStateView::Left(EmptyStateView),
+            self.state_store.delta(),
+        );
+        assert!(self.executed_output.is_none());
+        Self {
+            state_store,
+            event_store: self.event_store.clone(),
+            executor_thread_pool: Arc::clone(&self.executor_thread_pool),
+            block_time: self.block_time,
+            executed_output: None,
+            trace_dir: None,
+            rng: KeyGen::from_seed(RNG_SEED),
+            executor_mode: self.executor_mode,
+            allow_block_executor_fallback: self.allow_block_executor_fallback,
+            block_state: BlockState::None,
+        }
     }
 
     fn from_remote_state_impl(
@@ -503,6 +523,11 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
 
     pub fn state_store(&self) -> &(impl SimulationStateStore + use<O>) {
         &self.state_store
+    }
+
+    /// Returns the full state store delta (all writes applied on top of the base view).
+    pub fn get_state_delta(&self) -> HashMap<StateKey, Option<StateValue>> {
+        self.state_store.delta()
     }
 
     /// Creates an executor in which no genesis state has been applied yet.

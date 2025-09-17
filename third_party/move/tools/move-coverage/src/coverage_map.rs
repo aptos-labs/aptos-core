@@ -86,7 +86,7 @@ impl CoverageMap {
             } else {
                 // Don't count scripts (for now)
                 assert_eq!(context_segs.pop().unwrap(), "main",);
-                assert_eq!(context_segs.pop().unwrap(), "Script",);
+                assert_eq!(context_segs.pop().unwrap(), "script",);
             }
         }
         Ok(self)

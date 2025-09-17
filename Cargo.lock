@@ -3178,6 +3178,7 @@ dependencies = [
  "move-core-types",
  "move-coverage",
  "move-decompiler",
+ "move-fuzz",
  "move-linter",
  "move-model",
  "move-package",
@@ -7327,6 +7328,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "command-group"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a68fa787550392a9d58f44c21a3022cfb3ea3e2458b7f85d3b399d0ceeccf409"
+dependencies = [
+ "nix 0.27.1",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "compute-module-expansion-size"
 version = "0.1.0"
 dependencies = [
@@ -9725,6 +9736,12 @@ dependencies = [
  "libc",
  "winapi 0.3.9",
 ]
+
+[[package]]
+name = "fs_extra"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
 
 [[package]]
 name = "fsevent-sys"
@@ -13062,6 +13079,54 @@ version = "0.1.1"
 dependencies = [
  "move-prover",
  "move-stdlib",
+]
+
+[[package]]
+name = "move-fuzz"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-cached-packages",
+ "aptos-crypto",
+ "aptos-framework",
+ "aptos-gas-meter",
+ "aptos-gas-schedule",
+ "aptos-language-e2e-tests",
+ "aptos-transaction-simulation",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-vm-environment",
+ "aptos-vm-logging",
+ "aptos-vm-types",
+ "bcs 0.1.4",
+ "clap 4.5.60",
+ "command-group",
+ "env_logger",
+ "fs_extra",
+ "hex",
+ "itertools 0.13.0",
+ "lazy_static",
+ "legacy-move-compiler",
+ "log",
+ "move-binary-format",
+ "move-compiler-v2",
+ "move-core-types",
+ "move-coverage",
+ "move-model",
+ "move-package",
+ "move-symbol-pool",
+ "move-unit-test",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "num_cpus",
+ "petgraph 0.6.5",
+ "rand 0.7.3",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha3 0.9.1",
+ "tempfile",
+ "walkdir",
 ]
 
 [[package]]
