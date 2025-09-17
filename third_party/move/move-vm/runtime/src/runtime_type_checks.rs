@@ -405,15 +405,6 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         instruction: &Bytecode,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
-        /*
-        eprintln!(
-            "at {:?} fun {:?}::{} stack {:?}",
-            instruction,
-            frame.function.owner(),
-            frame.function.name(),
-            operand_stack
-        );
-         */
         let ty_builder = frame.ty_builder();
         match instruction {
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),

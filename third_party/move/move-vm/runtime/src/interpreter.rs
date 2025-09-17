@@ -415,7 +415,7 @@ where
                         .0
                         .last()
                         .map(|f| RTTCheck::should_perform_checks(&f.function.function))
-                        .unwrap_or_default();
+                        .unwrap_or(false);
                     let callee_has_rt_checks =
                         RTTCheck::should_perform_checks(&current_frame.function.function);
                     if callee_has_rt_checks {
@@ -433,16 +433,22 @@ where
                         // so we must push the return types of the function onto the type stack,
                         // following the runtime type checking protocol.
                         let ty_args = current_frame.function.ty_args();
-                        for mut ret_ty in current_frame.function.return_tys().iter().cloned() {
-                            if !ty_args.is_empty() {
-                                ret_ty = current_frame
-                                    .ty_builder()
-                                    .create_ty_with_subst(&ret_ty, ty_args)
+                        if ty_args.is_empty() {
+                            for ret_ty in current_frame.function.return_tys() {
+                                self.operand_stack
+                                    .push_ty(ret_ty.clone())
                                     .map_err(|e| set_err_info!(current_frame, e))?
                             }
-                            self.operand_stack
-                                .push_ty(ret_ty)
-                                .map_err(|e| set_err_info!(current_frame, e))?
+                        } else {
+                            for ret_ty in current_frame.function.return_tys() {
+                                let ret_ty = current_frame
+                                    .ty_builder()
+                                    .create_ty_with_subst(ret_ty, ty_args)
+                                    .map_err(|e| set_err_info!(current_frame, e))?;
+                                self.operand_stack
+                                    .push_ty(ret_ty)
+                                    .map_err(|e| set_err_info!(current_frame, e))?
+                            }
                         }
                     }
 
@@ -1758,8 +1764,12 @@ impl Stack {
 
     fn last_n(&self, n: usize) -> PartialVMResult<impl ExactSizeIterator<Item = &Value> + Clone> {
         if self.value.len() < n {
-            return Err(PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
-                .with_message("Failed to get last n arguments on the argument stack".to_string()));
+            return Err(
+                PartialVMError::new(StatusCode::EMPTY_VALUE_STACK).with_message(format!(
+                    "Failed to get last {} arguments on the argument stack",
+                    n
+                )),
+            );
         }
         Ok(self.value[(self.value.len() - n)..].iter())
     }
@@ -1803,9 +1813,10 @@ impl Stack {
     fn last_n_tys(&self, n: usize) -> PartialVMResult<&[Type]> {
         if self.types.len() < n {
             return Err(
-                PartialVMError::new(StatusCode::EMPTY_VALUE_STACK).with_message(
-                    "Failed to get last n arguments on the runtime type stack".to_string(),
-                ),
+                PartialVMError::new(StatusCode::EMPTY_VALUE_STACK).with_message(format!(
+                    "Failed to get last {} arguments on the runtime type stack",
+                    n
+                )),
             );
         }
         let len = self.types.len();

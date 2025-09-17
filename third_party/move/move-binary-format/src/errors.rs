@@ -692,12 +692,6 @@ impl fmt::Debug for PartialVMError_ {
             indices,
             offsets,
         } = self;
-        assert!(
-            major_status != &StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            "invariant err: {:?}",
-            message
-        );
-
         f.debug_struct("PartialVMError")
             .field("major_status", major_status)
             .field("sub_status", sub_status)
