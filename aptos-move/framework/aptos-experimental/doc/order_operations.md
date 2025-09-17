@@ -207,7 +207,7 @@ Parameters:
         <b>false</b>,
         aptos_experimental::market_types::order_status_size_reduced(),
         std::string::utf8(b"Order size reduced"),
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(metadata),
+        metadata,
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
         time_in_force,
         callbacks
@@ -260,7 +260,7 @@ Parameters:
         metadata
     ) = order.destroy_single_order();
     cleanup_order_internal(
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, single_order_book_type(), is_bid, remaining_size, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(metadata), callbacks
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, single_order_book_type(), is_bid, remaining_size, metadata, callbacks
     );
     market.emit_event_for_order(
         order_id,
@@ -274,7 +274,7 @@ Parameters:
         <b>false</b>,
         aptos_experimental::market_types::order_status_cancelled(),
         std::string::utf8(b"Order cancelled"),
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(metadata),
+        metadata,
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
         time_in_force,
         callbacks
