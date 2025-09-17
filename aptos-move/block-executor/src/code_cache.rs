@@ -17,6 +17,7 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
+use bytes::Bytes;
 #[cfg(test)]
 use fail::fail_point;
 use move_binary_format::{
@@ -25,7 +26,10 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    account_address::AccountAddress,
+    ident_str,
+    identifier::{IdentStr, Identifier},
+    language_storage::ModuleId,
 };
 use move_vm_runtime::{Module, RuntimeEnvironment, Script, WithRuntimeEnvironment};
 use move_vm_types::code::{
@@ -33,6 +37,8 @@ use move_vm_types::code::{
     WithBytes,
 };
 use std::sync::Arc;
+
+const OPTION_MODULE_BYTES: &[u8] = include_bytes!("../../../third_party/move/option.mv");
 
 impl<T: Transaction, S: TStateView<Key = T::Key>> WithRuntimeEnvironment for LatestView<'_, T, S> {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
@@ -50,8 +56,9 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestVi
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        let key = T::Key::from_address_and_module_name(key.address(), key.name());
-        self.get_raw_base_value(&key)
+        let constructed_key = T::Key::from_address_and_module_name(key.address(), key.name());
+        let result = self
+            .get_raw_base_value(&constructed_key)
             .map_err(|err| err.finish(Location::Undefined))?
             .map(|state_value| {
                 let extension = Arc::new(AptosModuleExtension::new(state_value));
@@ -60,7 +67,23 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestVi
                     .deserialize_into_compiled_module(extension.bytes())?;
                 Ok(ModuleCode::from_deserialized(compiled_module, extension))
             })
-            .transpose()
+            .transpose();
+        if self
+            .runtime_environment()
+            .vm_config()
+            .override_option_module
+            && key.address() == &AccountAddress::ONE
+            && *key.name() == *Identifier::from(ident_str!("option"))
+        {
+            let bytes = Bytes::from(OPTION_MODULE_BYTES.to_vec());
+            let compiled_module = self
+                .runtime_environment()
+                .deserialize_into_compiled_module(&bytes)?;
+            let extension = Arc::new(AptosModuleExtension::new_from_bytes(bytes));
+            let module = ModuleCode::from_deserialized(compiled_module, extension);
+            return Ok(Some(module));
+        }
+        result
     }
 }
 

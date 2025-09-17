@@ -21,12 +21,15 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use bytes::Bytes;
 use fail::fail_point;
 use move_binary_format::{
     errors::{Location, PartialVMError, VMResult},
     CompiledModule,
 };
-use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{
+    ident_str, identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode,
+};
 use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache},
@@ -34,6 +37,8 @@ use move_vm_types::{
 };
 use rand::{thread_rng, Rng};
 use std::sync::{Arc, Mutex};
+
+const OPTION_MODULE_BYTES: &[u8] = include_bytes!("../../third_party/move/option.mv");
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
@@ -225,10 +230,27 @@ impl<S: StateView> ModuleCodeBuilder for ValidationState<S> {
             Some(bytes) => bytes,
             None => return Ok(None),
         };
-        let compiled_module = self
+        let (compiled_module, extension) = if self
+            .environment
             .runtime_environment()
-            .deserialize_into_compiled_module(state_value.bytes())?;
-        let extension = Arc::new(AptosModuleExtension::new(state_value));
+            .vm_config()
+            .override_option_module
+            && key.address() == &AccountAddress::ONE
+            && *key.name() == *Identifier::from(ident_str!("option"))
+        {
+            let bytes = Bytes::from(OPTION_MODULE_BYTES.to_vec());
+            let compiled_module = self
+                .runtime_environment()
+                .deserialize_into_compiled_module(&bytes)?;
+            let extension = Arc::new(AptosModuleExtension::new_from_bytes(bytes));
+            (compiled_module, extension)
+        } else {
+            let compiled_module = self
+                .runtime_environment()
+                .deserialize_into_compiled_module(state_value.bytes())?;
+            let extension = Arc::new(AptosModuleExtension::new(state_value));
+            (compiled_module, extension)
+        };
         let module = ModuleCode::from_deserialized(compiled_module, extension);
         Ok(Some(module))
     }
