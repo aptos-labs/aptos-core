@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::range_proofs::univariate_range_proof::{commit, setup, Commitment, PublicParameters};
 use ark_ec::pairing::Pairing;
 use ark_std::rand::{CryptoRng, RngCore};
