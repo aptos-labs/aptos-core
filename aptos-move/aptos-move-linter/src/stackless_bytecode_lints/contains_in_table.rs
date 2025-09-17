@@ -214,7 +214,7 @@ impl StacklessBytecodeChecker for ContainsInTable {
 impl ContainsInTable {
     /// Propagate table existence knowledge through conditional branches
     ///
-    /// When branching on contains call results, this creates appropriate BranchKnowledge
+    /// When branching on table::contains results, this creates appropriate BranchKnowledge
     /// for each target label, encoding positive/negative existence information based on
     /// the branch condition. Handles both direct and negated contains conditions.
     fn handle_branch(

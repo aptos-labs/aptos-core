@@ -17,6 +17,7 @@ use std::collections::{HashMap, HashSet};
 use move_model::{
     ast::TempIndex,
     model::{ModuleId, StructId},
+    symbol::Symbol,
 };
 use move_stackless_bytecode::stackless_bytecode::{Bytecode, Constant, Operation};
 
@@ -25,6 +26,7 @@ use move_stackless_bytecode::stackless_bytecode::{Bytecode, Constant, Operation}
 struct FieldInfo {
     module_id: ModuleId,
     struct_id: StructId,
+    variant_path: Option<Vec<Symbol>>,
     field_offset: usize,
 }
 
@@ -110,6 +112,7 @@ impl AssignmentTracker {
                                 let field_info = FieldInfo {
                                     module_id: *mid,
                                     struct_id: *sid,
+                                    variant_path: None,
                                     field_offset: i,
                                 };
                                 self.set_temp_source(
@@ -129,6 +132,18 @@ impl AssignmentTracker {
                             let field_info = FieldInfo {
                                 module_id: *mid,
                                 struct_id: *sid,
+                                variant_path: None,
+                                field_offset: *field_offset,
+                            };
+                            self.set_temp_source(dest, TempSource::FieldBorrow(src, field_info));
+                        }
+                    },
+                    Operation::BorrowVariantField(mid, sid, variant_path, _, field_offset) => {
+                        if let (Some(&dest), Some(&src)) = (dests.first(), srcs.first()) {
+                            let field_info = FieldInfo {
+                                module_id: *mid,
+                                struct_id: *sid,
+                                variant_path: Some(variant_path.clone()),
                                 field_offset: *field_offset,
                             };
                             self.set_temp_source(dest, TempSource::FieldBorrow(src, field_info));
