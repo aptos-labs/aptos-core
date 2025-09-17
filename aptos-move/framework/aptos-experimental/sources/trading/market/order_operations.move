@@ -123,7 +123,7 @@ module aptos_experimental::order_operations {
             false,
             aptos_experimental::market_types::order_status_size_reduced(),
             std::string::utf8(b"Order size reduced"),
-            option::some(metadata),
+            metadata,
             option::none(),
             time_in_force,
             callbacks
@@ -156,7 +156,7 @@ module aptos_experimental::order_operations {
             metadata
         ) = order.destroy_single_order();
         cleanup_order_internal(
-            account, order_id, single_order_book_type(), is_bid, remaining_size, option::some(metadata), callbacks
+            account, order_id, single_order_book_type(), is_bid, remaining_size, metadata, callbacks
         );
         market.emit_event_for_order(
             order_id,
@@ -170,7 +170,7 @@ module aptos_experimental::order_operations {
             false,
             aptos_experimental::market_types::order_status_cancelled(),
             std::string::utf8(b"Order cancelled"),
-            option::some(metadata),
+            metadata,
             option::none(), // trigger_condition
             time_in_force,
             callbacks

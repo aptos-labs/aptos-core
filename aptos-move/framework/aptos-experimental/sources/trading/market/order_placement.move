@@ -291,7 +291,7 @@ module aptos_experimental::order_placement {
                 false,
                 market_types::order_status_open(),
                 std::string::utf8(b""),
-                option::some(metadata),
+                metadata,
                 trigger_condition,
                 time_in_force,
                 callbacks
@@ -337,7 +337,7 @@ module aptos_experimental::order_placement {
         order_id: OrderIdType,
         maker_cancellation_reason: String,
         unsettled_size: u64,
-        metadata: Option<M>,
+        metadata: M,
         time_in_force: TimeInForce,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
@@ -409,7 +409,7 @@ module aptos_experimental::order_placement {
             is_taker,
             market_types::order_status_cancelled(),
             cancel_details,
-            option::some(metadata),
+            metadata,
             option::none(), // trigger_condition
             time_in_force,
             callbacks
@@ -432,12 +432,12 @@ module aptos_experimental::order_placement {
         book_type: OrderBookType,
         is_bid: bool,
         remaining_size: u64,
-        metadata: Option<M>,
+        metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         if (book_type == single_order_book_type()) {
             callbacks.cleanup_order(
-                user_addr, order_id, is_bid, remaining_size, metadata.destroy_some()
+                user_addr, order_id, is_bid, remaining_size, metadata
             );
         } else {
             callbacks.cleanup_bulk_orders(
@@ -490,7 +490,7 @@ module aptos_experimental::order_placement {
             is_bid,
             maker_order.get_price_from_match_details(), // Order is always matched at the price of the maker
             maker_matched_size,
-            option::some(metadata),
+            metadata,
             // TODO(skedia) fix this to pass option to the callbacks
             maker_order.get_metadata_from_match_details()
         );
@@ -514,8 +514,8 @@ module aptos_experimental::order_placement {
                 true,
                 market_types::order_status_filled(),
                 std::string::utf8(b""),
-                option::some(metadata),
-                option::none(),
+                metadata,
+                option::none(), // trigger_condition
                 time_in_force,
                 callbacks
             );
@@ -652,7 +652,7 @@ module aptos_experimental::order_placement {
                 is_taker_order,
                 market_types::order_status_open(),
                 std::string::utf8(b""),
-                option::some(metadata),
+                metadata,
                 trigger_condition,
                 time_in_force,
                 callbacks
@@ -811,7 +811,7 @@ module aptos_experimental::order_placement {
             };
             if (remaining_size == 0) {
                 cleanup_order_internal(
-                    user_addr, order_id, single_order_book_type(), is_bid, 0, option::some(metadata), callbacks
+                    user_addr, order_id, single_order_book_type(), is_bid, 0, metadata, callbacks
                 );
                 break;
             };
@@ -902,8 +902,6 @@ module aptos_experimental::order_placement {
             match_count
         }
     }
-
-
 
     // ============================= test_only APIs ====================================
     #[test_only]
