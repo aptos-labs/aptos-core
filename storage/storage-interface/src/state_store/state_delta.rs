@@ -55,6 +55,7 @@ impl StateDelta {
         self.shards[state_key.get_shard_id()].get(state_key)
     }
 
+    // TODO(HotState): not used. Delete later.
     pub(crate) fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
         std::array::from_fn(|shard_id| {
             let num_items = self.current.num_hot_items(shard_id);
@@ -69,10 +70,12 @@ impl StateDelta {
         })
     }
 
+    // TODO(HotState): not used. Delete later.
     pub fn latest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
         self.current.latest_hot_key(shard_id)
     }
 
+    // TODO(HotState): not used. Delete later.
     pub fn oldest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
         self.current.oldest_hot_key(shard_id)
     }
