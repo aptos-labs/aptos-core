@@ -74,6 +74,8 @@ on:
           # Test varies the workload, across some basic workloads (i.e. some cheap, some expensive),
           # and checks that throughput and performance across different stages
           - realistic-env-workload-sweep
+          # Test runs different variants of the orderbook workload
+          - realistic-env-orderbook-workload-sweep
           # Test sends ConstTps workload above what the system can handle, while additionally sending
           # non-small high-fee traffic (1000 TPS), and measures overall system performance.
           - realistic-env-graceful-overload
@@ -153,6 +155,7 @@ jobs:
               { TEST_NAME: 'framework-upgrade-test', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'framework_upgrade' },
               { TEST_NAME: 'realistic-env-load-sweep', FORGE_RUNNER_DURATION_SECS: 1800, FORGE_TEST_SUITE: 'realistic_env_load_sweep' },
               { TEST_NAME: 'realistic-env-workload-sweep', FORGE_RUNNER_DURATION_SECS: 2000, FORGE_TEST_SUITE: 'realistic_env_workload_sweep' },
+              { TEST_NAME: 'realistic-env-orderbook-workload-sweep', FORGE_RUNNER_DURATION_SECS: 2000, FORGE_TEST_SUITE: 'realistic_env_orderbook_workload_sweep' },
               { TEST_NAME: 'realistic-env-graceful-overload', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'realistic_env_graceful_overload' },
               { TEST_NAME: 'realistic-env-graceful-workload-sweep', FORGE_RUNNER_DURATION_SECS: 2100, FORGE_TEST_SUITE: 'realistic_env_graceful_workload_sweep' },
               { TEST_NAME: 'realistic-env-fairness-workload-sweep', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'realistic_env_fairness_workload_sweep' },
@@ -197,7 +200,7 @@ jobs:
   # NOTE: this may be better as a separate workflow as the logic is quite complex but generalizable
   determine-test-metadata:
     runs-on: ubuntu-latest
-    needs: ["generate-matrix"]
+    needs: [ "generate-matrix" ]
     outputs:
       IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
       IMAGE_TAG_FOR_COMPAT_TEST: ${{ steps.get-last-released-image-tag-for-compat-test.outputs.IMAGE_TAG }}
@@ -272,7 +275,7 @@ jobs:
 
   run:
     name: forge-${{ matrix.TEST_NAME }}
-    needs: [determine-test-metadata, generate-matrix]
+    needs: [ determine-test-metadata, generate-matrix ]
     if: ${{ github.event_name != 'pull_request' }}
     strategy:
       fail-fast: false
