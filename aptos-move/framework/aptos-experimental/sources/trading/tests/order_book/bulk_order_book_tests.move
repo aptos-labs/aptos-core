@@ -32,8 +32,8 @@ module aptos_experimental::bulk_order_book_tests {
         TestMetadata { test_field }
     }
 
-    fun setup_test(): (BulkOrderBook, price_time_index::PriceTimeIndex, AscendingIdGenerator) {
-        let order_book = new_bulk_order_book();
+    fun setup_test(): (BulkOrderBook<TestMetadata>, price_time_index::PriceTimeIndex, AscendingIdGenerator) {
+        let order_book = new_bulk_order_book<TestMetadata>();
         let price_time_idx = price_time_index::new_price_time_idx();
         let ascending_id_generator = new_ascending_id_generator();
 
@@ -61,18 +61,19 @@ module aptos_experimental::bulk_order_book_tests {
         bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>
-    ): BulkOrderRequest {
+    ): BulkOrderRequest<TestMetadata> {
         new_bulk_order_request(
             account,
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            new_test_metadata(1)
         )
     }
 
     fun place_taker_order_and_get_matches(
-        order_book: &mut BulkOrderBook,
+        order_book: &mut BulkOrderBook<TestMetadata>,
         price_time_index: &mut price_time_index::PriceTimeIndex,
         taker_price: u64,
         taker_size: u64,
@@ -198,7 +199,7 @@ module aptos_experimental::bulk_order_book_tests {
 
     /// Creates and places a simple order with single price levels
     fun place_simple_order(
-        order_book: &mut BulkOrderBook,
+        order_book: &mut BulkOrderBook<TestMetadata>,
         price_time_index: &mut price_time_index::PriceTimeIndex,
         id_gen: &mut AscendingIdGenerator,
         account: address,
@@ -224,7 +225,7 @@ module aptos_experimental::bulk_order_book_tests {
 
     /// Creates and places a multi-level order
     fun place_multi_level_order(
-        order_book: &mut BulkOrderBook,
+        order_book: &mut BulkOrderBook<TestMetadata>,
         price_time_index: &mut price_time_index::PriceTimeIndex,
         id_gen: &mut AscendingIdGenerator,
         account: address,
@@ -276,7 +277,7 @@ module aptos_experimental::bulk_order_book_tests {
 
     /// Creates a test scenario with multiple accounts placing orders
     fun setup_multi_account_scenario(
-        order_book: &mut BulkOrderBook,
+        order_book: &mut BulkOrderBook<TestMetadata>,
         price_time_index: &mut price_time_index::PriceTimeIndex,
         id_gen: &mut AscendingIdGenerator,
         accounts_and_orders: vector<OrderData>
