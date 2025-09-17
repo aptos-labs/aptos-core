@@ -498,18 +498,13 @@ arbitrary = { version = "1.4.1", features = ["derive"] }
 arc-swap = "1.6.0"
 arr_macro = "0.2.1"
 ark-bls12-381 = "0.5.0"
-ark-bn254 = { git = "https://github.com/arkworks-rs/algebra.git", package = "ark-bn254", rev = "21d59f0b499562b9d9d9c39ba8c6ff5cbdc14df1" }
-# ark-bn254 = "0.5.0"
-ark-ec = { git = "https://github.com/arkworks-rs/algebra.git", package = "ark-ec", rev = "21d59f0b499562b9d9d9c39ba8c6ff5cbdc14df1" }
-# ark-ec = "0.5.0"
-ark-ff = { git = "https://github.com/arkworks-rs/algebra.git", package = "ark-ff", rev = "21d59f0b499562b9d9d9c39ba8c6ff5cbdc14df1" }
-# ark-ff = "0.5.0"
+ark-bn254 = "0.5.0"
+ark-ec = "0.5.0"
+ark-ff = "0.5.0"
 ark-groth16 = "0.5.0"
-ark-poly = { git = "https://github.com/arkworks-rs/algebra.git", package = "ark-poly", rev = "21d59f0b499562b9d9d9c39ba8c6ff5cbdc14df1" }
-# ark-poly = "0.5.0"
+ark-poly = "0.5.0"
 ark-relations = "0.5.0"
-ark-serialize = { git = "https://github.com/arkworks-rs/algebra.git", package = "ark-serialize", rev = "21d59f0b499562b9d9d9c39ba8c6ff5cbdc14df1" }
-# ark-serialize = { version = "0.5.0", features = ["derive"] }
+ark-serialize = { version = "0.5.0", features = ["derive"] }
 ark-std = { version = "0.5.0", features = ["getrandom"] }
 aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.2", features = [
     "postgres_partial",
