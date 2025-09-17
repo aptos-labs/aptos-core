@@ -53,6 +53,8 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, fail_fast: bool) {
         /* compute_coverage */ false,
         &mut out,
     );
+    // a bit ugly having to parse the output, it would be nice if the Err variant would
+    // return some structured data we could inspect
     let output = String::from_utf8_lossy(&out);
     let failed_re = Regex::new(r"failed:\s*(\d+)").unwrap();
     let pass_re = Regex::new(r"passed:\s*(\d+)").unwrap();
