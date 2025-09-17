@@ -10,11 +10,8 @@ use ark_std::rand::thread_rng;
 use criterion::{criterion_group, criterion_main, Criterion};
 
 /// Generic benchmark function over any pairing curve
-fn bench_range_proof<E: Pairing>(c: &mut Criterion)
-where
-    E::ScalarField: ark_ff::PrimeField,
-{
-    let mut group = c.benchmark_group("range_proof");
+fn bench_range_proof<E: Pairing>(c: &mut Criterion, curve_name: &str) {
+    let mut group = c.benchmark_group(format!("range_proof/{}", curve_name));
 
     let ell = std::env::var("L")
         .unwrap_or(std::env::var("ELL").unwrap_or_default())
@@ -61,7 +58,8 @@ where
 
 // Specialize benchmark for a concrete pairing curve
 fn bench_groups(c: &mut Criterion) {
-    bench_range_proof::<ark_bn254::Bn254>(c);
+    bench_range_proof::<ark_bn254::Bn254>(c, "Bn254");
+    bench_range_proof::<ark_bls12_381::Bls12_381>(c, "BLS12-381");
 }
 
 criterion_group!(
