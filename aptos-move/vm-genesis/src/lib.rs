@@ -1402,6 +1402,9 @@ pub fn generate_test_genesis(
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
     let validators = &validators_;
 
+    // Create override of features to ensure runtime checks are fully enabled
+    let initial_features_override = Some(Features::default_for_tests());
+
     let genesis = encode_genesis_change_set(
         &GENESIS_KEYPAIR.1,
         validators,
@@ -1422,7 +1425,7 @@ pub fn generate_test_genesis(
             voting_power_increase_limit: 50,
             employee_vesting_start: 1663456089,
             employee_vesting_period_duration: 5 * 60, // 5 minutes
-            initial_features_override: None,
+            initial_features_override,
             randomness_config_override: None,
             jwk_consensus_config_override: None,
             initial_jwks: vec![],
