@@ -4,6 +4,7 @@
 use crate::{
     metrics::{NUM_TXNS, TIMER},
     pipeline::ExecuteBlockMessage,
+    transaction_generator::create_block_metadata_transaction,
 };
 use aptos_block_partitioner::{BlockPartitioner, PartitionerConfig};
 use aptos_crypto::HashValue;
@@ -69,14 +70,27 @@ impl BlockPreparationStage {
             txns.len()
         );
         let block_id = HashValue::random();
+        
+        // Add BlockMetadata transaction at the beginning of the block
+        let block_metadata_txn = create_block_metadata_transaction();
+        info!(
+            "Added BlockMetadata transaction to block {}, total transactions: {} + 1 = {}",
+            self.num_blocks_processed,
+            txns.len(),
+            txns.len() + 1
+        );
+        let mut all_txns = Vec::with_capacity(txns.len() + 1);
+        all_txns.push(block_metadata_txn);
+        all_txns.extend(txns);
+        
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             self.sig_verify_pool.install(|| {
                 let _timer = TIMER.timer_with(&["sig_verify"]);
 
-                let num_txns = txns.len();
+                let num_txns = all_txns.len();
                 NUM_TXNS.inc_with_by(&["sig_verify"], num_txns as u64);
 
-                txns.into_par_iter()
+                all_txns.into_par_iter()
                     .with_min_len(optimal_min_len(num_txns, SIG_VERIFY_RAYON_MIN_THRESHOLD))
                     .map(|t| t.into())
                     .collect::<Vec<_>>()
