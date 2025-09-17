@@ -59,16 +59,16 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, fail_fast: bool) {
     let failed_re = Regex::new(r"failed:\s*(\d+)").unwrap();
     let pass_re = Regex::new(r"passed:\s*(\d+)").unwrap();
 
-    let passed = if let Some(caps) = pass_re.captures(&output) {
-        caps[1].parse().unwrap()
-    } else {
-        0
-    };
-    let failed = if let Some(caps) = failed_re.captures(&output) {
-        caps[1].parse().unwrap()
-    } else {
-        0
-    };
+    let passed: usize = pass_re
+        .captures(&output)
+        .and_then(|caps| caps[1].parse().ok())
+        .unwrap_or(0);
+
+    let failed: usize = failed_re
+        .captures(&output)
+        .and_then(|caps| caps[1].parse().ok())
+        .unwrap_or(0);
+
     if fail_fast {
         assert_eq!(
             failed, 1,
