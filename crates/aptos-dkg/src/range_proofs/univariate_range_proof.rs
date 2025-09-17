@@ -610,7 +610,7 @@ fn fiat_shamir_challenges<E: Pairing>(
     num_scalars: usize,
     fs_transcript: &mut merlin::Transcript,
 ) -> (Vec<E::ScalarField>, Vec<E::ScalarField>) {
-    <merlin::Transcript as fiat_shamir::RangeProof<E>>::append_sep(fs_transcript);
+    <merlin::Transcript as fiat_shamir::RangeProof<E>>::append_sep(fs_transcript, DST);
 
     <merlin::Transcript as fiat_shamir::RangeProof<E>>::append_vk(fs_transcript, vk);
 

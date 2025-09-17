@@ -86,7 +86,7 @@ pub trait PVSS<T: Transcript>: ScalarProtocol {
 }
 
 pub trait RangeProof<E: Pairing> {
-    fn append_sep(&mut self);
+    fn append_sep(&mut self, dst: &[u8]);
 
     fn append_vk(&mut self, vk: &(&E::G1, &E::G2, &E::G2, &E::G2));
 
@@ -171,8 +171,8 @@ use ark_serialize::CanonicalSerialize;
 
 #[allow(non_snake_case)]
 impl<E: Pairing> RangeProof<E> for merlin::Transcript {
-    fn append_sep(&mut self) {
-        self.append_message(b"dom-sep", univariate_range_proof::DST);
+    fn append_sep(&mut self, dst: &[u8]) {
+        self.append_message(b"dom-sep", dst);
     }
 
     fn append_vk(&mut self, vk: &(&E::G1, &E::G2, &E::G2, &E::G2)) {
