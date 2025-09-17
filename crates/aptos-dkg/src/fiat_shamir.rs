@@ -14,14 +14,11 @@ use crate::{
     SCALAR_NUM_BYTES,
 };
 use aptos_crypto::ValidCryptoMaterial;
+use ark_ec::pairing::Pairing;
+use ark_ff::Field;
 use serde::Serialize;
 
 pub const PVSS_DOM_SEP: &[u8; 21] = b"APTOS_SCRAPE_PVSS_DST"; // TODO: Name needs work, but check backwards-compatibility
-
-use ark_bn254::{
-    g1::Config as G1Config, Bn254 as PairingSetting, Config, Fq, Fr, G1Affine, G1Projective,
-    G2Affine, G2Projective,
-}; // TODO: Move this elsewhere
 
 /// Helper trait for deriving random scalars from a transcript.
 ///
@@ -88,19 +85,19 @@ pub trait PVSS<T: Transcript>: ScalarProtocol {
     fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<blstrs::Scalar>;
 }
 
-pub trait RangeProof {
+pub trait RangeProof<E: Pairing> {
     fn append_sep(&mut self);
 
-    fn append_vk(&mut self, vk: &(&G1Projective, &G2Projective, &G2Projective, &G2Projective));
+    fn append_vk(&mut self, vk: &(&E::G1, &E::G2, &E::G2, &E::G2));
 
     fn append_public_statement(
         &mut self,
-        public_statement: &(usize, &univariate_range_proof::Commitment),
+        public_statement: &(usize, &univariate_range_proof::Commitment<E>),
     );
 
-    fn append_bit_commitments(&mut self, bit_commitments: &(&[G1Projective], &[G2Projective]));
+    fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1], &[E::G2]));
 
-    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<Fr>;
+    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<E::ScalarField>;
 }
 
 #[allow(non_snake_case)]
@@ -173,12 +170,12 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
 use ark_serialize::CanonicalSerialize;
 
 #[allow(non_snake_case)]
-impl RangeProof for merlin::Transcript {
+impl<E: Pairing> RangeProof<E> for merlin::Transcript {
     fn append_sep(&mut self) {
         self.append_message(b"dom-sep", univariate_range_proof::DST);
     }
 
-    fn append_vk(&mut self, vk: &(&G1Projective, &G2Projective, &G2Projective, &G2Projective)) {
+    fn append_vk(&mut self, vk: &(&E::G1, &E::G2, &E::G2, &E::G2)) {
         // let vk_bytes = bcs::to_bytes(vk).expect("vk serialization should succeed");
         let mut vk_bytes = Vec::new();
         vk.0.serialize_compressed(&mut vk_bytes) // TODO: change this
@@ -194,7 +191,7 @@ impl RangeProof for merlin::Transcript {
 
     fn append_public_statement(
         &mut self,
-        public_statement: &(usize, &univariate_range_proof::Commitment),
+        public_statement: &(usize, &univariate_range_proof::Commitment<E>),
     ) {
         let mut public_statement_bytes = Vec::new();
         (*public_statement)
@@ -209,7 +206,7 @@ impl RangeProof for merlin::Transcript {
         self.append_message(b"public-statements", public_statement_bytes.as_slice());
     }
 
-    fn append_bit_commitments(&mut self, bit_commitments: &(&[G1Projective], &[G2Projective])) {
+    fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1], &[E::G2])) {
         let mut bit_commitments_bytes = Vec::new();
         bit_commitments
             .serialize_compressed(&mut bit_commitments_bytes)
@@ -219,7 +216,7 @@ impl RangeProof for merlin::Transcript {
         self.append_message(b"bit-commitments", bit_commitments_bytes.as_slice());
     }
 
-    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<Fr> {
+    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<E::ScalarField> {
         let mut buf = vec![0u8; num_scalars * 16];
         self.challenge_bytes(b"challenge_linear_combination", &mut buf);
 
@@ -229,7 +226,7 @@ impl RangeProof for merlin::Transcript {
             match chunk.try_into() {
                 Ok(chunk) => {
                     v.push(
-                        Fr::from_random_bytes(chunk)
+                        E::ScalarField::from_random_bytes(chunk)
                             .expect("Error sampling field elements from bytes"),
                     );
                 },
@@ -242,8 +239,6 @@ impl RangeProof for merlin::Transcript {
         v
     }
 }
-
-use ark_ff::{BigInt, Field, PrimeField};
 
 /// Securely derives a Fiat-Shamir challenge via Merlin.
 /// Returns (n+1-t) random scalars for the SCRAPE LDT test (i.e., the random polynomial itself).

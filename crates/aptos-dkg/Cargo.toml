@@ -10,6 +10,7 @@ aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-runtimes = { workspace = true }
 ark-bn254 = { workspace = true }
+ark-bls12-381 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
 ark-poly = { workspace = true }

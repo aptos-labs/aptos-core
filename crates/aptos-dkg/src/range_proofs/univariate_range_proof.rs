@@ -3,20 +3,7 @@
 
 use crate::{fiat_shamir, utils::pad_to_pow2_len_minus_one};
 use anyhow::ensure;
-use ark_bn254::{
-    // TODO: move this elsewhere
-    g1::Config as G1Config,
-    Bn254 as PairingSetting,
-    Config,
-    Fq,
-    Fq12,
-    Fr,
-    G1Affine,
-    G1Projective,
-    G2Affine,
-    G2Projective,
-};
-use ark_ec::{CurveGroup, PrimeGroup, VariableBaseMSM};
+use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
 use ark_ff::{Field, PrimeField};
 use ark_poly::{self, EvaluationDomain, GeneralEvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -35,18 +22,18 @@ use std::{
 
 pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V1_RANGE_PROOF_DST";
 
-pub struct PowersOfTau {
-    t1: Vec<G1Projective>, // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}, where `n` is the batch size
-    t2: Vec<G2Projective>,
+pub struct PowersOfTau<E: Pairing> {
+    t1: Vec<E::G1>, // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}, where `n` is the batch size
+    t2: Vec<E::G2>,
 }
 
-pub fn powers_of_tau<R>(rng: &mut R, n: usize) -> PowersOfTau
+pub fn powers_of_tau<E: Pairing, R>(rng: &mut R, n: usize) -> PowersOfTau<E>
 where
     R: RngCore + CryptoRng,
 {
-    let g1 = G1Projective::rand(rng);
-    let g2 = G2Projective::rand(rng);
-    let tau = Fr::rand(rng);
+    let g1 = E::G1::rand(rng);
+    let g2 = E::G2::rand(rng);
+    let tau = E::ScalarField::rand(rng);
     let mut t1 = vec![g1];
     let mut t2 = vec![g2];
     for i in 0..n {
@@ -56,35 +43,35 @@ where
     PowersOfTau { t1, t2 }
 }
 
-pub struct PublicParameters {
-    taus: PowersOfTau,               // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}
-    ell: usize,                      // the range is [0, 2^\ell)
-    n: usize,                        // the number of values we are batch proving; i.e., batch size
-    lagr_g1: Vec<G1Affine>,          // of size n + 1
-    lagr_g2: Vec<G2Affine>,          // of size n + 1
-    pub vanishing_com: G2Projective, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - \omega^n) used to test h(X)
-    eval_dom: GeneralEvaluationDomain<Fr>,
-    roots_of_unity_in_eval_dom: Vec<Fr>,
+pub struct PublicParameters<E: Pairing> {
+    taus: PowersOfTau<E>,      // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}
+    ell: usize,                // the range is [0, 2^\ell)
+    n: usize,                  // the number of values we are batch proving; i.e., batch size
+    lagr_g1: Vec<E::G1Affine>, // of size n + 1
+    lagr_g2: Vec<E::G2Affine>, // of size n + 1
+    pub vanishing_com: E::G2, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - \omega^n) used to test h(X)
+    eval_dom: GeneralEvaluationDomain<E::ScalarField>,
+    roots_of_unity_in_eval_dom: Vec<E::ScalarField>,
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-pub struct Commitment(G1Projective);
+pub struct Commitment<E: Pairing>(E::G1);
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-pub struct Proof {
-    d: G1Projective,          // commitment to h(X) = \sum_{j=0}^{\ell-1} beta_j h_j(X)
-    c: Vec<G1Projective>,     // of size \ell
-    c_hat: Vec<G2Projective>, // of size \ell
+pub struct Proof<E: Pairing> {
+    d: E::G1,          // commitment to h(X) = \sum_{j=0}^{\ell-1} beta_j h_j(X)
+    c: Vec<E::G1>,     // of size \ell
+    c_hat: Vec<E::G2>, // of size \ell
 }
 
-impl Proof {
+impl<E: Pairing> Proof<E> {
     pub fn maul(&mut self) {
-        self.c[0] += G1Projective::generator();
+        self.c[0] += E::G1::generator();
     }
 }
 
 /// Sets up the Borgeaud range proof for proving that size-`n` batches are in the range [0, 2^\ell).
-pub fn setup(ell: usize, n: usize) -> PublicParameters {
+pub fn setup<E: Pairing>(ell: usize, n: usize) -> PublicParameters<E> {
     let mut rng = thread_rng();
 
     let n = (n + 1).next_power_of_two() - 1;
@@ -94,12 +81,12 @@ pub fn setup(ell: usize, n: usize) -> PublicParameters {
     let taus = powers_of_tau(&mut rng, n); // The taus have length `n+1`
 
     // let batch_dom_n1 = ark_poly::EvaluationDomain::new(num_omegas);
-    let eval_dom = GeneralEvaluationDomain::<Fr>::new(num_omegas).unwrap();
+    let eval_dom = GeneralEvaluationDomain::<E::ScalarField>::new(num_omegas).unwrap();
     //let batch_dom_2n2 = ark_poly::EvaluationDomain::new(num_omegas * 2);
     // let batch_dom_n1 = BatchEvaluationDomain::new(num_omegas);
     //    let batch_dom_2n2 = BatchEvaluationDomain::new(num_omegas * 2);
     //    let dom_n1 = batch_dom_2n2.get_subdomain(num_omegas);
-    let all_roots_of_unity: Vec<Fr> = eval_dom.elements().collect();
+    let all_roots_of_unity: Vec<E::ScalarField> = eval_dom.elements().collect();
     // let omega_n: Vec<Fr> = (0..num_omegas)
     //     .map(|i| batch_dom_2n2.get_all_roots_of_unity()[i * 2])
     //     .collect();
@@ -108,8 +95,8 @@ pub fn setup(ell: usize, n: usize) -> PublicParameters {
     let lagr_g1_proj = eval_dom.ifft(&taus.t1);
     let lagr_g2_proj = eval_dom.ifft(&taus.t2);
 
-    let lagr_g1 = G1Projective::normalize_batch(&lagr_g1_proj);
-    let lagr_g2 = G2Projective::normalize_batch(&lagr_g2_proj);
+    let lagr_g1 = E::G1::normalize_batch(&lagr_g1_proj);
+    let lagr_g2 = E::G2::normalize_batch(&lagr_g2_proj);
 
     // let mut lagr_g1 = taus.t1[0..num_omegas].to_vec();
     // ifft_assign_g1(&mut lagr_g1, &dom_n1);
@@ -125,7 +112,7 @@ pub fn setup(ell: usize, n: usize) -> PublicParameters {
 
     // Therefore, below we commit to $V(X)$ by simply scaling it down by $\prod_{i\in[n)} (\omega^n - \omega^i)$!
     let vanishing_com = {
-        let last_eval: Fr = (0..n)
+        let last_eval: E::ScalarField = (0..n)
             .map(|i| all_roots_of_unity[n] - all_roots_of_unity[i])
             .product();
 
@@ -156,16 +143,24 @@ pub fn setup(ell: usize, n: usize) -> PublicParameters {
     }
 }
 
-pub fn commit<R>(pp: &PublicParameters, z: &[Fr], rng: &mut R) -> (Commitment, Fr)
+pub fn commit<E: Pairing, R>(
+    pp: &PublicParameters<E>,
+    z: &[E::ScalarField],
+    rng: &mut R,
+) -> (Commitment<E>, E::ScalarField)
 where
     R: RngCore + CryptoRng,
 {
-    let r = Fr::rand(rng);
+    let r = E::ScalarField::rand(rng);
     let c = commit_with_randomness(pp, z, &r);
     (c, r)
 }
 
-pub(crate) fn commit_with_randomness(pp: &PublicParameters, z: &[Fr], r: &Fr) -> Commitment {
+pub(crate) fn commit_with_randomness<E: Pairing>(
+    pp: &PublicParameters<E>,
+    z: &[E::ScalarField],
+    r: &E::ScalarField,
+) -> Commitment<E> {
     let mut scalars = z.to_vec();
     let mut bases = pp.lagr_g1[..scalars.len()].to_vec(); // TODO: atm the range proof algorithm couples `r` with `lagr_g1.last()` causing a copy here; this can be avoided by coupling `r` with `lagr_g1.first()` instead
 
@@ -173,13 +168,42 @@ pub(crate) fn commit_with_randomness(pp: &PublicParameters, z: &[Fr], r: &Fr) ->
     let last_base = pp.lagr_g1.last().expect("pp.lagr_g1 must not be empty");
     bases.push(*last_base);
 
-    let c = G1Projective::msm(&bases, &scalars)
-        .expect("could not compute msm in range proof commitment");
+    let c = E::G1::msm(&bases, &scalars).expect("could not compute msm in range proof commitment");
     Commitment(c)
 }
 
-fn fr_to_bits_le(x: &Fr) -> Vec<bool> {
-    let bigint: <Fr as ark_ff::PrimeField>::BigInt = x.into_bigint();
+use num_traits::Zero;
+
+fn msm_u1<E: Pairing>(bases: &[E::G1Affine], scalars: &[bool]) -> E::G1 {
+    assert_eq!(bases.len(), scalars.len());
+
+    // Accumulator in projective form
+    let mut acc = E::G1::zero();
+    for (base, &bit) in bases.iter().zip(scalars.iter()) {
+        if bit {
+            acc += E::G1::from(*base);
+        }
+    }
+
+    acc
+}
+
+fn msm_u2<E: Pairing>(bases: &[E::G2Affine], scalars: &[bool]) -> E::G2 {
+    assert_eq!(bases.len(), scalars.len());
+
+    // Accumulator in projective form
+    let mut acc = E::G2::zero();
+    for (base, &bit) in bases.iter().zip(scalars.iter()) {
+        if bit {
+            acc += E::G2::from(*base);
+        }
+    }
+
+    acc
+}
+
+fn fr_to_bits_le<E: Pairing>(x: &E::ScalarField) -> Vec<bool> {
+    let bigint: <E::ScalarField as ark_ff::PrimeField>::BigInt = x.into_bigint();
     ark_ff::BitIteratorLE::new(&bigint).collect()
 }
 
@@ -195,18 +219,18 @@ fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
 use ark_ff::AdditiveGroup;
 
 #[allow(non_snake_case)]
-pub fn batch_prove<R>(
+pub fn batch_prove<E: Pairing, R>(
     rng: &mut R,
-    pp: &PublicParameters,
-    zz: &[Fr],
-    cc: &Commitment,
-    rr: &Fr,
+    pp: &PublicParameters<E>,
+    zz: &[E::ScalarField],
+    cc: &Commitment<E>,
+    rr: &E::ScalarField,
     fs_transcript: &mut merlin::Transcript,
-) -> Proof
+) -> Proof<E>
 where
     R: RngCore + CryptoRng,
 {
-    let zz = pad_to_pow2_len_minus_one(zz.to_vec());
+    let zz = pad_to_pow2_len_minus_one::<E>(zz.to_vec());
 
     assert_eq!(zz.len(), pp.n);
     assert_eq!(pp.taus.t1.len(), pp.n + 1); // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}
@@ -229,7 +253,7 @@ where
     let bits: Vec<Vec<bool>> = zz
         .iter()
         .map(|z_val| {
-            fr_to_bits_le(z_val)
+            fr_to_bits_le::<E>(z_val)
                 .into_iter()
                 .take(pp.ell)
                 .collect::<Vec<_>>()
@@ -276,21 +300,17 @@ where
     // f_evals[j] = the evaluations of f_j(x) at all the (n+1)-th roots of unity.
     //            = (z_0[j], ..., z_{n-1}[j], r[j]), where z_i[j] is the j-th bit of z_i.
     let f_evals_without_r = (0..pp.ell)
-        .map(|j| {
-            (0..pp.n)
-                .map(|i| bits[i][j])
-                .collect::<Vec<bool>>()
-        })
+        .map(|j| (0..pp.n).map(|i| bits[i][j]).collect::<Vec<bool>>())
         .collect::<Vec<Vec<bool>>>();
 
     let f_evals = (0..pp.ell)
         .map(|j| {
             (0..pp.n)
-                .map(|i| Fr::from(bits[i][j]))
+                .map(|i| E::ScalarField::from(bits[i][j]))
                 .chain(once(r[j]))
-                .collect::<Vec<Fr>>()
+                .collect::<Vec<E::ScalarField>>()
         })
-        .collect::<Vec<Vec<Fr>>>();
+        .collect::<Vec<Vec<E::ScalarField>>>();
     // Assert f_evals is either 0 or 1s or r_j
     // for (j, evals) in f_evals.iter().enumerate() {
     //     for (i, e) in evals.iter().take(pp.n).enumerate() {
@@ -312,7 +332,7 @@ where
     let start = Instant::now();
     // c[j] = c_j = g_1^{f_j(\tau)}
     // let bits_flattened: Vec<bool> = bits.into_iter().flatten().collect();
-    let c: Vec<G1Projective> = (0..pp.ell)
+    let c: Vec<E::G1> = (0..pp.ell)
         // Note on blstrs: Using a multiexp will be 10-20% slower than manually multiplying.
         // .map(|j|
         //     g1_multi_exp(&pp.lagrange_basis, &f_evals[j]))
@@ -328,21 +348,22 @@ where
             //  For example, if we want to handle n = 2048, we can set c = 16, which gives
             //  `k = \ell / c = 2048 / 16 = 128` tables, each of size 2^c => 2^{16} * 48 bytes =
             //  3 MiB / table => 384 MiB total.
-            // let mut c: G1Projective = pp
+            // let mut c: E::G1 = pp
             //     .lagr_g1
             //     .iter()
             //     .take(pp.n)
             //     .zip(f_evals[j].iter().take(pp.n))
             //     .map(|(lagr, eval)| {
-            //         // Using G1Projective::mul here will be way slower! (Not sure why...)
+            //         // Using E::G1::mul here will be way slower! (Not sure why...)
             //         if eval.is_zero_vartime() {
-            //             G1ProjectiveOLD::identity()
+            //             E::G1OLD::identity()
             //         } else {
             //             *lagr
             //         }
             //     })
             //     .sum();
-            let mut c_j = G1Projective::msm_u1(&pp.lagr_g1[..pp.n], &f_evals_without_r[j]);
+            let mut c_j: <E as Pairing>::G1 =
+                msm_u1::<E>(&pp.lagr_g1[..pp.n], &f_evals_without_r[j]);
             c_j.add_assign(pp.lagr_g1[pp.n].mul(&r[j]));
             c_j
         })
@@ -363,25 +384,26 @@ where
     // Step 5: Compute c_hat[j] = \hat{c}_j = g_2^{f_j(\tau)}
     #[cfg(feature = "range_proof_timing")]
     let start = Instant::now();
-    let c_hat: Vec<G2Projective> = (0..pp.ell)
+    let c_hat: Vec<E::G2> = (0..pp.ell)
         // Note: Using a multiexp will be 10-20% slower than manually multiplying.
         // .map(|j| g2_multi_exp(&pp.lagrange_basis_g2, &f_evals[j]))
         .map(|j| {
-            // let mut c_hat_j: G2ProjectiveOLD = pp
+            // let mut c_hat_j: E::G2OLD = pp
             //     .lagr_g2
             //     .iter()
             //     .take(pp.n)
             //     .zip(f_evals[j].iter().take(pp.n))
             //     .map(|(lagr, eval)| {
-            //         // Using G1Projective::mul here will be way slower! (Not sure why...)
+            //         // Using E::G1::mul here will be way slower! (Not sure why...)
             //         if eval.is_zero_vartime() {
-            //             G2ProjectiveOLD::identity()
+            //             E::G2OLD::identity()
             //         } else {
             //             *lagr
             //         }
             //     })
             //     .sum();
-            let mut c_hat_j = G2Projective::msm_u1(&pp.lagr_g2[..pp.n], &f_evals_without_r[j]);
+            let mut c_hat_j: <E as Pairing>::G2 =
+                msm_u2::<E>(&pp.lagr_g2[..pp.n], &f_evals_without_r[j]);
             c_hat_j.add_assign(pp.lagr_g2[pp.n].mul(&r[j]));
             c_hat_j
         })
@@ -414,13 +436,13 @@ where
     #[cfg(feature = "range_proof_timing")]
     let start = Instant::now();
     let omega_n = pp.eval_dom.element(pp.n); // let omega_n = pp.all_roots_of_unity(pp.n)
-    let n1_inv = Fr::from(pp.n as u64 + 1).inverse().unwrap();
+    let n1_inv = E::ScalarField::from(pp.n as u64 + 1).inverse().unwrap();
     let mut omega_i_minus_n = Vec::with_capacity(pp.n);
     for i in 0..pp.n {
         let omega_i = pp.roots_of_unity_in_eval_dom[i];
         omega_i_minus_n.push(omega_i - omega_n);
     }
-    let h: Vec<Vec<Fr>> = (0..pp.ell)
+    let h: Vec<Vec<E::ScalarField>> = (0..pp.ell)
         .map(|j| {
             // Interpolate f_j coeffs
             let mut f_j = f_evals[j].clone();
@@ -441,7 +463,9 @@ where
             let mut diff_n_j_evals = Vec::with_capacity(num_omegas);
             for i in 0..pp.n {
                 diff_n_j_evals.push(
-                    (omega_i_minus_n[i]) * diff_f_j_evals[i] * (f_evals[j][i].double() - Fr::ONE),
+                    (omega_i_minus_n[i])
+                        * diff_f_j_evals[i]
+                        * (f_evals[j][i].double() - E::ScalarField::ONE),
                 );
             }
 
@@ -510,7 +534,7 @@ where
     // Step 8: Compute h(X) = \sum_{j=0}^{ell-1} beta_j h_j(X)
     #[cfg(feature = "range_proof_timing")]
     let start = Instant::now();
-    let mut hh: Vec<Fr> = vec![Fr::ZERO; pp.n + 1];
+    let mut hh: Vec<E::ScalarField> = vec![E::ScalarField::ZERO; pp.n + 1];
     for (h_j, &beta_j) in h.iter().zip(&betas) {
         for (hh_coeff, &h_coeff) in hh.iter_mut().zip(h_j) {
             *hh_coeff += h_coeff * beta_j;
@@ -554,20 +578,22 @@ where
 /// Verifies a batch proof against the given public parameters and commitment.
 ///
 /// Returns `Ok(())` if the proof is valid, or an error otherwise.
-pub fn batch_verify(
-    pp: &PublicParameters,
-    c: &Commitment,
-    proof: &Proof,
+pub fn batch_verify<E: Pairing>(
+    pp: &PublicParameters<E>,
+    c: &Commitment<E>,
+    proof: &Proof<E>,
     fs_transcript: &mut merlin::Transcript,
 ) -> anyhow::Result<()> {
     // TODO(Perf): Can have these precomputed in pp
-    let powers_of_two: Vec<Fr> = std::iter::successors(Some(Fr::ONE), |x| Some(x.double()))
-        .take(pp.ell)
-        .collect();
+    let powers_of_two: Vec<E::ScalarField> =
+        std::iter::successors(Some(E::ScalarField::ONE), |x| Some(x.double()))
+            .take(pp.ell)
+            .collect();
 
-    let commitment_decomp_affine: Vec<G1Affine> = proof.c.iter().map(|p| p.into_affine()).collect();
+    let commitment_decomp_affine: Vec<E::G1Affine> =
+        proof.c.iter().map(|p| p.into_affine()).collect();
 
-    let commitment_recomputed: G1Projective =
+    let commitment_recomputed: E::G1 =
         VariableBaseMSM::msm(&commitment_decomp_affine, &powers_of_two)
             .expect("Failed to compute msm");
     ensure!(c.0 == commitment_recomputed);
@@ -589,15 +615,15 @@ pub fn batch_verify(
     );
 
     // Verify h(\tau)
-    let h_check = PairingSetting::multi_pairing(
+    let h_check = E::multi_pairing(
         (0..pp.ell)
-            .map(|j| proof.c[j] * betas[j]) // G1Projective
+            .map(|j| proof.c[j] * betas[j]) // E::G1
             .chain(once(-proof.d)) // add -d
-            .collect::<Vec<_>>(), // collect into Vec<G1Projective>
+            .collect::<Vec<_>>(), // collect into Vec<E::G1>
         (0..pp.ell)
-            .map(|j| proof.c_hat[j] - pp.taus.t2[0]) // G2Projective
+            .map(|j| proof.c_hat[j] - pp.taus.t2[0]) // E::G2
             .chain(once(pp.vanishing_com)) // add vanishing commitment
-            .collect::<Vec<_>>(), // collect into Vec<G2Projective>
+            .collect::<Vec<_>>(), // collect into Vec<E::G2>
     );
     // let h_check = multi_pairing_g1_g2(
     //     (0..pp.ell)
@@ -611,7 +637,7 @@ pub fn batch_verify(
     //         .collect::<Vec<_>>()
     //         .iter(),
     // );
-    ensure!(Fq12::ONE == h_check.0);
+    ensure!(E::TargetField::ONE == h_check.0);
 
     // Ensure duality: c[j] matches c_hat[j].
 
@@ -621,7 +647,7 @@ pub fn batch_verify(
             .c
             .iter()
             .map(|p| p.into_affine())
-            .collect::<Vec<G1Affine>>(),
+            .collect::<Vec<E::G1Affine>>(),
         &alphas, // <-- keep them as Fr
     )
     .unwrap();
@@ -632,11 +658,11 @@ pub fn batch_verify(
             .c_hat
             .iter()
             .map(|p| p.into_affine())
-            .collect::<Vec<G2Affine>>(),
+            .collect::<Vec<E::G2Affine>>(),
         &alphas, // <-- also Fr
     )
     .unwrap();
-    let c_check = <Bn254 as Pairing>::multi_pairing(
+    let c_check = E::multi_pairing(
         vec![
             g1_comb,        // from MSM in G1
             -pp.taus.t1[0], // subtract tau_1
@@ -650,49 +676,42 @@ pub fn batch_verify(
     //     vec![g1_multi_exp(&proof.c, &alphas), -pp.taus.t1[0]].iter(),
     //     vec![pp.taus.t2[0], g2_multi_exp(&proof.c_hat, &alphas)].iter(),
     // );
-    ensure!(Fq12::ONE == c_check.0);
+    ensure!(E::TargetField::ONE == c_check.0);
 
     Ok(())
 }
 
-use ark_bn254::Bn254;
-use ark_ec::pairing::Pairing;
-
-fn byte_to_bits_le(val: u8) -> Vec<bool> {
-    (0..8).map(|i| (val >> i) & 1 == 1).collect()
-}
-
 /// Compute alpha, beta.
-fn fiat_shamir_challenges(
-    vk: &(&G1Projective, &G2Projective, &G2Projective, &G2Projective),
-    public_statement: &(usize, &Commitment),
-    bit_commitments: &(&[G1Projective], &[G2Projective]),
+fn fiat_shamir_challenges<E: Pairing>(
+    vk: &(&E::G1, &E::G2, &E::G2, &E::G2),
+    public_statement: &(usize, &Commitment<E>),
+    bit_commitments: &(&[E::G1], &[E::G2]),
     num_scalars: usize,
     fs_transcript: &mut merlin::Transcript,
-) -> (Vec<Fr>, Vec<Fr>) {
-    <merlin::Transcript as fiat_shamir::RangeProof>::append_sep(fs_transcript);
+) -> (Vec<E::ScalarField>, Vec<E::ScalarField>) {
+    <merlin::Transcript as fiat_shamir::RangeProof<E>>::append_sep(fs_transcript);
 
-    <merlin::Transcript as fiat_shamir::RangeProof>::append_vk(fs_transcript, vk);
+    <merlin::Transcript as fiat_shamir::RangeProof<E>>::append_vk(fs_transcript, vk);
 
-    <merlin::Transcript as fiat_shamir::RangeProof>::append_public_statement(
+    <merlin::Transcript as fiat_shamir::RangeProof<E>>::append_public_statement(
         fs_transcript,
         public_statement,
     );
 
-    <merlin::Transcript as fiat_shamir::RangeProof>::append_bit_commitments(
+    <merlin::Transcript as fiat_shamir::RangeProof<E>>::append_bit_commitments(
         fs_transcript,
         bit_commitments,
     );
 
     // Generate the Fiat–Shamir challenges from the updated transcript
     let beta_vals =
-        <merlin::Transcript as fiat_shamir::RangeProof>::challenge_linear_combination_128bit(
+        <merlin::Transcript as fiat_shamir::RangeProof<E>>::challenge_linear_combination_128bit(
             fs_transcript,
             num_scalars,
         );
 
     let alpha_vals =
-        <merlin::Transcript as fiat_shamir::RangeProof>::challenge_linear_combination_128bit(
+        <merlin::Transcript as fiat_shamir::RangeProof<E>>::challenge_linear_combination_128bit(
             fs_transcript,
             num_scalars,
         );
@@ -731,16 +750,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        algebra::polynomials::{poly_div_xnc, poly_eval},
-        range_proofs::univariate_range_proof::{byte_to_bits_le, correlated_randomness},
-        utils::random::{random_scalar, random_scalars},
-    };
+    use crate::range_proofs::univariate_range_proof::correlated_randomness;
     use ark_bn254::Fr;
     use ark_ff::Field;
     // use ff::Field;
     use ark_std::rand::thread_rng;
-    use blstrs::Scalar as ScalarOLD;
 
     // #[test]. // TODO: fix this stuff again
     // fn test_poly_div_xnc() {
@@ -756,19 +770,6 @@ mod tests {
     //         (x.pow(&[n as u64]) + c) * poly_eval(&quotient, &x) + poly_eval(&remainder, &x);
     //     assert_eq!(expected, actual);
     // }
-
-    #[test]
-    fn test_byte_to_bits_le() {
-        assert_eq!(vec![true; 8], byte_to_bits_le(255));
-        assert_eq!(
-            vec![true, true, true, true, true, true, true, false],
-            byte_to_bits_le(127)
-        );
-        assert_eq!(
-            vec![false, true, true, true, true, true, true, true],
-            byte_to_bits_le(254)
-        );
-    }
 
     #[test]
     fn test_correlated_randomness() {

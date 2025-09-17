@@ -4,8 +4,7 @@
 use crate::utils::{
     parallel_multi_pairing::parallel_multi_pairing_slice, random::random_scalar_from_uniform_bytes,
 };
-use ark_bn254::Fr; // TODO: Move this elsewhere
-use ark_ec::AdditiveGroup;
+use ark_ec::{pairing::Pairing, AdditiveGroup};
 use blstrs::{
     pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt,
     Scalar as ScalarOld,
@@ -20,6 +19,7 @@ pub(crate) mod biguint;
 pub mod parallel_multi_pairing;
 pub mod random;
 pub mod serialization;
+pub mod test_utils;
 
 #[inline]
 pub fn is_power_of_two(n: usize) -> bool {
@@ -190,8 +190,10 @@ impl HasMultiExp for G1Projective {
 ///   so the vector is padded to length 3 (no change).
 /// - If `scalars.len() == 5`, then `len + 1 = 6`, next power of two is 8,
 ///   so the vector is padded to length 7.
-pub(crate) fn pad_to_pow2_len_minus_one(mut scalars: Vec<Fr>) -> Vec<Fr> {
+pub(crate) fn pad_to_pow2_len_minus_one<E: Pairing>(
+    mut scalars: Vec<E::ScalarField>,
+) -> Vec<E::ScalarField> {
     let target_len = (scalars.len() + 1).next_power_of_two() - 1;
-    scalars.resize(target_len, Fr::ZERO);
+    scalars.resize(target_len, E::ScalarField::ZERO);
     scalars
 }

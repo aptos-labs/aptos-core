@@ -1,40 +1,22 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_dkg::range_proofs::univariate_range_proof::{
-    batch_prove, batch_verify, commit, setup, Commitment, Proof, PublicParameters, DST,
+use aptos_dkg::{
+    range_proofs::univariate_range_proof::{batch_prove, batch_verify, Proof, DST},
+    utils::test_utils,
 };
-use ark_bn254::Fr; // TODO: Move this elsewhere
+use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::rand::{thread_rng, CryptoRng, RngCore};
+use ark_std::rand::thread_rng;
 
 #[cfg(test)]
-fn random_instance<R: RngCore + CryptoRng>(
-    n: usize,
-    ell: usize,
-    rng: &mut R,
-) -> (PublicParameters, Vec<Fr>, Commitment, Fr) {
-    let pp = setup(ell, n);
-
-    let zz: Vec<Fr> = (0..n)
-        .map(|_| {
-            let val = rng.next_u64() >> (64 - ell); // Keep lowest ell bits
-            Fr::from(val)
-        })
-        .collect();
-
-    let (cc, r) = commit(&pp, &zz, rng);
-    (pp, zz, cc, r)
-}
-
-#[cfg(test)]
-fn run_range_proof_completeness(n: usize, ell: usize) {
+fn run_range_proof_completeness<E: Pairing>(n: usize, ell: usize) {
     let mut rng = thread_rng();
-    let (pp, zz, cc, r) = random_instance(n, ell, &mut rng);
+    let (pp, zz, cc, r) = test_utils::range_proof_random_instance(n, ell, &mut rng);
     println!("setup finished for n={}, ell={}, prove starting", n, ell);
 
     let mut fs_t = merlin::Transcript::new(DST);
-    let proof = batch_prove(&mut rng, &pp, &zz, &cc, &r, &mut fs_t);
+    let proof = batch_prove::<E, _>(&mut rng, &pp, &zz, &cc, &r, &mut fs_t);
     println!("prove finished, vrfy1 starting (n={}, ell={})", n, ell);
 
     let mut fs_t = merlin::Transcript::new(DST);
@@ -48,14 +30,14 @@ fn run_range_proof_completeness(n: usize, ell: usize) {
 }
 
 #[cfg(test)]
-fn run_serialize_range_proof(n: usize, ell: usize) {
+fn run_serialize_range_proof<E: Pairing>(n: usize, ell: usize) {
     let mut rng = thread_rng();
-    let (pp, zz, cc, r) = random_instance(n, ell, &mut rng);
+    let (pp, zz, cc, r) = test_utils::range_proof_random_instance(n, ell, &mut rng);
 
     println!("setup finished for n={}, ell={}, prove starting", n, ell);
 
     let mut fs_t = merlin::Transcript::new(DST);
-    let proof = batch_prove(&mut rng, &pp, &zz, &cc, &r, &mut fs_t);
+    let proof = batch_prove::<E, _>(&mut rng, &pp, &zz, &cc, &r, &mut fs_t);
 
     // === Serialize to memory ===
     let encoded = {
@@ -99,26 +81,58 @@ const TEST_CASES: &[(usize, usize)] = &[
     (4, 16),
     (8, 16),
     (16, 3),
-    // (16, 4),
-    // (16, 7),
-    // (16, 8),
-    // (255, 16),
-    // (255, 32),
-    // (512, 32),
-    // (1024, 32),
-    // (2047, 32),
+    (16, 4),
+    (16, 7),
+    (16, 8),
+    (255, 16),
+    (255, 32),
+    (512, 32),
+    (1024, 32),
+    (2047, 32),
 ];
+
+macro_rules! for_each_curve {
+    ($body:ident) => {{
+        use ark_bls12_381::Bls12_381;
+        use ark_bn254::Bn254;
+
+        $body!(Bn254);
+        $body!(Bls12_381);
+    }};
+}
 
 #[test]
 fn range_proof_completeness_multi() {
     for &(n, ell) in TEST_CASES {
-        run_range_proof_completeness(n, ell);
+        macro_rules! run_for_curve {
+            ($curve:ty) => {
+                println!(
+                    "Running tests for {} (n={}, ell={})",
+                    stringify!($curve),
+                    n,
+                    ell
+                );
+                run_range_proof_completeness::<$curve>(n, ell);
+            };
+        }
+        for_each_curve!(run_for_curve);
     }
 }
 
 #[test]
 fn serialize_range_proof_multi() {
     for &(n, ell) in TEST_CASES {
-        run_serialize_range_proof(n, ell);
+        macro_rules! run_for_curve {
+            ($curve:ty) => {
+                println!(
+                    "Serializing tests for {} (n={}, ell={})",
+                    stringify!($curve),
+                    n,
+                    ell
+                );
+                run_serialize_range_proof::<$curve>(n, ell);
+            };
+        }
+        for_each_curve!(run_for_curve);
     }
 }
