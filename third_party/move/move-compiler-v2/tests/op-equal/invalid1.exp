@@ -29,13 +29,13 @@ module 0x42::test {
         let x = 42;
         let p = &mut x;
         {
-            let $t = 1;
-            x = x + $t
+            let _t = 1;
+            x = x + _t
         };
         {
-            let $t2 = 1;
-            let $t1 = p;
-            *$t1 = *$t1 + $t2
+            let _t2 = 1;
+            let _t1 = p;
+            *_t1 = *_t1 + _t2
         };
         x;
     }

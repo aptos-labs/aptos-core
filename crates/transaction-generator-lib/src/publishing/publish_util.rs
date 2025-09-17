@@ -28,6 +28,7 @@ use move_binary_format::{
     file_format::{CompiledScript, FunctionHandleIndex, IdentifierIndex, SignatureToken},
     CompiledModule,
 };
+use move_core_types::language_storage::pseudo_script_module_id;
 use rand::{rngs::StdRng, Rng};
 
 // Information used to track a publisher and what allows to identify and
@@ -144,13 +145,13 @@ impl Package {
                 let mut script = script_opt
                     .clone()
                     .expect("Script not defined for wanted package");
-                assert_ne!(publisher, AccountAddress::MAX_ADDRESS);
+                assert_ne!(publisher, *pseudo_script_module_id().address());
 
-                // Make sure dependencies link to published modules. Compiler V2 adds 0xf..ff so we need to
+                // Make sure dependencies link to published modules. Compiler V2 adds `pseudo_script_module_id()` so we need to
                 // skip it.
                 assert_eq!(script.address_identifiers.len(), 2);
                 for address in &mut script.address_identifiers {
-                    if address != &AccountAddress::MAX_ADDRESS {
+                    if address != pseudo_script_module_id().address() {
                         *address = publisher;
                     }
                 }

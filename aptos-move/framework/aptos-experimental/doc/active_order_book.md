@@ -23,6 +23,7 @@ This is internal module, which cannot be used directly, use OrderBook instead.
 -  [Function `get_impact_ask_price`](#0x7_active_order_book_get_impact_ask_price)
 -  [Function `get_tie_breaker`](#0x7_active_order_book_get_tie_breaker)
 -  [Function `cancel_active_order`](#0x7_active_order_book_cancel_active_order)
+-  [Function `cancel_if_active_order`](#0x7_active_order_book_cancel_if_active_order)
 -  [Function `is_active_order`](#0x7_active_order_book_is_active_order)
 -  [Function `is_taker_order`](#0x7_active_order_book_is_taker_order)
 -  [Function `single_match_with_current_active_order`](#0x7_active_order_book_single_match_with_current_active_order)
@@ -500,7 +501,7 @@ aborts if there are no sells
     is_bid: bool
 ): u64 {
     <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
-    <b>let</b> key = <a href="active_order_book.md#0x7_active_order_book_ActiveBidKey">ActiveBidKey</a> { price: price, tie_breaker };
+    <b>let</b> key = <a href="active_order_book.md#0x7_active_order_book_ActiveBidKey">ActiveBidKey</a> { price, tie_breaker };
     <b>let</b> value =
         <b>if</b> (is_bid) {
             self.buys.remove(&key)
@@ -508,6 +509,45 @@ aborts if there are no sells
             self.sells.remove(&key)
         };
     value.size
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_active_order_book_cancel_if_active_order"></a>
+
+## Function `cancel_if_active_order`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_cancel_if_active_order">cancel_if_active_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_bid: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_cancel_if_active_order">cancel_if_active_order</a>(
+    self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
+    price: u64,
+    unique_priority_idx: UniqueIdxType,
+    is_bid: bool
+){
+    <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
+    <b>let</b> key = <a href="active_order_book.md#0x7_active_order_book_ActiveBidKey">ActiveBidKey</a> { price, tie_breaker };
+    <b>if</b> (is_bid) {
+       <b>if</b> (self.buys.contains(&key)) {
+            self.buys.remove(&key);
+        }
+    } <b>else</b> {
+        <b>if</b> (self.sells.contains(&key)) {
+            self.sells.remove(&key);
+        }
+    };
 }
 </code></pre>
 
@@ -557,7 +597,7 @@ aborts if there are no sells
 Check if the order is a taker order - i.e. if it can be immediately matched with the order book fully or partially.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_is_taker_order">is_taker_order</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, is_bid: bool): bool
+<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_is_taker_order">is_taker_order</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, is_bid: bool): bool
 </code></pre>
 
 
@@ -567,22 +607,15 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_is_taker_order">is_taker_order</a>(
-    self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, price: Option&lt;u64&gt;, is_bid: bool
+    self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, price: u64, is_bid: bool
 ): bool {
     <b>if</b> (is_bid) {
         <b>let</b> best_ask_price = self.<a href="active_order_book.md#0x7_active_order_book_best_ask_price">best_ask_price</a>();
-        best_ask_price.is_some()
-            && (
-                price.is_none()
-                    || price.destroy_some() &gt;= best_ask_price.destroy_some()
-            )
+        // print(&best_ask_price);
+        best_ask_price.is_some() && price &gt;= best_ask_price.destroy_some()
     } <b>else</b> {
         <b>let</b> best_bid_price = self.<a href="active_order_book.md#0x7_active_order_book_best_bid_price">best_bid_price</a>();
-        best_bid_price.is_some()
-            && (
-                price.is_none()
-                    || price.destroy_some() &lt;= best_bid_price.destroy_some()
-            )
+        best_bid_price.is_some() && price &lt;= best_bid_price.destroy_some()
     }
 }
 </code></pre>
@@ -647,7 +680,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 
-<pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, size: u64): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
+<pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, size: u64): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
 </code></pre>
 
 
@@ -657,14 +690,10 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 <pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(
-    self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, price: Option&lt;u64&gt;, size: u64
+    self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, price: u64, size: u64
 ): ActiveMatchedOrder {
     <b>let</b> (smallest_key, smallest_value) = self.sells.borrow_front();
-    <b>if</b> (price.is_some()) {
-        <b>assert</b>!(
-            price.destroy_some() &gt;= smallest_key.price, <a href="active_order_book.md#0x7_active_order_book_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>
-        );
-    };
+    <b>assert</b>!(price &gt;= smallest_key.price, <a href="active_order_book.md#0x7_active_order_book_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>);
     <a href="active_order_book.md#0x7_active_order_book_single_match_with_current_active_order">single_match_with_current_active_order</a>(
         size,
         smallest_key,
@@ -684,7 +713,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 
-<pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, size: u64): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
+<pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, size: u64): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
 </code></pre>
 
 
@@ -694,14 +723,10 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 <pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(
-    self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, price: Option&lt;u64&gt;, size: u64
+    self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, price: u64, size: u64
 ): ActiveMatchedOrder {
     <b>let</b> (largest_key, largest_value) = self.buys.borrow_back();
-    <b>if</b> (price.is_some()) {
-        <b>assert</b>!(
-            price.destroy_some() &lt;= largest_key.price, <a href="active_order_book.md#0x7_active_order_book_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>
-        );
-    };
+    <b>assert</b>!(price &lt;= largest_key.price, <a href="active_order_book.md#0x7_active_order_book_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>);
     <a href="active_order_book.md#0x7_active_order_book_single_match_with_current_active_order">single_match_with_current_active_order</a>(
         size,
         largest_key,
@@ -721,7 +746,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_result">get_single_match_result</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, size: u64, is_bid: bool): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_result">get_single_match_result</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, size: u64, is_bid: bool): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
 </code></pre>
 
 
@@ -732,7 +757,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_result">get_single_match_result</a>(
     self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
-    price: Option&lt;u64&gt;,
+    price: u64,
     size: u64,
     is_bid: bool
 ): ActiveMatchedOrder {
@@ -849,7 +874,7 @@ Decrease the size of the order in the order book without altering its position i
     <b>let</b> key = <a href="active_order_book.md#0x7_active_order_book_ActiveBidKey">ActiveBidKey</a> { price, tie_breaker };
     <b>let</b> value = <a href="active_order_book.md#0x7_active_order_book_ActiveBidData">ActiveBidData</a> { order_id, size };
     // Assert that this is not a taker order
-    <b>assert</b>!(!self.<a href="active_order_book.md#0x7_active_order_book_is_taker_order">is_taker_order</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(price), is_bid), <a href="active_order_book.md#0x7_active_order_book_EINVALID_MAKER_ORDER">EINVALID_MAKER_ORDER</a>);
+    <b>assert</b>!(!self.<a href="active_order_book.md#0x7_active_order_book_is_taker_order">is_taker_order</a>(price, is_bid), <a href="active_order_book.md#0x7_active_order_book_EINVALID_MAKER_ORDER">EINVALID_MAKER_ORDER</a>);
     <b>if</b> (is_bid) {
         self.buys.add(key, value);
     } <b>else</b> {

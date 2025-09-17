@@ -19,7 +19,7 @@ use aptos_types::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
     },
     state_store::{state_value::StateValue, MockStateView, TStateView},
-    transaction::{BlockExecutableTransaction as Transaction, BlockOutput},
+    transaction::{AuxiliaryInfo, BlockExecutableTransaction as Transaction, BlockOutput},
     vm::modules::AptosModuleExtension,
 };
 use move_core_types::language_storage::ModuleId;
@@ -104,11 +104,11 @@ pub(crate) fn execute_block_parallel<TxnType, ViewType, Provider>(
     data_view: &ViewType,
     all_module_ids: Option<&[ModuleId]>,
     block_stm_v2: bool,
-) -> Result<BlockOutput<ViewType::Key, MockOutput<KeyType<[u8; 32]>, MockEvent>>, ()>
+) -> Result<BlockOutput<TxnType, MockOutput<KeyType<[u8; 32]>, MockEvent>>, ()>
 where
     TxnType: Transaction<Key = KeyType<[u8; 32]>> + Debug + Clone + Send + Sync + 'static,
     ViewType: TStateView<Key = TxnType::Key> + Sync + 'static,
-    Provider: TxnProvider<TxnType> + Sync + 'static,
+    Provider: TxnProvider<TxnType, AuxiliaryInfo> + Sync + 'static,
     MockTask<KeyType<[u8; 32]>, MockEvent>: ExecutorTask<Txn = TxnType>,
 {
     let mut guard = AptosModuleCacheManagerGuard::none();
@@ -125,10 +125,16 @@ where
         ViewType,
         NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
         Provider,
+        AuxiliaryInfo,
     >::new(config, executor_thread_pool, None);
 
     if block_stm_v2 {
-        block_executor.execute_transactions_parallel_v2(txn_provider, data_view, &mut guard)
+        block_executor.execute_transactions_parallel_v2(
+            txn_provider,
+            data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        )
     } else {
         block_executor.execute_transactions_parallel(
             txn_provider,
@@ -235,7 +241,10 @@ pub(crate) fn run_transactions_resources(
                     let output = execute_block_parallel::<
                         MockTransaction<KeyType<[u8; 32]>, MockEvent>,
                         MockStateView<KeyType<[u8; 32]>>,
-                        DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
+                        DefaultTxnProvider<
+                            MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+                            AuxiliaryInfo,
+                        >,
                     >(
                         executor_thread_pool.clone(),
                         *maybe_block_gas_limit,

@@ -139,11 +139,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         bytes: &[u8],
     ) -> Result<Vec<MoveResource>> {
         let resources_with_tag: Vec<(StructTag, Vec<u8>)> = bcs::from_bytes::<ResourceGroup>(bytes)
-            .map(|map| {
-                map.into_iter()
-                    .map(|(key, value)| (key, value))
-                    .collect::<Vec<_>>()
-            })?;
+            .map(|map| map.into_iter().collect::<Vec<_>>())?;
 
         resources_with_tag
             .iter()
@@ -1177,7 +1173,7 @@ pub trait AsConverter<R> {
         &self,
         db: Arc<dyn DbReader>,
         indexer_reader: Option<Arc<dyn IndexerReader>>,
-    ) -> MoveConverter<R>;
+    ) -> MoveConverter<'_, R>;
 }
 
 impl<R: StateView> AsConverter<R> for R {
@@ -1185,7 +1181,7 @@ impl<R: StateView> AsConverter<R> for R {
         &self,
         db: Arc<dyn DbReader>,
         indexer_reader: Option<Arc<dyn IndexerReader>>,
-    ) -> MoveConverter<R> {
+    ) -> MoveConverter<'_, R> {
         MoveConverter::new(self, db, indexer_reader)
     }
 }

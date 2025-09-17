@@ -1,0 +1,40 @@
+//**** Cross-compiled for `move` syntax from `tests/constants/non_constant_empty_vec.move`
+
+//# publish
+module 0x42::M {
+    struct S {
+    }
+    public fun empty_generic_vec<T0>(): vector<T0> {
+        0x1::vector::empty<T0>()
+    }
+    public fun empty_generic_vec_vec<T0>(): vector<vector<T0>> {
+        0x1::vector::empty<vector<T0>>()
+    }
+    public fun empty_signer_vec(): vector<signer> {
+        0x1::vector::empty<signer>()
+    }
+    public fun empty_signer_vec_vec(): vector<vector<signer>> {
+        0x1::vector::empty<vector<signer>>()
+    }
+    public fun empty_struct_vec(): vector<S> {
+        0x1::vector::empty<S>()
+    }
+    public fun empty_struct_vec_vec(): vector<vector<S>> {
+        0x1::vector::empty<vector<S>>()
+    }
+}
+
+
+//# run 0x42::M::empty_struct_vec
+
+//# run 0x42::M::empty_struct_vec
+
+//# run 0x42::M::empty_signer_vec
+
+//# run 0x42::M::empty_generic_vec --type-args 0x42::M::S
+
+//# run 0x42::M::empty_struct_vec_vec
+
+//# run 0x42::M::empty_signer_vec_vec
+
+//# run 0x42::M::empty_generic_vec_vec --type-args 0x42::M::S

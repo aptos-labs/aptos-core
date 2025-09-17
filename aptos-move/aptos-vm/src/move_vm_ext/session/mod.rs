@@ -39,10 +39,12 @@ use move_core_types::{
 use move_vm_runtime::{
     config::VMConfig,
     data_cache::TransactionDataCache,
+    dispatch_loader,
     module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsFunctionValueExtension, LoadedFunction, ModuleStorage, VerifiedModuleBundle,
+    AsFunctionValueExtension, InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction,
+    Loader, ModuleStorage, VerifiedModuleBundle,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -86,6 +88,7 @@ where
         resolver: &'r R,
     ) -> Self {
         let mut extensions = NativeContextExtensions::default();
+        let session_counter = session_id.session_counter();
         let txn_hash: [u8; 32] = session_id
             .as_uuid()
             .to_vec()
@@ -107,6 +110,7 @@ where
             session_id.into_script_hash(),
             chain_id.id(),
             maybe_user_transaction_context,
+            session_counter,
         ));
         extensions.add(NativeCodeContext::new());
         extensions.add(NativeStateStorageContext::new(resolver));
@@ -132,17 +136,26 @@ where
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let func = module_storage.load_function(module_id, function_name, &ty_args)?;
-        MoveVM::execute_loaded_function(
-            func,
-            args,
-            &mut self.data_cache,
-            gas_meter,
-            traversal_context,
-            &mut self.extensions,
-            module_storage,
-            self.resolver,
-        )
+        dispatch_loader!(module_storage, loader, {
+            let func = loader.load_instantiated_function(
+                &LegacyLoaderConfig::unmetered(),
+                gas_meter,
+                traversal_context,
+                module_id,
+                function_name,
+                &ty_args,
+            )?;
+            MoveVM::execute_loaded_function(
+                func,
+                args,
+                &mut self.data_cache,
+                gas_meter,
+                traversal_context,
+                &mut self.extensions,
+                &loader,
+                self.resolver,
+            )
+        })
     }
 
     pub fn execute_loaded_function(
@@ -151,7 +164,7 @@ where
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
-        module_storage: &impl ModuleStorage,
+        loader: &impl Loader,
     ) -> VMResult<SerializedReturnValues> {
         MoveVM::execute_loaded_function(
             func,
@@ -160,7 +173,7 @@ where
             gas_meter,
             traversal_context,
             &mut self.extensions,
-            module_storage,
+            loader,
             self.resolver,
         )
     }

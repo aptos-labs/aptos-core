@@ -19,8 +19,9 @@ use crate::{
 use aptos_aggregator::delta_change_set::{serialize, DeltaOp};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    contract_event::TransactionEvent, state_store::state_value::StateValueMetadata,
-    transaction::BlockOutput, write_set::TransactionWrite,
+    contract_event::TransactionEvent, executable::ModulePath,
+    state_store::state_value::StateValueMetadata, transaction::BlockOutput,
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::{
     module_write_set::ModuleWrite, resolver::ResourceGroupSize,
@@ -335,7 +336,7 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
 
     fn with_module_writes(
         &mut self,
-        module_writes: &[ModuleWrite<ValueType>],
+        module_writes: impl Iterator<Item = ModuleWrite<ValueType>>,
         txn_idx: TxnIndex,
     ) -> &mut Self {
         for module_write in module_writes {
@@ -508,7 +509,10 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
             .with_group_deltas(group_deltas)
             .with_resource_writes(&behavior.resource_writes, delta_test_kind, txn_idx)
             .with_resource_deltas(resource_deltas, delta_test_kind)
-            .with_module_writes(&behavior.module_writes, txn_idx as TxnIndex);
+            .with_module_writes(
+                behavior.module_writes.values().cloned(),
+                txn_idx as TxnIndex,
+            );
 
         // Apply gas
         *accumulated_gas += behavior.gas;
@@ -526,7 +530,10 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
     }
 }
 
-impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
+impl<K> BaselineOutput<K>
+where
+    K: Debug + Hash + Clone + Ord + Send + Sync + ModulePath + 'static,
+{
     /// Must be invoked after parallel execution to have incarnation information set and
     /// work with dynamic read/writes.
     pub(crate) fn generate<E: Debug + Clone + TransactionEvent>(
@@ -588,6 +595,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                     }
                 },
                 MockTransaction::InterruptRequested => unreachable!("Not tested with outputs"),
+                MockTransaction::StateCheckpoint => unreachable!("Not used as test input"),
             }
         }
 
@@ -640,7 +648,10 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
         self.insert_or_verify_delayed_field_id(baseline_key.clone(), id);
     }
 
-    fn assert_success<E: Debug>(&self, block_output: &BlockOutput<K, MockOutput<K, E>>) {
+    fn assert_success<E: Clone + Debug + Send + Sync + TransactionEvent + 'static>(
+        &self,
+        block_output: &BlockOutput<MockTransaction<K, E>, MockOutput<K, E>>,
+    ) {
         let mut group_world = HashMap::new();
         let mut group_metadata: HashMap<K, Option<StateValueMetadata>> = HashMap::new();
 
@@ -1031,9 +1042,9 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
 
     // Used for testing, hence the function asserts the correctness conditions within
     // itself to be easily traceable in case of an error.
-    pub(crate) fn assert_output<E: Debug>(
+    pub(crate) fn assert_output<E: Clone + Debug + Send + Sync + TransactionEvent + 'static>(
         &self,
-        results: &BlockExecutionResult<BlockOutput<K, MockOutput<K, E>>, usize>,
+        results: &BlockExecutionResult<BlockOutput<MockTransaction<K, E>, MockOutput<K, E>>, usize>,
     ) {
         match results {
             Ok(block_output) => {
@@ -1050,9 +1061,11 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
         }
     }
 
-    pub(crate) fn assert_parallel_output<E: Debug>(
+    pub(crate) fn assert_parallel_output<
+        E: Clone + Debug + Send + Sync + TransactionEvent + 'static,
+    >(
         &self,
-        results: &Result<BlockOutput<K, MockOutput<K, E>>, ()>,
+        results: &Result<BlockOutput<MockTransaction<K, E>, MockOutput<K, E>>, ()>,
     ) {
         match results {
             Ok(block_output) => {

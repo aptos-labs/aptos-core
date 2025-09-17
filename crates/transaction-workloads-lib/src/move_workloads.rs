@@ -47,6 +47,13 @@ pub enum LoopType {
     BcsToBytes { len: u64 },
 }
 
+/// Monotonically increasing counter test variants
+#[derive(Debug, Copy, Clone)]
+pub enum MonotonicCounterType {
+    Single,                  // Call counter once per transaction
+    Multiple { count: u64 }, // Call counter multiple times per transaction
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum MapType {
     SimpleMap,
@@ -80,6 +87,8 @@ pub enum EntryPoints {
     Republish,
     /// Empty (NoOp) function
     Nop,
+    /// Empty (NoOp) function, with replay protection nonce
+    NopOrderless,
     /// Empty (NoOp) function, signed by publisher as fee-payer
     NopFeePayer,
     /// Empty (NoOp) function, signed by 2 accounts
@@ -267,6 +276,11 @@ pub enum EntryPoints {
         /// Buy size is picked randomly from [1, max_buy_size] range
         max_buy_size: u64,
     },
+
+    /// Test monotonically increasing counter native function throughput
+    MonotonicCounter {
+        counter_type: MonotonicCounterType,
+    },
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -278,6 +292,7 @@ impl EntryPointTrait for EntryPoints {
         match self {
             EntryPoints::Republish
             | EntryPoints::Nop
+            | EntryPoints::NopOrderless
             | EntryPoints::NopFeePayer
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
@@ -321,7 +336,8 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::CoinInitAndMint
             | EntryPoints::FungibleAssetMint
             | EntryPoints::APTTransferWithPermissionedSigner
-            | EntryPoints::APTTransferWithMasterSigner => "framework_usecases",
+            | EntryPoints::APTTransferWithMasterSigner
+            | EntryPoints::MonotonicCounter { .. } => "framework_usecases",
             EntryPoints::OrderBook { .. } => "experimental_usecases",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
@@ -343,6 +359,7 @@ impl EntryPointTrait for EntryPoints {
         match self {
             EntryPoints::Republish
             | EntryPoints::Nop
+            | EntryPoints::NopOrderless
             | EntryPoints::NopFeePayer
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
@@ -403,6 +420,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::DeserializeU256 => "bcs_stream",
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
+            EntryPoints::MonotonicCounter { .. } => "transaction_context_example",
             EntryPoints::OrderBook { .. } => "order_book_example",
         }
     }
@@ -433,6 +451,8 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::Nop5Signers => {
                 get_payload_void(module_id, ident_str!("nop_5_signers").to_owned())
             },
+            EntryPoints::NopOrderless => get_payload_void(module_id, ident_str!("nop").to_owned())
+                .set_replay_protection_nonce(rng.expect("Must provide RNG").gen()),
             EntryPoints::Step => get_payload_void(module_id, ident_str!("step").to_owned()),
             EntryPoints::GetCounter => {
                 get_payload_void(module_id, ident_str!("get_counter").to_owned())
@@ -836,6 +856,17 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&1u64).unwrap(),
                 ])
             },
+            EntryPoints::MonotonicCounter { counter_type } => match counter_type {
+                MonotonicCounterType::Single => get_payload_void(
+                    module_id,
+                    ident_str!("test_monotonic_counter_single").to_owned(),
+                ),
+                MonotonicCounterType::Multiple { count } => get_payload(
+                    module_id,
+                    ident_str!("test_monotonic_counter_multiple").to_owned(),
+                    vec![bcs::to_bytes(&count).unwrap()],
+                ),
+            },
             EntryPoints::OrderBook {
                 state,
                 num_markets,
@@ -930,6 +961,7 @@ impl EntryPointTrait for EntryPoints {
         match self {
             EntryPoints::Republish => AutomaticArgs::Signer,
             EntryPoints::Nop
+            | EntryPoints::NopOrderless
             | EntryPoints::NopFeePayer
             | EntryPoints::Step
             | EntryPoints::GetCounter
@@ -991,6 +1023,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => AutomaticArgs::Signer,
+            EntryPoints::MonotonicCounter { .. } => AutomaticArgs::None,
             EntryPoints::OrderBook { .. } => AutomaticArgs::None,
         }
     }

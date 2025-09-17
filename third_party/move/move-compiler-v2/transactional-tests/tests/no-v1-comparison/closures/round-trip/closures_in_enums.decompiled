@@ -1,0 +1,167 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/closures_in_enums.move`
+
+//# publish
+module 0xc0ffee::m {
+    enum Function has copy, drop {
+        NoParam {
+            _0: ||(u64) has copy + drop,
+        }
+        OneParam {
+            _0: |u64|(u64) has copy + drop,
+        }
+        TwoParam {
+            _0: |u64, u64|(u64) has copy + drop,
+        }
+    }
+    fun get_func(p0: &Function): &||(u64) has copy {
+        if (!(p0 is NoParam)) abort 42;
+        &p0._0
+    }
+    fun get_func_recursive(p0: Function): ||(u64) {
+        let _t2;
+        let _t1 = &p0;
+        if (_t1 is NoParam) {
+            let Function::NoParam{_0: _t8} = p0;
+            _t2 = _t8
+        } else if (_t1 is OneParam) {
+            let Function::OneParam{_0: _t14} = p0;
+            _t2 = get_func_recursive(Function::NoParam{_0: || lambda__1__get_func_recursive(_t14)})
+        } else if (_t1 is TwoParam) {
+            let Function::TwoParam{_0: _t21} = p0;
+            _t2 = get_func_recursive(Function::OneParam{_0: |arg0| lambda__2__get_func_recursive(_t21, arg0)})
+        } else abort 14566554180833181697;
+        _t2
+    }
+    fun lambda__1__get_func_recursive(p0: |u64|(u64) has copy + drop): u64 {
+        p0(0)
+    }
+    fun lambda__2__get_func_recursive(p0: |u64, u64|(u64) has copy + drop, p1: u64): u64 {
+        p0(0, p1)
+    }
+    fun runner_1(p0: Function): u64 {
+        let _t2;
+        let _t1 = &p0;
+        if (_t1 is NoParam) {
+            let Function::NoParam{_0: _t10} = p0;
+            _t2 = _t10()
+        } else if (_t1 is OneParam) {
+            let Function::OneParam{_0: _t17} = p0;
+            _t2 = _t17(0)
+        } else if (_t1 is TwoParam) {
+            let Function::TwoParam{_0: _t24} = p0;
+            _t2 = _t24(0, 0)
+        } else abort 14566554180833181697;
+        _t2
+    }
+    fun runner_2(p0: Function): u64 {
+        let _t2;
+        let _t1 = &p0;
+        if (_t1 is NoParam) {
+            let Function::NoParam{_0: _t8} = p0;
+            _t2 = _t8
+        } else if (_t1 is OneParam) {
+            let Function::OneParam{_0: _t15} = p0;
+            _t2 = || lambda__1__runner_2(_t15)
+        } else if (_t1 is TwoParam) {
+            let Function::TwoParam{_0: _t20} = p0;
+            _t2 = || lambda__2__runner_2(_t20)
+        } else abort 14566554180833181697;
+        _t2()
+    }
+    fun lambda__1__runner_2(p0: |u64|(u64) has copy + drop): u64 {
+        p0(0)
+    }
+    fun lambda__2__runner_2(p0: |u64, u64|(u64) has copy + drop): u64 {
+        p0(0, 0)
+    }
+    fun runner_3(p0: &Function): u64 {
+        let _t3 = *get_func(p0);
+        _t3()
+    }
+    fun runner_4(p0: Function): u64 {
+        let _t2 = get_func_recursive(p0);
+        _t2()
+    }
+    public fun test_1() {
+        if (!(runner_1(Function::NoParam{_0: || lambda__1__test_1()}) == 0)) abort 14566554180833181696;
+        if (!(runner_1(Function::OneParam{_0: |arg0| lambda__2__test_1(arg0)}) == 0)) abort 14566554180833181696;
+        if (!(runner_1(Function::TwoParam{_0: |arg0,arg1| lambda__3__test_1(arg0, arg1)}) == 0)) abort 14566554180833181696;
+        if (!(runner_1(Function::NoParam{_0: || lambda__4__test_1(1)}) == 1)) abort 14566554180833181696;
+        if (!(runner_1(Function::OneParam{_0: |arg0| lambda__5__test_1(1, arg0)}) == 1)) abort 14566554180833181696;
+    }
+    fun lambda__1__test_1(): u64 {
+        0
+    }
+    fun lambda__2__test_1(p0: u64): u64 {
+        p0
+    }
+    fun lambda__3__test_1(p0: u64, p1: u64): u64 {
+        p0 + p1
+    }
+    fun lambda__4__test_1(p0: u64): u64 {
+        p0
+    }
+    fun lambda__5__test_1(p0: u64, p1: u64): u64 {
+        p0 + p1
+    }
+    public fun test_2() {
+        if (!(runner_2(Function::NoParam{_0: || lambda__1__test_2()}) == 0)) abort 14566554180833181696;
+        if (!(runner_2(Function::OneParam{_0: |arg0| lambda__2__test_2(arg0)}) == 0)) abort 14566554180833181696;
+        if (!(runner_2(Function::TwoParam{_0: |arg0,arg1| lambda__3__test_2(arg0, arg1)}) == 0)) abort 14566554180833181696;
+        if (!(runner_2(Function::NoParam{_0: || lambda__4__test_2(1)}) == 1)) abort 14566554180833181696;
+        if (!(runner_2(Function::OneParam{_0: |arg0| lambda__5__test_2(1, arg0)}) == 1)) abort 14566554180833181696;
+    }
+    fun lambda__1__test_2(): u64 {
+        0
+    }
+    fun lambda__2__test_2(p0: u64): u64 {
+        p0
+    }
+    fun lambda__3__test_2(p0: u64, p1: u64): u64 {
+        p0 + p1
+    }
+    fun lambda__4__test_2(p0: u64): u64 {
+        p0
+    }
+    fun lambda__5__test_2(p0: u64, p1: u64): u64 {
+        p0 + p1
+    }
+    fun test_3() {
+        let _t0 = Function::NoParam{_0: || lambda__1__test_3()};
+        if (!(runner_3(&_t0) == 0)) abort 14566554180833181696;
+    }
+    fun lambda__1__test_3(): u64 {
+        0
+    }
+    public fun test_4() {
+        if (!(runner_4(Function::NoParam{_0: || lambda__1__test_4()}) == 0)) abort 14566554180833181696;
+        if (!(runner_4(Function::OneParam{_0: |arg0| lambda__2__test_4(arg0)}) == 0)) abort 14566554180833181696;
+        if (!(runner_4(Function::TwoParam{_0: |arg0,arg1| lambda__3__test_4(arg0, arg1)}) == 0)) abort 14566554180833181696;
+        if (!(runner_4(Function::NoParam{_0: || lambda__4__test_4(1)}) == 1)) abort 14566554180833181696;
+        if (!(runner_4(Function::OneParam{_0: |arg0| lambda__5__test_4(1, arg0)}) == 1)) abort 14566554180833181696;
+    }
+    fun lambda__1__test_4(): u64 {
+        0
+    }
+    fun lambda__2__test_4(p0: u64): u64 {
+        p0
+    }
+    fun lambda__3__test_4(p0: u64, p1: u64): u64 {
+        p0 + p1
+    }
+    fun lambda__4__test_4(p0: u64): u64 {
+        p0
+    }
+    fun lambda__5__test_4(p0: u64, p1: u64): u64 {
+        p0 + p1
+    }
+}
+
+
+//# run 0xc0ffee::m::test_1
+
+//# run 0xc0ffee::m::test_2
+
+//# run 0xc0ffee::m::test_3
+
+//# run 0xc0ffee::m::test_4

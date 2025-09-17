@@ -64,6 +64,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
+        hot_state::HotStateConfig,
         state_key::{prefix::StateKeyPrefix, StateKey},
         state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
@@ -330,12 +331,16 @@ impl StateStore {
             state_kv_pruner,
             skip_usage,
         });
-        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty()));
+        // TODO(HotState): probably fetch onchain config from storage.
+        let hot_state_config = HotStateConfig::default();
+        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
+            hot_state_config,
+        )));
         let persisted_state = PersistedState::new_empty();
         let buffered_state = if empty_buffered_state_for_restore {
             BufferedState::new_at_snapshot(
                 &state_db,
-                StateWithSummary::new_empty(),
+                StateWithSummary::new_empty(hot_state_config),
                 buffered_state_target_items,
                 current_state.clone(),
                 persisted_state.clone(),
@@ -487,7 +492,9 @@ impl StateStore {
             state_kv_pruner,
             skip_usage: false,
         });
-        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty()));
+        let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
+            HotStateConfig::default(),
+        )));
         let persisted_state = PersistedState::new_empty();
         let _ = Self::create_buffered_state_from_latest_snapshot(
             &state_db,
@@ -539,6 +546,7 @@ impl StateStore {
             *SPARSE_MERKLE_PLACEHOLDER_HASH, // TODO(HotState): for now hot state always starts from empty upon restart.
             latest_snapshot_root_hash,
             usage,
+            HotStateConfig::default(),
         );
         let mut buffered_state = BufferedState::new_at_snapshot(
             state_db,
@@ -649,7 +657,7 @@ impl StateStore {
         &self.buffered_state
     }
 
-    pub fn current_state_locked(&self) -> MutexGuard<LedgerStateWithSummary> {
+    pub fn current_state_locked(&self) -> MutexGuard<'_, LedgerStateWithSummary> {
         self.current_state.lock()
     }
 
@@ -661,7 +669,7 @@ impl StateStore {
         key_prefix: &StateKeyPrefix,
         first_key_opt: Option<&StateKey>,
         desired_version: Version,
-    ) -> Result<PrefixedStateValueIterator> {
+    ) -> Result<PrefixedStateValueIterator<'_>> {
         // this can only handle non-sharded db scenario.
         // For sharded db, should look at API side using internal indexer to handle this request
         PrefixedStateValueIterator::new(
@@ -770,9 +778,7 @@ impl StateStore {
     }
 
     pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["get_usage"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["get_usage"]);
         self.state_db.get_state_storage_usage(version)
     }
 
@@ -882,7 +888,12 @@ impl StateStore {
                 // TODO(aldenhu): cache changes here, should consume it.
                 let old_entry = cache
                     // TODO(HotState): Revisit: assuming every write op results in a hot slot
-                    .insert((*key).clone(), update_to_cold.to_result_slot())
+                    .insert(
+                        (*key).clone(),
+                        update_to_cold
+                            .to_result_slot()
+                            .expect("hot state ops should have been filtered out above"),
+                    )
                     .unwrap_or_else(|| {
                         // n.b. all updated state items must be read and recorded in the state cache,
                         // otherwise we can't calculate the correct usage. The is_untracked() hack
@@ -996,7 +1007,6 @@ impl StateStore {
             version,
             start_idx,
         )?
-        .map(|it| it)
         .map(move |res| match res {
             Ok((_hashed_key, (key, version))) => {
                 Ok((key.clone(), store.expect_value_by_version(&key, version)?))
@@ -1011,21 +1021,40 @@ impl StateStore {
         first_index: usize,
         chunk_size: usize,
     ) -> Result<StateValueChunkWithProof> {
-        let result_iter = JellyfishMerkleIterator::new_by_index(
+        let state_key_values: Vec<(StateKey, StateValue)> = self
+            .get_value_chunk_iter(version, first_index, chunk_size)?
+            .collect::<Result<Vec<_>>>()?;
+        self.get_value_chunk_proof(version, first_index, state_key_values)
+    }
+
+    pub fn get_value_chunk_iter(
+        self: &Arc<Self>,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync> {
+        let store = Arc::clone(self);
+        let value_chunk_iter = JellyfishMerkleIterator::new_by_index(
             Arc::clone(&self.state_merkle_db),
             version,
             first_index,
         )?
         .take(chunk_size)
-        .map(|it| it);
-        let state_key_values: Vec<(StateKey, StateValue)> = result_iter
-            .into_iter()
-            .map(|res| {
-                res.and_then(|(_, (key, version))| {
-                    Ok((key.clone(), self.expect_value_by_version(&key, version)?))
-                })
+        .map(move |res| {
+            res.and_then(|(_, (key, version))| {
+                Ok((key.clone(), store.expect_value_by_version(&key, version)?))
             })
-            .collect::<Result<Vec<_>>>()?;
+        });
+
+        Ok(value_chunk_iter)
+    }
+
+    pub fn get_value_chunk_proof(
+        self: &Arc<Self>,
+        version: Version,
+        first_index: usize,
+        state_key_values: Vec<(StateKey, StateValue)>,
+    ) -> Result<StateValueChunkWithProof> {
         ensure!(
             !state_key_values.is_empty(),
             "State chunk starting at {}",
@@ -1104,7 +1133,7 @@ impl StateStore {
 
     pub fn init_state_ignoring_summary(&self, version: Option<Version>) -> Result<()> {
         let usage = self.get_usage(version)?;
-        let state = State::new_at_version(version, usage);
+        let state = State::new_at_version(version, usage, HotStateConfig::default());
         let ledger_state = LedgerState::new(state.clone(), state);
         self.set_state_ignoring_summary(ledger_state);
 
@@ -1147,9 +1176,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         node_batch: &StateValueBatch,
         progress: StateSnapshotProgress,
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["state_value_writer_write_chunk"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_value_writer_write_chunk"]);
         let mut batch = SchemaBatch::new();
         let mut sharded_schema_batch = self.state_kv_db.new_sharded_native_batches();
 
@@ -1165,7 +1192,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
                 .unwrap()
                 .statekeys_enabled()
         {
-            let keys = node_batch.iter().map(|(key, _)| key.0.clone()).collect();
+            let keys = node_batch.keys().map(|key| key.0.clone()).collect();
             self.internal_indexer_db
                 .as_ref()
                 .unwrap()

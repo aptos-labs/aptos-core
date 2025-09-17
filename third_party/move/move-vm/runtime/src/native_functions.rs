@@ -15,7 +15,7 @@ use crate::{
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
     },
-    Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+    Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use ambassador::delegate_to_methods;
 use bytes::Bytes;
@@ -33,8 +33,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, NativeGasMeter},
-    loaded_data::runtime_types::{StructType, Type},
+    gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, DependencyKind, NativeGasMeter},
+    loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     resolver::ResourceResolver,
     values::{AbstractFunction, Value},
@@ -282,7 +282,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         self.traversal_context
     }
 
-    pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter {
+    pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter<'_> {
         FunctionValueExtensionAdapter {
             module_storage: self.module_storage,
         }
@@ -344,7 +344,7 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
     }
 
     /// Returns function value extension that can be used for (de)serializing function values.
-    pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter {
+    pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter<'_> {
         FunctionValueExtensionAdapter {
             module_storage: self.module_storage.module_storage,
         }

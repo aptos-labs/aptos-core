@@ -14,7 +14,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     state_store::TStateView,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
         SignedTransaction, Transaction, TransactionExecutableRef, TransactionInfo,
         TransactionOutput, TransactionPayload, Version,
     },
@@ -120,6 +120,7 @@ impl AptosDebugger {
         &self,
         version: Version,
         txn: SignedTransaction,
+        auxiliary_info: AuxiliaryInfo,
     ) -> anyhow::Result<(VMStatus, VMOutput, TransactionGasLog)> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -163,6 +164,7 @@ impl AptosDebugger {
                 };
                 gas_profiler
             },
+            &auxiliary_info,
         )?;
 
         Ok((status, output, gas_profiler.finish()))
@@ -442,7 +444,7 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
 }
 
 fn execute_block_no_limit(
-    txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+    txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
     state_view: &DebuggerStateView,
     concurrency_level: usize,
 ) -> Result<Vec<TransactionOutput>, VMStatus> {

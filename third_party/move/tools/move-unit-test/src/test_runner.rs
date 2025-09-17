@@ -29,11 +29,13 @@ use move_core_types::{
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_runtime::{
     data_cache::TransactionDataCache,
+    dispatch_loader,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
-    AsFunctionValueExtension, AsUnsyncModuleStorage, ModuleStorage, RuntimeEnvironment,
+    AsFunctionValueExtension, AsUnsyncModuleStorage, InstantiatedFunctionLoader,
+    LegacyLoaderConfig, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;
@@ -246,7 +248,7 @@ impl SharedTestingConfig {
         factory: &Mutex<F>,
     ) -> (
         VMResult<ChangeSet>,
-        VMResult<NativeContextExtensions>,
+        VMResult<NativeContextExtensions<'_>>,
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
     ) {
@@ -261,26 +263,31 @@ impl SharedTestingConfig {
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
 
         let now = Instant::now();
-        let result = module_storage
-            .load_function(
-                &test_plan.module_id,
-                IdentStr::new(function_name).unwrap(),
-                // No type args for now.
-                &[],
-            )
-            .and_then(|function| {
-                let args = serialize_values(test_info.arguments.iter());
-                MoveVM::execute_loaded_function(
-                    function,
-                    args,
-                    &mut data_cache,
+        let result = dispatch_loader!(&module_storage, loader, {
+            loader
+                .load_instantiated_function(
+                    &LegacyLoaderConfig::unmetered(),
                     &mut gas_meter,
                     &mut traversal_context,
-                    &mut extensions,
-                    &module_storage,
-                    &self.starting_storage_state,
+                    &test_plan.module_id,
+                    IdentStr::new(function_name).unwrap(),
+                    // No type args for now.
+                    &[],
                 )
-            });
+                .and_then(|function| {
+                    let args = serialize_values(test_info.arguments.iter());
+                    MoveVM::execute_loaded_function(
+                        function,
+                        args,
+                        &mut data_cache,
+                        &mut gas_meter,
+                        &mut traversal_context,
+                        &mut extensions,
+                        &loader,
+                        &self.starting_storage_state,
+                    )
+                })
+        });
 
         let mut return_result = result.map(|res| {
             res.return_values

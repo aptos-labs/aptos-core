@@ -130,11 +130,7 @@ impl TransactionGasLog {
             Value::Array(
                 deps.iter()
                     .map(|dep| {
-                        let name = format!(
-                            "{}{}",
-                            Render(&dep.id),
-                            if dep.is_new { " (new)" } else { "" }
-                        );
+                        let name = dep.render();
                         let cost_scaled =
                             format!("{:.8}", (u64::from(dep.cost) as f64 / scaling_factor));
                         let cost_scaled =
@@ -172,6 +168,20 @@ impl TransactionGasLog {
         data.insert(
             "ops".to_string(),
             Value::Array(aggregated.ops.into_iter().map(convert_op).collect()),
+        );
+        data.insert(
+            "methods".to_string(),
+            Value::Array(aggregated.methods.into_iter().map(convert_op).collect()),
+        );
+        data.insert(
+            "methods_self".to_string(),
+            Value::Array(
+                aggregated
+                    .methods_self
+                    .into_iter()
+                    .map(convert_op)
+                    .collect(),
+            ),
         );
         data.insert(
             "reads".to_string(),
@@ -305,7 +315,7 @@ impl TransactionGasLog {
         }
 
         // Execution trace
-        let mut tree = self.exec_io.to_erased().tree;
+        let mut tree = self.exec_io.to_erased(true).tree;
         tree.include_child_costs();
 
         let mut table = vec![];

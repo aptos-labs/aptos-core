@@ -6,7 +6,7 @@ use anyhow::{ensure, Result};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::state_update_refs::StateUpdateRefs;
 use aptos_types::transaction::{PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version};
-use itertools::izip;
+use itertools::{izip, Itertools};
 use std::{
     fmt::{Debug, Formatter},
     ops::Deref,
@@ -16,21 +16,21 @@ use std::{
 pub struct TransactionsWithOutput {
     pub transactions: Vec<Transaction>,
     pub transaction_outputs: Vec<TransactionOutput>,
-    pub persisted_info: Vec<PersistedAuxiliaryInfo>,
+    pub persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
 }
 
 impl TransactionsWithOutput {
     pub fn new(
         transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
-        persisted_info: Vec<PersistedAuxiliaryInfo>,
+        persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
     ) -> Self {
         assert_eq!(transactions.len(), transaction_outputs.len());
-        assert_eq!(transactions.len(), persisted_info.len());
+        assert_eq!(transactions.len(), persisted_auxiliary_infos.len());
         Self {
             transactions,
             transaction_outputs,
-            persisted_info,
+            persisted_auxiliary_infos,
         }
     }
 
@@ -42,11 +42,12 @@ impl TransactionsWithOutput {
         &mut self,
         transaction: Transaction,
         transaction_output: TransactionOutput,
-        persisted_info: PersistedAuxiliaryInfo,
+        persisted_auxiliary_info: PersistedAuxiliaryInfo,
     ) {
         self.transactions.push(transaction);
         self.transaction_outputs.push(transaction_output);
-        self.persisted_info.push(persisted_info);
+        self.persisted_auxiliary_infos
+            .push(persisted_auxiliary_info);
     }
 
     pub fn len(&self) -> usize {
@@ -63,8 +64,20 @@ impl TransactionsWithOutput {
         izip!(
             self.transactions.iter(),
             self.transaction_outputs.iter(),
-            self.persisted_info.iter()
+            self.persisted_auxiliary_infos.iter()
         )
+    }
+
+    pub fn last(&self) -> Option<(&Transaction, &TransactionOutput, &PersistedAuxiliaryInfo)> {
+        self.transactions.last().map(|txn| {
+            (
+                txn,
+                self.transaction_outputs.last().expect("Must be non-empty"),
+                self.persisted_auxiliary_infos
+                    .last()
+                    .expect("Must be non-empty"),
+            )
+        })
     }
 }
 
@@ -78,12 +91,17 @@ pub struct TransactionsToKeep {
 }
 
 impl TransactionsToKeep {
+    /// `must_be_block` is a hint to tell the implementation that the last transaction is the only
+    /// checkpoint and there is no need to look further to find other checkpoints.
     pub fn index(
         first_version: Version,
         transactions_with_output: TransactionsWithOutput,
-        is_reconfig: bool,
+        must_be_block: bool,
     ) -> Self {
         let _timer = TIMER.timer_with(&["transactions_to_keep__index"]);
+
+        let (all_checkpoint_indices, is_reconfig) =
+            Self::get_all_checkpoint_indices(&transactions_with_output, must_be_block);
 
         TransactionsToKeepBuilder {
             transactions_with_output,
@@ -93,10 +111,7 @@ impl TransactionsToKeep {
                     .transaction_outputs
                     .iter()
                     .map(TransactionOutput::write_set);
-                let last_checkpoint_index = Self::get_last_checkpoint_index(
-                    is_reconfig,
-                    &transactions_with_output.transactions,
-                );
+                let last_checkpoint_index = all_checkpoint_indices.last().copied();
                 StateUpdateRefs::index_write_sets(
                     first_version,
                     write_sets,
@@ -112,28 +127,36 @@ impl TransactionsToKeep {
         first_version: Version,
         transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
-        auxiliary_info: Vec<PersistedAuxiliaryInfo>,
-        is_reconfig: bool,
+        persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
     ) -> Self {
-        let txns_with_output =
-            TransactionsWithOutput::new(transactions, transaction_outputs, auxiliary_info);
-        Self::index(first_version, txns_with_output, is_reconfig)
+        let txns_with_output = TransactionsWithOutput::new(
+            transactions,
+            transaction_outputs,
+            persisted_auxiliary_infos,
+        );
+        Self::index(first_version, txns_with_output, false)
     }
 
     pub fn new_empty() -> Self {
-        Self::make(0, vec![], vec![], vec![], false)
+        Self::make(0, vec![], vec![], vec![])
     }
 
     pub fn new_dummy_success(txns: Vec<Transaction>) -> Self {
         let txn_outputs = vec![TransactionOutput::new_empty_success(); txns.len()];
-        Self::make(0, txns, txn_outputs, vec![], false)
+        let persisted_auxiliary_infos = (0..txns.len())
+            .map(|i| PersistedAuxiliaryInfo::V1 {
+                transaction_index: i as u32,
+            })
+            .collect();
+        Self::make(0, txns, txn_outputs, persisted_auxiliary_infos)
     }
 
+    /// Whether the last txn of this block/chunk is reconfig.
     pub fn is_reconfig(&self) -> bool {
         *self.borrow_is_reconfig()
     }
 
-    pub fn state_update_refs(&self) -> &StateUpdateRefs {
+    pub fn state_update_refs(&self) -> &StateUpdateRefs<'_> {
         self.borrow_state_update_refs()
     }
 
@@ -153,16 +176,32 @@ impl TransactionsToKeep {
         }
     }
 
-    fn get_last_checkpoint_index(is_reconfig: bool, transactions: &[Transaction]) -> Option<usize> {
-        let _timer = TIMER.timer_with(&["get_last_checkpoint_index"]);
+    fn get_all_checkpoint_indices(
+        transactions_with_output: &TransactionsWithOutput,
+        must_be_block: bool,
+    ) -> (Vec<usize>, bool) {
+        let _timer = TIMER.timer_with(&["get_all_checkpoint_indices"]);
 
-        if is_reconfig {
-            return Some(transactions.len() - 1);
+        let (last_txn, last_output) = match transactions_with_output.last() {
+            Some((txn, output, _)) => (txn, output),
+            None => return (Vec::new(), false),
+        };
+        let is_reconfig = last_output.has_new_epoch_event();
+
+        if must_be_block {
+            assert!(last_txn.is_non_reconfig_block_ending() || is_reconfig);
+            return (vec![transactions_with_output.len() - 1], is_reconfig);
         }
 
-        transactions
-            .iter()
-            .rposition(Transaction::is_non_reconfig_block_ending)
+        (
+            transactions_with_output
+                .iter()
+                .positions(|(txn, output, _)| {
+                    txn.is_non_reconfig_block_ending() || output.has_new_epoch_event()
+                })
+                .collect(),
+            is_reconfig,
+        )
     }
 
     pub fn ensure_at_most_one_checkpoint(&self) -> Result<()> {
@@ -206,5 +245,216 @@ impl Debug for TransactionsToKeep {
             )
             .field("is_reconfig", &self.is_reconfig())
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TransactionsToKeep, TransactionsWithOutput};
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
+    use aptos_types::{
+        account_address::AccountAddress,
+        contract_event::ContractEvent,
+        test_helpers::transaction_test_helpers::get_test_signed_txn,
+        transaction::{
+            ExecutionStatus, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
+            TransactionOutput, TransactionStatus,
+        },
+        write_set::WriteSet,
+    };
+
+    fn dummy_txn() -> Transaction {
+        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let public_key = private_key.public_key();
+        let sender = AccountAddress::ZERO;
+        Transaction::UserTransaction(get_test_signed_txn(
+            sender,
+            0,
+            &private_key,
+            public_key,
+            None,
+        ))
+    }
+
+    fn ckpt_txn() -> Transaction {
+        Transaction::StateCheckpoint(HashValue::zero())
+    }
+
+    fn default_output() -> TransactionOutput {
+        TransactionOutput::new(
+            WriteSet::default(),
+            vec![],
+            0,
+            TransactionStatus::Keep(ExecutionStatus::Success),
+            TransactionAuxiliaryData::default(),
+        )
+    }
+
+    fn output_with_reconfig() -> TransactionOutput {
+        let reconfig_event = ContractEvent::new_v2_with_type_tag_str(
+            "0x1::reconfiguration::NewEpochEvent",
+            b"".to_vec(),
+        );
+        TransactionOutput::new(
+            WriteSet::default(),
+            vec![reconfig_event],
+            0,
+            TransactionStatus::Keep(ExecutionStatus::Success),
+            TransactionAuxiliaryData::default(),
+        )
+    }
+
+    fn default_aux_info() -> PersistedAuxiliaryInfo {
+        PersistedAuxiliaryInfo::None
+    }
+
+    #[test]
+    fn test_regular_block_without_reconfig() {
+        let txns = vec![dummy_txn(), dummy_txn(), ckpt_txn()];
+        let outputs = vec![default_output(), default_output(), default_output()];
+        let aux_infos = vec![default_aux_info(), default_aux_info(), default_aux_info()];
+        let txn_with_outputs = TransactionsWithOutput::new(txns, outputs, aux_infos);
+
+        {
+            let (all_ckpt_indices, is_reconfig) =
+                TransactionsToKeep::get_all_checkpoint_indices(&txn_with_outputs, true);
+            assert_eq!(all_ckpt_indices, vec![2]);
+            assert!(!is_reconfig);
+        }
+
+        {
+            let (all_ckpt_indices, is_reconfig) =
+                TransactionsToKeep::get_all_checkpoint_indices(&txn_with_outputs, false);
+            assert_eq!(all_ckpt_indices, vec![2]);
+            assert!(!is_reconfig);
+        }
+    }
+
+    #[test]
+    fn test_regular_block_with_reconfig() {
+        let txns = vec![dummy_txn(), dummy_txn(), dummy_txn()];
+        let outputs = vec![default_output(), default_output(), output_with_reconfig()];
+        let aux_infos = vec![default_aux_info(), default_aux_info(), default_aux_info()];
+        let txn_with_outputs = TransactionsWithOutput::new(txns, outputs, aux_infos);
+
+        {
+            let (all_ckpt_indices, is_reconfig) =
+                TransactionsToKeep::get_all_checkpoint_indices(&txn_with_outputs, true);
+            assert_eq!(all_ckpt_indices, vec![2]);
+            assert!(is_reconfig);
+        }
+
+        {
+            let (all_ckpt_indices, is_reconfig) =
+                TransactionsToKeep::get_all_checkpoint_indices(&txn_with_outputs, false);
+            assert_eq!(all_ckpt_indices, vec![2]);
+            assert!(is_reconfig);
+        }
+    }
+
+    #[test]
+    fn test_chunk_with_no_ckpt() {
+        let txns = vec![dummy_txn(), dummy_txn(), dummy_txn()];
+        let outputs = vec![default_output(), default_output(), default_output()];
+        let aux_infos = vec![default_aux_info(), default_aux_info(), default_aux_info()];
+        let txn_with_outputs = TransactionsWithOutput::new(txns, outputs, aux_infos);
+
+        let (all_ckpt_indices, is_reconfig) =
+            TransactionsToKeep::get_all_checkpoint_indices(&txn_with_outputs, false);
+        assert!(all_ckpt_indices.is_empty());
+        assert!(!is_reconfig);
+    }
+
+    #[test]
+    fn test_chunk_with_ckpts_no_reconfig() {
+        let txns = vec![
+            dummy_txn(),
+            ckpt_txn(),
+            dummy_txn(),
+            ckpt_txn(),
+            dummy_txn(),
+        ];
+        let outputs = vec![
+            default_output(),
+            default_output(),
+            default_output(),
+            default_output(),
+            default_output(),
+        ];
+        let aux_infos = vec![
+            default_aux_info(),
+            default_aux_info(),
+            default_aux_info(),
+            default_aux_info(),
+            default_aux_info(),
+        ];
+        let txn_with_outputs = TransactionsWithOutput::new(txns, outputs, aux_infos);
+
+        let (all_ckpt_indices, is_reconfig) =
+            TransactionsToKeep::get_all_checkpoint_indices(&txn_with_outputs, false);
+        assert_eq!(all_ckpt_indices, vec![1, 3]);
+        assert!(!is_reconfig);
+    }
+
+    #[test]
+    fn test_chunk_with_ckpts_with_reconfig_in_the_middle() {
+        let txns = vec![
+            dummy_txn(),
+            ckpt_txn(),
+            dummy_txn(),
+            dummy_txn(),
+            dummy_txn(),
+        ];
+        let outputs = vec![
+            default_output(),
+            default_output(),
+            default_output(),
+            output_with_reconfig(),
+            default_output(),
+        ];
+        let aux_infos = vec![
+            default_aux_info(),
+            default_aux_info(),
+            default_aux_info(),
+            default_aux_info(),
+            default_aux_info(),
+        ];
+        let txn_with_outputs = TransactionsWithOutput::new(txns, outputs, aux_infos);
+
+        let (all_ckpt_indices, is_reconfig) =
+            TransactionsToKeep::get_all_checkpoint_indices(&txn_with_outputs, false);
+        assert_eq!(all_ckpt_indices, vec![1, 3]);
+        assert!(!is_reconfig);
+    }
+
+    #[test]
+    fn test_chunk_with_ckpts_with_reconfig_at_end() {
+        let txns = vec![
+            dummy_txn(),
+            ckpt_txn(),
+            dummy_txn(),
+            dummy_txn(),
+            dummy_txn(),
+        ];
+        let outputs = vec![
+            default_output(),
+            default_output(),
+            default_output(),
+            default_output(),
+            output_with_reconfig(),
+        ];
+        let aux_infos = vec![
+            default_aux_info(),
+            default_aux_info(),
+            default_aux_info(),
+            default_aux_info(),
+            default_aux_info(),
+        ];
+        let txn_with_outputs = TransactionsWithOutput::new(txns, outputs, aux_infos);
+
+        let (all_ckpt_indices, is_reconfig) =
+            TransactionsToKeep::get_all_checkpoint_indices(&txn_with_outputs, false);
+        assert_eq!(all_ckpt_indices, vec![1, 4]);
+        assert!(is_reconfig);
     }
 }

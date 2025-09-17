@@ -13,7 +13,7 @@ use crate::{
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     transaction::authenticator::{
-        AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
+        AASigningData, AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
         TransactionAuthenticator,
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
@@ -54,7 +54,9 @@ pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
 
-pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload, FeeDistribution};
+pub use self::block_epilogue::{
+    BlockEndInfo, BlockEndInfoExt, BlockEpiloguePayload, FeeDistribution, TBlockEndInfoExt,
+};
 use crate::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::TransactionEvent,
@@ -544,7 +546,7 @@ impl RawTransaction {
         self.payload
     }
 
-    pub fn executable_ref(&self) -> Result<TransactionExecutableRef> {
+    pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
         self.payload.executable_ref()
     }
 
@@ -585,8 +587,10 @@ fn gen_auth(
             AccountAuthenticator::ed25519(Ed25519PublicKey::from(private_key), sender_signature)
         },
         Auth::Abstraction(function_info, sign_function) => {
-            let digest =
-                HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
+            let digest = AASigningData::signing_message_digest(
+                signing_message(user_signed_message)?,
+                function_info.clone(),
+            )?;
             AccountAuthenticator::abstraction(
                 function_info.clone(),
                 digest.clone(),
@@ -598,8 +602,10 @@ fn gen_auth(
             account_identity,
             sign_function,
         } => {
-            let digest =
-                HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
+            let digest = AASigningData::signing_message_digest(
+                signing_message(user_signed_message)?,
+                function_info.clone(),
+            )?;
             AccountAuthenticator::derivable_abstraction(
                 function_info.clone(),
                 digest.clone(),
@@ -703,7 +709,7 @@ impl TransactionExecutable {
         matches!(self, Self::EntryFunction(_))
     }
 
-    pub fn as_ref(&self) -> TransactionExecutableRef {
+    pub fn as_ref(&self) -> TransactionExecutableRef<'_> {
         match self {
             TransactionExecutable::EntryFunction(entry_function) => {
                 TransactionExecutableRef::EntryFunction(entry_function)
@@ -790,7 +796,7 @@ impl TransactionPayload {
         }
     }
 
-    pub fn executable_ref(&self) -> Result<TransactionExecutableRef> {
+    pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
         match self {
             TransactionPayload::EntryFunction(entry_function) => {
                 Ok(TransactionExecutableRef::EntryFunction(entry_function))
@@ -843,27 +849,40 @@ impl TransactionPayload {
     }
 
     // Used in sdk and a lot of tests when upgrading current payload format to the new format.
-    pub fn upgrade_payload(
+    pub fn upgrade_payload_with_rng(
         self,
+        rng: &mut impl Rng,
         use_txn_payload_v2_format: bool,
         use_orderless_transactions: bool,
     ) -> Self {
+        self.upgrade_payload_with_fn(
+            use_txn_payload_v2_format,
+            use_orderless_transactions.then_some(|| rng.gen()),
+        )
+    }
+
+    pub fn upgrade_payload_with_fn<F>(
+        self,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: Option<F>,
+    ) -> Self
+    where
+        F: FnOnce() -> u64,
+    {
         if use_txn_payload_v2_format {
             let executable = self
                 .executable()
                 .expect("ModuleBundle variant is deprecated");
             let mut extra_config = self.extra_config();
-            if use_orderless_transactions {
+            if let Some(replay_nonce_f) = use_orderless_transactions {
                 extra_config = match extra_config {
                     TransactionExtraConfig::V1 {
                         multisig_address,
                         replay_protection_nonce,
                     } => TransactionExtraConfig::V1 {
                         multisig_address,
-                        replay_protection_nonce: replay_protection_nonce.or_else(|| {
-                            let mut rng = rand::thread_rng();
-                            Some(rng.gen())
-                        }),
+                        replay_protection_nonce: replay_protection_nonce
+                            .or_else(|| Some(replay_nonce_f())),
                     },
                 }
             }
@@ -874,6 +893,31 @@ impl TransactionPayload {
         } else {
             self
         }
+    }
+
+    pub fn set_replay_protection_nonce(self, replay_protection_nonce: u64) -> Self {
+        let executable = self
+            .executable()
+            .expect("ModuleBundle variant is deprecated");
+        let extra_config = match self.extra_config() {
+            TransactionExtraConfig::V1 {
+                multisig_address,
+                replay_protection_nonce: old_replay_protection_nonce,
+            } => {
+                assert!(
+                    old_replay_protection_nonce.is_none(),
+                    "trying to set replay protection nonce twice."
+                );
+                TransactionExtraConfig::V1 {
+                    multisig_address,
+                    replay_protection_nonce: Some(replay_protection_nonce),
+                }
+            },
+        };
+        TransactionPayload::Payload(TransactionPayloadInner::V1 {
+            executable,
+            extra_config,
+        })
     }
 }
 
@@ -1153,7 +1197,7 @@ impl SignedTransaction {
         &self.raw_txn.payload
     }
 
-    pub fn executable_ref(&self) -> Result<TransactionExecutableRef> {
+    pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
         self.raw_txn.executable_ref()
     }
 
@@ -1272,7 +1316,6 @@ impl IndexedTransactionSummary {
         }
     }
 }
-
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct TransactionWithProof {
@@ -1489,7 +1532,7 @@ impl TransactionStatus {
     pub fn as_kept_status(&self) -> Result<ExecutionStatus> {
         match self {
             Self::Keep(s) => Ok(s.clone()),
-            _ => Err(format_err!("Not Keep.")),
+            status => Err(format_err!("Expected kept status, got {:?}", status)),
         }
     }
 
@@ -1860,7 +1903,7 @@ impl TransactionInfo {
             state_checkpoint_hash,
             gas_used,
             status,
-            None,
+            Some(HashValue::default()),
         )
     }
 
@@ -1873,7 +1916,7 @@ impl TransactionInfo {
             None,
             0,
             ExecutionStatus::Success,
-            None,
+            Some(HashValue::default()),
         )
     }
 }
@@ -2093,11 +2136,11 @@ impl TransactionToCommit {
     }
 
     pub fn gas_used(&self) -> u64 {
-        self.transaction_info.gas_used
+        self.transaction_info.gas_used()
     }
 
     pub fn status(&self) -> &ExecutionStatus {
-        &self.transaction_info.status
+        self.transaction_info.status()
     }
 
     pub fn is_reconfig(&self) -> bool {
@@ -2446,11 +2489,11 @@ impl TransactionOutputListWithProof {
             // Verify the write set matches for both the transaction info and output
             let write_set_hash = CryptoHash::hash(&txn_output.write_set);
             ensure!(
-                txn_info.state_change_hash == write_set_hash,
+                txn_info.state_change_hash() == write_set_hash,
                 "The write set in transaction output does not match the transaction info \
                      in proof. Hash of write set in transaction output: {}. Write set hash in txn_info: {}.",
                 write_set_hash,
-                txn_info.state_change_hash,
+                txn_info.state_change_hash(),
             );
 
             // Verify the gas matches for both the transaction info and output
@@ -2862,7 +2905,7 @@ impl Transaction {
 
     pub fn block_epilogue_v1(
         block_id: HashValue,
-        block_end_info: BlockEndInfo,
+        block_end_info: BlockEndInfoExt,
         fee_distribution: FeeDistribution,
     ) -> Self {
         Self::BlockEpilogue(BlockEpiloguePayload::V1 {
@@ -2980,7 +3023,19 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         None
     }
 
-    fn from_txn(_txn: Transaction) -> Self {
+    fn state_checkpoint(_block_id: HashValue) -> Self {
+        unimplemented!()
+    }
+
+    fn block_epilogue_v0(_block_id: HashValue, _block_end_info: BlockEndInfo) -> Self {
+        unimplemented!()
+    }
+
+    fn block_epilogue_v1(
+        _block_id: HashValue,
+        _block_end_info: TBlockEndInfoExt<Self::Key>,
+        _fee_distribution: FeeDistribution,
+    ) -> Self {
         unimplemented!()
     }
 }
@@ -3068,13 +3123,6 @@ impl AuxiliaryInfo {
         }
     }
 
-    pub fn new_empty() -> Self {
-        Self {
-            persisted_info: PersistedAuxiliaryInfo::None,
-            ephemeral_info: None,
-        }
-    }
-
     pub fn into_persisted_info(self) -> PersistedAuxiliaryInfo {
         self.persisted_info
     }
@@ -3086,10 +3134,56 @@ impl AuxiliaryInfo {
     pub fn ephemeral_info(&self) -> &Option<EphemeralAuxiliaryInfo> {
         &self.ephemeral_info
     }
+
+    pub fn persisted_info_hash(&self) -> Option<HashValue> {
+        match self.persisted_info {
+            PersistedAuxiliaryInfo::V1 { .. } => Some(self.persisted_info.hash()),
+            PersistedAuxiliaryInfo::None => None,
+        }
+    }
+}
+
+impl Default for AuxiliaryInfo {
+    fn default() -> Self {
+        Self {
+            persisted_info: PersistedAuxiliaryInfo::None, // Use None by default for compatibility
+            ephemeral_info: None,
+        }
+    }
+}
+
+impl AuxiliaryInfoTrait for AuxiliaryInfo {
+    fn new_empty() -> Self {
+        Self {
+            persisted_info: PersistedAuxiliaryInfo::None,
+            ephemeral_info: None,
+        }
+    }
+
+    fn transaction_index(&self) -> Option<u32> {
+        match self.persisted_info {
+            PersistedAuxiliaryInfo::V1 { transaction_index } => Some(transaction_index),
+            PersistedAuxiliaryInfo::None => None,
+        }
+    }
+
+    fn proposer_index(&self) -> Option<u64> {
+        self.ephemeral_info
+            .map(|EphemeralAuxiliaryInfo { proposer_index }| proposer_index)
+    }
+
+    fn auxiliary_info_at_txn_index(txn_index: u32) -> Self {
+        Self {
+            persisted_info: PersistedAuxiliaryInfo::V1 {
+                transaction_index: txn_index,
+            },
+            ephemeral_info: None,
+        }
+    }
 }
 
 #[derive(
-    BCSCryptoHash, Clone, Copy, CryptoHasher, Debug, Eq, Serialize, Deserialize, PartialEq,
+    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, CryptoHasher, BCSCryptoHash,
 )]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum PersistedAuxiliaryInfo {
@@ -3098,6 +3192,13 @@ pub enum PersistedAuxiliaryInfo {
     // Note that this would be slightly different from the index of transactions that get committed
     // onchain, as this considers transactions that may get discarded.
     V1 { transaction_index: u32 },
+}
+
+pub trait AuxiliaryInfoTrait: Clone {
+    fn transaction_index(&self) -> Option<u32>;
+    fn proposer_index(&self) -> Option<u64>;
+    fn new_empty() -> Self;
+    fn auxiliary_info_at_txn_index(txn_index: u32) -> Self;
 }
 
 #[derive(Debug, Clone, Copy)]

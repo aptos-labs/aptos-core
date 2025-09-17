@@ -2,11 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::new_test_context;
-
 #[cfg(test)]
 mod tests {
-    use super::new_test_context;
+    use crate::tests::new_test_context_with_orderless_flags;
     use aptos_api_test_context::current_function_name;
     use aptos_crypto::{
         ed25519::Ed25519PrivateKey,
@@ -30,6 +28,7 @@ mod tests {
         Bytes,
     };
     use rand::{prelude::StdRng, SeedableRng};
+    use rstest::rstest;
 
     /// Sample `AuthenticatorData`
     static AUTHENTICATOR_DATA: &[u8] = &[
@@ -85,8 +84,22 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_webauthn_secp256r1_ecdsa() {
-        let mut context = new_test_context(current_function_name!());
+    #[rstest(
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+        case(false, false),
+        case(true, false),
+        case(true, true)
+    )]
+    async fn test_webauthn_secp256r1_ecdsa(
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) {
+        let mut context = new_test_context_with_orderless_flags(
+            current_function_name!(),
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
         let other = context.create_account().await;
 
         let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
@@ -136,8 +149,22 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_webauthn_secp256r1_ecdsa_failure() {
-        let mut context = new_test_context(current_function_name!());
+    #[rstest(
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+        case(false, false),
+        case(true, false),
+        case(true, true)
+    )]
+    async fn test_webauthn_secp256r1_ecdsa_failure(
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) {
+        let mut context = new_test_context_with_orderless_flags(
+            current_function_name!(),
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
         let other = context.create_account().await;
 
         let mut rng: StdRng = SeedableRng::from_seed([0; 32]);

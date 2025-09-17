@@ -40,8 +40,8 @@ use aptos_types::{
     on_chain_config::FeatureFlag,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, Transaction,
-        TransactionOutput, TransactionStatus, WriteSetPayload,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
+        Transaction, TransactionOutput, TransactionStatus, WriteSetPayload,
     },
     write_set::WriteOp,
     AptosCoinType,
@@ -86,11 +86,11 @@ impl VMBlockExecutor for NativeVMBlockExecutor {
     /// transaction output.
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         AptosBlockExecutorWrapper::<NativeVMExecutorTask>::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
@@ -118,6 +118,7 @@ pub(crate) struct NativeVMExecutorTask {
 }
 
 impl ExecutorTask for NativeVMExecutorTask {
+    type AuxiliaryInfo = AuxiliaryInfo;
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
@@ -147,6 +148,7 @@ impl ExecutorTask for NativeVMExecutorTask {
         &self,
         executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
         txn: &SignatureVerifiedTransaction,
+        _auxiliary_info: &AuxiliaryInfo,
         _txn_idx: TxnIndex,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         match self.execute_transaction_impl(

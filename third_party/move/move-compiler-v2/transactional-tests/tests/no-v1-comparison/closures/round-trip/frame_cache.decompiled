@@ -1,0 +1,62 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/frame_cache.move`
+
+//# publish
+module 0x42::dummy {
+    struct Dummy has key {
+    }
+}
+
+
+//# publish
+module 0x42::foo {
+    use 0x1::signer;
+    struct Foo<phantom T0> has store, key {
+        value: u64,
+    }
+    public fun foo_exists<T0>(p0: &signer): bool {
+        let _t2 = signer::address_of(p0);
+        exists<Foo<T0>>(_t2)
+    }
+    public fun foo_roundtrip<T0>() {
+        let Foo<T0>{value: _t2} = Foo<T0>{value: 0};
+    }
+}
+
+
+//# publish
+module 0x42::bar {
+    use 0x1::signer;
+    use 0x42::dummy;
+    struct Bar<phantom T0> has key {
+        value: u64,
+    }
+    public fun dummy_bar_exists(p0: &signer): bool {
+        let _t2 = signer::address_of(p0);
+        exists<Bar<dummy::Dummy>>(_t2)
+    }
+    public fun make_dummy_bar(p0: &signer) {
+        let _t3 = Bar<dummy::Dummy>{value: 10};
+        move_to<Bar<dummy::Dummy>>(p0, _t3);
+    }
+}
+
+
+//# publish
+module 0x42::poc {
+    use 0x42::dummy;
+    use 0x42::foo;
+    use 0x42::bar;
+    fun run(p0: &signer) {
+        let _t2: || has copy + drop = || foo::foo_roundtrip<dummy::Dummy>();
+        _t2();
+        let _t1 = |arg0| bar::make_dummy_bar(arg0);
+        _t1(p0);
+    }
+}
+
+
+//# run 0x42::poc::run --signers 0x42
+
+//# run 0x42::bar::dummy_bar_exists --signers 0x42
+
+//# run 0x42::foo::foo_exists --signers 0x42 --type-args 0x42::dummy::Dummy

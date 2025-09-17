@@ -1,0 +1,69 @@
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module cafe.Module0 {
+enum E has copy, drop {
+ V1{
+	f1: u8,
+	f2: S
+ },
+ V2{
+
+ }
+}
+struct S has copy, drop {
+	dummy_field: bool
+}
+
+public f() /* def_idx: 0 */ {
+L0:	$t1: E
+L1:	$t2: &E
+L2:	$t4: &S
+L3:	$t7: bool
+L4:	$t8: bool
+L5:	$t0: &bool
+L6:	$t11: bool
+B0:
+	0: PackVariant[0](E/V2)
+	1: StLoc[0]($t1: E)
+	2: ImmBorrowLoc[0]($t1: E)
+	3: StLoc[1]($t2: &E)
+	4: CopyLoc[1]($t2: &E)
+	5: TestVariant[1](E/V1)
+	6: BrFalse(23)
+B1:
+	7: MoveLoc[1]($t2: &E)
+	8: ImmBorrowVariantField[0](V1.f2: S)
+	9: Pop
+	10: MoveLoc[0]($t1: E)
+	11: UnpackVariant[1](E/V1)
+	12: Unpack[1](S)
+	13: Pop
+	14: Pop
+	15: LdTrue
+	16: StLoc[4]($t8: bool)
+B2:
+	17: ImmBorrowLoc[4]($t8: bool)
+	18: Pop
+B3:
+	19: Ret
+B4:
+	20: LdFalse
+	21: StLoc[4]($t8: bool)
+	22: Branch(17)
+B5:
+	23: MoveLoc[1]($t2: &E)
+	24: Pop
+	25: LdTrue
+	26: StLoc[6]($t11: bool)
+B6:
+	27: ImmBorrowLoc[6]($t11: bool)
+	28: Pop
+	29: Branch(19)
+B7:
+	30: LdFalse
+	31: StLoc[6]($t11: bool)
+	32: Branch(27)
+}
+}
+============ bytecode verification succeeded ========

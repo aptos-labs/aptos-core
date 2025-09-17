@@ -1,0 +1,63 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    private fun fib(n: u64): u64 {
+        if Lt<u64>(n, 2) {
+          n
+        } else {
+          Add<u64>(m::fib(Sub<u64>(n, 1)), m::fib(Sub<u64>(n, 2)))
+        }
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    fun fib(n: u64): u64 {
+        if (n < 2) n else fib(n - 1) + fib(n - 2)
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    private fun fib(n: u64): u64 {
+        if Lt<u64>(n, 2) {
+          n
+        } else {
+          Add<u64>(m::fib(Sub<u64>(n, 1)), m::fib(Sub<u64>(n, 2)))
+        }
+    }
+} // end 0xc0ffee::m
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+
+
+fib(n: u64): u64 /* def_idx: 0 */ {
+L1:	$t3: u64
+B0:
+	0: CopyLoc[0](n: u64)
+	1: LdU64(2)
+	2: Lt
+	3: BrFalse(8)
+B1:
+	4: MoveLoc[0](n: u64)
+	5: StLoc[1]($t3: u64)
+B2:
+	6: MoveLoc[1]($t3: u64)
+	7: Ret
+B3:
+	8: CopyLoc[0](n: u64)
+	9: LdU64(1)
+	10: Sub
+	11: Call fib(u64): u64
+	12: MoveLoc[0](n: u64)
+	13: LdU64(2)
+	14: Sub
+	15: Call fib(u64): u64
+	16: Add
+	17: StLoc[1]($t3: u64)
+	18: Branch(6)
+}
+}
+============ bytecode verification succeeded ========

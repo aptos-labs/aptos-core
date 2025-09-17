@@ -41,7 +41,7 @@ impl PersistedAuxiliaryInfoPruner {
         metadata_progress: Version,
     ) -> Result<Self> {
         let progress = get_or_initialize_subpruner_progress(
-            ledger_db.write_set_db_raw(),
+            ledger_db.persisted_auxiliary_info_db_raw(),
             &DbMetadataKey::PersistedAuxiliaryInfoPrunerProgress,
             metadata_progress,
         )?;

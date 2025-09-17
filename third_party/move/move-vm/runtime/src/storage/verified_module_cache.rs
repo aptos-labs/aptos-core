@@ -3,7 +3,6 @@
 
 use cfg_if::cfg_if;
 use lazy_static::lazy_static;
-use move_vm_metrics::VERIFIED_MODULE_CACHE_SIZE;
 use parking_lot::Mutex;
 use std::num::NonZeroUsize;
 
@@ -35,15 +34,17 @@ impl VerifiedModuleCache {
         if verifier_cache_enabled() {
             let mut cache = self.0.lock();
             cache.put(module_hash, ());
-            VERIFIED_MODULE_CACHE_SIZE.set(cache.len() as i64);
         }
     }
 
     /// Flushes the verified modules cache.
     pub(crate) fn flush(&self) {
-        if verifier_cache_enabled() {
-            self.0.lock().clear();
-        }
+        self.0.lock().clear();
+    }
+
+    /// Returns the number of verified modules in the cache.
+    pub(crate) fn size(&self) -> usize {
+        self.0.lock().len()
     }
 }
 
@@ -55,7 +56,7 @@ lazy_static! {
 #[inline(always)]
 fn verifier_cache_enabled() -> bool {
     cfg_if! {
-        if #[cfg(any(test, feature = "testing"))] {
+        if #[cfg(feature = "disable_verifier_cache")] {
             false
         } else {
             // Cache is enabled in non-test environments only.

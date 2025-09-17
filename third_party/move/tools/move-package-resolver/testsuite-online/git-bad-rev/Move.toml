@@ -1,0 +1,6 @@
+[package]
+name = "Pack"
+version = "0.1.2"
+
+[dependencies]
+MoveStdlib = { git = "https://github.com/aptos-labs/aptos-framework", rev = "bad-rev", subdir = "move-stdlib" }

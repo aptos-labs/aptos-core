@@ -155,7 +155,7 @@ impl Verifier {
 
         let aptos_db = AptosDB::open(
             StorageDirPaths::from_path(config.db_dir.as_path()),
-            false,
+            true,
             NO_OP_STORAGE_PRUNER_CONFIG,
             config.rocksdb_opt.clone().into(),
             false,

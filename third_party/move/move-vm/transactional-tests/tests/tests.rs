@@ -9,6 +9,7 @@ use move_transactional_test_runner::{vm_test_harness, vm_test_harness::TestRunCo
 use move_vm_runtime::config::VMConfig;
 use once_cell::sync::Lazy;
 use std::{
+    collections::BTreeSet,
     path::{Path, PathBuf},
     string::ToString,
 };
@@ -67,6 +68,23 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             include: &["/function_values_safety/"],
             exclude: &[],
         },
+        TestConfig {
+            name: "eager-loading",
+            experiments: &[],
+            language_version: LanguageVersion::latest(),
+            vm_config: VMConfig {
+                verifier_config: VerifierConfig::production(),
+                paranoid_type_checks: true,
+                enable_lazy_loading: false,
+                ..VMConfig::default()
+            },
+            include: &[],
+            exclude: &[
+                "/lazy_loading/",
+                "/paranoid-tests/",
+                "/function_values_safety/",
+            ],
+        },
     ]
 });
 
@@ -82,10 +100,14 @@ fn vm_config_for_tests(verifier_config: VerifierConfig) -> VMConfig {
 /// Test files which must use separate baselines because their result is different.
 ///
 /// Note that each config named "foo" above will compare the output of running `test.move` (or
-/// `test.mvir`) to the same baseline file `test.exp` *unless* there is an entry in this array
-/// matching the path of `test.move` or `test.mvir`. If there is such an entry, then each config
+/// `test.masm`) to the same baseline file `test.exp` *unless* there is an entry in this array
+/// matching the path of `test.move` or `test.masm`. If there is such an entry, then each config
 /// "foo" will have a separate baseline output file `test.foo.exp`.
-const SEPARATE_BASELINE: &[&str] = &["/function_values_safety/"];
+const SEPARATE_BASELINE: &[&str] = &[
+    "/function_values_safety/",
+    "/module_publishing/",
+    "/re_entrancy/",
+];
 
 fn get_config_by_name(name: &str) -> TestConfig {
     TEST_CONFIGS
@@ -113,6 +135,7 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         vm_config: config.vm_config,
         use_masm: true,
         echo: true,
+        cross_compilation_targets: BTreeSet::new(),
     };
 
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)

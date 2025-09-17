@@ -13,7 +13,7 @@ module 0x42::m
 // Function definition at index 0
 #[persistent] public fun bar()
     ld_u64 3
-    call m::foo
+    call foo
     ld_u64 2
     eq
     br_false l0

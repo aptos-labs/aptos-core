@@ -33,7 +33,7 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        AuxiliaryInfo, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo,
+        AuxiliaryInfo, AuxiliaryInfoTrait, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo,
         Transaction::{self, UserTransaction},
         TransactionListWithProofV2, TransactionWithProof, WriteSetPayload,
     },
@@ -197,7 +197,7 @@ pub fn test_execution_with_storage_impl_inner(
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
         .unwrap();
-    let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, &[signer.clone()]);
+    let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, std::slice::from_ref(&signer));
     let epoch2_genesis_id = Block::make_genesis_block_from_ledger_info(li1.ledger_info()).id();
     executor.commit_blocks(vec![block1_id], li1).unwrap();
 
@@ -314,7 +314,7 @@ pub fn test_execution_with_storage_impl_inner(
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
         .unwrap();
-    let li2 = gen_ledger_info_with_sigs(2, &output2, block2_id, &[signer.clone()]);
+    let li2 = gen_ledger_info_with_sigs(2, &output2, block2_id, std::slice::from_ref(&signer));
     let epoch3_genesis_id = Block::make_genesis_block_from_ledger_info(li2.ledger_info()).id();
     executor.commit_blocks(vec![block2_id], li2).unwrap();
 

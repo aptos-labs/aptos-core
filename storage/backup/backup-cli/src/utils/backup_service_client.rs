@@ -9,7 +9,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_db::backup::backup_handler::DbState;
-use aptos_metrics_core::{IntCounterHelper, TimerHelper};
+use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_types::transaction::Version;
 use clap::Parser;
 use futures::TryStreamExt;
@@ -72,7 +72,7 @@ impl BackupServiceClient {
                 THROUGHPUT_COUNTER.inc_with_by(&[endpoint], bytes.len() as u64);
                 bytes
             })
-            .map_err(|e| futures::io::Error::new(futures::io::ErrorKind::Other, e))
+            .map_err(futures::io::Error::other)
             .into_async_read()
             .compat();
 

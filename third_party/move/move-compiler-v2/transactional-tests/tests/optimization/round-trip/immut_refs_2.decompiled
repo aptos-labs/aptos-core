@@ -1,0 +1,15 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/immut_refs_2.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun main() {
+        if (!(test(42) == 42)) abort 5;
+    }
+    fun test(p0: u64): u64 {
+        let _t2 = &p0;
+        p0
+    }
+}
+
+
+//# run 0xc0ffee::m::main

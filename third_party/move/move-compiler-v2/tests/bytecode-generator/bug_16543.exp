@@ -5,7 +5,7 @@ module 0xc0ffee::m {
     }
 } // end 0xc0ffee::m
 module 0xc0ffee::n {
-    public fun test(): 0xc0ffee::m::Lazy {
+    public fun test(): m::Lazy {
         closure#0n::__lambda__1__test()
     }
     private fun __lambda__1__test() {
@@ -20,16 +20,16 @@ module 0xc0ffee::m {
     }
 }
 module 0xc0ffee::n {
-    public fun test(): 0xc0ffee::m::Lazy {
+    public fun test(): m::Lazy {
         <<wrongly typed closure expression>>
     }
-    fun __lambda__1__test() {
+    fun lambda__1__test() {
     }
 }
 
 
 Diagnostics:
-error: cannot implicitly pack a wrapper struct `0xc0ffee::m::Lazy` defined in a different module `0xc0ffee::m`
+error: cannot implicitly pack a wrapper struct `m::Lazy` defined in a different module `0xc0ffee::m`
   ┌─ tests/bytecode-generator/bug_16543.move:8:9
   │
 8 │         || {}

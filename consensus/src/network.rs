@@ -462,6 +462,12 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
+    pub async fn broadcast_commit_vote(&self, commit_vote_msg: CommitVote) {
+        fail_point!("consensus::send::commit_vote", |_| ());
+        let msg = ConsensusMsg::CommitVoteMsg(Box::new(commit_vote_msg));
+        self.broadcast(msg).await
+    }
+
     pub async fn broadcast_fast_share(&self, share: FastShare<Share>) {
         fail_point!("consensus::send::broadcast_share", |_| ());
         let msg = tokio::task::spawn_blocking(|| {

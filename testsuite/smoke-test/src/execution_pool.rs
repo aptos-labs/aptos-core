@@ -40,7 +40,10 @@ pub async fn assert_on_chain_consensus_config_window_size(
             panic!("Expected OnChainConsensusConfig::V4, but received a different version")
         },
         OnChainConsensusConfig::V4 { window_size, .. } => {
-            assert_eq!(window_size.map(|v| v), expected_window_size)
+            assert_eq!(window_size, expected_window_size)
+        },
+        OnChainConsensusConfig::V5 { window_size, .. } => {
+            assert_eq!(window_size, expected_window_size)
         },
     }
 }

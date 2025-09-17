@@ -38,11 +38,13 @@ use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
     data_cache::TransactionDataCache,
+    dispatch_loader,
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
     AsFunctionValueExtension, AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage,
-    LoadedFunction, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
+    InstantiatedFunctionLoader, LegacyLoaderConfig, RuntimeEnvironment, ScriptLoader,
+    StagingModuleStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -82,6 +84,17 @@ pub struct AdapterPublishArgs {
     /// print more complete information for VMErrors on publish
     #[clap(long)]
     pub verbose: bool,
+}
+
+/// Specifies entrypoint to dispatch execution of a script or a Move function.
+enum EntryPoint<'a> {
+    Script {
+        script_bytes: &'a [u8],
+    },
+    Function {
+        module: &'a ModuleId,
+        function: &'a IdentStr,
+    },
 }
 
 #[derive(Debug, Parser)]
@@ -298,15 +311,21 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
 
-        code_storage
-            .load_script(&script_bytes, &type_args)
-            .and_then(|func| self.execute_loaded_function(func, args, gas_budget, &code_storage))
-            .map_err(|err| {
-                anyhow!(
-                    "Script execution failed with VMError: {}",
-                    err.format_test_output(move_test_debug() || verbose)
-                )
-            })?;
+        self.execute_entrypoint(
+            EntryPoint::Script {
+                script_bytes: &script_bytes,
+            },
+            &type_args,
+            args,
+            gas_budget,
+            &code_storage,
+        )
+        .map_err(|err| {
+            anyhow!(
+                "Script execution failed with VMError: {}",
+                err.format_test_output(move_test_debug() || verbose)
+            )
+        })?;
         Ok(None)
     }
 
@@ -320,7 +339,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
     ) -> Result<(Option<String>, SerializedReturnValues)> {
-        let module_storage = self.storage.clone().into_unsync_module_storage();
+        let code_storage = self.storage.clone().into_unsync_code_storage();
 
         let signers: Vec<_> = signers
             .into_iter()
@@ -339,9 +358,14 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
 
-        let serialized_return_values = module_storage
-            .load_function(module, function, &type_args)
-            .and_then(|func| self.execute_loaded_function(func, args, gas_budget, &module_storage))
+        let serialized_return_values = self
+            .execute_entrypoint(
+                EntryPoint::Function { module, function },
+                &type_args,
+                args,
+                gas_budget,
+                &code_storage,
+            )
             .map_err(|err| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
@@ -394,36 +418,58 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 }
 
 impl SimpleVMTestAdapter<'_> {
-    fn execute_loaded_function(
+    fn execute_entrypoint(
         &mut self,
-        function: LoadedFunction,
+        entry_point: EntryPoint,
+        ty_args: &[TypeTag],
         args: Vec<Vec<u8>>,
         gas_budget: Option<u64>,
-        module_storage: &impl ModuleStorage,
+        code_storage: &impl CodeStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let mut gas_status = get_gas_status(
+        let mut gas_meter = get_gas_status(
             &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
             gas_budget,
         )
         .unwrap();
 
         let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
         let mut extensions = NativeContextExtensions::default();
-
         let mut data_cache = TransactionDataCache::empty();
-        let return_values = MoveVM::execute_loaded_function(
-            function,
-            args,
-            &mut data_cache,
-            &mut gas_status,
-            &mut TraversalContext::new(&traversal_storage),
-            &mut extensions,
-            module_storage,
-            &self.storage,
-        )?;
+
+        let return_values = dispatch_loader!(code_storage, loader, {
+            let legacy_loader_config = LegacyLoaderConfig::unmetered();
+            let function = match entry_point {
+                EntryPoint::Script { script_bytes } => loader.load_script(
+                    &legacy_loader_config,
+                    &mut gas_meter,
+                    &mut traversal_context,
+                    script_bytes,
+                    ty_args,
+                )?,
+                EntryPoint::Function { module, function } => loader.load_instantiated_function(
+                    &legacy_loader_config,
+                    &mut gas_meter,
+                    &mut traversal_context,
+                    module,
+                    function,
+                    ty_args,
+                )?,
+            };
+            MoveVM::execute_loaded_function(
+                function,
+                args,
+                &mut data_cache,
+                &mut gas_meter,
+                &mut traversal_context,
+                &mut extensions,
+                &loader,
+                &self.storage,
+            )?
+        });
 
         let change_set = data_cache
-            .into_effects(module_storage)
+            .into_effects(code_storage)
             .map_err(|err| err.finish(Location::Undefined))?;
         self.storage.apply(change_set).unwrap();
         Ok(return_values)
@@ -513,6 +559,24 @@ pub struct TestRunConfig {
     pub use_masm: bool,
     /// Whether to print each command executed to test output.
     pub echo: bool,
+    /// Set of targets into which to cross-compile.
+    pub cross_compilation_targets: BTreeSet<CrossCompileTarget>,
+}
+
+/// A cross-compile target. A new transactional test source file
+/// is generated for the target, with all embedded source code
+/// replaced by the result of decompiling or disassembling it.
+/// The file is placed in `<path>.decompiled` and `<path>.disassembled`,
+/// respectively.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CrossCompileTarget {
+    /// The syntax into which to cross-compile.
+    pub syntax: SyntaxChoice,
+    /// Whether the cross-compiled result should be run as a test
+    /// after cross-compilation.
+    pub run_after: bool,
+    /// Optional suffix to append to the file name of the code for cross compilation.
+    pub suffix: Option<String>,
 }
 
 impl Default for TestRunConfig {
@@ -534,12 +598,32 @@ impl TestRunConfig {
             },
             use_masm: true,
             echo: true,
+            cross_compilation_targets: BTreeSet::new(),
         }
     }
 
     pub fn with_masm(self) -> Self {
         Self {
             use_masm: true,
+            ..self
+        }
+    }
+
+    pub fn cross_compile_into(
+        self,
+        syntax: SyntaxChoice,
+        run_after: bool,
+        suffix: Option<String>,
+    ) -> Self {
+        assert!(matches!(syntax, SyntaxChoice::ASM | SyntaxChoice::Source));
+        let mut cross_compilation_targets = self.cross_compilation_targets.clone();
+        cross_compilation_targets.insert(CrossCompileTarget {
+            syntax,
+            run_after,
+            suffix,
+        });
+        Self {
+            cross_compilation_targets,
             ..self
         }
     }

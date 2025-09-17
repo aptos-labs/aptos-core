@@ -1,0 +1,55 @@
+//**** Cross-compiled for `masm` syntax from `tests/txn-test-integration/tera_macros.masm`
+
+//# publish --print-bytecode
+// Bytecode version v7
+module 0x66::h_1
+// Function definition at index 0
+public fun f()
+    ld_u64 1
+    ld_u64 1
+    eq
+    br_true l0
+    ld_u64 255
+    // @5
+    abort
+l0: ret
+
+
+
+//# run --verbose 0x66::h_1::f
+
+//# publish --print-bytecode
+// Bytecode version v7
+module 0x66::h_5
+// Function definition at index 0
+public fun f()
+    ld_u64 5
+    ld_u64 5
+    eq
+    br_true l0
+    ld_u64 255
+    // @5
+    abort
+l0: ret
+
+
+
+//# run --verbose 0x66::h_5::f
+
+//# publish --print-bytecode
+// Bytecode version v7
+module 0x66::h_10
+// Function definition at index 0
+public fun f()
+    ld_u64 10
+    ld_u64 10
+    eq
+    br_true l0
+    ld_u64 255
+    // @5
+    abort
+l0: ret
+
+
+
+//# run --verbose 0x66::h_10::f

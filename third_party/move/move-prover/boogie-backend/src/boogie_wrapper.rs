@@ -8,7 +8,7 @@
 // use backtrace::Backtrace;
 use crate::{
     boogie_helpers,
-    boogie_helpers::{boogie_inst_suffix, boogie_struct_name},
+    boogie_helpers::{boogie_inst_suffix, boogie_reverse_function_name, boogie_struct_name},
     options::{BoogieOptions, VectorTheory},
     prover_task_runner::{ProverTaskRunner, RunBoogieWithSeeds},
 };
@@ -1316,6 +1316,20 @@ impl ModelValue {
         None
     }
 
+    /// Extract the arguments of a list of the form `(<ctor_prefix>... element...)`, also returning
+    /// the ctor string for further analysis.
+    fn extract_ctor_and_list(&self, ctor_prefix: &str) -> Option<(String, &[ModelValue])> {
+        if let ModelValue::List(elems) = self {
+            if !elems.is_empty() {
+                let literal = elems[0].extract_literal()?;
+                if let Some(stripped) = literal.strip_prefix(ctor_prefix) {
+                    return Some((stripped.to_string(), &elems[1..]));
+                }
+            }
+        }
+        None
+    }
+
     /// Extract a $Value box value.
     fn extract_box(&self) -> &ModelValue {
         if let ModelValue::List(elems) = self {
@@ -1435,9 +1449,31 @@ impl ModelValue {
                 // effect the verification outcome, we may not have much need for seeing it.
                 Some(PrettyDoc::text("<generic>"))
             },
+            Type::Fun(..) => {
+                let repr = if let Some((ctor_rest, args)) = self.extract_ctor_and_list("|$closure'")
+                {
+                    let end = ctor_rest.rfind("'")?;
+                    let fun_name_mangled = &ctor_rest[..end];
+                    let fun_name = boogie_reverse_function_name(wrapper.env, fun_name_mangled)
+                        .unwrap_or_else(|| fun_name_mangled.to_string());
+                    format!("{}(captured={:?})", fun_name, args)
+                } else if let Some((_, args)) = self.extract_ctor_and_list("|$unknown_function'") {
+                    format!(
+                        "<some `{}`>(captured={:?})",
+                        ty.display(&wrapper.env.get_type_display_ctx()),
+                        args
+                    )
+                } else {
+                    format!(
+                        "<some `{}`>(captured={:?})",
+                        ty.display(&wrapper.env.get_type_display_ctx()),
+                        self
+                    )
+                };
+                Some(PrettyDoc::text(repr))
+            },
             Type::Tuple(_)
             | Type::Primitive(_)
-            | Type::Fun(..)
             | Type::TypeDomain(_)
             | Type::ResourceDomain(_, _, _)
             | Type::Error
@@ -1592,7 +1628,7 @@ impl ModelValue {
         // function table of $EncodeKey and turns into a map from int to encoded ModelValue.
         let encoding_key = format!(
             "$EncodeKey{}",
-            boogie_inst_suffix(wrapper.env, &[key_ty.clone()])
+            boogie_inst_suffix(wrapper.env, std::slice::from_ref(key_ty))
         );
         let encoding_map = model
             .vars

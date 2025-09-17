@@ -1,0 +1,55 @@
+module 0x42::test {
+    enum E1 {
+        V1 {
+            _0: S0,
+        }
+        V2 {
+            _0: S1,
+        }
+    }
+    struct S0 {
+        _0: u8,
+    }
+    struct S1 {
+        _0: bool,
+        _1: S0,
+    }
+    fun match(x: E1) {
+        let _t1 = &x;
+        if (_t1 is V1) {
+            let _t7 = &_t1._0;
+            let E1::V1{_0: _t9} = x;
+            let S0{_0: _t10} = _t9;
+        } else if (_t1 is V2) {
+            let _t15 = &(&_t1._0)._1;
+            let E1::V2{_0: _t17} = x;
+            let S1{_0: _t18, _1: _t19} = _t17;
+            let S0{_0: _t20} = _t19;
+        } else abort 14566554180833181697;
+    }
+    fun nested(x: S1) {
+        let S1{_0: _t2, _1: _t3} = x;
+        let S0{_0: _t4} = _t3;
+    }
+    fun simple(x: S0) {
+        let S0{_0: _t2} = x;
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot select field `_0` since it has different types in variants of enum `E1`
+   ┌─ bind_anonymous_field.move:20:24
+   │
+20 │             let _t7 = &_t1._0;
+   │                        ^^^
+   │
+   = field `_0` has type `S1` in variant `V2` and type `S0` in variant `V1`
+
+error: cannot select field `_0` since it has different types in variants of enum `E1`
+   ┌─ bind_anonymous_field.move:24:27
+   │
+24 │             let _t15 = &(&_t1._0)._1;
+   │                           ^^^
+   │
+   = field `_0` has type `S1` in variant `V2` and type `S0` in variant `V1`

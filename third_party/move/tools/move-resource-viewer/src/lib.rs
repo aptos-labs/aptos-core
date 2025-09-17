@@ -12,7 +12,7 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError},
     file_format::{
-        CompiledScript, FieldDefinition, SignatureToken, StructDefinitionIndex,
+        CompiledScript, FieldDefinition, Signature, SignatureToken, StructDefinitionIndex,
         StructFieldInformation, StructHandleIndex,
     },
     views::FunctionHandleView,
@@ -143,7 +143,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
         let args_bytes = convert_txn_args(args);
-        self.view_arguments_impl(&param_tys, ty_args, &args_bytes, &mut limit)
+        self.view_arguments_or_returns(&param_tys, ty_args, &args_bytes, &mut limit)
     }
 
     pub fn view_function_arguments(
@@ -155,10 +155,22 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
     ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
         let mut limit = Limiter::default();
         let param_tys = self.resolve_function_arguments(module, function, &mut limit)?;
-        self.view_arguments_impl(&param_tys, ty_args, args, &mut limit)
+        self.view_arguments_or_returns(&param_tys, ty_args, args, &mut limit)
     }
 
-    fn view_arguments_impl(
+    pub fn view_function_returns(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+        ty_args: &[TypeTag],
+        returns: &[Vec<u8>],
+    ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
+        let mut limit = Limiter::default();
+        let return_tys = self.resolve_function_returns(module, function, &mut limit)?;
+        self.view_arguments_or_returns(&return_tys, ty_args, returns, &mut limit)
+    }
+
+    fn view_arguments_or_returns(
         &self,
         param_tys: &[FatType],
         ty_args: &[TypeTag],
@@ -208,20 +220,23 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             .collect::<anyhow::Result<Vec<AnnotatedMoveValue>>>()
     }
 
-    fn resolve_function_arguments(
+    fn resolve_function_types<F>(
         &self,
         module: &ModuleId,
         function: &IdentStr,
         limit: &mut Limiter,
-    ) -> anyhow::Result<Vec<FatType>> {
+        selector: F,
+    ) -> anyhow::Result<Vec<FatType>>
+    where
+        F: Fn(FunctionHandleView<CompiledModule>) -> &Signature,
+    {
         let m = self.view_existing_module(module)?;
         let m = m.borrow();
         for def in m.function_defs.iter() {
             let fhandle = m.function_handle_at(def.function);
             let fhandle_view = FunctionHandleView::new(m, fhandle);
             if fhandle_view.name() == function {
-                return fhandle_view
-                    .parameters()
+                return selector(fhandle_view)
                     .0
                     .iter()
                     .map(|signature| {
@@ -231,6 +246,24 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             }
         }
         Err(anyhow!("Function {:?} not found in {:?}", function, module))
+    }
+
+    fn resolve_function_arguments(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<Vec<FatType>> {
+        self.resolve_function_types(module, function, limit, |fh| fh.parameters())
+    }
+
+    fn resolve_function_returns(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<Vec<FatType>> {
+        self.resolve_function_types(module, function, limit, |fh| fh.return_())
     }
 
     pub fn view_resource(

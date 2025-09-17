@@ -1,0 +1,20 @@
+module 0x99::cfg_opt_simple {
+    fun test1(x: u64, y: u64): u64 {
+        loop {
+            if (!(x > 1)) {
+                if (!(y > 2)) break};
+            y = y + 1
+        };
+        x + 1 + y
+    }
+    fun test2(x: u64, y: u64): u64 {
+        loop {
+            if (!(x > 1)) {
+                if (!(y > 2)) break};
+            y = y + 1
+        };
+        x + y
+    }
+}
+
+============ recompilation succeeded ========

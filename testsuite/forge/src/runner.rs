@@ -7,11 +7,12 @@ use crate::{
     config::ForgeConfig,
     observer::junit::JunitTestObserver,
     result::{TestResult, TestSummary},
+    success_criteria::SuccessCriteriaErrors,
     AdminContext, AdminTest, AptosContext, AptosTest, CoreContext, Factory, NetworkContext,
     NetworkContextSynchronizer, NetworkTest, ShouldFail, Test, TestReport, Version,
     NAMESPACE_CLEANUP_DURATION_BUFFER_SECS,
 };
-use anyhow::{bail, format_err, Error, Result};
+use anyhow::{format_err, Error, Result};
 use aptos_config::config::NodeConfig;
 use clap::{Parser, ValueEnum};
 use rand::{rngs::OsRng, Rng, SeedableRng};
@@ -247,7 +248,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         .expect("There has to be at least 1 version")
     }
 
-    pub fn run(&self) -> Result<TestReport> {
+    pub fn run(&self) -> Result<TestSummary> {
         let test_count = self.filter_tests(&self.tests.all_tests()).count();
         let filtered_out = test_count.saturating_sub(self.tests.all_tests().len());
         let retain_debug_logs = self.options.retain_debug_logs || self.tests.retain_debug_logs;
@@ -352,11 +353,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
         summary.write_summary()?;
 
-        if summary.success() {
-            Ok(report)
-        } else {
-            bail!("Tests Failed")
-        }
+        Ok(summary)
     }
 
     fn filter_tests<'a, T: Test + ?Sized>(
@@ -390,15 +387,19 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
 fn process_test_result(result: Result<()>) -> TestResult {
     match result {
-        Ok(()) => TestResult::Ok,
+        Ok(()) => TestResult::Successful,
         Err(e) => {
+            let test_result = e
+                .downcast()
+                .map(|e: SuccessCriteriaErrors| e.into())
+                .unwrap_or_else(|e| TestResult::InfraFailure(format!("Error: {:?}", e)));
             let is_triggerd_by_github_actions =
                 std::env::var("FORGE_TRIGGERED_BY").unwrap_or_default() == "github-actions";
             if is_triggerd_by_github_actions {
                 // ::error:: is github specific syntax to set an error on the job that is highlighted as described here https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-error-message
-                println!("::error::{:?}", e);
+                println!("::error::{:?}", test_result);
             }
-            TestResult::FailedWithMsg(format!("{:?}", e))
+            test_result
         },
     }
 }

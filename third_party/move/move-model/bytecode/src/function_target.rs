@@ -124,7 +124,7 @@ impl<'env> FunctionTarget<'env> {
     }
 
     /// Shortcut for accessing the module env of this function.
-    pub fn module_env(&self) -> &ModuleEnv {
+    pub fn module_env(&self) -> &ModuleEnv<'_> {
         &self.func_env.module_env
     }
 
@@ -465,14 +465,6 @@ impl<'env> FunctionTarget<'env> {
             texts.push(format!("     # {}", comment));
         }
 
-        // add location
-        if verbose {
-            texts.push(format!(
-                "     # {}",
-                self.get_bytecode_loc(attr_id).display(self.global_env())
-            ));
-        }
-
         // add annotations
         let annotations = self
             .annotation_formatters
@@ -500,13 +492,24 @@ impl<'env> FunctionTarget<'env> {
             ));
         }
 
-        // add the instruction itself with offset
-        texts.push(format!(
-            "{:>3}: {}",
-            offset,
-            code.display(self, label_offsets)
-        ));
+        // location string if verbose
+        let verbose_str = if verbose {
+            format!(
+                "# {}",
+                self.get_bytecode_loc(attr_id).display(self.global_env())
+            )
+        } else {
+            "".to_string()
+        };
 
+        // add the instruction itself with offset
+        let instr = format!(
+            "{:>3}: {:<40} {}",
+            offset,
+            code.display(self, label_offsets).to_string(),
+            verbose_str
+        );
+        texts.push(instr);
         texts.join("\n")
     }
 }

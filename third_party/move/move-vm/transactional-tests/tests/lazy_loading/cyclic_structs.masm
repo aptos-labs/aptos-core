@@ -1,0 +1,57 @@
+//# publish --verbose
+module 0x66::list
+
+enum List has store + drop
+    Nil
+        value: u64
+
+public fun nil(): List
+    ld_u64 100
+    pack_variant List, Nil
+    ret
+
+
+//# publish --verbose
+module 0x66::cons
+
+struct Cons has store + drop
+    next: 0x66::list::List
+
+
+//# publish --verbose
+module 0x66::list
+
+enum List has store + drop
+    Nil
+        value: u64
+    Cons
+        next: 0x66::cons::Cons
+
+public fun nil(): List
+    ld_u64 100
+    pack_variant List, Nil
+    ret
+
+
+//# publish --verbose
+module 0x66::app
+
+struct ListHolder has key + drop
+    list: 0x66::list::List
+
+public fun list_exists(a: address): bool
+    move_loc a
+    exists ListHolder
+    ret
+
+public fun create_list(s: &signer)
+     move_loc s
+     call 0x66::list::nil
+     pack ListHolder
+     move_to ListHolder
+     ret
+
+
+//# run 0x66::app::create_list --signers 0x42 --verbose
+
+//# run 0x66::app::list_exists --args @0x42 --verbose

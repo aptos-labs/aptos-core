@@ -1,0 +1,21 @@
+Move prover returns: exiting with bytecode transformation errors
+error: function `A::__lambda__1_inline_1_744__call_mutate_inline_no_modifies` is opaque but its specification does not have a modifies clause for `A::S`
+   ┌─ tests/sources/functional/inline-lambda-modifies.move:34:11
+   │
+34 │           } spec {
+   │ ╭───────────^
+35 │ │             pragma opaque;
+36 │ │             aborts_if !exists<S>(addr);
+37 │ │             ensures global<S>(addr).x == 2;
+38 │ │         })
+   │ ╰─────────^
+
+error: function `A::call_mutate_inline_caller_no_modifies` is opaque but its specification does not have a modifies clause for `A::S`
+   ┌─ tests/sources/functional/inline-lambda-modifies.move:52:5
+   │
+52 │ ╭     spec call_mutate_inline_caller_no_modifies {
+53 │ │         pragma opaque;
+54 │ │         aborts_if !exists<S>(addr);
+55 │ │         ensures global<S>(addr).x == 2;
+56 │ │     }
+   │ ╰─────^

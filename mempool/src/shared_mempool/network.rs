@@ -90,6 +90,20 @@ pub enum BroadcastError {
     TooManyPendingBroadcasts(PeerNetworkId),
 }
 
+impl BroadcastError {
+    /// Returns a summary label for the error
+    pub fn get_label(&self) -> &'static str {
+        match self {
+            Self::NetworkError(_, _) => "network_error",
+            Self::NoTransactions(_) => "no_transactions",
+            Self::PeerNotFound(_) => "peer_not_found",
+            Self::PeerNotPrioritized(_, _) => "peer_not_prioritized",
+            Self::PeerNotScheduled(_) => "peer_not_scheduled",
+            Self::TooManyPendingBroadcasts(_) => "too_many_pending_broadcasts",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum BroadcastPeerPriority {
     Primary,

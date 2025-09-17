@@ -614,9 +614,9 @@ pub enum StatusCode {
     NONCE_ALREADY_USED = 42,
     EMPTY_PAYLOAD_PROVIDED = 43,
     TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE = 44,
+    INVALID_NUMBER_OF_AUTHENTICATION_PROOFS = 45,
 
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_10 = 45,
     RESERVED_VALIDATION_ERROR_11 = 46,
     RESERVED_VALIDATION_ERROR_12 = 47,
     RESERVED_VALIDATION_ERROR_13 = 48,
@@ -774,12 +774,15 @@ pub enum StatusCode {
     CLOSURE_CALL_REQUIRES_FUNCTION = 1133,
     // Returned if init_module function is not valid during code publishing.
     INVALID_INIT_MODULE = 1134,
+    // When publishing a module bundle, all friends declared there must be in this bundle. If it is
+    // not the case, an error with this status code is returned.
+    FRIEND_NOT_FOUND_IN_MODULE_BUNDLE = 1135,
 
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_1 = 1135,
-    RESERVED_VERIFICATION_ERROR_2 = 1136,
-    RESERVED_VERIFICATION_ERROR_3 = 1137,
-    RESERVED_VERIFICATION_ERROR_4 = 1138,
+    RESERVED_VERIFICATION_ERROR_1 = 1136,
+    RESERVED_VERIFICATION_ERROR_2 = 1137,
+    RESERVED_VERIFICATION_ERROR_3 = 1138,
+    RESERVED_VERIFICATION_ERROR_4 = 1139,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.

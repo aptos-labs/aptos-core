@@ -56,6 +56,7 @@ use move_model::{
     model::{FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId, SpecFunId},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
+    well_known,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -155,7 +156,8 @@ pub fn run_inlining(
     }
 }
 
-/// Check that inline functions are (1) not native, (2) have a body (3) are not in a script.
+/// Check that inline functions are (1) not native, (2) have a body, (3) are not in a script,
+/// (4) do not have certain attributes, and (5) do not have access specifiers.
 /// Filter out inline functions from the targets if `Experiment::SKIP_INLINING_INLINE_FUNS` is on.
 fn check_and_maybe_filter_targets(env: &GlobalEnv, targets: &mut RewriteTargets) {
     let keep_inline_functions = !env
@@ -180,12 +182,32 @@ fn check_and_maybe_filter_targets(env: &GlobalEnv, targets: &mut RewriteTargets)
                         env.diag(Severity::Bug, &func_loc, &msg);
                     }
                 }
+
                 if func.module_env.is_script_module() {
                     env.error(
                         &func.get_id_loc(),
                         "inline function cannot be defined in a script",
                     );
                 }
+
+                if func.has_attribute(|attr| {
+                    let name = env.symbol_pool().string(attr.name());
+                    name.as_str() == well_known::PERSISTENT_ATTRIBUTE
+                        || name.as_str() == well_known::MODULE_LOCK_ATTRIBUTE
+                }) {
+                    env.error(
+                        &func.get_id_loc(),
+                        "inline functions cannot have the following attributes: `#[persistent]`, `#[module_lock]`",
+                    );
+                }
+
+                if func.get_access_specifiers().is_some() {
+                    env.warning(
+                        &func.get_id_loc(),
+                        "acquires and access specifiers are not applicable to inline functions and should be removed",
+                    );
+                }
+
                 keep_inline_functions
             } else {
                 // not an inline function
@@ -854,13 +876,29 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .map(|(_, para)| para)
             .collect_vec();
 
-        // Find free variables in lambda expr.  Perhaps we could minimize changes if we tracked each
-        // lambda arg individually in the inlined method and only rewrite the context of each
-        // inlined lambda, but that seems quite difficult.  Instead, just group all the free vars
-        // together and shadow them all.
+        // If a caller is provided, collect its parameter symbols.
+        let caller_param_symbols = target_qualified_fun_id_opt.map(|caller| {
+            env.get_function(caller)
+                .get_parameters()
+                .iter()
+                .map(|p| p.0)
+                .collect_vec()
+        });
+        // Find free variables across all lambda expr arguments.
+        // Perhaps we could minimize changes if we tracked each lambda arg individually in the inlined
+        // method and only rewrite the context of each inlined lambda, but that seems quite difficult.
+        // Instead, just group all the free vars together and shadow them all.
         let all_lambda_free_vars: BTreeSet<_> = lambda_args_matched
             .iter()
-            .flat_map(|(_, exp)| exp.free_vars().into_iter())
+            .flat_map(|(_, exp)| {
+                // If a caller is provided, compute free vars and used params.
+                if let Some(caller_param_symbols) = &caller_param_symbols {
+                    exp.free_vars_and_used_params(caller_param_symbols)
+                        .into_iter()
+                } else {
+                    exp.free_vars().into_iter()
+                }
+            })
             .collect();
 
         // While we're looking at the lambdas, check for Return in their bodies.
@@ -1433,7 +1471,7 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
                     pattern_vec.clone(),
                 ))
             },
-            Pattern::Wildcard(_) => None,
+            Pattern::Wildcard(_) => Some(Pattern::Wildcard(new_id)),
             Pattern::Error(_) => None,
         }
     }

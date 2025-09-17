@@ -139,6 +139,15 @@ impl SimpleInstruction {
     }
 }
 
+/// Represents a kind of dependency gas can be charged for.
+#[derive(Debug, Copy, Clone)]
+pub enum DependencyKind {
+    /// New dependency, typically charged on publish.
+    New,
+    /// Existing module dependency, charged typically on module load.
+    Existing,
+}
+
 /// Metering API for module or script dependencies. Defined as a stand-alone trait so it can be
 /// used in native context.
 ///
@@ -148,7 +157,7 @@ impl SimpleInstruction {
 pub trait DependencyGasMeter {
     fn charge_dependency(
         &mut self,
-        is_new: bool,
+        kind: DependencyKind,
         addr: &AccountAddress,
         name: &IdentStr,
         size: NumBytes,
@@ -375,7 +384,7 @@ pub struct UnmeteredGasMeter;
 impl DependencyGasMeter for UnmeteredGasMeter {
     fn charge_dependency(
         &mut self,
-        _is_new: bool,
+        _kind: DependencyKind,
         _addr: &AccountAddress,
         _name: &IdentStr,
         _size: NumBytes,

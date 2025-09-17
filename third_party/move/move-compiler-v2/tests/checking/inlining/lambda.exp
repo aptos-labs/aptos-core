@@ -280,6 +280,7 @@ module 0x42::LambdaTest1 {
 }
 module 0x42::LambdaTest2 {
     use 0x42::LambdaTest1;
+    use std::vector;
     public inline fun foreach<T>(v: &vector<T>, action: |&T|) {
         let i = 0;
         while (i < 0x1::vector::length<T>(v)) {

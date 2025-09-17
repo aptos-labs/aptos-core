@@ -129,13 +129,13 @@ impl<N> Node<N> {
 }
 
 impl ExecutionGasEvent {
-    fn to_erased(&self) -> Node<InternalGas> {
+    fn to_erased(&self, keep_generic_types: bool) -> Node<InternalGas> {
         use ExecutionGasEvent::*;
 
         match self {
             Loc(offset) => Node::new(format!("@{}", offset), 0),
             Bytecode { op, cost } => Node::new(format!("{:?}", op).to_ascii_lowercase(), *cost),
-            Call(frame) => frame.to_erased(),
+            Call(frame) => frame.to_erased(keep_generic_types),
             CallNative {
                 module_id,
                 fn_name,
@@ -144,7 +144,15 @@ impl ExecutionGasEvent {
             } => Node::new(
                 format!(
                     "{}",
-                    Render(&(module_id, fn_name.as_ident_str(), ty_args.as_slice()))
+                    Render(&(
+                        module_id,
+                        fn_name.as_ident_str(),
+                        if keep_generic_types {
+                            ty_args.as_slice()
+                        } else {
+                            &[]
+                        }
+                    ))
                 ),
                 *cost,
             ),
@@ -158,7 +166,7 @@ impl ExecutionGasEvent {
 }
 
 impl CallFrame {
-    fn to_erased(&self) -> Node<InternalGas> {
+    fn to_erased(&self, keep_generic_types: bool) -> Node<InternalGas> {
         let name = match &self.name {
             FrameName::Script => "script".to_string(),
             FrameName::Function {
@@ -168,7 +176,15 @@ impl CallFrame {
             } => {
                 format!(
                     "{}",
-                    Render(&(module_id, name.as_ident_str(), ty_args.as_slice()))
+                    Render(&(
+                        module_id,
+                        name.as_ident_str(),
+                        if keep_generic_types {
+                            ty_args.as_slice()
+                        } else {
+                            &[]
+                        }
+                    ))
                 )
             },
         };
@@ -176,7 +192,7 @@ impl CallFrame {
         let children = self
             .events
             .iter()
-            .map(|event| event.to_erased())
+            .map(|event| event.to_erased(keep_generic_types))
             .collect::<Vec<_>>();
 
         Node::new_with_children(name, 0, children)
@@ -200,20 +216,13 @@ impl WriteTransient {
 
 impl Dependency {
     fn to_erased(&self) -> Node<InternalGas> {
-        Node::new(
-            format!(
-                "{}{}",
-                Render(&self.id),
-                if self.is_new { " (new)" } else { "" }
-            ),
-            self.cost,
-        )
+        Node::new(self.render(), self.cost)
     }
 }
 
 impl ExecutionAndIOCosts {
     /// Convert the gas log into a type-erased representation.
-    pub fn to_erased(&self) -> TypeErasedExecutionAndIoCosts {
+    pub fn to_erased(&self, keep_generic_types: bool) -> TypeErasedExecutionAndIoCosts {
         let mut nodes = vec![];
 
         nodes.push(Node::new("intrinsic", self.intrinsic_cost));
@@ -229,7 +238,7 @@ impl ExecutionAndIOCosts {
             nodes.push(deps);
         }
 
-        nodes.push(self.call_graph.to_erased());
+        nodes.push(self.call_graph.to_erased(keep_generic_types));
 
         nodes.push(self.ledger_writes());
 
@@ -304,9 +313,9 @@ impl StorageFees {
 
 impl TransactionGasLog {
     /// Convert the gas log into a type-erased representation.
-    pub fn to_erased(&self) -> TypeErasedGasLog {
+    pub fn to_erased(&self, keep_generic_types: bool) -> TypeErasedGasLog {
         TypeErasedGasLog {
-            exec_io: self.exec_io.to_erased(),
+            exec_io: self.exec_io.to_erased(keep_generic_types),
             storage: self.storage.to_erased(),
         }
     }

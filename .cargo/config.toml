@@ -12,7 +12,6 @@ xclippy = [
   "-Aclippy::enum-variant-names",
   "-Aclippy::result-large-err",
   "-Aclippy::mutable-key-type",
-  "-Aclippy::map_identity",  # We temporarily ignore this due to: https://github.com/rust-lang/rust-clippy/issues/11764
   "-Aclippy::doc_lazy_continuation",
   "-Aclippy::collapsible_match",
   "-Aclippy::needless_borrows_for_generic_args",
@@ -21,12 +20,14 @@ xclippy = [
   "-Aclippy::empty_line_after_doc_comments",
   "-Aclippy::manual-ok-err",
   "-Aclippy::doc-overindented-list-items",
-  "-Aclippy::unneeded_struct_pattern",
   "-Aclippy::manual_div_ceil",
   "-Aclippy::manual-repeat-n",
   "-Aclippy::sliced-string-as-bytes",
   "-Aclippy::obfuscated-if-else",
   "-Aclippy::unnecessary-map-or",
+  "-Aclippy::nonminimal-bool",
+  "-Aclippy::unnecessary-unwrap",
+  "-Aclippy::large-enum-variant",
 ]
 x = "run --package aptos-cargo-cli --bin aptos-cargo-cli --"
 

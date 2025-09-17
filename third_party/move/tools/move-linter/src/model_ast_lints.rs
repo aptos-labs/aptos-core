@@ -3,9 +3,11 @@
 
 //! This module (and its submodules) contain various model-AST-based lint checks.
 
+mod aborting_overflow_checks;
 mod almost_swapped;
 mod assert_const;
 mod blocks_in_conditions;
+mod equal_operands_in_bin_op;
 mod needless_bool;
 mod needless_deref_ref;
 mod needless_ref_deref;
@@ -24,9 +26,11 @@ use std::collections::BTreeMap;
 pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box<dyn ExpChecker>> {
     // Start with the default set of checks.
     let checks: Vec<Box<dyn ExpChecker>> = vec![
+        Box::<aborting_overflow_checks::AbortingOverflowChecks>::default(),
         Box::<almost_swapped::AlmostSwapped>::default(),
         Box::<assert_const::AssertConst>::default(),
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
+        Box::<equal_operands_in_bin_op::EqualOperandsInBinOp>::default(),
         Box::<needless_bool::NeedlessBool>::default(),
         Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),

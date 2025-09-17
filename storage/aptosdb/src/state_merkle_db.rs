@@ -25,7 +25,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{
     batch::{IntoRawBatch, RawBatch, SchemaBatch, WriteBatch},
-    DB,
+    Cache, DB,
 };
 #[cfg(test)]
 use aptos_scratchpad::get_state_shard_id;
@@ -78,12 +78,18 @@ impl StateMerkleDb {
     ) -> Result<Self> {
         let sharding = rocksdb_configs.enable_storage_sharding;
         let state_merkle_db_config = rocksdb_configs.state_merkle_db_config;
+
         let mut version_caches = HashMap::with_capacity(NUM_STATE_SHARDS + 1);
         version_caches.insert(None, VersionedNodeCache::new());
         for i in 0..NUM_STATE_SHARDS {
             version_caches.insert(Some(i), VersionedNodeCache::new());
         }
         let lru_cache = NonZeroUsize::new(max_nodes_per_lru_cache_shard).map(LruNodeCache::new);
+        let block_cache = Cache::new_hyper_clock_cache(
+            state_merkle_db_config.block_cache_size as usize,
+            /* estimated_entry_charge = */ 0,
+        );
+
         if !sharding {
             info!("Sharded state merkle DB is not enabled!");
             let state_merkle_db_path = db_paths.default_root_path().join(STATE_MERKLE_DB_NAME);
@@ -91,6 +97,7 @@ impl StateMerkleDb {
                 state_merkle_db_path,
                 STATE_MERKLE_DB_NAME,
                 &state_merkle_db_config,
+                &block_cache,
                 readonly,
             )?);
             return Ok(Self {
@@ -105,6 +112,7 @@ impl StateMerkleDb {
         Self::open(
             db_paths,
             state_merkle_db_config,
+            &block_cache,
             readonly,
             version_caches,
             lru_cache,
@@ -423,9 +431,7 @@ impl StateMerkleDb {
         }
 
         let (shard_root_node, tree_update_batch) = {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["jmt_update"])
-                .start_timer();
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_update"]);
 
             self.batch_put_value_set_for_shard(
                 shard_id,
@@ -521,11 +527,13 @@ impl StateMerkleDb {
         self.lru_cache.as_ref()
     }
 
-    pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
-        self.state_merkle_metadata_db.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateMerklePrunerProgress,
-            &DbMetadataValue::Version(version),
-        )
+    pub(crate) fn write_pruner_progress(
+        &self,
+        progress_key: &DbMetadataKey,
+        version: Version,
+    ) -> Result<()> {
+        self.state_merkle_metadata_db
+            .put::<DbMetadataSchema>(progress_key, &DbMetadataValue::Version(version))
     }
 
     pub(crate) fn num_shards(&self) -> usize {
@@ -551,6 +559,7 @@ impl StateMerkleDb {
     fn open(
         db_paths: &StorageDirPaths,
         state_merkle_db_config: RocksdbConfig,
+        block_cache: &Cache,
         readonly: bool,
         version_caches: HashMap<Option<usize>, VersionedNodeCache>,
         lru_cache: Option<LruNodeCache>,
@@ -564,6 +573,7 @@ impl StateMerkleDb {
             state_merkle_metadata_db_path.clone(),
             STATE_MERKLE_METADATA_DB_NAME,
             &state_merkle_db_config,
+            block_cache,
             readonly,
         )?);
 
@@ -576,11 +586,16 @@ impl StateMerkleDb {
             .into_par_iter()
             .map(|shard_id| {
                 let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id);
-                let db =
-                    Self::open_shard(shard_root_path, shard_id, &state_merkle_db_config, readonly)
-                        .unwrap_or_else(|e| {
-                            panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
-                        });
+                let db = Self::open_shard(
+                    shard_root_path,
+                    shard_id,
+                    &state_merkle_db_config,
+                    block_cache,
+                    readonly,
+                )
+                .unwrap_or_else(|e| {
+                    panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
+                });
                 Arc::new(db)
             })
             .collect::<Vec<_>>()
@@ -613,6 +628,7 @@ impl StateMerkleDb {
         db_root_path: P,
         shard_id: usize,
         state_merkle_db_config: &RocksdbConfig,
+        block_cache: &Cache,
         readonly: bool,
     ) -> Result<DB> {
         let db_name = format!("state_merkle_db_shard_{}", shard_id);
@@ -620,6 +636,7 @@ impl StateMerkleDb {
             Self::db_shard_path(db_root_path, shard_id),
             &db_name,
             state_merkle_db_config,
+            block_cache,
             readonly,
         )
     }
@@ -628,6 +645,7 @@ impl StateMerkleDb {
         path: PathBuf,
         name: &str,
         state_merkle_db_config: &RocksdbConfig,
+        block_cache: &Cache,
         readonly: bool,
     ) -> Result<DB> {
         Ok(if readonly {
@@ -635,14 +653,14 @@ impl StateMerkleDb {
                 &gen_rocksdb_options(state_merkle_db_config, true),
                 path,
                 name,
-                gen_state_merkle_cfds(state_merkle_db_config),
+                gen_state_merkle_cfds(state_merkle_db_config, Some(block_cache)),
             )?
         } else {
             DB::open_cf(
                 &gen_rocksdb_options(state_merkle_db_config, false),
                 path,
                 name,
-                gen_state_merkle_cfds(state_merkle_db_config),
+                gen_state_merkle_cfds(state_merkle_db_config, Some(block_cache)),
             )?
         })
     }
@@ -769,8 +787,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
                 .db_by_key(node_key)
                 .get::<JellyfishMerkleNodeSchema>(node_key)?;
             NODE_CACHE_SECONDS
-                .with_label_values(&[tag, "cache_disabled"])
-                .observe(start_time.elapsed().as_secs_f64());
+                .observe_with(&[tag, "cache_disabled"], start_time.elapsed().as_secs_f64());
             return Ok(node_opt);
         }
         if let Some(node_cache) = self
@@ -780,17 +797,17 @@ impl TreeReader<StateKey> for StateMerkleDb {
             .get_version(node_key.version())
         {
             let node = node_cache.get(node_key).cloned();
-            NODE_CACHE_SECONDS
-                .with_label_values(&[tag, "versioned_cache_hit"])
-                .observe(start_time.elapsed().as_secs_f64());
+            NODE_CACHE_SECONDS.observe_with(
+                &[tag, "versioned_cache_hit"],
+                start_time.elapsed().as_secs_f64(),
+            );
             return Ok(node);
         }
 
         if let Some(lru_cache) = &self.lru_cache {
             if let Some(node) = lru_cache.get(node_key) {
                 NODE_CACHE_SECONDS
-                    .with_label_values(&[tag, "lru_cache_hit"])
-                    .observe(start_time.elapsed().as_secs_f64());
+                    .observe_with(&[tag, "lru_cache_hit"], start_time.elapsed().as_secs_f64());
                 return Ok(Some(node));
             }
         }
@@ -803,9 +820,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
                 lru_cache.put(node_key.clone(), node.clone());
             }
         }
-        NODE_CACHE_SECONDS
-            .with_label_values(&[tag, "cache_miss"])
-            .observe(start_time.elapsed().as_secs_f64());
+        NODE_CACHE_SECONDS.observe_with(&[tag, "cache_miss"], start_time.elapsed().as_secs_f64());
         Ok(node_opt)
     }
 
@@ -828,9 +843,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
 
 impl TreeWriter<StateKey> for StateMerkleDb {
     fn write_node_batch(&self, node_batch: &NodeBatch) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["tree_writer_write_batch"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["tree_writer_write_batch"]);
         // Get the top level batch and sharded batch from raw NodeBatch
         let mut top_level_batch = SchemaBatch::new();
         let mut jmt_shard_batches: Vec<SchemaBatch> = Vec::with_capacity(NUM_STATE_SHARDS);

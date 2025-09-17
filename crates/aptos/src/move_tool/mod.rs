@@ -15,7 +15,7 @@ use crate::{
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            profile_or_submit, prompt_yes_with_override, write_to_file,
+            dispatch_transaction, prompt_yes_with_override, write_to_file,
         },
     },
     governance::CompileScriptFunction,
@@ -25,6 +25,7 @@ use crate::{
         fmt::Fmt,
         lint::LintPackage,
         manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
+        sim::Sim,
     },
     CliCommand, CliResult,
 };
@@ -67,6 +68,7 @@ use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
+use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
@@ -78,7 +80,6 @@ use std::{
 pub use stored_package::*;
 use tokio::task;
 use url::Url;
-
 pub mod aptos_debug_natives;
 mod bytecode;
 pub mod coverage;
@@ -87,6 +88,7 @@ mod lint;
 mod manifest;
 pub mod package_hooks;
 mod show;
+mod sim;
 pub mod stored_package;
 
 const HELLO_BLOCKCHAIN_EXAMPLE: &str = include_str!(
@@ -135,6 +137,8 @@ pub enum MoveTool {
     View(ViewFunction),
     Replay(Replay),
     Fmt(Fmt),
+    #[clap(subcommand)]
+    Sim(Sim),
 }
 
 impl MoveTool {
@@ -173,6 +177,7 @@ impl MoveTool {
             MoveTool::Replay(tool) => tool.execute_serialized().await,
             MoveTool::Fmt(tool) => tool.execute_serialized().await,
             MoveTool::Lint(tool) => tool.execute_serialized().await,
+            MoveTool::Sim(tool) => tool.execute().await,
         }
     }
 }
@@ -596,7 +601,6 @@ impl CliCommand<&'static str> for TestPackage {
             config.clone(),
             UnitTestingConfig {
                 filter: self.filter.clone(),
-                report_stacktrace_on_abort: true,
                 report_storage_on_error: self.dump_state,
                 ignore_compile_warnings: self.ignore_compile_warnings,
                 named_address_values: self
@@ -1057,7 +1061,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             .await
         } else {
             let package_publication_data: PackagePublicationData = (&self).try_into()?;
-            profile_or_submit(package_publication_data.payload, &self.txn_options).await
+            dispatch_transaction(package_publication_data.payload, &self.txn_options).await
         }
     }
 }
@@ -2137,7 +2141,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        profile_or_submit(
+        dispatch_transaction(
             TransactionPayload::EntryFunction(self.entry_function_args.try_into()?),
             &self.txn_options,
         )
@@ -2177,7 +2181,8 @@ impl CliCommand<TransactionSummary> for Simulate {
         if self.local {
             self.txn_options.simulate_locally(payload).await
         } else {
-            self.txn_options.simulate_remotely(payload).await
+            let mut rng = rand::rngs::StdRng::from_entropy();
+            self.txn_options.simulate_remotely(&mut rng, payload).await
         }
     }
 }
@@ -2226,7 +2231,7 @@ impl CliCommand<TransactionSummary> for RunScript {
             .compile_proposal_args
             .compile("RunScript", self.txn_options.prompt_options)?;
 
-        profile_or_submit(
+        dispatch_transaction(
             self.script_function_args.create_script_payload(bytecode)?,
             &self.txn_options,
         )
@@ -2240,6 +2245,21 @@ pub enum ReplayNetworkSelection {
     Testnet,
     Devnet,
     RestEndpoint(String),
+}
+
+impl ReplayNetworkSelection {
+    pub fn to_base_url(&self) -> CliTypedResult<AptosBaseUrl> {
+        match self {
+            ReplayNetworkSelection::Mainnet => Ok(AptosBaseUrl::Mainnet),
+            ReplayNetworkSelection::Testnet => Ok(AptosBaseUrl::Testnet),
+            ReplayNetworkSelection::Devnet => Ok(AptosBaseUrl::Devnet),
+            ReplayNetworkSelection::RestEndpoint(url) => {
+                Ok(AptosBaseUrl::Custom(Url::parse(url).map_err(|e| {
+                    CliError::UnableToParse("url", e.to_string())
+                })?))
+            },
+        }
+    }
 }
 
 /// Replay a comitted transaction using a local VM.
@@ -2294,26 +2314,14 @@ impl CliCommand<TransactionSummary> for Replay {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        use ReplayNetworkSelection::*;
-
         if self.profile_gas && self.benchmark {
             return Err(CliError::UnexpectedError(
                 "Cannot perform benchmarking and gas profiling at the same time.".to_string(),
             ));
         }
 
-        let rest_endpoint = match &self.network {
-            Mainnet => "https://fullnode.mainnet.aptoslabs.com",
-            Testnet => "https://fullnode.testnet.aptoslabs.com",
-            Devnet => "https://fullnode.devnet.aptoslabs.com",
-            RestEndpoint(url) => url,
-        };
-
         // Build the client
-        let client = Client::builder(AptosBaseUrl::Custom(
-            Url::parse(rest_endpoint)
-                .map_err(|_err| CliError::UnableToParse("url", rest_endpoint.to_string()))?,
-        ));
+        let client = Client::builder(self.network.to_base_url()?);
 
         // add the node API key if it is provided
         let client = if let Some(api_key) = self.node_api_key {

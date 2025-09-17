@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::{mock, mock::MockClient, utils};
+use crate::tests::{
+    mock,
+    mock::{MockClient, MockDatabaseReader},
+    utils,
+};
 use aptos_config::config::StorageServiceConfig;
 use aptos_storage_service_types::{
     requests::{DataRequest, TransactionOutputsWithProofRequest},
@@ -10,19 +14,82 @@ use aptos_storage_service_types::{
 };
 use aptos_types::transaction::TransactionOutputListWithProofV2;
 use claims::assert_matches;
-use mockall::{predicate::eq, Sequence};
+use std::cmp::min;
 
 #[tokio::test]
 async fn test_get_transaction_outputs_with_proof() {
-    // Test both v1 and v2 data requests
-    for use_request_v2 in [false, true] {
-        // Test small and large chunk requests
-        let max_output_chunk_size =
-            StorageServiceConfig::default().max_transaction_output_chunk_size;
-        for chunk_size in [1, 100, max_output_chunk_size] {
+    // Test size and time-aware chunking
+    for use_size_and_time_aware_chunking in [false, true] {
+        // Test both v1 and v2 data requests
+        for use_request_v2 in [false, true] {
+            // Test small and large chunk requests
+            let max_output_chunk_size =
+                StorageServiceConfig::default().max_transaction_output_chunk_size;
+            for chunk_size in [1, 100, max_output_chunk_size] {
+                // Create test data
+                let start_version = 0;
+                let end_version = start_version + chunk_size - 1;
+                let proof_version = end_version;
+                let output_list_with_proof = utils::create_output_list_with_proof(
+                    start_version,
+                    end_version,
+                    proof_version,
+                    use_request_v2,
+                );
+
+                // Create the mock db reader
+                let mut db_reader = mock::create_mock_db_reader();
+                utils::expect_get_transaction_outputs(
+                    &mut db_reader,
+                    start_version,
+                    chunk_size,
+                    proof_version,
+                    output_list_with_proof.clone(),
+                    use_size_and_time_aware_chunking,
+                );
+
+                // Create a storage service config
+                let storage_config =
+                    utils::create_storage_config(use_request_v2, use_size_and_time_aware_chunking);
+
+                // Create the storage client and server
+                let (mut mock_client, mut service, _, _, _) =
+                    MockClient::new(Some(db_reader), Some(storage_config));
+                utils::update_storage_server_summary(&mut service, proof_version + 100, 10);
+                tokio::spawn(service.start());
+
+                // Create a request to fetch transactions outputs with a proof
+                let response = get_outputs_with_proof(
+                    &mut mock_client,
+                    start_version,
+                    end_version,
+                    end_version,
+                    true,
+                    use_request_v2,
+                    storage_config.max_network_chunk_bytes_v2,
+                )
+                .await
+                .unwrap();
+
+                // Verify the response is correct
+                verify_output_with_proof_response(use_request_v2, output_list_with_proof, response);
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_get_transaction_outputs_with_proof_chunk_limit() {
+    // Test size and time-aware chunking
+    for use_size_and_time_aware_chunking in [false, true] {
+        // Test both v1 and v2 data requests
+        for use_request_v2 in [false, true] {
             // Create test data
+            let max_output_chunk_size =
+                StorageServiceConfig::default().max_transaction_output_chunk_size;
+            let chunk_size = max_output_chunk_size * 10; // Set a chunk request larger than the max
             let start_version = 0;
-            let end_version = start_version + chunk_size - 1;
+            let end_version = start_version + max_output_chunk_size - 1;
             let proof_version = end_version;
             let output_list_with_proof = utils::create_output_list_with_proof(
                 start_version,
@@ -36,28 +103,31 @@ async fn test_get_transaction_outputs_with_proof() {
             utils::expect_get_transaction_outputs(
                 &mut db_reader,
                 start_version,
-                chunk_size,
+                max_output_chunk_size,
                 proof_version,
                 output_list_with_proof.clone(),
+                use_size_and_time_aware_chunking,
             );
 
             // Create a storage service config
-            let storage_config = utils::create_storage_config(use_request_v2);
+            let storage_config =
+                utils::create_storage_config(use_request_v2, use_size_and_time_aware_chunking);
 
             // Create the storage client and server
             let (mut mock_client, mut service, _, _, _) =
                 MockClient::new(Some(db_reader), Some(storage_config));
-            utils::update_storage_server_summary(&mut service, proof_version + 100, 10);
+            utils::update_storage_server_summary(&mut service, proof_version + chunk_size, 10);
             tokio::spawn(service.start());
 
-            // Create a request to fetch transactions outputs with a proof
+            // Create a request to fetch transaction outputs with a proof
             let response = get_outputs_with_proof(
                 &mut mock_client,
                 start_version,
-                end_version,
+                start_version + chunk_size - 1,
                 end_version,
                 true,
                 use_request_v2,
+                storage_config.max_network_chunk_bytes_v2,
             )
             .await
             .unwrap();
@@ -69,64 +139,10 @@ async fn test_get_transaction_outputs_with_proof() {
 }
 
 #[tokio::test]
-async fn test_get_transaction_outputs_with_proof_chunk_limit() {
-    // Test both v1 and v2 data requests
-    for use_request_v2 in [false, true] {
-        // Create test data
-        let max_output_chunk_size =
-            StorageServiceConfig::default().max_transaction_output_chunk_size;
-        let chunk_size = max_output_chunk_size * 10; // Set a chunk request larger than the max
-        let start_version = 0;
-        let end_version = start_version + max_output_chunk_size - 1;
-        let proof_version = end_version;
-        let output_list_with_proof = utils::create_output_list_with_proof(
-            start_version,
-            end_version,
-            proof_version,
-            use_request_v2,
-        );
-
-        // Create the mock db reader
-        let mut db_reader = mock::create_mock_db_reader();
-        utils::expect_get_transaction_outputs(
-            &mut db_reader,
-            start_version,
-            max_output_chunk_size,
-            proof_version,
-            output_list_with_proof.clone(),
-        );
-
-        // Create a storage service config
-        let storage_config = utils::create_storage_config(use_request_v2);
-
-        // Create the storage client and server
-        let (mut mock_client, mut service, _, _, _) =
-            MockClient::new(Some(db_reader), Some(storage_config));
-        utils::update_storage_server_summary(&mut service, proof_version + chunk_size, 10);
-        tokio::spawn(service.start());
-
-        // Create a request to fetch transaction outputs with a proof
-        let response = get_outputs_with_proof(
-            &mut mock_client,
-            start_version,
-            start_version + chunk_size - 1,
-            end_version,
-            true,
-            use_request_v2,
-        )
-        .await
-        .unwrap();
-
-        // Verify the response is correct
-        verify_output_with_proof_response(use_request_v2, output_list_with_proof, response);
-    }
-}
-
-#[tokio::test]
 #[should_panic(expected = "Canceled")]
 async fn test_get_transaction_outputs_with_proof_disable_v2() {
     // Create a storage service config with transaction v2 disabled
-    let storage_config = utils::create_storage_config(false);
+    let storage_config = utils::create_storage_config(false, false);
 
     // Create the storage client and server
     let (mut mock_client, service, _, _, _) = MockClient::new(None, Some(storage_config));
@@ -141,6 +157,7 @@ async fn test_get_transaction_outputs_with_proof_disable_v2() {
         10,
         true,
         true, // Use transaction v2
+        storage_config.max_network_chunk_bytes_v2,
     )
     .await
     .unwrap();
@@ -148,80 +165,141 @@ async fn test_get_transaction_outputs_with_proof_disable_v2() {
 
 #[tokio::test]
 async fn test_get_transaction_outputs_with_proof_invalid() {
-    // Test both v1 and v2 data requests
-    for use_request_v2 in [false, true] {
-        // Create a storage service config
-        let storage_config = utils::create_storage_config(use_request_v2);
+    // Test size and time-aware chunking
+    for use_size_and_time_aware_chunking in [false, true] {
+        // Test both v1 and v2 data requests
+        for use_request_v2 in [false, true] {
+            // Create a storage service config
+            let storage_config =
+                utils::create_storage_config(use_request_v2, use_size_and_time_aware_chunking);
 
-        // Create the storage client and server
-        let (mut mock_client, service, _, _, _) = MockClient::new(None, Some(storage_config));
-        tokio::spawn(service.start());
+            // Create the storage client and server
+            let (mut mock_client, service, _, _, _) = MockClient::new(None, Some(storage_config));
+            tokio::spawn(service.start());
 
-        // Test invalid ranges
-        let start_version = 1000;
-        for end_version in [0, 999] {
-            let response = get_outputs_with_proof(
-                &mut mock_client,
-                start_version,
-                end_version,
-                end_version,
-                true,
-                use_request_v2,
-            )
-            .await
-            .unwrap_err();
-            assert_matches!(response, StorageServiceError::InvalidRequest(_));
+            // Test invalid ranges
+            let start_version = 1000;
+            for end_version in [0, 999] {
+                let response = get_outputs_with_proof(
+                    &mut mock_client,
+                    start_version,
+                    end_version,
+                    end_version,
+                    true,
+                    use_request_v2,
+                    storage_config.max_network_chunk_bytes_v2,
+                )
+                .await
+                .unwrap_err();
+                assert_matches!(response, StorageServiceError::InvalidRequest(_));
+            }
         }
     }
 }
 
 #[tokio::test]
 async fn test_get_transaction_outputs_with_proof_network_limit() {
-    // Test both v1 and v2 data requests
-    for use_request_v2 in [false, true] {
-        // Test different byte limits
-        for network_limit_bytes in [1, 5 * 1024, 50 * 1024] {
-            get_outputs_with_proof_network_limit(network_limit_bytes, use_request_v2).await;
+    // Test size and time-aware chunking
+    for use_size_and_time_aware_chunking in [false, true] {
+        // Test both v1 and v2 data requests
+        for use_request_v2 in [false, true] {
+            // Test different byte limits (the client and server limits match)
+            for max_specified_bytes in [1, 5 * 1024, 50 * 1024] {
+                get_outputs_with_proof_network_limit(
+                    max_specified_bytes,
+                    max_specified_bytes,
+                    use_request_v2,
+                    use_size_and_time_aware_chunking,
+                )
+                .await;
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_get_transaction_outputs_with_proof_network_limit_client_bounded() {
+    // Test size and time-aware chunking
+    for use_size_and_time_aware_chunking in [false, true] {
+        // Test both v1 and v2 data requests
+        for use_request_v2 in [false, true] {
+            // Test different byte limits
+            for max_specified_bytes in [1, 5 * 1024, 50 * 1024] {
+                let max_server_specified_bytes = max_specified_bytes * 10; // The server limit is 10x the client limit
+                get_outputs_with_proof_network_limit(
+                    max_specified_bytes,
+                    max_server_specified_bytes,
+                    use_request_v2,
+                    use_size_and_time_aware_chunking,
+                )
+                .await;
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_get_transaction_outputs_with_proof_network_limit_server_bounded() {
+    // Test size and time-aware chunking
+    for use_size_and_time_aware_chunking in [false, true] {
+        // Test both v1 and v2 data requests
+        for use_request_v2 in [false, true] {
+            // Test different byte limits
+            for max_specified_bytes in [1, 5 * 1024, 50 * 1024] {
+                let max_client_specified_bytes = max_specified_bytes * 10; // The client limit is 10x the server limit
+                get_outputs_with_proof_network_limit(
+                    max_client_specified_bytes,
+                    max_specified_bytes,
+                    use_request_v2,
+                    use_size_and_time_aware_chunking,
+                )
+                .await;
+            }
         }
     }
 }
 
 #[tokio::test]
 async fn test_get_transaction_outputs_with_proof_not_serviceable() {
-    // Test both v1 and v2 data requests
-    for use_request_v2 in [false, true] {
-        // Test small and large chunk requests
-        let max_output_chunk_size =
-            StorageServiceConfig::default().max_transaction_output_chunk_size;
-        for chunk_size in [2, 100, max_output_chunk_size] {
-            // Create test data
-            let start_version = 0;
-            let end_version = start_version + chunk_size - 1;
-            let proof_version = end_version;
+    // Test size and time-aware chunking
+    for use_size_and_time_aware_chunking in [false, true] {
+        // Test both v1 and v2 data requests
+        for use_request_v2 in [false, true] {
+            // Test small and large chunk requests
+            let max_output_chunk_size =
+                StorageServiceConfig::default().max_transaction_output_chunk_size;
+            for chunk_size in [2, 100, max_output_chunk_size] {
+                // Create test data
+                let start_version = 0;
+                let end_version = start_version + chunk_size - 1;
+                let proof_version = end_version;
 
-            // Create a storage service config
-            let storage_config = utils::create_storage_config(use_request_v2);
+                // Create a storage service config
+                let storage_config =
+                    utils::create_storage_config(use_request_v2, use_size_and_time_aware_chunking);
 
-            // Create the storage client and server (that cannot service the request)
-            let (mut mock_client, mut service, _, _, _) =
-                MockClient::new(None, Some(storage_config));
-            utils::update_storage_server_summary(&mut service, proof_version - 1, 10);
-            tokio::spawn(service.start());
+                // Create the storage client and server (that cannot service the request)
+                let (mut mock_client, mut service, _, _, _) =
+                    MockClient::new(None, Some(storage_config));
+                utils::update_storage_server_summary(&mut service, proof_version - 1, 10);
+                tokio::spawn(service.start());
 
-            // Create a request to fetch transactions outputs with a proof
-            let response = get_outputs_with_proof(
-                &mut mock_client,
-                start_version,
-                end_version,
-                end_version,
-                true,
-                use_request_v2,
-            )
-            .await
-            .unwrap_err();
+                // Create a request to fetch transactions outputs with a proof
+                let response = get_outputs_with_proof(
+                    &mut mock_client,
+                    start_version,
+                    end_version,
+                    end_version,
+                    true,
+                    use_request_v2,
+                    storage_config.max_network_chunk_bytes_v2,
+                )
+                .await
+                .unwrap_err();
 
-            // Verify the request is not serviceable
-            assert_matches!(response, StorageServiceError::InvalidRequest(_));
+                // Verify the request is not serviceable
+                assert_matches!(response, StorageServiceError::InvalidRequest(_));
+            }
         }
     }
 }
@@ -234,13 +312,14 @@ async fn get_outputs_with_proof(
     proof_version: u64,
     use_compression: bool,
     use_request_v2: bool,
+    max_response_bytes_v2: u64,
 ) -> Result<StorageServiceResponse, StorageServiceError> {
     let data_request = if use_request_v2 {
         DataRequest::get_transaction_output_data_with_proof(
             proof_version,
             start_version,
             end_version,
-            0,
+            max_response_bytes_v2,
         )
     } else {
         DataRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
@@ -253,8 +332,13 @@ async fn get_outputs_with_proof(
 }
 
 /// A helper method to request a transaction outputs with proof chunk using
-/// the specified network limit.
-async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64, use_request_v2: bool) {
+/// the specified network limits (client and server).
+async fn get_outputs_with_proof_network_limit(
+    max_client_specified_bytes: u64,
+    max_server_specified_bytes: u64,
+    use_request_v2: bool,
+    use_size_and_time_aware_chunking: bool,
+) {
     for use_compression in [true, false] {
         // Create test data
         let max_output_chunk_size =
@@ -264,31 +348,21 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64, use_requ
         let proof_version = 1000000;
 
         // Create the mock db reader
-        let mut db_reader = mock::create_mock_db_reader();
-        let mut expectation_sequence = Sequence::new();
-        let mut chunk_size = max_output_chunk_size;
-        while chunk_size >= 1 {
-            // Expect a call to get outputs with the specified chunk size
-            let output_list_with_proof = utils::create_output_list_using_sizes(
-                start_version,
-                chunk_size,
-                min_bytes_per_output,
-                use_request_v2,
-            );
-            db_reader
-                .expect_get_transaction_outputs()
-                .times(1)
-                .with(eq(start_version), eq(chunk_size), eq(proof_version))
-                .in_sequence(&mut expectation_sequence)
-                .returning(move |_, _, _| Ok(output_list_with_proof.clone()));
-
-            chunk_size /= 2;
-        }
+        let db_reader = create_mock_db_with_output_expectations(
+            use_request_v2,
+            use_size_and_time_aware_chunking,
+            max_output_chunk_size,
+            min_bytes_per_output,
+            start_version,
+            proof_version,
+        );
 
         // Create a storage config with the specified max network byte limit
         let storage_config = StorageServiceConfig {
-            max_network_chunk_bytes: network_limit_bytes,
+            max_network_chunk_bytes: max_server_specified_bytes,
+            max_network_chunk_bytes_v2: max_server_specified_bytes,
             enable_transaction_data_v2: use_request_v2,
+            enable_size_and_time_aware_chunking: use_size_and_time_aware_chunking,
             ..Default::default()
         };
 
@@ -306,6 +380,7 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64, use_requ
             proof_version,
             use_compression,
             use_request_v2,
+            max_client_specified_bytes,
         )
         .await
         .unwrap();
@@ -324,13 +399,78 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64, use_requ
             },
             _ => panic!("Expected outputs with proof but got: {:?}", response),
         };
-        if num_response_bytes > network_limit_bytes {
+        if num_response_bytes > max_server_specified_bytes {
             assert_eq!(num_outputs, 1); // Data cannot be reduced more than a single item
         } else {
-            let max_outputs = network_limit_bytes / min_bytes_per_output;
-            assert!(num_outputs <= max_outputs); // Verify data fits correctly into the limit
+            // Determine the max specified bytes
+            let max_specified_bytes = if use_request_v2 {
+                min(max_client_specified_bytes, max_server_specified_bytes)
+            } else {
+                max_server_specified_bytes
+            };
+
+            // Verify the number of outputs fits within the specified byte limit
+            let max_outputs = max_specified_bytes / min_bytes_per_output;
+            assert!(num_outputs <= max_outputs);
         }
     }
+}
+
+/// Creates a mock db reader with expectations for fetching outputs
+fn create_mock_db_with_output_expectations(
+    use_request_v2: bool,
+    use_size_and_time_aware_chunking: bool,
+    mut chunk_size: u64,
+    min_bytes_per_output: u64,
+    start_version: u64,
+    proof_version: u64,
+) -> MockDatabaseReader {
+    // Create the mock DB reader
+    let mut db_reader = mock::create_mock_db_reader();
+
+    // Create an output list using the initial chunk size
+    let output_list_with_proof = utils::create_output_list_using_sizes(
+        start_version,
+        chunk_size,
+        min_bytes_per_output,
+        use_request_v2,
+    );
+
+    // If size and time-aware chunking are enabled, expect iterator usage
+    if use_size_and_time_aware_chunking {
+        utils::expect_get_transaction_outputs(
+            &mut db_reader,
+            start_version,
+            chunk_size,
+            proof_version,
+            output_list_with_proof.clone(),
+            use_size_and_time_aware_chunking,
+        );
+        return db_reader;
+    }
+
+    // Otherwise, expect the legacy implementation that halves the chunk size until it fits
+    while chunk_size >= 1 {
+        let output_list_with_proof = utils::create_output_list_using_sizes(
+            start_version,
+            chunk_size,
+            min_bytes_per_output,
+            use_request_v2,
+        );
+
+        utils::expect_get_transaction_outputs(
+            &mut db_reader,
+            start_version,
+            chunk_size,
+            proof_version,
+            output_list_with_proof.clone(),
+            use_size_and_time_aware_chunking,
+        );
+
+        chunk_size /= 2;
+    }
+
+    db_reader
 }
 
 /// Verifies the response for a transaction output with proof request

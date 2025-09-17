@@ -1,0 +1,28 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/bug_16607.move`
+
+//# publish
+module 0xcafe::Module0 {
+    enum Enum0 has copy, drop {
+        E1 {
+            _0: bool,
+        }
+    }
+    struct S has copy, drop {
+        x: Enum0,
+    }
+    fun f(p0: S) {
+        let _t1: || has copy + drop = || lambda__1__f();
+        let _t2: || has copy + drop = || lambda__2__f();
+        let _t3 = *&(&p0).x;
+        if (!(&_t3 is E1)) abort 14566554180833181697;
+        let Enum0::E1{_0: _t13} = _t3;
+        let _t4 = &mut _t1;
+        *_t4 = _t2;
+    }
+    fun lambda__1__f() {
+        ()
+    }
+    fun lambda__2__f() {
+        ()
+    }
+}

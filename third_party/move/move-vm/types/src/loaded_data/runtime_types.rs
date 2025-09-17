@@ -8,7 +8,7 @@ use crate::loaded_data::struct_name_indexing::StructNameIndex;
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    errors::{PartialVMError, PartialVMResult},
     file_format::{
         SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex, VariantIndex,
     },
@@ -1041,9 +1041,9 @@ impl TypeBuilder {
     }
 
     /// Creates a fully-instantiated type from its storage representation.
-    pub fn create_ty<F>(&self, ty_tag: &TypeTag, mut resolver: F) -> VMResult<Type>
+    pub fn create_ty<F>(&self, ty_tag: &TypeTag, mut resolver: F) -> PartialVMResult<Type>
     where
-        F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,
+        F: FnMut(&StructTag) -> PartialVMResult<Arc<StructType>>,
     {
         let mut count = 0;
         self.create_ty_impl(ty_tag, &mut resolver, &mut count, 1)
@@ -1274,15 +1274,14 @@ impl TypeBuilder {
         resolver: &mut F,
         count: &mut u64,
         depth: u64,
-    ) -> VMResult<Type>
+    ) -> PartialVMResult<Type>
     where
-        F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,
+        F: FnMut(&StructTag) -> PartialVMResult<Arc<StructType>>,
     {
         use Type::*;
         use TypeTag as T;
 
-        self.check(count, depth)
-            .map_err(|e| e.finish(Location::Undefined))?;
+        self.check(count, depth)?;
         *count += 1;
         Ok(match ty_tag {
             T::Bool => Bool,
@@ -1312,8 +1311,7 @@ impl TypeBuilder {
                         let ty_arg = self.create_ty_impl(ty_arg, resolver, count, depth + 1)?;
                         ty_args.push(ty_arg);
                     }
-                    Type::verify_ty_arg_abilities(struct_ty.ty_param_constraints(), &ty_args)
-                        .map_err(|e| e.finish(Location::Undefined))?;
+                    Type::verify_ty_arg_abilities(struct_ty.ty_param_constraints(), &ty_args)?;
                     StructInstantiation {
                         idx: struct_ty.idx,
                         ty_args: triomphe::Arc::new(ty_args),
@@ -1347,7 +1345,7 @@ impl TypeBuilder {
                                 },
                             })
                         })
-                        .collect::<VMResult<Vec<_>>>()
+                        .collect::<PartialVMResult<Vec<_>>>()
                 };
                 Function {
                     args: to_list(args)?,
@@ -1595,7 +1593,7 @@ mod unit_tests {
 
         let ty = Vector(TriompheArc::new(Vector(TriompheArc::new(TyParam(0)))));
         let ty_arg = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
-        assert_ok!(ty_builder.create_ty_with_subst(&ty, &[ty_arg.clone()]));
+        assert_ok!(ty_builder.create_ty_with_subst(&ty, std::slice::from_ref(&ty_arg)));
 
         let ty_arg = Vector(TriompheArc::new(ty_arg));
         let err = assert_err!(ty_builder.create_ty_with_subst(&ty, &[ty_arg]));

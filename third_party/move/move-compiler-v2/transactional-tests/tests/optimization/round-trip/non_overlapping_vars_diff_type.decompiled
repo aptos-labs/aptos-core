@@ -1,0 +1,15 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/non_overlapping_vars_diff_type.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun main() {
+        if (!(test() == 3)) abort 0;
+    }
+    fun test(): u64 {
+        let _t2 = 1u32 + 1u32;
+        2 + 1
+    }
+}
+
+
+//# run 0xc0ffee::m::main

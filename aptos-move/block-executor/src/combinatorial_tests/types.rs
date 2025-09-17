@@ -4,6 +4,7 @@
 
 use crate::types::delayed_field_mock_serialization::serialize_delayed_field_tuple;
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, serialize, DeltaOp};
+use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::TransactionEvent,
@@ -330,7 +331,7 @@ pub(crate) struct MockIncarnation<K, E> {
     pub(crate) group_writes: Vec<(K, StateValueMetadata, HashMap<u32, (ValueType, bool)>)>,
     // For testing get_module_or_build_with and insert_verified_module interfaces.
     pub(crate) module_reads: Vec<ModuleId>,
-    pub(crate) module_writes: Vec<ModuleWrite<ValueType>>,
+    pub(crate) module_writes: BTreeMap<K, ModuleWrite<ValueType>>,
     /// Keys to query group size for - false is querying size, true is querying metadata.
     pub(crate) group_queries: Vec<(K, bool)>,
     /// A vector of keys and corresponding deltas to be produced during mock incarnation
@@ -362,7 +363,7 @@ impl<K, E> MockIncarnation<K, E> {
             group_writes: vec![],
             group_queries: vec![],
             module_reads: vec![],
-            module_writes: vec![],
+            module_writes: BTreeMap::new(),
             deltas,
             events,
             metadata_seeds,
@@ -384,7 +385,7 @@ impl<K, E> MockIncarnation<K, E> {
             group_writes: vec![],
             group_queries: vec![],
             module_reads: vec![],
-            module_writes: vec![],
+            module_writes: BTreeMap::new(),
             deltas,
             events,
             metadata_seeds: [0; 3],
@@ -423,6 +424,7 @@ pub(crate) enum MockTransaction<K, E> {
     SkipRest(u64),
     /// Abort the execution.
     Abort,
+    StateCheckpoint,
 }
 
 impl<K, E> MockTransaction<K, E> {
@@ -473,6 +475,9 @@ impl<K, E> MockTransaction<K, E> {
             Self::InterruptRequested => {
                 unreachable!("InterruptRequested does not contain incarnation behaviors")
             },
+            Self::StateCheckpoint => {
+                unreachable!("StateCheckpoint does not contain incarnation behaviors")
+            },
         }
     }
 }
@@ -491,15 +496,8 @@ impl<
         0
     }
 
-    fn from_txn(txn: aptos_types::transaction::Transaction) -> Self {
-        match txn {
-            aptos_types::transaction::Transaction::StateCheckpoint(_)
-            | aptos_types::transaction::Transaction::BlockEpilogue(_) => {
-                let behaivor = MockIncarnation::new(vec![], vec![], vec![], vec![], 0);
-                Self::from_behavior(behaivor)
-            },
-            _ => unreachable!(),
-        }
+    fn state_checkpoint(_block_id: HashValue) -> Self {
+        Self::StateCheckpoint
     }
 }
 
@@ -769,11 +767,14 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 .expect("Failed to serialize compiled module");
             value.bytes = Some(serialized_bytes.into());
 
-            behavior.module_writes = vec![ModuleWrite::new(module_id, value)];
-
             // Handle reads.
             let (key_to_convert, _) = behavior.resource_reads.pop().unwrap();
             behavior.module_reads = vec![key_to_mock_module_id(&key_to_convert, universe_len)];
+
+            // TODO(BlockSTMv2): Support more than 1 module write per txn.
+            behavior
+                .module_writes
+                .insert(key_to_convert, ModuleWrite::new(module_id, value));
         });
 
         MockTransaction::from_behaviors(behaviors)

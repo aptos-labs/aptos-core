@@ -6,11 +6,13 @@ use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::state_store::{
     hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
 };
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 
 pub(crate) struct HotStateLRU<'a> {
-    /// The entire committed hot state. While this may contain all the shards, this struct is
-    /// supposed to handle a single shard.
+    /// Max total number of items in the cache.
+    capacity: NonZeroUsize,
+    /// The entire committed hot state. While this contains all the shards, this struct is supposed
+    /// to handle a single shard.
     committed: Arc<dyn HotStateView>,
     /// Additional entries resulted from previous speculative execution.
     overlay: &'a LayeredMap<StateKey, StateSlot>,
@@ -26,6 +28,7 @@ pub(crate) struct HotStateLRU<'a> {
 
 impl<'a> HotStateLRU<'a> {
     pub fn new(
+        capacity: NonZeroUsize,
         committed: Arc<dyn HotStateView>,
         overlay: &'a LayeredMap<StateKey, StateSlot>,
         head: Option<StateKey>,
@@ -33,6 +36,7 @@ impl<'a> HotStateLRU<'a> {
         num_items: usize,
     ) -> Self {
         Self {
+            capacity,
             committed,
             overlay,
             pending: HashMap::new(),
@@ -47,7 +51,9 @@ impl<'a> HotStateLRU<'a> {
             slot.is_hot(),
             "Should not insert cold slots into hot state."
         );
-        self.delete(&key);
+        if self.delete(&key).is_none() {
+            self.num_items += 1;
+        }
         self.insert_as_head(key, slot);
     }
 
@@ -70,18 +76,40 @@ impl<'a> HotStateLRU<'a> {
                 self.tail = Some(key);
             },
         }
-
-        self.num_items += 1;
     }
 
-    pub fn evict(&mut self, key: &StateKey) {
-        if let Some(slot) = self.delete(key) {
-            self.pending.insert(key.clone(), slot.to_cold());
+    /// Returns the list of entries evicted, beginning from the LRU.
+    pub fn maybe_evict(&mut self) -> Vec<(StateKey, StateSlot)> {
+        let mut current = match &self.tail {
+            Some(tail) => tail.clone(),
+            None => {
+                assert_eq!(self.num_items, 0);
+                return Vec::new();
+            },
+        };
+
+        let mut evicted = Vec::new();
+        while self.num_items > self.capacity.get() {
+            let slot = self
+                .delete(&current)
+                .expect("There must be entries to evict when current size is above capacity.");
+            let prev_key = slot
+                .prev()
+                .cloned()
+                .expect("There must be at least one newer entry (num_items > capacity >= 1).");
+            evicted.push((current.clone(), slot.clone()));
+            self.pending.insert(current, slot.to_cold());
+            current = prev_key;
+            self.num_items -= 1;
         }
+        evicted
     }
 
-    /// Returns the deleted slot.
+    /// Returns the deleted slot, or `None` if the key doesn't exist or is not hot.
     fn delete(&mut self, key: &StateKey) -> Option<StateSlot> {
+        // Fetch the slot corresponding to the given key. Note that `self.pending` and
+        // `self.overlay` may contain cold slots, like the ones recently evicted, and we need to
+        // ignore them.
         let old_slot = match self.get_slot(key) {
             Some(slot) if slot.is_hot() => slot,
             _ => return None,
@@ -111,7 +139,6 @@ impl<'a> HotStateLRU<'a> {
             },
         }
 
-        self.num_items -= 1;
         Some(old_slot)
     }
 
@@ -129,7 +156,7 @@ impl<'a> HotStateLRU<'a> {
 
     fn expect_hot_slot(&self, key: &StateKey) -> StateSlot {
         let slot = self.get_slot(key).expect("Given key is expected to exist.");
-        assert!(slot.is_hot());
+        assert!(slot.is_hot(), "Given key is expected to be hot.");
         slot
     }
 
@@ -145,7 +172,7 @@ impl<'a> HotStateLRU<'a> {
     }
 
     #[cfg(test)]
-    fn iter(&self) -> Iter {
+    fn iter(&self) -> Iter<'_, '_> {
         Iter {
             current_key: self.head.clone(),
             lru: self,
@@ -208,13 +235,13 @@ mod tests {
     use lru::LruCache;
     use proptest::{
         collection::{hash_set, vec},
-        option,
         prelude::*,
         sample,
         strategy::Strategy,
     };
     use std::{
         collections::HashMap,
+        num::NonZeroUsize,
         sync::{Arc, Mutex},
     };
 
@@ -264,27 +291,37 @@ mod tests {
             tail: Option<StateKey>,
             num_items: usize,
         ) {
+            // For most of the logic we don't really care whether the data is in committed state or
+            // in the overlay, so we just merge everything directly to committed state, and keep
+            // the overlay empty.
             let mut locked = self.hot_state.lock().unwrap();
-            locked
-                .inner
-                .extend(updates.into_iter().filter(|(_key, slot)| slot.is_hot()));
+            for (key, slot) in updates {
+                if slot.is_hot() {
+                    locked.inner.insert(key, slot);
+                } else {
+                    locked.inner.remove(&key);
+                }
+            }
             locked.head = head;
             locked.tail = tail;
             assert_eq!(locked.inner.len(), num_items);
         }
     }
 
-    fn arb_state_slot() -> impl Strategy<Value = Option<StateSlot>> {
+    fn arb_hot_slot() -> impl Strategy<Value = StateSlot> {
         (any::<Version>(), any::<StateValue>()).prop_flat_map(|(version, value)| {
-            option::weighted(
-                0.8,
-                Just(StateSlot::HotOccupied {
+            prop_oneof![
+                4 => Just(StateSlot::HotOccupied {
                     value_version: version,
                     value,
                     hot_since_version: version,
                     lru_info: LRUEntry::uninitialized(),
                 }),
-            )
+                1 => Just(StateSlot::HotVacant {
+                    hot_since_version: version,
+                    lru_info: LRUEntry::uninitialized(),
+                }),
+            ]
         })
     }
 
@@ -292,11 +329,17 @@ mod tests {
         assert_eq!(
             actual
                 .iter()
-                .map(|(key, slot)| (key, slot.into_state_value_opt().unwrap()))
+                .map(|(key, slot)| {
+                    assert!(slot.is_hot());
+                    (key, slot.into_state_value_opt())
+                })
                 .collect::<Vec<_>>(),
             expected
                 .iter()
-                .map(|(key, slot)| (key.clone(), slot.clone().into_state_value_opt().unwrap()))
+                .map(|(key, slot)| {
+                    assert!(slot.is_hot());
+                    (key.clone(), slot.clone().into_state_value_opt())
+                })
                 .collect::<Vec<_>>(),
         );
     }
@@ -306,67 +349,62 @@ mod tests {
 
         #[test]
         fn test_empty_overlay(
-            (updates1, updates2) in hash_set(any::<StateKey>(), 1..50)
-                .prop_flat_map(|keys| {
+            blocks in (hash_set(any::<StateKey>(), 1..50), 1..10usize)
+                .prop_flat_map(|(keys, num_blocks)| {
                     let pool: Vec<_> = keys.into_iter().collect();
-                    (
-                        vec((sample::select(pool.clone()), arb_state_slot()), 1..100),
-                        vec((sample::select(pool), arb_state_slot()), 1..100),
-                    )
+                    let mut blocks = Vec::new();
+                    for _i in 0..num_blocks {
+                        let block = vec((sample::select(pool.clone()), arb_hot_slot()), 1..100);
+                        blocks.push(block);
+                    }
+                    blocks
                 }),
+            capacity in (1..10usize).prop_map(|n| NonZeroUsize::new(n).unwrap()),
         ) {
             let test_obj = LRUTest::new_empty();
-            let mut lru = HotStateLRU::new(
-                Arc::clone(&test_obj.hot_state) as Arc<dyn HotStateView>,
-                &test_obj.overlay,
-                None,
-                None,
-                0,
-            );
-            lru.validate();
-
+            let mut head = None;
+            let mut tail = None;
+            let mut num_items = 0;
+            // Use an unbounded cache because it can temporarily exceed the capacity in the middle
+            // of the block.
             let mut naive_lru = LruCache::unbounded();
-            for (key, slot_opt) in updates1 {
-                match slot_opt {
-                    Some(slot) => {
-                        lru.insert(key.clone(), slot.clone());
-                        naive_lru.put(key, slot);
-                    }
-                    None => {
-                        lru.evict(&key);
-                        naive_lru.pop(&key);
-                    }
-                }
-                assert_lru_equal(&lru, &naive_lru);
-            }
-            lru.validate();
-            // TODO: maybe verify the content of pending (including the cold slots) is expected?
 
-            let (updates, new_head, new_tail, new_num_items) = lru.into_updates();
-            test_obj.commit_updates(updates, new_head.clone(), new_tail.clone(), new_num_items);
-            let mut lru = HotStateLRU::new(
-                Arc::clone(&test_obj.hot_state) as Arc<dyn HotStateView>,
-                &test_obj.overlay,
-                new_head,
-                new_tail,
-                new_num_items,
-            );
-            lru.validate();
+            for updates in blocks {
+                let mut lru = HotStateLRU::new(
+                    capacity,
+                    Arc::clone(&test_obj.hot_state) as Arc<dyn HotStateView>,
+                    &test_obj.overlay,
+                    head,
+                    tail,
+                    num_items,
+                );
+                lru.validate();
 
-            for (key, slot_opt) in updates2 {
-                match slot_opt {
-                    Some(slot) => {
-                        lru.insert(key.clone(), slot.clone());
-                        naive_lru.put(key, slot);
-                    }
-                    None => {
-                        lru.evict(&key);
-                        naive_lru.pop(&key);
-                    }
+                for (key, slot) in updates {
+                    lru.insert(key.clone(), slot.clone());
+                    naive_lru.put(key, slot);
+                    lru.validate();
+                    assert_lru_equal(&lru, &naive_lru);
                 }
+
+                let actual_evicted = lru.maybe_evict();
+                let mut expected_evicted = Vec::new();
+                while naive_lru.len() > capacity.get() {
+                    expected_evicted.push(naive_lru.pop_lru().unwrap());
+                }
+                itertools::zip_eq(actual_evicted, expected_evicted).for_each(|(actual, expected)| {
+                    assert_eq!(actual.0, expected.0);
+                    assert_eq!(actual.1.into_state_value_opt(), expected.1.into_state_value_opt());
+                });
+                lru.validate();
                 assert_lru_equal(&lru, &naive_lru);
+
+                let (updates, new_head, new_tail, new_num_items) = lru.into_updates();
+                test_obj.commit_updates(updates, new_head.clone(), new_tail.clone(), new_num_items);
+                head = new_head;
+                tail = new_tail;
+                num_items = new_num_items;
             }
-            lru.validate();
         }
     }
 }

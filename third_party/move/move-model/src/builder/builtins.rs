@@ -180,7 +180,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         // conceptually: `fun _+_<A>(x: A, y: A): A where A: u8|u16|..|u256`.
         declare_arithm_ops(
             trans,
-            &[param_t_decl.clone()],
+            std::slice::from_ref(&param_t_decl),
             &[(
                 0,
                 Constraint::SomeNumber(PrimitiveType::all_int_types().into_iter().collect()),
@@ -232,24 +232,28 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             .language_version()
             .is_at_least(LanguageVersion::V2_2)
         {
-            // For LanguageVersion::V2_2 and later, we support comparison on all non-reference types.
+            // For LanguageVersion::V2_2 and later, we support comparison on all types.
             // - integer types supported by the VM natively
             // - other types supported by the `compare` native function
             //      - implicitly through compiler rewrite at the AST level
-            declare_cmp_ops(
-                trans,
-                &[param_t_decl.clone()],
-                &[(0, Constraint::NoReference)].into_iter().collect(),
-                param_t.clone(),
-                Impl, // visible only in the impl language
-            );
+            let ref_param_t = Type::Reference(ReferenceKind::Immutable, Box::new(param_t.clone()));
+            // Allow cmp over both generic types and reference types
+            for pt in [ref_param_t.clone(), param_t.clone()] {
+                declare_cmp_ops(
+                    trans,
+                    std::slice::from_ref(&param_t_decl),
+                    &BTreeMap::default(),
+                    pt,
+                    Impl, // visible only in the impl language
+                );
+            }
         } else {
             // For LanguageVersion::V2_1 and earlier, we support only integer types.
             // We use a generic function with a constraint, conceptually:
             // `fun _cmp_<A>(x: A, y: A): bool where A: u8|u16|..|u256`.
             declare_cmp_ops(
                 trans,
-                &[param_t_decl.clone()],
+                std::slice::from_ref(&param_t_decl),
                 &[(
                     0,
                     Constraint::SomeNumber(PrimitiveType::all_int_types().into_iter().collect()),
