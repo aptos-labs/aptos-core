@@ -193,11 +193,11 @@ impl<E: Pairing> RangeProof<E> for merlin::Transcript {
         public_statement: &(usize, &univariate_range_proof::Commitment<E>),
     ) {
         let mut public_statement_bytes = Vec::new();
-        (*public_statement)
+        public_statement
             .0
             .serialize_compressed(&mut public_statement_bytes)
             .expect("public_statement0 serialization should succeed");
-        (*public_statement)
+        public_statement
             .1
             .serialize_compressed(&mut public_statement_bytes)
             .expect("public_statement1 serialization should succeed");
