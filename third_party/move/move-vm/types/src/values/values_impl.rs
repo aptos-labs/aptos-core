@@ -63,8 +63,6 @@ pub const DEFAULT_MAX_VM_VALUE_NESTED_DEPTH: u64 = 128;
 
 /// Runtime representation of a Move value.
 pub(crate) enum ValueImpl {
-    Invalid,
-
     U8(u8),
     U16(u16),
     U32(u32),
@@ -123,7 +121,7 @@ pub(crate) enum ValueImpl {
 /// making it possible to be shared by references.
 #[derive(Debug)]
 pub(crate) enum Container {
-    Locals(Rc<RefCell<Vec<ValueImpl>>>),
+    Locals(Rc<RefCell<Vec<Option<ValueImpl>>>>),
     Vec(Rc<RefCell<Vec<ValueImpl>>>),
     Struct(Rc<RefCell<Vec<ValueImpl>>>),
     VecU8(Rc<RefCell<Vec<u8>>>),
@@ -263,7 +261,7 @@ pub struct GlobalValue(GlobalValueImpl);
 /// The locals for a function frame. It allows values to be read, written or taken
 /// reference from.
 #[derive(Debug)]
-pub struct Locals(Rc<RefCell<Vec<ValueImpl>>>);
+pub struct Locals(Rc<RefCell<Vec<Option<ValueImpl>>>>);
 
 /***************************************************************************************
  *
@@ -411,8 +409,6 @@ impl ValueImpl {
 
         check_depth(depth, max_depth)?;
         Ok(match self {
-            Invalid => Invalid,
-
             U8(x) => U8(*x),
             U16(x) => U16(*x),
             U32(x) => U32(*x),
@@ -590,8 +586,7 @@ impl ValueImpl {
                 }
             },
 
-            (Invalid, _)
-            | (U8(_), _)
+            (U8(_), _)
             | (U16(_), _)
             | (U32(_), _)
             | (U64(_), _)
@@ -663,8 +658,7 @@ impl ValueImpl {
                 }
             },
 
-            (Invalid, _)
-            | (U8(_), _)
+            (U8(_), _)
             | (U16(_), _)
             | (U32(_), _)
             | (U64(_), _)
@@ -816,6 +810,12 @@ impl ContainerRef {
     }
 }
 
+macro_rules! unwrap_local {
+    ($v:expr) => {{
+        $v.as_ref().ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))
+    }};
+}
+
 impl IndexedRef {
     fn equals(&self, other: &Self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<bool> {
         use Container::*;
@@ -828,14 +828,23 @@ impl IndexedRef {
             // VecC <=> VecR impossible
             (Vec(r1), Vec(r2))
             | (Vec(r1), Struct(r2))
-            | (Vec(r1), Locals(r2))
             | (Struct(r1), Vec(r2))
-            | (Struct(r1), Struct(r2))
-            | (Struct(r1), Locals(r2))
-            | (Locals(r1), Vec(r2))
-            | (Locals(r1), Struct(r2))
-            | (Locals(r1), Locals(r2)) => {
+            | (Struct(r1), Struct(r2)) => {
                 r1.borrow()[self.idx].equals(&r2.borrow()[other.idx], depth + 1, max_depth)?
+            },
+
+            (Vec(r1), Locals(r2))
+            | (Struct(r1), Locals(r2)) => {
+                r1.borrow()[self.idx].equals(unwrap_local!(&r2.borrow()[other.idx])?, depth + 1, max_depth)?
+            }
+
+            (Locals(r1), Vec(r2))
+            | (Locals(r1), Struct(r2)) => {
+                unwrap_local!(&r1.borrow()[self.idx])?.equals(&r2.borrow()[other.idx], depth + 1, max_depth)?
+            }
+
+            (Locals(r1), Locals(r2)) => {
+                unwrap_local!(&r1.borrow()[self.idx])?.equals(unwrap_local!(&r2.borrow()[other.idx])?, depth + 1, max_depth)?
             },
 
             (VecU8(r1), VecU8(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
@@ -848,60 +857,108 @@ impl IndexedRef {
             (VecAddress(r1), VecAddress(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
 
             // Equality between a generic and a specialized container.
-            (Locals(r1), VecU8(r2)) | (Struct(r1), VecU8(r2)) => {
+            (Struct(r1), VecU8(r2)) => {
                 *r1.borrow()[self.idx].as_value_ref::<u8>()? == r2.borrow()[other.idx]
             },
-            (VecU8(r1), Locals(r2)) | (VecU8(r1), Struct(r2)) => {
+            (VecU8(r1), Struct(r2)) => {
                 r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u8>()?
             },
+            (Locals(r1), VecU8(r2)) => {
+                *unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<u8>()? == r2.borrow()[other.idx]
+            },
+            (VecU8(r1), Locals(r2)) => {
+                r1.borrow()[self.idx] == *(unwrap_local!(&r2.borrow()[other.idx]))?.as_value_ref::<u8>()?
+            },
 
-            (Locals(r1), VecU16(r2)) | (Struct(r1), VecU16(r2)) => {
+            (Struct(r1), VecU16(r2)) => {
                 *r1.borrow()[self.idx].as_value_ref::<u16>()? == r2.borrow()[other.idx]
             },
-            (VecU16(r1), Locals(r2)) | (VecU16(r1), Struct(r2)) => {
+            (VecU16(r1), Struct(r2)) => {
                 r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u16>()?
             },
+            (Locals(r1), VecU16(r2)) => {
+                *unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<u16>()? == r2.borrow()[other.idx]
+            },
+            (VecU16(r1), Locals(r2)) => {
+                r1.borrow()[self.idx] == *(unwrap_local!(&r2.borrow()[other.idx]))?.as_value_ref::<u16>()?
+            },
 
-            (Locals(r1), VecU32(r2)) | (Struct(r1), VecU32(r2)) => {
+            (Struct(r1), VecU32(r2)) => {
                 *r1.borrow()[self.idx].as_value_ref::<u32>()? == r2.borrow()[other.idx]
             },
-            (VecU32(r1), Locals(r2)) | (VecU32(r1), Struct(r2)) => {
+            (VecU32(r1), Struct(r2)) => {
                 r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u32>()?
             },
+            (Locals(r1), VecU32(r2)) => {
+                *unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<u32>()? == r2.borrow()[other.idx]
+            },
+            (VecU32(r1), Locals(r2)) => {
+                r1.borrow()[self.idx] == *(unwrap_local!(&r2.borrow()[other.idx]))?.as_value_ref::<u32>()?
+            },
 
-            (Locals(r1), VecU64(r2)) | (Struct(r1), VecU64(r2)) => {
+            (Struct(r1), VecU64(r2)) => {
                 *r1.borrow()[self.idx].as_value_ref::<u64>()? == r2.borrow()[other.idx]
             },
-            (VecU64(r1), Locals(r2)) | (VecU64(r1), Struct(r2)) => {
+            (VecU64(r1), Struct(r2)) => {
                 r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u64>()?
             },
+            (Locals(r1), VecU64(r2)) => {
+                *unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<u64>()? == r2.borrow()[other.idx]
+            },
+            (VecU64(r1), Locals(r2)) => {
+                r1.borrow()[self.idx] == *(unwrap_local!(&r2.borrow()[other.idx]))?.as_value_ref::<u64>()?
+            },
 
-            (Locals(r1), VecU128(r2)) | (Struct(r1), VecU128(r2)) => {
+            (Struct(r1), VecU128(r2)) => {
                 *r1.borrow()[self.idx].as_value_ref::<u128>()? == r2.borrow()[other.idx]
             },
-            (VecU128(r1), Locals(r2)) | (VecU128(r1), Struct(r2)) => {
+            (VecU128(r1), Struct(r2)) => {
                 r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u128>()?
             },
+            (Locals(r1), VecU128(r2)) => {
+                *unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<u128>()? == r2.borrow()[other.idx]
+            },
+            (VecU128(r1), Locals(r2)) => {
+                r1.borrow()[self.idx] == *(unwrap_local!(&r2.borrow()[other.idx]))?.as_value_ref::<u128>()?
+            },
 
-            (Locals(r1), VecU256(r2)) | (Struct(r1), VecU256(r2)) => {
+            (Struct(r1), VecU256(r2)) => {
                 *r1.borrow()[self.idx].as_value_ref::<u256::U256>()? == r2.borrow()[other.idx]
             },
-            (VecU256(r1), Locals(r2)) | (VecU256(r1), Struct(r2)) => {
+            (VecU256(r1), Struct(r2)) => {
                 r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u256::U256>()?
             },
+            (Locals(r1), VecU256(r2)) => {
+                *unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<u256::U256>()? == r2.borrow()[other.idx]
+            },
+            (VecU256(r1), Locals(r2)) => {
+                r1.borrow()[self.idx] == *(unwrap_local!(&r2.borrow()[other.idx]))?.as_value_ref::<u256::U256>()?
+            },
 
-            (Locals(r1), VecBool(r2)) | (Struct(r1), VecBool(r2)) => {
+            (Struct(r1), VecBool(r2)) => {
                 *r1.borrow()[self.idx].as_value_ref::<bool>()? == r2.borrow()[other.idx]
             },
-            (VecBool(r1), Locals(r2)) | (VecBool(r1), Struct(r2)) => {
+            (VecBool(r1), Struct(r2)) => {
                 r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<bool>()?
             },
+            (Locals(r1), VecBool(r2)) => {
+                *unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<bool>()? == r2.borrow()[other.idx]
+            },
+            (VecBool(r1), Locals(r2)) => {
+                r1.borrow()[self.idx] == *(unwrap_local!(&r2.borrow()[other.idx]))?.as_value_ref::<bool>()?
+            },
 
-            (Locals(r1), VecAddress(r2)) | (Struct(r1), VecAddress(r2)) => {
+            (Struct(r1), VecAddress(r2)) => {
                 *r1.borrow()[self.idx].as_value_ref::<AccountAddress>()? == r2.borrow()[other.idx]
             },
-            (VecAddress(r1), Locals(r2)) | (VecAddress(r1), Struct(r2)) => {
+            (VecAddress(r1), Struct(r2)) => {
                 r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<AccountAddress>()?
+            },
+            (Locals(r1), VecAddress(r2)) => {
+                *unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<AccountAddress>()? == r2.borrow()[other.idx]
+            },
+            (VecAddress(r1), Locals(r2)) => {
+                r1.borrow()[self.idx] == *(unwrap_local!(&r2.borrow()[other.idx]))?.as_value_ref::<AccountAddress>()?
             },
 
             // All other combinations are illegal.
@@ -936,14 +993,23 @@ impl IndexedRef {
             // VecC <=> VecR impossible
             (Vec(r1), Vec(r2))
             | (Vec(r1), Struct(r2))
-            | (Vec(r1), Locals(r2))
             | (Struct(r1), Vec(r2))
-            | (Struct(r1), Struct(r2))
-            | (Struct(r1), Locals(r2))
-            | (Locals(r1), Vec(r2))
-            | (Locals(r1), Struct(r2))
-            | (Locals(r1), Locals(r2)) => {
+            | (Struct(r1), Struct(r2)) => {
                 r1.borrow()[self.idx].compare(&r2.borrow()[other.idx], depth + 1, max_depth)?
+            },
+
+            (Vec(r1), Locals(r2))
+            | (Struct(r1), Locals(r2)) => {
+                r1.borrow()[self.idx].compare(unwrap_local!(&r2.borrow()[other.idx])?, depth + 1, max_depth)?
+            }
+
+            (Locals(r1), Vec(r2))
+            | (Locals(r1), Struct(r2)) => {
+                unwrap_local!(&r1.borrow()[self.idx])?.compare(&r2.borrow()[other.idx], depth + 1, max_depth)?
+            }
+
+            (Locals(r1), Locals(r2)) => {
+                unwrap_local!(&r1.borrow()[self.idx])?.compare(unwrap_local!(&r2.borrow()[other.idx])?, depth + 1, max_depth)?
             },
 
             (VecU8(r1), VecU8(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
@@ -956,60 +1022,108 @@ impl IndexedRef {
             (VecAddress(r1), VecAddress(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
 
             // Comparison between a generic and a specialized container.
-            (Locals(r1), VecU8(r2)) | (Struct(r1), VecU8(r2)) => r1.borrow()[self.idx]
-                .as_value_ref::<u8>()?
-                .cmp(&r2.borrow()[other.idx]),
-            (VecU8(r1), Locals(r2)) | (VecU8(r1), Struct(r2)) => {
+            (Struct(r1), VecU8(r2)) => {
+                r1.borrow()[self.idx].as_value_ref::<u8>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecU8(r1), Struct(r2)) => {
                 r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u8>()?)
             },
+            (Locals(r1), VecU8(r2)) => {
+                unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<u8>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecU8(r1), Locals(r2)) => {
+                r1.borrow()[self.idx].cmp(unwrap_local!(&r2.borrow()[other.idx])?.as_value_ref::<u8>()?)
+            },
 
-            (Locals(r1), VecU16(r2)) | (Struct(r1), VecU16(r2)) => r1.borrow()[self.idx]
-                .as_value_ref::<u16>()?
-                .cmp(&r2.borrow()[other.idx]),
-            (VecU16(r1), Locals(r2)) | (VecU16(r1), Struct(r2)) => {
+            (Struct(r1), VecU16(r2)) => {
+                r1.borrow()[self.idx].as_value_ref::<u16>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecU16(r1), Struct(r2)) => {
                 r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u16>()?)
             },
+            (Locals(r1), VecU16(r2)) => {
+                unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<u16>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecU16(r1), Locals(r2)) => {
+                r1.borrow()[self.idx].cmp(unwrap_local!(&r2.borrow()[other.idx])?.as_value_ref::<u16>()?)
+            },
 
-            (Locals(r1), VecU32(r2)) | (Struct(r1), VecU32(r2)) => r1.borrow()[self.idx]
-                .as_value_ref::<u32>()?
-                .cmp(&r2.borrow()[other.idx]),
-            (VecU32(r1), Locals(r2)) | (VecU32(r1), Struct(r2)) => {
+            (Struct(r1), VecU32(r2)) => {
+                r1.borrow()[self.idx].as_value_ref::<u32>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecU32(r1), Struct(r2)) => {
                 r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u32>()?)
             },
+            (Locals(r1), VecU32(r2)) => {
+                unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<u32>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecU32(r1), Locals(r2)) => {
+                r1.borrow()[self.idx].cmp(unwrap_local!(&r2.borrow()[other.idx])?.as_value_ref::<u32>()?)
+            },
 
-            (Locals(r1), VecU64(r2)) | (Struct(r1), VecU64(r2)) => r1.borrow()[self.idx]
-                .as_value_ref::<u64>()?
-                .cmp(&r2.borrow()[other.idx]),
-            (VecU64(r1), Locals(r2)) | (VecU64(r1), Struct(r2)) => {
+            (Struct(r1), VecU64(r2)) => {
+                r1.borrow()[self.idx].as_value_ref::<u64>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecU64(r1), Struct(r2)) => {
                 r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u64>()?)
             },
+            (Locals(r1), VecU64(r2)) => {
+                unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<u64>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecU64(r1), Locals(r2)) => {
+                r1.borrow()[self.idx].cmp(unwrap_local!(&r2.borrow()[other.idx])?.as_value_ref::<u64>()?)
+            },
 
-            (Locals(r1), VecU128(r2)) | (Struct(r1), VecU128(r2)) => r1.borrow()[self.idx]
-                .as_value_ref::<u128>()?
-                .cmp(&r2.borrow()[other.idx]),
-            (VecU128(r1), Locals(r2)) | (VecU128(r1), Struct(r2)) => {
+            (Struct(r1), VecU128(r2)) => {
+                r1.borrow()[self.idx].as_value_ref::<u128>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecU128(r1), Struct(r2)) => {
                 r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u128>()?)
             },
+            (Locals(r1), VecU128(r2)) => {
+                unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<u128>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecU128(r1), Locals(r2)) => {
+                r1.borrow()[self.idx].cmp(unwrap_local!(&r2.borrow()[other.idx])?.as_value_ref::<u128>()?)
+            },
 
-            (Locals(r1), VecU256(r2)) | (Struct(r1), VecU256(r2)) => r1.borrow()[self.idx]
-                .as_value_ref::<u256::U256>()?
-                .cmp(&r2.borrow()[other.idx]),
-            (VecU256(r1), Locals(r2)) | (VecU256(r1), Struct(r2)) => {
+            (Struct(r1), VecU256(r2)) => {
+                r1.borrow()[self.idx].as_value_ref::<u256::U256>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecU256(r1), Struct(r2)) => {
                 r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u256::U256>()?)
             },
-
-            (Locals(r1), VecBool(r2)) | (Struct(r1), VecBool(r2)) => r1.borrow()[self.idx]
-                .as_value_ref::<bool>()?
-                .cmp(&r2.borrow()[other.idx]),
-            (VecBool(r1), Locals(r2)) | (VecBool(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<bool>()?)
+            (Locals(r1), VecU256(r2)) => {
+                unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<u256::U256>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecU256(r1), Locals(r2)) => {
+                r1.borrow()[self.idx].cmp(unwrap_local!(&r2.borrow()[other.idx])?.as_value_ref::<u256::U256>()?)
             },
 
-            (Locals(r1), VecAddress(r2)) | (Struct(r1), VecAddress(r2)) => r1.borrow()[self.idx]
-                .as_value_ref::<AccountAddress>()?
-                .cmp(&r2.borrow()[other.idx]),
-            (VecAddress(r1), Locals(r2)) | (VecAddress(r1), Struct(r2)) => {
+            (Struct(r1), VecBool(r2)) => {
+                r1.borrow()[self.idx].as_value_ref::<bool>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecBool(r1), Struct(r2)) => {
+                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<bool>()?)
+            },
+            (Locals(r1), VecBool(r2)) => {
+                unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<bool>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecBool(r1), Locals(r2)) => {
+                r1.borrow()[self.idx].cmp(unwrap_local!(&r2.borrow()[other.idx])?.as_value_ref::<bool>()?)
+            },
+
+            (Struct(r1), VecAddress(r2)) => {
+                r1.borrow()[self.idx].as_value_ref::<AccountAddress>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecAddress(r1), Struct(r2)) => {
                 r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<AccountAddress>()?)
+            },
+            (Locals(r1), VecAddress(r2)) => {
+                unwrap_local!(&r1.borrow()[self.idx])?.as_value_ref::<AccountAddress>()?.cmp(&r2.borrow()[other.idx])
+            },
+            (VecAddress(r1), Locals(r2)) => {
+                r1.borrow()[self.idx].cmp(unwrap_local!(&r2.borrow()[other.idx])?.as_value_ref::<AccountAddress>()?)
             },
 
             // All other combinations are illegal.
@@ -1087,7 +1201,7 @@ impl IndexedRef {
             VecBool(r) => ValueImpl::Bool(r.borrow()[self.idx]),
             VecAddress(r) => ValueImpl::Address(r.borrow()[self.idx]),
 
-            Locals(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
+            Locals(r) => r.borrow()[self.idx].as_ref().ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?.copy_value(depth + 1, max_depth)?,
         };
 
         Ok(Value(res))
@@ -1194,7 +1308,6 @@ impl IndexedRef {
         match &x.0 {
             ValueImpl::IndexedRef(_)
             | ValueImpl::ContainerRef(_)
-            | ValueImpl::Invalid
             | ValueImpl::Container(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1208,7 +1321,11 @@ impl IndexedRef {
         }
 
         match (self.container_ref.container(), &x.0) {
-            (Container::Locals(r), _) | (Container::Vec(r), _) | (Container::Struct(r), _) => {
+            (Container::Locals(r), _) => {
+                let mut v = r.borrow_mut();
+                v[self.idx].replace(x.0);
+            },
+            (Container::Vec(r), _) | (Container::Struct(r), _) => {
                 let mut v = r.borrow_mut();
                 v[self.idx] = x.0;
             },
@@ -1399,13 +1516,30 @@ impl IndexedRef {
             // Case 1: (generic, generic)
             (Vec(r1), Vec(r2))
             | (Vec(r1), Struct(r2))
-            | (Vec(r1), Locals(r2))
             | (Struct(r1), Vec(r2))
-            | (Struct(r1), Struct(r2))
-            | (Struct(r1), Locals(r2))
-            | (Locals(r1), Vec(r2))
-            | (Locals(r1), Struct(r2))
-            | (Locals(r1), Locals(r2)) => swap!(r1, r2),
+            | (Struct(r1), Struct(r2)) => swap!(r1, r2),
+
+            (Locals(r1), Locals(r2)) => swap!(r1, r2),
+
+            (Locals(r1), Vec(r2))
+            | (Locals(r1), Struct(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let local_ref = r1[self.idx].as_mut().ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                mem::swap(
+                    local_ref,
+                    &mut r2.borrow_mut()[other.idx],
+                );
+            },
+
+            (Vec(r1), Locals(r2))
+            | (Struct(r1), Locals(r2)) => {
+                let mut r2 = r2.borrow_mut();
+                let local_ref =  r2[other.idx].as_mut().ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                mem::swap(
+                    local_ref,
+                    &mut r1.borrow_mut()[self.idx],
+                );
+            },
 
             // Case 2: (specialized, specialized)
             (VecU8(r1), VecU8(r2)) => swap!(r1, r2),
@@ -1418,29 +1552,158 @@ impl IndexedRef {
             (VecAddress(r1), VecAddress(r2)) => swap!(r1, r2),
 
             // Case 3: (generic, specialized) or (specialized, generic)
-            (Locals(r1) | Struct(r1), VecU8(r2)) => swap_general_with_specialized!(r1, r2),
-            (VecU8(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+            (Struct(r1), VecU8(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecU8(r1), Struct(r2)) => swap_specialized_with_general!(r1, r2),
+            (Locals(r1), VecU8(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
 
-            (Locals(r1) | Struct(r1), VecU16(r2)) => swap_general_with_specialized!(r1, r2),
-            (VecU16(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+                let x2 = ValueImpl::from_primitive(r2[other.idx]);
+                let x1 = r1[self.idx].replace(x2).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r2[other.idx] = *x1.as_value_ref()?;
+            },
+            (VecU8(r1), Locals(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
 
-            (Locals(r1) | Struct(r1), VecU32(r2)) => swap_general_with_specialized!(r1, r2),
-            (VecU32(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+                let x1 = ValueImpl::from_primitive(r1[self.idx]);
+                let x2 = r2[other.idx].replace(x1).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r1[self.idx] = *x2.as_value_ref()?;
+            },
 
-            (Locals(r1) | Struct(r1), VecU64(r2)) => swap_general_with_specialized!(r1, r2),
-            (VecU64(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+            (Struct(r1), VecU16(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecU16(r1), Struct(r2)) => swap_specialized_with_general!(r1, r2),
+            (Locals(r1), VecU16(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
 
-            (Locals(r1) | Struct(r1), VecU128(r2)) => swap_general_with_specialized!(r1, r2),
-            (VecU128(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+                let x2 = ValueImpl::from_primitive(r2[other.idx]);
+                let x1 = r1[self.idx].replace(x2).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r2[other.idx] = *x1.as_value_ref()?;
+            },
+            (VecU16(r1), Locals(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
 
-            (Locals(r1) | Struct(r1), VecU256(r2)) => swap_general_with_specialized!(r1, r2),
-            (VecU256(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+                let x1 = ValueImpl::from_primitive(r1[self.idx]);
+                let x2 = r2[other.idx].replace(x1).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r1[self.idx] = *x2.as_value_ref()?;
+            },
 
-            (Locals(r1) | Struct(r1), VecBool(r2)) => swap_general_with_specialized!(r1, r2),
-            (VecBool(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
 
-            (Locals(r1) | Struct(r1), VecAddress(r2)) => swap_general_with_specialized!(r1, r2),
-            (VecAddress(r1), Locals(r2) | Struct(r2)) => swap_specialized_with_general!(r1, r2),
+            (Struct(r1), VecU32(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecU32(r1), Struct(r2)) => swap_specialized_with_general!(r1, r2),
+            (Locals(r1), VecU32(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
+
+                let x2 = ValueImpl::from_primitive(r2[other.idx]);
+                let x1 = r1[self.idx].replace(x2).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r2[other.idx] = *x1.as_value_ref()?;
+            },
+            (VecU32(r1), Locals(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
+
+                let x1 = ValueImpl::from_primitive(r1[self.idx]);
+                let x2 = r2[other.idx].replace(x1).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r1[self.idx] = *x2.as_value_ref()?;
+            },
+
+            (Struct(r1), VecU64(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecU64(r1), Struct(r2)) => swap_specialized_with_general!(r1, r2),
+            (Locals(r1), VecU64(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
+
+                let x2 = ValueImpl::from_primitive(r2[other.idx]);
+                let x1 = r1[self.idx].replace(x2).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r2[other.idx] = *x1.as_value_ref()?;
+            },
+            (VecU64(r1), Locals(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
+
+                let x1 = ValueImpl::from_primitive(r1[self.idx]);
+                let x2 = r2[other.idx].replace(x1).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r1[self.idx] = *x2.as_value_ref()?;
+            },
+
+            (Struct(r1), VecU128(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecU128(r1), Struct(r2)) => swap_specialized_with_general!(r1, r2),
+            (Locals(r1), VecU128(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
+
+                let x2 = ValueImpl::from_primitive(r2[other.idx]);
+                let x1 = r1[self.idx].replace(x2).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r2[other.idx] = *x1.as_value_ref()?;
+            },
+            (VecU128(r1), Locals(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
+
+                let x1 = ValueImpl::from_primitive(r1[self.idx]);
+                let x2 = r2[other.idx].replace(x1).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r1[self.idx] = *x2.as_value_ref()?;
+            },
+
+            (Struct(r1), VecU256(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecU256(r1), Struct(r2)) => swap_specialized_with_general!(r1, r2),
+            (Locals(r1), VecU256(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
+
+                let x2 = ValueImpl::from_primitive(r2[other.idx]);
+                let x1 = r1[self.idx].replace(x2).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r2[other.idx] = *x1.as_value_ref()?;
+            },
+            (VecU256(r1), Locals(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
+
+                let x1 = ValueImpl::from_primitive(r1[self.idx]);
+                let x2 = r2[other.idx].replace(x1).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r1[self.idx] = *x2.as_value_ref()?;
+            },
+
+            (Struct(r1), VecBool(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecBool(r1), Struct(r2)) => swap_specialized_with_general!(r1, r2),
+            (Locals(r1), VecBool(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
+
+                let x2 = ValueImpl::from_primitive(r2[other.idx]);
+                let x1 = r1[self.idx].replace(x2).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r2[other.idx] = *x1.as_value_ref()?;
+            },
+            (VecBool(r1), Locals(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
+
+                let x1 = ValueImpl::from_primitive(r1[self.idx]);
+                let x2 = r2[other.idx].replace(x1).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r1[self.idx] = *x2.as_value_ref()?;
+            },
+
+            (Struct(r1), VecAddress(r2)) => swap_general_with_specialized!(r1, r2),
+            (VecAddress(r1), Struct(r2)) => swap_specialized_with_general!(r1, r2),
+            (Locals(r1), VecAddress(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
+
+                let x2 = ValueImpl::from_primitive(r2[other.idx]);
+                let x1 = r1[self.idx].replace(x2).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r2[other.idx] = *x1.as_value_ref()?;
+            },
+            (VecAddress(r1), Locals(r2)) => {
+                let mut r1 = r1.borrow_mut();
+                let mut r2 = r2.borrow_mut();
+
+                let x1 = ValueImpl::from_primitive(r1[self.idx]);
+                let x2 = r2[other.idx].replace(x1).ok_or_else(|| PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR))?;
+                r1[self.idx] = *x2.as_value_ref()?;
+            },
 
             // All other combinations are illegal.
             (Vec(_), _)
@@ -1516,7 +1779,43 @@ impl ContainerRef {
         }
 
         Ok(match self.container() {
-            Container::Locals(r) | Container::Vec(r) | Container::Struct(r) => {
+            Container::Locals(r) => {
+                let v = r.borrow();
+                match v[idx].as_ref().ok_or_else(|| PartialVMError::new_invariant_violation("local not set"))? {
+                    ValueImpl::Container(container) => {
+                        let r = match self {
+                            Self::Local(_) => Self::Local(container.copy_by_ref()),
+                            Self::Global { status, .. } => Self::Global {
+                                status: Rc::clone(status),
+                                container: container.copy_by_ref(),
+                            },
+                        };
+                        ValueImpl::ContainerRef(r)
+                    },
+
+                    ValueImpl::U8(_)
+                    | ValueImpl::U16(_)
+                    | ValueImpl::U32(_)
+                    | ValueImpl::U64(_)
+                    | ValueImpl::U128(_)
+                    | ValueImpl::U256(_)
+                    | ValueImpl::Bool(_)
+                    | ValueImpl::Address(_)
+                    | ValueImpl::ClosureValue(_)
+                    | ValueImpl::DelayedFieldID { .. } => ValueImpl::IndexedRef(IndexedRef {
+                        idx,
+                        container_ref: self.copy_by_ref(),
+                    }),
+
+                    ValueImpl::ContainerRef(_) | ValueImpl::IndexedRef(_) => {
+                        return Err(PartialVMError::new(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                        )
+                            .with_message(format!("cannot borrow element {:?}", &v[idx])))
+                    },
+                }
+            },
+            Container::Vec(r) | Container::Struct(r) => {
                 let v = r.borrow();
                 match &v[idx] {
                     ValueImpl::Container(container) => {
@@ -1544,7 +1843,7 @@ impl ContainerRef {
                         container_ref: self.copy_by_ref(),
                     }),
 
-                    ValueImpl::ContainerRef(_) | ValueImpl::Invalid | ValueImpl::IndexedRef(_) => {
+                    ValueImpl::ContainerRef(_) | ValueImpl::IndexedRef(_) => {
                         return Err(PartialVMError::new(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                         )
@@ -1620,7 +1919,11 @@ impl Locals {
             );
         }
 
-        match &v[idx] {
+        let v = v[idx].as_ref().ok_or_else(|| {
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+        })?;
+
+        match v {
             ValueImpl::Container(c) => Ok(Value(ValueImpl::ContainerRef(ContainerRef::Local(
                 c.copy_by_ref(),
             )))),
@@ -1639,9 +1942,9 @@ impl Locals {
                 container_ref: ContainerRef::Local(Container::Locals(Rc::clone(&self.0))),
             }))),
 
-            ValueImpl::ContainerRef(_) | ValueImpl::Invalid | ValueImpl::IndexedRef(_) => Err(
+            ValueImpl::ContainerRef(_) | ValueImpl::IndexedRef(_) => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!("cannot borrow local {:?}", &v[idx])),
+                    .with_message(format!("cannot borrow local {:?}", v)),
             ),
         }
     }
@@ -1695,7 +1998,7 @@ impl SignerRef {
 impl Locals {
     pub fn new(n: usize) -> Self {
         Self(Rc::new(RefCell::new(
-            iter::repeat_with(|| ValueImpl::Invalid).take(n).collect(),
+            iter::repeat_with(|| None).take(n).collect(),
         )))
     }
 
@@ -1712,11 +2015,11 @@ impl Locals {
     fn copy_loc_impl(&self, idx: usize, max_depth: Option<u64>) -> PartialVMResult<Value> {
         let v = self.0.borrow();
         match v.get(idx) {
-            Some(ValueImpl::Invalid) => Err(PartialVMError::new(
+            Some(None) => Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             )
             .with_message(format!("cannot copy invalid value at index {}", idx))),
-            Some(v) => Ok(Value(v.copy_value(1, max_depth)?)),
+            Some(Some(v)) => Ok(Value(v.copy_value(1, max_depth)?)),
             None => Err(
                 PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
                     format!("local index out of bounds: got {}, len: {}", idx, v.len()),
@@ -1725,12 +2028,12 @@ impl Locals {
         }
     }
 
-    fn swap_loc(&mut self, idx: usize, x: Value, violation_check: bool) -> PartialVMResult<Value> {
+    pub fn store_loc(&mut self, idx: usize, x: Value, violation_check: bool) -> PartialVMResult<()> {
         let mut v = self.0.borrow_mut();
         match v.get_mut(idx) {
             Some(v) => {
                 if violation_check {
-                    if let ValueImpl::Container(c) = v {
+                    if let Some(ValueImpl::Container(c)) = v {
                         if c.rc_count() > 1 {
                             return Err(PartialVMError::new(
                                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -1740,7 +2043,8 @@ impl Locals {
                         }
                     }
                 }
-                Ok(Value(std::mem::replace(v, x.0)))
+                v.replace(x.0);
+                Ok(())
             },
             None => Err(
                 PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
@@ -1751,23 +2055,34 @@ impl Locals {
     }
 
     pub fn move_loc(&mut self, idx: usize, violation_check: bool) -> PartialVMResult<Value> {
-        match self.swap_loc(idx, Value(ValueImpl::Invalid), violation_check)? {
-            Value(ValueImpl::Invalid) => Err(PartialVMError::new(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            )
-            .with_message(format!("cannot move invalid value at index {}", idx))),
-            v => Ok(v),
+        let mut v = self.0.borrow_mut();
+        match v.get_mut(idx) {
+            Some(v) => {
+                if violation_check {
+                    if let Some(ValueImpl::Container(c)) = v {
+                        if c.rc_count() > 1 {
+                            return Err(PartialVMError::new(
+                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            )
+                                .with_message("moving container with dangling references".to_string())
+                                .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EREFERENCE_COUNTING_FAILURE));
+                        }
+                    }
+                }
+                match v.take() {
+                    Some(v) => Ok(Value(v)),
+                    None => Err(PartialVMError::new(
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    )
+                        .with_message(format!("cannot move invalid value at index {}", idx))),
+                }
+            },
+            None => Err(
+                PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
+                    format!("local index out of bounds: got {}, len: {}", idx, v.len()),
+                ),
+            ),
         }
-    }
-
-    pub fn store_loc(
-        &mut self,
-        idx: usize,
-        x: Value,
-        violation_check: bool,
-    ) -> PartialVMResult<()> {
-        self.swap_loc(idx, x, violation_check)?;
-        Ok(())
     }
 
     /// Drop all Move values onto a different Vec to avoid leaking memory.
@@ -1778,13 +2093,13 @@ impl Locals {
 
         for idx in 0..locals.len() {
             match &locals[idx] {
-                ValueImpl::Invalid => (),
-                ValueImpl::ContainerRef(_) | ValueImpl::IndexedRef(_) => {
-                    locals[idx] = ValueImpl::Invalid;
+                None => (),
+                Some(ValueImpl::ContainerRef(_)) | Some(ValueImpl::IndexedRef(_)) => {
+                    locals[idx] = None;
                 },
                 _ => res.push((
                     idx,
-                    Value(std::mem::replace(&mut locals[idx], ValueImpl::Invalid)),
+                    Value(locals[idx].take().expect("Local is set")),
                 )),
             }
         }
@@ -1794,15 +2109,9 @@ impl Locals {
 
     pub fn is_invalid(&self, idx: usize) -> PartialVMResult<bool> {
         let v = self.0.borrow();
-        match v.get(idx) {
-            Some(ValueImpl::Invalid) => Ok(true),
-            Some(_) => Ok(false),
-            None => Err(
-                PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
-                    format!("local index out of bounds: got {}, len: {}", idx, v.len()),
-                ),
-            ),
-        }
+        v.get(idx).map(|l| l.is_none()).ok_or_else(|| PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
+            format!("local index out of bounds: got {}, len: {}", idx, v.len()),
+        ))
     }
 }
 
@@ -3128,7 +3437,10 @@ impl Container {
     #[cfg(test)]
     fn legacy_size(&self) -> AbstractMemorySize {
         match self {
-            Self::Locals(r) | Self::Vec(r) | Self::Struct(r) => {
+            Self::Locals(_) => {
+                LEGACY_STRUCT_SIZE
+            },
+            Self::Vec(r) | Self::Struct(r) => {
                 Struct::legacy_size_impl(&r.borrow())
             },
             Self::VecU8(r) => {
@@ -3179,7 +3491,7 @@ impl ValueImpl {
         use ValueImpl::*;
 
         match self {
-            Invalid | U8(_) | U16(_) | U32(_) | U64(_) | U128(_) | U256(_) | Bool(_) => {
+            U8(_) | U16(_) | U32(_) | U64(_) | U128(_) | U256(_) | Bool(_) => {
                 LEGACY_CONST_SIZE
             },
             Address(_) => AbstractMemorySize::new(AccountAddress::LENGTH as u64),
@@ -3484,8 +3796,6 @@ impl GlobalValue {
 impl Debug for ValueImpl {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Invalid => write!(f, "Invalid"),
-
             Self::U8(x) => write!(f, "U8({:?})", x),
             Self::U16(x) => write!(f, "U16({:?})", x),
             Self::U32(x) => write!(f, "U32({:?})", x),
@@ -3521,8 +3831,6 @@ impl Debug for ValueImpl {
 impl Display for ValueImpl {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Invalid => write!(f, "Invalid"),
-
             Self::U8(x) => write!(f, "U8({})", x),
             Self::U16(x) => write!(f, "U16({})", x),
             Self::U32(x) => write!(f, "U32({})", x),
@@ -3585,7 +3893,10 @@ impl Display for Container {
         write!(f, "(container: ")?;
 
         match self {
-            Self::Locals(r) | Self::Vec(r) | Self::Struct(r) => {
+            Self::Locals(_) => {
+                write!(f, "locals!")
+            },
+            Self::Vec(r) | Self::Struct(r) => {
                 display_list_of_items(r.borrow().iter(), f)
             },
             Self::VecU8(r) => display_list_of_items(r.borrow().iter(), f),
@@ -3617,7 +3928,16 @@ impl Display for Locals {
                 .borrow()
                 .iter()
                 .enumerate()
-                .map(|(idx, val)| format!("[{}] {}", idx, val))
+                .map(|(idx, val)| {
+                    match val.as_ref() {
+                        None => {
+                            format!("[{}] invalid", idx)
+                        }
+                        Some(val) => {
+                            format!("[{}] {}", idx, val)
+                        }
+                    }
+                })
                 .collect::<Vec<_>>()
                 .join("\n")
         )
@@ -3675,8 +3995,6 @@ pub mod debug {
 
     fn print_value_impl<B: Write>(buf: &mut B, val: &ValueImpl) -> PartialVMResult<()> {
         match val {
-            ValueImpl::Invalid => print_invalid(buf),
-
             ValueImpl::U8(x) => print_u8(buf, x),
             ValueImpl::U16(x) => print_u16(buf, x),
             ValueImpl::U32(x) => print_u32(buf, x),
@@ -3769,7 +4087,20 @@ pub mod debug {
     fn print_indexed_ref<B: Write>(buf: &mut B, r: &IndexedRef) -> PartialVMResult<()> {
         let idx = r.idx;
         match r.container_ref.container() {
-            Container::Locals(r) | Container::Vec(r) | Container::Struct(r) => {
+            Container::Locals(r) => {
+                match r.borrow().get(idx) {
+                    Some(Some(x)) => print_value_impl(buf, x),
+                    Some(None) => {
+                        debug_write!(buf, "invalid")
+                    },
+                    None => Err(
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message("ref index out of bounds".to_string()),
+                    ),
+                }
+            }
+
+            Container::Vec(r) | Container::Struct(r) => {
                 print_slice_elem(buf, &r.borrow(), idx, print_value_impl)
             },
 
@@ -3788,7 +4119,14 @@ pub mod debug {
         // REVIEW: The number of spaces in the indent is currently hard coded.
         for (idx, val) in locals.0.borrow().iter().enumerate() {
             debug_write!(buf, "            [{}] ", idx)?;
-            print_value_impl(buf, val)?;
+            match val {
+                None => {
+                    debug_write!(buf, "invalid")?;
+                },
+                Some(val) => {
+                    print_value_impl(buf, val)?;
+                },
+            }
             debug_writeln!(buf)?;
         }
         Ok(())
@@ -4488,7 +4826,13 @@ impl Container {
         use Container::*;
 
         match self {
-            Locals(r) | Vec(r) | Struct(r) => r.borrow()[idx].visit_impl(visitor, depth + 1),
+            Locals(r) => {
+                match r.borrow()[idx].as_ref() {
+                    None => unreachable!(),
+                    Some(x) => x.visit_impl(visitor, depth + 1),
+                }
+            },
+            Vec(r) | Struct(r) => r.borrow()[idx].visit_impl(visitor, depth + 1),
             VecU8(vals) => visitor.visit_u8(depth + 1, vals.borrow()[idx]),
             VecU16(vals) => visitor.visit_u16(depth + 1, vals.borrow()[idx]),
             VecU32(vals) => visitor.visit_u32(depth + 1, vals.borrow()[idx]),
@@ -4550,7 +4894,6 @@ impl ValueImpl {
         use ValueImpl::*;
 
         match self {
-            Invalid => unreachable!("Should not be able to visit an invalid value"),
             U8(val) => visitor.visit_u8(depth, *val),
             U16(val) => visitor.visit_u16(depth, *val),
             U32(val) => visitor.visit_u32(depth, *val),

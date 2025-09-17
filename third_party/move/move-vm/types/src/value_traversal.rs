@@ -62,7 +62,7 @@ fn find_identifiers_in_value_impl(
             }
         },
 
-        ValueImpl::Invalid | ValueImpl::ContainerRef(_) | ValueImpl::IndexedRef(_) => {
+        ValueImpl::ContainerRef(_) | ValueImpl::IndexedRef(_) => {
             return Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             ))
