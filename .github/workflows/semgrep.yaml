@@ -20,7 +20,7 @@ jobs:
     if: (github.actor != 'dependabot[bot]')
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: semgrep ci
         env:
            SEMGREP_RULES: >-
