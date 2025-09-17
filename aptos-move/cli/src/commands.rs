@@ -6,6 +6,7 @@ use crate::{
     coverage::{CoverageCommon, SummaryCoverage},
     dispatch_transaction, exchange,
     fmt::Fmt,
+    fuzz::Fuzz,
     lint::LintPackage,
     local_simulation,
     manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
@@ -132,6 +133,7 @@ pub enum MoveTool {
     View(ViewFunction),
     Replay(Replay),
     Fmt(Fmt),
+    Fuzz(Fuzz),
     #[clap(subcommand)]
     Sim(Sim),
 }
@@ -176,6 +178,7 @@ impl MoveTool {
             MoveTool::List(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::Test(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::Fmt(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Fuzz(tool) => tool.execute_serialized().await,
             MoveTool::Sim(tool) => tool.attach_env(env).execute().await,
         }
     }
