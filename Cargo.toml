@@ -504,7 +504,7 @@ ark-ff = "0.5.0"
 ark-groth16 = "0.5.0"
 ark-poly = "0.5.0"
 ark-relations = "0.5.0"
-ark-serialize = { version = "0.5.0", features = ["derive"] }
+ark-serialize = "0.5.0"
 ark-std = { version = "0.5.0", features = ["getrandom"] }
 aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.2", features = [
     "postgres_partial",

@@ -176,16 +176,15 @@ impl<E: Pairing> RangeProof<E> for merlin::Transcript {
     }
 
     fn append_vk(&mut self, vk: &(&E::G1, &E::G2, &E::G2, &E::G2)) {
-        // let vk_bytes = bcs::to_bytes(vk).expect("vk serialization should succeed");
         let mut vk_bytes = Vec::new();
         vk.0.serialize_compressed(&mut vk_bytes) // TODO: change this
-            .expect("vk serialization should succeed");
+            .expect("vk0 serialization should succeed");
         vk.1.serialize_compressed(&mut vk_bytes)
-            .expect("vk serialization should succeed");
+            .expect("vk1 serialization should succeed");
         vk.2.serialize_compressed(&mut vk_bytes)
-            .expect("vk serialization should succeed");
+            .expect("vk2 serialization should succeed");
         vk.3.serialize_compressed(&mut vk_bytes)
-            .expect("vk serialization should succeed");
+            .expect("vk3 serialization should succeed");
         self.append_message(b"vk", vk_bytes.as_slice());
     }
 
@@ -197,11 +196,11 @@ impl<E: Pairing> RangeProof<E> for merlin::Transcript {
         (*public_statement)
             .0
             .serialize_compressed(&mut public_statement_bytes)
-            .expect("public_statement serialization should succeed");
+            .expect("public_statement0 serialization should succeed");
         (*public_statement)
             .1
             .serialize_compressed(&mut public_statement_bytes)
-            .expect("public_statement serialization should succeed");
+            .expect("public_statement1 serialization should succeed");
         // TODO: CHANGE THIS STUFF
         self.append_message(b"public-statements", public_statement_bytes.as_slice());
     }
@@ -211,8 +210,6 @@ impl<E: Pairing> RangeProof<E> for merlin::Transcript {
         bit_commitments
             .serialize_compressed(&mut bit_commitments_bytes)
             .expect("bit_commitments serialization should succeed");
-        // let bit_commitments_bytes =
-        //     bcs::to_bytes(bit_commitments).expect("bit_commitments serialization should succeed");
         self.append_message(b"bit-commitments", bit_commitments_bytes.as_slice());
     }
 
