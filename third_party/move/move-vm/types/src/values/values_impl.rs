@@ -70,9 +70,9 @@ pub(crate) enum ValueImpl {
     U32(u32),
     U64(u64),
     U128(u128),
-    U256(u256::U256),
+    U256(Box<u256::U256>),
     Bool(bool),
-    Address(AccountAddress),
+    Address(Box<AccountAddress>),
 
     Container(Container),
 
@@ -313,7 +313,7 @@ impl Container {
     fn master_signer(x: AccountAddress) -> Self {
         Container::Struct(Rc::new(RefCell::new(vec![
             ValueImpl::U16(MASTER_SIGNER_VARIANT),
-            ValueImpl::Address(x),
+            ValueImpl::Address(Box::new(x)),
         ])))
     }
 }
@@ -376,6 +376,17 @@ macro_rules! impl_vm_value_ref {
             }
         }
     };
+    ($ty:ty, $tc:ident, boxed) => {
+        impl VMValueRef<$ty> for ValueImpl {
+            fn value_ref(&self) -> PartialVMResult<&$ty> {
+                match self {
+                    ValueImpl::$tc(x) => Ok(x.as_ref()),
+                    _ => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                        .with_message(format!("cannot take {:?} as &{}", self, stringify!($ty)))),
+                }
+            }
+        }
+    };
 }
 
 impl_vm_value_ref!(u8, U8);
@@ -383,9 +394,9 @@ impl_vm_value_ref!(u16, U16);
 impl_vm_value_ref!(u32, U32);
 impl_vm_value_ref!(u64, U64);
 impl_vm_value_ref!(u128, U128);
-impl_vm_value_ref!(u256::U256, U256);
+impl_vm_value_ref!(u256::U256, U256, boxed);
 impl_vm_value_ref!(bool, Bool);
-impl_vm_value_ref!(AccountAddress, Address);
+impl_vm_value_ref!(AccountAddress, Address, boxed);
 
 impl ValueImpl {
     fn as_value_ref<T>(&self) -> PartialVMResult<&T>
@@ -418,9 +429,9 @@ impl ValueImpl {
             U32(x) => U32(*x),
             U64(x) => U64(*x),
             U128(x) => U128(*x),
-            U256(x) => U256(*x),
+            U256(x) => U256(Box::new(**x)),
             Bool(x) => Bool(*x),
-            Address(x) => Address(*x),
+            Address(x) => Address(Box::new(**x)),
 
             // Note: refs copy only clones Rc, so no need to increment depth.
             ContainerRef(r) => ContainerRef(r.copy_by_ref()),
@@ -441,7 +452,7 @@ impl ValueImpl {
                     .iter()
                     .map(|v| v.copy_value(depth + 1, max_depth))
                     .collect::<PartialVMResult<_>>()?;
-                ClosureValue(Closure(fun.clone_dyn()?, captured))
+                ClosureValue(Closure(fun.clone_dyn()?, Box::new(captured)))
             },
         })
     }
@@ -1083,9 +1094,9 @@ impl IndexedRef {
             VecU32(r) => ValueImpl::U32(r.borrow()[self.idx]),
             VecU64(r) => ValueImpl::U64(r.borrow()[self.idx]),
             VecU128(r) => ValueImpl::U128(r.borrow()[self.idx]),
-            VecU256(r) => ValueImpl::U256(r.borrow()[self.idx]),
+            VecU256(r) => ValueImpl::U256(Box::new(r.borrow()[self.idx])),
             VecBool(r) => ValueImpl::Bool(r.borrow()[self.idx]),
-            VecAddress(r) => ValueImpl::Address(r.borrow()[self.idx]),
+            VecAddress(r) => ValueImpl::Address(Box::new(r.borrow()[self.idx])),
 
             Locals(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
         };
@@ -1217,9 +1228,9 @@ impl IndexedRef {
             (Container::VecU32(r), ValueImpl::U32(x)) => r.borrow_mut()[self.idx] = *x,
             (Container::VecU64(r), ValueImpl::U64(x)) => r.borrow_mut()[self.idx] = *x,
             (Container::VecU128(r), ValueImpl::U128(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecU256(r), ValueImpl::U256(x)) => r.borrow_mut()[self.idx] = *x,
+            (Container::VecU256(r), ValueImpl::U256(x)) => r.borrow_mut()[self.idx] = **x,
             (Container::VecBool(r), ValueImpl::Bool(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecAddress(r), ValueImpl::Address(x)) => r.borrow_mut()[self.idx] = *x,
+            (Container::VecAddress(r), ValueImpl::Address(x)) => r.borrow_mut()[self.idx] = **x,
 
             (Container::VecU8(_), _)
             | (Container::VecU16(_), _)
@@ -1274,6 +1285,13 @@ macro_rules! impl_vm_value_from_primitive {
             }
         }
     };
+    ($ty:ty, $tc:ident, boxed) => {
+        impl VMValueFromPrimitive<$ty> for ValueImpl {
+            fn from_primitive(val: $ty) -> Self {
+                Self::$tc(Box::new(val))
+            }
+        }
+    };
 }
 
 impl_vm_value_from_primitive!(u8, U8);
@@ -1281,9 +1299,9 @@ impl_vm_value_from_primitive!(u16, U16);
 impl_vm_value_from_primitive!(u32, U32);
 impl_vm_value_from_primitive!(u64, U64);
 impl_vm_value_from_primitive!(u128, U128);
-impl_vm_value_from_primitive!(u256::U256, U256);
+impl_vm_value_from_primitive!(u256::U256, U256, boxed);
 impl_vm_value_from_primitive!(bool, Bool);
-impl_vm_value_from_primitive!(AccountAddress, Address);
+impl_vm_value_from_primitive!(AccountAddress, Address, boxed);
 
 /**************************************************************************************
  *
@@ -1839,7 +1857,7 @@ impl Value {
     }
 
     pub fn u256(x: u256::U256) -> Self {
-        Self(ValueImpl::U256(x))
+        Self(ValueImpl::U256(Box::new(x)))
     }
 
     pub fn bool(x: bool) -> Self {
@@ -1847,7 +1865,7 @@ impl Value {
     }
 
     pub fn address(x: AccountAddress) -> Self {
-        Self(ValueImpl::Address(x))
+        Self(ValueImpl::Address(Box::new(x)))
     }
 
     pub fn master_signer(x: AccountAddress) -> Self {
@@ -1967,6 +1985,17 @@ macro_rules! impl_vm_value_cast {
             }
         }
     };
+    ($ty:ty, $tc:ident, boxed) => {
+        impl VMValueCast<$ty> for Value {
+            fn cast(self) -> PartialVMResult<$ty> {
+                match self.0 {
+                    ValueImpl::$tc(x) => Ok(*x),
+                    v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                        .with_message(format!("cannot cast {:?} to {}", v, stringify!($ty)))),
+                }
+            }
+        }
+    };
 }
 
 impl_vm_value_cast!(u8, U8);
@@ -1974,9 +2003,9 @@ impl_vm_value_cast!(u16, U16);
 impl_vm_value_cast!(u32, U32);
 impl_vm_value_cast!(u64, U64);
 impl_vm_value_cast!(u128, U128);
-impl_vm_value_cast!(u256::U256, U256);
+impl_vm_value_cast!(u256::U256, U256, boxed);
 impl_vm_value_cast!(bool, Bool);
-impl_vm_value_cast!(AccountAddress, Address);
+impl_vm_value_cast!(AccountAddress, Address, boxed);
 impl_vm_value_cast!(ContainerRef, ContainerRef);
 impl_vm_value_cast!(IndexedRef, IndexedRef);
 
@@ -2002,7 +2031,7 @@ impl VMValueCast<IntegerValue> for Value {
             ValueImpl::U32(x) => Ok(IntegerValue::U32(x)),
             ValueImpl::U64(x) => Ok(IntegerValue::U64(x)),
             ValueImpl::U128(x) => Ok(IntegerValue::U128(x)),
-            ValueImpl::U256(x) => Ok(IntegerValue::U256(x)),
+            ValueImpl::U256(x) => Ok(IntegerValue::U256(*x)),
             v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                 .with_message(format!("cannot cast {:?} to integer", v,))),
         }
@@ -4505,7 +4534,7 @@ impl Closure {
     fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
         let Self(_, captured) = self;
         if visitor.visit_closure(depth, captured.len())? {
-            for val in captured {
+            for val in captured.iter() {
                 val.visit_impl(visitor, depth + 1)?;
             }
         }
@@ -4556,9 +4585,9 @@ impl ValueImpl {
             U32(val) => visitor.visit_u32(depth, *val),
             U64(val) => visitor.visit_u64(depth, *val),
             U128(val) => visitor.visit_u128(depth, *val),
-            U256(val) => visitor.visit_u256(depth, *val),
+            U256(val) => visitor.visit_u256(depth, **val),
             Bool(val) => visitor.visit_bool(depth, *val),
-            Address(val) => visitor.visit_address(depth, *val),
+            Address(val) => visitor.visit_address(depth, **val),
             Container(c) => c.visit_impl(visitor, depth),
             ContainerRef(r) => r.visit_impl(visitor, depth),
             IndexedRef(r) => r.visit_impl(visitor, depth),
@@ -4831,7 +4860,7 @@ pub mod prop {
                     })
                     .boxed(),
             },
-            L::Struct(_struct_layout @ MoveStructLayout::RuntimeVariants(variants)) => {
+            L::Struct(MoveStructLayout::RuntimeVariants(variants)) => {
                 // Randomly choose a variant index
                 let variant_count = variants.len();
                 let variants = variants.clone();
@@ -4960,9 +4989,9 @@ impl ValueImpl {
             (L::U32, ValueImpl::U32(x)) => MoveValue::U32(*x),
             (L::U64, ValueImpl::U64(x)) => MoveValue::U64(*x),
             (L::U128, ValueImpl::U128(x)) => MoveValue::U128(*x),
-            (L::U256, ValueImpl::U256(x)) => MoveValue::U256(*x),
+            (L::U256, ValueImpl::U256(x)) => MoveValue::U256(**x),
             (L::Bool, ValueImpl::Bool(x)) => MoveValue::Bool(*x),
-            (L::Address, ValueImpl::Address(x)) => MoveValue::Address(*x),
+            (L::Address, ValueImpl::Address(x)) => MoveValue::Address(**x),
 
             (L::Struct(struct_layout), ValueImpl::Container(Container::Struct(r))) => {
                 let values_ref = r.borrow();
@@ -5016,7 +5045,7 @@ impl ValueImpl {
             (L::Signer, ValueImpl::Container(Container::Struct(r))) => {
                 let v = r.borrow();
                 match &v[MASTER_ADDRESS_FIELD_OFFSET] {
-                    ValueImpl::Address(a) => MoveValue::Signer(*a),
+                    ValueImpl::Address(a) => MoveValue::Signer(**a),
                     v => panic!("Unexpected non-address while converting signer: {:?}", v),
                 }
             },
