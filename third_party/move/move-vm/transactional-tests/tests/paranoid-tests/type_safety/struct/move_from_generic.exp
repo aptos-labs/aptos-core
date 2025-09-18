@@ -1,12 +1,12 @@
 processed 4 tasks
-task 0 lines 1-20:  publish [module 0x2.A {]
-task 1 lines 22-28:  run --signers 0x1  [import 0x2.A;]
-task 2 lines 30-39:  run --signers 0x1  [import 0x2.A;]
-task 3 lines 41-47:  run --signers 0x1  [import 0x2.A;]
+task 0 lines 1-20:  publish [module 0x22.A {]
+task 1 lines 22-28:  run --signers 0x1 [import 0x22.A;]
+task 2 lines 30-39:  run --signers 0x1 [import 0x22.A;]
+task 3 lines 41-47:  run --signers 0x1 [import 0x22.A;]
 Error: Script execution failed with VMError: {
     major_status: INTERNAL_TYPE_ERROR,
     sub_status: None,
-    location: 0x2::A,
+    location: 0x22::A,
     indices: [],
     offsets: [(FunctionDefinitionIndex(2), 1)],
 }

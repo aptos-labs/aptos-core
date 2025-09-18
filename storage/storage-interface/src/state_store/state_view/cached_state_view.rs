@@ -265,6 +265,10 @@ impl CachedStateView {
         &self.speculative.base
     }
 
+    pub fn persisted_hot_state(&self) -> Arc<dyn HotStateView> {
+        Arc::clone(&self.hot)
+    }
+
     pub fn memorized_reads(&self) -> &ShardedStateCache {
         &self.memorized
     }
