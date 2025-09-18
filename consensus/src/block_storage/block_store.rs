@@ -614,6 +614,18 @@ impl BlockStore {
     pub fn pre_commit_status(&self) -> Option<Arc<Mutex<PreCommitStatus>>> {
         self.pre_commit_status.clone()
     }
+
+    pub async fn abort_pipeline_for_state_sync(&self) {
+        let blocks = self.inner.read().get_all_blocks();
+        // the blocks are not ordered by round here, so we need to abort all then wait
+        let futs: Vec<_> = blocks
+            .into_iter()
+            .filter_map(|b| b.abort_pipeline())
+            .collect();
+        for f in futs {
+            f.wait_until_finishes().await;
+        }
+    }
 }
 
 impl BlockReader for BlockStore {
