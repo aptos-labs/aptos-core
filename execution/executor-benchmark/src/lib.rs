@@ -437,7 +437,7 @@ fn add_accounts_impl<V>(
         executor,
         start_version,
         &pipeline_config,
-        Some(1 + num_new_accounts / block_size * 101 / 100),
+        Some(1 + 1 + num_new_accounts / block_size * 101 / 100),
     );
 
     let mut generator = TransactionGenerator::new_with_existing_db(

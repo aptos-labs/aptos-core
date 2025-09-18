@@ -73,8 +73,13 @@ where
             self.allow_discards,
             self.allow_retries,
         );
-        if !self.allow_retries && num_input_txns != 0 {
-            assert_eq!(output.num_transactions_to_commit(), num_input_txns + 1);
+
+        if !self.allow_retries {
+            if output.epoch_state().is_none() {
+                assert_eq!(output.num_transactions_to_commit(), num_input_txns + 1);
+            } else {
+                assert_eq!(output.num_transactions_to_commit(), num_input_txns);
+            }
         }
 
         let mut event_summary = self.event_summary.lock();

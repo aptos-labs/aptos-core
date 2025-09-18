@@ -712,13 +712,15 @@ impl TransactionGenerator {
         }
 
         let mut transactions = Vec::new();
+
+        let init_size = transactions.len();
         for i in 0..block_size {
             if let Some(txn) = transactions_by_index.get(&i) {
                 transactions.push(txn.clone());
             }
         }
 
-        if transactions.is_empty() {
+        if transactions.len() == init_size {
             let val = phase.fetch_add(1, Ordering::Relaxed);
             let last_generated_at = last_non_empty_phase.load(Ordering::Relaxed);
             if val > last_generated_at + 2 {
