@@ -441,9 +441,6 @@ fn add_accounts_impl<V>(
         Some(1 + 1 + num_new_accounts / block_size * 101 / 100),
     );
 
-    // BlockMetadata transactions are now added in the block preparation stage
-    // No need to send them separately here
-
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
         TransactionGenerator::read_root_account(genesis_key, &db),
