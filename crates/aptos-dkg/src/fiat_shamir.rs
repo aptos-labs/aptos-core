@@ -9,7 +9,7 @@
 
 use crate::{
     pvss::{traits::Transcript, ThresholdConfig},
-    range_proofs::univariate_range_proof,
+    range_proofs::dekart_univariate,
     utils::random::random_scalar_from_uniform_bytes,
     SCALAR_NUM_BYTES,
 };
@@ -92,7 +92,7 @@ pub trait RangeProof<E: Pairing> {
 
     fn append_public_statement(
         &mut self,
-        public_statement: &(usize, &univariate_range_proof::Commitment<E>),
+        public_statement: &(usize, &dekart_univariate::Commitment<E>),
     );
 
     fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1], &[E::G2]));
@@ -190,7 +190,7 @@ impl<E: Pairing> RangeProof<E> for merlin::Transcript {
 
     fn append_public_statement(
         &mut self,
-        public_statement: &(usize, &univariate_range_proof::Commitment<E>),
+        public_statement: &(usize, &dekart_univariate::Commitment<E>),
     ) {
         let mut public_statement_bytes = Vec::new();
         public_statement

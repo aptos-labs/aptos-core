@@ -11,6 +11,7 @@ use pairing::{MillerLoopResult, MultiMillerLoop};
 use rayon::ThreadPool;
 use sha3::Digest;
 use std::ops::Mul;
+use ark_ff::PrimeField;
 
 pub(crate) mod biguint;
 pub mod parallel_multi_pairing;
@@ -21,6 +22,11 @@ pub mod test_utils;
 #[inline]
 pub fn is_power_of_two(n: usize) -> bool {
     n != 0 && (n & (n - 1) == 0)
+}
+
+pub(crate) fn scalar_to_bits_le<E: Pairing>(x: &E::ScalarField) -> Vec<bool> {
+    let bigint: <E::ScalarField as ark_ff::PrimeField>::BigInt = x.into_bigint();
+    ark_ff::BitIteratorLE::new(&bigint).collect()
 }
 
 /// Hashes the specified `msg` and domain separation tag `dst` into a `Scalar` by computing a 512-bit

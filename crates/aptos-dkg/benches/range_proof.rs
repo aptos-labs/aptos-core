@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_dkg::{
-    range_proofs::univariate_range_proof::{batch_prove, batch_verify, DST},
+    range_proofs::dekart_univariate::{batch_prove, batch_verify, DST},
     utils::test_utils,
 };
 use ark_ec::pairing::Pairing;
@@ -58,7 +58,7 @@ fn bench_range_proof<E: Pairing>(c: &mut Criterion, curve_name: &str) {
 
 // Specialize benchmark for a concrete pairing curve
 fn bench_groups(c: &mut Criterion) {
-    bench_range_proof::<ark_bn254::Bn254>(c, "Bn254");
+    bench_range_proof::<ark_bn254::Bn254>(c, "BN254");
     bench_range_proof::<ark_bls12_381::Bls12_381>(c, "BLS12-381");
 }
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_dkg::{
-    range_proofs::univariate_range_proof::{batch_prove, batch_verify, Proof, DST},
+    range_proofs::dekart_univariate::{batch_prove, batch_verify, Proof, DST},
     utils::test_utils,
 };
 use ark_ec::pairing::Pairing;
@@ -52,7 +52,7 @@ fn run_serialize_range_proof<E: Pairing>(n: usize, ell: usize) {
         n,
         ell,
         encoded.len(),
-        2 * 8 + 48 + (48 + 96) * ell // Can get rid of the 2 * 8 by turning the Vecs in `proof` into tuples
+        2 * 8 + 48 + (48 + 96) * ell // Can get rid of the 2 * 8 here by turning the Vecs in `proof` into tuples
     );
 
     // === Round-trip deserialization ===
