@@ -19,6 +19,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
+    native_extensions::UnreachableNativeExtensionSession,
     native_functions,
     native_functions::{LoaderContext, NativeContext, NativeFunction, NativeFunctionTable},
 };
@@ -37,7 +38,6 @@ use std::{
     fmt::{Debug, Display},
     sync::Arc,
 };
-
 // ===========================================================================================
 // Public Data Structures and Constants
 
@@ -147,6 +147,9 @@ const HANDLE_FIELD_INDEX: usize = 0;
 
 // =========================================================================================
 // Implementation of Native Table Context
+
+// Note: new session model is irrelevant for this table implementation.
+impl<'a> UnreachableNativeExtensionSession for NativeTableContext<'a> {}
 
 impl<'a> NativeTableContext<'a> {
     /// Create a new instance of a native table context. This must be passed in via an

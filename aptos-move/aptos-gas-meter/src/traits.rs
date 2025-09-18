@@ -13,6 +13,7 @@ use aptos_vm_types::{
     storage::{
         io_pricing::IoPricing,
         space_pricing::{ChargeAndRefund, DiskSpacePricing},
+        StorageGasParameters,
     },
 };
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
@@ -26,8 +27,11 @@ pub trait GasAlgebra {
     /// Returns the gas feature version.
     fn feature_version(&self) -> u64;
 
-    /// Returns the struct containing all (regular) gas parameters.
+    /// Returns the struct containing all (non-storage) gas parameters.
     fn vm_gas_params(&self) -> &VMGasParameters;
+
+    /// Returns the struct containing all (storage) gas parameters.
+    fn storage_gas_params(&self) -> &StorageGasParameters;
 
     /// Returns the struct containing the storage-specific gas parameters.
     fn io_pricing(&self) -> &IoPricing;

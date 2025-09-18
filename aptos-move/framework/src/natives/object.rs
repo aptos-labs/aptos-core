@@ -13,7 +13,9 @@ use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerByte},
     vm_status::StatusCode,
 };
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{
+    native_extensions::NativeExtensionSession, native_functions::NativeFunction,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::PartialVMError, values::Value,
 };
@@ -32,6 +34,21 @@ pub struct NativeObjectContext {
     //   - if it is worth moving to native/caching other address deriving as well
     derived_from_object_addresses:
         RefCell<HashMap<(AccountAddress, AccountAddress), AccountAddress>>,
+}
+
+impl NativeExtensionSession for NativeObjectContext {
+    fn abort(&mut self) {
+        // No state changes to abort.
+    }
+
+    fn finish(&mut self) {
+        // No state changes to save.
+    }
+
+    fn start(&mut self, _txn_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        // This is safe to persist derived addresses caches because they are only saving compute.
+        // Hence, on new session start we do not need to reset anything.
+    }
 }
 
 /***************************************************************************************************
