@@ -14,7 +14,6 @@ use blstrs::Scalar;
 use ff::Field as FieldOld;
 use more_asserts::debug_assert_le;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
-use ark_ff::Field;
 
 pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
     let degree = coeffs.len() - 1;
