@@ -95,7 +95,7 @@ pub trait RangeProof<E: Pairing> {
         public_statement: &(usize, &dekart_univariate::Commitment<E>),
     );
 
-    fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1], &[E::G2]));
+    fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1Affine], &[E::G2Affine]));
 
     fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<E::ScalarField>;
 }
@@ -205,7 +205,7 @@ impl<E: Pairing> RangeProof<E> for merlin::Transcript {
         self.append_message(b"public-statements", public_statement_bytes.as_slice());
     }
 
-    fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1], &[E::G2])) {
+    fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1Affine], &[E::G2Affine])) {
         let mut bit_commitments_bytes = Vec::new();
         bit_commitments
             .serialize_compressed(&mut bit_commitments_bytes)

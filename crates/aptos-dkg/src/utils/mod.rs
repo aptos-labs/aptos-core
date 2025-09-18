@@ -5,13 +5,13 @@ use crate::utils::{
     parallel_multi_pairing::parallel_multi_pairing_slice, random::random_scalar_from_uniform_bytes,
 };
 use ark_ec::{pairing::Pairing, AdditiveGroup};
+use ark_ff::PrimeField;
 use blstrs::{pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt};
 use group::{Curve, Group};
 use pairing::{MillerLoopResult, MultiMillerLoop};
 use rayon::ThreadPool;
 use sha3::Digest;
 use std::ops::Mul;
-use ark_ff::PrimeField;
 
 pub(crate) mod biguint;
 pub mod parallel_multi_pairing;
