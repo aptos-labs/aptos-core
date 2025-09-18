@@ -167,6 +167,8 @@ pub fn aptos_prod_vm_config(
     // shallow while the value can be deeply nested, thanks to captured arguments not visible in a
     // type. Hence, depth checks have been adjusted to operate on values.
     let enable_depth_checks = features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES);
+    let enable_capture_option = !timed_features.is_enabled(TimedFeatureFlag::DisabledCaptureOption)
+        || features.is_enabled(FeatureFlag::ENABLE_CAPTURE_OPTION);
 
     let config = VMConfig {
         verifier_config,
@@ -190,6 +192,7 @@ pub fn aptos_prod_vm_config(
         enable_lazy_loading: features.is_lazy_loading_enabled(),
         enable_depth_checks,
         paranoid_ref_checks,
+        enable_capture_option,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

@@ -9,7 +9,10 @@ use crate::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
     identifier::Identifier,
+    language_storage::ModuleId,
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -21,7 +24,12 @@ use move_vm_types::{
         struct_name_indexing::StructNameIndex,
     },
 };
+use once_cell::sync::Lazy;
 use std::sync::Arc;
+
+static OPTION_MODULE_ID: Lazy<ModuleId> =
+    Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("option"))));
+static OPTION_STRUCT_NAME: Lazy<Identifier> = Lazy::new(|| Identifier::from(ident_str!("Option")));
 
 /// Stores type layout as well as a flag if it contains any delayed fields.
 #[derive(Debug)]
@@ -77,8 +85,14 @@ where
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         ty: &Type,
+        check_option_type: bool,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
-        self.type_to_type_layout_with_delayed_fields_impl::<false>(gas_meter, traversal_context, ty)
+        self.type_to_type_layout_with_delayed_fields_impl::<false>(
+            gas_meter,
+            traversal_context,
+            ty,
+            check_option_type,
+        )
     }
 
     /// Returns the decorated layout of a type.
@@ -90,7 +104,12 @@ where
         traversal_context: &mut TraversalContext,
         ty: &Type,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
-        self.type_to_type_layout_with_delayed_fields_impl::<true>(gas_meter, traversal_context, ty)
+        self.type_to_type_layout_with_delayed_fields_impl::<true>(
+            gas_meter,
+            traversal_context,
+            ty,
+            false,
+        )
     }
 
     /// Returns the VM config used in the system.
@@ -163,6 +182,7 @@ where
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         ty: &Type,
+        check_option_type: bool,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
         let _timer = VM_TIMER.timer_with_label("type_to_type_layout_with_delayed_fields");
 
@@ -173,6 +193,7 @@ where
             ty,
             &mut count,
             1,
+            check_option_type,
         )?;
         Ok(LayoutWithDelayedFields {
             layout,
@@ -190,6 +211,7 @@ where
         ty: &Type,
         count: &mut u64,
         depth: u64,
+        check_option_type: bool,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         self.check_depth_and_increment_count(count, depth)?;
 
@@ -211,6 +233,7 @@ where
                     ty,
                     count,
                     depth + 1,
+                    check_option_type,
                 )
                 .map(|(elem_layout, contains_delayed_fields)| {
                     let vec_layout = MoveTypeLayout::Vector(Box::new(elem_layout));
@@ -223,6 +246,7 @@ where
                 &[],
                 count,
                 depth + 1,
+                check_option_type,
             )?,
             Type::StructInstantiation { idx, ty_args, .. } => self
                 .struct_to_type_layout::<ANNOTATED>(
@@ -232,6 +256,7 @@ where
                     ty_args,
                     count,
                     depth + 1,
+                    check_option_type,
                 )?,
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -251,6 +276,7 @@ where
         tys: &[Type],
         count: &mut u64,
         depth: u64,
+        check_option_type: bool,
     ) -> PartialVMResult<(Vec<MoveTypeLayout>, bool)> {
         let mut contains_delayed_fields = false;
         let layouts = tys
@@ -263,6 +289,7 @@ where
                         ty,
                         count,
                         depth,
+                        check_option_type,
                     )?;
                 contains_delayed_fields |= ty_contains_delayed_fields;
                 Ok(layout)
@@ -287,12 +314,28 @@ where
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
+        check_option_type: bool,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         let struct_definition = self.struct_definition_loader.load_struct_definition(
             gas_meter,
             traversal_context,
             idx,
         )?;
+
+        if check_option_type && !self.runtime_environment().vm_config().enable_capture_option {
+            let struct_identifier = self
+                .runtime_environment()
+                .struct_name_index_map()
+                .idx_to_struct_name(*idx)?;
+            if struct_identifier.module == *OPTION_MODULE_ID
+                && struct_identifier.name == *OPTION_STRUCT_NAME
+            {
+                return Err(
+                    PartialVMError::new(StatusCode::UNABLE_TO_CAPTURE_OPTION_TYPE)
+                        .with_message("Option type cannot be captured".to_string()),
+                );
+            }
+        }
 
         let result = match &struct_definition.layout {
             // For enums, construct layouts for all possible variants. No special handling for
@@ -312,6 +355,7 @@ where
                                 &self.apply_subst_for_field_tys(&variant.1, ty_args)?,
                                 count,
                                 depth,
+                                check_option_type,
                             )?;
                         variant_contains_delayed_fields |= variant_fields_contain_delayed_fields;
                         Ok(variant_field_layouts)
@@ -337,6 +381,7 @@ where
                         &self.apply_subst_for_field_tys(fields, ty_args)?,
                         count,
                         depth,
+                        check_option_type,
                     )?;
 
                 match (kind, fields_contain_delayed_fields) {
@@ -464,6 +509,7 @@ mod tests {
                 &mut gas_meter,
                 &mut traversal_context,
                 ty,
+                false,
             )
         }
     }
