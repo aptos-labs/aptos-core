@@ -3659,7 +3659,7 @@ impl<'env> ModuleEnv<'env> {
     pub fn get_spec_funs_of_name(
         &self,
         name: Symbol,
-    ) -> impl Iterator<Item = (&'env SpecFunId, &'env SpecFunDecl)> {
+    ) -> impl Iterator<Item = (&'env SpecFunId, &'env SpecFunDecl)> + use<'env> {
         self.data
             .spec_funs
             .iter()
@@ -3962,7 +3962,7 @@ impl<'env> StructEnv<'env> {
 
     /// Returns an iteration of the variant names in the struct, in the order they
     /// are declared.
-    pub fn get_variants(&self) -> impl Iterator<Item = Symbol> + 'env {
+    pub fn get_variants(&self) -> impl Iterator<Item = Symbol> + 'env + use<'env> {
         self.data
             .variants
             .as_ref()

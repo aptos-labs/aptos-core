@@ -362,7 +362,7 @@ impl FakeExecutor {
         )
     }
 
-    pub fn state_store(&self) -> &impl SimulationStateStore {
+    pub fn state_store(&self) -> &(impl SimulationStateStore + use<>) {
         &self.state_store
     }
 
@@ -903,23 +903,20 @@ impl FakeExecutor {
             &code_storage,
             &txn,
             &log_context,
-            |gas_meter| {
-                let gas_profiler = match txn.payload().executable_ref() {
-                    Ok(TransactionExecutableRef::Script(_)) => GasProfiler::new_script(gas_meter),
-                    Ok(TransactionExecutableRef::EntryFunction(entry_func))
-                        if !txn.payload().is_multisig() =>
-                    {
-                        GasProfiler::new_function(
-                            gas_meter,
-                            entry_func.module().clone(),
-                            entry_func.function().to_owned(),
-                            entry_func.ty_args().to_vec(),
-                        )
-                    },
-                    Ok(_) => unimplemented!("multisig or empty payload not supported yet"),
-                    Err(_) => unimplemented!("payload type is deprecated"),
-                };
-                gas_profiler
+            |gas_meter| match txn.payload().executable_ref() {
+                Ok(TransactionExecutableRef::Script(_)) => GasProfiler::new_script(gas_meter),
+                Ok(TransactionExecutableRef::EntryFunction(entry_func))
+                    if !txn.payload().is_multisig() =>
+                {
+                    GasProfiler::new_function(
+                        gas_meter,
+                        entry_func.module().clone(),
+                        entry_func.function().to_owned(),
+                        entry_func.ty_args().to_vec(),
+                    )
+                },
+                Ok(_) => unimplemented!("multisig or empty payload not supported yet"),
+                Err(_) => unimplemented!("payload type is deprecated"),
             },
             auxiliary_info,
         )?;
@@ -976,7 +973,7 @@ impl FakeExecutor {
         )
     }
 
-    pub fn get_state_view(&self) -> &impl StateView {
+    pub fn get_state_view(&self) -> &(impl StateView + use<>) {
         &self.state_store
     }
 

@@ -138,8 +138,8 @@ prop_compose! {
         let mut should_fail_without_waypoints = false;
         let mut res_lis = Vec::new();
         let mut res_waypoints = Vec::new();
-        for (block_size, gen, overwrite, trusted) in blocks {
-            let mut li = gen.materialize(&mut universe, block_size);
+        for (block_size, r#gen, overwrite, trusted) in blocks {
+            let mut li = r#gen.materialize(&mut universe, block_size);
             if li.ledger_info().ends_epoch() {
                 if overwrite && li.ledger_info().epoch() != 0 {
                     li = LedgerInfoWithSignatures::new(
