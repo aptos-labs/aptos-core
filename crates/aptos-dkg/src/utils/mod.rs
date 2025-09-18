@@ -12,6 +12,7 @@ use pairing::{MillerLoopResult, MultiMillerLoop};
 use rayon::ThreadPool;
 use sha3::Digest;
 use std::ops::Mul;
+use ark_ff::PrimeField;
 
 pub(crate) mod biguint;
 pub mod parallel_multi_pairing;
