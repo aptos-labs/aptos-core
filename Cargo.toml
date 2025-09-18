@@ -952,3 +952,5 @@ jemalloc-sys = { git = "https://github.com/aptos-labs/jemalloc-sys-shim", rev = 
 
 # There is a bug in the lru crate. Patch it until https://github.com/jeromefroe/lru-rs/pull/219 is merged and released.
 lru = { git = "https://github.com/aptos-labs/lru-rs", rev = "d16747e8b119c48315a1c76669f962456d06dfe7" }
+
+librocksdb-sys = { git = "https://github.com/wqfish/rust-rocksdb", rev = "ea5557d7b2a6c99c16da1799c2295c486b53290e" }
