@@ -118,7 +118,7 @@ pub async fn get_federated_jwk(jwt: &str) -> Result<Arc<RSA_JWK>> {
 }
 
 /// Inserts the test JWK into the JWT cache
-fn insert_test_jwk(jwk_cache: JWKCache) {
+pub fn insert_test_jwk(jwk_cache: JWKCache) {
     let test_jwk = include_str!("../../../../../types/src/jwks/rsa/secure_test_jwk.json");
     let parsed_jwk = parse_jwks(test_jwk).expect("The test JWK should parse successfully!");
     jwk_cache.lock().insert(get_sample_iss(), parsed_jwk);

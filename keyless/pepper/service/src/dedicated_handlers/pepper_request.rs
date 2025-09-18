@@ -271,8 +271,9 @@ fn get_verified_derivation_path(
     let derivation_path = derivation_path.unwrap_or(DEFAULT_DERIVATION_PATH.into());
 
     // Verify the derivation path
-    slip_10::get_aptos_derivation_path(&derivation_path)
-        .map_err(|error| PepperServiceError::BadRequest(error.to_string()))
+    slip_10::get_aptos_derivation_path(&derivation_path).map_err(|error| {
+        PepperServiceError::BadRequest(format!("Invalid derivation path: {}", error))
+    })
 }
 
 /// Verifies the JWT signature using the cached JWKs, or fetches the federated JWK if not found in cache
@@ -286,7 +287,7 @@ async fn verify_jwt_signature(
         .header
         .kid
         .clone()
-        .ok_or_else(|| PepperServiceError::BadRequest("missing kid in JWT".to_string()))?;
+        .ok_or_else(|| PepperServiceError::BadRequest("Missing kid in JWT".to_string()))?;
 
     // Get the JWK from the cache, or fetch the federated JWK if not found
     let rsa_jwk = match jwk_fetcher::get_cached_jwk_as_rsa(&claims.claims.iss, &key_id, jwk_cache) {
@@ -309,7 +310,8 @@ async fn verify_jwt_signature(
             ))
         })?;
 
-    // Validate the JWT signature
+    // Validate the JWT signature.
+    // TODO: can we avoid decoding the JWT twice?
     let mut validation_with_sig_verification = Validation::new(RS256);
     validation_with_sig_verification.validate_exp = false; // Don't validate the exp time
     jsonwebtoken::decode::<Claims>(jwt, &jwk_decoding_key, &validation_with_sig_verification) // Signature verification happens here
@@ -371,7 +373,7 @@ fn verify_public_key_expiry_date_secs(
     }
 
     // Get the maximum allowed expiry date
-    let (max_exp_data_secs, overflowed) = claims
+    let (max_exp_date_secs, overflowed) = claims
         .claims
         .iat
         .overflowing_add(keyless_configuration.max_exp_horizon_secs);
@@ -382,11 +384,55 @@ fn verify_public_key_expiry_date_secs(
     }
 
     // Verify that the expiry date is within the allowed horizon
-    if exp_date_secs >= max_exp_data_secs {
+    if exp_date_secs >= max_exp_date_secs {
         Err(PepperServiceError::BadRequest(
             "The ephemeral public key expiry date is too far in the future (and beyond the max allowed horizon)".into()
         ))
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_uid_key_and_value() {
+        // Create test token data
+        let claims = TokenData {
+            claims: Claims {
+                iss: "test_issuer".into(),
+                sub: "test_sub".into(),
+                aud: "test_aud".into(),
+                exp: 0,
+                iat: 0,
+                nonce: "test_nonce".into(),
+                email: Some("test_email".into()),
+                azp: None,
+            },
+            header: Default::default(),
+        };
+
+        // Test with no uid_key (should use the default)
+        let (uid_key, uid_val) = get_uid_key_and_value(None, &claims).unwrap();
+        assert_eq!(uid_key, "sub");
+        assert_eq!(uid_val, "test_sub");
+
+        // Test with "email" uid_key
+        let (uid_key, uid_val) = get_uid_key_and_value(Some("email".into()), &claims).unwrap();
+        assert_eq!(uid_key, "email");
+        assert_eq!(uid_val, "test_email");
+
+        // Test with an unsupported uid_key
+        let result = get_uid_key_and_value(Some("unsupported".to_string()), &claims);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_derivation_path() {
+        let invalid_path = Some("m/44'/637'/0'/0/0'".to_string()); // Invalid because one index is not hardened
+        let result = get_verified_derivation_path(invalid_path);
+        assert!(result.is_err());
     }
 }
