@@ -3917,7 +3917,7 @@ pub trait AbilityInference: AbilityContext {
     /// Infers the abilities of the type. The returned boolean indicates whether
     /// the type is a phantom type parameter,
     fn infer_abilities(&self, ty: &Type) -> (bool, AbilitySet) {
-        let res = match ty {
+        match ty {
             Type::Primitive(p) => match p {
                 PrimitiveType::Bool
                 | PrimitiveType::U8
@@ -3957,8 +3957,7 @@ pub trait AbilityInference: AbilityContext {
             Type::TypeDomain(_) | Type::ResourceDomain(_, _, _) | Type::Error => {
                 (false, AbilitySet::EMPTY)
             },
-        };
-        res
+        }
     }
 
     fn infer_struct_abilities(&self, qid: QualifiedId<StructId>, ty_args: &[Type]) -> AbilitySet {

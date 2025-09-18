@@ -439,7 +439,7 @@ fn create_optimistic_fetch_data_request(
 
     // Generate the random data request
     let mut rng = OsRng;
-    let random_number: u8 = rng.gen();
+    let random_number: u8 = rng.r#gen();
     match random_number % 3 {
         0 => {
             if use_request_v2 {

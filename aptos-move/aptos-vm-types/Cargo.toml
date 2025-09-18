@@ -5,7 +5,7 @@ version = "0.0.1"
 
 # Workspace inherited keys
 authors = { workspace = true }
-edition = { workspace = true }
+edition = "2021"
 homepage = { workspace = true }
 license = { workspace = true }
 publish = { workspace = true }
