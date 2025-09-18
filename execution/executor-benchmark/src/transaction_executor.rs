@@ -63,9 +63,6 @@ where
         );
         let num_input_txns = executable_block.transactions.num_transactions();
         assert!(num_input_txns > 0);
-        if num_input_txns == 1 {
-            println!("{:?}", executable_block.transactions.txns());
-        }
         {
             let _timer = TIMER.with_label_values(&["execute"]).start_timer();
             self.executor

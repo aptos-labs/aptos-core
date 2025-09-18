@@ -41,7 +41,6 @@ use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use measurements::{EventMeasurements, OverallMeasurement, OverallMeasuring};
 use pipeline::PipelineConfig;
-// Removed: BlockMetadata transactions now added in block preparation stage
 use std::{
     fs,
     path::Path,
