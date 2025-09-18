@@ -6,8 +6,7 @@ use crate::{
     account_generator::{AccountCache, AccountGenerator},
     metrics::{NUM_TXNS, TIMER},
 };
-use aptos_config::keys::ConfigKey;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, Uniform};
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
@@ -17,13 +16,19 @@ use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter,
 };
 use aptos_types::{
-    account_address::AccountAddress, account_config::{aptos_test_root_address, AccountResource}, block_metadata::BlockMetadata, chain_id::ChainId, state_store::MoveResourceExt, transaction::{authenticator::AuthenticationKey, EntryFunction, Transaction, TransactionPayload}
+    account_address::AccountAddress,
+    account_config::{aptos_test_root_address, AccountResource},
+    chain_id::ChainId,
+    state_store::MoveResourceExt,
+    transaction::{EntryFunction, Transaction, TransactionPayload},
 };
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use move_core_types::{ident_str, language_storage::ModuleId};
-use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
+#[cfg(test)]
+use rand::SeedableRng;
+use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng};
 use rayon::{
     iter::{IntoParallelRefIterator, ParallelIterator},
     ThreadPool, ThreadPoolBuilder,
@@ -705,7 +710,6 @@ impl TransactionGenerator {
 
         let mut transactions = Vec::new();
 
-        // transactions.push(create_block_metadata_transaction());
         let init_size = transactions.len();
         for i in 0..block_size {
             if let Some(txn) = transactions_by_index.get(&i) {
@@ -823,35 +827,6 @@ impl TransactionGenerator {
     pub fn drop_sender(&mut self) {
         self.block_sender.take().unwrap();
     }
-}
-
-pub(crate) fn create_block_metadata_transaction() -> Transaction {
-    // Use a static counter to ensure unique, incrementing round numbers and controlled timestamps
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static ROUND_COUNTER: AtomicU64 = AtomicU64::new(0);
-    
-    let round = ROUND_COUNTER.fetch_add(1, Ordering::SeqCst);
-    // Start from 1 second since genesis is already at timestamp 0
-    // This ensures each BlockMetadata has a strictly increasing timestamp
-    let timestamp_usecs = (round + 1) * 1_000_000; // Start at 1 second, increment by 1 second
-    
-    Transaction::BlockMetadata(BlockMetadata::new(
-        HashValue::random(),
-        0,                     // epoch stays 0 for benchmark
-        round,                 // proper incrementing round number
-        validator_address(),   // keep existing validator address
-        vec![],
-        vec![],
-        timestamp_usecs))
-}
-
-fn validator_address() -> AccountAddress {
-    let mut rng = StdRng::from_seed([0; 32]);
-    let _: [u8; 32] = rng.gen();
-    let seed: [u8; 32] = rng.gen();
-    let key = Ed25519PrivateKey::generate(&mut StdRng::from_seed(seed));
-    let account_address = AuthenticationKey::ed25519(&ConfigKey::new(key).public_key()).account_address();
-    account_address
 }
 
 /// With probability `1-h/n`, pick an integer in [0, h) uniformly at random;
