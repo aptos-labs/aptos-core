@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_generator::{AccountCache, AccountGenerator},
-    metrics::{NUM_TXNS, TIMER},
+    account_generator::{AccountCache, AccountGenerator}, block_preparation::create_block_metadata_transaction_epoch_1, metrics::{NUM_TXNS, TIMER}
 };
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
@@ -222,9 +221,9 @@ impl TransactionGenerator {
 
     pub fn create_transaction_factory() -> TransactionFactory {
         TransactionFactory::new(ChainId::test())
-            // executor benchmark doesn't have BlockMetadata txns, time doesn't pass for it
-            // so we need to use absolute timestamp (so orderless txns are not rejected as too far in the future)
-            .with_absolute_transaction_expiration_timestamp(30)
+            // Use relative expiration: current time + 60 seconds
+            // This ensures transactions have reasonable expiration window regardless of blockchain time
+            .with_transaction_expiration_time(60)
             .with_gas_unit_price(100)
     }
 
@@ -374,7 +373,7 @@ impl TransactionGenerator {
         // and re-mint seed accounts here.
         let num_seed_accounts = (num_new_accounts / 1000).clamp(1, 100000);
         let seed_accounts_cache =
-            Self::gen_seed_account_cache(reader, num_seed_accounts, is_keyless);
+            Self::gen_seed_account_cache(reader.clone(), num_seed_accounts, is_keyless);
 
         println!(
             "[{}] Generating {} seed account creation txns, with {} coins.",
@@ -390,6 +389,11 @@ impl TransactionGenerator {
             .collect::<Vec<_>>()
             .chunks(block_size)
         {
+            // Refresh root account sequence number once per block from database
+            // This ensures we stay in sync even if BlockMetadata or other transactions affected the account
+            let current_seq_num = get_sequence_number(self.root_account.address(), reader.clone());
+            self.root_account.set_sequence_number(current_seq_num);
+            
             let transactions: Vec<_> = chunk
                 .iter()
                 .map(|new_account| {
@@ -712,6 +716,7 @@ impl TransactionGenerator {
         }
 
         let mut transactions = Vec::new();
+        transactions.push(create_block_metadata_transaction_epoch_1());
 
         let init_size = transactions.len();
         for i in 0..block_size {

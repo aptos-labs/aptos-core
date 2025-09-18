@@ -17,6 +17,7 @@ pub mod transaction_executor;
 pub mod transaction_generator;
 
 use crate::{
+    block_preparation::create_block_metadata_transaction_epoch_0,
     db_access::DbAccessUtil, pipeline::Pipeline, transaction_committer::TransactionCommitter,
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
@@ -433,11 +434,30 @@ fn add_accounts_impl<V>(
 
     let start_version = db.reader.get_latest_ledger_info_version().unwrap();
 
-    let (pipeline, block_sender) = Pipeline::new(
-        executor,
+    // Execute BlockMetadata transactions one by one and wait for results
+    
+    // First BlockMetadata transaction (epoch=0 to trigger epoch change)
+    let executor1 = BlockExecutor::<V>::new(db.clone());
+    let (pipeline1, block_sender1) = Pipeline::new(
+        executor1,
         start_version,
         &pipeline_config,
-        Some(1 + 1 + num_new_accounts / block_size * 101 / 100),
+        Some(1), // Only 1 block
+    );
+    
+    block_sender1.send(vec![create_block_metadata_transaction_epoch_0()]).unwrap();
+    drop(block_sender1); // Close the sender to indicate no more transactions
+    
+    pipeline1.start_pipeline_processing();
+    let (num_txns1, results1, _events1) = pipeline1.join();
+    
+    // Now create the main pipeline for account creation
+    let current_version = db.reader.get_latest_ledger_info_version().unwrap();
+    let (pipeline, block_sender) = Pipeline::new(
+        executor,
+        current_version,
+        &pipeline_config,
+        Some(num_new_accounts / block_size * 101 / 100),
     );
 
     let mut generator = TransactionGenerator::new_with_existing_db(

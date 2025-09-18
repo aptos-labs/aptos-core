@@ -39,7 +39,8 @@ liquidity-pool-swap	1	VM	6	0.993	1.009	831.8
 liquidity-pool-swap	100	VM	6	0.985	1.017	9426.9
 liquidity-pool-swap-stable	1	VM	6	0.997	1.014	799.8
 liquidity-pool-swap-stable	100	VM	6	0.994	1.031	9163.3
-deserialize-u256	1	VM	6	0.998	1.019	33394.0
+deserialze-u256	1	VM	6	0.841	1.066	14851.3
+monotonic-counter-single	1	VM	6	0.841	1.066	13356.40
 no-op-fee-payer	1	VM	6	0.986	1.004	2317.1
 no-op-fee-payer	100	VM	6	0.986	1.017	27943.9
 simple-script	1	VM	6	0.991	1.012	35002.7
