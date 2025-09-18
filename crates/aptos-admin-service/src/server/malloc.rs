@@ -12,8 +12,8 @@ use std::{
 const PROFILE_PATH_PREFIX: &str = "/tmp/heap-profile";
 
 unsafe extern "C" fn write_cb(buf: *mut c_void, s: *const c_char) {
-    let out = &mut *(buf as *mut Vec<u8>);
-    let stats_cstr = CStr::from_ptr(s).to_bytes();
+    let out = unsafe { &mut *(buf as *mut Vec<u8>) };
+    let stats_cstr = unsafe { CStr::from_ptr(s).to_bytes() };
     // We do not want any memory allocation in the callback.
     let len = std::cmp::min(out.capacity(), stats_cstr.len());
     out.extend_from_slice(&stats_cstr[0..len]);

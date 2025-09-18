@@ -1299,13 +1299,13 @@ fn no_conflict_task_count() {
                     SchedulerTask::ExecutionTask(txn_idx, incarnation, _) => {
                         assert_eq!(incarnation, 0);
                         // true means an execution task.
-                        tasks.insert(rng.gen::<u32>(), (true, txn_idx));
+                        tasks.insert(rng.r#gen::<u32>(), (true, txn_idx));
                     },
                     SchedulerTask::ValidationTask(txn_idx, incarnation, cur_wave) => {
                         assert_eq!(incarnation, 0);
                         assert_eq!(cur_wave, 0);
                         // false means a validation task.
-                        tasks.insert(rng.gen::<u32>(), (false, txn_idx));
+                        tasks.insert(rng.r#gen::<u32>(), (false, txn_idx));
                     },
                     SchedulerTask::Retry => break,
                     // Unreachable because we never call try_commit.
@@ -1331,7 +1331,7 @@ fn no_conflict_task_count() {
                             assert_eq!(idx, txn_idx);
                             assert_eq!(incarnation, 0);
                             assert_eq!(wave, 0);
-                            tasks.insert(rng.gen::<u32>(), (false, txn_idx));
+                            tasks.insert(rng.r#gen::<u32>(), (false, txn_idx));
                         } else {
                             assert_matches!(task_res, Ok(SchedulerTask::Retry));
                         }

@@ -405,7 +405,7 @@ pub async fn uninstall_testnet_resources(kube_namespace: String) -> Result<()> {
 
 pub fn generate_new_era() -> String {
     let mut rng = rand::thread_rng();
-    let r: u32 = rng.gen();
+    let r: u32 = rng.r#gen();
     format!("forge{:08x}", r)
 }
 

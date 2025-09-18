@@ -13,6 +13,7 @@ xclippy = [
   "-Aclippy::result-large-err",
   "-Aclippy::mutable-key-type",
   "-Aclippy::doc_lazy_continuation",
+  "-Aclippy::collapsible_if",
   "-Aclippy::collapsible_match",
   "-Aclippy::needless_borrows_for_generic_args",
   "-Anon_local_definitions",

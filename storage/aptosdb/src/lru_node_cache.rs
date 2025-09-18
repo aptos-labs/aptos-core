@@ -39,14 +39,13 @@ impl LruNodeCache {
 
     pub fn get(&self, node_key: &NodeKey) -> Option<Node> {
         let mut r = self.shards[Self::shard(node_key.nibble_path()) as usize].lock();
-        let ret = r.get(node_key.nibble_path()).and_then(|(version, node)| {
+        r.get(node_key.nibble_path()).and_then(|(version, node)| {
             if *version == node_key.version() {
                 Some(node.clone())
             } else {
                 None
             }
-        });
-        ret
+        })
     }
 
     pub fn put(&self, node_key: NodeKey, node: Node) {

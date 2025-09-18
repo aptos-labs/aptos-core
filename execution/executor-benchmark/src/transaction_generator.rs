@@ -605,7 +605,7 @@ impl TransactionGenerator {
                 let conflicting_indices: Vec<_> = (0..num_txns_per_grp)
                     .map(|_| {
                         let index2 = accounts_pool[rng.gen_range(0, accounts_pool.len())];
-                        if rng.gen::<bool>() {
+                        if rng.r#gen::<bool>() {
                             (index1, index2)
                         } else {
                             (index2, index1)

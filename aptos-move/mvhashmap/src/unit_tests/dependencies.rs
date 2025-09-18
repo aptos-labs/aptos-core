@@ -185,7 +185,7 @@ fn test_dependencies(
                         );
                         let correct = match speculative_read_value {
                             Ok(MVDataOutput::Versioned(_version, value)) => {
-                                let correct = baseline
+                                baseline
                                     .get(&key)
                                     .expect("key should exist in baseline")
                                     .range(..txn_idx)
@@ -209,8 +209,7 @@ fn test_dependencies(
                                                     None,
                                                 )
                                         },
-                                    );
-                                correct
+                                    )
                             },
                             Err(MVDataError::Uninitialized) => {
                                 map.data().set_base_value(

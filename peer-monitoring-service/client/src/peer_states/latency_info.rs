@@ -362,7 +362,7 @@ mod test {
     /// Returns a random U64
     fn get_random_u64() -> u64 {
         let mut rng = OsRng;
-        rng.gen()
+        rng.r#gen()
     }
 
     /// Handles a monitoring service response from a peer
