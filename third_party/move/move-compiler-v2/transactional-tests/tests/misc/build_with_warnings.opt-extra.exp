@@ -1,0 +1,26 @@
+processed 2 tasks
+task 0 lines 1-10:  publish --print-bytecode [module 0x42::m {]
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+  ┌─ TEMPFILE:3:20
+  │
+3 │     public fun foo(x: u64): u64 {
+  │                    ^
+
+
+== BEGIN Bytecode ==
+// Bytecode version v8
+module 0x42::m
+// Function definition at index 0
+#[persistent] public fun bar()
+    ret
+    ld_u64 1
+    abort
+
+// Function definition at index 1
+#[persistent] public fun foo(l0: u64): u64
+    ld_u64 2
+    ret
+
+
+== END Bytecode ==
+task 1 lines 12-12:  run 0x42::m::bar

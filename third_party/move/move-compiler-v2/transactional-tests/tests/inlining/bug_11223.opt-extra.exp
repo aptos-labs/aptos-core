@@ -1,0 +1,14 @@
+processed 1 task
+task 0 lines 1-14:  publish --print-bytecode [module 0xcafe::vectors {]
+
+== BEGIN Bytecode ==
+// Bytecode version v8
+module 0xcafe::vectors
+// Function definition at index 0
+#[persistent] entry public fun guess_flips_break2(l0: vector<u8>): u64
+    borrow_loc l0
+    vec_len <u8>
+    ret
+
+
+== END Bytecode ==

@@ -1,0 +1,10 @@
+processed 2 tasks
+task 0 lines 1-10:  publish [module 0xCAFE::m {]
+task 1 lines 12-12:  run 0xCAFE::m::f
+Error: Function execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(1),
+    location: 0xcafe::m,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 4)],
+}

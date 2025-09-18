@@ -1,0 +1,112 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::test {
+    struct T<A,B> {
+        x: A,
+        y: B,
+    }
+    struct S<A,B,C> {
+        0: A,
+        1: B,
+        2: C,
+    }
+    private fun proj_0<A,B,C>(self: S<A, B, C>): A {
+        {
+          let test::S<A, B, C>{ 0: x, 1: _, 2: _ } = self;
+          x
+        }
+    }
+    private fun test_proj_0(): u8 {
+        {
+          let x: S<u8, address, bool> = pack test::S<u8, address, bool>(42, 0x1, true);
+          test::proj_0<u8, address, bool>(x)
+        }
+    }
+} // end 0x42::test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::test {
+    struct T<A, B> has drop {
+        x: A,
+        y: B,
+    }
+    struct S<A, B, C> has drop {
+        0: A,
+        1: B,
+        2: C,
+    }
+    fun proj_0<A, B: drop, C: drop>(self: S<A, B, C>): A {
+        let S<A,B,C>(x, _, _) = self;
+        x
+    }
+    fun test_proj_0(): u8 {
+        let x = S<u8,address,bool>(42u8, @0x1, true);
+        proj_0<u8,address,bool>(x)
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::test {
+    struct T<A,B> {
+        x: A,
+        y: B,
+    }
+    struct S<A,B,C> {
+        0: A,
+        1: B,
+        2: C,
+    }
+    private fun proj_0<A,B,C>(self: S<A, B, C>): A {
+        {
+          let test::S<A, B, C>{ 0: x, 1: _, 2: _ } = self;
+          x
+        }
+    }
+    private fun test_proj_0(): u8 {
+        {
+          let x: S<u8, address, bool> = pack test::S<u8, address, bool>(42, 0x1, true);
+          {
+            let (self: S<u8, address, bool>): (S<u8, address, bool>) = Tuple(x);
+            {
+              let test::S<u8, address, bool>{ 0: x, 1: _, 2: _ } = self;
+              x
+            }
+          }
+        }
+    }
+} // end 0x42::test
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module 42.test {
+struct T<A, B> has drop {
+	x: A,
+	y: B
+}
+struct S<A, B, C> has drop {
+	_0: A,
+	_1: B,
+	_2: C
+}
+
+proj_0<A, B: drop, C: drop>(self: S<A, B, C>): A /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](self: S<A, B, C>)
+	1: UnpackGeneric[0](S<A, B, C>)
+	2: Pop
+	3: Pop
+	4: Ret
+}
+test_proj_0(): u8 /* def_idx: 1 */ {
+B0:
+	0: LdU8(42)
+	1: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+	2: LdTrue
+	3: PackGeneric[1](S<u8, address, bool>)
+	4: UnpackGeneric[1](S<u8, address, bool>)
+	5: Pop
+	6: Pop
+	7: Ret
+}
+}
+============ bytecode verification succeeded ========

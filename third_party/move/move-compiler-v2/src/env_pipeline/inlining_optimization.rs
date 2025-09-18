@@ -13,7 +13,7 @@ use crate::{
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
 use move_model::{
-    ast::{Exp, ExpData, Operation, Pattern, TempIndex},
+    ast::{AccessSpecifierKind, Exp, ExpData, Operation, Pattern, TempIndex},
     exp_rewriter::ExpRewriterFunctions,
     metadata::LanguageVersion,
     model::{
@@ -21,6 +21,7 @@ use move_model::{
         QualifiedId,
     },
     ty::Type,
+    well_known,
 };
 use petgraph::{algo::kosaraju_scc, prelude::DiGraphMap};
 use std::collections::BTreeSet;
@@ -67,6 +68,7 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
             // - is not a verify only function
             // - is not a native function
             // - is not an inline function
+            // - does not have the `#[module_lock]` attribute
             !skip_functions.contains(function_id)
                 && function.module_env.is_primary_target()
                 && !function.module_env.is_script_module()
@@ -74,6 +76,7 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
                 && !function.is_verify_only()
                 && !function.is_native()
                 && !function.is_inline()
+                && !has_module_lock_attribute(&function)
         } else {
             // only move functions are considered for inlining optimization
             false
@@ -225,6 +228,8 @@ fn compute_call_sites_to_inline_and_new_function_size(
                 || has_explicit_return(&callee_env)
                 || has_privileged_operations(caller_mid, &callee_env)
                 || has_invisible_calls(caller_module, &callee_env, across_package)
+                || has_module_lock_attribute(&callee_env)
+                || has_access_controls(&callee_env)
             {
                 // won't inline if:
                 // - callee is inline (should have been inlined already)
@@ -235,6 +240,8 @@ fn compute_call_sites_to_inline_and_new_function_size(
                 // - callee has privileged operations on structs/enums that the caller cannot
                 //   perform directly
                 // - callee has calls to functions that are not visible from the caller module
+                // - callee has the `#[module_lock]` attribute
+                // - callee has runtime access control checks
                 None
             } else {
                 let function_size = get_function_size_estimate(env, &callee);
@@ -502,6 +509,32 @@ fn has_explicit_return(function: &FunctionEnv) -> bool {
         !found
     });
     found
+}
+
+/// Does `function` have any runtime access control checks?
+/// If so, by inlining, such checks would not be performed.
+fn has_access_controls(function: &FunctionEnv) -> bool {
+    if let Some(access_specifiers) = function.get_access_specifiers() {
+        if access_specifiers.is_empty() {
+            // empty access specifiers means no access is allowed, the strictest form
+            // of access control
+            return true;
+        }
+        // any reads or writes specification is considered an access control
+        access_specifiers
+            .iter()
+            .any(|spec| spec.kind != AccessSpecifierKind::LegacyAcquires)
+    } else {
+        false
+    }
+}
+
+/// Does `function` have the `#[module_lock]` attribute?
+fn has_module_lock_attribute(function: &FunctionEnv) -> bool {
+    let env = function.env();
+    function.has_attribute(|attr| {
+        env.symbol_pool().string(attr.name()).as_str() == well_known::MODULE_LOCK_ATTRIBUTE
+    })
 }
 
 /// Rewriter for a caller function to inline the call sites in it.
