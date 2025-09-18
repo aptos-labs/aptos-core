@@ -28,14 +28,17 @@ use move_vm_types::{
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{GlobalValue, Value},
 };
-use std::collections::btree_map::{BTreeMap, Entry};
+use std::{
+    collections::btree_map::{BTreeMap, Entry},
+    sync::Arc,
+};
 
 /// An entry in the data cache, containing resource's [GlobalValue] as well as additional cached
 /// information such as tag, layout, and a flag whether there are any delayed fields inside the
 /// resource.
 pub(crate) struct DataCacheEntry {
     struct_tag: StructTag,
-    layout: MoveTypeLayout,
+    layout: Arc<MoveTypeLayout>,
     contains_delayed_fields: bool,
     value: GlobalValue,
 }
@@ -78,7 +81,7 @@ impl TransactionDataCache {
     /// Gives all proper guarantees on lifetime of global data as well.
     pub fn into_effects(self, module_storage: &dyn ModuleStorage) -> PartialVMResult<ChangeSet> {
         let resource_converter =
-            |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
+            |value: Value, layout: Arc<MoveTypeLayout>, _: bool| -> PartialVMResult<Bytes> {
                 let function_value_extension = FunctionValueExtensionAdapter { module_storage };
                 let max_value_nest_depth = function_value_extension.max_value_nest_depth();
                 ValueSerDeContext::new(max_value_nest_depth)
@@ -97,7 +100,7 @@ impl TransactionDataCache {
     /// produced effects for resources.
     pub fn into_custom_effects<Resource>(
         self,
-        resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
+        resource_converter: &dyn Fn(Value, Arc<MoveTypeLayout>, bool) -> PartialVMResult<Resource>,
     ) -> PartialVMResult<Changes<Resource>> {
         let mut change_set = Changes::<Resource>::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
