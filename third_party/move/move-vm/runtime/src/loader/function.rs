@@ -3,6 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    execution_format::{
+        converter::ExecutionFormatConverter, converters::v0::ExecutionFormatConverterV0,
+        instructions::Bytecode,
+    },
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
@@ -13,9 +17,7 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::{
-        Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
-    },
+    file_format::{CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility},
 };
 use move_core_types::{
     ability::AbilitySet,
@@ -522,7 +524,7 @@ impl Function {
         };
         // Native functions do not have a code unit
         let code = match &def.code {
-            Some(code) => code.code.clone(),
+            Some(code) => ExecutionFormatConverterV0.convert_code(&code.code)?,
             None => vec![],
         };
         let ty_param_abilities = handle.type_parameters.clone();

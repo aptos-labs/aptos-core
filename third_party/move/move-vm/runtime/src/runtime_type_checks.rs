@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack,
-    reentrancy_checker::CallType, LoadedFunction,
+    execution_format::instructions::Bytecode, frame::Frame, frame_type_cache::FrameTypeCache,
+    interpreter::Stack, reentrancy_checker::CallType, LoadedFunction,
 };
-use move_binary_format::{errors::*, file_format::Bytecode};
+use move_binary_format::errors::*;
 use move_core_types::{
     ability::{Ability, AbilitySet},
     function::ClosureMask,
