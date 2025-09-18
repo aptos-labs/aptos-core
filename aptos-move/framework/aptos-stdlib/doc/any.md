@@ -7,6 +7,7 @@
 
 -  [Struct `Any`](#0x1_any_Any)
 -  [Constants](#@Constants_0)
+-  [Function `new`](#0x1_any_new)
 -  [Function `pack`](#0x1_any_pack)
 -  [Function `unpack`](#0x1_any_unpack)
 -  [Function `type_name`](#0x1_any_type_name)
@@ -83,6 +84,34 @@ The type provided for <code>unpack</code> is not the same as was given for <code
 </code></pre>
 
 
+
+<a id="0x1_any_new"></a>
+
+## Function `new`
+
+Create a new <code><a href="any.md#0x1_any_Any">Any</a></code> struct with provided parameters
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_new">new</a>(type_name: <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, data: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="any.md#0x1_any_Any">any::Any</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_new">new</a>(type_name: String, data: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="any.md#0x1_any_Any">Any</a> {
+    <a href="any.md#0x1_any_Any">Any</a> {
+        type_name,
+        data
+    }
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_any_pack"></a>
 

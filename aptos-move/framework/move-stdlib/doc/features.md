@@ -141,6 +141,8 @@ return true.
 -  [Function `supra_automation_task_sync_enabled`](#0x1_features_supra_automation_task_sync_enabled)
 -  [Function `get_supra_count_failed_proposals_feature`](#0x1_features_get_supra_count_failed_proposals_feature)
 -  [Function `supra_count_failed_proposals_enabled`](#0x1_features_supra_count_failed_proposals_enabled)
+-  [Function `get_supra_rlp_feature`](#0x1_features_get_supra_rlp_feature)
+-  [Function `supra_rlp_enabled`](#0x1_features_supra_rlp_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -934,6 +936,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SUPRA_NATIVE_AUTOMATION">SUPRA_NATIVE_AUTOMATION</a>: u64 = 88;
+</code></pre>
+
+
+
+<a id="0x1_features_SUPRA_RLP_ENCODE"></a>
+
+Whether the APIs related to the rlp feature are enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SUPRA_RLP_ENCODE">SUPRA_RLP_ENCODE</a>: u64 = 94;
 </code></pre>
 
 
@@ -3598,6 +3612,54 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_supra_count_failed_proposals_enabled">supra_count_failed_proposals_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SUPRA_COUNT_FAILED_PROPOSALS">SUPRA_COUNT_FAILED_PROPOSALS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_supra_rlp_feature"></a>
+
+## Function `get_supra_rlp_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_supra_rlp_feature">get_supra_rlp_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_supra_rlp_feature">get_supra_rlp_feature</a>(): u64 {
+    <a href="features.md#0x1_features_SUPRA_RLP_ENCODE">SUPRA_RLP_ENCODE</a>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_supra_rlp_enabled"></a>
+
+## Function `supra_rlp_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_supra_rlp_enabled">supra_rlp_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_supra_rlp_enabled">supra_rlp_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SUPRA_RLP_ENCODE">SUPRA_RLP_ENCODE</a>)
 }
 </code></pre>
 

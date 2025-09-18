@@ -738,6 +738,19 @@ module std::features {
         is_enabled(SUPRA_COUNT_FAILED_PROPOSALS)
     }
 
+    /// Whether the APIs related to the rlp feature are enabled.
+    ///
+    /// Lifetime: transient
+    const SUPRA_RLP_ENCODE: u64 = 94;
+
+    public fun get_supra_rlp_feature(): u64 {
+        SUPRA_RLP_ENCODE
+    }
+
+    public fun supra_rlp_enabled(): bool acquires Features {
+        is_enabled(SUPRA_RLP_ENCODE)
+    }
+    
     // ============================================================================================
     // Feature Flag Implementation
 

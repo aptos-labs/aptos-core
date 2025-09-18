@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Supra.
+
 use std::collections::VecDeque;
 use std::sync::Arc;
 use keccak_hash::{keccak, H256};

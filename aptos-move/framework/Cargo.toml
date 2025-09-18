@@ -72,6 +72,7 @@ once_cell = { workspace = true }
 rand = { workspace = true }
 rand_core = { workspace = true }
 ripemd = { workspace = true }
+rlp = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 sha2 = { workspace = true }
