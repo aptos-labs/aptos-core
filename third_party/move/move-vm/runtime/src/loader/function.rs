@@ -34,7 +34,14 @@ use move_vm_types::{
     },
     values::{AbstractFunction, SerializedFunctionData},
 };
-use std::{cell::RefCell, cmp::Ordering, fmt::Debug, mem, rc::Rc, sync::Arc};
+use std::{
+    cell::RefCell,
+    cmp::Ordering,
+    fmt::{Debug, Formatter},
+    mem,
+    rc::Rc,
+    sync::Arc,
+};
 
 /// A runtime function definition representation.
 pub struct Function {
@@ -55,6 +62,7 @@ pub struct Function {
     pub(crate) access_specifier: AccessSpecifier,
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
+    pub(crate) is_trusted: bool,
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
@@ -62,6 +70,22 @@ pub struct Function {
 pub enum LoadedFunctionOwner {
     Script(Arc<Script>),
     Module(Arc<Module>),
+}
+
+impl Debug for LoadedFunctionOwner {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LoadedFunctionOwner::Script(_) => f.write_str("script"),
+            LoadedFunctionOwner::Module(m) => {
+                write!(
+                    f,
+                    "{}::{}",
+                    m.module.address().to_hex_literal(),
+                    m.module.name()
+                )
+            },
+        }
+    }
 }
 
 /// A loaded runtime function representation along with type arguments used to instantiate it.
@@ -510,6 +534,9 @@ impl Function {
         let name = module.identifier_at(handle.name).to_owned();
         let module_id = module.self_id();
 
+        // For now, just framework code considered trusted, but this could be expanded.
+        let is_trusted = module.address().is_special();
+
         let (native, is_native) = if def.is_native() {
             let native = natives.resolve(
                 module_id.address(),
@@ -559,6 +586,7 @@ impl Function {
             access_specifier,
             is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
             has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
+            is_trusted,
         })
     }
 

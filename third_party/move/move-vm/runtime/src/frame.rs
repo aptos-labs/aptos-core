@@ -47,7 +47,7 @@ pub(crate) struct Frame {
     call_type: CallType,
     // Locals for this execution context and their instantiated types.
     pub(crate) locals: Locals,
-    local_tys: Vec<Type>,
+    pub(crate) local_tys: Vec<Type>,
     // Cache of types accessed in this frame, to improve performance when accessing
     // and constructing types.
     pub(crate) frame_cache: Rc<RefCell<FrameTypeCache>>,
@@ -146,7 +146,7 @@ impl Frame {
         }
 
         let ty_builder = vm_config.ty_builder.clone();
-        let local_tys = if RTTCheck::should_perform_checks() {
+        let local_tys = if RTTCheck::should_perform_checks(&function.function) {
             if ty_args.is_empty() {
                 function.local_tys().to_vec()
             } else {
@@ -190,6 +190,11 @@ impl Frame {
             }
         }
         Ok(())
+    }
+
+    #[inline(always)]
+    pub(crate) fn untrusted_code(&self) -> bool {
+        !self.function.function.is_trusted
     }
 
     pub(crate) fn constant_at(&self, idx: ConstantPoolIndex) -> &Constant {

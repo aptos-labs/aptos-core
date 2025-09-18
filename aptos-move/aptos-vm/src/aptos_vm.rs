@@ -2823,9 +2823,9 @@ impl AptosVM {
                             speculative_error!(
                                 log_context,
                                 format!(
-                                    "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
+                                    "[aptos_vm] Transaction breaking invariant violation: {:?}\ntxn: {:?}",
+                                    vm_status,
                                     bcs::to_bytes::<SignedTransaction>(txn),
-                                    vm_status
                                 ),
                             );
                         },
@@ -2836,9 +2836,9 @@ impl AptosVM {
                             {
                                 error!(
                                 *log_context,
-                                "[aptos_vm] Transaction breaking paranoid mode. txn: {:?}, status: {:?}",
-                                bcs::to_bytes::<SignedTransaction>(txn),
+                                "[aptos_vm] Transaction breaking paranoid mode: {:?}\ntxn: {:?}",
                                 vm_status,
+                                bcs::to_bytes::<SignedTransaction>(txn),
                             );
                             },
                         // Paranoid mode failure but with reference counting
@@ -2848,9 +2848,9 @@ impl AptosVM {
                             {
                                 error!(
                                 *log_context,
-                                "[aptos_vm] Transaction breaking paranoid mode. txn: {:?}, status: {:?}",
-                                bcs::to_bytes::<SignedTransaction>(txn),
+                                "[aptos_vm] Transaction breaking paranoid mode: {:?}\ntxn: {:?}",
                                 vm_status,
+                                bcs::to_bytes::<SignedTransaction>(txn),
                             );
                             },
                         // Paranoid mode failure but with reference safety checks
@@ -2873,9 +2873,9 @@ impl AptosVM {
                         _ => {
                             error!(
                                 *log_context,
-                                "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
-                                bcs::to_bytes::<SignedTransaction>(txn),
+                                "[aptos_vm] Transaction breaking invariant violation: {:?}\ntxn: {:?}, ",
                                 vm_status,
+                                bcs::to_bytes::<SignedTransaction>(txn),
                             );
                         },
                     }

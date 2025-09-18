@@ -144,6 +144,9 @@ pub enum FeatureFlag {
     CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
     DISTRIBUTE_TRANSACTION_FEE = 97,
     MONOTONICALLY_INCREASING_COUNTER = 98,
+
+    /// Whether to allow trusted code optimizations.
+    ENABLE_TRUSTED_CODE = 99,
 }
 
 impl FeatureFlag {
@@ -244,6 +247,7 @@ impl FeatureFlag {
             FeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
             FeatureFlag::ENABLE_LAZY_LOADING,
             FeatureFlag::MONOTONICALLY_INCREASING_COUNTER,
+            FeatureFlag::ENABLE_TRUSTED_CODE,
         ]
     }
 }
@@ -274,6 +278,15 @@ impl OnChainConfig for Features {
 }
 
 impl Features {
+    /// Returns default features for testing. This is the same as `default()` except features are
+    /// added or removed to ensure available runtime checks are enabled during tests.
+    pub fn default_for_tests() -> Self {
+        let mut features = Self::default();
+        // Do not trust any code during testing, but verify it at runtime.
+        features.disable(FeatureFlag::ENABLE_TRUSTED_CODE);
+        features
+    }
+
     fn resize_for_flag(&mut self, flag: FeatureFlag) -> (usize, u8) {
         let byte_index = (flag as u64 / 8) as usize;
         let bit_mask = 1 << (flag as u64 % 8);
@@ -404,6 +417,10 @@ impl Features {
         self.is_enabled(FeatureFlag::ENABLE_LAZY_LOADING)
     }
 
+    pub fn is_trusted_code_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_TRUSTED_CODE)
+    }
+
     pub fn is_default_account_resource_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::DEFAULT_ACCOUNT_RESOURCE)
     }
@@ -450,7 +467,7 @@ impl Features {
 }
 
 pub fn aptos_test_feature_flags_genesis() -> ChangeSet {
-    let features_value = bcs::to_bytes(&Features::default()).unwrap();
+    let features_value = bcs::to_bytes(&Features::default_for_tests()).unwrap();
 
     let mut change_set = ChangeSet::new();
     // we need to initialize features to their defaults.
