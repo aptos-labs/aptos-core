@@ -12,7 +12,7 @@ use crate::{
         implementations::unsync_module_storage::{AsUnsyncModuleStorage, UnsyncModuleStorage},
         module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
     },
-    LayoutCache, LayoutCacheEntry, LayoutCacheHit,
+    GenericKey, LayoutCache, LayoutCacheEntry, LayoutCacheHit,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
@@ -53,6 +53,18 @@ impl<M> LayoutCache for UnsyncCodeStorage<M> {
     fn store_non_generic_struct_layout(
         &self,
         _idx: &StructNameIndex,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn get_generic_struct_layout(&self, _key: &GenericKey) -> Option<LayoutCacheHit> {
+        None
+    }
+
+    fn store_generic_struct_layout(
+        &self,
+        _key: GenericKey,
         _entry: LayoutCacheEntry,
     ) -> PartialVMResult<()> {
         Ok(())

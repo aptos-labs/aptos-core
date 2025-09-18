@@ -25,8 +25,8 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage,
-    LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, ModuleStorage, RuntimeEnvironment,
-    Script, UnsyncCodeStorage, UnsyncModuleStorage, WithRuntimeEnvironment,
+    GenericKey, LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, ModuleStorage,
+    RuntimeEnvironment, Script, UnsyncCodeStorage, UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_types::{
     code::{ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ModuleCode, ScriptCache},
@@ -100,6 +100,18 @@ impl<'ctx, S, E> LayoutCache for AptosCodeStorageAdapter<'ctx, S, E> {
     fn store_non_generic_struct_layout(
         &self,
         _idx: &StructNameIndex,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn get_generic_struct_layout(&self, _key: &GenericKey) -> Option<LayoutCacheHit> {
+        None
+    }
+
+    fn store_generic_struct_layout(
+        &self,
+        _key: GenericKey,
         _entry: LayoutCacheEntry,
     ) -> PartialVMResult<()> {
         Ok(())

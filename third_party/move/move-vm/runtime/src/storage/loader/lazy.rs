@@ -8,8 +8,8 @@ use crate::{
         LegacyLoaderConfig, Loader, ModuleMetadataLoader, NativeModuleLoader, ScriptLoader,
         StructDefinitionLoader,
     },
-    Function, LayoutCacheEntry, LayoutCacheHit, LayoutWithDelayedFields, LoadedFunction, Module,
-    ModuleStorage, RuntimeEnvironment, Script, WithRuntimeEnvironment,
+    Function, GenericKey, LayoutCacheEntry, LayoutCacheHit, LayoutWithDelayedFields,
+    LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, Script, WithRuntimeEnvironment,
 };
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
@@ -219,6 +219,36 @@ where
     ) -> PartialVMResult<()> {
         self.module_storage
             .store_non_generic_struct_layout(idx, entry)
+    }
+
+    fn load_generic_struct_layout_from_cache(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        key: &GenericKey,
+    ) -> Option<PartialVMResult<LayoutWithDelayedFields>> {
+        let hit = self.module_storage.get_generic_struct_layout(key)?;
+        Some(Ok(match hit {
+            LayoutCacheHit::Charged(layout) => layout,
+            LayoutCacheHit::NotYetCharged(layout, modules) => {
+                for module_id in modules.iter() {
+                    // Re-read all modules for this layout, so that transaction gets invalidated
+                    // on module publish.
+                    if let Err(err) = self.charge_module(gas_meter, traversal_context, module_id) {
+                        return Some(Err(err));
+                    }
+                }
+                layout
+            },
+        }))
+    }
+
+    fn store_generic_struct_layout_to_cache(
+        &self,
+        key: GenericKey,
+        entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        self.module_storage.store_generic_struct_layout(key, entry)
     }
 }
 

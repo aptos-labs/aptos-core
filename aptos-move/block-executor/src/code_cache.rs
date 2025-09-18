@@ -28,7 +28,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
 };
 use move_vm_runtime::{
-    LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, RuntimeEnvironment, Script,
+    GenericKey, LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, RuntimeEnvironment, Script,
     WithRuntimeEnvironment,
 };
 use move_vm_types::{
@@ -299,6 +299,60 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> LayoutCache for LatestView<'_,
             ViewState::Unsync(_) => {
                 self.global_module_cache
                     .store_non_generic_struct_layout_entry(idx, entry)?;
+            },
+        }
+        Ok(())
+    }
+
+    fn get_generic_struct_layout(&self, key: &GenericKey) -> Option<LayoutCacheHit> {
+        match &self.latest_view {
+            ViewState::Sync(state) => {
+                // If in captured reads, this layout must have been charged and all modules that
+                // defined it were added to the read-set.
+                if let CacheRead::Hit(layout) =
+                    state.captured_reads.borrow().get_generic_struct_layout(key)
+                {
+                    return Some(LayoutCacheHit::Charged(layout));
+                }
+
+                // If not yet in captured reads, try to get it from the layout cache.
+                let entry = self
+                    .global_module_cache
+                    .get_generic_struct_layout_entry(key)?;
+                state
+                    .captured_reads
+                    .borrow_mut()
+                    .capture_generic_struct_layout_read(*key, entry.layout());
+                Some(entry.into_cache_hit())
+            },
+            ViewState::Unsync(_) => {
+                let entry = self
+                    .global_module_cache
+                    .get_generic_struct_layout_entry(key)?;
+                Some(entry.into_cache_hit())
+            },
+        }
+    }
+
+    fn store_generic_struct_layout(
+        &self,
+        key: GenericKey,
+        entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        match &self.latest_view {
+            ViewState::Sync(state) => {
+                // Record the layout in read-set, so we can resolve later reads to the same one.
+                state
+                    .captured_reads
+                    .borrow_mut()
+                    .capture_generic_struct_layout_read(key, entry.layout());
+                // Insert into global cache.
+                self.global_module_cache
+                    .store_generic_struct_layout_entry(key, entry)?;
+            },
+            ViewState::Unsync(_) => {
+                self.global_module_cache
+                    .store_generic_struct_layout_entry(key, entry)?;
             },
         }
         Ok(())

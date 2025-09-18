@@ -8,7 +8,7 @@ use crate::{
         layout_cache::DefiningModules, loader::traits::StructDefinitionLoader,
         ty_tag_converter::TypeTagConverter,
     },
-    LayoutCacheEntry, RuntimeEnvironment,
+    GenericKey, LayoutCacheEntry, RuntimeEnvironment,
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
@@ -90,36 +90,60 @@ where
         ty: &Type,
         check_option_type: bool,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
-        if let Type::Struct { idx, .. } = ty {
-            if let Some(result) = self
-                .struct_definition_loader
-                .load_non_generic_struct_layout_from_cache(gas_meter, traversal_context, idx)
-            {
-                return result;
-            }
+        match ty {
+            Type::Struct { idx, .. } => {
+                if let Some(result) = self
+                    .struct_definition_loader
+                    .load_non_generic_struct_layout_from_cache(gas_meter, traversal_context, idx)
+                {
+                    return result;
+                }
 
-            // Otherwise a cache miss, compute the result and store it.
-            let mut modules = DefiningModules::new();
-            let layout = self.type_to_type_layout_with_delayed_fields_impl::<false>(
+                // Otherwise a cache miss, compute the result and store it.
+                let mut modules = DefiningModules::new();
+                let layout = self.type_to_type_layout_with_delayed_fields_impl::<false>(
+                    gas_meter,
+                    traversal_context,
+                    &mut modules,
+                    ty,
+                    check_option_type,
+                )?;
+                let cache_entry = LayoutCacheEntry::new(layout.clone(), modules);
+                self.struct_definition_loader
+                    .store_non_generic_struct_layout_to_cache(idx, cache_entry)?;
+                Ok(layout)
+            },
+            Type::StructInstantiation { idx, ty_args, .. } => {
+                let key = GenericKey::new(*idx, ty_args);
+                if let Some(result) = self
+                    .struct_definition_loader
+                    .load_generic_struct_layout_from_cache(gas_meter, traversal_context, &key)
+                {
+                    return result;
+                }
+
+                // Otherwise a cache miss, compute the result and store it.
+                let mut modules = DefiningModules::new();
+                let layout = self.type_to_type_layout_with_delayed_fields_impl::<false>(
+                    gas_meter,
+                    traversal_context,
+                    &mut modules,
+                    ty,
+                    check_option_type,
+                )?;
+                let cache_entry = LayoutCacheEntry::new(layout.clone(), modules);
+                self.struct_definition_loader
+                    .store_generic_struct_layout_to_cache(key, cache_entry)?;
+                Ok(layout)
+            },
+            _ => self.type_to_type_layout_with_delayed_fields_impl::<false>(
                 gas_meter,
                 traversal_context,
-                &mut modules,
+                &mut DefiningModules::new(),
                 ty,
                 check_option_type,
-            )?;
-            let cache_entry = LayoutCacheEntry::new(layout.clone(), modules);
-            self.struct_definition_loader
-                .store_non_generic_struct_layout_to_cache(idx, cache_entry)?;
-            return Ok(layout);
+            ),
         }
-
-        self.type_to_type_layout_with_delayed_fields_impl::<false>(
-            gas_meter,
-            traversal_context,
-            &mut DefiningModules::new(),
-            ty,
-            check_option_type,
-        )
     }
 
     /// Returns the decorated layout of a type.

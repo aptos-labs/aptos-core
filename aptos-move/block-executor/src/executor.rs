@@ -2048,7 +2048,7 @@ where
         }
         // For simplicity, flush layout cache on module publish.
         if modules_published {
-            global_module_cache.flush_non_generic_layout_cache();
+            global_module_cache.flush_all_layout_caches();
         }
 
         let mut second_phase = Vec::new();

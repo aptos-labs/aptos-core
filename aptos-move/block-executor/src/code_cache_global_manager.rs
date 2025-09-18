@@ -152,6 +152,12 @@ where
             self.module_cache.flush_non_generic_layout_cache();
         }
 
+        let num_generic_layout_entries = self.module_cache.num_generic_layouts();
+        GLOBAL_LAYOUT_CACHE_NUM_NON_GENERIC_ENTRIES.set(num_generic_layout_entries as i64);
+        if num_non_generic_layout_entries > config.max_generic_layout_cache_size {
+            self.module_cache.flush_generic_layout_cache();
+        }
+
         Ok(())
     }
 }
@@ -445,6 +451,7 @@ mod test {
             max_module_cache_size_in_bytes: 32,
             max_struct_name_index_map_num_entries: 2,
             max_non_generic_layout_cache_size: 10,
+            max_generic_layout_cache_size: 10,
         };
 
         // Populate the cache for testing.
