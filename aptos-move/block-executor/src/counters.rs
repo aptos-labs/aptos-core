@@ -384,6 +384,14 @@ pub static GLOBAL_LAYOUT_CACHE_NUM_NON_GENERIC_ENTRIES: Lazy<IntGauge> = Lazy::n
     .unwrap()
 });
 
+pub static GLOBAL_LAYOUT_CACHE_NUM_GENERIC_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "global_layout_cache_num_generic_entries",
+        "Number of layouts for instantiated generic struct/enum cached in global cache"
+    )
+    .unwrap()
+});
+
 pub static GLOBAL_LAYOUT_CACHE_MISSES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "global_layout_cache_misses",

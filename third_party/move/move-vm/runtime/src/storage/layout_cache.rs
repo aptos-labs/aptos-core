@@ -4,8 +4,11 @@
 use crate::LayoutWithDelayedFields;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::language_storage::ModuleId;
-use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
-use std::{collections::BTreeSet, sync::Arc};
+use move_vm_types::loaded_data::{
+    runtime_types::Type, struct_name_indexing::StructNameIndex,
+    ty_args_fingerprint::TyArgsFingerprint,
+};
+use std::{collections::BTreeSet, hash::Hash, sync::Arc};
 
 /// Set of unique modules that define this layout. Iterating over the modules uses the insertion
 /// order.
@@ -80,12 +83,35 @@ impl LayoutCacheEntry {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct GenericKey {
+    idx: StructNameIndex,
+    ty_args_fingerprint: TyArgsFingerprint,
+}
+
+impl GenericKey {
+    pub(crate) fn new(idx: StructNameIndex, ty_args: &[Type]) -> Self {
+        Self {
+            idx,
+            ty_args_fingerprint: TyArgsFingerprint::from_ty_args(ty_args),
+        }
+    }
+}
+
 pub trait LayoutCache {
     fn get_non_generic_struct_layout(&self, idx: &StructNameIndex) -> Option<LayoutCacheHit>;
 
     fn store_non_generic_struct_layout(
         &self,
         idx: &StructNameIndex,
+        entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()>;
+
+    fn get_generic_struct_layout(&self, key: &GenericKey) -> Option<LayoutCacheHit>;
+
+    fn store_generic_struct_layout(
+        &self,
+        key: GenericKey,
         entry: LayoutCacheEntry,
     ) -> PartialVMResult<()>;
 }
