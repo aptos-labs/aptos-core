@@ -164,7 +164,7 @@ impl HashValue {
 
     /// Creates a random instance with given rng. Useful in unit tests.
     pub fn random_with_rng<R: Rng>(rng: &mut R) -> Self {
-        rng.gen()
+        rng.r#gen()
     }
 
     /// Convenience function that computes a `HashValue` internally equal to
@@ -413,7 +413,7 @@ impl FromStr for HashValue {
 
 impl Distribution<HashValue> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> HashValue {
-        HashValue { hash: rng.gen() }
+        HashValue { hash: rng.r#gen() }
     }
 }
 

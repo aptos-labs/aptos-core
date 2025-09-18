@@ -4737,7 +4737,7 @@ impl ExpTranslator<'_, '_, '_> {
         args: Vec<Exp>,
     ) -> Vec<Exp> {
         let params = entry.get_signature().1;
-        let new_args = params
+        params
             .iter()
             .map(|Parameter(_, ty, _)| ty.instantiate(instantiation))
             .zip(args)
@@ -4745,8 +4745,7 @@ impl ExpTranslator<'_, '_, '_> {
                 let exp_ty = self.env().get_node_type(exp.node_id());
                 self.try_freeze(&param_ty, &exp_ty, exp)
             })
-            .collect_vec();
-        new_args
+            .collect_vec()
     }
 
     /// Inserts the freeze operation when `expected_ty` is immutable ref and ty is mutable ref

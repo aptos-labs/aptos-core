@@ -44,10 +44,13 @@ impl ParserContext {
             info!(
                 "[NFT Metadata Crawler] Google Application Credentials path found, setting env var"
             );
-            std::env::set_var(
-                "GOOGLE_APPLICATION_CREDENTIALS",
-                google_application_credentials,
-            );
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            unsafe {
+                std::env::set_var(
+                    "GOOGLE_APPLICATION_CREDENTIALS",
+                    google_application_credentials,
+                );
+            }
         }
 
         // Establish GCS client

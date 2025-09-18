@@ -1000,7 +1000,7 @@ impl StateStore {
         self: &Arc<Self>,
         version: Version,
         start_idx: usize,
-    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync> {
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync + use<>> {
         let store = Arc::clone(self);
         Ok(JellyfishMerkleIterator::new_by_index(
             Arc::clone(&self.state_merkle_db),
@@ -1032,7 +1032,7 @@ impl StateStore {
         version: Version,
         first_index: usize,
         chunk_size: usize,
-    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync> {
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync + use<>> {
         let store = Arc::clone(self);
         let value_chunk_iter = JellyfishMerkleIterator::new_by_index(
             Arc::clone(&self.state_merkle_db),

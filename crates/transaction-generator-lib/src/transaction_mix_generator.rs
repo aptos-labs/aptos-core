@@ -49,9 +49,9 @@ impl TransactionGenerator for PhasedTxnMixGenerator {
         };
 
         let mut picked = self.rng.gen_range(0, self.total_weight_per_phase[phase]);
-        for (gen, weight) in &mut self.txn_mix_per_phase[phase] {
+        for (r#gen, weight) in &mut self.txn_mix_per_phase[phase] {
             if picked < *weight {
-                return gen.generate_transactions(account, num_to_create);
+                return r#gen.generate_transactions(account, num_to_create);
             }
             picked -= *weight;
         }

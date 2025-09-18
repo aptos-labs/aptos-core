@@ -86,7 +86,7 @@ impl<T: TName> UniqueSet<T> {
         self.into_iter()
     }
 
-    pub fn cloned_iter(&self) -> impl Iterator<Item = T> {
+    pub fn cloned_iter(&self) -> impl Iterator<Item = T> + use<T> {
         self.into_iter()
             .map(|(loc, k_)| T::add_loc(loc, k_.clone()))
             .collect::<Vec<_>>()

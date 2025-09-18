@@ -698,7 +698,7 @@ mod test {
     async fn test_transfer_health() -> Result<()> {
         // Create a local account and store its private key at the path expected by
         // the config for this test.
-        let private_key = Ed25519PrivateKey::generate(&mut StdRng::from_seed(OsRng.gen()));
+        let private_key = Ed25519PrivateKey::generate(&mut StdRng::from_seed(OsRng.r#gen()));
         let serialized_keys = aptos_sdk::bcs::to_bytes(&private_key)?;
         let mut key_file = std::fs::File::create("/tmp/transfer_funder_devnet.key")?;
         key_file.write_all(&serialized_keys)?;

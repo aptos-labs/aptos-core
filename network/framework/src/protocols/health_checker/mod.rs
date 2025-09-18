@@ -242,7 +242,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                     }
 
                     for peer_id in connected {
-                        let nonce = self.rng.gen::<u32>();
+                        let nonce = self.rng.r#gen::<u32>();
                         trace!(
                             NetworkSchema::new(&self.network_context),
                             round = self.round,

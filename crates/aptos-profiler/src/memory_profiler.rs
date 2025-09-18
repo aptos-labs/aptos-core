@@ -140,13 +140,11 @@ impl Profiler for MemProfiler {
 
     /// Expose the results in TXT format
     fn expose_text_results(&self) -> Result<String> {
-        let content = convert_svg_to_string(self.txt_result_path.as_path());
-        content
+        convert_svg_to_string(self.txt_result_path.as_path())
     }
 
     /// Expose the results in SVG format
     fn expose_svg_results(&self) -> Result<String> {
-        let content = convert_svg_to_string(self.svg_result_path.as_path());
-        content
+        convert_svg_to_string(self.svg_result_path.as_path())
     }
 }

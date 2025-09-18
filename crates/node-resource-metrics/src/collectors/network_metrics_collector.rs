@@ -124,7 +124,7 @@ impl Collector for NetworkMetricsCollector {
         system.refresh_networks_list();
         system.refresh_networks();
 
-        let mfs = system
+        system
             .networks()
             .iter()
             .flat_map(|(interface_name, network)| {
@@ -175,9 +175,7 @@ impl Collector for NetworkMetricsCollector {
                 ]
             })
             .flat_map(|metric| metric.collect())
-            .collect();
-
-        mfs
+            .collect()
     }
 }
 
