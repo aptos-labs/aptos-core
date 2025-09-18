@@ -1,0 +1,16 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/for_empty.move`
+
+//# run
+script {
+    fun main() {
+        let _t0 = 0;
+        let _t1 = 10;
+        let _t2 = false;
+        loop {
+            if (_t2) _t1 = _t1 + 1 else _t2 = true;
+            if (!(_t1 < 4)) break;
+            _t0 = _t0 + 1
+        };
+        if (!(_t0 == 0)) abort 42;
+    }
+}

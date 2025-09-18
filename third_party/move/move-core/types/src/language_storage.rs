@@ -353,11 +353,16 @@ impl From<ModuleId> for (AccountAddress, Identifier) {
 }
 
 static SCRIPT_MODULE_ID: Lazy<ModuleId> = Lazy::new(|| ModuleId {
+    // [TODO #17369]: Replace `AccountAddress::MAX_ADDRESS` with the value below for `address`
+    // Currently, this is blocked by performance benchmarking in CI
+    /*
     address: AccountAddress::from_str_strict(
-        // This is generated using sha256sum on 10k of bytes from /dev/urandom
-        "0x8bd18359a7ebb84407b6defa7bc5da9aca34a3d1ce764ddfb4d0adcc663430b4",
+       // This is generated using sha256sum on 10k of bytes from /dev/urandom
+         "0x8bd18359a7ebb84407b6defa7bc5da9aca34a3d1ce764ddfb4d0adcc663430b4",
     )
     .expect("parsing of script address constant"),
+    */
+    address: AccountAddress::MAX_ADDRESS,
     name: Identifier::new("__script__").expect("valid identifier for script"),
 });
 

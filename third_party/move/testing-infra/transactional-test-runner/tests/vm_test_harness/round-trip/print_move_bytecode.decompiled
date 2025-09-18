@@ -1,0 +1,16 @@
+//**** Cross-compiled for `move` syntax from `tests/vm_test_harness/print_move_bytecode.move`
+
+//# print-bytecode
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# print-bytecode --input=module
+module 0x3::N {
+    public entry fun ex(p0: signer, p1: u64) {
+        abort 0
+    }
+}

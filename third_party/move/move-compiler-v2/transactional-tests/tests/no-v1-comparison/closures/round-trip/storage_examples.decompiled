@@ -1,0 +1,29 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/storage_examples.move`
+
+//# publish
+module 0xc0ffee::m {
+    use 0x1::signer;
+    struct Wrapper has copy, drop, store, key {
+        _0: |&signer|(u64) has copy + drop + store,
+    }
+    public fun init(p0: &signer) {
+        let _t1 = Wrapper{_0: |arg0| foo(arg0)};
+        move_to<Wrapper>(p0, _t1);
+    }
+    #[persistent]
+    fun foo(p0: &signer): u64 {
+        7
+    }
+    public fun fetch_and_run(p0: &signer): u64
+        acquires Wrapper
+    {
+        let _t3 = signer::address_of(p0);
+        let _t1 = *&borrow_global<Wrapper>(_t3)._0;
+        _t1(p0)
+    }
+}
+
+
+//# run 0xc0ffee::m::init --signers 0xc0ffee
+
+//# run 0xc0ffee::m::fetch_and_run --signers 0xc0ffee

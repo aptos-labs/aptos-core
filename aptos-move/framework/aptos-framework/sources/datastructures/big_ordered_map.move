@@ -297,8 +297,11 @@ module aptos_std::big_ordered_map {
 
     /// Returns true iff the BigOrderedMap is empty.
     public fun is_empty<K: store, V: store>(self: &BigOrderedMap<K, V>): bool {
-        let node = self.borrow_node(self.min_leaf_index);
-        node.children.is_empty()
+        if (self.root.is_leaf) {
+            self.root.children.is_empty()
+        } else {
+            false
+        }
     }
 
     /// Returns the number of elements in the BigOrderedMap.
@@ -1441,6 +1444,7 @@ module aptos_std::big_ordered_map {
     #[test_only]
     fun validate_iteration<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>) {
         let expected_num_elements = self.compute_length();
+        assert!((expected_num_elements == 0) == self.is_empty(), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
         let num_elements = 0;
         let it = self.new_begin_iter();
         while (!it.iter_is_end(self)) {
@@ -2342,6 +2346,7 @@ module aptos_std::big_ordered_map {
             assert spec_get(map, 4) == 6;
             assert option::spec_is_some(result_2);
             assert option::spec_borrow(result_2) == 5;
+            assert !spec_contains_key(map, 10);
         };
         spec {
             assert keys[0] == 1;

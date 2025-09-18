@@ -6,11 +6,11 @@ module aptos_experimental::pending_order_book_index {
     use aptos_experimental::order_book_types::{
         OrderIdType,
         UniqueIdxType,
-        TriggerCondition,
         new_default_big_ordered_map
     };
+    use aptos_experimental::order_book_types::TriggerCondition;
 
-    friend aptos_experimental::order_book;
+    friend aptos_experimental::single_order_book;
 
     struct PendingOrderKey has store, copy, drop {
         price: u64,
@@ -42,7 +42,7 @@ module aptos_experimental::pending_order_book_index {
         trigger_condition: TriggerCondition,
         unique_priority_idx: UniqueIdxType,
     ) {
-        let (price_move_up_index, price_move_down_index, time_based_index) =
+        let (price_move_down_index, price_move_up_index, time_based_index) =
             trigger_condition.index();
         if (price_move_up_index.is_some()) {
             self.price_move_up_index.remove(

@@ -260,7 +260,7 @@ module 0xc0ffee::m {
     public fun inner_value(self: Inner): u64 {
         match (self) {
             Inner::Inner1{x: x} => x,
-            Inner::Inner2{x: x,y: y} => x + y,
+            Inner::Inner2{x: x, y: y} => x + y,
         }
     }
     public fun is_inner1(self: &Inner): bool {
@@ -292,7 +292,7 @@ module 0xc0ffee::m {
         match (o) {
             Outer::None{} => 0,
             Outer::One{i: i} => inner_value(i),
-            Outer::Two{i: i,b: b} => inner_value(i) + b.x,
+            Outer::Two{i: i, b: b} => inner_value(i) + b.x,
         }
     }
     public fun outer_value_nested(o: Outer): u64 {
@@ -300,7 +300,7 @@ module 0xc0ffee::m {
             Outer::None{} => 0,
             Outer::One{i: Inner::Inner1{x: x}} => x,
             Outer::One{i: i} => inner_value(i),
-            Outer::Two{i: i,b: b} => inner_value(i) + b.x,
+            Outer::Two{i: i, b: b} => inner_value(i) + b.x,
         }
     }
     public fun outer_value_with_cond(o: Outer): u64 {
@@ -308,7 +308,7 @@ module 0xc0ffee::m {
             Outer::None{} => 0,
             Outer::One{i: i} if is_inner1(&i) => inner_value(i) % 2,
             Outer::One{i: i} => inner_value(i),
-            Outer::Two{i: i,b: b} => inner_value(i) + b.x,
+            Outer::Two{i: i, b: b} => inner_value(i) + b.x,
         }
     }
     public fun outer_value_with_cond_ref(o: &Outer): bool {
@@ -316,13 +316,13 @@ module 0xc0ffee::m {
             Outer::None{} => false,
             Outer::One{i: i} if is_inner1(i) => true,
             Outer::One{i: i} => is_inner1(i),
-            Outer::Two{i: i,b: _} => is_inner1(i),
+            Outer::Two{i: i, b: _} => is_inner1(i),
         }
     }
     fun select_common_fields(s: CommonFields): u64 {
         s.x + (match (s) {
-            CommonFields::Foo{x: _,y: y} => y,
-            CommonFields::Bar{x: _,z: z} => z,
+            CommonFields::Foo{x: _, y: y} => y,
+            CommonFields::Bar{x: _, z: z} => z,
         })
     }
     fun select_common_fields_different_offset(s: CommonFieldsAtDifferentOffset): u64 {

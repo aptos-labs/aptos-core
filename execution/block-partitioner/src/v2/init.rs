@@ -8,14 +8,13 @@ use crate::{
         state::PartitionState, types::OriginalTxnIdx, PartitionerV2,
     },
 };
+use aptos_metrics_core::TimerHelper;
 use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
 use std::sync::RwLock;
 
 impl PartitionerV2 {
     pub(crate) fn init(state: &mut PartitionState) {
-        let _timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["init"])
-            .start_timer();
+        let _timer = MISC_TIMERS_SECONDS.timer_with(&["init"]);
 
         state.thread_pool.install(|| {
             (0..state.num_txns())

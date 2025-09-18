@@ -11,7 +11,7 @@ use crate::{
 use core::fmt;
 use itertools::{Either, Itertools};
 use log::debug;
-use move_model::model::{FunId, FunctionEnv, GlobalEnv, QualifiedId};
+use move_model::model::{FunId, FunctionEnv, FunctionSize, GlobalEnv, QualifiedId};
 use petgraph::graph::DiGraph;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -294,6 +294,23 @@ impl FunctionTargetsHolder {
                 self.insert_target_data(&id, variant, processed_data);
             }
         }
+    }
+
+    /// Computes the estimated sizes of functions using their stackless bytecode.
+    pub fn compute_function_size_estimates(&self) -> BTreeMap<QualifiedId<FunId>, FunctionSize> {
+        self.targets
+            .iter()
+            .filter_map(|(fid, variants)| {
+                let baseline_function = variants.get(&FunctionVariant::Baseline)?;
+                Some((
+                    *fid,
+                    FunctionSize::new(
+                        baseline_function.code.len(),
+                        baseline_function.local_types.len(),
+                    ),
+                ))
+            })
+            .collect()
     }
 }
 

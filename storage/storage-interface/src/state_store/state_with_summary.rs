@@ -7,7 +7,10 @@ use crate::state_store::{
 };
 use aptos_crypto::HashValue;
 use aptos_scratchpad::SparseMerkleTree;
-use aptos_types::{state_store::state_storage_usage::StateStorageUsage, transaction::Version};
+use aptos_types::{
+    state_store::{hot_state::HotStateConfig, state_storage_usage::StateStorageUsage},
+    transaction::Version,
+};
 use derive_more::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Deref)]
@@ -23,8 +26,11 @@ impl StateWithSummary {
         Self { state, summary }
     }
 
-    pub fn new_empty() -> Self {
-        Self::new(State::new_empty(), StateSummary::new_empty())
+    pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
+        Self::new(
+            State::new_empty(hot_state_config),
+            StateSummary::new_empty(),
+        )
     }
 
     pub fn new_at_version(
@@ -32,9 +38,10 @@ impl StateWithSummary {
         hot_state_root_hash: HashValue,
         global_state_root_hash: HashValue,
         usage: StateStorageUsage,
+        hot_state_config: HotStateConfig,
     ) -> Self {
         Self::new(
-            State::new_at_version(version, usage),
+            State::new_at_version(version, usage, hot_state_config),
             StateSummary::new_at_version(
                 version,
                 SparseMerkleTree::new(hot_state_root_hash),
@@ -86,8 +93,8 @@ impl LedgerStateWithSummary {
         Self::from_latest_and_last_checkpoint(checkpoint.clone(), checkpoint)
     }
 
-    pub fn new_empty() -> Self {
-        let empty = StateWithSummary::new_empty();
+    pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
+        let empty = StateWithSummary::new_empty(hot_state_config);
         Self::from_latest_and_last_checkpoint(empty.clone(), empty)
     }
 

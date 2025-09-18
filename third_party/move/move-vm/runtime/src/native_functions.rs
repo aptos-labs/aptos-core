@@ -282,7 +282,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         self.traversal_context
     }
 
-    pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter {
+    pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter<'_> {
         FunctionValueExtensionAdapter {
             module_storage: self.module_storage,
         }
@@ -344,7 +344,7 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
     }
 
     /// Returns function value extension that can be used for (de)serializing function values.
-    pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter {
+    pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter<'_> {
         FunctionValueExtensionAdapter {
             module_storage: self.module_storage.module_storage,
         }

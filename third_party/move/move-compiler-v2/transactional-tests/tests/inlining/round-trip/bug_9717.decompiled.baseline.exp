@@ -1,0 +1,6 @@
+processed 5 tasks
+task 0 lines 3-65:  publish [module 0xcafe::vectors {]
+task 1 lines 68-68:  run 0xcafe::vectors::test_guess_with_inline_break
+task 2 lines 70-70:  run 0xcafe::vectors::test_guess_directly
+task 3 lines 72-72:  run 0xcafe::vectors::test_guess_with_break_no_inline
+task 4 lines 74-74:  run 0xcafe::vectors::test_guess_without_break

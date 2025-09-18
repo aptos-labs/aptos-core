@@ -1,0 +1,23 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/sequential_assign_struct.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct Foo has copy, drop {
+        a: u64,
+        b: u64,
+        c: u64,
+        d: u64,
+        e: u64,
+    }
+    public fun main() {
+        let _t6 = sequential(Foo{a: 1, b: 2, c: 3, d: 4, e: 5});
+        let _t12 = Foo{a: 1, b: 2, c: 3, d: 4, e: 5};
+        if (!(_t6 == _t12)) abort 0;
+    }
+    fun sequential(p0: Foo): Foo {
+        p0
+    }
+}
+
+
+//# run 0xc0ffee::m::main

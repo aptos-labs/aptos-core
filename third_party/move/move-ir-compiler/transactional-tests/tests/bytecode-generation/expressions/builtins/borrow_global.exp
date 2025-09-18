@@ -3,12 +3,12 @@ task 0 lines 1-14:  print-bytecode --input=module [// Borrowing a global of a ty
 // Bytecode version v7
 module 0x1d6::M
 use 0x1::signer
-struct T
+struct T has key
   b: bool
 
 // Function definition at index 0
 fun f(l0: signer)
-    local l1: &M::T
+    local l1: &T
     borrow_loc l0
     call signer::address_of
     borrow_global T

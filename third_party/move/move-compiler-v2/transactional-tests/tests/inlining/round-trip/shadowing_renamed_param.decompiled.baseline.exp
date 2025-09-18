@@ -1,0 +1,16 @@
+processed 2 tasks
+task 0 lines 3-17:  publish [module 0x42::Test {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+  ┌─ TEMPFILE:5:31
+  │
+5 │     public fun test_shadowing(p0: u64) {
+  │                               ^^
+
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+  ┌─ TEMPFILE:9:32
+  │
+9 │     public fun test_shadowing2(p0: u64) {
+  │                                ^^
+
+
+task 1 lines 20-20:  run 0x42::Test::test_shadowing_entry

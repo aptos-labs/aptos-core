@@ -389,9 +389,11 @@ impl BufferManager {
         } = ordered_blocks;
 
         info!(
-            "Receive {} ordered block ends with {}, the queue size is {}",
+            "Receive {} ordered block ends with [epoch: {}, round: {}, id: {}], the queue size is {}",
             ordered_blocks.len(),
-            ordered_proof.commit_info(),
+            ordered_proof.commit_info().epoch(),
+            ordered_proof.commit_info().round(),
+            ordered_proof.commit_info().id(),
             self.buffer.len() + 1,
         );
 
@@ -438,9 +440,12 @@ impl BufferManager {
             // Schedule retry.
             self.execution_root
         } else {
-            info!(
-                "Advance execution root from {:?} to {:?}",
-                cursor, self.execution_root
+            sample!(
+                SampleRate::Frequency(2),
+                info!(
+                    "Advance execution root from {:?} to {:?}",
+                    cursor, self.execution_root
+                )
             );
             // Otherwise do nothing, because the execution wait phase is driven by the response of
             // the execution schedule phase, which is in turn fed as soon as the ordered blocks
@@ -458,9 +463,12 @@ impl BufferManager {
             .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
                 item.is_executed()
             });
-        info!(
-            "Advance signing root from {:?} to {:?}",
-            cursor, self.signing_root
+        sample!(
+            SampleRate::Frequency(2),
+            info!(
+                "Advance signing root from {:?} to {:?}",
+                cursor, self.signing_root
+            )
         );
         if self.signing_root.is_some() {
             let item = self.buffer.get(&self.signing_root);

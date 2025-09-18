@@ -1,0 +1,24 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/swap_in_a_loop.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun main() {
+        let (_t3,_t4) = test(9, 55);
+        if (!(_t3 == 55)) abort 0;
+        if (!(_t4 == 9)) abort 0;
+    }
+    public fun test(p0: u64, p1: u64): (u64, u64) {
+        let _t2 = p0;
+        while (_t2 > 0) {
+            let _t7 = p0;
+            p0 = p1;
+            p1 = _t7;
+            _t2 = _t2 - 1;
+            continue
+        };
+        (p0, p1)
+    }
+}
+
+
+//# run 0xc0ffee::m::main

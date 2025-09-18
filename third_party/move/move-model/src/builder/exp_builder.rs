@@ -580,7 +580,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         "previously declared here".to_string(),
                     )],
                 );
-                return;
             }
             self.type_params.push((name, ty, kind, loc.clone()));
         } else if report_errors {
@@ -882,7 +881,7 @@ impl UnificationContext for ExpTranslator<'_, '_, '_> {
         }
     }
 
-    fn type_display_context(&self) -> TypeDisplayContext {
+    fn type_display_context(&self) -> TypeDisplayContext<'_> {
         self.type_display_context()
     }
 }

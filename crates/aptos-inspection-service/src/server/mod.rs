@@ -18,6 +18,7 @@ use std::{
 };
 
 mod configuration;
+mod identity_information;
 mod index;
 mod json_encoder;
 mod metrics;
@@ -32,6 +33,7 @@ mod tests;
 pub const CONFIGURATION_PATH: &str = "/configuration";
 pub const CONSENSUS_HEALTH_CHECK_PATH: &str = "/consensus_health_check";
 pub const FORGE_METRICS_PATH: &str = "/forge_metrics";
+pub const IDENTITY_INFORMATION_PATH: &str = "/identity_information";
 pub const INDEX_PATH: &str = "/";
 pub const JSON_METRICS_PATH: &str = "/json_metrics";
 pub const METRICS_PATH: &str = "/metrics";
@@ -121,6 +123,11 @@ async fn serve_requests(
             // /forge_metrics
             // Exposes forge encoded metrics
             metrics::handle_forge_metrics()
+        },
+        IDENTITY_INFORMATION_PATH => {
+            // /identity_information
+            // Exposes the identity information of the node
+            identity_information::handle_identity_information_request(&node_config)
         },
         INDEX_PATH => {
             // /

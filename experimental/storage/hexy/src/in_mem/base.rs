@@ -136,6 +136,7 @@ impl HexyBase {
         }
     }
 
+    #[allow(clippy::mut_from_ref)]
     unsafe fn unsafe_get_hash_mut(&self, position: NodePosition) -> Result<&mut HashValue> {
         let num_leaves = self.num_leaves();
         ensure!(

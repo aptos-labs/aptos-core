@@ -10,12 +10,19 @@ use clap::*;
 use legacy_move_compiler::shared::NumericalAddress;
 use move_command_line_common::{
     address::ParsedAddress,
-    files::{MOVE_EXTENSION, MOVE_IR_EXTENSION},
+    files::{MOVE_ASM_EXTENSION, MOVE_EXTENSION, MOVE_IR_EXTENSION},
     types::{ParsedStructType, ParsedType},
     values::{ParsableValue, ParsedValue},
 };
 use move_core_types::identifier::Identifier;
-use std::{convert::TryInto, fmt::Debug, fs, path::Path, str::FromStr};
+use std::{
+    convert::TryInto,
+    fmt,
+    fmt::{Debug, Formatter},
+    fs,
+    path::Path,
+    str::FromStr,
+};
 use tempfile::NamedTempFile;
 
 #[derive(Debug)]
@@ -198,7 +205,7 @@ impl<T> TaskInput<T> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SyntaxChoice {
     Source,
     IR,
@@ -399,6 +406,16 @@ fn parse_qualified_module_access(s: &str) -> Result<(ParsedAddress, Identifier, 
     Ok((addr, module, struct_))
 }
 
+impl fmt::Display for SyntaxChoice {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            SyntaxChoice::Source => MOVE_EXTENSION,
+            SyntaxChoice::IR => MOVE_IR_EXTENSION,
+            SyntaxChoice::ASM => MOVE_ASM_EXTENSION,
+        })
+    }
+}
+
 impl FromStr for SyntaxChoice {
     type Err = anyhow::Error;
 
@@ -406,10 +423,12 @@ impl FromStr for SyntaxChoice {
         match s {
             MOVE_EXTENSION => Ok(SyntaxChoice::Source),
             MOVE_IR_EXTENSION => Ok(SyntaxChoice::IR),
+            MOVE_ASM_EXTENSION => Ok(SyntaxChoice::ASM),
             _ => Err(anyhow!(
-                "Invalid syntax choice. Expected '{}' or '{}'",
+                "Invalid syntax choice. Expected '{}' or '{}' or '{}'",
                 MOVE_EXTENSION,
-                MOVE_IR_EXTENSION
+                MOVE_IR_EXTENSION,
+                MOVE_ASM_EXTENSION
             )),
         }
     }

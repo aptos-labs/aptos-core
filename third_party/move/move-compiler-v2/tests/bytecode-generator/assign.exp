@@ -41,11 +41,11 @@ module 0x42::assign {
         *x = 42;
     }
     fun assign_pattern(s: S, f: u64, h: u64): u64 {
-        S{f: f,g: T{h: h}} = s;
+        S{f: f, g: T{h: h}} = s;
         f + h
     }
     fun assign_struct(s: &mut S) {
-        *s = S{f: 42,g: T{h: 42}};
+        *s = S{f: 42, g: T{h: 42}};
     }
 }
 

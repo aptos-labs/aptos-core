@@ -1,0 +1,8 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/loop_simple.move`
+
+//# run
+script {
+    fun main() {
+        if (!(0 + 1 == 1)) abort 42;
+    }
+}

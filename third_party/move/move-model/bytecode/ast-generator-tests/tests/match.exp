@@ -237,7 +237,8 @@ _t1: &Entity = Borrow(Immutable)(self);
 loop {
   loop {
     if (Not(test_variants m::Entity::Person(_t1))) break;
-    if (Not(Gt(Deref(select_variants m::Entity.Person.id(_t1)), 0))) break;
+    _t15: u64 = Deref(select_variants m::Entity.Person.id(_t1));
+    if (Not(Gt(_t15, 0))) break;
     m::Entity::Person{ id: _t20 } = self;
     _t2: u64 = _t20;
     break[1]
@@ -255,16 +256,22 @@ return _t2
 
 --- If-Transformed Generated AST
 _t1: &Entity = Borrow(Immutable)(self);
-if And(test_variants m::Entity::Person(_t1), Gt(Deref(select_variants m::Entity.Person.id(_t1)), 0)) {
-  m::Entity::Person{ id: _t20 } = self;
-  _t2: u64 = _t20
-} else {
+loop {
+  if test_variants m::Entity::Person(_t1) {
+    _t15: u64 = Deref(select_variants m::Entity.Person.id(_t1));
+    if Gt(_t15, 0) {
+      m::Entity::Person{ id: _t20 } = self;
+      _t2: u64 = _t20;
+      break
+    }
+  };
   if test_variants m::Entity::Institution(_t1) {
     m::Entity::Institution{ id: _t9, admin: _t10 } = self;
-    _t2: u64 = _t9
-  } else {
-    _t2: u64 = 0
-  }
+    _t2: u64 = _t9;
+    break
+  };
+  _t2: u64 = 0;
+  break
 };
 return _t2
 
@@ -273,20 +280,22 @@ return _t2
   let _t2: u64;
   {
     let _t1: &Entity = Borrow(Immutable)(self);
-    if And(test_variants m::Entity::Person(_t1), Gt(Deref(select_variants m::Entity.Person.id(_t1)), 0)) {
-      {
-        let m::Entity::Person{ id: _t20 } = self;
-        _t2: u64 = _t20
-      }
-    } else {
-      if test_variants m::Entity::Institution(_t1) {
-        {
-          let m::Entity::Institution{ id: _t9, admin: _t10 } = self;
-          _t2: u64 = _t9
+    loop {
+      if (test_variants m::Entity::Person(_t1)) {
+        let _t15: u64 = Deref(select_variants m::Entity.Person.id(_t1));
+        if (Gt(_t15, 0)) {
+          let m::Entity::Person{ id: _t20 } = self;
+          _t2: u64 = _t20;
+          break
         }
-      } else {
-        _t2: u64 = 0
-      }
+      };
+      if (test_variants m::Entity::Institution(_t1)) {
+        let m::Entity::Institution{ id: _t9, admin: _t10 } = self;
+        _t2: u64 = _t9;
+        break
+      };
+      _t2: u64 = 0;
+      break
     };
     return _t2
   }
@@ -311,13 +320,23 @@ module 0x815::m {
     fun id2(self: Entity): u64 {
         let _t2;
         let _t1 = &self;
-        if ((_t1 is Person) && *&_t1.id > 0) {
-            let Entity::Person{id: _t20} = self;
-            _t2 = _t20
-        } else if (_t1 is Institution) {
-            let Entity::Institution{id: _t9,admin: _t10} = self;
-            _t2 = _t9
-        } else _t2 = 0;
+        loop {
+            if (_t1 is Person) {
+                let _t15 = *&_t1.id;
+                if (_t15 > 0) {
+                    let Entity::Person{id: _t20} = self;
+                    _t2 = _t20;
+                    break
+                }
+            };
+            if (_t1 is Institution) {
+                let Entity::Institution{id: _t9, admin: _t10} = self;
+                _t2 = _t9;
+                break
+            };
+            _t2 = 0;
+            break
+        };
         _t2
     }
 }

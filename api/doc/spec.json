@@ -15178,7 +15178,7 @@
   },
   "components": {
     "schemas": {
-      "AbstractionSignature": {
+      "AbstractSignature": {
         "type": "object",
         "required": [
           "function_info",
@@ -15229,7 +15229,7 @@
             "$ref": "#/components/schemas/AccountSignature_NoAccountSignature"
           },
           {
-            "$ref": "#/components/schemas/AccountSignature_AbstractionSignature"
+            "$ref": "#/components/schemas/AccountSignature_AbstractSignature"
           }
         ],
         "discriminator": {
@@ -15240,11 +15240,11 @@
             "single_key_signature": "#/components/schemas/AccountSignature_SingleKeySignature",
             "multi_key_signature": "#/components/schemas/AccountSignature_MultiKeySignature",
             "no_account_signature": "#/components/schemas/AccountSignature_NoAccountSignature",
-            "abstraction_signature": "#/components/schemas/AccountSignature_AbstractionSignature"
+            "abstract_signature": "#/components/schemas/AccountSignature_AbstractSignature"
           }
         }
       },
-      "AccountSignature_AbstractionSignature": {
+      "AccountSignature_AbstractSignature": {
         "allOf": [
           {
             "type": "object",
@@ -15255,14 +15255,14 @@
               "type": {
                 "type": "string",
                 "enum": [
-                  "abstraction_signature"
+                  "abstract_signature"
                 ],
-                "example": "abstraction_signature"
+                "example": "abstract_signature"
               }
             }
           },
           {
-            "$ref": "#/components/schemas/AbstractionSignature"
+            "$ref": "#/components/schemas/AbstractSignature"
           }
         ]
       },

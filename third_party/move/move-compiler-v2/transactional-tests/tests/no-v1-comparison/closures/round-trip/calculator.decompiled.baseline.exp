@@ -1,0 +1,68 @@
+processed 8 tasks
+task 0 lines 3-95:  publish [module 0x66::calculator {]
+Error: compilation errors:
+ error: cannot select field `_0` since it has different types in variants of enum `State`
+   ┌─ TEMPFILE:93:11
+   │
+93 │         *&_t1._0
+   │           ^^^
+   │
+   = field `_0` has type `|u64|u64 has copy + drop + store` in variant `Continuation` and type `u64` in variant `Value`
+
+
+task 1 lines 98-98:  run 0x66::calculator::init_module --signers 0x66
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 100-100:  run 0x66::calculator::number --signers 0x66 --args 10
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 102-102:  run 0x66::calculator::add --signers 0x66
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 104-104:  run 0x66::calculator::number --signers 0x66 --args 20
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 5 lines 106-106:  run 0x66::calculator::sub --signers 0x66
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 6 lines 108-108:  run 0x66::calculator::number --signers 0x66 --args 5
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 7 lines 110-110:  run 0x66::calculator::view --signers 0x66
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

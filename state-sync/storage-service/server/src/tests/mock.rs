@@ -31,20 +31,25 @@ use aptos_storage_service_types::{
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{
     account_address::AccountAddress,
-    contract_event::EventWithVersion,
+    contract_event::{ContractEvent, EventWithVersion},
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
-    proof::{AccumulatorConsistencyProof, SparseMerkleProof, TransactionAccumulatorSummary},
+    proof::{
+        AccumulatorConsistencyProof, SparseMerkleProof, TransactionAccumulatorRangeProof,
+        TransactionAccumulatorSummary,
+    },
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, PersistedAuxiliaryInfo, TransactionListWithProofV2,
+        AccountOrderedTransactionsWithProof, PersistedAuxiliaryInfo, Transaction,
+        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProofV2,
         TransactionOutputListWithProofV2, TransactionWithProof, Version,
     },
+    write_set::WriteSet,
     PeerId,
 };
 use futures::channel::{oneshot, oneshot::Receiver};
@@ -82,9 +87,11 @@ impl MockClient {
         state_sync_config.storage_service = storage_service_config;
 
         // Create the storage reader
+        let mock_time_service = TimeService::mock();
         let storage_reader = StorageReader::new(
             storage_service_config,
             Arc::new(db_reader.unwrap_or_else(create_mock_db_reader)),
+            mock_time_service.clone(),
         );
 
         // Setup the networks and the network events
@@ -113,7 +120,6 @@ impl MockClient {
         // Create the storage service
         let peers_and_metadata = create_peers_and_metadata(network_ids);
         let executor = tokio::runtime::Handle::current();
-        let mock_time_service = TimeService::mock();
         let storage_server = StorageServiceServer::new(
             state_sync_config,
             executor,
@@ -360,6 +366,63 @@ mock! {
             start_version: Version,
             num_persisted_auxiliary_info: usize,
         ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<PersistedAuxiliaryInfo>>>>;
+
+        fn get_epoch_ending_ledger_info_iterator(
+            &self,
+            start_epoch: u64,
+            end_epoch: u64,
+        ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<LedgerInfoWithSignatures>>>>;
+
+        fn get_transaction_iterator(
+            &self,
+            start_version: Version,
+            limit: u64,
+        ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<Transaction>>>>;
+
+        fn get_transaction_info_iterator(
+            &self,
+            start_version: Version,
+            limit: u64,
+        ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<TransactionInfo>>>>;
+
+        fn get_events_iterator(
+            &self,
+            start_version: Version,
+            limit: u64,
+        ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<Vec<ContractEvent>>>>>;
+
+        fn get_write_set_iterator(
+            &self,
+            start_version: Version,
+            limit: u64,
+        ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<WriteSet>>>>;
+
+        fn get_auxiliary_data_iterator(
+            &self,
+            start_version: Version,
+            limit: u64,
+        ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<TransactionAuxiliaryData>>>>;
+
+        fn get_transaction_accumulator_range_proof(
+            &self,
+            start_version: Version,
+            limit: u64,
+            ledger_version: Version,
+        ) -> aptos_storage_interface::Result<TransactionAccumulatorRangeProof>;
+
+        fn get_state_value_chunk_iter(
+            &self,
+            version: Version,
+            first_index: usize,
+            chunk_size: usize,
+        ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<(StateKey, StateValue)>>>>;
+
+        fn get_state_value_chunk_proof(
+            &self,
+            version: Version,
+            first_index: usize,
+            state_key_values: Vec<(StateKey, StateValue)>,
+        ) -> aptos_storage_interface::Result<StateValueChunkWithProof>;
     }
 }
 

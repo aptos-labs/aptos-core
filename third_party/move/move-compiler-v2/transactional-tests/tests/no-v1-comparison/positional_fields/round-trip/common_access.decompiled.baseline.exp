@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 3-19:  publish [module 0x42::test {]
+task 1 lines 22-22:  run --verbose -- 0x42::test::test_common_access
+return values: 42

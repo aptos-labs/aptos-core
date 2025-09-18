@@ -580,7 +580,7 @@ impl LifetimeAnalysisStep<'_, '_> {
     }
 
     #[inline]
-    fn target(&self) -> &FunctionTarget {
+    fn target(&self) -> &FunctionTarget<'_> {
         self.parent.target
     }
 

@@ -607,6 +607,8 @@ pub struct GlobalEnv {
     pub(crate) generated_by_v2: bool,
     /// A set of types that are instantiated in cmp module.
     pub cmp_types: RefCell<BTreeSet<Type>>,
+    /// An estimate of each target Move function's size.
+    pub function_size_estimate: RefCell<BTreeMap<QualifiedId<FunId>, FunctionSize>>,
 }
 
 /// A helper type for implementing fmt::Display depending on GlobalEnv
@@ -669,6 +671,7 @@ impl GlobalEnv {
             everything_is_target: Default::default(),
             generated_by_v2: false,
             cmp_types: RefCell::new(Default::default()),
+            function_size_estimate: RefCell::new(Default::default()),
         }
     }
 
@@ -883,7 +886,7 @@ impl GlobalEnv {
     }
 
     /// Find all target modules and return in a vector
-    pub fn get_target_modules(&self) -> Vec<ModuleEnv> {
+    pub fn get_target_modules(&self) -> Vec<ModuleEnv<'_>> {
         let mut target_modules: Vec<ModuleEnv> = vec![];
         for module_env in self.get_modules() {
             if module_env.is_target() {
@@ -894,7 +897,7 @@ impl GlobalEnv {
     }
 
     /// Find all target modules and their transitive closures and return in a vector
-    pub fn get_target_modules_transitive_closure(&self) -> Vec<ModuleEnv> {
+    pub fn get_target_modules_transitive_closure(&self) -> Vec<ModuleEnv<'_>> {
         let mut target_and_transitive_modules: BTreeSet<ModuleId> = BTreeSet::new();
         let mut todo_modules: BTreeSet<ModuleId> = BTreeSet::new();
         for module_env in self.get_modules() {
@@ -925,7 +928,7 @@ impl GlobalEnv {
     }
 
     /// Find all primary target modules and return in a vector
-    pub fn get_primary_target_modules(&self) -> Vec<ModuleEnv> {
+    pub fn get_primary_target_modules(&self) -> Vec<ModuleEnv<'_>> {
         let mut target_modules: Vec<ModuleEnv> = vec![];
         for module_env in self.get_modules() {
             if module_env.is_primary_target() {
@@ -1708,11 +1711,104 @@ impl GlobalEnv {
         }
         let used_modules = self.get_used_modules_from_bytecode(&module);
         let friend_modules = self.get_friend_modules_from_bytecode(&module);
+
+        // If use decls decls are empty, let's propagage them from the CompiledModule with aliases assigned
+        let use_decls = if self.module_data[module_id.0 as usize].use_decls.is_empty() {
+            // Map to keep track of aliases for used modules
+            // key: module name (without address)
+            // value: [module address -> module alias]
+            let mut aliases = BTreeMap::new();
+            let mut make_alias = |address: Address, module_name: Symbol| {
+                // module name does not exist: alias not needed but keep track of it
+                let addr_alias_map = aliases.entry(module_name).or_insert_with(|| {
+                    let mut inner_map = BTreeMap::new();
+                    inner_map.insert(address.clone(), module_name);
+                    inner_map
+                });
+                // The module name exists and the address has not been recorded, we need to make an alias for this module name at this address
+                if addr_alias_map.get(&address).is_none() {
+                    let module_alias = format!(
+                        "{}_{}",
+                        module_name.display(&self.symbol_pool),
+                        addr_alias_map.len()
+                    );
+                    let alias = self.symbol_pool.make(&module_alias);
+                    addr_alias_map.insert(address, alias);
+                    return Some(alias);
+                }
+                None
+            };
+            used_modules
+                .iter()
+                .map(|mid| {
+                    let module_env = self.get_module(*mid);
+                    let name = module_env.get_name();
+                    UseDecl {
+                        loc: Loc::default(),
+                        module_name: name.clone(),
+                        module_id: Some(*mid),
+                        alias: make_alias(name.addr().clone(), name.name()),
+                        members: vec![],
+                    }
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+        // If friend decls are empty, let's propagage them from the CompiledModule
+        // Different from use decls, we allow friend modules that have not been added to the GlobalEnv
+        // - why: use decls are ensured to be added when `with_dep_closure` is set, which is not the case for friend decls
+        let friend_decls = if self.module_data[module_id.0 as usize]
+            .friend_decls
+            .is_empty()
+        {
+            module
+                .immediate_friends_iter()
+                .map(|(ff_addr, ff_name)| {
+                    let addr = Address::Numerical(*ff_addr);
+                    let name = self.symbol_pool.make(ff_name.as_str());
+                    let module_name = ModuleName::new(addr, name);
+                    let module_id = self
+                        .find_module(&module_name)
+                        .map(|module_env| module_env.get_id());
+                    FriendDecl {
+                        loc: Loc::default(),
+                        module_name,
+                        module_id,
+                    }
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+
         let mod_data = &mut self.module_data[module_id.0 as usize];
         mod_data.used_modules = used_modules;
+        mod_data.use_decls = use_decls;
         mod_data.friend_modules = friend_modules;
+        mod_data.friend_decls = friend_decls;
         mod_data.compiled_module = Some(module);
         mod_data.source_map = Some(source_map);
+    }
+
+    /// Updates modules previously loaded into the environment
+    pub fn update_loaded_modules(&mut self) {
+        // update friend modules that are not ready when loading a module
+        let friend_modules_vec: Vec<Option<BTreeSet<ModuleId>>> =
+            self.module_data
+                .iter()
+                .map(|mod_data| {
+                    mod_data.compiled_module.as_ref().map(|compiled_module| {
+                        self.get_friend_modules_from_bytecode(compiled_module)
+                    })
+                })
+                .collect();
+
+        for (mod_data, friend_modules_opt) in self.module_data.iter_mut().zip(friend_modules_vec) {
+            if let Some(friend_modules) = friend_modules_opt {
+                mod_data.friend_modules = friend_modules;
+            }
+        }
     }
 
     fn get_used_funs_from_bytecode(
@@ -1964,8 +2060,16 @@ impl GlobalEnv {
             .function_data
             .get_mut(&fun.id)
             .unwrap();
-        data.used_funs = Some(def.used_funs());
+        // Recompute called and used functions.
         data.called_funs = Some(def.called_funs());
+        data.used_funs = Some(def.used_funs());
+        // Reset various caches because the AST has changed.
+        *data.calling_funs.borrow_mut() = None;
+        *data.transitive_closure_of_called_funs.borrow_mut() = None;
+        *data.using_funs.borrow_mut() = None;
+        *data.transitive_closure_of_used_funs.borrow_mut() = None;
+        *data.used_functions_with_transitive_inline.borrow_mut() = None;
+        // Set the new function definition.
         data.def = Some(def);
     }
 
@@ -2132,7 +2236,7 @@ impl GlobalEnv {
 
     /// Gets the spec block associated with the spec block target. Only
     /// module, struct, and function specs are supported.
-    pub fn get_spec_block(&self, target: &SpecBlockTarget) -> Ref<Spec> {
+    pub fn get_spec_block(&self, target: &SpecBlockTarget) -> Ref<'_, Spec> {
         use SpecBlockTarget::*;
         match target {
             Module(mid) => self.module_data[mid.to_usize()].module_spec.borrow(),
@@ -2159,7 +2263,7 @@ impl GlobalEnv {
 
     /// Gets the spec block associated with the spec block target. Only
     /// module, struct, and function specs are supported.
-    pub fn get_spec_block_mut(&self, target: &SpecBlockTarget) -> RefMut<Spec> {
+    pub fn get_spec_block_mut(&self, target: &SpecBlockTarget) -> RefMut<'_, Spec> {
         use SpecBlockTarget::*;
         match target {
             Module(mid) => self.module_data[mid.to_usize()].module_spec.borrow_mut(),
@@ -2185,8 +2289,18 @@ impl GlobalEnv {
     }
 
     /// Return the `StructEnv` for `str`
-    pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv {
+    pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv<'_> {
         self.get_module(str.module_id).into_struct(str.id)
+    }
+
+    /// Return the `Option<StructEnv>` for `str`
+    pub fn get_struct_opt(&self, str: QualifiedId<StructId>) -> Option<StructEnv<'_>> {
+        self.get_module_opt(str.module_id).and_then(|module| {
+            module.data.struct_data.get(&str.id).map(|data| StructEnv {
+                module_env: module,
+                data,
+            })
+        })
     }
 
     // Gets the number of modules in this environment.
@@ -2514,7 +2628,7 @@ impl GlobalEnv {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext::new(self)
     }
 
@@ -2555,6 +2669,42 @@ impl GlobalEnv {
                     using_funs.retain(|qfun_id| predicate(qfun_id))
                 }
             });
+        }
+    }
+
+    /// Update the friend declarations in all target modules, when the
+    /// callees could have changed due to AST-level optimizations.
+    pub fn update_friend_decls_in_targets(&mut self) {
+        let mut friend_decls_to_add = BTreeMap::new();
+        for module in self.get_target_modules() {
+            let module_name = module.get_name();
+            let needed = module.need_to_be_friended_by();
+            for need_to_be_friended_by in needed {
+                let need_to_be_friend_with = self.get_module(need_to_be_friended_by);
+                let already_friended = need_to_be_friend_with
+                    .get_friend_decls()
+                    .iter()
+                    .any(|friend_decl| &friend_decl.module_name == module_name);
+                if !already_friended {
+                    let loc = need_to_be_friend_with.get_loc();
+                    let friend_decl = FriendDecl {
+                        loc,
+                        module_name: module_name.clone(),
+                        module_id: Some(module.get_id()),
+                    };
+                    friend_decls_to_add
+                        .entry(need_to_be_friended_by)
+                        .or_insert_with(Vec::new)
+                        .push(friend_decl);
+                }
+            }
+        }
+        for (module_id, friend_decls) in friend_decls_to_add {
+            let module_data = self.get_module_data_mut(module_id);
+            module_data
+                .friend_modules
+                .extend(friend_decls.iter().flat_map(|d| d.module_id));
+            module_data.friend_decls.extend(friend_decls);
         }
     }
 }
@@ -2830,6 +2980,10 @@ impl GlobalEnv {
             format!(": {}", result_type.display(tctx))
         };
         format!("{}({}){}", type_params_str, params_str, result_str)
+    }
+
+    pub fn set_function_size_estimates(&self, sizes: BTreeMap<QualifiedId<FunId>, FunctionSize>) {
+        *self.function_size_estimate.borrow_mut() = sizes;
     }
 }
 
@@ -3174,7 +3328,7 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns a context to display types for this module.
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext {
             module_name: Some(self.get_name().clone()),
             used_modules: self.get_used_modules(false),
@@ -3490,7 +3644,7 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Gets module specification.
-    pub fn get_spec(&self) -> Ref<Spec> {
+    pub fn get_spec(&self) -> Ref<'_, Spec> {
         self.data.module_spec.borrow()
     }
 
@@ -3947,7 +4101,7 @@ impl<'env> StructEnv<'env> {
     }
 
     /// Returns the data invariants associated with this struct.
-    pub fn get_spec(&self) -> Ref<Spec> {
+    pub fn get_spec(&self) -> Ref<'_, Spec> {
         self.data.spec.borrow()
     }
 
@@ -3966,7 +4120,7 @@ impl<'env> StructEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         let type_param_names = self
             .get_type_parameters()
             .iter()
@@ -4159,7 +4313,7 @@ impl NamedConstantEnv<'_> {
     }
 
     /// Returns a context to display types for this module.
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext {
             module_name: Some(self.module_env.get_name().clone()),
             used_modules: self.module_env.get_used_modules(false),
@@ -5221,7 +5375,7 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         let type_param_names = self
             .get_type_parameters()
             .iter()
@@ -5410,5 +5564,22 @@ impl fmt::Display for EnvDisplay<'_, Parameter> {
             p.get_name().display(self.env.symbol_pool()),
             p.get_type().display(&self.env.get_type_display_ctx())
         )
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct FunctionSize {
+    /// Number of instructions in the function body
+    pub code_size: usize,
+    /// Number of local variables in the function
+    pub num_locals: usize,
+}
+
+impl FunctionSize {
+    pub fn new(code_size: usize, num_locals: usize) -> Self {
+        Self {
+            code_size,
+            num_locals,
+        }
     }
 }

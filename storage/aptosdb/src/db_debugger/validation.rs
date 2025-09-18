@@ -118,7 +118,7 @@ pub fn verify_state_kvs(
 ) -> Result<()> {
     println!("Validating db statekeys");
     let storage_dir = StorageDirPaths::from_path(db_root_path);
-    let state_kv_db = StateKvDb::open_sharded(&storage_dir, RocksdbConfig::default(), false)?;
+    let state_kv_db = StateKvDb::open_sharded(&storage_dir, RocksdbConfig::default(), None, false)?;
 
     //read all statekeys from internal db and store them in mem
     let mut all_internal_keys = HashSet::new();

@@ -213,7 +213,7 @@ pub fn is_pragma_valid_for_block(
                 | INTRINSIC_PRAGMA
                 | UNROLL_PRAGMA
         ),
-        Function(..) => matches!(
+        Function(..) | FunctionCodeV2(.., Some(..)) => matches!(
             pragma,
             VERIFY_PRAGMA
                 | TIMEOUT_PRAGMA

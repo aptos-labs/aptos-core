@@ -24,6 +24,7 @@ use anyhow::anyhow;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
+use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{schema::KeyCodec, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
@@ -57,9 +58,7 @@ where
 
     fn prune(&self, batch_size: usize) -> Result<Version> {
         // TODO(grao): Consider separate pruner metrics, and have a label for pruner name.
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["state_merkle_pruner__prune"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_merkle_pruner__prune"]);
         let mut progress = self.progress();
         let target_version = self.target_version();
 

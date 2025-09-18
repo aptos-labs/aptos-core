@@ -18,9 +18,9 @@ module 0x42::m {
     fun foo(f: |&u64| has drop) {
     }
     fun g() {
-        foo(|arg0| __lambda__1__g(arg0));
+        foo(|arg0| lambda__1__g(arg0));
     }
-    fun __lambda__1__g(v: &u64) {
+    fun lambda__1__g(v: &u64) {
         v == &1;
     }
 }

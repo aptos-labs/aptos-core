@@ -235,7 +235,7 @@ impl TreeInserter {
         committed_block: Option<BlockInfo>,
     ) -> QuorumCert {
         gen_test_certificate(
-            &[self.signer.clone()],
+            std::slice::from_ref(&self.signer),
             block.block_info(),
             block.quorum_cert().certified_block().clone(),
             committed_block,

@@ -138,4 +138,4 @@ const MAX_FIELD_INST_COUNT: usize = FF::TableIndex::MAX as usize;
 const MAX_FUNCTION_COUNT: usize = FF::TableIndex::MAX as usize;
 const MAX_FUNCTION_INST_COUNT: usize = FF::TableIndex::MAX as usize;
 const MAX_FUNCTION_DEF_COUNT: usize = FF::TableIndex::MAX as usize;
-const MAX_LOCAL_COUNT: usize = FF::LocalIndex::MAX as usize;
+pub const MAX_LOCAL_COUNT: usize = FF::LocalIndex::MAX as usize;

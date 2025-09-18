@@ -93,11 +93,19 @@ impl DoLedgerUpdate {
         )
         .map(
             |(
-                (txn, txn_out, persisted_info),
+                (txn, txn_out, persisted_auxiliary_info),
                 state_checkpoint_hash,
                 event_root_hash,
                 write_set_hash,
             )| {
+                // Use the auxiliary info hash directly from the persisted info
+                let auxiliary_info_hash = match persisted_auxiliary_info {
+                    PersistedAuxiliaryInfo::None => None,
+                    PersistedAuxiliaryInfo::V1 { .. } => {
+                        Some(CryptoHash::hash(persisted_auxiliary_info))
+                    },
+                };
+
                 TransactionInfo::new(
                     txn.hash(),
                     write_set_hash,
@@ -105,11 +113,7 @@ impl DoLedgerUpdate {
                     state_checkpoint_hash,
                     txn_out.gas_used(),
                     txn_out.status().as_kept_status().expect("Already sorted."),
-                    if matches!(persisted_info, PersistedAuxiliaryInfo::None) {
-                        None
-                    } else {
-                        Some(CryptoHash::hash(persisted_info))
-                    },
+                    auxiliary_info_hash,
                 )
             },
         )

@@ -319,7 +319,7 @@ async fn test_get_account_balance(
                 AptosCoinType::type_tag(),
             ))
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
@@ -358,7 +358,7 @@ async fn test_get_account_balance(
                 vec![bcs::to_bytes(&primary_apt_store(root_account.address())).unwrap()],
             )))
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
@@ -387,7 +387,7 @@ async fn test_get_account_modules_by_ledger_version_with_context(mut context: Te
             .transaction_factory()
             .payload(payload)
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,

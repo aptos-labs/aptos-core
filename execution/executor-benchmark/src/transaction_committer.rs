@@ -13,6 +13,7 @@ use aptos_executor::{
 };
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::prelude::*;
+use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
@@ -86,9 +87,7 @@ where
                 .transaction_accumulator
                 .root_hash();
             let num_input_txns = output.num_input_transactions();
-            NUM_TXNS
-                .with_label_values(&["commit"])
-                .inc_by(num_input_txns as u64);
+            NUM_TXNS.inc_with_by(&["commit"], num_input_txns as u64);
 
             let version = output.expect_last_version();
             let commit_start = Instant::now();

@@ -11,6 +11,7 @@ use crate::handlers::utils::{
 };
 use aptos_crypto::hash::HashValue;
 use aptos_db::backup::backup_handler::BackupHandler;
+use aptos_metrics_core::TimerHelper;
 use aptos_types::transaction::Version;
 use warp::{filters::BoxedFilter, reply::Reply, Filter};
 
@@ -138,9 +139,10 @@ pub(crate) fn get_routes(backup_handler: BackupHandler) -> BoxedFilter<(impl Rep
         .and(routes)
         .with(warp::log::custom(|info| {
             let endpoint = info.path().split('/').nth(1).unwrap_or("-");
-            LATENCY_HISTOGRAM
-                .with_label_values(&[endpoint, info.status().as_str()])
-                .observe(info.elapsed().as_secs_f64())
+            LATENCY_HISTOGRAM.observe_with(
+                &[endpoint, info.status().as_str()],
+                info.elapsed().as_secs_f64(),
+            )
         }))
         .boxed()
 }

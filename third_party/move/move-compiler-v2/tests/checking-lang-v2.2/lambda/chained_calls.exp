@@ -14,12 +14,12 @@ module 0x66::test {
 // -- Sourcified model before first bytecode pipeline
 module 0x66::test {
     fun add_some(x: u64): |u64|u64 {
-        |arg0| __lambda__1__add_some(x, arg0)
+        |arg0| lambda__1__add_some(x, arg0)
     }
     fun chain(v: vector<|u64|(|u64|u64)>): u64 {
         (*0x1::vector::borrow<|u64|(|u64|u64)>(&v, 0))(1)(2) + add_some(1)(2)
     }
-    fun __lambda__1__add_some(x: u64, y: u64): u64 {
+    fun lambda__1__add_some(x: u64, y: u64): u64 {
         x + y
     }
 }

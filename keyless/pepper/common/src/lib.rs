@@ -193,6 +193,12 @@ pub struct PepperV0VufPubKey {
     pub public_key: Vec<u8>,
 }
 
+impl PepperV0VufPubKey {
+    pub fn new(public_key: Vec<u8>) -> Self {
+        Self { public_key }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PepperInput {
     pub iss: String,

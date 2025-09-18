@@ -28,18 +28,20 @@ module 0x42::Test {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::map_opt {
+    use std::option;
     public fun map<Element: drop, OtherElement>(t: 0x1::option::Option<Element>, f: |Element|OtherElement has drop): 0x1::option::Option<OtherElement> {
         if (0x1::option::is_some<Element>(&t)) 0x1::option::some<OtherElement>(f(0x1::option::extract<Element>(&mut t))) else 0x1::option::none<OtherElement>()
     }
 }
 module 0x42::Test {
+    use std::option;
     use 0x42::map_opt;
     public fun test(): u64 {
         let t = 0x1::option::some<u64>(1);
-        let x = map_opt::map<u64,u64>(t, |arg0| __lambda__1__test(arg0));
+        let x = map_opt::map<u64,u64>(t, |arg0| lambda__1__test(arg0));
         0x1::option::extract<u64>(&mut x)
     }
-    fun __lambda__1__test(e: u64): u64 {
+    fun lambda__1__test(e: u64): u64 {
         e + 1
     }
 }

@@ -50,84 +50,56 @@ import {
 // When we release aptos-node, we also want to release related images for tooling, testing, etc. Similarly, other images have other related images
 // that we can release together, ie in a release group.
 const IMAGES_TO_RELEASE_BY_RELEASE_GROUP = {
-  "aptos-node": [
-    "validator",
-    "validator-testing",
-    "faucet",
-    "tools",
-  ],
-  "aptos-indexer-grpc": [
-    "indexer-grpc",
-  ],
-}
+  "aptos-node": ["validator", "validator-testing", "faucet", "tools"],
+  "aptos-indexer-grpc": ["indexer-grpc"],
+};
 
 const IMAGE_NAMES_TO_RELEASE_ONLY_INTERNAL = ["validator-testing"];
 const IMAGES_TO_RELEASE = {
   validator: {
-    [CargoBuildProfiles.Performance]: [
-      CargoBuildFeatures.Default,
-    ],
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-    ],
+    [CargoBuildProfiles.Performance]: [CargoBuildFeatures.Default],
+    [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   "validator-testing": {
-    [CargoBuildProfiles.Performance]: [
-      CargoBuildFeatures.Default,
-    ],
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-    ],
+    [CargoBuildProfiles.Performance]: [CargoBuildFeatures.Default],
+    [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   faucet: {
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-    ],
+    [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   forge: {
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-    ],
+    [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   tools: {
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-    ],
+    [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   "node-checker": {
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-    ],
+    [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   "indexer-grpc": {
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-    ],
+    [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
 };
-
 
 async function main() {
   const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "AWS_ACCOUNT_ID", "IMAGE_TAG_PREFIX"];
   const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS", "DRY_RUN"];
+  const BOOLEAN_ARGS = ["PROFILE_RELEASE"];
 
-  const parsedArgs = parseArgsFromFlagOrEnv(REQUIRED_ARGS, OPTIONAL_ARGS);
+  const parsedArgs = parseArgsFromFlagOrEnv(REQUIRED_ARGS, OPTIONAL_ARGS, BOOLEAN_ARGS);
 
   await assertExecutingInRepoRoot();
   const crane = await installCrane();
   const craneVersion = await $`${crane} version`;
   console.log(`INFO: crane version: ${craneVersion}`);
-  
+
   const AWS_ECR = `${parsedArgs.AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/aptos`;
   const GCP_ARTIFACT_REPO = parsedArgs.GCP_DOCKER_ARTIFACT_REPO;
   const DOCKERHUB = "docker.io/aptoslabs";
 
   const INTERNAL_TARGET_REGISTRIES = [GCP_ARTIFACT_REPO, AWS_ECR];
 
-  const ALL_TARGET_REGISTRIES = [
-    ...INTERNAL_TARGET_REGISTRIES,
-    DOCKERHUB,
-  ];
+  const ALL_TARGET_REGISTRIES = [...INTERNAL_TARGET_REGISTRIES, DOCKERHUB];
 
   // default 10 seconds
   parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
@@ -154,7 +126,9 @@ async function main() {
       const profilePrefix = profile === "release" ? "" : profile;
       for (const feature of features) {
         const featureSuffix = feature === CargoBuildFeatures.Default ? "" : feature;
-        const targetRegistries = IMAGE_NAMES_TO_RELEASE_ONLY_INTERNAL.includes(image) ? INTERNAL_TARGET_REGISTRIES : ALL_TARGET_REGISTRIES;
+        const targetRegistries = IMAGE_NAMES_TO_RELEASE_ONLY_INTERNAL.includes(image)
+          ? INTERNAL_TARGET_REGISTRIES
+          : ALL_TARGET_REGISTRIES;
 
         for (const targetRegistry of targetRegistries) {
           const imageSource = `${parsedArgs.GCP_DOCKER_ARTIFACT_REPO}/${image}:${joinTagSegments(
@@ -162,7 +136,11 @@ async function main() {
             featureSuffix,
             parsedArgs.GIT_SHA,
           )}`;
-          const imageTarget = `${targetRegistry}/${image}:${joinTagSegments(parsedArgs.IMAGE_TAG_PREFIX, profilePrefix, featureSuffix)}`;
+          const imageTarget = `${targetRegistry}/${image}:${joinTagSegments(
+            parsedArgs.IMAGE_TAG_PREFIX,
+            profilePrefix,
+            featureSuffix,
+          )}`;
           await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
           if (parsedArgs.DRY_RUN) {
             console.info(chalk.yellow(`INFO: skipping copy of ${imageSource} to ${imageTarget} due to dry run`));
@@ -193,12 +171,11 @@ export function getImageReleaseGroupByImageTagPrefix(prefix) {
   return "aptos-node";
 }
 
-
 // This prevents tests from executing main
 if (import.meta.jest === undefined) {
   pnpmInstall();
   await lazyImports();
-  await main()
+  await main();
 } else {
   // Because we do this weird import in order to test we also have to resolve imports
   // However we force the caller to actually install pnpm first here

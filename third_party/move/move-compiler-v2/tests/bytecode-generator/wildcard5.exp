@@ -22,8 +22,8 @@ module 0xc0ffee::m {
         y: u64,
     }
     public fun test() {
-        let s = S{x: 3,y: 4};
-        let S{x: _,y: _} = s;
+        let s = S{x: 3, y: 4};
+        let S{x: _, y: _} = s;
     }
 }
 

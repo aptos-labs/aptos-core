@@ -28,10 +28,10 @@ module 0x42::pack_unpack {
         g: T,
     }
     fun pack(x: u64, y: u64): S {
-        S{f: x,g: T{h: y}}
+        S{f: x, g: T{h: y}}
     }
     fun unpack(s: S): (u64, u64) {
-        let S{f: f,g: T{h: h}} = s;
+        let S{f: f, g: T{h: h}} = s;
         (f, h)
     }
 }

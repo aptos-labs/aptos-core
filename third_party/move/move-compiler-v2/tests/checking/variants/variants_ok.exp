@@ -245,61 +245,61 @@ module 0x815::m {
     }
     fun t1(self: Color): bool {
         match (self) {
-            Color::RGB{red: red,green: green,blue: blue} => red + green + blue > 0,
+            Color::RGB{red: red, green: green, blue: blue} => red + green + blue > 0,
             Color::Red{} => true,
             Color::Blue{} => false,
         }
     }
     fun t1_address_qualified(self: Color): bool {
         match (self) {
-            Color::RGB{red: red,green: green,blue: blue} => red + green + blue > 0,
+            Color::RGB{red: red, green: green, blue: blue} => red + green + blue > 0,
             Color::Red{} => true,
             Color::Blue{} => false,
         }
     }
     fun t1_field_named(self: Color): bool {
         match (self) {
-            Color::RGB{red: r,green: g,blue: blue} => r + g + blue > 0,
+            Color::RGB{red: r, green: g, blue: blue} => r + g + blue > 0,
             Color::Red{} => true,
             Color::Blue{} => false,
         }
     }
     fun t1_module_qualified(self: Color): bool {
         match (self) {
-            Color::RGB{red: red,green: green,blue: blue} => red + green + blue > 0,
+            Color::RGB{red: red, green: green, blue: blue} => red + green + blue > 0,
             Color::Red{} => true,
             Color::Blue{} => false,
         }
     }
     fun t1_uses_block(self: Color): bool {
         match (self) {
-            Color::RGB{red: red,green: green,blue: blue} => red + green + blue > 0,
+            Color::RGB{red: red, green: green, blue: blue} => red + green + blue > 0,
             Color::Red{} => true,
             Color::Blue{} => false,
         }
     }
     fun t1_uses_block_no_comma(self: Color): bool {
         match (self) {
-            Color::RGB{red: red,green: green,blue: blue} => red + green + blue > 0,
+            Color::RGB{red: red, green: green, blue: blue} => red + green + blue > 0,
             Color::Red{} => true,
             Color::Blue{} => false,
         }
     }
     fun t2(self: Color): bool {
         match (self) {
-            Color::RGB{red: red,green: green,blue: blue} => red + green + blue > 0,
+            Color::RGB{red: red, green: green, blue: blue} => red + green + blue > 0,
             _ => true,
         }
     }
     fun t3(self: Color): bool {
         match (&self) {
-            Color::RGB{red: red,green: green,blue: blue} => *red + *green + *blue > 0,
+            Color::RGB{red: red, green: green, blue: blue} => *red + *green + *blue > 0,
             _ => true,
         }
     }
     fun t4(self: Color): Color {
         match (&mut self) {
-            Color::RGB{red: red,green: _,blue: _} => *red = 2,
+            Color::RGB{red: red, green: _, blue: _} => *red = 2,
             _ => (),
         };
         self
@@ -315,17 +315,17 @@ module 0x815::m {
     }
     fun t6_construct(self: Color): Color {
         match (self) {
-            Color::RGB{red: red,green: green,blue: blue} => Color::RGB{red: red + 1,green: green - 1,blue: blue},
+            Color::RGB{red: red, green: green, blue: blue} => Color::RGB{red: red + 1, green: green - 1, blue: blue},
             _ => self,
         }
     }
     fun t7_let_unpack(self: Color): u64 {
-        let Color::RGB{red: red,green: green,blue: blue} = self;
+        let Color::RGB{red: red, green: green, blue: blue} = self;
         red + green + blue
     }
     fun t8_unqualified_variant(self: Color): bool {
         match (self) {
-            Color::RGB{red: red,green: green,blue: blue} => red != green && green != blue,
+            Color::RGB{red: red, green: green, blue: blue} => red != green && green != blue,
             Color::Red{} => true,
             Color::Blue{} => false,
         }

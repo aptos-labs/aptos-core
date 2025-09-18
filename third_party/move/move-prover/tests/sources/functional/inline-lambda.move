@@ -58,6 +58,7 @@ module 0x42::Test {
     fun call_inline_2(y: u64) {
         let z = 3 + y;
         inline_2(y, |x| { while(z < y) {let _x = x;}; x > 5 } spec {
+            pragma opaque;
             requires x > 0;
             ensures result == (x > 5);
             ensures result != !(x > 5);
@@ -121,4 +122,20 @@ module 0x42::Test {
         let s = vector[1, 2, 3];
         let (_a, _b) = find(&s, |x| *x > 1);
     }
+
+    inline fun inline_3(x: &mut u64, f: |&mut u64|) {
+        f(x);
+    }
+
+    fun call_inline_3(x: &mut u64) {
+        inline_3(x, |y| *y = *y + 1 spec {
+            ensures y == old(y) + 1;
+        });
+    }
+
+    spec call_inline_3 {
+        ensures x == old(x) + 1;
+    }
+
+
 }

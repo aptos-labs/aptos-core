@@ -8,14 +8,15 @@ module 0x1::option {
         vector::borrow<Element>(&self.vec, 0)
     }
     public fun borrow_mut<Element>(self: &mut Option<Element>): &mut Element {
-        if (!is_some<Element>(/*freeze*/self)) abort 262145;
+        if (!is_some<Element>(freeze(self))) abort 262145;
         vector::borrow_mut<Element>(&mut self.vec, 0)
     }
     public fun swap<Element>(self: &mut Option<Element>, e: Element): Element {
-        if (!is_some<Element>(/*freeze*/self)) abort 262145;
+        if (!is_some<Element>(freeze(self))) abort 262145;
         let _t2 = &mut self.vec;
+        let _t9 = vector::pop_back<Element>(_t2);
         vector::push_back<Element>(_t2, e);
-        vector::pop_back<Element>(_t2)
+        _t9
     }
     public fun contains<Element>(self: &Option<Element>, e_ref: &Element): bool {
         vector::contains<Element>(&self.vec, e_ref)
@@ -41,23 +42,24 @@ module 0x1::option {
         if (!is_some<Element>(&self)) abort 262145;
         let Option<Element>{vec: _t5} = self;
         let _t1 = _t5;
+        let _t7 = vector::pop_back<Element>(&mut _t1);
         vector::destroy_empty<Element>(_t1);
-        vector::pop_back<Element>(&mut _t1)
+        _t7
     }
     public fun destroy_with_default<Element: drop>(self: Option<Element>, default: Element): Element {
         let _t3;
         let Option<Element>{vec: _t5} = self;
         let _t2 = _t5;
-        if (vector::is_empty<Element>(/*freeze*/&mut _t2)) _t3 = default else _t3 = vector::pop_back<Element>(&mut _t2);
+        if (vector::is_empty<Element>(freeze(&mut _t2))) _t3 = default else _t3 = vector::pop_back<Element>(&mut _t2);
         _t3
     }
     public fun extract<Element>(self: &mut Option<Element>): Element {
-        if (!is_some<Element>(/*freeze*/self)) abort 262145;
+        if (!is_some<Element>(freeze(self))) abort 262145;
         vector::pop_back<Element>(&mut self.vec)
     }
     public fun fill<Element>(self: &mut Option<Element>, e: Element) {
         let _t2 = &mut self.vec;
-        if (!vector::is_empty<Element>(/*freeze*/_t2)) abort 262144;
+        if (!vector::is_empty<Element>(freeze(_t2))) abort 262144;
         vector::push_back<Element>(_t2, e);
     }
     public fun from_vec<Element>(vec: vector<Element>): Option<Element> {
@@ -79,7 +81,7 @@ module 0x1::option {
     public fun swap_or_fill<Element>(self: &mut Option<Element>, e: Element): Option<Element> {
         let _t3;
         let _t2 = &mut self.vec;
-        if (vector::is_empty<Element>(/*freeze*/_t2)) _t3 = none<Element>() else _t3 = some<Element>(vector::pop_back<Element>(_t2));
+        if (vector::is_empty<Element>(freeze(_t2))) _t3 = none<Element>() else _t3 = some<Element>(vector::pop_back<Element>(_t2));
         vector::push_back<Element>(_t2, e);
         _t3
     }
@@ -89,18 +91,4 @@ module 0x1::option {
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with stackless-bytecode checks failed
-error: local `_t1` of type `vector<Element>` does not have the `copy` ability
-   ┌─ option.move:44:9
-   │
-44 │         vector::destroy_empty<Element>(_t1);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ copy needed here because value is still in use
-45 │         vector::pop_back<Element>(&mut _t1)
-   │                                   -------- used here
-
-error: local `_t1` of type `vector<Element>` does not have the `drop` ability
-   ┌─ option.move:45:35
-   │
-45 │         vector::pop_back<Element>(&mut _t1)
-   │                                   ^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
+============ recompilation succeeded ========

@@ -1,0 +1,16 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/seq_kills_2.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun main() {
+        if (!(test(100) == true)) abort 0;
+    }
+    fun test(p0: u64): bool {
+        let _t1 = p0;
+        let _t7 = p0 + 1;
+        _t1 == _t1
+    }
+}
+
+
+//# run 0xc0ffee::m::main

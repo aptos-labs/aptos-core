@@ -2,19 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::{
-    account_config::CoinStoreResource,
+    account_config::{
+        CoinStoreResource, ConcurrentSupplyResource, FungibleStoreResource, ObjectGroupResource,
+    },
     contract_event::ContractEvent,
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{ExecutionStatus, TransactionOutput},
-    write_set::{WriteOp, WriteSet, TOTAL_SUPPLY_STATE_KEY},
+    write_set::{TransactionWrite, WriteOp, WriteSet, TOTAL_SUPPLY_STATE_KEY},
     AptosCoinType,
 };
-use claims::{assert_ok, assert_some};
+use claims::assert_ok;
 use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, move_resource::MoveStructType,
 };
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 
 /// Different parts of [TransactionOutput] that can be different:
 ///   1. gas used,
@@ -251,8 +253,42 @@ impl TransactionDiffBuilder {
         right: WriteSet,
         fee_payer: Option<AccountAddress>,
     ) -> Vec<Diff> {
-        let left = left.into_mut().into_inner();
+        let mut left = left.into_mut().into_inner();
         let mut right = right.into_mut().into_inner();
+
+        let filter_gas_related_ops = |ops: &mut BTreeMap<StateKey, WriteOp>| {
+            // Skip total coin APT supply comparisons.
+            ops.remove(&*TOTAL_SUPPLY_STATE_KEY);
+
+            // Total supply for fungible store. Note that this sadly does not work well for
+            // comparisons between FA and non-FA since we write the full group, so even if supply
+            // changes are removed, we still fail comparison on the rest of the group members...
+            patch_object_group(ops, &AccountAddress::from_str("0xa").unwrap(), |group| {
+                group.group.remove(&ConcurrentSupplyResource::struct_tag());
+            });
+
+            if let Some(fee_payer) = fee_payer {
+                // Skip changes to fee payer's coin balance.
+                let coin_resource_key = StateKey::resource(
+                    &fee_payer,
+                    &CoinStoreResource::<AptosCoinType>::struct_tag(),
+                )
+                .unwrap();
+                ops.remove(&coin_resource_key);
+
+                // Skip changes to fee payer's FA balance.
+                patch_object_group(ops, &fee_payer, |group| {
+                    group.group.remove(&FungibleStoreResource::struct_tag());
+                });
+            }
+        };
+
+        // For comparison without gas, we can simply evict all gas-related ops (and inner ops in
+        // resource groups).
+        if self.allow_different_gas_usage {
+            filter_gas_related_ops(&mut left);
+            filter_gas_related_ops(&mut right);
+        }
 
         let mut diffs = vec![];
         for (state_key, left_write_op) in left {
@@ -263,30 +299,6 @@ impl TransactionDiffBuilder {
             {
                 // Both write ops exist and are the same.
                 continue;
-            }
-
-            if self.allow_different_gas_usage {
-                // Skip total APT supply comparisons. Those should always be part of the write set.
-                if state_key == *TOTAL_SUPPLY_STATE_KEY {
-                    assert_some!(maybe_right_write_op);
-                    continue;
-                }
-
-                // Skip changes to fee payer's balance.
-                if let Some(fee_payer) = fee_payer {
-                    if state_key
-                        == StateKey::resource(
-                            &fee_payer,
-                            &CoinStoreResource::<AptosCoinType>::struct_tag(),
-                        )
-                        .unwrap()
-                    {
-                        // Sanity check: other write set should also contain balance changes.
-                        assert_some!(maybe_right_write_op);
-
-                        continue;
-                    }
-                }
             }
 
             diffs.push(Diff::WriteSet {
@@ -304,6 +316,21 @@ impl TransactionDiffBuilder {
             });
         }
         diffs
+    }
+}
+
+fn patch_object_group<F>(ops: &mut BTreeMap<StateKey, WriteOp>, addr: &AccountAddress, action: F)
+where
+    F: FnOnce(&mut ObjectGroupResource),
+{
+    let object_group_key = StateKey::resource_group(addr, &ObjectGroupResource::struct_tag());
+    if let Some(w) = ops.get_mut(&object_group_key) {
+        if let Some(bytes) = w.bytes().cloned() {
+            let mut group = bcs::from_bytes::<ObjectGroupResource>(&bytes).unwrap();
+            action(&mut group);
+            let patched_bytes = bcs::to_bytes(&group).unwrap();
+            w.set_bytes(patched_bytes.into());
+        }
     }
 }
 

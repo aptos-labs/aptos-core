@@ -155,6 +155,7 @@ spec aptos_std::big_ordered_map {
         ensures [abstract] spec_contains_key(old(self), key) ==> spec_len(old(self)) == spec_len(self);
         ensures [abstract] forall k: K: spec_contains_key(old(self), k) && k != key ==> spec_get(old(self), k) == spec_get(self, k);
         ensures [abstract] forall k: K: spec_contains_key(old(self), k) ==> spec_contains_key(self, k);
+        ensures [abstract] forall k: K: spec_contains_key(self, k) ==> (k == key || spec_contains_key(old(self), k));
     }
 
     spec add_all {

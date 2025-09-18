@@ -1,6 +1,6 @@
 // -- Model dump before first bytecode pipeline
 module 0x42::Test {
-    private fun foo(f: |(u64, u64)|u64,g: |(u64, u64)|u64,h: |(u64, u64)|u64,i: |(u64, u64)|u64,x: u64,y: u64): u64 {
+    private fun foo(f: |u64, u64|u64,g: |u64, u64|u64,h: |u64, u64|u64,i: |u64, u64|u64,x: u64,y: u64): u64 {
         Add<u64>(Add<u64>(Add<u64>((f)(x, y), (g)(x, y)), (h)(x, y)), (i)(x, y))
     }
     public fun test() {
@@ -33,24 +33,24 @@ module 0x42::Test {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::Test {
-    fun foo(f: |(u64, u64)|u64, g: |(u64, u64)|u64, h: |(u64, u64)|u64, i: |(u64, u64)|u64, x: u64, y: u64): u64 {
+    fun foo(f: |u64, u64|u64, g: |u64, u64|u64, h: |u64, u64|u64, i: |u64, u64|u64, x: u64, y: u64): u64 {
         f(x, y) + g(x, y) + h(x, y) + i(x, y)
     }
     public fun test() {
-        if (foo(|(arg0,arg1)| __lambda__1__test(arg0, arg1), |(arg0,arg1)| __lambda__2__test(arg0, arg1), |(arg0,arg1)| __lambda__3__test(arg0, arg1), |(arg0,arg1)| __lambda__4__test(arg0, arg1), 10, 100) == 220) () else abort 0;
+        if (foo(|arg0,arg1| lambda__1__test(arg0, arg1), |arg0,arg1| lambda__2__test(arg0, arg1), |arg0,arg1| lambda__3__test(arg0, arg1), |arg0,arg1| lambda__4__test(arg0, arg1), 10, 100) == 220) () else abort 0;
     }
-    fun __lambda__1__test(x: u64, param$1: u64): u64 {
-        let _ = param$1;
+    fun lambda__1__test(x: u64, param_1: u64): u64 {
+        let _ = param_1;
         x
     }
-    fun __lambda__2__test(param$0: u64, y: u64): u64 {
-        let _ = param$0;
+    fun lambda__2__test(param_0: u64, y: u64): u64 {
+        let _ = param_0;
         y
     }
-    fun __lambda__3__test(a: u64, _b: u64): u64 {
+    fun lambda__3__test(a: u64, _b: u64): u64 {
         a
     }
-    fun __lambda__4__test(_c: u64, d: u64): u64 {
+    fun lambda__4__test(_c: u64, d: u64): u64 {
         d
     }
 }

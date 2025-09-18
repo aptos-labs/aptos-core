@@ -1128,7 +1128,7 @@ impl SpecTranslator<'_> {
                 let mut count = 0;
                 for arg in &args[0..args.len() - 1] {
                     emit!(self.writer, "ConcatVec(");
-                    self.translate_call(node_id, oper, &[arg.clone()]);
+                    self.translate_call(node_id, oper, std::slice::from_ref(arg));
                     emit!(self.writer, ",");
                     count += 1;
                 }

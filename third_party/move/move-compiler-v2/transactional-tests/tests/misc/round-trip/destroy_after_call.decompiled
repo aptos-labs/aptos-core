@@ -1,0 +1,13 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/destroy_after_call.move`
+
+//# publish
+module 0x42::m {
+    fun f(p0: &mut u64): &mut u64 {
+        p0
+    }
+    fun g() {
+        let _t0 = 22;
+        let _t5 = f(&mut _t0);
+        let _t6 = &_t0;
+    }
+}

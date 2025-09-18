@@ -1,0 +1,11 @@
+//**** Cross-compiled for `move` syntax from `tests/inlining/bug_10991b.move`
+
+//# publish
+module 0x42::Test {
+    public fun test() {
+        ()
+    }
+}
+
+
+//# run 0x42::Test::test

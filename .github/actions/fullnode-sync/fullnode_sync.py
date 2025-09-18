@@ -253,6 +253,9 @@ def setup_fullnode_config(bootstrapping_mode, continuous_syncing_mode, data_dir_
   # Avoid having to set ulimit configurations
   fullnode_config['storage'] = {"ensure_rlimit_nofile": 0}
 
+  # Enable storage sharding (AIP-97)
+  fullnode_config['storage']['rocksdb_configs'] = {"enable_storage_sharding": True}
+
   # Write the config file back to disk
   with open(FULLNODE_CONFIG_NAME, "w") as file:
     yaml.dump(fullnode_config, file)

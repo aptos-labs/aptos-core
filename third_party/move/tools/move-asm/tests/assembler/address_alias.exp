@@ -11,7 +11,7 @@ fun f(l0: u64)
 // Function definition at index 1
 fun g()
     ld_u64 1
-    call test::f
+    call f
     ret
 
 

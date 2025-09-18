@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::{AuthenticationConfig, NodeConfig};
+use aptos_config::config::{AdminServiceConfig, AuthenticationConfig, NodeConfig};
 use aptos_consensus::{
     persistent_liveness_storage::StorageWriteProxy, quorum_store::quorum_store_db::QuorumStoreDB,
 };
@@ -27,11 +27,13 @@ use std::{
 use tokio::runtime::Runtime;
 
 mod consensus;
+#[cfg(unix)]
+mod malloc;
 mod mempool;
 
 #[derive(Default)]
 pub struct Context {
-    authentication_configs: Vec<AuthenticationConfig>,
+    config: AdminServiceConfig,
 
     aptos_db: RwLock<Option<Arc<DbReaderWriter>>>,
     consensus_db: RwLock<Option<Arc<StorageWriteProxy>>>,
@@ -67,9 +69,10 @@ impl AdminService {
     /// Starts the admin service that listens on the configured address and handles various endpoint
     /// requests.
     pub fn new(node_config: &NodeConfig) -> Self {
+        let config = node_config.admin_service.clone();
         // Fetch the service port and address
-        let service_port = node_config.admin_service.port;
-        let service_address = node_config.admin_service.address.clone();
+        let service_port = config.port;
+        let service_address = config.address.clone();
 
         // Create the admin service socket address
         let address: SocketAddr = (service_address.as_str(), service_port)
@@ -86,16 +89,15 @@ impl AdminService {
         // Create a runtime for the admin service
         let runtime = aptos_runtimes::spawn_named_runtime("admin".into(), None);
 
+        // TODO(grao): Consider support enabling the service through an authenticated request.
+        let enabled = config.enabled.unwrap_or(false);
         let admin_service = Self {
             runtime,
             context: Arc::new(Context {
-                authentication_configs: node_config.admin_service.authentication_configs.clone(),
+                config,
                 ..Default::default()
             }),
         };
-
-        // TODO(grao): Consider support enabling the service through an authenticated request.
-        let enabled = node_config.admin_service.enabled.unwrap_or(false);
         admin_service.start(address, enabled);
 
         admin_service
@@ -150,10 +152,10 @@ impl AdminService {
         }
 
         let mut authenticated = false;
-        if context.authentication_configs.is_empty() {
+        if context.config.authentication_configs.is_empty() {
             authenticated = true;
         } else {
-            for authentication_config in &context.authentication_configs {
+            for authentication_config in &context.config.authentication_configs {
                 match authentication_config {
                     AuthenticationConfig::PasscodeSha256(passcode_sha256) => {
                         let query = req.uri().query().unwrap_or("");
@@ -183,6 +185,12 @@ impl AdminService {
             (hyper::Method::GET, "/profilez") => handle_cpu_profiling_request(req).await,
             #[cfg(target_os = "linux")]
             (hyper::Method::GET, "/threadz") => handle_thread_dump_request(req).await,
+            #[cfg(unix)]
+            (hyper::Method::GET, "/malloc/stats") => {
+                malloc::handle_malloc_stats_request(context.config.malloc_stats_max_len)
+            },
+            #[cfg(unix)]
+            (hyper::Method::GET, "/malloc/dump_profile") => malloc::handle_dump_profile_request(),
             (hyper::Method::GET, "/debug/consensus/consensusdb") => {
                 let consensus_db = context.consensus_db.read().clone();
                 if let Some(consensus_db) = consensus_db {

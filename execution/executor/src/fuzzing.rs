@@ -20,7 +20,7 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, Transaction, TransactionOutput, Version,
+        AuxiliaryInfo, BlockOutput, Transaction, TransactionOutput, Version,
     },
     vm_status::VMStatus,
 };
@@ -28,7 +28,7 @@ use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     VMBlockExecutor,
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {
     // setup fake db
@@ -78,12 +78,12 @@ impl VMBlockExecutor for FakeVM {
 
     fn execute_block(
         &self,
-        _txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        _txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         _state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
-        Ok(BlockOutput::new(vec![], None, BTreeMap::new()))
+        Ok(BlockOutput::new(vec![], None))
     }
 }
 

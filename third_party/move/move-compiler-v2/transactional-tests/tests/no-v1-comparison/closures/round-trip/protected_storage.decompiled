@@ -1,0 +1,66 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/protected_storage.move`
+
+//# publish
+module 0x66::protected {
+    use 0x1::signer;
+    struct Entry<T0> has key {
+        _0: T0,
+    }
+    public fun create<T0: store>(p0: &signer, p1: T0) {
+        let _t4 = Entry<T0>{_0: p1};
+        move_to<Entry<T0>>(p0, _t4);
+    }
+    public fun modify<T0: store, T1>(p0: &signer, p1: |&mut T0|(T1)): T1
+        acquires Entry
+    {
+        let _t3 = signer::address_of(p0);
+        let _t5 = &mut borrow_global_mut<Entry<T0>>(_t3)._0;
+        p1(_t5)
+    }
+    public fun read<T0: store, T1>(p0: &signer, p1: |&T0|(T1)): T1
+        acquires Entry
+    {
+        let _t3 = signer::address_of(p0);
+        let _t5 = &borrow_global<Entry<T0>>(_t3)._0;
+        p1(_t5)
+    }
+}
+
+
+//# publish
+module 0x66::app {
+    use 0x66::protected;
+    struct Data has store {
+        _0: u64,
+    }
+    fun increment(p0: &signer): u64 {
+        let _t2: |&mut Data|u64 has copy + drop = |arg0| lambda__1__increment(arg0);
+        protected::modify<Data,u64>(p0, _t2)
+    }
+    fun lambda__1__increment(p0: &mut Data): u64 {
+        let _t4 = *&p0._0;
+        let _t1 = &mut p0._0;
+        *_t1 = *_t1 + 1;
+        _t4
+    }
+    fun init_module(p0: &signer) {
+        let _t3 = Data{_0: 0};
+        protected::create<Data>(p0, _t3);
+    }
+    fun view(p0: &signer): u64 {
+        let _t2: |&Data|u64 has copy + drop = |arg0| lambda__1__view(arg0);
+        protected::read<Data,u64>(p0, _t2)
+    }
+    fun lambda__1__view(p0: &Data): u64 {
+        *&p0._0
+    }
+}
+
+
+//# run 0x66::app::init_module --signers 0x66
+
+//# run 0x66::app::increment --signers 0x66
+
+//# run 0x66::app::increment --signers 0x66
+
+//# run 0x66::app::view --signers 0x66

@@ -70,6 +70,22 @@ pub fn random_scalar_from_uniform_bytes(bytes: &[u8; 2 * SCALAR_NUM_BYTES]) -> S
     crate::utils::biguint::biguint_to_scalar(&remainder)
 }
 
+pub fn random_128bit_scalar<R>(rng: &mut R) -> Scalar
+where
+    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+{
+    let mut low_bytes = [0u8; SCALAR_NUM_BYTES / 2];
+    rng.fill(&mut low_bytes[..]);
+
+    // Create a 32-byte array (little-endian) by extending the 128-bit number with zeros
+    let mut full_bytes = [0u8; SCALAR_NUM_BYTES];
+
+    // Copy the 128-bit random number to the lower half of the 32-byte array
+    full_bytes[..SCALAR_NUM_BYTES / 2].copy_from_slice(&low_bytes);
+
+    Scalar::from_bytes_le(&full_bytes).unwrap()
+}
+
 /// Returns a random `blstrs::G1Projective` given an older RNG as input.
 ///
 /// Slow: Takes 50 microseconds.

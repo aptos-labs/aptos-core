@@ -1,6 +1,0 @@
-Unable to parse Move package manifest: TOML parse error at line 7, column 1
-  |
-7 | OtherDep = { local = "./deps_only/different_dep" }
-  | ^
-duplicate key `OtherDep` in table `dependencies`
-

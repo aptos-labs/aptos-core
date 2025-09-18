@@ -7,6 +7,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{restore::JellyfishMerkleRestore, Key, TreeReader, TreeWriter, Value};
+use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{Result, StateSnapshotReceiver};
 use aptos_types::{
     proof::SparseMerkleRangeProof, state_store::state_storage_usage::StateStorageUsage,
@@ -226,9 +227,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
 {
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()> {
         let kv_fn = || {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["state_value_add_chunk"])
-                .start_timer();
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_value_add_chunk"]);
             self.kv_restore
                 .lock()
                 .as_mut()
@@ -237,9 +236,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
         };
 
         let tree_fn = || {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["jmt_add_chunk"])
-                .start_timer();
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_add_chunk"]);
             self.tree_restore
                 .lock()
                 .as_mut()

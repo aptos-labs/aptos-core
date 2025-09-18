@@ -614,9 +614,9 @@ pub enum StatusCode {
     NONCE_ALREADY_USED = 42,
     EMPTY_PAYLOAD_PROVIDED = 43,
     TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE = 44,
+    INVALID_NUMBER_OF_AUTHENTICATION_PROOFS = 45,
 
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_10 = 45,
     RESERVED_VALIDATION_ERROR_11 = 46,
     RESERVED_VALIDATION_ERROR_12 = 47,
     RESERVED_VALIDATION_ERROR_13 = 48,
@@ -1056,21 +1056,24 @@ fn test_status_codes() {
 }
 
 pub mod sub_status {
-    // Native Function Error sub-codes
+    /// Native Function Error sub-codes
     pub const NFE_VECTOR_ERROR_BASE: u64 = 0;
-    // Failure in BCS deserialization
+    /// Failure in BCS deserialization
     pub const NFE_BCS_SERIALIZATION_FAILURE: u64 = 0x1C5;
 
     pub mod unknown_invariant_violation {
-        // Paranoid Type checking returns an error
+        /// Paranoid Type checking returns an error
         pub const EPARANOID_FAILURE: u64 = 0x1;
 
-        // Reference safety checks failure
+        /// Reference counting checks failure
         pub const EREFERENCE_COUNTING_FAILURE: u64 = 0x2;
+
+        /// Dynamic reference safety checks failure
+        pub const EREFERENCE_SAFETY_FAILURE: u64 = 0x3;
     }
 
     pub mod type_resolution_failure {
-        // User provided typetag failed to load.
+        /// User provided typetag failed to load.
         pub const EUSER_TYPE_LOADING_FAILURE: u64 = 0x1;
     }
 }

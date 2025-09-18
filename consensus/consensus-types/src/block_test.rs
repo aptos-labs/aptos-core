@@ -57,7 +57,7 @@ fn test_nil_block() {
     let signer = ValidatorSigner::random(None);
     let parent_block_info = nil_block.quorum_cert().certified_block();
     let nil_block_qc = gen_test_certificate(
-        &[signer.clone()],
+        std::slice::from_ref(&signer),
         nil_block.gen_block_info(
             parent_block_info.executed_state_id(),
             parent_block_info.version(),

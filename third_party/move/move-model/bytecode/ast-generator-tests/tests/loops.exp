@@ -89,9 +89,11 @@ return _t17
 --- Assign-Transformed Generated AST
 loop {
   c: u64 = Add(c, 1);
-  if (Eq(Mod(c, 2), 0)) continue;
+  _t6: u64 = Mod(c, 2);
+  if (Eq(_t6, 0)) continue;
   c: u64 = Add(c, 3);
-  if (Not(Eq(Mod(c, 2), 1))) continue;
+  _t14: u64 = Mod(c, 2);
+  if (Not(Eq(_t14, 1))) continue;
   break
 };
 return c
@@ -99,9 +101,11 @@ return c
 --- If-Transformed Generated AST
 loop {
   c: u64 = Add(c, 1);
-  if (Eq(Mod(c, 2), 0)) continue;
+  _t6: u64 = Mod(c, 2);
+  if (Eq(_t6, 0)) continue;
   c: u64 = Add(c, 3);
-  if (Not(Eq(Mod(c, 2), 1))) continue;
+  _t14: u64 = Mod(c, 2);
+  if (Not(Eq(_t14, 1))) continue;
   break
 };
 return c
@@ -109,10 +113,16 @@ return c
 --- Var-Bound Generated AST
 loop {
   c: u64 = Add(c, 1);
-  if (Eq(Mod(c, 2), 0)) continue;
-  c: u64 = Add(c, 3);
-  if (Not(Eq(Mod(c, 2), 1))) continue;
-  break
+  {
+    let _t6: u64 = Mod(c, 2);
+    if (Eq(_t6, 0)) continue;
+    c: u64 = Add(c, 3);
+    {
+      let _t14: u64 = Mod(c, 2);
+      if (Not(Eq(_t14, 1))) continue;
+      break
+    }
+  }
 };
 return c
 
@@ -206,8 +216,9 @@ return _t13
 loop {
   loop {
     if (Not(Gt(x, 0))) break[1];
+    _t6: bool = Gt(x, 10);
     loop {
-      if (Not(Gt(x, 10))) break;
+      if (Not(_t6)) break;
       x: u64 = Sub(x, 1);
       break
     };
@@ -221,7 +232,8 @@ return x
 --- If-Transformed Generated AST
 loop {
   if (Not(Gt(x, 0))) break;
-  if (Gt(x, 10)) x: u64 = Sub(x, 1);
+  _t6: bool = Gt(x, 10);
+  if (_t6) x: u64 = Sub(x, 1);
   x: u64 = Sub(x, 1);
   continue
 };
@@ -230,9 +242,12 @@ return x
 --- Var-Bound Generated AST
 loop {
   if (Not(Gt(x, 0))) break;
-  if (Gt(x, 10)) x: u64 = Sub(x, 1);
-  x: u64 = Sub(x, 1);
-  continue
+  {
+    let _t6: bool = Gt(x, 10);
+    if (_t6) x: u64 = Sub(x, 1);
+    x: u64 = Sub(x, 1);
+    continue
+  }
 };
 return x
 
@@ -551,17 +566,21 @@ module 0x815::m {
     fun loop_1(c: u64): u64 {
         loop {
             c = c + 1;
-            if (c % 2 == 0) continue;
+            let _t6 = c % 2;
+            if (_t6 == 0) continue;
             c = c + 3;
-            if (!(c % 2 == 1)) continue;
+            let _t14 = c % 2;
+            if (!(_t14 == 1)) continue;
             break
         };
         c
     }
     fun nested_loop(x: u64): u64 {
         while (x > 0) {
-            if (x > 10) x = x - 1;
-            x = x - 1
+            let _t6 = x > 10;
+            if (_t6) x = x - 1;
+            x = x - 1;
+            continue
         };
         x
     }

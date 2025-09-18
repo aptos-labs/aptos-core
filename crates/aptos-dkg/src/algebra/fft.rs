@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::algebra::evaluation_domain::EvaluationDomain;
-use blstrs::Scalar;
+use blstrs::{G1Projective, G2Projective, Scalar};
 use ff::Field;
 use std::ops::{AddAssign, MulAssign, SubAssign};
 
@@ -37,8 +37,120 @@ pub fn ifft_assign(poly: &mut Vec<Scalar>, dom: &EvaluationDomain) {
     }
 }
 
+/// TODO: dedup with macro or something
+pub fn ifft_assign_g1(poly: &mut Vec<G1Projective>, dom: &EvaluationDomain) {
+    serial_fft_assign_g1(poly.as_mut_slice(), &dom.omega_inverse, dom.log_N as u32);
+
+    for coeff in poly {
+        coeff.mul_assign(&dom.N_inverse);
+    }
+}
+
+/// TODO: dedup with macro or something
+pub fn ifft_assign_g2(poly: &mut Vec<G2Projective>, dom: &EvaluationDomain) {
+    serial_fft_assign_g2(poly.as_mut_slice(), &dom.omega_inverse, dom.log_N as u32);
+
+    for coeff in poly {
+        coeff.mul_assign(&dom.N_inverse);
+    }
+}
+
 /// `bellman`'s FFT code adapted to `blstrs::Scalar`.
 fn serial_fft_assign(a: &mut [Scalar], omega: &Scalar, log_n: u32) {
+    fn bitreverse(mut n: u32, l: u32) -> u32 {
+        let mut r = 0;
+        for _ in 0..l {
+            r = (r << 1) | (n & 1);
+            n >>= 1;
+        }
+        r
+    }
+
+    let n = a.len() as u32;
+    assert_eq!(n, 1 << log_n);
+
+    for k in 0..n {
+        let rk = bitreverse(k, log_n);
+        if k < rk {
+            a.swap(rk as usize, k as usize);
+        }
+    }
+
+    let mut m = 1;
+    for _ in 0..log_n {
+        // TODO(Performance): Could have these precomputed via BatchEvaluationDomain, but need to
+        //  update all upstream calls to pass in the `BatchEvaluationDomain`.
+        let w_m = omega.pow_vartime([u64::from(n / (2 * m))]);
+
+        let mut k = 0;
+        while k < n {
+            let mut w = Scalar::ONE;
+            for j in 0..m {
+                let mut t = a[(k + j + m) as usize];
+                t.mul_assign(&w);
+                let mut tmp = a[(k + j) as usize];
+                tmp.sub_assign(&t);
+                a[(k + j + m) as usize] = tmp;
+                a[(k + j) as usize].add_assign(&t);
+                w.mul_assign(&w_m);
+            }
+
+            k += 2 * m;
+        }
+
+        m *= 2;
+    }
+}
+
+/// TODO: dedup with macro or something
+pub fn serial_fft_assign_g1(a: &mut [G1Projective], omega: &Scalar, log_n: u32) {
+    fn bitreverse(mut n: u32, l: u32) -> u32 {
+        let mut r = 0;
+        for _ in 0..l {
+            r = (r << 1) | (n & 1);
+            n >>= 1;
+        }
+        r
+    }
+
+    let n = a.len() as u32;
+    assert_eq!(n, 1 << log_n);
+
+    for k in 0..n {
+        let rk = bitreverse(k, log_n);
+        if k < rk {
+            a.swap(rk as usize, k as usize);
+        }
+    }
+
+    let mut m = 1;
+    for _ in 0..log_n {
+        // TODO(Performance): Could have these precomputed via BatchEvaluationDomain, but need to
+        //  update all upstream calls to pass in the `BatchEvaluationDomain`.
+        let w_m = omega.pow_vartime([u64::from(n / (2 * m))]);
+
+        let mut k = 0;
+        while k < n {
+            let mut w = Scalar::ONE;
+            for j in 0..m {
+                let mut t = a[(k + j + m) as usize];
+                t.mul_assign(&w);
+                let mut tmp = a[(k + j) as usize];
+                tmp.sub_assign(&t);
+                a[(k + j + m) as usize] = tmp;
+                a[(k + j) as usize].add_assign(&t);
+                w.mul_assign(&w_m);
+            }
+
+            k += 2 * m;
+        }
+
+        m *= 2;
+    }
+}
+
+/// TODO: dedup with macro or something
+pub fn serial_fft_assign_g2(a: &mut [G2Projective], omega: &Scalar, log_n: u32) {
     fn bitreverse(mut n: u32, l: u32) -> u32 {
         let mut r = 0;
         for _ in 0..l {

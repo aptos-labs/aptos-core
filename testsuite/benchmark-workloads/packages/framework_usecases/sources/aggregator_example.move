@@ -1,5 +1,3 @@
-
-
 module 0xABCD::aggregator_example {
     use std::error;
     use std::signer;

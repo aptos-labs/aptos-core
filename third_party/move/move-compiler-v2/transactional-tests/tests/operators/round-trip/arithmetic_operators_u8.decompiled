@@ -1,0 +1,136 @@
+//**** Cross-compiled for `move` syntax from `tests/operators/arithmetic_operators_u8.move`
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1u8 + 255u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 215u8 + 156u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0u8 - 1u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 54u8 - 100u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 16u8 * 16u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 128u8 * 2u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0u8 / 0u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1u8 / 0u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 255u8 / 0u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0u8 % 0u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1u8 % 0u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 255u8 % 0u8;
+    }
+}

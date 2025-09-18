@@ -1,0 +1,20 @@
+//**** Cross-compiled for `move` syntax from `tests/operator_eval/op_with_side_effect_12.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun aborter(p0: u64): u64 {
+        abort p0
+    }
+    public fun test(p0: bool): u64 {
+        if (p0) {
+            let _t3 = aborter(1);
+            abort 3
+        };
+        abort 2
+    }
+}
+
+
+//# run 0xc0ffee::m::test --args true
+
+//# run 0xc0ffee::m::test --args false

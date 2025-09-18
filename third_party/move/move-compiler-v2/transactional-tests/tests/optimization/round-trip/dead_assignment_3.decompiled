@@ -1,0 +1,15 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/dead_assignment_3.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test(p0: bool): u32 {
+        let _t2;
+        if (p0) _t2 = 1u32 else _t2 = 9u32;
+        _t2
+    }
+}
+
+
+//# run 0xc0ffee::m::test --args true
+
+//# run 0xc0ffee::m::test --args false

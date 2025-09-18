@@ -1,0 +1,34 @@
+//**** Cross-compiled for `move` syntax from `tests/dependencies/dependency_order.move`
+
+//# publish
+module 0x42::C {
+    struct T {
+    }
+    public fun foo(): T {
+        T{}
+    }
+}
+
+
+//# publish
+module 0x42::B {
+    use 0x42::C;
+    public fun foo(): C::T {
+        C::foo()
+    }
+}
+
+
+//# publish
+module 0x42::A {
+    use 0x42::C;
+    use 0x42::B;
+    struct T {
+        t_b: C::T,
+        t_c: C::T,
+    }
+    public fun foo(): T {
+        let _t0 = C::foo();
+        T{t_b: B::foo(), t_c: _t0}
+    }
+}

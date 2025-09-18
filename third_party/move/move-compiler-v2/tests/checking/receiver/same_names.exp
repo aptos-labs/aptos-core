@@ -18,7 +18,7 @@ module 0x42::b {
 module 0x42::c {
     use 0x42::a; // resolved as: 0x42::a
     use 0x42::b; // resolved as: 0x42::b
-    private inline fun foo(f: |(a::MyList, b::MyOtherList)|,x: a::MyList,y: b::MyOtherList) {
+    private inline fun foo(f: |a::MyList, b::MyOtherList|,x: a::MyList,y: b::MyOtherList) {
         (f)(x, y)
     }
     private fun test(x: a::MyList,y: b::MyOtherList) {
@@ -56,7 +56,7 @@ module 0x42::b {
 module 0x42::c {
     use 0x42::a;
     use 0x42::b;
-    inline fun foo(f: |(a::MyList, b::MyOtherList)|, x: a::MyList, y: b::MyOtherList) {
+    inline fun foo(f: |a::MyList, b::MyOtherList|, x: a::MyList, y: b::MyOtherList) {
         f(x, y)
     }
     fun test(x: a::MyList, y: b::MyOtherList) {

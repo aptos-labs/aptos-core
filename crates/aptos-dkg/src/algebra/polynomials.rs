@@ -103,6 +103,27 @@ pub fn poly_sub_assign(f: &mut Vec<Scalar>, g: &[Scalar]) {
     }
 }
 
+/// Returns $g(X) = a f(X)$.
+pub fn poly_mul_scalar(f: &Vec<Scalar>, a: Scalar) -> Vec<Scalar> {
+    let mut g = f.clone();
+    for c in g.iter_mut() {
+        c.mul_assign(&a);
+    }
+    g
+}
+
+/// Divide `f(x)` by `x^n+c`. Polys are in coef repr, least significant coef first.
+pub fn poly_div_xnc(mut coefs: Vec<Scalar>, n: usize, c: Scalar) -> (Vec<Scalar>, Vec<Scalar>) {
+    let max_degree = coefs.len() - 1 - n;
+    let mut quotient = vec![Scalar::ZERO; max_degree + 1];
+    for i in (n..coefs.len()).rev() {
+        let coef = coefs.pop().unwrap();
+        quotient[i - n] = coef;
+        coefs[i - n] -= c * coef;
+    }
+    (quotient, coefs)
+}
+
 /// Computes the product of $f$ and $g$, letting $f = f \cdot g$ and $g = FFT(g)$.
 /// Let $d = \deg(f) + \deg(g)$. Takes $O(d\log{d})$ time via three FFT.
 ///

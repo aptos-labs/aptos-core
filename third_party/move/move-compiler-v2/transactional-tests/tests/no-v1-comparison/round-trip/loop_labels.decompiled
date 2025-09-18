@@ -1,0 +1,20 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/loop_labels.move`
+
+//# run
+script {
+    fun main() {
+        let _t0 = 0;
+        while (_t0 < 100) {
+            if (!(_t0 < 50)) {
+                _t0 = _t0 + 20;
+                continue
+            };
+            if (_t0 < 30) {
+                _t0 = _t0 + 1;
+                continue
+            };
+            _t0 = _t0 + 10
+        };
+        if (!(_t0 == 110)) abort 14566554180833181696;
+    }
+}

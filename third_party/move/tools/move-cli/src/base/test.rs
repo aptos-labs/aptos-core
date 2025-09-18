@@ -75,10 +75,6 @@ pub struct Test {
     #[clap(name = "ignore_compile_warnings", long = "ignore_compile_warnings")]
     pub ignore_compile_warnings: bool,
 
-    /// Use the stackless bytecode interpreter to run the tests and cross check its results with
-    /// the execution result from Move VM.
-    #[clap(long = "stackless")]
-    pub check_stackless_vm: bool,
     /// Verbose mode
     #[clap(long = "verbose")]
     pub verbose_mode: bool,
@@ -105,7 +101,6 @@ impl Test {
             report_statistics,
             report_storage_on_error,
             ignore_compile_warnings,
-            check_stackless_vm,
             verbose_mode,
             compute_coverage,
         } = self;
@@ -115,7 +110,6 @@ impl Test {
             num_threads,
             report_statistics,
             report_storage_on_error,
-            check_stackless_vm,
             verbose: verbose_mode,
             ignore_compile_warnings,
             ..UnitTestingConfig::default()

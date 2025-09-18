@@ -3,7 +3,7 @@
 
 //! Test framework for the Move decompiler, allowing different compilation, decompilation, and testing configurations.
 
-use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
+use codespan_reporting::term::termcolor::Buffer;
 use libtest_mimic::{Arguments, Trial};
 use move_compiler_v2::{logging, run_move_compiler_for_analysis, Experiment};
 use move_decompiler::Decompiler;
@@ -253,11 +253,14 @@ fn run_compile_decompile_test_workflow(path: &Path, config: &TestConfig) -> anyh
 
     // Step 2: decompile the compiled modules
     let mut decompiler = Decompiler::new(config.decompiler_options.clone());
+    let mut modules = vec![];
+    let mut source_maps = vec![];
     for module_env in env.get_modules() {
         if !module_env.is_primary_target() {
             continue;
         }
         if let Some(compiled_module) = module_env.get_verified_module() {
+            modules.push(compiled_module.clone());
             let source_map = module_env.get_source_map().cloned().unwrap_or_else(|| {
                 let mut bytes = vec![];
                 compiled_module
@@ -265,22 +268,12 @@ fn run_compile_decompile_test_workflow(path: &Path, config: &TestConfig) -> anyh
                     .expect("expected serialization success");
                 decompiler.empty_source_map(&module_env.get_full_name_str(), &bytes)
             });
-            output += &decompiler.decompile_module(compiled_module.clone(), source_map);
-            output += "\n";
+            source_maps.push(source_map);
         }
     }
-    if decompiler
-        .env()
-        .check_diag(&mut error_writer, Severity::Warning, "decompilation")
-        .is_err()
-    {
-        // Early exit if decompilation fails
-        output.push_str(&format!(
-            "--- decompilation errors:\n{}\n",
-            String::from_utf8_lossy(&error_writer.into_inner())
-        ));
-        return Ok(output);
-    }
+
+    output += &decompiler.decompile_package(modules, source_maps)?;
+    output += "\n";
 
     if config.test_level == TestLevel::Decompile {
         // If we only want to test decompilation, return the output here.

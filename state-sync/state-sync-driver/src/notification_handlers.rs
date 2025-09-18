@@ -263,9 +263,10 @@ impl ConsensusNotificationHandler {
     pub async fn initialize_sync_target_request(
         &mut self,
         sync_target_notification: ConsensusSyncTargetNotification,
+        latest_pre_committed_version: Version,
         latest_synced_ledger_info: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
-        // Get the latest committed version and the target sync version
+        // Get the target sync version and latest committed version
         let sync_target_version = sync_target_notification
             .get_target()
             .ledger_info()
@@ -273,22 +274,40 @@ impl ConsensusNotificationHandler {
         let latest_committed_version = latest_synced_ledger_info.ledger_info().version();
 
         // If the target version is old, return an error to consensus (something is wrong!)
-        if sync_target_version < latest_committed_version {
+        if sync_target_version < latest_committed_version
+            || sync_target_version < latest_pre_committed_version
+        {
             let error = Err(Error::OldSyncRequest(
                 sync_target_version,
+                latest_pre_committed_version,
                 latest_committed_version,
             ));
             self.respond_to_sync_target_notification(sync_target_notification, error.clone())?;
             return error;
         }
 
-        // If we're now at the target, return successfully
+        // If the committed version is at the target, return successfully
         if sync_target_version == latest_committed_version {
-            info!(LogSchema::new(LogEntry::NotificationHandler)
-                .message("We're already at the requested sync target version! Returning early"));
+            info!(
+                LogSchema::new(LogEntry::NotificationHandler).message(&format!(
+                    "We're already at the requested sync target version: {} \
+                (pre-committed version: {}, committed version: {})!",
+                    sync_target_version, latest_pre_committed_version, latest_committed_version
+                ))
+            );
             let result = Ok(());
             self.respond_to_sync_target_notification(sync_target_notification, result.clone())?;
             return result;
+        }
+
+        // If the pre-committed version is already at the target, something has else gone wrong
+        if sync_target_version == latest_pre_committed_version {
+            let error = Err(Error::InvalidSyncRequest(
+                sync_target_version,
+                latest_pre_committed_version,
+            ));
+            self.respond_to_sync_target_notification(sync_target_notification, error.clone())?;
+            return error;
         }
 
         // Save the request so we can notify consensus once we've hit the target

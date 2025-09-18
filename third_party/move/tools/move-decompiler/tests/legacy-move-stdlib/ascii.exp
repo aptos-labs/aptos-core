@@ -22,10 +22,11 @@ module 0x1::ascii {
         &string.bytes
     }
     public fun all_characters_printable(string: &String): bool {
+        let _t1 = 0x1::vector::length<u8>(&string.bytes);
         let _t2 = 0;
         'l0: loop {
             loop {
-                if (!(_t2 < 0x1::vector::length<u8>(&string.bytes))) break 'l0;
+                if (!(_t2 < _t1)) break 'l0;
                 if (!is_printable_char(*0x1::vector::borrow<u8>(&string.bytes, _t2))) break;
                 _t2 = _t2 + 1
             };
@@ -39,10 +40,11 @@ module 0x1::ascii {
         _t1
     }
     public fun try_string(bytes: vector<u8>): option::Option<String> {
+        let _t1 = 0x1::vector::length<u8>(&bytes);
         let _t2 = 0;
         'l0: loop {
             loop {
-                if (!(_t2 < 0x1::vector::length<u8>(&bytes))) break 'l0;
+                if (!(_t2 < _t1)) break 'l0;
                 if (!is_valid_char(*0x1::vector::borrow<u8>(&bytes, _t2))) break;
                 _t2 = _t2 + 1
             };
@@ -65,7 +67,9 @@ module 0x1::ascii {
         Char{byte: 0x1::vector::pop_back<u8>(&mut string.bytes)}
     }
     public fun push_char(string: &mut String, char: Char) {
-        0x1::vector::push_back<u8>(&mut string.bytes, *&(&char).byte);
+        let _t3 = &mut string.bytes;
+        let _t6 = *&(&char).byte;
+        0x1::vector::push_back<u8>(_t3, _t6);
     }
 }
 

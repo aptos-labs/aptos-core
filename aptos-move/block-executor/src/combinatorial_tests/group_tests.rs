@@ -20,8 +20,11 @@ use crate::{
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
 };
-use aptos_types::block_executor::{
-    config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+use aptos_types::{
+    block_executor::{
+        config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+    },
+    transaction::AuxiliaryInfo,
 };
 use proptest::{collection::vec, prelude::*, strategy::ValueTree, test_runner::TestRunner};
 use std::sync::Arc;
@@ -64,7 +67,10 @@ pub(crate) fn run_tests_with_groups(
                 let output = execute_block_parallel::<
                     MockTransaction<KeyType<[u8; 32]>, MockEvent>,
                     NonEmptyGroupDataView<KeyType<[u8; 32]>>,
-                    DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
+                    DefaultTxnProvider<
+                        MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+                        AuxiliaryInfo,
+                    >,
                 >(
                     executor_thread_pool.clone(),
                     *maybe_block_gas_limit,
@@ -89,7 +95,8 @@ pub(crate) fn run_tests_with_groups(
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-            DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
+            DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>, AuxiliaryInfo>,
+            AuxiliaryInfo,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             executor_thread_pool.clone(),

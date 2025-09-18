@@ -1,0 +1,75 @@
+//**** Cross-compiled for `move` syntax from `tests/simplifier/constant_folding.move`
+
+//# publish
+module 0xcafe::MyModule {
+    fun main() {
+        let _t14;
+        let _t0 = vector[true, true, true, true, true, true, true, false, false, false, false, false, false, false, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, true, false, false, false, true, true, true, false, true, false, true];
+        let _t27 = 0x1::vector::length<bool>(&_t0);
+        let _t1 = vector[true, true, true, true, true, true, true, false, false, false, false, false, false, false, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, true, false, false, false, true, true, true, false, true, false, true];
+        let _t30 = 0x1::vector::length<bool>(&_t1);
+        if (!(_t27 == _t30)) {
+            let _t23 = vector[true, true, true, true, true, true, true, false, false, false, false, false, false, false, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, true, false, false, false, true, true, true, false, true, false, true];
+            let _t120 = 0x1::vector::length<bool>(&_t23);
+            let _t24 = vector[true, true, true, true, true, true, true, false, false, false, false, false, false, false, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, true, false, false, false, true, true, true, false, true, false, true];
+            let _t123 = 0x1::vector::length<bool>(&_t24);
+            let _t124 = _t120 - _t123;
+            abort _t124
+        };
+        let _t2 = vector[true, true, true, true, true, true, true, false, false, false, false, false, false, false, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, true, false, false, false, true, true, true, false, true, false, true];
+        let _t34 = 0x1::vector::length<bool>(&_t2);
+        let _t3 = vector[true, true, true, true, true, true, true, false, false, false, false, false, false, false, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, true, false, false, false, true, true, true, false, true, false, true];
+        let _t37 = 0x1::vector::length<bool>(&_t3);
+        if (!(_t34 == _t37)) {
+            let _t21 = vector[true, true, true, true, true, true, true, false, false, false, false, false, false, false, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, true, false, false, false, true, true, true, false, true, false, true];
+            let _t113 = 0x1::vector::length<bool>(&_t21);
+            let _t22 = vector[true, true, true, true, true, true, true, false, false, false, false, false, false, false, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, true, false, false, false, true, true, true, false, true, false, true];
+            let _t116 = 0x1::vector::length<bool>(&_t22);
+            let _t117 = _t113 - _t116;
+            abort _t117
+        };
+        let _t4 = 0;
+        let _t5 = false;
+        let _t6 = vector[true, true, true, true, true, true, true, false, false, false, false, false, false, false, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, true, false, false, false, true, true, true, false, true, false, true];
+        let _t7 = 0x1::vector::length<bool>(&_t6);
+        'l0: loop {
+            loop {
+                if (_t5) _t4 = _t4 + 1 else _t5 = true;
+                if (!(_t4 < _t7)) break 'l0;
+                let _t8 = vector[true, true, true, true, true, true, true, false, false, false, false, false, false, false, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, true, false, false, false, true, true, true, false, true, false, true];
+                let _t54 = 0x1::vector::borrow<bool>(&_t8, _t4);
+                let _t9 = vector[true, true, true, true, true, true, true, false, false, false, false, false, false, false, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, true, false, false, false, true, true, true, false, true, false, true];
+                let _t58 = 0x1::vector::borrow<bool>(&_t9, _t4);
+                if (_t54 == _t58) continue;
+                break
+            };
+            abort _t4
+        };
+        let _t10 = vector[128u256, 9223372036854775808u256, 170141183460469231731687303715884105728u256, 1u256, 1u256, 1u256, 127u256, 9223372036854775807u256, 170141183460469231731687303715884105727u256, 1u256, 1u256, 1u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 0u256, 0u256, 0u256, 255u256, 18446744073709551615u256, 1u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 0u256, 0u256, 0u256, 3402823669209384u256, 340282366920938463463374607431768211455340282366920938463463374573u256, 340282366920938463463374267149401290516876818992313506695251919267u256, 340282366920938463463374267149401290518196254258471629768325169763u256, 340282366920938463463374607091485844535721254169704454104768413936u256, 0u256];
+        let _t11 = 0x1::vector::length<u256>(&_t10);
+        let _t12 = vector[128u256, 9223372036854775808u256, 170141183460469231731687303715884105728u256, 1u256, 1u256, 1u256, 127u256, 9223372036854775807u256, 170141183460469231731687303715884105727u256, 1u256, 1u256, 1u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 0u256, 0u256, 0u256, 255u256, 18446744073709551615u256, 1u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 0u256, 0u256, 0u256, 3402823669209384u256, 340282366920938463463374607431768211455340282366920938463463374573u256, 340282366920938463463374267149401290516876818992313506695251919267u256, 340282366920938463463374267149401290518196254258471629768325169763u256, 340282366920938463463374607091485844535721254169704454104768413936u256, 0u256];
+        let _t13 = 0x1::vector::length<u256>(&_t12);
+        if (_t11 < _t13) _t14 = 1000 + _t13 - _t11 else _t14 = 2000 + _t11 - _t13;
+        if (!(_t14 == 2000)) abort _t14;
+        let _t15 = 0;
+        let _t16 = false;
+        let _t17 = vector[128u256, 9223372036854775808u256, 170141183460469231731687303715884105728u256, 1u256, 1u256, 1u256, 127u256, 9223372036854775807u256, 170141183460469231731687303715884105727u256, 1u256, 1u256, 1u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 0u256, 0u256, 0u256, 255u256, 18446744073709551615u256, 1u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 0u256, 0u256, 0u256, 3402823669209384u256, 340282366920938463463374607431768211455340282366920938463463374573u256, 340282366920938463463374267149401290516876818992313506695251919267u256, 340282366920938463463374267149401290518196254258471629768325169763u256, 340282366920938463463374607091485844535721254169704454104768413936u256, 0u256];
+        let _t18 = 0x1::vector::length<u256>(&_t17);
+        'l1: loop {
+            loop {
+                if (_t16) _t15 = _t15 + 1 else _t16 = true;
+                if (!(_t15 < _t18)) break 'l1;
+                let _t19 = vector[128u256, 9223372036854775808u256, 170141183460469231731687303715884105728u256, 1u256, 1u256, 1u256, 127u256, 9223372036854775807u256, 170141183460469231731687303715884105727u256, 1u256, 1u256, 1u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 0u256, 0u256, 0u256, 255u256, 18446744073709551615u256, 1u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 0u256, 0u256, 0u256, 3402823669209384u256, 340282366920938463463374607431768211455340282366920938463463374573u256, 340282366920938463463374267149401290516876818992313506695251919267u256, 340282366920938463463374267149401290518196254258471629768325169763u256, 340282366920938463463374607091485844535721254169704454104768413936u256, 0u256];
+                let _t93 = 0x1::vector::borrow<u256>(&_t19, _t15);
+                let _t20 = vector[128u256, 9223372036854775808u256, 170141183460469231731687303715884105728u256, 1u256, 1u256, 1u256, 127u256, 9223372036854775807u256, 170141183460469231731687303715884105727u256, 1u256, 1u256, 1u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 0u256, 0u256, 0u256, 255u256, 18446744073709551615u256, 1u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 255u256, 18446744073709551615u256, 340282366920938463463374607431768211455u256, 0u256, 0u256, 0u256, 3402823669209384u256, 340282366920938463463374607431768211455340282366920938463463374573u256, 340282366920938463463374267149401290516876818992313506695251919267u256, 340282366920938463463374267149401290518196254258471629768325169763u256, 340282366920938463463374607091485844535721254169704454104768413936u256, 0u256];
+                let _t97 = 0x1::vector::borrow<u256>(&_t20, _t15);
+                if (_t93 == _t97) continue;
+                break
+            };
+            abort _t15
+        };
+    }
+}
+
+
+//# run 0xcafe::MyModule::main

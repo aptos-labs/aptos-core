@@ -95,7 +95,6 @@ fn run_test_impl(path: &Path) -> anyhow::Result<()> {
             .into_iter()
             .collect(),
         verbose: true,
-        report_stacktrace_on_abort: true,
 
         ..UnitTestingConfig::default()
     };

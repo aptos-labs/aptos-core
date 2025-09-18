@@ -427,19 +427,46 @@ impl ContinuousTransactionStreamEngine {
         data_streaming_config: DataStreamingServiceConfig,
         stream_request: &StreamRequest,
     ) -> Result<Self, Error> {
-        let (next_version, next_epoch) = match stream_request {
+        // Extract the target version, next version, and next epoch
+        let (target_version, next_version, next_epoch) = match stream_request {
             StreamRequest::ContinuouslyStreamTransactions(request) => {
-                Self::calculate_next_version_and_epoch(request.known_version, request.known_epoch)?
+                let target_version = Self::get_target_version(&request.target);
+                let (next_version, next_epoch) = Self::calculate_next_version_and_epoch(
+                    request.known_version,
+                    request.known_epoch,
+                )?;
+                (target_version, next_version, next_epoch)
             },
             StreamRequest::ContinuouslyStreamTransactionOutputs(request) => {
-                Self::calculate_next_version_and_epoch(request.known_version, request.known_epoch)?
+                let target_version = Self::get_target_version(&request.target);
+                let (next_version, next_epoch) = Self::calculate_next_version_and_epoch(
+                    request.known_version,
+                    request.known_epoch,
+                )?;
+                (target_version, next_version, next_epoch)
             },
             StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
-                Self::calculate_next_version_and_epoch(request.known_version, request.known_epoch)?
+                let target_version = Self::get_target_version(&request.target);
+                let (next_version, next_epoch) = Self::calculate_next_version_and_epoch(
+                    request.known_version,
+                    request.known_epoch,
+                )?;
+                (target_version, next_version, next_epoch)
             },
             request => invalid_stream_request!(request),
         };
 
+        // Verify that the target version is >= the next version
+        if let Some(target_version) = target_version {
+            if target_version < next_version {
+                return Err(Error::UnexpectedErrorEncountered(format!(
+                    "Invalid stream request found! Target version ({}) is < next version ({})! No data can be fetched!",
+                    target_version, next_version
+                )));
+            }
+        }
+
+        // Create the continuous transaction stream engine
         Ok(ContinuousTransactionStreamEngine {
             data_streaming_config,
             request: stream_request.clone(),
@@ -451,6 +478,12 @@ impl ContinuousTransactionStreamEngine {
             next_request_version_and_epoch: (next_version, next_epoch),
             stream_is_complete: false,
         })
+    }
+
+    fn get_target_version(target: &Option<LedgerInfoWithSignatures>) -> Option<Version> {
+        target
+            .as_ref()
+            .map(|ledger_info_with_signatures| ledger_info_with_signatures.ledger_info().version())
     }
 
     fn calculate_next_version_and_epoch(

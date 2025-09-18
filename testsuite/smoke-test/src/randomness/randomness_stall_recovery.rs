@@ -157,9 +157,9 @@ script {
 
     let PerBlockRandomness {
         epoch: actual_epoch,
-        seed,
         ..
     } = get_on_chain_resource::<PerBlockRandomness>(&rest_client).await;
-    assert!(seed.is_some());
+    // seed is not necessarily generated because of the rand check optimization.
+    // but epoch and round should be updated.
     assert_eq!(epoch + 1, actual_epoch);
 }

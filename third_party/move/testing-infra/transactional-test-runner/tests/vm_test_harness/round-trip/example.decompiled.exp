@@ -1,0 +1,34 @@
+processed 9 tasks
+task 1 lines 5-10:  run [script {]
+task 2 lines 13-13:  view --address 0x1 --resource 0x42::N::R<u64>
+[No Resource Exists]
+task 3 lines 15-35:  publish [module 0x42::N {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE1:21:25
+   │
+21 │     public entry fun ex(p0: signer, p1: u64) {
+   │                         ^^
+
+warning: Unused value of parameter `p1`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p1`), or binding to `_`
+   ┌─ TEMPFILE1:21:37
+   │
+21 │     public entry fun ex(p0: signer, p1: u64) {
+   │                                     ^^
+
+
+task 4 lines 38-38:  run --signers 0x1 --args 0 -- 0x42::N::ex
+Error: Function execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(0),
+    location: 0x42::N,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}
+task 5 lines 40-46:  run --signers 0x1 [script {]
+task 6 lines 49-49:  view --address 0x1 --resource 0x42::N::R<u64>
+key 0x42::N::R<u64> {
+    v: 0
+}
+task 7 lines 51-57:  run --signers 0x1  [script {]
+task 8 lines 60-60:  view --address 0x1 --resource 0x42::N::R<u64>
+[No Resource Exists]

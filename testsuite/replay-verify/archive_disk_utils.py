@@ -34,7 +34,7 @@ CLUSTER_NAME = "devinfra-usce1-0"
 NAMESPACE = "replay-verify"
 ZONE = "us-central1-a"
 
-DEFAULT_PVC_ACCESS_MODE = "ReadWriteOnce"
+DEFAULT_PVC_ACCESS_MODE = "ReadOnlyMany"  # Default access mode for PVCs
 SNAPSHOT_DISK_SIZE = "12Ti"  # Default disk size for snapshots
 
 
@@ -653,7 +653,7 @@ def create_one_pvc_from_existing(
             "labels": {"run": f"{label}"},
         },
         "spec": {
-            "accessModes": ["ReadWriteOnce"],
+            "accessModes": [DEFAULT_PVC_ACCESS_MODE],
             "resources": {"requests": {"storage": storage_size}},
             "storageClassName": STORAGE_CLASS,
             "volumeMode": "Filesystem",

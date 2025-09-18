@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 3-39:  publish [module 0x42::vector {]
+task 1 lines 42-42:  run 0x42::vector::test_fold
+task 2 lines 44-44:  run 0x42::vector::test_remove

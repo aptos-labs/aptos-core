@@ -32,10 +32,10 @@ module 0x8675309::M {
         abort 0
     }
     fun t0() {
-        let Box<u64>{f1: f1,f2: f2} = new<u64>();
+        let Box<u64>{f1: f1, f2: f2} = new<u64>();
         f1;
         f2;
-        let Box<Box<u64>>{f1: f1,f2: f2} = new<Box<u64>>();
+        let Box<Box<u64>>{f1: f1, f2: f2} = new<Box<u64>>();
         f1;
         f2;
     }

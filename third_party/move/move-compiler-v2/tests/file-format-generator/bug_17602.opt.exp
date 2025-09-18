@@ -1,0 +1,27 @@
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module 42.test {
+struct T<A, B> has drop {
+	x: A,
+	y: B
+}
+struct S<A, B, C> has drop {
+	_0: A,
+	_1: B,
+	_2: C
+}
+
+test_proj_0(): u8 /* def_idx: 0 */ {
+B0:
+	0: LdU8(42)
+	1: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+	2: LdTrue
+	3: PackGeneric[0](S<u8, address, bool>)
+	4: UnpackGeneric[0](S<u8, address, bool>)
+	5: Pop
+	6: Pop
+	7: Ret
+}
+}
+============ bytecode verification succeeded ========

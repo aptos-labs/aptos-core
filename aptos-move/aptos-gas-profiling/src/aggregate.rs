@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    erased::Node,
     log::{ExecutionAndIOCosts, ExecutionGasEvent},
     render::{Render, TableKey},
 };
-use aptos_gas_algebra::{GasQuantity, GasScalingFactor, InternalGas};
+use aptos_gas_algebra::{GasQuantity, GasScalingFactor, InternalGas, InternalGasUnit};
 use std::collections::{btree_map, BTreeMap};
 
 /// Represents an aggregation of execution gas events, including the count and total gas costs for each type of event.
@@ -22,6 +23,8 @@ pub struct AggregatedExecutionGasEvents {
 
     // TODO: Make this more strongly typed?
     pub ops: Vec<(String, usize, InternalGas)>,
+    pub methods: Vec<(String, usize, InternalGas)>,
+    pub methods_self: Vec<(String, usize, InternalGas)>,
     pub transaction_write: InternalGas,
     pub event_writes: Vec<(String, usize, InternalGas)>,
     pub storage_reads: Vec<(String, usize, InternalGas)>,
@@ -126,15 +129,55 @@ impl ExecutionAndIOCosts {
             insert_or_add(&mut storage_writes, key, write.cost);
         }
 
+        let tree = self.to_erased(false).tree;
+        let mut methods = BTreeMap::new();
+        compute_method_recursive_cost(&tree, &mut methods);
+        let mut methods_self = BTreeMap::new();
+        compute_method_self_cost(&tree, &mut methods_self);
+
         AggregatedExecutionGasEvents {
             gas_scaling_factor: self.gas_scaling_factor,
             total: self.total,
 
             ops: into_sorted_vec(ops),
+            methods: into_sorted_vec(methods),
+            methods_self: into_sorted_vec(methods_self),
             transaction_write: self.transaction_transient.unwrap_or_else(|| 0.into()),
             event_writes: into_sorted_vec(event_writes),
             storage_reads: into_sorted_vec(storage_reads),
             storage_writes: into_sorted_vec(storage_writes),
         }
+    }
+}
+
+fn compute_method_recursive_cost(
+    node: &Node<GasQuantity<InternalGasUnit>>,
+    methods: &mut BTreeMap<String, (usize, GasQuantity<InternalGasUnit>)>,
+) -> GasQuantity<InternalGasUnit> {
+    let mut sum = node.val;
+    for child in &node.children {
+        sum += compute_method_recursive_cost(child, methods);
+    }
+
+    if !node.children.is_empty() {
+        insert_or_add(methods, node.text.clone(), sum);
+    }
+    sum
+}
+
+fn compute_method_self_cost(
+    node: &Node<GasQuantity<InternalGasUnit>>,
+    methods: &mut BTreeMap<String, (usize, GasQuantity<InternalGasUnit>)>,
+) {
+    let mut sum = node.val;
+    for child in &node.children {
+        compute_method_self_cost(child, methods);
+
+        // method invocation cost itself is counted to both parent and child.
+        sum += child.val;
+    }
+
+    if !node.children.is_empty() {
+        insert_or_add(methods, node.text.clone(), sum);
     }
 }

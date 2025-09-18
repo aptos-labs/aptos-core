@@ -37,6 +37,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }
+bytes = { workspace = true }
 lru = { workspace = true }
 
 [features]

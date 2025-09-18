@@ -23,7 +23,6 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
 </code></pre>
@@ -159,7 +158,7 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_pre_cancel_order_for_tracker">pre_cancel_order_for_tracker</a>(tracker: &<b>mut</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">pre_cancellation_tracker::PreCancellationTracker</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, client_order_id: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_pre_cancel_order_for_tracker">pre_cancel_order_for_tracker</a>(tracker: &<b>mut</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">pre_cancellation_tracker::PreCancellationTracker</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: u64)
 </code></pre>
 
 
@@ -170,11 +169,11 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 
 <pre><code><b>public</b>(<b>package</b>) <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_pre_cancel_order_for_tracker">pre_cancel_order_for_tracker</a>(
     tracker: &<b>mut</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a>,
-    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     client_order_id: u64
 ) {
     <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_garbage_collect">garbage_collect</a>(tracker);
-    <b>let</b> account_order_id = new_account_client_order_id(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>), client_order_id);
+    <b>let</b> account_order_id = new_account_client_order_id(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id);
     <b>if</b> (tracker.account_order_ids.contains(&account_order_id)) {
         // If the account_order_id already <b>exists</b> <b>with</b> a previously set expiration time,
         // we <b>update</b> the expiration time.

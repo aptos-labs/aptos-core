@@ -10,7 +10,7 @@ use ambassador::delegatable_trait;
 use bytes::Bytes;
 use hashbrown::HashSet;
 #[cfg(fuzzing)]
-use move_binary_format::access::ModuleAccess;
+use move_binary_format::{access::ModuleAccess, errors::Location};
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
@@ -549,11 +549,11 @@ pub struct FunctionValueExtensionAdapter<'a> {
 }
 
 pub trait AsFunctionValueExtension {
-    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter;
+    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter<'_>;
 }
 
 impl<T: ModuleStorage> AsFunctionValueExtension for T {
-    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter {
+    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter<'_> {
         FunctionValueExtensionAdapter {
             module_storage: self,
         }

@@ -10,7 +10,7 @@ use aptos_config::keys::ConfigKey;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, Uniform};
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::info;
-use aptos_metrics_core::{IntCounterHelper, TimerHelper};
+use aptos_metrics_core::{IntCounterHelper, IntCounterVecHelper, TimerHelper};
 use aptos_types::{
     account_address::AccountAddress,
     block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},

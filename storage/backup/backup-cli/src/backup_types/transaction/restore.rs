@@ -588,9 +588,7 @@ impl TransactionRestoreBatchController {
                 base_version += offset;
                 offset = txns.len() as u64;
                 async move {
-                    let _timer = OTHER_TIMERS_SECONDS
-                        .with_label_values(&["replay_txn_chunk_kv_only"])
-                        .start_timer();
+                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["replay_txn_chunk_kv_only"]);
                     tokio::task::spawn_blocking(move || {
                         // we directly save transaction and kvs to DB without involving chunk executor
                         handler.save_transactions_and_replay_kv(
@@ -613,9 +611,7 @@ impl TransactionRestoreBatchController {
 
         let total_replayed = db_commit_stream
             .and_then(|version| async move {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["commit_txn_chunk_kv_only"])
-                    .start_timer();
+                let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_txn_chunk_kv_only"]);
                 tokio::task::spawn_blocking(move || {
                     // version is the latest version finishing the KV replaying
                     let total_replayed = version - first_version;

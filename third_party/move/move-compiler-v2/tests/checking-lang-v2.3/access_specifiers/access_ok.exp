@@ -91,7 +91,7 @@ module 0x42::m {
     struct S has store {
     }
     fun f10(x: u64)
-        reads *(m::make_up_address(x))
+        reads *(make_up_address(x))
     {
     }
     fun f11()
@@ -115,7 +115,7 @@ module 0x42::m {
     {
     }
     fun f5()
-        reads 0x42::*
+        reads 0x42::*::*
     {
     }
     fun f6()
@@ -142,6 +142,6 @@ module 0x42::m {
     {
     }
     fun make_up_address(_x: u64): address {
-        0x42
+        @0x42
     }
 }

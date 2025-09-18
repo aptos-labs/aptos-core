@@ -1,0 +1,43 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/enum/enum_field_select.move`
+
+//# publish
+module 0x42::m {
+    enum Data has drop {
+        V1 {
+            x: u64,
+        }
+        V2 {
+            x: u64,
+            y: bool,
+        }
+    }
+    fun get_y(p0: &Data): bool {
+        if (!(p0 is V2)) abort 33;
+        *&p0.y
+    }
+    fun test_get_x_v1(): u64 {
+        let _t0 = Data::V1{x: 43};
+        *&(&_t0).x
+    }
+    fun test_get_x_v2(): u64 {
+        let _t0 = Data::V2{x: 43, y: false};
+        *&(&_t0).x
+    }
+    fun test_get_y_v1(): bool {
+        let _t0 = Data::V1{x: 43};
+        get_y(&_t0)
+    }
+    fun test_get_y_v2(): bool {
+        let _t0 = Data::V2{x: 43, y: true};
+        get_y(&_t0)
+    }
+}
+
+
+//# run 0x42::m::test_get_x_v1
+
+//# run 0x42::m::test_get_x_v2
+
+//# run 0x42::m::test_get_y_v1
+
+//# run 0x42::m::test_get_y_v2

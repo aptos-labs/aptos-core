@@ -119,9 +119,9 @@ use std::{
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
 const PROPOSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
-/// Number of rounds we expect storage to be ahead of the proposer round,
+/// Number of rounds we expect storage to be behind the proposer round,
 /// used for fetching data from DB.
-const PROPOSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 10;
+const PROPOSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 30;
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {
@@ -573,7 +573,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let (request_tx, mut request_rx) = aptos_channel::new::<_, IncomingBlockRetrievalRequest>(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
         );
         let task = async move {
@@ -685,7 +685,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let (recovery_manager_tx, recovery_manager_rx) = aptos_channel::new(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(recovery_manager_tx);
@@ -940,13 +940,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
 
         let (buffered_proposal_tx, buffered_proposal_rx) = aptos_channel::new(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
 
@@ -1266,7 +1266,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             None,
         );
 

@@ -26,6 +26,7 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_db::state_restore::StateSnapshotRestoreMode;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::StateSnapshotReceiver;
 use aptos_types::{
     access_path::Path,
@@ -200,9 +201,7 @@ impl StateSnapshotRestoreController {
         let mut start = None;
         while let Some((chunk_idx, chunk, mut blobs, proof)) = futs_stream.try_next().await? {
             start = start.or_else(|| Some(Instant::now()));
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["add_state_chunk"])
-                .start_timer();
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["add_state_chunk"]);
             let receiver = receiver.clone();
             if self.validate_modules {
                 blobs = tokio::task::spawn_blocking(move || {

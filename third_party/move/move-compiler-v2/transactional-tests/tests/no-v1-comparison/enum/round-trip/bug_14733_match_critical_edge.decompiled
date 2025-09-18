@@ -1,0 +1,215 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/enum/bug_14733_match_critical_edge.move`
+
+//# publish
+module 0x815::m {
+    enum Admin has drop {
+        Superuser,
+        User {
+            _0: u64,
+        }
+    }
+    enum Entity has drop {
+        Person {
+            id: u64,
+        }
+        Institution {
+            id: u64,
+            admin: Admin,
+        }
+    }
+    fun admin_id(p0: &Entity): u64 {
+        let _t3;
+        'l0: loop {
+            let _t8;
+            let _t2;
+            if (!((p0 is Institution) && (&p0.admin is Superuser))) {
+                let _t6;
+                let _t1;
+                loop {
+                    let _t5;
+                    if (p0 is Institution) {
+                        _t5 = &p0.admin;
+                        if (_t5 is User) {
+                            _t2 = &_t5._0;
+                            if (*_t2 > 10) break
+                        }
+                    };
+                    loop {
+                        if (p0 is Institution) {
+                            _t5 = &p0.admin;
+                            if (_t5 is User) {
+                                if (*&_t5._0 <= 10) break}
+                        };
+                        _t1 = p0;
+                        if (_t1 is Person) {
+                            _t2 = &_t1.id;
+                            if (*_t2 > 10) {
+                                _t3 = *_t2;
+                                break 'l0
+                            }
+                        };
+                        if (_t1 is Institution) {
+                            _t3 = *&_t1.id;
+                            break 'l0
+                        };
+                        _t3 = 0;
+                        break 'l0
+                    };
+                    _t1 = p0;
+                    loop {
+                        if (_t1 is Person) {
+                            _t2 = &_t1.id;
+                            if (*_t2 > 10) {
+                                _t6 = *_t2;
+                                break
+                            }
+                        };
+                        if (_t1 is Institution) {
+                            _t6 = *&_t1.id;
+                            break
+                        };
+                        _t6 = 0;
+                        break
+                    };
+                    _t3 = _t6 + 5;
+                    break 'l0
+                };
+                _t8 = *_t2;
+                _t1 = p0;
+                loop {
+                    if (_t1 is Person) {
+                        _t2 = &_t1.id;
+                        if (*_t2 > 10) {
+                            _t6 = *_t2;
+                            break
+                        }
+                    };
+                    if (_t1 is Institution) {
+                        _t6 = *&_t1.id;
+                        break
+                    };
+                    _t6 = 0;
+                    break
+                };
+                _t3 = _t8 + _t6;
+                break
+            };
+            loop {
+                if (p0 is Person) {
+                    _t2 = &p0.id;
+                    if (*_t2 > 10) {
+                        _t8 = *_t2;
+                        break
+                    }
+                };
+                if (p0 is Institution) {
+                    _t8 = *&p0.id;
+                    break
+                };
+                _t8 = 0;
+                break
+            };
+            _t3 = 1 + _t8;
+            break
+        };
+        _t3
+    }
+    fun test1(): u64 {
+        let _t3;
+        let _t0 = Entity::Person{id: 22};
+        let _t1 = &_t0;
+        loop {
+            if (_t1 is Person) {
+                let _t2 = &_t1.id;
+                if (*_t2 > 10) {
+                    _t3 = *_t2;
+                    break
+                }
+            };
+            if (_t1 is Institution) {
+                _t3 = *&_t1.id;
+                break
+            };
+            _t3 = 0;
+            break
+        };
+        _t3
+    }
+    fun test2(): u64 {
+        let _t3;
+        let _t0 = Entity::Person{id: 10};
+        let _t1 = &_t0;
+        loop {
+            if (_t1 is Person) {
+                let _t2 = &_t1.id;
+                if (*_t2 > 10) {
+                    _t3 = *_t2;
+                    break
+                }
+            };
+            if (_t1 is Institution) {
+                _t3 = *&_t1.id;
+                break
+            };
+            _t3 = 0;
+            break
+        };
+        _t3
+    }
+    fun test3(): u64 {
+        let _t3;
+        let _t6 = Admin::Superuser{};
+        let _t0 = Entity::Institution{id: 10, admin: _t6};
+        let _t1 = &_t0;
+        loop {
+            if (_t1 is Person) {
+                let _t2 = &_t1.id;
+                if (*_t2 > 10) {
+                    _t3 = *_t2;
+                    break
+                }
+            };
+            if (_t1 is Institution) {
+                _t3 = *&_t1.id;
+                break
+            };
+            _t3 = 0;
+            break
+        };
+        _t3
+    }
+    fun test4(): u64 {
+        let _t2 = Admin::Superuser{};
+        let _t0 = Entity::Institution{id: 20, admin: _t2};
+        admin_id(&_t0)
+    }
+    fun test5(): u64 {
+        let _t3 = Admin::User{_0: 23};
+        let _t0 = Entity::Institution{id: 20, admin: _t3};
+        admin_id(&_t0)
+    }
+    fun test6(): u64 {
+        let _t3 = Admin::User{_0: 8};
+        let _t0 = Entity::Institution{id: 20, admin: _t3};
+        admin_id(&_t0)
+    }
+    fun test7(): u64 {
+        let _t0 = Entity::Person{id: 15};
+        admin_id(&_t0)
+    }
+}
+
+
+//# run 0x815::m::test1
+
+//# run 0x815::m::test2
+
+//# run 0x815::m::test3
+
+//# run 0x815::m::test4
+
+//# run 0x815::m::test5
+
+//# run 0x815::m::test6
+
+//# run 0x815::m::test7

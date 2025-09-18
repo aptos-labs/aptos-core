@@ -178,7 +178,9 @@ pub fn make_proposal_with_parent_and_overrides(
     let qc = QuorumCert::new(
         vote_data,
         ledger_info_with_signatures
-            .aggregate_signatures(&generate_validator_verifier(&[validator_signer.clone()]))
+            .aggregate_signatures(&generate_validator_verifier(std::slice::from_ref(
+                validator_signer,
+            )))
             .unwrap(),
     );
 
@@ -213,7 +215,7 @@ pub fn make_timeout_cert(
     let signature = timeout.sign(signer).unwrap();
     tc_partial.add(signer.author(), timeout, signature);
     tc_partial
-        .aggregate_signatures(&generate_validator_verifier(&[signer.clone()]))
+        .aggregate_signatures(&generate_validator_verifier(std::slice::from_ref(signer)))
         .unwrap()
 }
 

@@ -537,9 +537,7 @@ module aptos_framework::coin {
         option::fill(burn_ref_opt, burn_ref);
     }
 
-    inline fun borrow_paired_burn_ref<CoinType>(
-        _: &BurnCapability<CoinType>
-    ): &BurnRef acquires CoinConversionMap, PairedFungibleAssetRefs {
+    inline fun borrow_paired_burn_ref<CoinType>(_: &BurnCapability<CoinType>): &BurnRef  {
         let metadata = assert_paired_metadata_exists<CoinType>();
         let metadata_addr = object_address(&metadata);
         assert!(exists<PairedFungibleAssetRefs>(metadata_addr), error::internal(EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND));

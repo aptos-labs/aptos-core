@@ -1,0 +1,29 @@
+//**** Cross-compiled for `move` syntax from `tests/dependencies/transitive_deps.move`
+
+//# publish
+module 0x42::X {
+    struct T has drop {
+    }
+    public fun new(): T {
+        T{}
+    }
+}
+
+
+//# publish
+module 0x42::Y {
+    use 0x42::X;
+    public fun foo(): X::T {
+        X::new()
+    }
+}
+
+
+//# run
+script {
+    use 0x42::Y;
+    use 0x42::X;
+    fun main() {
+        let _t0 = Y::foo();
+    }
+}

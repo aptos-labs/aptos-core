@@ -1,0 +1,25 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/bug_16407.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun apply_repeatedly(p0: |u64|(u64) has copy + drop, p1: u64): |u64|(u64) has copy + drop {
+        |arg0| lambda__1__apply_repeatedly(p1, p0, arg0)
+    }
+    fun lambda__1__apply_repeatedly(p0: u64, p1: |u64|(u64) has copy + drop, p2: u64): u64 {
+        let _t3 = 0;
+        let _t4 = false;
+        loop {
+            if (_t4) _t3 = _t3 + 1 else _t4 = true;
+            if (!(_t3 < p0)) break;
+            p2 = p1(p2)
+        };
+        p2
+    }
+    public fun test(): u64 {
+        let _t3 = apply_repeatedly(|arg0| lambda__1__test(arg0), 10);
+        _t3(1)
+    }
+    fun lambda__1__test(p0: u64): u64 {
+        p0 + 1
+    }
+}

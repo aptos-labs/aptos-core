@@ -1,13 +1,13 @@
 // -- Model dump before first bytecode pipeline
 module 0x42::sort {
     use std::vector;
-    public fun incorrect_sort<T>(arr: &mut vector<T>,a_less_b: |(T, T)|bool) {
+    public fun incorrect_sort<T>(arr: &mut vector<T>,a_less_b: |T, T|bool) {
         {
           let n: u64 = vector::length<T>(Freeze(false)(arr));
           sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
         }
     }
-    public fun incorrect_sort_recursive<T>(arr: &mut vector<T>,low: u64,high: u64,a_less_b: |(T, T)|bool) {
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<T>,low: u64,high: u64,a_less_b: |T, T|bool) {
         if Lt<u64>(low, high) {
           {
             let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
@@ -24,11 +24,12 @@ module 0x42::sort {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::sort {
-    public fun incorrect_sort<T: copy>(arr: &mut vector<T>, a_less_b: |(T, T)|bool) {
+    use std::vector;
+    public fun incorrect_sort<T: copy>(arr: &mut vector<T>, a_less_b: |T, T|bool) {
         let n = 0x1::vector::length<T>(/*freeze*/arr);
         incorrect_sort_recursive<T>(arr, 0, n - 1, a_less_b)
     }
-    public fun incorrect_sort_recursive<T: copy>(arr: &mut vector<T>, low: u64, high: u64, a_less_b: |(T, T)|bool) {
+    public fun incorrect_sort_recursive<T: copy>(arr: &mut vector<T>, low: u64, high: u64, a_less_b: |T, T|bool) {
         if (low < high) {
             let pi = low + high / 2;
             incorrect_sort_recursive<T>(arr, low, pi - 1, a_less_b);

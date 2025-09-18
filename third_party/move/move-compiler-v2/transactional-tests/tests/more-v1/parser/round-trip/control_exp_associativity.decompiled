@@ -1,0 +1,16 @@
+//**** Cross-compiled for `move` syntax from `tests/more-v1/parser/control_exp_associativity.move`
+
+//# publish
+module 0x42::M {
+    fun t(): u64 {
+        if (!(1 + 20 == 21)) abort 0;
+        if (!true) abort 0;
+        if (!(10 == 10)) abort 0;
+        if (!(0 + 1 == 1)) abort 0;
+        if (!(0 == 0)) abort 0;
+        42
+    }
+}
+
+
+//# run 0x42::M::t

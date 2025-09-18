@@ -253,18 +253,18 @@ module 0x2::Token {
         value: u64,
     }
     public fun create<ATy: copy + drop + store>(type: ATy, value: u64): Coin<ATy> {
-        Coin<ATy>{type: type,value: value}
+        Coin<ATy>{type: type, value: value}
     }
     public fun value<ATy: copy + drop + store>(coin: &Coin<ATy>): u64 {
         coin.value
     }
     public fun deposit<ATy: copy + drop + store>(coin: &mut Coin<ATy>, check: Coin<ATy>) {
-        let Coin<ATy>{type: type,value: value} = check;
+        let Coin<ATy>{type: type, value: value} = check;
         if (&coin.type == &type) () else abort 42;
         coin.value = coin.value + value;
     }
     public fun destroy_zero<ATy: copy + drop + store>(coin: Coin<ATy>) {
-        let Coin<ATy>{type: _,value: value} = coin;
+        let Coin<ATy>{type: _, value: value} = coin;
         if (value == 0) () else abort 11
     }
     public fun join<ATy: copy + drop + store>(xus: Coin<ATy>, coin2: Coin<ATy>): Coin<ATy> {
@@ -278,31 +278,33 @@ module 0x2::Token {
     public fun withdraw<ATy: copy + drop + store>(coin: &mut Coin<ATy>, amount: u64): Coin<ATy> {
         if (coin.value >= amount) () else abort 10;
         coin.value = coin.value - amount;
-        Coin<ATy>{type: *&coin.type,value: amount}
+        Coin<ATy>{type: *&coin.type, value: amount}
     }
 }
 module 0x70dd::ToddNickels {
     use 0x2::Token;
+    use std::signer;
     struct T has copy, drop, store {
     }
     struct Wallet has key {
         nickels: Token::Coin<T>,
     }
     public fun init(account: &signer) {
-        if (0x1::signer::address_of(account) == 0x70dd) () else abort 42;
-        move_to<Wallet>(account, Wallet{nickels: Token::create<T>(T{}, 0)})
+        if (0x1::signer::address_of(account) == @0x70dd) () else abort 42;
+        move_to<Wallet>(Wallet{nickels: Token::create<T>(T{}, 0)}, account)
     }
     public fun destroy(c: Token::Coin<T>)
         acquires Wallet
     {
-        Token::deposit<T>(&mut borrow_global_mut<Wallet>(0x70dd).nickels, c)
+        Token::deposit<T>(&mut borrow_global_mut<Wallet>(@0x70dd).nickels, c)
     }
     public fun mint(account: &signer): Token::Coin<T> {
-        if (0x1::signer::address_of(account) == 0x70dd) () else abort 42;
+        if (0x1::signer::address_of(account) == @0x70dd) () else abort 42;
         Token::create<T>(T{}, 5)
     }
 }
 module 0xb055::OneToOneMarket {
+    use std::signer;
     use 0x2::Token;
     struct BorrowRecord<phantom InputAsset: copy + drop, phantom OutputAsset: copy + drop> has key {
         record: u64,
@@ -324,7 +326,7 @@ module 0xb055::OneToOneMarket {
     {
         if (amount <= max_borrow_amount<In,Out>(account)) () else abort 1025;
         update_borrow_record<In,Out>(account, amount);
-        let pool = borrow_global_mut<Pool<Out>>(0xb055);
+        let pool = borrow_global_mut<Pool<Out>>(@0xb055);
         Token::withdraw<Out>(&mut pool.coin, amount)
     }
     public fun deposit<In: copy + drop + store, Out: copy + drop + store>(account: &signer, coin: Token::Coin<In>)
@@ -333,13 +335,13 @@ module 0xb055::OneToOneMarket {
     {
         let amount = Token::value<In>(&coin);
         update_deposit_record<In,Out>(account, amount);
-        let pool = borrow_global_mut<Pool<In>>(0xb055);
+        let pool = borrow_global_mut<Pool<In>>(@0xb055);
         Token::deposit<In>(&mut pool.coin, coin)
     }
     fun accept<AssetType: copy + drop + store>(account: &signer, init: Token::Coin<AssetType>) {
         let sender = 0x1::signer::address_of(account);
         if (!exists<Pool<AssetType>>(sender)) () else abort 42;
-        move_to<Pool<AssetType>>(account, Pool<AssetType>{coin: init})
+        move_to<Pool<AssetType>>(Pool<AssetType>{coin: init}, account)
     }
     fun borrowed_amount<In: copy + drop + store, Out: copy + drop + store>(account: &signer): u64
         acquires BorrowRecord
@@ -363,26 +365,26 @@ module 0xb055::OneToOneMarket {
     {
         let input_deposited = deposited_amount<In,Out>(account);
         let output_deposited = borrowed_amount<In,Out>(account);
-        let input_into_output = input_deposited * borrow_global<Price<In, Out>>(0xb055).price;
+        let input_into_output = input_deposited * borrow_global<Price<In, Out>>(@0xb055).price;
         let max_output = if (input_into_output < output_deposited) 0 else input_into_output - output_deposited;
         let available_output = {
-            let pool = borrow_global<Pool<Out>>(0xb055);
+            let pool = borrow_global<Pool<Out>>(@0xb055);
             Token::value<Out>(&pool.coin)
         };
         if (max_output < available_output) max_output else available_output
     }
     public fun register_price<In: copy + drop + store, Out: copy + drop + store>(account: &signer, initial_in: Token::Coin<In>, initial_out: Token::Coin<Out>, price: u64) {
         let sender = 0x1::signer::address_of(account);
-        if (sender == 0xb055) () else abort 42;
+        if (sender == @0xb055) () else abort 42;
         accept<In>(account, initial_in);
         accept<Out>(account, initial_out);
-        move_to<Price<In, Out>>(account, Price<In,Out>{price: price})
+        move_to<Price<In, Out>>(Price<In,Out>{price: price}, account)
     }
     fun update_borrow_record<In: copy + drop + store, Out: copy + drop + store>(account: &signer, amount: u64)
         acquires BorrowRecord
     {
         let sender = 0x1::signer::address_of(account);
-        if (!exists<BorrowRecord<In, Out>>(sender)) move_to<BorrowRecord<In, Out>>(account, BorrowRecord<In,Out>{record: 0});
+        if (!exists<BorrowRecord<In, Out>>(sender)) move_to<BorrowRecord<In, Out>>(BorrowRecord<In,Out>{record: 0}, account);
         let record = &mut borrow_global_mut<BorrowRecord<In, Out>>(sender).record;
         *record = *record + amount
     }
@@ -390,7 +392,7 @@ module 0xb055::OneToOneMarket {
         acquires DepositRecord
     {
         let sender = 0x1::signer::address_of(account);
-        if (!exists<DepositRecord<In, Out>>(sender)) move_to<DepositRecord<In, Out>>(account, DepositRecord<In,Out>{record: 0});
+        if (!exists<DepositRecord<In, Out>>(sender)) move_to<DepositRecord<In, Out>>(DepositRecord<In,Out>{record: 0}, account);
         let record = &mut borrow_global_mut<DepositRecord<In, Out>>(sender).record;
         *record = *record + amount
     }

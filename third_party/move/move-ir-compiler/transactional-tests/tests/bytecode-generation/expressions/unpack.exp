@@ -6,16 +6,16 @@ struct T
   b: bool
 
 // Function definition at index 0
-fun new(): M::T
+fun new(): T
     ld_true
     pack T
     ret
 
 // Function definition at index 1
 fun f()
-    local l0: M::T
+    local l0: T
     local l1: bool
-    call M::new
+    call new
     st_loc l0
     move_loc l0
     unpack T

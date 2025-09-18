@@ -194,7 +194,7 @@ where
         }
         generator
             .output(&mut self.out, &script_registry)
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", err)))?;
+            .map_err(|err| std::io::Error::other(format!("{}", err)))?;
         Ok(())
     }
 
@@ -471,13 +471,10 @@ func DecodeEntryFunctionPayload(script aptostypes.TransactionPayload) (EntryFunc
                 None => {
                     let vec_string_tag =
                         TypeTag::from_str("vector<0x1::string::String>").map_err(|err| {
-                            io::Error::new(
-                                io::ErrorKind::Other,
-                                format!(
-                                    "Failed to construct a type tag for vector of strings: {:?}",
-                                    err
-                                ),
-                            )
+                            io::Error::other(format!(
+                                "Failed to construct a type tag for vector of strings: {:?}",
+                                err
+                            ))
                         })?;
                     if arg.type_tag() == &vec_string_tag {
                         format!(

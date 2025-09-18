@@ -83,6 +83,17 @@ impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
             .view_function_arguments(module, function, ty_args, args)
     }
 
+    pub fn view_function_returns(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+        ty_args: &[TypeTag],
+        returns: &[Vec<u8>],
+    ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
+        self.0
+            .view_function_returns(module, function, ty_args, returns)
+    }
+
     pub fn view_script_arguments(
         &self,
         script_bytes: &[u8],

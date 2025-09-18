@@ -22,10 +22,10 @@ use aptos_types::{
     on_chain_config::{ConfigurationResource, ValidatorSet},
     state_store::{state_key::StateKey, StateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockEndInfo, BlockOutput,
-        ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionArgument, TransactionAuxiliaryData, TransactionExecutableRef, TransactionOutput,
-        TransactionStatus, WriteSetPayload,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockEndInfo,
+        BlockOutput, ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction,
+        Transaction, TransactionArgument, TransactionAuxiliaryData, TransactionExecutableRef,
+        TransactionOutput, TransactionStatus, WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -36,10 +36,7 @@ use aptos_vm::{
 };
 use move_core_types::language_storage::TypeTag;
 use once_cell::sync::Lazy;
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Debug)]
 enum MockVMTransaction {
@@ -71,7 +68,7 @@ impl VMBlockExecutor for MockVM {
 
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
@@ -215,7 +212,6 @@ impl VMBlockExecutor for MockVM {
         Ok(BlockOutput::new(
             outputs,
             block_epilogue_txn.map(Into::into),
-            BTreeMap::new(),
         ))
     }
 

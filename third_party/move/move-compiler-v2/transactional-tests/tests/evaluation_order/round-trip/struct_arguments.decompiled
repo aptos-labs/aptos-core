@@ -1,0 +1,105 @@
+//**** Cross-compiled for `move` syntax from `tests/evaluation_order/struct_arguments.move`
+
+//# publish
+module 0x42::M {
+    struct Cup has key {
+        a: u64,
+        b: R,
+    }
+    struct R has store, key {
+    }
+    struct S has drop {
+        a: u64,
+        b: u64,
+    }
+    fun fail(p0: u64): u64 {
+        abort p0
+    }
+    fun mts(p0: &signer): u64 {
+        let _t1 = R{};
+        let _t7 = Cup{a: 0, b: _t1};
+        move_to<Cup>(p0, _t7);
+        0
+    }
+    public fun t0() {
+        let _t0 = 1 / 0;
+        let _t7 = S{a: fail(0), b: _t0};
+    }
+    public fun t1() {
+        let _t0 = 18446744073709551615 + 18446744073709551615;
+        let _t7 = S{a: fail(0), b: _t0};
+    }
+    public fun t2() {
+        let _t0 = 0 - 1;
+        let _t7 = S{a: fail(0), b: _t0};
+    }
+    public fun t3() {
+        let _t0 = 1 % 0;
+        let _t7 = S{a: fail(0), b: _t0};
+    }
+    public fun t4() {
+        let _t0 = 18446744073709551615 * 18446744073709551615;
+        let _t7 = S{a: fail(0), b: _t0};
+    }
+    public fun t6(p0: &signer) {
+        let _t1 = R{};
+        let _t8 = Cup{a: 0, b: _t1};
+        move_to<Cup>(p0, _t8);
+        let _t2 = mts(p0);
+        let _t14 = S{a: fail(0), b: _t2};
+    }
+}
+
+
+//# run
+script {
+    use 0x42::M;
+    fun main() {
+        M::t0();
+    }
+}
+
+
+//# run
+script {
+    use 0x42::M;
+    fun main() {
+        M::t1();
+    }
+}
+
+
+//# run
+script {
+    use 0x42::M;
+    fun main() {
+        M::t2();
+    }
+}
+
+
+//# run
+script {
+    use 0x42::M;
+    fun main() {
+        M::t3();
+    }
+}
+
+
+//# run
+script {
+    use 0x42::M;
+    fun main() {
+        M::t4();
+    }
+}
+
+
+//# run --signers 0x1
+script {
+    use 0x42::M;
+    fun main(p0: signer) {
+        M::t6(&p0);
+    }
+}

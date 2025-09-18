@@ -331,7 +331,7 @@ pub(crate) struct MockIncarnation<K, E> {
     pub(crate) group_writes: Vec<(K, StateValueMetadata, HashMap<u32, (ValueType, bool)>)>,
     // For testing get_module_or_build_with and insert_verified_module interfaces.
     pub(crate) module_reads: Vec<ModuleId>,
-    pub(crate) module_writes: Vec<ModuleWrite<ValueType>>,
+    pub(crate) module_writes: BTreeMap<K, ModuleWrite<ValueType>>,
     /// Keys to query group size for - false is querying size, true is querying metadata.
     pub(crate) group_queries: Vec<(K, bool)>,
     /// A vector of keys and corresponding deltas to be produced during mock incarnation
@@ -363,7 +363,7 @@ impl<K, E> MockIncarnation<K, E> {
             group_writes: vec![],
             group_queries: vec![],
             module_reads: vec![],
-            module_writes: vec![],
+            module_writes: BTreeMap::new(),
             deltas,
             events,
             metadata_seeds,
@@ -385,7 +385,7 @@ impl<K, E> MockIncarnation<K, E> {
             group_writes: vec![],
             group_queries: vec![],
             module_reads: vec![],
-            module_writes: vec![],
+            module_writes: BTreeMap::new(),
             deltas,
             events,
             metadata_seeds: [0; 3],
@@ -767,11 +767,14 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 .expect("Failed to serialize compiled module");
             value.bytes = Some(serialized_bytes.into());
 
-            behavior.module_writes = vec![ModuleWrite::new(module_id, value)];
-
             // Handle reads.
             let (key_to_convert, _) = behavior.resource_reads.pop().unwrap();
             behavior.module_reads = vec![key_to_mock_module_id(&key_to_convert, universe_len)];
+
+            // TODO(BlockSTMv2): Support more than 1 module write per txn.
+            behavior
+                .module_writes
+                .insert(key_to_convert, ModuleWrite::new(module_id, value));
         });
 
         MockTransaction::from_behaviors(behaviors)

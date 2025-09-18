@@ -77,7 +77,7 @@ struct StructKeyRef<'a> {
 
 impl StructKey {
     #[cfg(test)]
-    fn as_ref(&self) -> StructKeyRef {
+    fn as_ref(&self) -> StructKeyRef<'_> {
         StructKeyRef {
             idx: &self.idx,
             ty_args: self.ty_args.as_slice(),

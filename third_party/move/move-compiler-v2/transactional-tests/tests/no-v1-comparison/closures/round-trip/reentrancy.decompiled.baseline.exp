@@ -1,0 +1,23 @@
+processed 5 tasks
+task 0 lines 3-8:  publish [module 0x42::callee {]
+task 1 lines 11-53:  publish [module 0x42::caller {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE1:32:35
+   │
+32 │     fun lambda__1__callback_fails(p0: &mut R)
+   │                                   ^^
+
+
+task 2 lines 56-56:  run 0x42::caller::init --signers 0x42
+task 3 lines 58-58:  run 0x42::caller::callback_ok
+return values: true
+task 4 lines 60-60:  run 0x42::caller::callback_fails --verbose
+Error: Function execution failed with VMError: {
+    message: Resource `0x42::caller::R` cannot be accessed because of active reentrancy of defining module.,
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::caller,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 3)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000042, name: Identifier("callee") }), FunctionDefinitionIndex(0), 2), (Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000042, name: Identifier("caller") }), FunctionDefinitionIndex(1), 7)] }),
+}

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::handlers::utils::THROUGHPUT_COUNTER;
-use aptos_metrics_core::IntCounterHelper;
+use aptos_metrics_core::IntCounterVecHelper;
 use aptos_storage_interface::{AptosDbError, Result as DbResult};
 use bytes::{BufMut, Bytes, BytesMut};
 use serde::Serialize;

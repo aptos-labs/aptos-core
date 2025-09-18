@@ -33,10 +33,10 @@ module 0x1::m {
     fun f1()
         acquires R
     {
-        let x = borrow_global_mut<R>(0x1);
+        let x = borrow_global_mut<R>(@0x1);
         x.value = false;
-        if (borrow_global<R>(0x1).value == false) () else abort 1;
-        borrow_global_mut<R>(0x1).value = true;
-        if (borrow_global<R>(0x1).value == true) () else abort 2;
+        if (borrow_global<R>(@0x1).value == false) () else abort 1;
+        borrow_global_mut<R>(@0x1).value = true;
+        if (borrow_global<R>(@0x1).value == true) () else abort 2;
     }
 }

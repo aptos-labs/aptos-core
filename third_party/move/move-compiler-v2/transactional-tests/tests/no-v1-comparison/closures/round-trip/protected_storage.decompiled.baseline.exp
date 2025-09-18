@@ -1,0 +1,10 @@
+processed 6 tasks
+task 0 lines 3-27:  publish [module 0x66::protected {]
+task 1 lines 30-57:  publish [module 0x66::app {]
+task 2 lines 60-60:  run 0x66::app::init_module --signers 0x66
+task 3 lines 62-62:  run 0x66::app::increment --signers 0x66
+return values: 0
+task 4 lines 64-64:  run 0x66::app::increment --signers 0x66
+return values: 1
+task 5 lines 66-66:  run 0x66::app::view --signers 0x66
+return values: 2

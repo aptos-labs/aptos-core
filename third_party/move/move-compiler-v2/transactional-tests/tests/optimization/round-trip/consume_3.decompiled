@@ -1,0 +1,29 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/consume_3.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct W has copy, drop {
+        a: u32,
+    }
+    fun consume(p0: u32) {
+        ()
+    }
+    fun consume_(p0: W) {
+        ()
+    }
+    public fun main() {
+        test(55u32);
+        test_(W{a: 56u32});
+    }
+    public fun test(p0: u32) {
+        consume(p0);
+        consume(p0);
+    }
+    public fun test_(p0: W) {
+        consume_(p0);
+        consume_(p0);
+    }
+}
+
+
+//# run 0xc0ffee::m::main

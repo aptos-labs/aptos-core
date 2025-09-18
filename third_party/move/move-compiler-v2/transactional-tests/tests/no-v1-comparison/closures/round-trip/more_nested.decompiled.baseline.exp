@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 3-68:  publish [module 0xc0ffee::n {]
+task 1 lines 71-71:  run 0xc0ffee::n::test_nested_functions
+task 2 lines 73-73:  run 0xc0ffee::n::test_composed_captures

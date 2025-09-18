@@ -155,7 +155,7 @@
     trigger_condition: TriggerCondition,
     unique_priority_idx: UniqueIdxType,
 ) {
-    <b>let</b> (price_move_up_index, price_move_down_index, time_based_index) =
+    <b>let</b> (price_move_down_index, price_move_up_index, time_based_index) =
         trigger_condition.index();
     <b>if</b> (price_move_up_index.is_some()) {
         self.price_move_up_index.remove(

@@ -409,7 +409,7 @@ async fn test_view_tuple(use_txn_payload_v2_format: bool, use_orderless_transact
             .transaction_factory()
             .payload(payload)
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
@@ -455,7 +455,7 @@ async fn test_view_aggregator(use_txn_payload_v2_format: bool, use_orderless_tra
             .transaction_factory()
             .payload(payload)
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,

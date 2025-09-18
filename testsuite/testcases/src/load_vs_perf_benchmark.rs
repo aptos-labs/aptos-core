@@ -7,7 +7,7 @@ use aptos_forge::{
     args::TransactionTypeArg,
     emitter::NumAccountsMode,
     prometheus_metrics::{LatencyBreakdown, LatencyBreakdownSlice, MetricSamples},
-    success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
+    success_criteria::{SuccessCriteria, SuccessCriteriaChecker, SuccessCriteriaResults},
     EmitJob, EmitJobMode, EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest,
     Result, Test, TxnStats, WorkflowProgress,
 };
@@ -406,18 +406,21 @@ impl NetworkTest for LoadVsPerfBenchmark {
             None => None,
         };
 
+        let mut criteria_results = SuccessCriteriaResults::default();
         for (index, result) in results.iter().enumerate() {
             // always take last phase for success criteria
             let target_result = &result[result.len() - 1];
             let rate = target_result.stats.rate();
             if let Some(criteria) = self.criteria.get(index) {
-                SuccessCriteriaChecker::check_core_for_success(
+                let outcome = SuccessCriteriaChecker::check_core_for_success(
                     criteria,
                     ctx.report,
                     &rate,
                     Some(&target_result.latency_breakdown),
                     Some(target_result.name.clone()),
-                )?;
+                );
+                let outcome = outcome.map_err(|e| e.downcast().unwrap());
+                criteria_results.extend(outcome);
             }
         }
 
@@ -431,16 +434,20 @@ impl NetworkTest for LoadVsPerfBenchmark {
                     .criteria
                     .get(index)
                 {
-                    SuccessCriteriaChecker::check_core_for_success(
+                    let outcome = SuccessCriteriaChecker::check_core_for_success(
                         criteria,
                         ctx.report,
                         &rate,
                         None,
                         Some(name),
-                    )?;
+                    );
+                    let outcome = outcome.map_err(|e| e.downcast().unwrap());
+                    criteria_results.extend(outcome);
                 }
             }
         }
+
+        criteria_results.evaluate()?;
 
         Ok(())
     }

@@ -6,7 +6,7 @@ use crate::{
     IN_ANY_DROP_POOL,
 };
 use aptos_infallible::Mutex;
-use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
+use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Condvar,

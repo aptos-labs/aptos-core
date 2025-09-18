@@ -203,15 +203,24 @@ pub enum OnChainConsensusConfig {
         // Execution pool block window
         window_size: Option<u64>,
     },
+    V5 {
+        alg: ConsensusAlgorithmConfig,
+        vtxn: ValidatorTxnConfig,
+        // Execution pool block window
+        window_size: Option<u64>,
+        // Whether to check if we can skip generating randomness for blocks
+        rand_check_enabled: bool,
+    },
 }
 
 /// The public interface that exposes all values with safe fallback.
 impl OnChainConsensusConfig {
     pub fn default_for_genesis() -> Self {
-        OnChainConsensusConfig::V4 {
+        OnChainConsensusConfig::V5 {
             alg: ConsensusAlgorithmConfig::default_for_genesis(),
             vtxn: ValidatorTxnConfig::default_for_genesis(),
             window_size: DEFAULT_WINDOW_SIZE,
+            rand_check_enabled: true,
         }
     }
 
@@ -221,9 +230,9 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 config.exclude_round
             },
-            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
-                alg.leader_reputation_exclude_round()
-            },
+            OnChainConsensusConfig::V3 { alg, .. }
+            | OnChainConsensusConfig::V4 { alg, .. }
+            | OnChainConsensusConfig::V5 { alg, .. } => alg.leader_reputation_exclude_round(),
         }
     }
 
@@ -239,9 +248,9 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 config.max_failed_authors_to_store
             },
-            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
-                alg.max_failed_authors_to_store()
-            },
+            OnChainConsensusConfig::V3 { alg, .. }
+            | OnChainConsensusConfig::V4 { alg, .. }
+            | OnChainConsensusConfig::V5 { alg, .. } => alg.max_failed_authors_to_store(),
         }
     }
 
@@ -251,9 +260,9 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 &config.proposer_election_type
             },
-            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
-                alg.proposer_election_type()
-            },
+            OnChainConsensusConfig::V3 { alg, .. }
+            | OnChainConsensusConfig::V4 { alg, .. }
+            | OnChainConsensusConfig::V5 { alg, .. } => alg.proposer_election_type(),
         }
     }
 
@@ -261,9 +270,9 @@ impl OnChainConsensusConfig {
         match &self {
             OnChainConsensusConfig::V1(_config) => false,
             OnChainConsensusConfig::V2(_) => true,
-            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
-                alg.quorum_store_enabled()
-            },
+            OnChainConsensusConfig::V3 { alg, .. }
+            | OnChainConsensusConfig::V4 { alg, .. }
+            | OnChainConsensusConfig::V5 { alg, .. } => alg.quorum_store_enabled(),
         }
     }
 
@@ -271,9 +280,9 @@ impl OnChainConsensusConfig {
         match &self {
             OnChainConsensusConfig::V1(_config) => false,
             OnChainConsensusConfig::V2(_) => false,
-            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
-                alg.order_vote_enabled()
-            },
+            OnChainConsensusConfig::V3 { alg, .. }
+            | OnChainConsensusConfig::V4 { alg, .. }
+            | OnChainConsensusConfig::V5 { alg, .. } => alg.order_vote_enabled(),
         }
     }
 
@@ -281,9 +290,9 @@ impl OnChainConsensusConfig {
         match self {
             OnChainConsensusConfig::V1(_) => false,
             OnChainConsensusConfig::V2(_) => false,
-            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
-                alg.is_dag_enabled()
-            },
+            OnChainConsensusConfig::V3 { alg, .. }
+            | OnChainConsensusConfig::V4 { alg, .. }
+            | OnChainConsensusConfig::V5 { alg, .. } => alg.is_dag_enabled(),
         }
     }
 
@@ -292,9 +301,9 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => {
                 unreachable!("not a dag config")
             },
-            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
-                alg.unwrap_dag_config_v1()
-            },
+            OnChainConsensusConfig::V3 { alg, .. }
+            | OnChainConsensusConfig::V4 { alg, .. }
+            | OnChainConsensusConfig::V5 { alg, .. } => alg.unwrap_dag_config_v1(),
         }
     }
 
@@ -303,9 +312,9 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => {
                 ValidatorTxnConfig::default_disabled()
             },
-            OnChainConsensusConfig::V3 { vtxn, .. } | OnChainConsensusConfig::V4 { vtxn, .. } => {
-                vtxn.clone()
-            },
+            OnChainConsensusConfig::V3 { vtxn, .. }
+            | OnChainConsensusConfig::V4 { vtxn, .. }
+            | OnChainConsensusConfig::V5 { vtxn, .. } => vtxn.clone(),
         }
     }
 
@@ -318,7 +327,9 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => {
                 // vtxn not supported. No-op.
             },
-            OnChainConsensusConfig::V3 { vtxn, .. } | OnChainConsensusConfig::V4 { vtxn, .. } => {
+            OnChainConsensusConfig::V3 { vtxn, .. }
+            | OnChainConsensusConfig::V4 { vtxn, .. }
+            | OnChainConsensusConfig::V5 { vtxn, .. } => {
                 *vtxn = ValidatorTxnConfig::V0;
             },
         }
@@ -326,7 +337,7 @@ impl OnChainConsensusConfig {
 
     pub fn enable_validator_txns(&mut self) {
         let new_self = match std::mem::take(self) {
-            OnChainConsensusConfig::V1(config) => OnChainConsensusConfig::V4 {
+            OnChainConsensusConfig::V1(config) => OnChainConsensusConfig::V5 {
                 alg: ConsensusAlgorithmConfig::JolteonV2 {
                     main: config,
                     quorum_store_enabled: false,
@@ -334,8 +345,9 @@ impl OnChainConsensusConfig {
                 },
                 vtxn: ValidatorTxnConfig::default_enabled(),
                 window_size: DEFAULT_WINDOW_SIZE,
+                rand_check_enabled: true,
             },
-            OnChainConsensusConfig::V2(config) => OnChainConsensusConfig::V4 {
+            OnChainConsensusConfig::V2(config) => OnChainConsensusConfig::V5 {
                 alg: ConsensusAlgorithmConfig::JolteonV2 {
                     main: config,
                     quorum_store_enabled: true,
@@ -343,14 +355,16 @@ impl OnChainConsensusConfig {
                 },
                 vtxn: ValidatorTxnConfig::default_enabled(),
                 window_size: DEFAULT_WINDOW_SIZE,
+                rand_check_enabled: true,
             },
             OnChainConsensusConfig::V3 {
                 vtxn: ValidatorTxnConfig::V0,
                 alg,
-            } => OnChainConsensusConfig::V4 {
+            } => OnChainConsensusConfig::V5 {
                 alg,
                 vtxn: ValidatorTxnConfig::default_enabled(),
                 window_size: DEFAULT_WINDOW_SIZE,
+                rand_check_enabled: true,
             },
             OnChainConsensusConfig::V4 {
                 alg,
@@ -361,11 +375,26 @@ impl OnChainConsensusConfig {
                 vtxn: ValidatorTxnConfig::default_enabled(),
                 window_size,
             },
+            OnChainConsensusConfig::V5 {
+                alg,
+                vtxn: ValidatorTxnConfig::V0,
+                window_size,
+                rand_check_enabled: rand_check,
+            } => OnChainConsensusConfig::V5 {
+                alg,
+                vtxn: ValidatorTxnConfig::default_enabled(),
+                window_size,
+                rand_check_enabled: rand_check,
+            },
             item @ OnChainConsensusConfig::V3 {
                 vtxn: ValidatorTxnConfig::V1 { .. },
                 ..
             } => item,
             item @ OnChainConsensusConfig::V4 {
+                vtxn: ValidatorTxnConfig::V1 { .. },
+                ..
+            } => item,
+            item @ OnChainConsensusConfig::V5 {
                 vtxn: ValidatorTxnConfig::V1 { .. },
                 ..
             } => item,
@@ -378,7 +407,34 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(_)
             | OnChainConsensusConfig::V2(_)
             | OnChainConsensusConfig::V3 { .. } => None,
-            OnChainConsensusConfig::V4 { window_size, .. } => *window_size,
+            OnChainConsensusConfig::V4 { window_size, .. }
+            | OnChainConsensusConfig::V5 { window_size, .. } => *window_size,
+        }
+    }
+
+    pub fn rand_check_enabled(&self) -> bool {
+        match self {
+            OnChainConsensusConfig::V1(_)
+            | OnChainConsensusConfig::V2(_)
+            | OnChainConsensusConfig::V3 { .. }
+            | OnChainConsensusConfig::V4 { .. } => false,
+            OnChainConsensusConfig::V5 {
+                rand_check_enabled: rand_check,
+                ..
+            } => *rand_check,
+        }
+    }
+
+    pub fn disable_rand_check(&mut self) {
+        match self {
+            OnChainConsensusConfig::V5 {
+                rand_check_enabled, ..
+            } => {
+                *rand_check_enabled = false;
+            },
+            _ => {
+                // rand_check not supported. No-op.
+            },
         }
     }
 }

@@ -31,14 +31,14 @@ module 0xdecafbad::m {
         f();
     }
     public fun one() {
-        foo(|()| __lambda__1__one());
+        foo(|| lambda__1__one());
     }
     public fun two(x: u64): u64 {
-        bar(|()| __lambda__1__two(x))
+        bar(|| lambda__1__two(x))
     }
-    fun __lambda__1__one() {
+    fun lambda__1__one() {
     }
-    fun __lambda__1__two(x: u64): u64 {
+    fun lambda__1__two(x: u64): u64 {
         x
     }
 }

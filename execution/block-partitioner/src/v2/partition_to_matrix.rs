@@ -9,6 +9,7 @@ use crate::v2::{
     PartitionerV2,
 };
 use aptos_logger::trace;
+use aptos_metrics_core::TimerHelper;
 use aptos_types::block_executor::partitioner::{RoundId, TxnIndex};
 use dashmap::DashMap;
 use rayon::{
@@ -27,9 +28,7 @@ impl PartitionerV2 {
     /// Populate `state.finalized_txn_matrix` with txns flattened into a matrix (num_rounds by num_shards),
     /// in a way that avoid in-round cross-shard conflicts.
     pub(crate) fn remove_cross_shard_dependencies(state: &mut PartitionState) {
-        let _timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["remove_cross_shard_dependencies"])
-            .start_timer();
+        let _timer = MISC_TIMERS_SECONDS.timer_with(&["remove_cross_shard_dependencies"]);
 
         let mut remaining_txns = mem::take(&mut state.pre_partitioned);
         assert_eq!(state.num_executor_shards, remaining_txns.len());
@@ -48,9 +47,7 @@ impl PartitionerV2 {
             }
         }
 
-        let _timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["last_round"])
-            .start_timer();
+        let _timer = MISC_TIMERS_SECONDS.timer_with(&["last_round"]);
 
         if !state.partition_last_round {
             trace!("Merging txns after discarding stopped.");
@@ -83,9 +80,7 @@ impl PartitionerV2 {
         Vec<Vec<PrePartitionedTxnIdx>>,
         Vec<Vec<PrePartitionedTxnIdx>>,
     ) {
-        let _timer = MISC_TIMERS_SECONDS
-            .with_label_values(&[format!("round_{round_id}").as_str()])
-            .start_timer();
+        let _timer = MISC_TIMERS_SECONDS.timer_with(&[format!("round_{round_id}").as_str()]);
 
         let num_shards = remaining_txns.len();
 
@@ -182,9 +177,7 @@ impl PartitionerV2 {
     }
 
     pub(crate) fn build_index_from_txn_matrix(state: &mut PartitionState) {
-        let _timer = MISC_TIMERS_SECONDS
-            .with_label_values(&["build_index_from_txn_matrix"])
-            .start_timer();
+        let _timer = MISC_TIMERS_SECONDS.timer_with(&["build_index_from_txn_matrix"]);
 
         let num_rounds = state.finalized_txn_matrix.len();
         state.start_index_matrix = vec![vec![0; state.num_executor_shards]; num_rounds];

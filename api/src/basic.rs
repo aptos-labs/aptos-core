@@ -74,6 +74,8 @@ impl BasicApi {
     )]
     async fn info(&self) -> Json<HashMap<String, serde_json::Value>> {
         let mut info = HashMap::new();
+
+        // Insert state sync configuration information
         info.insert(
             "bootstrapping_mode".to_string(),
             serde_json::to_value(
@@ -96,6 +98,8 @@ impl BasicApi {
             )
             .unwrap(),
         );
+
+        // Insert storage configuration information
         info.insert(
             "new_storage_format".to_string(),
             serde_json::to_value(
@@ -111,6 +115,20 @@ impl BasicApi {
             "internal_indexer_config".to_string(),
             serde_json::to_value(&self.context.node_config.indexer_db_config).unwrap(),
         );
+
+        // Insert node identity information
+        if let Some(validator_network) = &self.context.node_config.validator_network {
+            info.insert(
+                "validator_network_peer_id".to_string(),
+                serde_json::to_value(validator_network.peer_id()).unwrap(),
+            );
+        }
+        for fullnode_network in &self.context.node_config.full_node_networks {
+            info.insert(
+                format!("fullnode_network_peer_id_{}", fullnode_network.network_id),
+                serde_json::to_value(fullnode_network.peer_id()).unwrap(),
+            );
+        }
 
         Json(info)
     }
