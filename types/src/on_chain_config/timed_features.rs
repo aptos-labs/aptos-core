@@ -119,7 +119,7 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
             (DisabledCaptureOption, TESTNET) => Los_Angeles
-                .with_ymd_and_hms(2025, 9, 15, 12, 0, 0)
+                .with_ymd_and_hms(2025, 9, 18, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             // For testing, time set to 1 hour after the beginning of time to test the old and new behaviors in tests.
