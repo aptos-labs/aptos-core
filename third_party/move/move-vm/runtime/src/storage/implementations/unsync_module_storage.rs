@@ -7,7 +7,7 @@ use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
     loader::Module,
     storage::environment::{RuntimeEnvironment, WithRuntimeEnvironment},
-    LayoutCache, LayoutCacheEntry, LayoutCacheHit, ModuleStorage,
+    GenericKey, LayoutCache, LayoutCacheEntry, LayoutCacheHit, ModuleStorage,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
@@ -165,6 +165,18 @@ impl<Ctx> LayoutCache for UnsyncModuleStorageImpl<'_, Ctx> {
     ) -> PartialVMResult<()> {
         Ok(())
     }
+
+    fn get_generic_struct_layout(&self, _key: &GenericKey) -> Option<LayoutCacheHit> {
+        None
+    }
+
+    fn store_generic_struct_layout(
+        &self,
+        _key: GenericKey,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
 }
 
 /// Implementation of (not thread-safe) module storage used for Move unit tests, and externally.
@@ -187,6 +199,18 @@ impl<Ctx> LayoutCache for UnsyncModuleStorage<'_, Ctx> {
     fn store_non_generic_struct_layout(
         &self,
         _idx: &StructNameIndex,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn get_generic_struct_layout(&self, _key: &GenericKey) -> Option<LayoutCacheHit> {
+        None
+    }
+
+    fn store_generic_struct_layout(
+        &self,
+        _key: GenericKey,
         _entry: LayoutCacheEntry,
     ) -> PartialVMResult<()> {
         Ok(())

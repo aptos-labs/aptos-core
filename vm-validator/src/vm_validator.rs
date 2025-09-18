@@ -28,7 +28,7 @@ use move_binary_format::{
 };
 use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_runtime::{
-    LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, RuntimeEnvironment,
+    GenericKey, LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, RuntimeEnvironment,
     WithRuntimeEnvironment,
 };
 use move_vm_types::{
@@ -114,6 +114,18 @@ impl<S: StateView> LayoutCache for ValidationState<S> {
     fn store_non_generic_struct_layout(
         &self,
         _idx: &StructNameIndex,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn get_generic_struct_layout(&self, _key: &GenericKey) -> Option<LayoutCacheHit> {
+        None
+    }
+
+    fn store_generic_struct_layout(
+        &self,
+        _key: GenericKey,
         _entry: LayoutCacheEntry,
     ) -> PartialVMResult<()> {
         Ok(())
