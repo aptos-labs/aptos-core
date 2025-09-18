@@ -36,6 +36,7 @@ x = "run --package aptos-cargo-cli --bin aptos-cargo-cli --"
 rustflags = ["--cfg", "tokio_unstable", "-C", "force-frame-pointers=yes", "-C", "force-unwind-tables=yes"]
 
 # TODO(grao): Figure out whether we should enable othaer cpu features, and whether we should use a different way to configure them rather than list every single one here.
+# dummy change
 [target.x86_64-unknown-linux-gnu]
 rustflags = ["--cfg", "tokio_unstable", "-C", "link-arg=-fuse-ld=lld", "-C", "force-frame-pointers=yes", "-C", "force-unwind-tables=yes", "-C", "target-cpu=x86-64-v2"]
 
