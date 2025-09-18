@@ -153,6 +153,7 @@ impl TransactionDataCache {
             gas_meter,
             traversal_context,
             ty,
+            false,
         )?;
 
         let (data, bytes_loaded) = {
