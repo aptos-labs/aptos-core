@@ -1,9 +1,0 @@
-[package]
-name = "UnitTest"
-version = "1.0.0"
-
-[addresses]
-UnitTest = "0xba31"
-
-[dependencies]
-MoveStdlib = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "move-stdlib", rev = "main", addr_subst = { "std" = "0x1" } }
