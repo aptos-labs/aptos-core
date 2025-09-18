@@ -1,4 +1,5 @@
-module UnitTest::UnitTest {
+address 0x1 {
+module UnitTest {
     const ONE: u64 = 0x20001;
     const TWO: u64 = 0x20002;
 
@@ -9,24 +10,25 @@ module UnitTest::UnitTest {
     #[test]
     fun test_baz() {
         let ret = bar(17);
-        assert!(ret == 18, UnitTest::UnitTest::ONE);
+        assert!(ret == 18, ONE);
     }
 
     #[test]
     fun test_ba() {
         let ret = bar(17);
-        assert!(ret == 19, UnitTest::UnitTest::ONE);
+        assert!(ret == 19, ONE);
     }
 
     #[test]
     fun test_bar() {
         let ret = bar(17);
-        assert!(ret == 17, UnitTest::UnitTest::ONE);
+        assert!(ret == 17, ONE);
     }
 
-    #[test, expected_failure(abort_code = UnitTest::UnitTest::TWO)]
+    #[test, expected_failure(abort_code = TWO)]
     fun test_foo() {
         let ret = bar(19);
-        assert!(ret == 17, UnitTest::UnitTest::TWO);
+        assert!(ret == 17, TWO);
     }
+}
 }
