@@ -6,7 +6,6 @@ pub mod extensions;
 mod filter;
 pub mod test_reporter;
 pub mod test_runner;
-mod filter;
 
 pub use crate::filter::FilterOptions;
 use crate::test_runner::TestRunner;
@@ -29,8 +28,6 @@ use std::{
     sync::Mutex,
 };
 use test_reporter::UnitTestFactory;
-
-pub use crate::filter::FilterOptions;
 
 /// The default value bounding the amount of gas consumed in a test.
 const DEFAULT_EXECUTION_BOUND: u64 = 1_000_000;
