@@ -228,7 +228,7 @@ impl Deref for LedgerInfoWithSignatures {
 impl DerefMut for LedgerInfoWithSignatures {
     fn deref_mut(&mut self) -> &mut LedgerInfoWithV0 {
         match self {
-            LedgerInfoWithSignatures::V0(ref mut ledger) => ledger,
+            LedgerInfoWithSignatures::V0(ledger) => ledger,
         }
     }
 }

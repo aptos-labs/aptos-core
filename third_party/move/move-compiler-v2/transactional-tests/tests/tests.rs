@@ -78,6 +78,21 @@ const TEST_CONFIGS: &[TestConfig] = &[
         exclude: COMMON_EXCLUSIONS,
         cross_compile: false,
     },
+    // Test enabling inlining optimization, across package inlining, and extra optimizations.
+    TestConfig {
+        name: "opt-extra",
+        runner: |p| run(p, get_config_by_name("opt-extra")),
+        experiments: &[
+            (Experiment::INLINING_OPTIMIZATION, true),
+            (Experiment::ACROSS_PACKAGE_INLINING, true),
+            (Experiment::OPTIMIZE, true),
+            (Experiment::OPTIMIZE_EXTRA, true),
+        ],
+        language_version: LanguageVersion::latest(),
+        include: &[], // all tests except those excluded below
+        exclude: COMMON_EXCLUSIONS,
+        cross_compile: false,
+    },
     // Test `/operator_eval/` with language version 1 and 2
     TestConfig {
         name: "operator-eval-lang-1",
@@ -159,6 +174,8 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/enum/enum_scoping.move",
     // Different error messages depending on optimizations or not
     "no-v1-comparison/fv_as_keys.move",
+    // needed until bug #17615 is fixed
+    "misc/bug_14817_extended.move",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {
@@ -183,18 +200,20 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         .map(|(s, v)| (s.to_string(), *v))
         .collect_vec();
     let language_version = config.language_version;
-    // For cross compilation, we need to always append the config name as a part of the outcome file suffix, as optimizations affect the generated code!
-    let vm_test_config = if config.cross_compile {
-        TestRunConfig::new(language_version, experiments).cross_compile_into(
+    let mut vm_test_config =
+        TestRunConfig::new(language_version, experiments).with_runtime_ref_checks();
+    // For cross compilation, we need to always append the config name as a part of the
+    // outcome file suffix, as optimizations affect the generated code.
+    if config.cross_compile {
+        vm_test_config = vm_test_config.cross_compile_into(
             SyntaxChoice::Source,
             true,
             exp_suffix
                 .clone()
                 .or_else(|| Some(format!("{}.exp", config.name))),
-        )
-    } else {
-        TestRunConfig::new(language_version, experiments)
-    };
+        );
+    }
+
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)
 }
 

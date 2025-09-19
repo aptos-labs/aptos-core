@@ -33,6 +33,7 @@ module aptos_experimental::market_bulk_order {
         bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>,
+        metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): option::Option<OrderIdType> {
         // TODO(skedia) Add support for events for bulk orders
@@ -41,7 +42,8 @@ module aptos_experimental::market_bulk_order {
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            metadata
         )) {
             // If the bulk order is not valid, we simply return without placing the order.
             return option::none();
@@ -51,7 +53,8 @@ module aptos_experimental::market_bulk_order {
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            metadata,
         )))
     }
 

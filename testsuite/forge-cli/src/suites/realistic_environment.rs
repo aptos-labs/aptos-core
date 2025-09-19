@@ -41,6 +41,7 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
+        "realistic_env_orderbook_workload_sweep" => realistic_env_orderbook_workload_sweep_bench(),
         "realistic_env_fairness_workload_sweep" => realistic_env_fairness_workload_sweep(),
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(duration),
@@ -129,6 +130,81 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
             (3200, 500, 0.3 + 1.0, 0.7, 0.8),
             // TODO - pos-to-proposal is set to high, until it is calibrated/understood.
             (28, 5, 0.3 + 5.0, 0.7, 1.0),
+        ]
+        .into_iter()
+        .map(
+            |(
+                min_tps,
+                max_expired,
+                mempool_to_block_creation,
+                proposal_to_ordered,
+                ordered_to_commit,
+            )| {
+                SuccessCriteria::new(min_tps)
+                    .add_max_expired_tps(max_expired as f64)
+                    .add_max_failed_submission_tps(200.0)
+                    .add_no_restarts()
+                    .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
+                        (
+                            LatencyBreakdownSlice::MempoolToBlockCreation,
+                            mempool_to_block_creation,
+                        ),
+                        (
+                            LatencyBreakdownSlice::ConsensusProposalToOrdered,
+                            proposal_to_ordered,
+                        ),
+                        (
+                            LatencyBreakdownSlice::ConsensusOrderedToCommit,
+                            ordered_to_commit,
+                        ),
+                    ]))
+            },
+        )
+        .collect(),
+        background_traffic: background_traffic_for_sweep(5),
+    })
+}
+
+pub(crate) fn realistic_env_orderbook_workload_sweep_bench() -> ForgeConfig {
+    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        workloads: Workloads::TRANSACTIONS(vec![
+            TransactionWorkload::new(
+                TransactionTypeArg::OrderBookBalancedMatches25Pct1Market,
+                1000,
+            ),
+            TransactionWorkload::new(
+                TransactionTypeArg::OrderBookBalancedMatches25Pct50Markets,
+                5000,
+            ),
+            TransactionWorkload::new(
+                TransactionTypeArg::OrderBookBalancedMatches80Pct1Market,
+                1000,
+            ),
+            TransactionWorkload::new(
+                TransactionTypeArg::OrderBookBalancedMatches80Pct50Markets,
+                5000,
+            ),
+            TransactionWorkload::new(
+                TransactionTypeArg::OrderBookBalancedSizeSkewed80Pct1Market,
+                1000,
+            ),
+            TransactionWorkload::new(
+                TransactionTypeArg::OrderBookBalancedSizeSkewed80Pct50Markets,
+                5000,
+            ),
+            TransactionWorkload::new(TransactionTypeArg::OrderBookNoMatches1Market, 1000),
+            TransactionWorkload::new(TransactionTypeArg::OrderBookNoMatches50Markets, 5000),
+        ]),
+        criteria: [
+            (350, 100, 0.3 + 1.0, 0.4, 0.2),
+            (1700, 100, 0.3 + 1.0, 0.4, 0.5),
+            (350, 300, 0.3 + 1.0, 0.4, 0.2),
+            (2000, 500, 0.3 + 1.0, 0.4, 0.5),
+            (320, 5, 0.3 + 1.0, 0.4, 0.25),
+            (1500, 5, 0.3 + 1.5, 0.4, 0.5),
+            (320, 100, 0.3 + 1.0, 0.4, 0.2),
+            (1700, 100, 0.3 + 1.0, 0.4, 0.7),
         ]
         .into_iter()
         .map(

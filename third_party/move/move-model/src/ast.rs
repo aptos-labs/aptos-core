@@ -1219,6 +1219,36 @@ impl ExpData {
         called
     }
 
+    /// Returns the Move functions called by this expression, along with call sites and their
+    /// loop depth.
+    pub fn called_funs_with_callsites_and_loop_depth(
+        &self,
+    ) -> BTreeMap<QualifiedId<FunId>, BTreeSet<(NodeId, usize)>> {
+        let mut called: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
+        let mut loop_depth = 0;
+        let mut visitor = |post: bool, e: &ExpData| {
+            match e {
+                ExpData::Loop(..) => {
+                    if post {
+                        loop_depth -= 1
+                    } else {
+                        loop_depth += 1
+                    }
+                },
+                ExpData::Call(node_id, Operation::MoveFunction(mid, fid), _) if !post => {
+                    called
+                        .entry(mid.qualified(*fid))
+                        .or_default()
+                        .insert((*node_id, loop_depth));
+                },
+                _ => {},
+            }
+            true // keep going
+        };
+        self.visit_pre_post(&mut visitor);
+        called
+    }
+
     /// Returns true if the given expression contains a `continue` or
     /// `break` which refers to a loop in the given `nest_range`.
     /// For example, `branches_to(loop { break }, 1..10)` will return false,

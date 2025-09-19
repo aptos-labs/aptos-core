@@ -580,7 +580,7 @@ async fn single_good_peer() {
                         send_transaction_response(network_request);
                     } else {
                         // Send an error or drop the request
-                        if !OsRng.gen::<bool>() {
+                        if !OsRng.r#gen::<bool>() {
                             send_error_response(network_request);
                         }
                     }
@@ -664,7 +664,7 @@ async fn single_good_peer_across_priorities() {
                     send_transaction_response(network_request);
                 } else {
                     // Send an error or drop the request
-                    if !OsRng.gen::<bool>() {
+                    if !OsRng.r#gen::<bool>() {
                         send_error_response(network_request);
                     }
                 }
@@ -683,7 +683,7 @@ async fn single_good_peer_across_priorities() {
 /// If no duration is specified, the sleep duration is randomly chosen.
 async fn emulate_network_latencies(sleep_duration_ms: Option<u64>) {
     let sleep_duration_ms = sleep_duration_ms.unwrap_or_else(|| {
-        OsRng.gen::<u64>() % 500 // Up to 0.5 seconds
+        OsRng.r#gen::<u64>() % 500 // Up to 0.5 seconds
     });
     tokio::time::sleep(Duration::from_millis(sleep_duration_ms)).await;
 }

@@ -203,8 +203,7 @@ pub(crate) fn extract_resource_group_metadata_from_module(
             .iter()
             .map(|struct_def| {
                 let struct_handle = old_module.struct_handle_at(struct_def.struct_handle);
-                let name = old_module.identifier_at(struct_handle.name).to_string();
-                name
+                old_module.identifier_at(struct_handle.name).to_string()
             })
             .collect::<BTreeSet<_>>();
         Ok((groups, members, structs))

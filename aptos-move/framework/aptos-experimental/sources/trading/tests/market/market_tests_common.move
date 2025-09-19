@@ -104,6 +104,7 @@ module aptos_experimental::market_tests_common {
             bid_sizes,
             ask_prices,
             ask_sizes,
+            clearinghouse_test::new_test_order_metadata(1),
             &test_market_callbacks()
         )
     }

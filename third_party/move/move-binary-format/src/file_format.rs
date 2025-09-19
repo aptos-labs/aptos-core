@@ -1181,10 +1181,11 @@ impl SignatureToken {
     /// Panics if this token doesn't contain a struct handle.
     pub fn debug_set_sh_idx(&mut self, sh_idx: StructHandleIndex) {
         match self {
-            SignatureToken::Struct(ref mut wrapped) => *wrapped = sh_idx,
-            SignatureToken::StructInstantiation(ref mut wrapped, _) => *wrapped = sh_idx,
-            SignatureToken::Reference(ref mut token)
-            | SignatureToken::MutableReference(ref mut token) => token.debug_set_sh_idx(sh_idx),
+            SignatureToken::Struct(wrapped) => *wrapped = sh_idx,
+            SignatureToken::StructInstantiation(wrapped, _) => *wrapped = sh_idx,
+            SignatureToken::Reference(token) | SignatureToken::MutableReference(token) => {
+                token.debug_set_sh_idx(sh_idx)
+            },
             other => panic!(
                 "debug_set_sh_idx (to {}) called for non-struct token {:?}",
                 sh_idx, other
@@ -1688,7 +1689,7 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &struct_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
         ty_stack << bool
     "#]
     TestVariant(StructVariantHandleIndex),
@@ -1821,7 +1822,7 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &struct_ty
+        assert ty == &mut struct_ty
         ty_stack << &mut field_ty
     "#]
     #[gas_type_creation_tier_0 = "struct_ty"]
@@ -1863,7 +1864,7 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &struct_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
         ty_stack << &field_ty
     "#]
     ImmBorrowField(FieldHandleIndex),
@@ -1886,8 +1887,8 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &mut struct_ty
-        ty_stack << &mut field_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
+        ty_stack << &field_ty
     "#]
     ImmBorrowVariantField(VariantFieldHandleIndex),
 
@@ -1904,7 +1905,7 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &struct_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
         ty_stack << &field_ty
     "#]
     #[gas_type_creation_tier_0 = "struct_ty"]
@@ -1929,8 +1930,8 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &mut struct_ty
-        ty_stack << &mut field_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
+        ty_stack << &field_ty
     "#]
     ImmBorrowVariantFieldGeneric(VariantFieldInstantiationIndex),
 
@@ -2435,7 +2436,7 @@ pub enum Bytecode {
     #[runtime_check_epilogue = r#"
         ty_stack >> ty1
         ty_stack >> ty2
-        assert ty2 == signer
+        assert ty2 == &signer
         assert ty1 == struct_ty
         assert struct_ty has key
     "#]
@@ -2532,7 +2533,7 @@ pub enum Bytecode {
     #[runtime_check_epilogue = r#"
         elem_ty = instantiate elem_ty
         ty_stack >> ty
-        assert ty == &elem_ty
+        assert ty == &vector<elem_ty> or ty == &mut vector<elem_ty>
         ty_stack << u64
     "#]
     #[gas_type_creation_tier_0 = "elem_ty"]
@@ -2553,7 +2554,7 @@ pub enum Bytecode {
         ty_stack >> idx_ty
         assert idx_ty == u64
         ty_stack >> ref_ty
-        assert ref_ty == &vector<elem_ty>
+        assert ref_ty == &vector<elem_ty> or ref_ty == &mut vector<elem_ty>
         ty_stack << &elem_ty
     "#]
     #[gas_type_creation_tier_0 = "elem_ty"]
@@ -2651,7 +2652,7 @@ pub enum Bytecode {
         ty_stack >> ty3
         assert ty1 == u64
         assert ty2 == u64
-        assert ty3 == &vector<elem_ty>
+        assert ty3 == &mut vector<elem_ty>
     "#]
     VecSwap(SignatureIndex),
 

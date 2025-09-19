@@ -612,7 +612,7 @@ pub async fn bulk_create_accounts(
 
     let seed = config.seed.unwrap_or_else(|| {
         let mut rng = StdRng::from_entropy();
-        rng.gen()
+        rng.r#gen()
     });
     info!(
         "AccountMinter Seed (reuse accounts by passing into --account-minter-seed): {:?}",

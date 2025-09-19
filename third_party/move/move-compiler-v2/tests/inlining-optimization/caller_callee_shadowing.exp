@@ -1,0 +1,69 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    private fun callee(a: u64,_b: u64): u64 {
+        {
+          let x: u64 = 1;
+          {
+            let y: u64 = Add<u64>(a, x);
+            y
+          }
+        }
+    }
+    private fun caller(): u64 {
+        {
+          let x: u64 = 1;
+          {
+            let y: u64 = 1;
+            m::callee(x, y)
+          }
+        }
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    fun callee(a: u64, _b: u64): u64 {
+        let x = 1;
+        let y = a + x;
+        y
+    }
+    fun caller(): u64 {
+        let x = 1;
+        let y = 1;
+        callee(x, y)
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    private fun callee(a: u64,_b: u64): u64 {
+        {
+          let y: u64 = Add<u64>(a, 1);
+          y
+        }
+    }
+    private fun caller(): u64 {
+        2
+    }
+} // end 0xc0ffee::m
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+
+
+callee(a: u64, _b: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](a: u64)
+	1: LdU64(1)
+	2: Add
+	3: Ret
+}
+caller(): u64 /* def_idx: 1 */ {
+B0:
+	0: LdU64(2)
+	1: Ret
+}
+}
+============ bytecode verification succeeded ========

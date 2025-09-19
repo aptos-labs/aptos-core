@@ -148,7 +148,7 @@ impl BackupHandler {
         version: Version,
         start_idx: usize,
         limit: usize,
-    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send> {
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + use<>> {
         let iterator = self
             .state_store
             .get_state_key_and_value_iter(version, start_idx)?

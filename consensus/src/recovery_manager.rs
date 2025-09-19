@@ -110,6 +110,7 @@ impl RecoveryManager {
             self.payload_manager.clone(),
             self.order_vote_enabled,
             self.window_size,
+            None,
         )
         .await?;
 

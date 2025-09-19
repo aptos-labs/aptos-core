@@ -297,6 +297,7 @@ impl BlockStore {
             self.payload_manager.clone(),
             self.order_vote_enabled,
             self.window_size,
+            Some(self),
         )
         .await?
         .take();
@@ -366,6 +367,7 @@ impl BlockStore {
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
         window_size: Option<u64>,
+        maybe_block_store: Option<&'a BlockStore>,
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
@@ -495,7 +497,14 @@ impl BlockStore {
             })?;
 
         storage.save_tree(blocks.clone(), quorum_certs.clone())?;
-
+        // abort any pending executor tasks before entering state sync
+        // with zaptos, things can run before hitting buffer manager
+        if let Some(block_store) = maybe_block_store {
+            monitor!(
+                "abort_pipeline_for_state_sync",
+                block_store.abort_pipeline_for_state_sync().await
+            );
+        }
         execution_client
             .sync_to_target(highest_commit_cert.ledger_info().clone())
             .await?;

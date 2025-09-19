@@ -1,0 +1,17 @@
+//# publish
+module 0xc0ffee::m
+
+public fun foo(): u64
+    local x: u64
+    local r: &u64
+    ld_u64 0
+    st_loc x
+    borrow_loc x
+    st_loc r
+    move_loc x
+    pop
+    move_loc r
+    read_ref
+    ret
+
+//# run 0xc0ffee::m::foo --verbose

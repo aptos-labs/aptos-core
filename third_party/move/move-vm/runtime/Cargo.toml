@@ -7,7 +7,7 @@ repository = "https://github.com/diem/diem"
 homepage = "https://diem.com"
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = { workspace = true }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -17,7 +17,9 @@ bytes = { workspace = true }
 cfg-if = { workspace = true }
 claims = { workspace = true }
 fail = { workspace = true }
+fxhash = { workspace = true }
 hashbrown = { workspace = true }
+itertools = { workspace = true }
 lazy_static = { workspace = true }
 lru = { workspace = true }
 move-binary-format = { workspace = true }
@@ -37,7 +39,7 @@ hex = { workspace = true }
 legacy-move-compiler = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-ir-compiler = { workspace = true }
-move-vm-test-utils ={ workspace = true }
+move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }
 proptest = { workspace = true }
 smallbitvec = { workspace = true }
