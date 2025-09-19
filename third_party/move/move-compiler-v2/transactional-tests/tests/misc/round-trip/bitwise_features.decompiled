@@ -28,12 +28,12 @@ module 0x42::TestFeatures {
         };
     }
     fun set(p0: &mut vector<u8>, p1: u64, p2: bool) {
-        let _t3 = 0x1::vector::length<u8>(freeze(p0));
-        let _t11 = *p0;
+        let _t3 = 0x1::vector::length<u8>(p0);
+        let _t10 = *p0;
         let _t4 = p1 / 8;
-        let _t19 = (p1 % 8) as u8;
-        let _t5 = 1u8 << _t19;
-        while (0x1::vector::length<u8>(freeze(p0)) <= _t4) {
+        let _t18 = (p1 % 8) as u8;
+        let _t5 = 1u8 << _t18;
+        while (0x1::vector::length<u8>(p0) <= _t4) {
             0x1::vector::push_back<u8>(p0, 0u8);
             _t3 = _t3 + 1
         };

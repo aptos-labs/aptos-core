@@ -68,15 +68,15 @@ module 0x42::heap {
     fun sort(p0: &mut vector<u64>) {
         let _t1 = 0;
         loop {
-            let _t7 = 0x1::vector::length<u64>(freeze(p0));
-            if (!(_t1 < _t7)) break;
+            let _t6 = 0x1::vector::length<u64>(p0);
+            if (!(_t1 < _t6)) break;
             let _t2 = _t1 + 1;
             loop {
-                let _t15 = 0x1::vector::length<u64>(freeze(p0));
-                if (!(_t2 < _t15)) break;
-                let _t21 = *0x1::vector::borrow<u64>(freeze(p0), _t1);
-                let _t26 = *0x1::vector::borrow<u64>(freeze(p0), _t2);
-                if (_t21 > _t26) 0x1::vector::swap<u64>(p0, _t1, _t2);
+                let _t13 = 0x1::vector::length<u64>(p0);
+                if (!(_t2 < _t13)) break;
+                let _t19 = *0x1::vector::borrow<u64>(freeze(p0), _t1);
+                let _t24 = *0x1::vector::borrow<u64>(freeze(p0), _t2);
+                if (_t19 > _t24) 0x1::vector::swap<u64>(p0, _t1, _t2);
                 _t2 = _t2 + 1;
                 continue
             };
