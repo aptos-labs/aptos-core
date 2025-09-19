@@ -48,7 +48,7 @@ fn run_serialize_range_proof<E: Pairing>(n: usize, ell: usize) {
         v
     };
     println!(
-        "Serialized proof size (n={}, ell={}): {} bytes, expected for blstrs: {} bytes",
+        "Serialized proof size (n={}, ell={}): {} bytes (expected for blstrs: {} bytes)",
         n,
         ell,
         encoded.len(),
@@ -74,6 +74,7 @@ fn run_serialize_range_proof<E: Pairing>(n: usize, ell: usize) {
     );
 }
 
+#[cfg(test)]
 const TEST_CASES: &[(usize, usize)] = &[
     // (n, \ell)
     (3, 16),
@@ -91,48 +92,27 @@ const TEST_CASES: &[(usize, usize)] = &[
     (2047, 32),
 ];
 
+#[cfg(test)]
 macro_rules! for_each_curve {
-    ($body:ident) => {{
+    ($f:ident, $n:expr, $ell:expr) => {{
         use ark_bls12_381::Bls12_381;
         use ark_bn254::Bn254;
 
-        $body!(Bn254);
-        $body!(Bls12_381);
+        $f::<Bn254>($n, $ell);
+        $f::<Bls12_381>($n, $ell);
     }};
 }
 
 #[test]
 fn range_proof_completeness_multi() {
     for &(n, ell) in TEST_CASES {
-        macro_rules! run_for_curve {
-            ($curve:ty) => {
-                println!(
-                    "Running tests for {} (n={}, ell={})",
-                    stringify!($curve),
-                    n,
-                    ell
-                );
-                run_range_proof_completeness::<$curve>(n, ell);
-            };
-        }
-        for_each_curve!(run_for_curve);
+        for_each_curve!(run_range_proof_completeness, n, ell);
     }
 }
 
 #[test]
 fn serialize_range_proof_multi() {
     for &(n, ell) in TEST_CASES {
-        macro_rules! run_for_curve {
-            ($curve:ty) => {
-                println!(
-                    "Serializing tests for {} (n={}, ell={})",
-                    stringify!($curve),
-                    n,
-                    ell
-                );
-                run_serialize_range_proof::<$curve>(n, ell);
-            };
-        }
-        for_each_curve!(run_for_curve);
+        for_each_curve!(run_serialize_range_proof, n, ell);
     }
 }
