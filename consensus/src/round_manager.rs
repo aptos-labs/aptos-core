@@ -26,6 +26,7 @@ use crate::{
     monitor,
     network::NetworkSender,
     network_interface::ConsensusMsg,
+    proxy_network_interfaces::{ProxyConsensusMsg, ProxyConsensusMessage},
     pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
     pending_votes::{VoteReceptionResult, VoteStatus},
     persistent_liveness_storage::PersistentLivenessStorage,
@@ -98,6 +99,8 @@ pub enum UnverifiedEvent {
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
     OptProposalMsg(Box<OptProposalMsg>),
+    // proxy events
+    UnverifiedProxyEvent(Box<UnverifiedProxyEvent>),
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
@@ -195,6 +198,7 @@ impl UnverifiedEvent {
                 }
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
+            UnverifiedEvent::UnverifiedProxyEvent(e) => VerifiedEvent::VerifiedProxyEvent(Box::new(e.verify(peer_id, validator, proof_cache, quorum_store_enabled, self_message)?)),
         })
     }
 
@@ -209,6 +213,7 @@ impl UnverifiedEvent {
             UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
             UnverifiedEvent::RoundTimeoutMsg(t) => Ok(t.epoch()),
+            UnverifiedEvent::UnverifiedProxyEvent(e) => e.epoch(),
         }
     }
 }
@@ -225,10 +230,111 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
             ConsensusMsg::RoundTimeoutMsg(m) => UnverifiedEvent::RoundTimeoutMsg(m),
+            ConsensusMsg::ProxyConsensusMsg(m) => UnverifiedEvent::UnverifiedProxyEvent(Box::new((*m).into())),
             _ => unreachable!("Unexpected conversion"),
         }
     }
 }
+
+#[derive(Debug, Serialize, Clone)]
+pub enum UnverifiedProxyEvent {
+    ProposalMsg(ProposalMsg),
+    OptProposalMsg(OptProposalMsg),
+    VoteMsg(VoteMsg),
+    OrderVoteMsg(OrderVoteMsg),
+    RoundTimeoutMsg(RoundTimeoutMsg),
+    SyncInfo(SyncInfo),
+}
+
+impl UnverifiedProxyEvent {
+    pub fn verify(
+        self,
+        peer_id: PeerId,
+        validator: &ValidatorVerifier,
+        proof_cache: &ProofCache,
+        quorum_store_enabled: bool,
+        self_message: bool,
+    ) -> Result<VerifiedProxyEvent, VerifyError> {
+        let start_time = Instant::now();
+        Ok(match self {
+            //TODO: no need to sign and verify the proposal
+            UnverifiedProxyEvent::ProposalMsg(p) => {
+                if !self_message {
+                    p.verify(peer_id, validator, proof_cache, quorum_store_enabled)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["proxy_proposal"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedProxyEvent::ProposalMsg(p)
+            },
+            UnverifiedProxyEvent::OptProposalMsg(p) => {
+                if !self_message {
+                    p.verify(peer_id, validator, proof_cache, quorum_store_enabled)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["proxy_opt_proposal"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedProxyEvent::OptProposalMsg(p)
+            },
+            UnverifiedProxyEvent::VoteMsg(v) => {
+                if !self_message {
+                    v.verify(peer_id, validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["proxy_vote"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedProxyEvent::VoteMsg(v)
+            },
+            UnverifiedProxyEvent::RoundTimeoutMsg(v) => {
+                if !self_message {
+                    v.verify(validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["proxy_timeout"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedProxyEvent::RoundTimeoutMsg(v)
+            },
+            UnverifiedProxyEvent::OrderVoteMsg(v) => {
+                if !self_message {
+                    v.verify_order_vote(peer_id, validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["proxy_order_vote"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedProxyEvent::OrderVoteMsg(v)
+            },
+            // sync info verification is on-demand (verified when it's used)
+            UnverifiedProxyEvent::SyncInfo(s) => VerifiedProxyEvent::SyncInfo(s),
+        })
+    }
+
+    pub fn epoch(&self) -> anyhow::Result<u64> {
+        match self {
+            UnverifiedProxyEvent::ProposalMsg(p) => Ok(p.epoch()),
+            UnverifiedProxyEvent::OptProposalMsg(p) => Ok(p.epoch()),
+            UnverifiedProxyEvent::VoteMsg(v) => Ok(v.epoch()),
+            UnverifiedProxyEvent::OrderVoteMsg(v) => Ok(v.epoch()),
+            UnverifiedProxyEvent::RoundTimeoutMsg(t) => Ok(t.epoch()),
+            UnverifiedProxyEvent::SyncInfo(s) => Ok(s.epoch()),
+        }
+    }
+}
+
+impl From<ProxyConsensusMsg> for UnverifiedProxyEvent {
+    fn from(value: ProxyConsensusMsg) -> Self {
+        let ProxyConsensusMsg { proxy_consensus_message, consensus_id } = value;
+        match proxy_consensus_message {
+            ProxyConsensusMessage::ProposalMsg(m) => UnverifiedProxyEvent::ProposalMsg(m),
+            ProxyConsensusMessage::OptProposalMsg(m) => UnverifiedProxyEvent::OptProposalMsg(m),
+            ProxyConsensusMessage::VoteMsg(m) => UnverifiedProxyEvent::VoteMsg(m),
+            ProxyConsensusMessage::OrderVoteMsg(m) => UnverifiedProxyEvent::OrderVoteMsg(m),
+            ProxyConsensusMessage::RoundTimeoutMsg(m) => UnverifiedProxyEvent::RoundTimeoutMsg(m),
+            ProxyConsensusMessage::SyncInfo(m) => UnverifiedProxyEvent::SyncInfo(m),
+            _ => unreachable!("Unexpected conversion"),
+        }
+    }
+}
+
 
 #[derive(Debug)]
 pub enum VerifiedEvent {
@@ -247,6 +353,18 @@ pub enum VerifiedEvent {
     // Shutdown the NetworkListener
     Shutdown(TokioOneshot::Sender<()>),
     OptProposalMsg(Box<OptProposalMsg>),
+    // proxy events
+    VerifiedProxyEvent(Box<VerifiedProxyEvent>),
+}
+
+#[derive(Debug)]
+pub enum VerifiedProxyEvent {
+    ProposalMsg(ProposalMsg),
+    OptProposalMsg(OptProposalMsg),
+    VoteMsg(VoteMsg),
+    OrderVoteMsg(OrderVoteMsg),
+    RoundTimeoutMsg(RoundTimeoutMsg),
+    SyncInfo(SyncInfo),
 }
 
 #[cfg(test)]
@@ -2147,6 +2265,28 @@ impl RoundManager {
                             "process_local_timeout",
                             self.process_local_timeout(round).await
                         ),
+                        VerifiedEvent::VerifiedProxyEvent(proxy_event) => {
+                            match *proxy_event {
+                                VerifiedProxyEvent::ProposalMsg(proposal_msg) => {
+                                    monitor!("process_proxy_proposal", self.process_proposal_msg(proposal_msg).await)
+                                }
+                                VerifiedProxyEvent::OptProposalMsg(opt_proposal_msg) => {
+                                    monitor!("process_proxy_opt_proposal", self.process_opt_proposal_msg(opt_proposal_msg).await)
+                                }
+                                VerifiedProxyEvent::VoteMsg(vote_msg) => {
+                                    monitor!("process_proxy_vote", self.process_vote_msg(vote_msg).await)
+                                }
+                                VerifiedProxyEvent::OrderVoteMsg(order_vote_msg) => {
+                                    monitor!("process_proxy_order_vote", self.process_order_vote_msg(order_vote_msg).await)
+                                }
+                                VerifiedProxyEvent::RoundTimeoutMsg(timeout_msg) => {
+                                    monitor!("process_proxy_round_timeout", self.process_round_timeout_msg(timeout_msg).await)
+                                }
+                                VerifiedProxyEvent::SyncInfo(sync_info) => {
+                                    monitor!("process_proxy_sync_info", self.process_sync_info_msg(sync_info, peer_id).await)
+                                }
+                            }
+                        },
                         unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
                     }
                     .with_context(|| format!("from peer {}", peer_id));

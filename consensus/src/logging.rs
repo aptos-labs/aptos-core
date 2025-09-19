@@ -7,6 +7,7 @@ use aptos_crypto::HashValue;
 use aptos_logger::Schema;
 use aptos_types::block_info::Round;
 use serde::Serialize;
+use crate::block_storage::tracing::BlockType;
 
 #[derive(Schema)]
 pub struct LogSchema {
@@ -16,6 +17,7 @@ pub struct LogSchema {
     epoch: Option<u64>,
     round: Option<Round>,
     id: Option<HashValue>,
+    block_type: Option<BlockType>,
 }
 
 #[derive(Serialize)]
@@ -74,6 +76,7 @@ impl LogSchema {
             epoch: None,
             round: None,
             id: None,
+            block_type: None,
         }
     }
 }

@@ -56,6 +56,7 @@ pub mod consensus_provider;
 pub mod counters;
 /// AptosNet interface.
 pub mod network_interface;
+pub mod proxy_network_interfaces;
 mod payload_manager;
 mod transaction_deduper;
 mod transaction_shuffler;

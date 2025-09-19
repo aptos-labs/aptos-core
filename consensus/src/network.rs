@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::tracing::{observe_block, BlockStage},
+    block_storage::tracing::{BlockStage, observe_block, observe_block_inner},
     counters,
     dag::{
         DAGMessage, DAGNetworkMessage, DAGRpcResult, ProofNotifier, RpcWithFallback,
@@ -12,6 +12,7 @@ use crate::{
     logging::{LogEvent, LogSchema},
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
+    proxy_network_interfaces::{ProxyConsensusMsg, ProxyConsensusMessage},
     pipeline::commit_reliable_broadcast::CommitMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
     rand::rand_gen::{
@@ -61,7 +62,7 @@ use std::{
     time::Duration,
 };
 use tokio::time::timeout;
-
+use crate::block_storage::tracing::BlockType;
 pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
 
@@ -119,6 +120,13 @@ pub struct IncomingBlockRetrievalRequest {
 }
 
 #[derive(Debug)]
+pub struct IncomingProxyBlockRetrievalRequest {
+    pub req: BlockRetrievalRequest,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+#[derive(Debug)]
 pub struct IncomingBatchRetrievalRequest {
     pub req: BatchRequest,
     pub protocol: ProtocolId,
@@ -157,6 +165,7 @@ pub enum IncomingRpcRequest {
     CommitRequest(IncomingCommitRequest),
     RandGenRequest(IncomingRandGenRequest),
     BlockRetrieval(IncomingBlockRetrievalRequest),
+    ProxyBlockRetrieval(IncomingProxyBlockRetrievalRequest),
 }
 
 impl IncomingRpcRequest {
@@ -169,6 +178,7 @@ impl IncomingRpcRequest {
             IncomingRpcRequest::CommitRequest(req) => req.req.epoch(),
             IncomingRpcRequest::DeprecatedBlockRetrieval(_) => None,
             IncomingRpcRequest::BlockRetrieval(_) => None,
+            IncomingRpcRequest::ProxyBlockRetrieval(_) => None,
         }
     }
 }
@@ -178,6 +188,10 @@ impl IncomingRpcRequest {
 pub struct NetworkReceivers {
     /// Provide a LIFO buffer for each (Author, MessageType) key
     pub consensus_messages: aptos_channel::Receiver<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
+    pub proxy_consensus_messages: aptos_channel::Receiver<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
@@ -682,6 +696,10 @@ pub struct NetworkTask {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
+    proxy_consensus_messages_tx: aptos_channel::Sender<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
     quorum_store_messages_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
@@ -700,6 +718,11 @@ impl NetworkTask {
         self_receiver: aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            10,
+            Some(&counters::CONSENSUS_CHANNEL_MSGS),
+        );
+        let (proxy_consensus_messages_tx, proxy_consensus_messages) = aptos_channel::new(
             QueueStyle::FIFO,
             10,
             Some(&counters::CONSENSUS_CHANNEL_MSGS),
@@ -729,12 +752,14 @@ impl NetworkTask {
         (
             NetworkTask {
                 consensus_messages_tx,
+                proxy_consensus_messages_tx,
                 quorum_store_messages_tx,
                 rpc_tx,
                 all_events,
             },
             NetworkReceivers {
                 consensus_messages,
+                proxy_consensus_messages,
                 quorum_store_messages,
                 rpc_rx,
             },
@@ -861,6 +886,57 @@ impl NetworkTask {
                                 warn!(error = ?e, "aptos channel closed");
                             };
                         },
+                        ConsensusMsg::ProxyConsensusMsg(proxy_consensus_msg) => {
+                            let ProxyConsensusMsg { proxy_consensus_message, consensus_id } = proxy_consensus_msg.as_ref();
+                            match proxy_consensus_message {
+                                ProxyConsensusMessage::ProposalMsg(_)
+                                | ProxyConsensusMessage::OptProposalMsg(_)
+                                | ProxyConsensusMessage::VoteMsg(_)
+                                | ProxyConsensusMessage::OrderVoteMsg(_)
+                                | ProxyConsensusMessage::RoundTimeoutMsg(_)
+                                | ProxyConsensusMessage::SyncInfo(_) => {
+                                    if let ProxyConsensusMessage::ProposalMsg(proposal) = proxy_consensus_message {
+                                        observe_block_inner(
+                                            proposal.proposal().timestamp_usecs(),
+                                            BlockStage::NETWORK_RECEIVED,
+                                            BlockType::MOON,
+                                        );
+                                        info!(
+                                            LogSchema::new(LogEvent::NetworkReceiveProposal)
+                                                .remote_peer(peer_id),
+                                            block_round = proposal.proposal().round(),
+                                            block_hash = proposal.proposal().id(),
+                                            block_type = BlockType::MOON,
+                                        );
+                                    }
+                                    if let ProxyConsensusMessage::OptProposalMsg(proposal) = proxy_consensus_message {
+                                        observe_block_inner(
+                                            proposal.timestamp_usecs(),
+                                            BlockStage::NETWORK_RECEIVED,
+                                            BlockType::MOON,
+                                        );
+                                        observe_block_inner(
+                                            proposal.timestamp_usecs(),
+                                            BlockStage::NETWORK_RECEIVED_OPT_PROPOSAL,
+                                            BlockType::MOON,
+                                        );
+                                        info!(
+                                            LogSchema::new(LogEvent::NetworkReceiveOptProposal)
+                                                .remote_peer(peer_id),
+                                            block_author = proposal.proposer(),
+                                            block_epoch = proposal.epoch(),
+                                            block_round = proposal.round(),
+                                            block_type = BlockType::MOON,
+                                        );
+                                    }
+                                    Self::push_msg(peer_id, proxy_consensus_msg.into_network_message(), &self.proxy_consensus_messages_tx);
+                                },
+                                _ => {
+                                    warn!(remote_peer = peer_id, "Unexpected proxy consensus msg: {:?}", proxy_consensus_msg);
+                                    continue;
+                                },
+                            }
+                        }
                         _ => {
                             warn!(remote_peer = peer_id, "Unexpected direct send msg");
                             continue;
@@ -938,6 +1014,22 @@ impl NetworkTask {
                                 protocol,
                                 response_sender: callback,
                             })
+                        },
+                        ConsensusMsg::ProxyConsensusMsg(msg) => {
+                            let ProxyConsensusMsg { proxy_consensus_message, consensus_id } = *msg;
+                            match proxy_consensus_message {
+                                ProxyConsensusMessage::BlockRetrievalRequest(request) => {
+                                    IncomingRpcRequest::ProxyBlockRetrieval(IncomingProxyBlockRetrievalRequest {
+                                        req: request,
+                                        protocol,
+                                        response_sender: callback,
+                                    })
+                                },
+                                _ => {
+                                    warn!(remote_peer = peer_id, "Unexpected proxy consensus msg: {:?}", proxy_consensus_message);
+                                    continue;
+                                },
+                            }
                         },
                         _ => {
                             warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);
