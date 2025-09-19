@@ -146,7 +146,6 @@ allowing cleaner iterator APIs.
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/cmp.md#0x1_cmp">0x1::cmp</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="ordered_map.md#0x1_ordered_map">0x1::ordered_map</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/storage_slots_allocator.md#0x1_storage_slots_allocator">0x1::storage_slots_allocator</a>;

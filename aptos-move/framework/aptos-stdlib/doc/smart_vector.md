@@ -64,7 +64,6 @@
 
 <pre><code><b>use</b> <a href="big_vector.md#0x1_big_vector">0x1::big_vector</a>;
 <b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="type_info.md#0x1_type_info">0x1::type_info</a>;
 <b>use</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;

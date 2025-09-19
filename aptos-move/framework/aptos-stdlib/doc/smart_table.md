@@ -74,7 +74,6 @@ has been deprecated in favor of <code>big_ordered_map.<b>move</b></code>.
 
 <pre><code><b>use</b> <a href="hash.md#0x1_aptos_hash">0x1::aptos_hash</a>;
 <b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="table_with_length.md#0x1_table_with_length">0x1::table_with_length</a>;
