@@ -10,7 +10,7 @@ use crate::{
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
     },
-    loader::LazyLoadedFunction,
+    loader::{FunctionHandle, LazyLoadedFunction},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
@@ -22,7 +22,7 @@ use crate::{
         loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
         ty_layout_converter::LayoutConverter,
     },
-    trace, LoadedFunction, RuntimeEnvironment,
+    trace, LoadedFunction, LoadedFunctionOwner, RuntimeEnvironment,
 };
 use fail::fail_point;
 use move_binary_format::{
@@ -36,6 +36,7 @@ use move_core_types::{
     account_address::AccountAddress,
     function::ClosureMask,
     gas_algebra::NumBytes,
+    identifier::IdentStr,
     language_storage::TypeTag,
     vm_status::{
         sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode, StatusType,
@@ -1710,6 +1711,26 @@ enum ExitCode {
     CallClosure(SignatureIndex),
 }
 
+struct FastFrame<'a> {
+    num_locals: usize, // args included
+    num_rets: usize,
+
+    locals: Option<Locals>,
+    locals_mask: [u64; 4],
+
+    code: &'a [Bytecode],
+    pc: usize,
+    bp: usize,
+}
+
+impl<'a> FastFrame<'a> {
+    #[inline(always)]
+    fn has_promoted_local(&self, idx: usize) -> bool {
+        assert!(idx < 256);
+        self.locals_mask[idx / 64] & (1 << (idx % 64)) != 0
+    }
+}
+
 impl Frame {
     /// Execute a Move function until a return or a call opcode is found.
     fn execute_code<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
@@ -1726,6 +1747,7 @@ impl Frame {
             resource_resolver,
             gas_meter,
             traversal_context,
+            None,
         )
         .map_err(|e| {
             let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
@@ -1744,6 +1766,8 @@ impl Frame {
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
+
+        mut fast_frame: Option<FastFrame>,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;
 
@@ -1756,11 +1780,30 @@ impl Frame {
             };
         }
 
-        let frame_cache = &mut *self.frame_cache.borrow_mut();
+        let loaded_fn = self.function.clone();
 
-        let code = self.function.code();
+        /*
+        match &fast_frame {
+            Some(fast_frame) => {
+                println!("fn: {}", "<fast fn>");
+            },
+            None => {
+                println!("fn: {}", self.function.name());
+                if self.function.name() == "initialize_core_resources_and_aptos_coin" {
+                    println!("pc: {}", self.pc);
+                    println!("{:#?}", loaded_fn.code());
+                }
+            },
+        }
+        */
+
         loop {
-            for instruction in &code[self.pc as usize..] {
+            let (code, pc) = match &fast_frame {
+                Some(fast_frame) => (fast_frame.code, fast_frame.pc),
+                None => (loaded_fn.code(), self.pc as usize),
+            };
+
+            for instruction in &code[pc..] {
                 trace!(
                     &self.function,
                     &self.locals,
@@ -1769,6 +1812,12 @@ impl Frame {
                     interpreter.loader.runtime_environment(),
                     interpreter
                 );
+
+                //println!(
+                //    "instruction: {:?}, fast_call: {}",
+                //    instruction,
+                //    fast_frame.is_some()
+                //);
 
                 fail_point!("move_vm::interpreter_loop", |_| {
                     Err(
@@ -1786,16 +1835,19 @@ impl Frame {
                 // The reason for this design is we charge gas during instruction execution and we want to perform checks only after
                 // proper gas has been charged for each instruction.
 
-                RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
-                RTTCheck::pre_execution_type_stack_transition(
-                    self,
-                    &mut interpreter.operand_stack,
-                    instruction,
-                    frame_cache,
-                )?;
+                if fast_frame.is_none() {
+                    RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
+
+                    RTTCheck::pre_execution_type_stack_transition(
+                        self,
+                        &mut interpreter.operand_stack,
+                        instruction,
+                        &mut *self.frame_cache.borrow_mut(),
+                    )?;
+                }
 
                 macro_rules! binop_int {
-                    ($op: expr) => {{
+                    ($op:expr) => {{
                         let rhs = interpreter.operand_stack.pop_as::<IntegerValue>()?;
                         let lhs = interpreter.operand_stack.pop_as::<IntegerValue>()?;
                         let result = match $op(lhs, rhs)? {
@@ -1807,16 +1859,16 @@ impl Frame {
                             IntegerValue::U256(x) => Value::u256(x),
                         };
                         interpreter.operand_stack.push(result)
-                    }}
+                    }};
                 }
 
                 macro_rules! binop_bool {
-                    ($op: expr) => {{
+                    ($op:expr) => {{
                         let rhs = interpreter.operand_stack.pop_as()?;
                         let lhs = interpreter.operand_stack.pop_as()?;
                         let result: bool = $op(lhs, rhs)?;
                         interpreter.operand_stack.push(Value::bool(result))
-                    }}
+                    }};
                 }
 
                 match instruction {
@@ -1826,12 +1878,38 @@ impl Frame {
                     },
                     Bytecode::Ret => {
                         gas_meter.charge_simple_instr(S::Ret)?;
-                        return Ok(ExitCode::Return);
+
+                        match fast_frame.as_mut() {
+                            Some(fast_frame) => {
+                                let stack = &mut interpreter.operand_stack.value;
+
+                                assert!(
+                                    stack.len()
+                                        == fast_frame.bp
+                                            + fast_frame.num_locals
+                                            + fast_frame.num_rets
+                                );
+
+                                stack.drain(fast_frame.bp..(fast_frame.bp + fast_frame.num_locals));
+
+                                //println!("    returning from fastcall");
+                                //println!("    stack: {:?}", stack);
+
+                                return Ok(ExitCode::Return); // unused
+                            },
+                            None => return Ok(ExitCode::Return),
+                        }
+                        // FASTCALL: pop stack
                     },
                     Bytecode::BrTrue(offset) => {
                         if interpreter.operand_stack.pop_as::<bool>()? {
                             gas_meter.charge_br_true(Some(*offset))?;
-                            self.pc = *offset;
+
+                            match fast_frame.as_mut() {
+                                Some(fast_frame) => fast_frame.pc = *offset as usize,
+                                None => self.pc = *offset,
+                            }
+
                             break;
                         } else {
                             gas_meter.charge_br_true(None)?;
@@ -1840,7 +1918,12 @@ impl Frame {
                     Bytecode::BrFalse(offset) => {
                         if !interpreter.operand_stack.pop_as::<bool>()? {
                             gas_meter.charge_br_false(Some(*offset))?;
-                            self.pc = *offset;
+
+                            match fast_frame.as_mut() {
+                                Some(fast_frame) => fast_frame.pc = *offset as usize,
+                                None => self.pc = *offset,
+                            }
+
                             break;
                         } else {
                             gas_meter.charge_br_false(None)?;
@@ -1848,7 +1931,12 @@ impl Frame {
                     },
                     Bytecode::Branch(offset) => {
                         gas_meter.charge_branch(*offset)?;
-                        self.pc = *offset;
+
+                        match fast_frame.as_mut() {
+                            Some(fast_frame) => fast_frame.pc = *offset as usize,
+                            None => self.pc = *offset,
+                        }
+
                         break;
                     },
                     Bytecode::LdU8(int_const) => {
@@ -1882,6 +1970,8 @@ impl Frame {
                         //     constant.type_.num_nodes() as u64,
                         // ))?;
 
+                        assert!(fast_frame.is_none());
+
                         gas_meter.charge_ld_const(NumBytes::new(constant.data.len() as u64))?;
 
                         let val = Value::deserialize_constant(constant).ok_or_else(|| {
@@ -1906,44 +1996,308 @@ impl Frame {
                     },
                     Bytecode::CopyLoc(idx) => {
                         // TODO(Gas): We should charge gas before copying the value.
-                        let local = self.locals.copy_loc(*idx as usize)?;
+                        let local = match fast_frame.as_mut() {
+                            Some(fast_frame) => {
+                                if fast_frame.has_promoted_local(*idx as usize) {
+                                    fast_frame
+                                        .locals
+                                        .as_ref()
+                                        .unwrap()
+                                        .copy_loc(*idx as usize)?
+                                } else {
+                                    //println!("not promoted, loading from stack");
+
+                                    //println!("fast_frame.bp = {}", fast_frame.bp);
+
+                                    //println!("{:?}", interpreter.operand_stack.value);
+
+                                    let val_ref_opt = interpreter
+                                        .operand_stack
+                                        .value
+                                        .get(fast_frame.bp + *idx as usize);
+
+                                    match val_ref_opt {
+                                        Some(val) => val.copy_value()?,
+                                        None => {
+                                            return Err(PartialVMError::new(
+                                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                                            ))
+                                        },
+                                    }
+                                }
+                            },
+                            None => self.locals.copy_loc(*idx as usize)?,
+                        };
+                        //println!("copy_loc done");
                         gas_meter.charge_copy_loc(&local)?;
+                        //println!("charge done");
                         interpreter.operand_stack.push(local)?;
+                        //println!("push done");
                     },
                     Bytecode::MoveLoc(idx) => {
-                        let local = self.locals.move_loc(
-                            *idx as usize,
-                            interpreter.vm_config.check_invariant_in_swap_loc,
-                        )?;
-                        gas_meter.charge_move_loc(&local)?;
+                        let local = match fast_frame.as_mut() {
+                            Some(fast_frame) => {
+                                if fast_frame.has_promoted_local(*idx as usize) {
+                                    fast_frame.locals.as_mut().unwrap().move_loc(
+                                        *idx as usize,
+                                        interpreter.vm_config.check_invariant_in_swap_loc,
+                                    )?
+                                } else {
+                                    let val_ref_opt = interpreter
+                                        .operand_stack
+                                        .value
+                                        .get_mut(fast_frame.bp + *idx as usize);
 
+                                    match val_ref_opt {
+                                        Some(val) => std::mem::replace(val, Value::invalid()),
+                                        None => {
+                                            return Err(PartialVMError::new(
+                                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                                            ))
+                                        },
+                                    }
+                                }
+                            },
+                            None => self.locals.move_loc(
+                                *idx as usize,
+                                interpreter.vm_config.check_invariant_in_swap_loc,
+                            )?,
+                        };
+                        gas_meter.charge_move_loc(&local)?;
                         interpreter.operand_stack.push(local)?;
                     },
                     Bytecode::StLoc(idx) => {
                         let value_to_store = interpreter.operand_stack.pop()?;
                         gas_meter.charge_store_loc(&value_to_store)?;
-                        self.locals.store_loc(
-                            *idx as usize,
-                            value_to_store,
-                            interpreter.vm_config.check_invariant_in_swap_loc,
-                        )?;
+
+                        match fast_frame.as_mut() {
+                            Some(fast_frame) => {
+                                if fast_frame.has_promoted_local(*idx as usize) {
+                                    fast_frame.locals.as_mut().unwrap().store_loc(
+                                        *idx as usize,
+                                        value_to_store,
+                                        interpreter.vm_config.check_invariant_in_swap_loc,
+                                    )?
+                                } else {
+                                    let val_ref_opt = interpreter
+                                        .operand_stack
+                                        .value
+                                        .get_mut(fast_frame.bp + *idx as usize);
+
+                                    match val_ref_opt {
+                                        Some(val) => {
+                                            _ = std::mem::replace(val, value_to_store);
+                                        },
+                                        None => {
+                                            return Err(PartialVMError::new(
+                                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                                            ))
+                                        },
+                                    }
+                                }
+                            },
+                            None => self.locals.store_loc(
+                                *idx as usize,
+                                value_to_store,
+                                interpreter.vm_config.check_invariant_in_swap_loc,
+                            )?,
+                        }
                     },
                     Bytecode::Call(idx) => {
-                        return Ok(ExitCode::Call(*idx));
+                        // FASTCALL: dispatch
+
+                        let fh = match self.function.owner() {
+                            LoadedFunctionOwner::Module(module) => module.function_at(idx.0),
+                            LoadedFunctionOwner::Script(script) => script.function_at(idx.0),
+                        };
+
+                        let func = match fh {
+                            FunctionHandle::Local(function) => {
+                                if function.is_fast_callable {
+                                    function.clone()
+                                } else {
+                                    return Ok(ExitCode::Call(*idx));
+                                }
+                            },
+                            FunctionHandle::Remote { module, name } => {
+                                let (_module, function) = interpreter
+                                    .loader
+                                    .load_function_definition(
+                                        gas_meter,
+                                        traversal_context,
+                                        module,
+                                        name,
+                                    )
+                                    .map_err(|err| err.to_partial())?;
+
+                                if function.is_fast_callable {
+                                    function
+                                } else {
+                                    return Ok(ExitCode::Call(*idx));
+                                }
+                            },
+                        };
+
+                        //println!("  => fast call: {}", func.name());
+
+                        // TODO: gas metering
+
+                        let fast_frame = FastFrame {
+                            num_locals: func.local_tys().len(),
+                            num_rets: func.return_tys().len(),
+
+                            locals: None,
+                            locals_mask: [0; 4],
+
+                            code: &func.code,
+                            pc: 0,
+                            bp: interpreter.operand_stack.value.len() - func.param_tys().len(),
+                        };
+
+                        let n_locals = func.local_tys().len() - func.param_tys().len();
+                        interpreter
+                            .operand_stack
+                            .value
+                            .extend(std::iter::repeat_with(|| Value::invalid()).take(n_locals));
+
+                        self.execute_code_impl::<RTTCheck, RTCaches>(
+                            interpreter,
+                            data_cache,
+                            resource_resolver,
+                            gas_meter,
+                            traversal_context,
+                            Some(fast_frame),
+                        )?;
+
+                        //println!("returned from fastcall");
                     },
                     Bytecode::CallGeneric(idx) => {
-                        return Ok(ExitCode::CallGeneric(*idx));
+                        // FASTCALL: dispatch
+                        let fh = match self.function.owner() {
+                            LoadedFunctionOwner::Module(module) => {
+                                module.function_instantiation_handle_at(idx.0)
+                            },
+                            LoadedFunctionOwner::Script(script) => {
+                                script.function_instantiation_handle_at(idx.0)
+                            },
+                        };
+
+                        let func = match fh {
+                            FunctionHandle::Local(function) => {
+                                match self.function.owner() {
+                                    LoadedFunctionOwner::Module(module) => {
+                                        //println!(
+                                        //    "  => local fast call module: {}",
+                                        //    module.self_id()
+                                        //);
+                                    },
+                                    LoadedFunctionOwner::Script(script) => (),
+                                }
+
+                                if function.is_fast_callable {
+                                    function.clone()
+                                } else {
+                                    return Ok(ExitCode::CallGeneric(*idx));
+                                }
+                            },
+                            FunctionHandle::Remote { module, name } => {
+                                let (_module, function) = interpreter
+                                    .loader
+                                    .load_function_definition(
+                                        gas_meter,
+                                        traversal_context,
+                                        module,
+                                        name,
+                                    )
+                                    .map_err(|err| err.to_partial())?;
+
+                                //println!("  => remote fast call module: {}", module.name());
+
+                                if function.is_fast_callable {
+                                    function
+                                } else {
+                                    return Ok(ExitCode::CallGeneric(*idx));
+                                }
+                            },
+                        };
+
+                        //println!("  => fast call: {}", func.name());
+
+                        // TODO: gas metering
+
+                        let fast_frame = FastFrame {
+                            num_locals: func.local_tys().len(),
+                            num_rets: func.return_tys().len(),
+
+                            locals: None,
+                            locals_mask: [0; 4],
+
+                            code: &func.code,
+                            pc: 0,
+                            bp: interpreter.operand_stack.value.len() - func.param_tys().len(),
+                        };
+
+                        let n_locals = func.local_tys().len() - func.param_tys().len();
+                        interpreter
+                            .operand_stack
+                            .value
+                            .extend(std::iter::repeat_with(|| Value::invalid()).take(n_locals));
+
+                        self.execute_code_impl::<RTTCheck, RTCaches>(
+                            interpreter,
+                            data_cache,
+                            resource_resolver,
+                            gas_meter,
+                            traversal_context,
+                            Some(fast_frame),
+                        )?;
                     },
-                    Bytecode::CallClosure(idx) => return Ok(ExitCode::CallClosure(*idx)),
+                    Bytecode::CallClosure(idx) => {
+                        assert!(fast_frame.is_none());
+
+                        return Ok(ExitCode::CallClosure(*idx));
+                    },
                     Bytecode::MutBorrowLoc(idx) | Bytecode::ImmBorrowLoc(idx) => {
+                        let idx = *idx as usize;
+
                         let instr = match instruction {
                             Bytecode::MutBorrowLoc(_) => S::MutBorrowLoc,
                             _ => S::ImmBorrowLoc,
                         };
                         gas_meter.charge_simple_instr(instr)?;
-                        interpreter
-                            .operand_stack
-                            .push(self.locals.borrow_loc(*idx as usize)?)?;
+
+                        let ref_val = match fast_frame.as_mut() {
+                            Some(fast_frame) => {
+                                if fast_frame.has_promoted_local(idx) {
+                                    fast_frame.locals.as_mut().unwrap().borrow_loc(idx)?
+                                } else {
+                                    let val_ref_opt = interpreter
+                                        .operand_stack
+                                        .value
+                                        .get_mut(fast_frame.bp + idx);
+
+                                    let val = match val_ref_opt {
+                                        Some(val) => std::mem::replace(val, Value::invalid()),
+                                        None => {
+                                            return Err(PartialVMError::new(
+                                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                                            ))
+                                        },
+                                    };
+
+                                    let locals = fast_frame
+                                        .locals
+                                        .get_or_insert_with(|| Locals::new(fast_frame.num_locals));
+
+                                    fast_frame.locals_mask[idx / 64] |= (1 << (idx % 64));
+                                    locals.store_loc(idx, val, false)?;
+                                    locals.borrow_loc(idx)?
+                                }
+                            },
+                            None => self.locals.borrow_loc(idx)?,
+                        };
+
+                        interpreter.operand_stack.push(ref_val)?;
                     },
                     Bytecode::ImmBorrowField(fh_idx) | Bytecode::MutBorrowField(fh_idx) => {
                         let instr = match instruction {
@@ -2038,6 +2392,8 @@ impl Frame {
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
+                        assert!(fast_frame.is_none());
+
                         let mut get_field_count_charge_gas_and_check_depth =
                             || -> PartialVMResult<u16> {
                                 let field_count = self.field_count(*sd_idx);
@@ -2049,6 +2405,8 @@ impl Frame {
                                 )?;
                                 Ok(field_count)
                             };
+
+                        let frame_cache = &mut *self.frame_cache.borrow_mut();
 
                         let field_count = if RTCaches::caches_enabled() {
                             let cached_field_count =
@@ -2075,6 +2433,8 @@ impl Frame {
                             .push(Value::struct_(Struct::pack(args)))?;
                     },
                     Bytecode::PackVariant(idx) => {
+                        assert!(fast_frame.is_none());
+
                         let info = self.get_struct_variant_at(*idx);
                         let struct_type = self.create_struct_ty(&info.definition_struct_type);
                         interpreter.ty_depth_checker.check_depth_of_type(
@@ -2094,11 +2454,15 @@ impl Frame {
                             .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
                     },
                     Bytecode::PackGeneric(si_idx) => {
+                        assert!(fast_frame.is_none());
+
                         // TODO: Even though the types are not needed for execution, we still
                         //       instantiate them for gas metering.
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
+
+                        let frame_cache = &mut *self.frame_cache.borrow_mut();
 
                         let field_count = if RTCaches::caches_enabled() {
                             let cached_field_count =
@@ -2142,6 +2506,7 @@ impl Frame {
                         //     traversal_context,
                         //     ty,
                         // )?;
+                        assert!(fast_frame.is_none());
 
                         let info = self.get_struct_variant_instantiation_at(*si_idx);
                         gas_meter.charge_pack_variant(
@@ -2165,6 +2530,8 @@ impl Frame {
                         }
                     },
                     Bytecode::UnpackVariant(sd_idx) => {
+                        assert!(fast_frame.is_none());
+
                         let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
 
                         gas_meter.charge_unpack_variant(false, struct_value.field_views())?;
@@ -2224,6 +2591,8 @@ impl Frame {
                         //     ty,
                         // )?;
 
+                        assert!(fast_frame.is_none());
+
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
                         gas_meter.charge_unpack_variant(true, struct_.field_views())?;
@@ -2236,6 +2605,8 @@ impl Frame {
                         }
                     },
                     Bytecode::TestVariant(sd_idx) => {
+                        assert!(fast_frame.is_none());
+
                         let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
                         gas_meter.charge_simple_instr(S::TestVariant)?;
                         let info = self.get_struct_variant_at(*sd_idx);
@@ -2253,6 +2624,8 @@ impl Frame {
                         //     frame_cache.get_struct_variant_type(*sd_idx, self)?;
                         // gas_meter.charge_create_ty(struct_ty_count)?;
 
+                        assert!(fast_frame.is_none());
+
                         let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
                         gas_meter.charge_simple_instr(S::TestVariantGeneric)?;
                         let info = self.get_struct_variant_instantiation_at(*sd_idx);
@@ -2261,6 +2634,8 @@ impl Frame {
                             .push(reference.test_variant(info.variant)?)?;
                     },
                     Bytecode::PackClosure(fh_idx, mask) => {
+                        assert!(fast_frame.is_none());
+
                         gas_meter.charge_pack_closure(
                             false,
                             interpreter
@@ -2299,6 +2674,7 @@ impl Frame {
                             .push(Value::closure(Box::new(lazy_function), captured))?;
                     },
                     Bytecode::PackClosureGeneric(fi_idx, mask) => {
+                        assert!(fast_frame.is_none());
                         gas_meter.charge_pack_closure(
                             true,
                             interpreter
@@ -2476,15 +2852,26 @@ impl Frame {
                         binop_bool!(IntegerValue::ge)?
                     },
                     Bytecode::Abort => {
+                        // FASTCALL: Abort Location/stack trace
                         gas_meter.charge_simple_instr(S::Abort)?;
                         let error_code = interpreter.operand_stack.pop_as::<u64>()?;
+
+                        let msg = match fast_frame.as_ref() {
+                            Some(fast_frame) => {
+                                format!("{} at offset {}", "<fast call>", fast_frame.pc,)
+                            },
+                            None => {
+                                format!(
+                                    "{} at offset {}",
+                                    self.function.name_as_pretty_string(),
+                                    self.pc,
+                                )
+                            },
+                        };
+
                         let error = PartialVMError::new(StatusCode::ABORTED)
                             .with_sub_status(error_code)
-                            .with_message(format!(
-                                "{} at offset {}",
-                                self.function.name_as_pretty_string(),
-                                self.pc,
-                            ));
+                            .with_message(msg);
                         return Err(error);
                     },
                     Bytecode::Eq => {
@@ -2504,6 +2891,8 @@ impl Frame {
                             .push(Value::bool(!lhs.equals(&rhs)?))?;
                     },
                     Bytecode::MutBorrowGlobal(sd_idx) | Bytecode::ImmBorrowGlobal(sd_idx) => {
+                        assert!(fast_frame.is_none());
+
                         let is_mut = matches!(instruction, Bytecode::MutBorrowGlobal(_));
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let ty = self.get_struct_ty(*sd_idx);
@@ -2520,6 +2909,10 @@ impl Frame {
                     },
                     Bytecode::MutBorrowGlobalGeneric(si_idx)
                     | Bytecode::ImmBorrowGlobalGeneric(si_idx) => {
+                        assert!(fast_frame.is_none());
+
+                        let frame_cache = &mut *self.frame_cache.borrow_mut();
+
                         let is_mut = matches!(instruction, Bytecode::MutBorrowGlobalGeneric(_));
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let (ty, _) = frame_cache.get_struct_type(*si_idx, self)?;
@@ -2536,6 +2929,8 @@ impl Frame {
                         )?;
                     },
                     Bytecode::Exists(sd_idx) => {
+                        assert!(fast_frame.is_none());
+
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let ty = self.get_struct_ty(*sd_idx);
                         interpreter.exists(
@@ -2549,6 +2944,10 @@ impl Frame {
                         )?;
                     },
                     Bytecode::ExistsGeneric(si_idx) => {
+                        assert!(fast_frame.is_none());
+
+                        let frame_cache = &mut *self.frame_cache.borrow_mut();
+
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let (ty, _) = frame_cache.get_struct_type(*si_idx, self)?;
                         // gas_meter.charge_create_ty(ty_count)?;
@@ -2563,6 +2962,8 @@ impl Frame {
                         )?;
                     },
                     Bytecode::MoveFrom(sd_idx) => {
+                        assert!(fast_frame.is_none());
+
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let ty = self.get_struct_ty(*sd_idx);
                         interpreter.move_from(
@@ -2576,6 +2977,10 @@ impl Frame {
                         )?;
                     },
                     Bytecode::MoveFromGeneric(si_idx) => {
+                        assert!(fast_frame.is_none());
+
+                        let frame_cache = &mut *self.frame_cache.borrow_mut();
+
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let (ty, _) = frame_cache.get_struct_type(*si_idx, self)?;
                         // gas_meter.charge_create_ty(ty_count)?;
@@ -2590,6 +2995,8 @@ impl Frame {
                         )?;
                     },
                     Bytecode::MoveTo(sd_idx) => {
+                        assert!(fast_frame.is_none());
+
                         let resource = interpreter.operand_stack.pop()?;
                         let signer_reference = interpreter.operand_stack.pop_as::<SignerRef>()?;
                         let addr = signer_reference
@@ -2610,6 +3017,10 @@ impl Frame {
                         )?;
                     },
                     Bytecode::MoveToGeneric(si_idx) => {
+                        assert!(fast_frame.is_none());
+
+                        let frame_cache = &mut *self.frame_cache.borrow_mut();
+
                         let resource = interpreter.operand_stack.pop()?;
                         let signer_reference = interpreter.operand_stack.pop_as::<SignerRef>()?;
                         let addr = signer_reference
@@ -2644,6 +3055,10 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Nop)?;
                     },
                     Bytecode::VecPack(si, num) => {
+                        assert!(fast_frame.is_none());
+
+                        let frame_cache = &mut *self.frame_cache.borrow_mut();
+
                         let (ty, _) = frame_cache.get_signature_index_type(*si, self)?;
                         // gas_meter.charge_create_ty(ty_count)?;
                         interpreter.ty_depth_checker.check_depth_of_type(
@@ -2726,29 +3141,58 @@ impl Frame {
                     },
                 }
 
-                RTTCheck::post_execution_type_stack_transition(
-                    self,
-                    &mut interpreter.operand_stack,
-                    instruction,
-                    frame_cache,
-                )?;
-                RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
+                //println!("post execution");
+
+                if fast_frame.is_none() {
+                    RTTCheck::post_execution_type_stack_transition(
+                        self,
+                        &mut interpreter.operand_stack,
+                        instruction,
+                        &mut *self.frame_cache.borrow_mut(),
+                    )?;
+                    RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
+                }
 
                 // invariant: advance to pc +1 is iff instruction at pc executed without aborting
-                self.pc += 1;
+                match fast_frame.as_mut() {
+                    Some(fast_frame) => fast_frame.pc += 1,
+                    None => self.pc += 1,
+                }
+
+                //println!("pc advanced");
             }
+
             // ok we are out, it's a branch, check the pc for good luck
             // TODO: re-work the logic here. Tests should have a more
             // natural way to plug in
-            if self.pc as usize >= code.len() {
-                if cfg!(test) {
-                    // In order to test the behavior of an instruction stream, hitting end of the
-                    // code should report no error so that we can check the
-                    // locals.
-                    return Ok(ExitCode::Return);
-                } else {
-                    return Err(PartialVMError::new(StatusCode::PC_OVERFLOW));
-                }
+            match &fast_frame {
+                Some(fast_frame) => {
+                    if fast_frame.pc >= code.len() {
+                        if cfg!(test) {
+                            return Ok(ExitCode::Return);
+                        } else {
+                            //println!("pc = {}", fast_frame.pc);
+                            //println!("code.len() = {}", code.len());
+                            //println!("code: {:#?}", code);
+                            return Err(PartialVMError::new(StatusCode::PC_OVERFLOW));
+                        }
+                    }
+                },
+                None => {
+                    if self.pc as usize >= code.len() {
+                        if cfg!(test) {
+                            // In order to test the behavior of an instruction stream, hitting end of the
+                            // code should report no error so that we can check the
+                            // locals.
+                            return Ok(ExitCode::Return);
+                        } else {
+                            //println!("pc = {}", self.pc);
+                            //println!("code.len() = {}", code.len());
+                            //println!("code: {:#?}", code);
+                            return Err(PartialVMError::new(StatusCode::PC_OVERFLOW));
+                        }
+                    }
+                },
             }
         }
     }
