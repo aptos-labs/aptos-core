@@ -3,23 +3,23 @@
 //# publish
 module 0xcafe::vectors {
     public entry fun guess_flips(p0: vector<u8>) {
-        let _t1 = &p0;
-        let _t2 = 0;
+        let _v0 = &p0;
+        let _v1 = 0;
         loop {
-            let _t7 = 0x1::vector::length<u8>(_t1);
-            if (!(_t2 < _t7)) break;
-            if (*0x1::vector::borrow<u8>(_t1, _t2) != 0u8) break;
-            _t2 = _t2 + 1;
+            let _v2 = 0x1::vector::length<u8>(_v0);
+            if (!(_v1 < _v2)) break;
+            if (*0x1::vector::borrow<u8>(_v0, _v1) != 0u8) break;
+            _v1 = _v1 + 1;
             continue
         };
     }
     public entry fun guess_flips_directly(p0: vector<u8>) {
-        let _t1 = 0;
+        let _v0 = 0;
         loop {
-            let _t5 = 0x1::vector::length<u8>(&p0);
-            if (!(_t1 < _t5)) break;
-            if (*0x1::vector::borrow<u8>(&p0, _t1) != 0u8) break;
-            _t1 = _t1 + 1;
+            let _v1 = 0x1::vector::length<u8>(&p0);
+            if (!(_v0 < _v1)) break;
+            if (*0x1::vector::borrow<u8>(&p0, _v0) != 0u8) break;
+            _v0 = _v0 + 1;
             continue
         };
     }
@@ -27,24 +27,24 @@ module 0xcafe::vectors {
         loops_with_break_no_inline(&p0);
     }
     fun loops_with_break_no_inline(p0: &vector<u8>) {
-        let _t1 = 0;
+        let _v0 = 0;
         loop {
-            let _t5 = 0x1::vector::length<u8>(p0);
-            if (!(_t1 < _t5)) break;
-            if (*0x1::vector::borrow<u8>(p0, _t1) != 0u8) break;
-            _t1 = _t1 + 1;
+            let _v1 = 0x1::vector::length<u8>(p0);
+            if (!(_v0 < _v1)) break;
+            if (*0x1::vector::borrow<u8>(p0, _v0) != 0u8) break;
+            _v0 = _v0 + 1;
             continue
         };
     }
     public entry fun guess_without_break_with_inline(p0: vector<u8>) {
-        let _t1 = &p0;
-        let _t2 = 0;
+        let _v0 = &p0;
+        let _v1 = 0;
         'l0: loop {
             loop {
-                let _t7 = 0x1::vector::length<u8>(_t1);
-                if (!(_t2 < _t7)) break 'l0;
-                if (!(*0x1::vector::borrow<u8>(_t1, _t2) == 0u8)) break;
-                _t2 = _t2 + 1;
+                let _v2 = 0x1::vector::length<u8>(_v0);
+                if (!(_v1 < _v2)) break 'l0;
+                if (!(*0x1::vector::borrow<u8>(_v0, _v1) == 0u8)) break;
+                _v1 = _v1 + 1;
                 continue
             };
             abort 3

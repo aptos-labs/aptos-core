@@ -7,14 +7,14 @@ module 0xc0ffee::m {
         b: u64,
     }
     public fun main() {
-        if (!(test(S{a: 1, b: 2}) == 1)) abort 5;
+        assert!(test(S{a: 1, b: 2}) == 1, 5);
     }
     fun test(p0: S): u64 {
-        let _t1 = p0;
-        let _t2 = _t1;
-        let _t4 = &mut (&mut _t1).a;
-        *_t4 = 0;
-        *&(&_t2).a
+        let _v0 = p0;
+        let _v1 = _v0;
+        let _v2 = &mut (&mut _v0).a;
+        *_v2 = 0;
+        *&(&_v1).a
     }
 }
 

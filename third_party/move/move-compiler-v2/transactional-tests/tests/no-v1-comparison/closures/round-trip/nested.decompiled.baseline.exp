@@ -4,7 +4,7 @@ Error: compilation errors:
  error: cannot return `(|u64|u64, u64)` from a function with result type `(|u64|u64 has copy + drop, integer)`
   ┌─ TEMPFILE:8:9
   │
-8 │         _t1(_t3, 1)
+8 │         _v1(_v0, 1)
   │         ^^^^^^^^^^^
 
 

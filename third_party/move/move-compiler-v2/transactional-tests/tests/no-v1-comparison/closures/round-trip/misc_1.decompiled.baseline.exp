@@ -15,7 +15,7 @@ Error: compilation errors:
  error: unexpected token
    ┌─ TEMPFILE1:48:23
    │
-48 │         let _t7: ||u64|(u64)|u64 has copy + drop = |arg0| lambda__13__test(p0, arg0);
+48 │         let _v2: ||u64|(u64)|u64 has copy + drop = |arg0| lambda__13__test(p0, arg0);
    │                       ^
    │                       │
    │                       Unexpected '|'
@@ -35,7 +35,7 @@ Error: compilation errors:
  error: unexpected token
     ┌─ TEMPFILE2:114:23
     │
-114 │         let _t7: ||u64|(u64)|u64 has copy + drop = |arg0| lambda__256__test(p0, arg0);
+114 │         let _v2: ||u64|(u64)|u64 has copy + drop = |arg0| lambda__256__test(p0, arg0);
     │                       ^
     │                       │
     │                       Unexpected '|'

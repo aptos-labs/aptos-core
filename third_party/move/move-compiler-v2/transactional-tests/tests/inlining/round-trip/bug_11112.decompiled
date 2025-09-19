@@ -3,20 +3,20 @@
 //# publish
 module 0xcafe::vectors {
     fun test_for_each_mut() {
-        let _t0 = vector[1, 2, 3];
-        let _t1 = 2;
-        let _t2 = &mut _t0;
-        let _t3 = 0;
+        let _v0 = vector[1, 2, 3];
+        let _v1 = 2;
+        let _v2 = &mut _v0;
+        let _v3 = 0;
         loop {
-            let _t12 = 0x1::vector::length<u64>(freeze(_t2));
-            if (!(_t3 < _t12)) break;
-            let _t4 = 0x1::vector::borrow_mut<u64>(_t2, _t3);
-            *_t4 = _t1;
-            _t1 = _t1 + 1;
-            _t3 = _t3 + 1;
+            let _v4 = 0x1::vector::length<u64>(freeze(_v2));
+            if (!(_v3 < _v4)) break;
+            let _v5 = 0x1::vector::borrow_mut<u64>(_v2, _v3);
+            *_v5 = _v1;
+            _v1 = _v1 + 1;
+            _v3 = _v3 + 1;
             continue
         };
-        if (!(_t0 == vector[2, 3, 4])) abort 0;
+        assert!(_v0 == vector[2, 3, 4], 0);
     }
 }
 

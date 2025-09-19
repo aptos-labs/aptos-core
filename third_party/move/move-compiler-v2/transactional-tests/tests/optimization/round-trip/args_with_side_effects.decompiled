@@ -6,8 +6,8 @@ module 0xc0ffee::m {
         p0 + p1
     }
     public fun test(p0: u64): u64 {
-        let _t4 = p0 + 1;
-        add(p0, _t4)
+        let _v0 = p0 + 1;
+        add(p0, _v0)
     }
 }
 

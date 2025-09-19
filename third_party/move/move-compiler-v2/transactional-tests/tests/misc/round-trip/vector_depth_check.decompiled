@@ -3,8 +3,8 @@
 //# publish
 module 0xc0ffee::m {
     public fun test(): u64 {
-        let _t0 = 0x1::vector::empty<vector<vector<vector<vector<u64>>>>>();
-        0x1::vector::length<vector<vector<vector<vector<u64>>>>>(&_t0)
+        let _v0 = 0x1::vector::empty<vector<vector<vector<vector<u64>>>>>();
+        0x1::vector::length<vector<vector<vector<vector<u64>>>>>(&_v0)
     }
 }
 
@@ -14,7 +14,7 @@ module 0xc0ffee::m {
 //# publish
 module 0xc0ffee::n {
     public fun test(): u64 {
-        let _t0 = 0x1::vector::empty<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u64>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>();
-        0x1::vector::length<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u64>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>(&_t0)
+        let _v0 = 0x1::vector::empty<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u64>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>();
+        0x1::vector::length<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u64>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>(&_v0)
     }
 }

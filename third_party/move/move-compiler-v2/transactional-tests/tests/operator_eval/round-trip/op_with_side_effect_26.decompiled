@@ -3,20 +3,20 @@
 //# publish
 module 0xc0ffee::m {
     public fun test(): u64 {
-        let _t0 = 1;
-        let _t2 = _t0;
-        let _t3 = _t0;
-        _t0 = _t0 + 1;
-        let _t8 = _t3 + _t0;
-        let _t11 = _t0 + 1;
-        _t0 = _t8 + _t11;
-        let _t14 = _t2 + _t0;
-        let _t15 = _t0;
-        _t0 = _t0 + 1;
-        let _t20 = _t15 + _t0;
-        let _t23 = _t0 + 1;
-        let _t24 = _t20 + _t23;
-        _t14 + _t24
+        let _v0 = 1;
+        let _v1 = _v0;
+        let _v2 = _v0;
+        _v0 = _v0 + 1;
+        let _v3 = _v2 + _v0;
+        let _v4 = _v0 + 1;
+        _v0 = _v3 + _v4;
+        let _v5 = _v1 + _v0;
+        let _v6 = _v0;
+        _v0 = _v0 + 1;
+        let _v7 = _v6 + _v0;
+        let _v8 = _v0 + 1;
+        let _v9 = _v7 + _v8;
+        _v5 + _v9
     }
 }
 

@@ -24,6 +24,6 @@ script {
     use 0x42::Y;
     use 0x42::X;
     fun main() {
-        let _t0 = Y::foo();
+        let _v0 = Y::foo();
     }
 }

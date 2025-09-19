@@ -4,7 +4,7 @@ Error: compilation errors:
  error: cannot select field `_0` since it has different types in variants of enum `State`
    ┌─ TEMPFILE:93:11
    │
-93 │         *&_t1._0
+93 │         *&_v1._0
    │           ^^^
    │
    = field `_0` has type `|u64|u64 has copy + drop + store` in variant `Continuation` and type `u64` in variant `Value`

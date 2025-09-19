@@ -8,12 +8,12 @@ module 0x42::test {
         value: bool,
     }
     fun init(p0: &signer) {
-        let _t3 = R{value: true};
-        move_to<R>(p0, _t3);
+        let _v0 = R{value: true};
+        move_to<R>(p0, _v0);
     }
     fun fail1(): bool
-        reads Other
         acquires R
+        reads Other
     {
         !*&borrow_global<R>(@0x1).value
     }
@@ -23,37 +23,37 @@ module 0x42::test {
         !exists<R>(@0x1)
     }
     fun fail3(): bool
+        acquires R
         reads R
         writes Other
-        acquires R
     {
-        let _t0 = move_from<R>(@0x1);
-        !*&(&_t0).value
+        let _v0 = move_from<R>(@0x1);
+        !*&(&_v0).value
     }
     fun fail4(): bool
+        acquires R
         reads R
         writes Other
-        acquires R
     {
-        let _t3 = &mut borrow_global_mut<R>(@0x1).value;
-        *_t3 = false;
+        let _v0 = &mut borrow_global_mut<R>(@0x1).value;
+        *_v0 = false;
         false
     }
     fun fail5(): bool
-        reads Other
         acquires R
+        reads Other
     {
         fail_no_subsumes()
     }
     fun fail_no_subsumes(): bool
-        reads R
         acquires R
+        reads R
     {
         *&borrow_global<R>(@0x1).value
     }
     fun ok1(): bool
-        reads R
         acquires R
+        reads R
     {
         *&borrow_global<R>(@0x1).value
     }
@@ -65,16 +65,16 @@ module 0x42::test {
     fun ok3(p0: &signer): bool
         writes R
     {
-        let _t3 = R{value: true};
-        move_to<R>(p0, _t3);
+        let _v0 = R{value: true};
+        move_to<R>(p0, _v0);
         true
     }
     fun ok4(): bool
-        writes R
         acquires R
+        writes R
     {
-        let _t3 = &mut borrow_global_mut<R>(@0x1).value;
-        *_t3 = false;
+        let _v0 = &mut borrow_global_mut<R>(@0x1).value;
+        *_v0 = false;
         true
     }
 }

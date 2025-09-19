@@ -9,13 +9,13 @@ module 0x66::registry {
     public fun remove<T0: store>(p0: &signer): T0
         acquires R
     {
-        let _t2 = signer::address_of(p0);
-        let R<T0>{_0: _t4} = move_from<R<T0>>(_t2);
-        _t4
+        let _v0 = signer::address_of(p0);
+        let R<T0>{_0: _v1} = move_from<R<T0>>(_v0);
+        _v1
     }
     public fun store<T0: store>(p0: &signer, p1: T0) {
-        let _t4 = R<T0>{_0: p1};
-        move_to<R<T0>>(p0, _t4);
+        let _v0 = R<T0>{_0: p1};
+        move_to<R<T0>>(p0, _v0);
     }
 }
 
@@ -27,24 +27,24 @@ module 0x66::delayed_work {
         _0: |u64|(u64) has store,
     }
     entry fun add(p0: &signer, p1: u64) {
-        let _t4 = registry::remove<Work>(p0);
-        let _t2 = Work{_0: |arg0| more_work(_t4, p1, arg0)};
-        registry::store<Work>(p0, _t2);
+        let _v0 = registry::remove<Work>(p0);
+        let _v1 = Work{_0: |arg0| more_work(_v0, p1, arg0)};
+        registry::store<Work>(p0, _v1);
     }
     public fun more_work(p0: Work, p1: u64, p2: u64): u64 {
-        let Work{_0: _t5} = p0;
-        _t5(p1) + p2
+        let Work{_0: _v0} = p0;
+        _v0(p1) + p2
     }
     entry fun eval(p0: &signer, p1: u64, p2: u64) {
-        let Work{_0: _t6} = registry::remove<Work>(p0);
-        if (!(_t6(p1) == p2)) abort 14566554180833181696;
+        let Work{_0: _v0} = registry::remove<Work>(p0);
+        assert!(_v0(p1) == p2, 14566554180833181696);
     }
     public fun id_fun(p0: u64): u64 {
         p0
     }
     entry fun initialize(p0: &signer) {
-        let _t3 = Work{_0: |arg0| id_fun(arg0)};
-        registry::store<Work>(p0, _t3);
+        let _v0 = Work{_0: |arg0| id_fun(arg0)};
+        registry::store<Work>(p0, _v0);
     }
 }
 

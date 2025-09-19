@@ -3,8 +3,8 @@
 //# run
 script {
     fun main() {
-        let _t0 = 0;
-        while (_t0 < 5) _t0 = _t0 + 1;
-        if (!(_t0 == 5)) abort 42;
+        let _v0 = 0;
+        while (_v0 < 5) _v0 = _v0 + 1;
+        assert!(_v0 == 5, 42);
     }
 }

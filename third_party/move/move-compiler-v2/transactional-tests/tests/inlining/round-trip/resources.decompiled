@@ -8,9 +8,9 @@ module 0x42::M {
     public fun test_resource(p0: &signer)
         acquires R
     {
-        let _t3 = R{f: 1};
-        move_to<R>(p0, _t3);
-        if (!(*&borrow_global<R>(@0x42).f == 1)) abort 1;
+        let _v0 = R{f: 1};
+        move_to<R>(p0, _v0);
+        assert!(*&borrow_global<R>(@0x42).f == 1, 1);
     }
 }
 

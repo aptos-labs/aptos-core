@@ -6,20 +6,20 @@ module 0x42::worker1 {
         _0: u64,
     }
     public fun init(p0: &signer) {
-        let _t3 = R{_0: 0};
-        move_to<R>(p0, _t3);
+        let _v0 = R{_0: 0};
+        move_to<R>(p0, _v0);
     }
     public fun set(p0: u64)
         acquires R
     {
-        let _t1 = &mut borrow_global_mut<R>(@0x42)._0;
-        *_t1 = p0;
+        let _v0 = &mut borrow_global_mut<R>(@0x42)._0;
+        *_v0 = p0;
     }
     public fun work(p0: ||)
         acquires R
     {
-        let _t1 = &mut borrow_global_mut<R>(@0x42)._0;
-        *_t1 = *_t1 + 1;
+        let _v0 = &mut borrow_global_mut<R>(@0x42)._0;
+        *_v0 = *_v0 + 1;
         p0();
     }
 }
@@ -32,20 +32,20 @@ module 0x42::worker2 {
         _0: u64,
     }
     public fun init(p0: &signer) {
-        let _t3 = R{_0: 0};
-        move_to<R>(p0, _t3);
+        let _v0 = R{_0: 0};
+        move_to<R>(p0, _v0);
     }
     public fun set(p0: u64)
         acquires R
     {
-        let _t1 = &mut borrow_global_mut<R>(@0x42)._0;
-        *_t1 = p0;
+        let _v0 = &mut borrow_global_mut<R>(@0x42)._0;
+        *_v0 = p0;
     }
     public fun work(p0: ||)
         acquires R
     {
-        let _t1 = &mut borrow_global_mut<R>(@0x42)._0;
-        *_t1 = *_t1 + 1;
+        let _v0 = &mut borrow_global_mut<R>(@0x42)._0;
+        *_v0 = *_v0 + 1;
         worker1::work(p0);
     }
 }
@@ -61,8 +61,8 @@ module 0x42::tests {
     fun init(p0: &signer) {
         worker1::init(p0);
         worker2::init(p0);
-        let _t5 = R{_0: 0};
-        move_to<R>(p0, _t5);
+        let _v0 = R{_0: 0};
+        move_to<R>(p0, _v0);
     }
     fun direct_failure(): bool {
         worker2::work(|| lambda__1__direct_failure());
@@ -71,8 +71,8 @@ module 0x42::tests {
     fun lambda__1__direct_failure()
         acquires R
     {
-        let _t0 = &mut borrow_global_mut<R>(@0x2a)._0;
-        *_t0 = *_t0 + 1;
+        let _v0 = &mut borrow_global_mut<R>(@0x2a)._0;
+        *_v0 = *_v0 + 1;
     }
     fun worker1_failure(): bool {
         worker2::work(|| worker1::set(10));
