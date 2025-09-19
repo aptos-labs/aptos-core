@@ -5,11 +5,14 @@ use crate::{
     captured_reads::{CapturedReads, DataRead, ReadKind},
     code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
     errors::ParallelBlockExecutionError,
+    explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler_wrapper::SchedulerWrapper,
     task::{BeforeMaterializationOutput, ExecutionStatus, TransactionOutput},
-    types::{InputOutputKey, ReadWriteSummary},
+    txn_commit_hook::TransactionCommitHook,
+    types::ReadWriteSummary,
 };
+use aptos_infallible::Mutex;
 use aptos_logger::error;
 use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
 use aptos_types::{
@@ -50,33 +53,146 @@ macro_rules! with_success_or_skip_rest {
         )
     };
     // The flexible form for any expression.
-    ($self:ident, $txn_idx:ident, | $t:ident | $body:expr, $fallback:expr) => {
-        if let Some(output) = $self.outputs[$txn_idx as usize].load().as_ref() {
-            match output.as_ref() {
-                ExecutionStatus::Success($t) | ExecutionStatus::SkipRest($t) => $body,
-                ExecutionStatus::Abort(_)
-                | ExecutionStatus::SpeculativeExecutionAbortError(_)
-                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => $fallback,
-            }
-        } else {
-            $fallback
+    ($self:ident, $txn_idx:ident, | $t:ident | $body:expr, $fallback:expr) => {{
+        let wrapper = $self.output_wrappers[$txn_idx as usize].lock();
+        match (&wrapper.output_status_kind, &wrapper.output) {
+            (OutputStatusKind::Success, Some($t)) | (OutputStatusKind::SkipRest, Some($t)) => $body,
+            (OutputStatusKind::Abort(_), None)
+            | (OutputStatusKind::SpeculativeExecutionAbortError, None)
+            | (OutputStatusKind::DelayedFieldsCodeInvariantError, None)
+            | (OutputStatusKind::None, None) => $fallback,
+            // The remaining arms are all unreachable.
+            (OutputStatusKind::Success, None)
+            | (OutputStatusKind::SkipRest, None)
+            | (OutputStatusKind::Abort(_), Some(_))
+            | (OutputStatusKind::SpeculativeExecutionAbortError, Some(_))
+            | (OutputStatusKind::DelayedFieldsCodeInvariantError, Some(_))
+            | (OutputStatusKind::None, Some(_)) => {
+                unreachable!(
+                    "Inconsistent wrapper status kind {:?} and output {:?}",
+                    wrapper.output_status_kind, wrapper.output
+                )
+            },
         }
-    };
+    }};
 }
 
-pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
-    inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
+#[derive(Debug, PartialEq)]
+enum OutputStatusKind {
+    Success,
+    SkipRest,
+    Abort(String),
+    SpeculativeExecutionAbortError,
+    DelayedFieldsCodeInvariantError,
+    None,
+}
 
-    // TODO: Consider breaking down the outputs when storing (avoid traversals, cache below).
-    outputs: Vec<CachePadded<ArcSwapOption<ExecutionStatus<O, E>>>>, // txn_idx -> output.
+struct OutputWrapper<T: Transaction, O: TransactionOutput<Txn = T>> {
+    output: Option<O>,
+    maybe_read_write_summary: Option<ReadWriteSummary<T>>,
+    maybe_approx_output_size: Option<u64>,
+    output_status_kind: OutputStatusKind,
+}
+
+impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
+    fn empty_with_status(output_status_kind: OutputStatusKind) -> Self {
+        Self {
+            output: None,
+            maybe_read_write_summary: None,
+            maybe_approx_output_size: None,
+            output_status_kind,
+        }
+    }
+
+    fn from_execution_status<E: Debug>(
+        output: ExecutionStatus<O, E>,
+        read_set: &TxnInput<T>,
+        block_gas_limit_type: &BlockGasLimitType,
+        user_txn_bytes_len: u64,
+    ) -> Result<Self, PanicError> {
+        let is_skip_rest = matches!(output, ExecutionStatus::SkipRest(_));
+
+        Ok(match output {
+            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                let output_before_guard = output.before_materialization()?;
+
+                let maybe_approx_output_size =
+                    block_gas_limit_type.block_output_limit().map(|_| {
+                        output_before_guard.output_approx_size()
+                            + if block_gas_limit_type.include_user_txn_size_in_block_output() {
+                                user_txn_bytes_len
+                            } else {
+                                0
+                            }
+                    });
+
+                let maybe_read_write_summary =
+                    block_gas_limit_type.conflict_penalty_window().map(|_| {
+                        ReadWriteSummary::new(
+                            read_set.get_read_summary(),
+                            output_before_guard.get_write_summary(),
+                        )
+                    });
+                drop(output_before_guard);
+
+                Self {
+                    output: Some(output),
+                    maybe_approx_output_size,
+                    maybe_read_write_summary,
+                    output_status_kind: if is_skip_rest {
+                        OutputStatusKind::SkipRest
+                    } else {
+                        OutputStatusKind::Success
+                    },
+                }
+            },
+            ExecutionStatus::Abort(err) => {
+                Self::empty_with_status(OutputStatusKind::Abort(format!("{:?}", err)))
+            },
+            ExecutionStatus::SpeculativeExecutionAbortError(_) => {
+                Self::empty_with_status(OutputStatusKind::SpeculativeExecutionAbortError)
+            },
+            ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
+                Self::empty_with_status(OutputStatusKind::DelayedFieldsCodeInvariantError)
+            },
+        })
+    }
+
+    fn take_output(&mut self) -> Result<O, PanicError> {
+        self.check_success_or_skip_status()?;
+
+        self.output.take().ok_or_else(|| {
+            code_invariant_error("[BlockSTM]: Output must be recorded after execution")
+        })
+    }
+
+    fn check_success_or_skip_status(&self) -> Result<&O, PanicError> {
+        if self.output_status_kind != OutputStatusKind::Success
+            && self.output_status_kind != OutputStatusKind::SkipRest
+        {
+            return Err(code_invariant_error(format!(
+                "Output status {:?}!= success or skip rest",
+                self.output_status_kind
+            )));
+        }
+
+        Ok(self
+            .output
+            .as_ref()
+            .expect("Output must be set when status is success or skip rest"))
+    }
+}
+
+pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>> {
+    inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input (read set).
+
+    output_wrappers: Vec<CachePadded<Mutex<OutputWrapper<T, O>>>>,
     // Used to record if the latest incarnation of a txn was a failure due to the
     // speculative nature of parallel execution.
     speculative_failures: Vec<CachePadded<AtomicBool>>,
 }
 
-impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
-    TxnLastInputOutput<T, O, E>
-{
+impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     /// num_txns passed here is typically larger than the number of txns in the block,
     /// currently by 1 to account for the block epilogue txn.
     pub fn new(num_txns: TxnIndex) -> Self {
@@ -84,8 +200,12 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             inputs: (0..num_txns)
                 .map(|_| CachePadded::new(ArcSwapOption::empty()))
                 .collect(),
-            outputs: (0..num_txns)
-                .map(|_| CachePadded::new(ArcSwapOption::empty()))
+            output_wrappers: (0..num_txns)
+                .map(|_| {
+                    CachePadded::new(Mutex::new(OutputWrapper::empty_with_status(
+                        OutputStatusKind::None,
+                    )))
+                })
                 .collect(),
             speculative_failures: (0..num_txns)
                 .map(|_| CachePadded::new(AtomicBool::new(false)))
@@ -93,15 +213,24 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         }
     }
 
-    pub(crate) fn record(
+    pub(crate) fn record<E: Debug>(
         &self,
         txn_idx: TxnIndex,
         input: TxnInput<T>,
         output: ExecutionStatus<O, E>,
-    ) {
+        block_gas_limit_type: &BlockGasLimitType,
+        user_txn_bytes_len: u64,
+    ) -> Result<(), PanicError> {
         self.speculative_failures[txn_idx as usize].store(false, Ordering::Relaxed);
+        *self.output_wrappers[txn_idx as usize].lock() = OutputWrapper::from_execution_status(
+            output,
+            &input,
+            block_gas_limit_type,
+            user_txn_bytes_len,
+        )?;
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
-        self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
+
+        Ok(())
     }
 
     pub(crate) fn record_speculative_failure(&self, txn_idx: TxnIndex) {
@@ -159,105 +288,61 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         txn_idx: TxnIndex,
         num_txns: TxnIndex,
         num_workers: usize,
-        user_txn_bytes_len: u64,
-        block_gas_limit_type: &BlockGasLimitType,
         block_limit_processor: &mut BlockGasLimitProcessor<T>,
+        maybe_block_epilogue_txn_idx: &ExplicitSyncWrapper<Option<TxnIndex>>,
         scheduler: &SchedulerWrapper,
-    ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
-        let (mut skips_rest, mut must_create_epilogue_txn, maybe_fee_statement_and_output_size) =
-            match self.outputs[txn_idx as usize]
-                .load()
-                .as_ref()
-                .ok_or_else(|| {
-                    code_invariant_error(format!(
-                        "Execution output for txn {} not found during commit",
-                        txn_idx
-                    ))
-                })?
-                .as_ref()
-            {
-                ExecutionStatus::Success(output) => {
-                    let output = output.before_materialization()?;
-                    (
-                        false,
-                        txn_idx == num_txns - 1 && !output.has_new_epoch_event(),
-                        Some((output.fee_statement(), output.output_approx_size())),
-                    )
-                },
-                ExecutionStatus::SkipRest(output) => {
-                    let output = output.before_materialization()?;
-                    (
-                        true,
-                        !output.has_new_epoch_event(),
-                        Some((output.fee_statement(), output.output_approx_size())),
-                    )
-                },
-                // Transaction cannot be committed with below statuses, as:
-                // - Speculative error must have failed validation.
-                // - Execution w. delayed field code error propagates the error directly,
-                // does not finish execution. Similar for FatalVMError / abort.
-                ExecutionStatus::Abort(err) => {
-                    // Fatal VM error.
-                    error!(
-                        "FatalVMError from parallel execution {:?} at txn {}",
-                        err, txn_idx
-                    );
-                    return Err(PanicOr::Or(ParallelBlockExecutionError::FatalVMError));
-                },
-                ExecutionStatus::SpeculativeExecutionAbortError(_) => {
-                    return Err(code_invariant_error(
-                        "Speculative error status cannot be committed",
-                    )
-                    .into());
-                },
-                ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
-                    return Err(code_invariant_error(
-                        "Delayed field invariant error cannot be committed",
-                    )
-                    .into());
-                },
-            };
+    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
+        let mut output_wrapper = self.output_wrappers[txn_idx as usize].lock();
+        let maybe_read_write_summary = output_wrapper.maybe_read_write_summary.take();
 
-        if let Some((fee_statement, recorded_output_size)) = maybe_fee_statement_and_output_size {
-            let approx_output_size = block_gas_limit_type.block_output_limit().map(|_| {
-                recorded_output_size
-                    + if block_gas_limit_type.include_user_txn_size_in_block_output() {
-                        user_txn_bytes_len
-                    } else {
-                        0
-                    }
-            });
-            let txn_read_write_summary = block_gas_limit_type
-                .conflict_penalty_window()
-                .map(|_| self.get_txn_read_write_summary(txn_idx));
-
-            // For committed txns with Success status, calculate the accumulated gas costs.
-            block_limit_processor.accumulate_fee_statement(
-                fee_statement,
-                txn_read_write_summary,
-                approx_output_size,
+        // Transaction cannot be committed with below statuses, as:
+        // - Speculative error must have failed validation.
+        // - Execution w. delayed field code error propagates the error directly
+        // and does not finish execution. Similar for FatalVMError / abort.
+        // - None means there is no output to commit.
+        // check_success_or_skip_status below returns an invariant error for all
+        // these cases, but we handle Abort case separately first.
+        if let OutputStatusKind::Abort(msg) = &output_wrapper.output_status_kind {
+            // Fatal VM error.
+            error!(
+                "FatalVMError from parallel execution {:?} at txn {}",
+                msg, txn_idx
             );
+            return Err(PanicOr::Or(ParallelBlockExecutionError::FatalVMError));
+        }
+        let output_before_guard = output_wrapper
+            .check_success_or_skip_status()?
+            .before_materialization()?;
 
-            if txn_idx < num_txns - 1
-                && block_limit_processor.should_end_block_parallel()
-                && !skips_rest
-            {
-                // Set the execution output status to be SkipRest, to skip the rest of the txns.
-                // check_execution_status_during_commit must be used for checks re:status.
-                // Hence, since the status is not SkipRest, it must be Success.
-                if let ExecutionStatus::Success(output) = self.take_output(txn_idx)? {
-                    must_create_epilogue_txn =
-                        !output.before_materialization()?.has_new_epoch_event();
-                    self.outputs[txn_idx as usize]
-                        .store(Some(Arc::new(ExecutionStatus::SkipRest(output))));
-                } else {
-                    return Err(code_invariant_error(
-                        "Unexpected status to change to SkipRest, must be Success",
-                    )
-                    .into());
-                }
-                skips_rest = true;
+        let (mut skips_rest, mut must_create_epilogue_txn) =
+            if output_wrapper.output_status_kind == OutputStatusKind::SkipRest {
+                (true, !output_before_guard.has_new_epoch_event())
+            } else {
+                assert!(output_wrapper.output_status_kind == OutputStatusKind::Success);
+                (
+                    false,
+                    txn_idx == num_txns - 1 && !output_before_guard.has_new_epoch_event(),
+                )
+            };
+        let fee_statement = output_before_guard.fee_statement();
+
+        // For committed txns, calculate the accumulated gas costs.
+        block_limit_processor.accumulate_fee_statement(
+            fee_statement,
+            maybe_read_write_summary,
+            output_wrapper.maybe_approx_output_size,
+        );
+
+        if txn_idx < num_txns - 1
+            && block_limit_processor.should_end_block_parallel()
+            && !skips_rest
+        {
+            if output_wrapper.output_status_kind == OutputStatusKind::Success {
+                must_create_epilogue_txn |= !output_before_guard.has_new_epoch_event();
+                drop(output_before_guard);
+                output_wrapper.output_status_kind = OutputStatusKind::SkipRest;
             }
+            skips_rest = true;
         }
 
         // Add before halt, so SchedulerV2 can organically observe and process post commit
@@ -288,11 +373,43 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             .into()));
         }
 
-        Ok(must_create_epilogue_txn)
+        if must_create_epilogue_txn {
+            *maybe_block_epilogue_txn_idx.acquire().dereference_mut() = Some(txn_idx + 1);
+        }
+
+        Ok(())
     }
 
-    pub(crate) fn txn_output(&self, txn_idx: TxnIndex) -> Option<Arc<ExecutionStatus<O, E>>> {
-        self.outputs[txn_idx as usize].load_full()
+    pub(crate) fn notify_listener<L: TransactionCommitHook<Output = O>>(
+        &self,
+        txn_idx: TxnIndex,
+        txn_listener: &L,
+    ) -> Result<(), PanicError> {
+        let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
+        match output_wrapper.output_status_kind {
+            OutputStatusKind::Success | OutputStatusKind::SkipRest => {
+                txn_listener.on_transaction_committed(
+                    txn_idx,
+                    output_wrapper
+                        .output
+                        .as_ref()
+                        .expect("Output must be set when status is success or skip rest"),
+                );
+            },
+            OutputStatusKind::Abort(_) => {
+                txn_listener.on_execution_aborted(txn_idx);
+            },
+            OutputStatusKind::SpeculativeExecutionAbortError
+            | OutputStatusKind::DelayedFieldsCodeInvariantError
+            | OutputStatusKind::None => {
+                return Err(code_invariant_error(format!(
+                    "Unexpected output status kind {:?}",
+                    output_wrapper.output_status_kind
+                )));
+            },
+        }
+
+        Ok(())
     }
 
     /// Returns an error if callback returns an error.
@@ -301,19 +418,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         txn_idx: TxnIndex,
         mut callback: impl FnMut(&T::Key, HashSet<&T::Tag>) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
-        if let Some(txn_output) = self.outputs[txn_idx as usize].load().as_ref() {
-            match txn_output.as_ref() {
-                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                    t.before_materialization()?
-                        .for_each_resource_group_key_and_tags(&mut callback)?;
-                },
-                ExecutionStatus::Abort(_)
-                | ExecutionStatus::SpeculativeExecutionAbortError(_)
-                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
-                    // No resource group keys for failed transactions
-                },
-            }
+        let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
+        if let Some(output) = output_wrapper.output.as_ref() {
+            output
+                .before_materialization()?
+                .for_each_resource_group_key_and_tags(&mut callback)?;
         }
+
         Ok(())
     }
 
@@ -400,6 +511,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         )
     }
 
+    // The output needs to be Success or SkipRest, o.w. invariant error is returned.
     pub(crate) fn publish_module_write_set(
         &self,
         txn_idx: TxnIndex,
@@ -413,42 +525,31 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         runtime_environment: &RuntimeEnvironment,
         scheduler: &SchedulerWrapper<'_>,
     ) -> Result<bool, PanicError> {
-        use ExecutionStatus as E;
+        let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
+        let output_before_guard = output_wrapper
+            .check_success_or_skip_status()?
+            .before_materialization()?;
 
-        match self.outputs[txn_idx as usize]
-            .load()
-            .as_ref()
-            .map(|status| status.as_ref())
-        {
-            Some(E::Success(t) | E::SkipRest(t)) => {
-                let mut published = false;
-                let mut module_ids_for_v2 = BTreeSet::new();
-                for write in t.before_materialization()?.module_write_set().values() {
-                    published = true;
-                    if scheduler.is_v2() {
-                        module_ids_for_v2.insert(write.module_id().clone());
-                    }
-                    add_module_write_to_module_cache::<T>(
-                        write,
-                        txn_idx,
-                        runtime_environment,
-                        global_module_cache,
-                        versioned_cache.module_cache(),
-                    )?;
-                }
-                if published {
-                    // Record validation requirements after the modules are published.
-                    scheduler.record_validation_requirements(txn_idx, module_ids_for_v2)?;
-                }
-                Ok(published)
-            },
-            Some(
-                E::Abort(_)
-                | E::DelayedFieldsCodeInvariantError(_)
-                | E::SpeculativeExecutionAbortError(_),
-            )
-            | None => Ok(false),
+        let mut published = false;
+        let mut module_ids_for_v2 = BTreeSet::new();
+        for write in output_before_guard.module_write_set().values() {
+            published = true;
+            if scheduler.is_v2() {
+                module_ids_for_v2.insert(write.module_id().clone());
+            }
+            add_module_write_to_module_cache::<T>(
+                write,
+                txn_idx,
+                runtime_environment,
+                global_module_cache,
+                versioned_cache.module_cache(),
+            )?;
         }
+        if published {
+            // Record validation requirements after the modules are published.
+            scheduler.record_validation_requirements(txn_idx, module_ids_for_v2)?;
+        }
+        Ok(published)
     }
 
     pub(crate) fn delayed_field_keys(
@@ -557,34 +658,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         )
     }
 
-    pub(crate) fn get_txn_read_write_summary(&self, txn_idx: TxnIndex) -> ReadWriteSummary<T> {
-        let read_set = self.read_set(txn_idx).expect("Read set must be recorded").0;
-
-        let reads = read_set.get_read_summary();
-        let writes = self.get_write_summary(txn_idx);
-        ReadWriteSummary::new(reads, writes)
-    }
-
-    pub(crate) fn get_write_summary(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
-        with_success_or_skip_rest!(self, txn_idx, get_write_summary, HashSet::new())
-            .expect("Output must be set")
-    }
-
-    // Must be executed after parallel execution is done, grabs outputs. Will panic if
-    // other outstanding references to the recorded outputs exist.
-    pub(crate) fn take_output(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Result<ExecutionStatus<O, E>, PanicError> {
-        let owning_ptr = self.outputs[txn_idx as usize].swap(None).ok_or_else(|| {
-            code_invariant_error("[BlockSTM]: Output must be recorded after execution")
-        })?;
-
-        Arc::try_unwrap(owning_ptr).map_err(|_| {
-            code_invariant_error("[BlockSTM]: Output must be uniquely owned after execution")
-        })
+    // Must be executed after parallel execution is done, grabs outputs.
+    pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> Result<O, PanicError> {
+        self.output_wrappers[txn_idx as usize].lock().take_output()
     }
 }
