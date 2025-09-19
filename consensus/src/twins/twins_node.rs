@@ -140,8 +140,6 @@ impl SMRNode {
 
         let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 
-        let (timeout_sender, timeout_receiver) =
-            aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
         let (self_sender, self_receiver) =
             aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
 
@@ -153,7 +151,6 @@ impl SMRNode {
             time_service,
             self_sender,
             consensus_network_client,
-            timeout_sender,
             quorum_store_to_mempool_sender,
             execution_client.clone(),
             storage.clone(),
@@ -169,7 +166,7 @@ impl SMRNode {
             NetworkTask::new(network_service_events, self_receiver);
 
         runtime.spawn(network_task.start());
-        runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
+        runtime.spawn(epoch_mgr.start(network_receiver));
 
         let (commit_cb_sender, commit_cb_receiver) = mpsc::unbounded::<LedgerInfoWithSignatures>();
         runtime.spawn(async move {

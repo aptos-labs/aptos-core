@@ -73,8 +73,6 @@ pub fn start_consensus(
 
     let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 
-    let (timeout_sender, timeout_receiver) =
-        aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
     let (self_sender, self_receiver) =
         aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
@@ -101,7 +99,6 @@ pub fn start_consensus(
         time_service,
         self_sender,
         consensus_network_client,
-        timeout_sender,
         consensus_to_mempool_sender,
         execution_client,
         storage.clone(),
@@ -117,7 +114,7 @@ pub fn start_consensus(
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);
 
     runtime.spawn(network_task.start());
-    runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
+    runtime.spawn(epoch_mgr.start(network_receiver));
 
     debug!("Consensus started.");
     (runtime, storage, quorum_store_db)
