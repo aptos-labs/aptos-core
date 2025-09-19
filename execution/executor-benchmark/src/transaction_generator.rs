@@ -3,9 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_generator::{AccountCache, AccountGenerator}, block_preparation::create_block_metadata_transaction_epoch_1, metrics::{NUM_TXNS, TIMER}
+    account_generator::{AccountCache, AccountGenerator},
+    metrics::{NUM_TXNS, TIMER},
 };
-use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_config::keys::ConfigKey;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, Uniform};
 use aptos_logger::info;
 use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_sdk::{
@@ -18,17 +20,18 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{aptos_test_root_address, AccountResource},
+    block_metadata::BlockMetadata,
     chain_id::ChainId,
     state_store::MoveResourceExt,
-    transaction::{EntryFunction, Transaction, TransactionPayload},
+    transaction::{
+        authenticator::AuthenticationKey, EntryFunction, Transaction, TransactionPayload,
+    },
 };
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use move_core_types::{ident_str, language_storage::ModuleId};
-#[cfg(test)]
-use rand::SeedableRng;
-use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng};
+use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
 use rayon::{
     iter::{IntoParallelRefIterator, ParallelIterator},
     ThreadPool, ThreadPoolBuilder,
@@ -51,6 +54,60 @@ use thread_local::ThreadLocal;
 
 const META_FILENAME: &str = "metadata.toml";
 pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
+
+fn validator_address() -> AccountAddress {
+    let mut rng = StdRng::from_seed([0; 32]);
+    let _: [u8; 32] = rng.gen();
+    let seed: [u8; 32] = rng.gen();
+    let key = Ed25519PrivateKey::generate(&mut StdRng::from_seed(seed));
+    AuthenticationKey::ed25519(&ConfigKey::new(key).public_key()).account_address()
+}
+
+pub(crate) fn create_block_metadata_transaction(epoch: u64) -> Transaction {
+    // Use incremental timestamps to avoid triggering epoch reconfigurations
+    // Large real timestamps cause immediate epoch changes since last_reconfiguration_time is small
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static ROUND_COUNTER: AtomicU64 = AtomicU64::new(0);
+    static LAST_TIMESTAMP: AtomicU64 = AtomicU64::new(0);
+    static LAST_EPOCH: AtomicU64 = AtomicU64::new(0);
+
+    // Check if epoch has changed and reset round counter if needed
+    let last_epoch = LAST_EPOCH.load(Ordering::SeqCst);
+    if last_epoch != epoch {
+        ROUND_COUNTER.store(0, Ordering::SeqCst);
+        LAST_EPOCH.store(epoch, Ordering::SeqCst);
+    }
+
+    let round = ROUND_COUNTER.fetch_add(1, Ordering::SeqCst);
+
+    // Get current real time to keep blockchain time close to real time for orderless transactions
+    let current_time_usecs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_micros() as u64;
+
+    // Ensure strictly increasing timestamps by comparing with last used timestamp
+    let last_timestamp = LAST_TIMESTAMP.load(Ordering::SeqCst);
+    let timestamp_usecs = if current_time_usecs > last_timestamp {
+        current_time_usecs
+    } else {
+        // If current time is not greater, increment by 1 microsecond to maintain strict ordering
+        last_timestamp + 1
+    };
+
+    // Update the last timestamp atomically
+    LAST_TIMESTAMP.store(timestamp_usecs, Ordering::SeqCst);
+
+    Transaction::BlockMetadata(BlockMetadata::new(
+        HashValue::random(),
+        epoch,               // use provided epoch
+        round,               // proper incrementing round number (resets on epoch change)
+        validator_address(), // keep existing validator address
+        vec![],
+        vec![],
+        timestamp_usecs, // real time with strict ordering guarantee
+    ))
+}
 
 pub(crate) fn get_progress_bar(num_accounts: usize) -> ProgressBar {
     let bar = ProgressBar::new(num_accounts as u64);
@@ -393,7 +450,7 @@ impl TransactionGenerator {
             // This ensures we stay in sync even if BlockMetadata or other transactions affected the account
             let current_seq_num = get_sequence_number(self.root_account.address(), reader.clone());
             self.root_account.set_sequence_number(current_seq_num);
-            
+
             let transactions: Vec<_> = chunk
                 .iter()
                 .map(|new_account| {
@@ -716,7 +773,7 @@ impl TransactionGenerator {
         }
 
         let mut transactions = Vec::new();
-        transactions.push(create_block_metadata_transaction_epoch_1());
+        transactions.push(create_block_metadata_transaction(1));
 
         let init_size = transactions.len();
         for i in 0..block_size {

@@ -45,7 +45,9 @@ impl NativeTransaction {
             aptos_types::transaction::Transaction::UserTransaction(user_txn) => {
                 // Use executable_ref() to handle both EntryFunction and Payload variants uniformly
                 match user_txn.payload().executable_ref() {
-                    Ok(aptos_types::transaction::TransactionExecutableRef::EntryFunction(f)) if !user_txn.payload().is_multisig() => {
+                    Ok(aptos_types::transaction::TransactionExecutableRef::EntryFunction(f))
+                        if !user_txn.payload().is_multisig() =>
+                    {
                         match (
                             *f.module().address(),
                             f.module().name().as_str(),
