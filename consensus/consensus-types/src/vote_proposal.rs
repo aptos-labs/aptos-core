@@ -4,8 +4,8 @@
 
 use crate::{block::Block, vote_data::VoteData};
 use aptos_crypto::hash::{
-    TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH, MOON_BLOCK_HAS_EARTH_QC_HASH,
-    MOON_BLOCK_NO_EARTH_QC_HASH,
+    TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH, PROXY_BLOCK_HAS_PRIMARY_QC_HASH,
+    PROXY_BLOCK_NO_PRIMARY_QC_HASH,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
@@ -64,9 +64,9 @@ impl VoteProposal {
     fn vote_data_ordering_only(&self) -> VoteData {
         let executed_state_id_place_holder = if self.block().proxy_block().is_some() {
             if self.block().primary_qc().is_some() {
-                *MOON_BLOCK_HAS_EARTH_QC_HASH
+                *PROXY_BLOCK_HAS_PRIMARY_QC_HASH
             } else {
-                *MOON_BLOCK_NO_EARTH_QC_HASH
+                *PROXY_BLOCK_NO_PRIMARY_QC_HASH
             }
         } else {
             *ACCUMULATOR_PLACEHOLDER_HASH

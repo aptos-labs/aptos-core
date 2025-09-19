@@ -5,7 +5,7 @@
 use crate::counters;
 use aptos_infallible::duration_since_epoch;
 use std::time::Duration;
-
+use serde::Serialize;
 pub struct BlockStage;
 
 impl BlockStage {
@@ -47,11 +47,24 @@ impl BlockStage {
     pub const VOTED_OPT_BLOCK: &'static str = "voted_opt_block";
 }
 
+#[derive(Serialize, Clone, PartialEq, Eq)]
+pub struct BlockType;
+
+impl BlockType {
+    pub const PRIMARY: &'static str = "primary";
+    pub const PROXY: &'static str = "proxy";
+}
+
 /// Record the time during each stage of a block.
 pub fn observe_block(timestamp: u64, stage: &'static str) {
+    observe_block_with_type(timestamp, stage, BlockType::PRIMARY);
+}
+
+/// Record the time during each stage of a block.
+pub fn observe_block_with_type(timestamp: u64, stage: &'static str, block_type: &'static str) {
     if let Some(t) = duration_since_epoch().checked_sub(Duration::from_micros(timestamp)) {
         counters::BLOCK_TRACING
-            .with_label_values(&[stage])
+            .with_label_values(&[stage, block_type])
             .observe(t.as_secs_f64());
     }
 }

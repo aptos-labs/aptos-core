@@ -13,7 +13,7 @@ use anyhow::{bail, ensure, format_err, Result};
 use aptos_bitvec::BitVec;
 use aptos_crypto::{
     bls12381,
-    hash::{CryptoHash, MOON_BLOCK_HAS_EARTH_QC_HASH, MOON_BLOCK_NO_EARTH_QC_HASH},
+    hash::{CryptoHash, PROXY_BLOCK_HAS_PRIMARY_QC_HASH, PROXY_BLOCK_NO_PRIMARY_QC_HASH},
     HashValue,
 };
 use aptos_infallible::duration_since_epoch;
@@ -605,8 +605,8 @@ impl Block {
             if let Payload::ProxyBlock(proxy_block) = payload {
                 let parent = self.quorum_cert().certified_block();
                 let parent_has_primary_qc =
-                    parent.executed_state_id() == *MOON_BLOCK_HAS_EARTH_QC_HASH;
-                let parent_no_primary_qc = parent.executed_state_id() == *MOON_BLOCK_NO_EARTH_QC_HASH;
+                    parent.executed_state_id() == *PROXY_BLOCK_HAS_PRIMARY_QC_HASH;
+                let parent_no_primary_qc = parent.executed_state_id() == *PROXY_BLOCK_NO_PRIMARY_QC_HASH;
                 ensure!(
                     parent_has_primary_qc || parent_no_primary_qc,
                     "Parent proxy block must have primary QC or no primary QC"

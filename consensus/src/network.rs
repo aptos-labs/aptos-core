@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::tracing::{observe_block, BlockStage},
+    block_storage::tracing::{BlockStage, observe_block, observe_block_with_type},
     counters,
     dag::{
         DAGMessage, DAGNetworkMessage, DAGRpcResult, ProofNotifier, RpcWithFallback,
@@ -12,6 +12,7 @@ use crate::{
     logging::{LogEvent, LogSchema},
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
+    proxy_network_interfaces::{ProxyConsensusMsg, ProxyConsensusMessage},
     pipeline::commit_reliable_broadcast::CommitMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
     rand::rand_gen::{
@@ -61,7 +62,8 @@ use std::{
     time::Duration,
 };
 use tokio::time::timeout;
-
+use crate::block_storage::tracing::BlockType;
+use crate::proxy_network_interfaces::ConsensusId;
 pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
 
@@ -119,6 +121,13 @@ pub struct IncomingBlockRetrievalRequest {
 }
 
 #[derive(Debug)]
+pub struct IncomingProxyBlockRetrievalRequest {
+    pub req: BlockRetrievalRequest,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+#[derive(Debug)]
 pub struct IncomingBatchRetrievalRequest {
     pub req: BatchRequest,
     pub protocol: ProtocolId,
@@ -157,6 +166,7 @@ pub enum IncomingRpcRequest {
     CommitRequest(IncomingCommitRequest),
     RandGenRequest(IncomingRandGenRequest),
     BlockRetrieval(IncomingBlockRetrievalRequest),
+    ProxyBlockRetrieval(IncomingProxyBlockRetrievalRequest),
 }
 
 impl IncomingRpcRequest {
@@ -169,6 +179,7 @@ impl IncomingRpcRequest {
             IncomingRpcRequest::CommitRequest(req) => req.req.epoch(),
             IncomingRpcRequest::DeprecatedBlockRetrieval(_) => None,
             IncomingRpcRequest::BlockRetrieval(_) => None,
+            IncomingRpcRequest::ProxyBlockRetrieval(_) => None,
         }
     }
 }
@@ -178,6 +189,10 @@ impl IncomingRpcRequest {
 pub struct NetworkReceivers {
     /// Provide a LIFO buffer for each (Author, MessageType) key
     pub consensus_messages: aptos_channel::Receiver<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
+    pub proxy_consensus_messages: aptos_channel::Receiver<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
@@ -248,6 +263,7 @@ impl NetworkSender {
         retrieval_request: BlockRetrievalRequest,
         from: Author,
         timeout: Duration,
+        consensus_id: ConsensusId,
     ) -> anyhow::Result<BlockRetrievalResponse> {
         fail_point!("consensus::send::any", |_| {
             Err(anyhow::anyhow!("Injected error in request_block"))
@@ -257,13 +273,33 @@ impl NetworkSender {
         });
 
         ensure!(from != self.author, "Retrieve block from self");
-        let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
+        let msg = match consensus_id {
+            ConsensusId::Primary => ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone())),
+            ConsensusId::Proxy(_) => ConsensusMsg::ProxyConsensusMsg(Box::new(ProxyConsensusMsg {
+                proxy_consensus_message: ProxyConsensusMessage::BlockRetrievalRequest(retrieval_request.clone()),
+                consensus_id: consensus_id.clone(),
+            })),
+        };
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc();
         let response_msg = monitor!("block_retrieval", self.send_rpc(from, msg, timeout).await)?;
         let response = match response_msg {
-            ConsensusMsg::BlockRetrievalResponse(resp) => *resp,
+            ConsensusMsg::BlockRetrievalResponse(resp) => {
+                if consensus_id != ConsensusId::Primary {
+                    return Err(anyhow!("Invalid response to request"));
+                }
+                *resp
+            },
+            ConsensusMsg::ProxyConsensusMsg(proxy_consensus_msg) => {
+                if proxy_consensus_msg.consensus_id != consensus_id {
+                    return Err(anyhow!("Invalid response to request"));
+                }
+                match proxy_consensus_msg.proxy_consensus_message {
+                    ProxyConsensusMessage::BlockRetrievalResponse(resp) => resp,
+                    _ => return Err(anyhow!("Invalid response to request")),
+                }
+            },
             _ => return Err(anyhow!("Invalid response to request")),
         };
 
@@ -401,27 +437,51 @@ impl NetworkSender {
         }
     }
 
-    pub async fn broadcast_proposal(&self, proposal_msg: ProposalMsg) {
+    pub async fn broadcast_proposal(&self, proposal_msg: ProposalMsg, consensus_id: ConsensusId) {
         fail_point!("consensus::send::broadcast_proposal", |_| ());
-        let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
+        let msg = match consensus_id {
+            ConsensusId::Primary => ConsensusMsg::ProposalMsg(Box::new(proposal_msg)),
+            ConsensusId::Proxy(_) => ConsensusMsg::ProxyConsensusMsg(Box::new(ProxyConsensusMsg {
+                proxy_consensus_message: ProxyConsensusMessage::ProposalMsg(proposal_msg),
+                consensus_id: consensus_id,
+            })),
+        };
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_opt_proposal(&self, proposal_msg: OptProposalMsg) {
+    pub async fn broadcast_opt_proposal(&self, proposal_msg: OptProposalMsg, consensus_id: ConsensusId) {
         fail_point!("consensus::send::broadcast_opt_proposal", |_| ());
-        let msg = ConsensusMsg::OptProposalMsg(Box::new(proposal_msg));
+        let msg = match consensus_id {
+            ConsensusId::Primary => ConsensusMsg::OptProposalMsg(Box::new(proposal_msg)),
+            ConsensusId::Proxy(_) => ConsensusMsg::ProxyConsensusMsg(Box::new(ProxyConsensusMsg {
+                proxy_consensus_message: ProxyConsensusMessage::OptProposalMsg(proposal_msg),
+                consensus_id: consensus_id,
+            })),
+        };
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_sync_info(&self, sync_info_msg: SyncInfo) {
+    pub async fn broadcast_sync_info(&self, sync_info_msg: SyncInfo, consensus_id: ConsensusId) {
         fail_point!("consensus::send::broadcast_sync_info", |_| ());
-        let msg = ConsensusMsg::SyncInfo(Box::new(sync_info_msg));
+        let msg = match consensus_id {
+            ConsensusId::Primary => ConsensusMsg::SyncInfo(Box::new(sync_info_msg)),
+            ConsensusId::Proxy(_) => ConsensusMsg::ProxyConsensusMsg(Box::new(ProxyConsensusMsg {
+                proxy_consensus_message: ProxyConsensusMessage::SyncInfo(sync_info_msg),
+                consensus_id: consensus_id,
+            })),
+        };
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_timeout_vote(&self, timeout_vote_msg: VoteMsg) {
+    pub async fn broadcast_timeout_vote(&self, timeout_vote_msg: VoteMsg, consensus_id: ConsensusId) {
         fail_point!("consensus::send::broadcast_timeout_vote", |_| ());
-        let msg = ConsensusMsg::VoteMsg(Box::new(timeout_vote_msg));
+        let msg = match consensus_id {
+            ConsensusId::Primary => ConsensusMsg::VoteMsg(Box::new(timeout_vote_msg)),
+            ConsensusId::Proxy(_) => ConsensusMsg::ProxyConsensusMsg(Box::new(ProxyConsensusMsg {
+                proxy_consensus_message: ProxyConsensusMessage::VoteMsg(timeout_vote_msg),
+                consensus_id: consensus_id,
+            })),
+        };
         self.broadcast(msg).await
     }
 
@@ -444,21 +504,39 @@ impl NetworkSender {
             .map(|_| ())
     }
 
-    pub async fn broadcast_vote(&self, vote_msg: VoteMsg) {
+    pub async fn broadcast_vote(&self, vote_msg: VoteMsg, consensus_id: ConsensusId) {
         fail_point!("consensus::send::vote", |_| ());
-        let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
+        let msg = match consensus_id {
+            ConsensusId::Primary => ConsensusMsg::VoteMsg(Box::new(vote_msg)),
+            ConsensusId::Proxy(_) => ConsensusMsg::ProxyConsensusMsg(Box::new(ProxyConsensusMsg {
+                proxy_consensus_message: ProxyConsensusMessage::VoteMsg(vote_msg),
+                consensus_id: consensus_id,
+            })),
+        };
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_round_timeout(&self, round_timeout: RoundTimeoutMsg) {
+    pub async fn broadcast_round_timeout(&self, round_timeout: RoundTimeoutMsg, consensus_id: ConsensusId) {
         fail_point!("consensus::send::round_timeout", |_| ());
-        let msg = ConsensusMsg::RoundTimeoutMsg(Box::new(round_timeout));
+        let msg = match consensus_id {
+            ConsensusId::Primary => ConsensusMsg::RoundTimeoutMsg(Box::new(round_timeout)),
+            ConsensusId::Proxy(_) => ConsensusMsg::ProxyConsensusMsg(Box::new(ProxyConsensusMsg {
+                proxy_consensus_message: ProxyConsensusMessage::RoundTimeoutMsg(round_timeout),
+                consensus_id: consensus_id,
+            })),
+        };
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_order_vote(&self, order_vote_msg: OrderVoteMsg) {
+    pub async fn broadcast_order_vote(&self, order_vote_msg: OrderVoteMsg, consensus_id: ConsensusId) {
         fail_point!("consensus::send::order_vote", |_| ());
-        let msg = ConsensusMsg::OrderVoteMsg(Box::new(order_vote_msg));
+        let msg = match consensus_id {
+            ConsensusId::Primary => ConsensusMsg::OrderVoteMsg(Box::new(order_vote_msg)),
+            ConsensusId::Proxy(_) => ConsensusMsg::ProxyConsensusMsg(Box::new(ProxyConsensusMsg {
+                proxy_consensus_message: ProxyConsensusMessage::OrderVoteMsg(order_vote_msg),
+                consensus_id: consensus_id,
+            })),
+        };
         self.broadcast(msg).await
     }
 
@@ -486,16 +564,28 @@ impl NetworkSender {
     /// internal(to provide back pressure), it does not indicate the message is delivered or sent
     /// out. It does not give indication about when the message is delivered to the recipients,
     /// as well as there is no indication about the network failures.
-    pub async fn send_vote(&self, vote_msg: VoteMsg, recipients: Vec<Author>) {
+    pub async fn send_vote(&self, vote_msg: VoteMsg, recipients: Vec<Author>, consensus_id: ConsensusId) {
         fail_point!("consensus::send::vote", |_| ());
-        let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
+        let msg = match consensus_id {
+            ConsensusId::Primary => ConsensusMsg::VoteMsg(Box::new(vote_msg)),
+            ConsensusId::Proxy(_) => ConsensusMsg::ProxyConsensusMsg(Box::new(ProxyConsensusMsg {
+                proxy_consensus_message: ProxyConsensusMessage::VoteMsg(vote_msg),
+                consensus_id: consensus_id,
+            })),
+        };
         self.send(msg, recipients).await
     }
 
     #[cfg(feature = "failpoints")]
-    pub async fn send_proposal(&self, proposal_msg: ProposalMsg, recipients: Vec<Author>) {
+    pub async fn send_proposal(&self, proposal_msg: ProposalMsg, recipients: Vec<Author>, consensus_id: ConsensusId) {
         fail_point!("consensus::send::proposal", |_| ());
-        let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
+        let msg = match consensus_id {
+            ConsensusId::Primary => ConsensusMsg::ProposalMsg(Box::new(proposal_msg)),
+            ConsensusId::Proxy(_) => ConsensusMsg::ProxyConsensusMsg(Box::new(ProxyConsensusMsg {
+                proxy_consensus_message: ProxyConsensusMessage::ProposalMsg(proposal_msg),
+                consensus_id: consensus_id,
+            })),
+        };
         self.send(msg, recipients).await
     }
 
@@ -682,6 +772,10 @@ pub struct NetworkTask {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
+    proxy_consensus_messages_tx: aptos_channel::Sender<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
     quorum_store_messages_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
@@ -700,6 +794,11 @@ impl NetworkTask {
         self_receiver: aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            10,
+            Some(&counters::CONSENSUS_CHANNEL_MSGS),
+        );
+        let (proxy_consensus_messages_tx, proxy_consensus_messages) = aptos_channel::new(
             QueueStyle::FIFO,
             10,
             Some(&counters::CONSENSUS_CHANNEL_MSGS),
@@ -729,12 +828,14 @@ impl NetworkTask {
         (
             NetworkTask {
                 consensus_messages_tx,
+                proxy_consensus_messages_tx,
                 quorum_store_messages_tx,
                 rpc_tx,
                 all_events,
             },
             NetworkReceivers {
                 consensus_messages,
+                proxy_consensus_messages,
                 quorum_store_messages,
                 rpc_rx,
             },
@@ -861,6 +962,57 @@ impl NetworkTask {
                                 warn!(error = ?e, "aptos channel closed");
                             };
                         },
+                        ConsensusMsg::ProxyConsensusMsg(proxy_consensus_msg) => {
+                            let ProxyConsensusMsg { proxy_consensus_message, consensus_id } = proxy_consensus_msg.as_ref();
+                            match proxy_consensus_message {
+                                ProxyConsensusMessage::ProposalMsg(_)
+                                | ProxyConsensusMessage::OptProposalMsg(_)
+                                | ProxyConsensusMessage::VoteMsg(_)
+                                | ProxyConsensusMessage::OrderVoteMsg(_)
+                                | ProxyConsensusMessage::RoundTimeoutMsg(_)
+                                | ProxyConsensusMessage::SyncInfo(_) => {
+                                    if let ProxyConsensusMessage::ProposalMsg(proposal) = proxy_consensus_message {
+                                        observe_block_with_type(
+                                            proposal.proposal().timestamp_usecs(),
+                                            BlockStage::NETWORK_RECEIVED,
+                                            BlockType::PROXY,
+                                        );
+                                        info!(
+                                            LogSchema::new(LogEvent::NetworkReceiveProposal)
+                                                .remote_peer(peer_id),
+                                            block_round = proposal.proposal().round(),
+                                            block_hash = proposal.proposal().id(),
+                                            block_type = BlockType::PROXY,
+                                        );
+                                    }
+                                    if let ProxyConsensusMessage::OptProposalMsg(proposal) = proxy_consensus_message {
+                                        observe_block_with_type(
+                                            proposal.timestamp_usecs(),
+                                            BlockStage::NETWORK_RECEIVED,
+                                            BlockType::PROXY,
+                                        );
+                                        observe_block_with_type(
+                                            proposal.timestamp_usecs(),
+                                            BlockStage::NETWORK_RECEIVED_OPT_PROPOSAL,
+                                            BlockType::PROXY,
+                                        );
+                                        info!(
+                                            LogSchema::new(LogEvent::NetworkReceiveOptProposal)
+                                                .remote_peer(peer_id),
+                                            block_author = proposal.proposer(),
+                                            block_epoch = proposal.epoch(),
+                                            block_round = proposal.round(),
+                                            block_type = BlockType::PROXY,
+                                        );
+                                    }
+                                    Self::push_msg(peer_id, proxy_consensus_msg.into_network_message(), &self.proxy_consensus_messages_tx);
+                                },
+                                _ => {
+                                    warn!(remote_peer = peer_id, "Unexpected proxy consensus msg: {:?}", proxy_consensus_msg);
+                                    continue;
+                                },
+                            }
+                        }
                         _ => {
                             warn!(remote_peer = peer_id, "Unexpected direct send msg");
                             continue;
@@ -938,6 +1090,22 @@ impl NetworkTask {
                                 protocol,
                                 response_sender: callback,
                             })
+                        },
+                        ConsensusMsg::ProxyConsensusMsg(msg) => {
+                            let ProxyConsensusMsg { proxy_consensus_message, consensus_id } = *msg;
+                            match proxy_consensus_message {
+                                ProxyConsensusMessage::BlockRetrievalRequest(request) => {
+                                    IncomingRpcRequest::ProxyBlockRetrieval(IncomingProxyBlockRetrievalRequest {
+                                        req: request,
+                                        protocol,
+                                        response_sender: callback,
+                                    })
+                                },
+                                _ => {
+                                    warn!(remote_peer = peer_id, "Unexpected proxy consensus msg: {:?}", proxy_consensus_message);
+                                    continue;
+                                },
+                            }
                         },
                         _ => {
                             warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);

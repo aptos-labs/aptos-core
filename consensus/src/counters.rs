@@ -897,7 +897,7 @@ pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_consensus_block_tracing",
         "Histogram for different stages of a block",
-        &["stage"],
+        &["stage", "block_type"],
         TRACING_BUCKETS.to_vec()
     )
     .unwrap()

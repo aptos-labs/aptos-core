@@ -34,7 +34,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{
     hash::{
-        ACCUMULATOR_PLACEHOLDER_HASH, MOON_BLOCK_HAS_EARTH_QC_HASH, MOON_BLOCK_NO_EARTH_QC_HASH,
+        ACCUMULATOR_PLACEHOLDER_HASH, PROXY_BLOCK_HAS_PRIMARY_QC_HASH, PROXY_BLOCK_NO_PRIMARY_QC_HASH,
     },
     HashValue,
 };
@@ -207,8 +207,8 @@ impl BlockStore {
         assert!(
             // decoupled execution allows dummy executed_state_id
             root_qc.certified_block().executed_state_id() == *ACCUMULATOR_PLACEHOLDER_HASH
-                || root_qc.certified_block().executed_state_id() == *MOON_BLOCK_NO_EARTH_QC_HASH
-                || root_qc.certified_block().executed_state_id() == *MOON_BLOCK_HAS_EARTH_QC_HASH
+                || root_qc.certified_block().executed_state_id() == *PROXY_BLOCK_NO_PRIMARY_QC_HASH
+                || root_qc.certified_block().executed_state_id() == *PROXY_BLOCK_HAS_PRIMARY_QC_HASH
                 || root_qc.certified_block().executed_state_id() == root_metadata.accu_hash,
             "root qc state id {} doesn't match committed trees {}",
             root_qc.certified_block().executed_state_id(),

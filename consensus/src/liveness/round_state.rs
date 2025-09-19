@@ -20,6 +20,7 @@ use aptos_types::validator_verifier::ValidatorVerifier;
 use futures::future::AbortHandle;
 use serde::Serialize;
 use std::{fmt, sync::Arc, time::Duration};
+use crate::proxy_network_interfaces::ConsensusId;
 
 /// A reason for starting a new round: introduced for monitoring / debug purposes.
 #[derive(Serialize, Debug, PartialEq, Eq, Clone)]
@@ -155,7 +156,7 @@ pub struct RoundState {
     // Service for timer
     time_service: Arc<dyn TimeService>,
     // To send local timeout events to the subscriber (e.g., SMR)
-    timeout_sender: aptos_channels::Sender<Round>,
+    timeout_sender: aptos_channels::Sender<(ConsensusId, Round)>,
     // Votes received for the current round.
     pending_votes: PendingVotes,
     // Vote sent locally for the current round.
@@ -164,6 +165,8 @@ pub struct RoundState {
     timeout_sent: Option<RoundTimeout>,
     // The handle to cancel previous timeout task when moving to next round.
     abort_handle: Option<AbortHandle>,
+    // The consensus id
+    consensus_id: ConsensusId,
 }
 
 #[derive(Default, Schema)]
@@ -191,7 +194,8 @@ impl RoundState {
     pub fn new(
         time_interval: Box<dyn RoundTimeInterval>,
         time_service: Arc<dyn TimeService>,
-        timeout_sender: aptos_channels::Sender<Round>,
+        timeout_sender: aptos_channels::Sender<(ConsensusId, Round)>,
+        consensus_id: ConsensusId,
     ) -> Self {
         // Our counters are initialized lazily, so they're not going to appear in
         // Prometheus if some conditions never happen. Invoking get() function enforces creation.
@@ -211,6 +215,7 @@ impl RoundState {
             vote_sent: None,
             timeout_sent: None,
             abort_handle: None,
+            consensus_id,
         }
     }
 
@@ -347,7 +352,7 @@ impl RoundState {
         );
         let abort_handle = self
             .time_service
-            .run_after(timeout, SendTask::make(timeout_sender, self.current_round));
+            .run_after(timeout, SendTask::make(timeout_sender, (self.consensus_id.clone(), self.current_round)));
         if let Some(handle) = self.abort_handle.replace(abort_handle) {
             handle.abort();
         }

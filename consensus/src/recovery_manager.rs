@@ -24,9 +24,12 @@ use futures::{FutureExt, StreamExt};
 use futures_channel::oneshot;
 use std::{mem::Discriminant, process, sync::Arc};
 
+use crate::proxy_network_interfaces::ConsensusId;
+
 /// If the node can't recover corresponding blocks from local storage, RecoveryManager is responsible
 /// for processing the events carrying sync info and use the info to retrieve blocks from peers
 pub struct RecoveryManager {
+    consensus_id: ConsensusId,
     epoch_state: Arc<EpochState>,
     network: Arc<NetworkSender>,
     storage: Arc<dyn PersistentLivenessStorage>,
@@ -41,6 +44,7 @@ pub struct RecoveryManager {
 
 impl RecoveryManager {
     pub fn new(
+        consensus_id: ConsensusId,
         epoch_state: Arc<EpochState>,
         network: Arc<NetworkSender>,
         storage: Arc<dyn PersistentLivenessStorage>,
@@ -53,6 +57,7 @@ impl RecoveryManager {
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
         RecoveryManager {
+            consensus_id,
             epoch_state,
             network,
             storage,
@@ -92,6 +97,7 @@ impl RecoveryManager {
             "[RecoveryManager] Received sync info is in different epoch than committed block"
         );
         let mut retriever = BlockRetriever::new(
+            self.consensus_id.clone(),
             self.network.clone(),
             peer,
             self.epoch_state

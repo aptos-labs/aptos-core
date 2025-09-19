@@ -26,6 +26,7 @@ use crate::{
     monitor,
     network::NetworkSender,
     network_interface::ConsensusMsg,
+    proxy_network_interfaces::{ProxyConsensusMsg, ProxyConsensusMessage},
     pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
     pending_votes::{VoteReceptionResult, VoteStatus},
     persistent_liveness_storage::PersistentLivenessStorage,
@@ -86,6 +87,7 @@ use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
 };
+use crate::proxy_network_interfaces::ConsensusId;
 
 #[derive(Debug, Serialize, Clone)]
 pub enum UnverifiedEvent {
@@ -98,6 +100,8 @@ pub enum UnverifiedEvent {
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
     OptProposalMsg(Box<OptProposalMsg>),
+    // proxy events
+    UnverifiedProxyEvent(Box<UnverifiedProxyEvent>),
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
@@ -195,6 +199,7 @@ impl UnverifiedEvent {
                 }
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
+            UnverifiedEvent::UnverifiedProxyEvent(e) => VerifiedEvent::VerifiedProxyEvent(Box::new(e.verify(peer_id, validator, proof_cache, quorum_store_enabled, self_message)?)),
         })
     }
 
@@ -209,6 +214,7 @@ impl UnverifiedEvent {
             UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
             UnverifiedEvent::RoundTimeoutMsg(t) => Ok(t.epoch()),
+            UnverifiedEvent::UnverifiedProxyEvent(e) => e.epoch(),
         }
     }
 }
@@ -225,10 +231,111 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
             ConsensusMsg::RoundTimeoutMsg(m) => UnverifiedEvent::RoundTimeoutMsg(m),
+            ConsensusMsg::ProxyConsensusMsg(m) => UnverifiedEvent::UnverifiedProxyEvent(Box::new((*m).into())),
             _ => unreachable!("Unexpected conversion"),
         }
     }
 }
+
+#[derive(Debug, Serialize, Clone)]
+pub enum UnverifiedProxyEvent {
+    ProposalMsg(ProposalMsg),
+    OptProposalMsg(OptProposalMsg),
+    VoteMsg(VoteMsg),
+    OrderVoteMsg(OrderVoteMsg),
+    RoundTimeoutMsg(RoundTimeoutMsg),
+    SyncInfo(SyncInfo),
+}
+
+impl UnverifiedProxyEvent {
+    pub fn verify(
+        self,
+        peer_id: PeerId,
+        validator: &ValidatorVerifier,
+        proof_cache: &ProofCache,
+        quorum_store_enabled: bool,
+        self_message: bool,
+    ) -> Result<VerifiedProxyEvent, VerifyError> {
+        let start_time = Instant::now();
+        Ok(match self {
+            //TODO: no need to sign and verify the proposal
+            UnverifiedProxyEvent::ProposalMsg(p) => {
+                if !self_message {
+                    p.verify(peer_id, validator, proof_cache, quorum_store_enabled)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["proxy_proposal"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedProxyEvent::ProposalMsg(p)
+            },
+            UnverifiedProxyEvent::OptProposalMsg(p) => {
+                if !self_message {
+                    p.verify(peer_id, validator, proof_cache, quorum_store_enabled)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["proxy_opt_proposal"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedProxyEvent::OptProposalMsg(p)
+            },
+            UnverifiedProxyEvent::VoteMsg(v) => {
+                if !self_message {
+                    v.verify(peer_id, validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["proxy_vote"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedProxyEvent::VoteMsg(v)
+            },
+            UnverifiedProxyEvent::RoundTimeoutMsg(v) => {
+                if !self_message {
+                    v.verify(validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["proxy_timeout"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedProxyEvent::RoundTimeoutMsg(v)
+            },
+            UnverifiedProxyEvent::OrderVoteMsg(v) => {
+                if !self_message {
+                    v.verify_order_vote(peer_id, validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["proxy_order_vote"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedProxyEvent::OrderVoteMsg(v)
+            },
+            // sync info verification is on-demand (verified when it's used)
+            UnverifiedProxyEvent::SyncInfo(s) => VerifiedProxyEvent::SyncInfo(s),
+        })
+    }
+
+    pub fn epoch(&self) -> anyhow::Result<u64> {
+        match self {
+            UnverifiedProxyEvent::ProposalMsg(p) => Ok(p.epoch()),
+            UnverifiedProxyEvent::OptProposalMsg(p) => Ok(p.epoch()),
+            UnverifiedProxyEvent::VoteMsg(v) => Ok(v.epoch()),
+            UnverifiedProxyEvent::OrderVoteMsg(v) => Ok(v.epoch()),
+            UnverifiedProxyEvent::RoundTimeoutMsg(t) => Ok(t.epoch()),
+            UnverifiedProxyEvent::SyncInfo(s) => Ok(s.epoch()),
+        }
+    }
+}
+
+impl From<ProxyConsensusMsg> for UnverifiedProxyEvent {
+    fn from(value: ProxyConsensusMsg) -> Self {
+        let ProxyConsensusMsg { proxy_consensus_message, consensus_id } = value;
+        match proxy_consensus_message {
+            ProxyConsensusMessage::ProposalMsg(m) => UnverifiedProxyEvent::ProposalMsg(m),
+            ProxyConsensusMessage::OptProposalMsg(m) => UnverifiedProxyEvent::OptProposalMsg(m),
+            ProxyConsensusMessage::VoteMsg(m) => UnverifiedProxyEvent::VoteMsg(m),
+            ProxyConsensusMessage::OrderVoteMsg(m) => UnverifiedProxyEvent::OrderVoteMsg(m),
+            ProxyConsensusMessage::RoundTimeoutMsg(m) => UnverifiedProxyEvent::RoundTimeoutMsg(m),
+            ProxyConsensusMessage::SyncInfo(m) => UnverifiedProxyEvent::SyncInfo(m),
+            _ => unreachable!("Unexpected conversion"),
+        }
+    }
+}
+
 
 #[derive(Debug)]
 pub enum VerifiedEvent {
@@ -247,6 +354,20 @@ pub enum VerifiedEvent {
     // Shutdown the NetworkListener
     Shutdown(TokioOneshot::Sender<()>),
     OptProposalMsg(Box<OptProposalMsg>),
+    // proxy events
+    VerifiedProxyEvent(Box<VerifiedProxyEvent>),
+}
+
+#[derive(Debug)]
+pub enum VerifiedProxyEvent {
+    ProposalMsg(ProposalMsg),
+    OptProposalMsg(OptProposalMsg),
+    VoteMsg(VoteMsg),
+    OrderVoteMsg(OrderVoteMsg),
+    RoundTimeoutMsg(RoundTimeoutMsg),
+    SyncInfo(SyncInfo),
+    // local messages
+    LocalTimeout(Round),
 }
 
 #[cfg(test)]
@@ -263,6 +384,7 @@ pub mod round_manager_fuzzing;
 /// The caller is responsible for running the event loops and driving the execution via some
 /// executors.
 pub struct RoundManager {
+    consensus_id: ConsensusId,
     epoch_state: Arc<EpochState>,
     block_store: Arc<BlockStore>,
     round_state: RoundState,
@@ -296,6 +418,7 @@ pub struct RoundManager {
 impl RoundManager {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        consensus_id: ConsensusId,
         epoch_state: Arc<EpochState>,
         block_store: Arc<BlockStore>,
         round_state: RoundState,
@@ -325,6 +448,7 @@ impl RoundManager {
         let vtxn_config = onchain_config.effective_validator_txn_config();
         debug!("vtxn_config={:?}", vtxn_config);
         Self {
+            consensus_id,
             epoch_state,
             block_store,
             round_state,
@@ -355,6 +479,7 @@ impl RoundManager {
     // TODO: Evaluate if creating a block retriever is slow and cache this if needed.
     fn create_block_retriever(&self, author: Author) -> BlockRetriever {
         BlockRetriever::new(
+            self.consensus_id.clone(),
             self.network.clone(),
             author,
             self.epoch_state
@@ -454,6 +579,7 @@ impl RoundManager {
             let proposal_generator = self.proposal_generator.clone();
             let safety_rules = self.safety_rules.clone();
             let proposer_election = self.proposer_election.clone();
+            let consensus_id = self.consensus_id.clone();
             tokio::spawn(async move {
                 if let Err(e) = monitor!(
                     "generate_and_send_proposal",
@@ -465,6 +591,7 @@ impl RoundManager {
                         proposal_generator,
                         safety_rules,
                         proposer_election,
+                        consensus_id,
                     )
                     .await
                 ) {
@@ -483,6 +610,7 @@ impl RoundManager {
         proposal_generator: Arc<ProposalGenerator>,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+        consensus_id: ConsensusId,
     ) -> anyhow::Result<()> {
         Self::log_collected_vote_stats(epoch_state.clone(), &new_round_event);
         let proposal_msg = Self::generate_proposal(
@@ -501,11 +629,12 @@ impl RoundManager {
                     epoch_state,
                     network.clone(),
                     &proposal_msg,
+                    consensus_id.clone(),
                 )
                 .await?;
             }
         };
-        network.broadcast_proposal(proposal_msg).await;
+        network.broadcast_proposal(proposal_msg, consensus_id).await;
         counters::PROPOSALS_COUNT.inc();
         Ok(())
     }
@@ -519,6 +648,7 @@ impl RoundManager {
         sync_info: SyncInfo,
         proposal_generator: Arc<ProposalGenerator>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+        consensus_id: ConsensusId,
     ) -> anyhow::Result<()> {
         let proposal_msg = Self::generate_opt_proposal(
             epoch_state.clone(),
@@ -530,7 +660,7 @@ impl RoundManager {
             proposer_election,
         )
         .await?;
-        network.broadcast_opt_proposal(proposal_msg).await;
+        network.broadcast_opt_proposal(proposal_msg, consensus_id).await;
         counters::PROPOSALS_COUNT.inc();
         Ok(())
     }
@@ -959,7 +1089,7 @@ impl RoundManager {
 
         if self.sync_only() {
             self.network
-                .broadcast_sync_info(self.block_store.sync_info())
+                .broadcast_sync_info(self.block_store.sync_info(), self.consensus_id.clone())
                 .await;
             bail!("[RoundManager] sync_only flag is set, broadcasting SyncInfo");
         }
@@ -995,7 +1125,7 @@ impl RoundManager {
             self.round_state.record_round_timeout(timeout.clone());
             let round_timeout_msg = RoundTimeoutMsg::new(timeout, self.block_store.sync_info());
             self.network
-                .broadcast_round_timeout(round_timeout_msg)
+                .broadcast_round_timeout(round_timeout_msg, self.consensus_id.clone())
                 .await;
             warn!(
                 round = round,
@@ -1040,7 +1170,7 @@ impl RoundManager {
 
             self.round_state.record_vote(timeout_vote.clone());
             let timeout_vote_msg = VoteMsg::new(timeout_vote, self.block_store.sync_info());
-            self.network.broadcast_timeout_vote(timeout_vote_msg).await;
+            self.network.broadcast_timeout_vote(timeout_vote_msg, self.consensus_id.clone()).await;
             warn!(
                 round = round,
                 remote_peer = self.proposer_election.get_valid_proposer(round),
@@ -1368,7 +1498,7 @@ impl RoundManager {
         if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
             PROPOSAL_VOTE_BROADCASTED.inc();
-            self.network.broadcast_vote(vote_msg).await;
+            self.network.broadcast_vote(vote_msg, self.consensus_id.clone()).await;
         } else {
             let recipient = self
                 .proposer_election
@@ -1377,7 +1507,7 @@ impl RoundManager {
                 self.new_log(LogEvent::Vote).remote_peer(recipient),
                 "{}", vote
             );
-            self.network.send_vote(vote_msg, vec![recipient]).await;
+            self.network.send_vote(vote_msg, vec![recipient], self.consensus_id.clone()).await;
         }
 
         if let Err(e) = self.start_next_opt_round(vote, parent_qc) {
@@ -1429,6 +1559,7 @@ impl RoundManager {
             let sync_info = self.block_store.sync_info();
             let proposal_generator = self.proposal_generator.clone();
             let proposer_election = self.proposer_election.clone();
+            let consensus_id = self.consensus_id.clone();
             tokio::spawn(async move {
                 if let Err(e) = monitor!(
                     "generate_and_send_opt_proposal",
@@ -1441,6 +1572,7 @@ impl RoundManager {
                         sync_info,
                         proposal_generator,
                         proposer_election,
+                        consensus_id,
                     )
                     .await
                 ) {
@@ -1639,7 +1771,7 @@ impl RoundManager {
                 self.new_log(LogEvent::BroadcastOrderVote),
                 "{}", order_vote_msg
             );
-            self.network.broadcast_order_vote(order_vote_msg).await;
+            self.network.broadcast_order_vote(order_vote_msg, self.consensus_id.clone()).await;
             if proposed_block.pipeline_futs().is_some() {
                 if let Some(tx) = proposed_block.pipeline_tx().lock().as_mut() {
                     let _ = tx.order_vote_tx.take().map(|tx| tx.send(()));
@@ -2147,6 +2279,31 @@ impl RoundManager {
                             "process_local_timeout",
                             self.process_local_timeout(round).await
                         ),
+                        VerifiedEvent::VerifiedProxyEvent(proxy_event) => {
+                            match *proxy_event {
+                                VerifiedProxyEvent::ProposalMsg(proposal_msg) => {
+                                    monitor!("process_proxy_proposal", self.process_proposal_msg(proposal_msg).await)
+                                }
+                                VerifiedProxyEvent::OptProposalMsg(opt_proposal_msg) => {
+                                    monitor!("process_proxy_opt_proposal", self.process_opt_proposal_msg(opt_proposal_msg).await)
+                                }
+                                VerifiedProxyEvent::VoteMsg(vote_msg) => {
+                                    monitor!("process_proxy_vote", self.process_vote_msg(vote_msg).await)
+                                }
+                                VerifiedProxyEvent::OrderVoteMsg(order_vote_msg) => {
+                                    monitor!("process_proxy_order_vote", self.process_order_vote_msg(order_vote_msg).await)
+                                }
+                                VerifiedProxyEvent::RoundTimeoutMsg(timeout_msg) => {
+                                    monitor!("process_proxy_round_timeout", self.process_round_timeout_msg(timeout_msg).await)
+                                }
+                                VerifiedProxyEvent::SyncInfo(sync_info) => {
+                                    monitor!("process_proxy_sync_info", self.process_sync_info_msg(sync_info, peer_id).await)
+                                }
+                                VerifiedProxyEvent::LocalTimeout(round) => {
+                                    monitor!("process_proxy_local_timeout", self.process_local_timeout(round).await)
+                                }
+                            }
+                        },
                         unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
                     }
                     .with_context(|| format!("from peer {}", peer_id));
@@ -2181,6 +2338,7 @@ impl RoundManager {
         epoch_state: Arc<EpochState>,
         network: Arc<NetworkSender>,
         proposal_msg: &ProposalMsg,
+        consensus_id: ConsensusId,
     ) -> anyhow::Result<()> {
         let block_data = proposal_msg.proposal().block_data();
         let direct_suffix = block_data.is_reconfiguration_suffix()
@@ -2198,7 +2356,7 @@ impl RoundManager {
                 .collect();
             half_peers.truncate(half_peers.len() / 2);
             network
-                .send_proposal(proposal_msg.clone(), half_peers)
+                .send_proposal(proposal_msg.clone(), half_peers, consensus_id)
                 .await;
             Err(anyhow::anyhow!("Injected error in reconfiguration suffix"))
         } else {

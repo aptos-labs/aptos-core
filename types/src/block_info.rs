@@ -7,8 +7,8 @@ use crate::{
     validator_verifier::ValidatorVerifier,
 };
 use aptos_crypto::hash::{
-    HashValue, ACCUMULATOR_PLACEHOLDER_HASH, MOON_BLOCK_HAS_EARTH_QC_HASH,
-    MOON_BLOCK_NO_EARTH_QC_HASH,
+    HashValue, ACCUMULATOR_PLACEHOLDER_HASH, PROXY_BLOCK_HAS_PRIMARY_QC_HASH,
+    PROXY_BLOCK_NO_PRIMARY_QC_HASH,
 };
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -214,8 +214,8 @@ impl BlockInfo {
         *self != BlockInfo::empty()
             && self.next_epoch_state.is_none()
             && (self.executed_state_id == *ACCUMULATOR_PLACEHOLDER_HASH
-                || self.executed_state_id == *MOON_BLOCK_NO_EARTH_QC_HASH
-                || self.executed_state_id == *MOON_BLOCK_HAS_EARTH_QC_HASH)
+                || self.executed_state_id == *PROXY_BLOCK_NO_PRIMARY_QC_HASH
+                || self.executed_state_id == *PROXY_BLOCK_HAS_PRIMARY_QC_HASH)
             && self.version == 0
     }
 

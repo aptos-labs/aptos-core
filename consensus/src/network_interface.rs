@@ -32,6 +32,7 @@ use bytes::Bytes;
 pub use pipeline::commit_reliable_broadcast::CommitMessage;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, time::Duration};
+use crate::proxy_network_interfaces::{ConsensusId, ProxyConsensusMsg};
 
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -91,6 +92,8 @@ pub enum ConsensusMsg {
     BlockRetrievalRequest(Box<BlockRetrievalRequest>),
     /// OptProposalMsg contains the optimistic proposal and sync info.
     OptProposalMsg(Box<OptProposalMsg>),
+    /// For proxy consensus
+    ProxyConsensusMsg(Box<ProxyConsensusMsg>),
 }
 
 /// Network type for consensus
@@ -121,6 +124,14 @@ impl ConsensusMsg {
             ConsensusMsg::BatchResponseV2(_) => "BatchResponseV2",
             ConsensusMsg::RoundTimeoutMsg(_) => "RoundTimeoutV2",
             ConsensusMsg::BlockRetrievalRequest(_) => "BlockRetrievalRequest",
+            ConsensusMsg::ProxyConsensusMsg(proxy_consensus_msg) => proxy_consensus_msg.name(),
+        }
+    }
+
+    pub fn consensus_id(&self) -> ConsensusId {
+        match self {
+            ConsensusMsg::ProxyConsensusMsg(proxy_consensus_msg) => proxy_consensus_msg.consensus_id(),
+            _ => ConsensusId::Primary,
         }
     }
 }

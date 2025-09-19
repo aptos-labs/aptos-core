@@ -50,6 +50,7 @@ use futures_channel::oneshot;
 use rand::{prelude::*, Rng};
 use std::{clone::Clone, cmp::min, fmt::Display, sync::Arc, time::Duration};
 use tokio::{time, time::timeout};
+use crate::proxy_network_interfaces::ConsensusId;
 
 #[derive(Debug, PartialEq, Eq)]
 /// Whether we need to do block retrieval if we want to insert a Quorum Cert.
@@ -603,6 +604,7 @@ impl BlockStore {
 
 /// BlockRetriever is used internally to retrieve blocks
 pub struct BlockRetriever {
+    consensus_id: ConsensusId,
     network: Arc<NetworkSender>,
     preferred_peer: Author,
     validator_addresses: Vec<AccountAddress>,
@@ -632,6 +634,7 @@ impl Display for TargetBlockRetrieval {
 
 impl BlockRetriever {
     pub fn new(
+        consensus_id: ConsensusId,
         network: Arc<NetworkSender>,
         preferred_peer: Author,
         validator_addresses: Vec<AccountAddress>,
@@ -639,6 +642,7 @@ impl BlockRetriever {
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
         Self {
+            consensus_id,
             network,
             preferred_peer,
             validator_addresses,
@@ -741,6 +745,7 @@ impl BlockRetriever {
                                 request.clone(),
                                 peer,
                                 rpc_timeout,
+                                self.consensus_id.clone(),
                             );
                             futures.push(async move { (remote_peer, future.await) }.boxed());
                         }
