@@ -671,7 +671,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 part for part in line.strip().split(CALIBRATION_SEPARATOR) if part
             ]
         )
-        >= 1
+        >= 3
     }
     print(calibrated_expected_tps)
 
