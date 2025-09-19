@@ -162,7 +162,7 @@ fn msm_bool<G: AffineRepr>(bases: &[G], scalars: &[bool]) -> G::Group {
     let mut acc = G::Group::zero();
     for (base, &bit) in bases.iter().zip(scalars) {
         if bit {
-            acc = acc + base;
+            acc += base;
         }
     }
     acc
