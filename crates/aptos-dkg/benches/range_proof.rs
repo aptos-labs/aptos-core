@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_dkg::range_proof::{batch_prove, batch_verify, commit, setup};
+use aptos_dkg::range_proof::{batch_prove, batch_verify, commit, setup, DST};
 use blstrs::Scalar;
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::thread_rng;
@@ -13,12 +13,12 @@ pub fn bench_groups(c: &mut Criterion) {
     let ell = std::env::var("L")
         .unwrap_or(std::env::var("ELL").unwrap_or_default())
         .parse::<usize>()
-        .unwrap_or(16);
+        .unwrap_or(48);
 
     let n = std::env::var("N")
         .unwrap_or_default()
         .parse::<usize>()
-        .unwrap_or(127);
+        .unwrap_or(2048 - 1);
 
     group.bench_function(format!("prove/ell={ell}/n={n}").as_str(), move |b| {
         b.iter_with_setup(
@@ -35,8 +35,9 @@ pub fn bench_groups(c: &mut Criterion) {
                 (pp, zz, cc, r)
             },
             |(pp, z_vals, com, prover_state)| {
+                let mut fs_t = merlin::Transcript::new(DST);
                 let mut rng = thread_rng();
-                let _proof = batch_prove(&mut rng, &pp, &z_vals, &com, &prover_state);
+                let _proof = batch_prove(&mut rng, &pp, &z_vals, &com, &prover_state, &mut fs_t);
             },
         )
     });
@@ -52,11 +53,13 @@ pub fn bench_groups(c: &mut Criterion) {
                     })
                     .collect();
                 let (cc, r) = commit(&pp, &zz, &mut rng);
-                let proof = batch_prove(&mut rng, &pp, &zz, &cc, &r);
+                let mut fs_t = merlin::Transcript::new(DST);
+                let proof = batch_prove(&mut rng, &pp, &zz, &cc, &r, &mut fs_t);
                 (pp, cc, proof)
             },
             |(pp, com, proof)| {
-                batch_verify(&pp, &com, &proof).unwrap();
+                let mut fs_t = merlin::Transcript::new(DST);
+                batch_verify(&pp, &com, &proof, &mut fs_t).unwrap();
             },
         )
     });

@@ -137,3 +137,47 @@ async fn test_function_values_with_references(
         })
     );
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_function_values_with_captured_struct(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let mut account = context.create_account().await;
+    let addr = account.address();
+
+    let named_addresses = vec![("account".to_string(), addr)];
+    let txn = futures::executor::block_on(async move {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("src/tests/move/pack_function_values_with_struct");
+        TestContext::build_package_with_latest_language(path, named_addresses)
+    });
+    context.publish_package(&mut account, txn).await;
+
+    let resource = format!("{}::test::FunctionStore", addr);
+    let response = &context.gen_resource(&addr, &resource).await.unwrap();
+
+    let expected_name = format!("{}::test::id", addr);
+    assert_eq!(
+        response["data"],
+        json!({
+            "f": {
+                "__captured__": [ {"_0": "1"} ],
+                "__fun_name__": &expected_name,
+                "__mask__": "1",
+            }
+        })
+    );
+}

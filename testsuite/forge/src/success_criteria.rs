@@ -260,7 +260,7 @@ impl SuccessCriteria {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum CheckType {
+pub enum CheckType {
     Hard,
     Soft,
 }
@@ -359,13 +359,13 @@ impl SuccessCriteriaResults {
         }
     }
 
-    fn extend(&mut self, result: anyhow::Result<(), SuccessCriteriaErrors>) {
+    pub fn extend(&mut self, result: anyhow::Result<(), SuccessCriteriaErrors>) {
         if let Err(e) = result {
             self.check_errors.extend(e)
         }
     }
 
-    fn evaluate(self) -> Result<(), SuccessCriteriaErrors> {
+    pub fn evaluate(self) -> Result<(), SuccessCriteriaErrors> {
         if self.check_errors.is_empty() {
             Ok(())
         } else {

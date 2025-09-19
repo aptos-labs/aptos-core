@@ -7,7 +7,10 @@ use crate::{
         DeltaTestKind, GroupSizeOrMetadata, MockIncarnation, MockTransaction, ValueType,
         RESERVED_TAG,
     },
-    task::{ExecutionStatus, ExecutorTask, TransactionOutput},
+    task::{
+        AfterMaterializationOutput, BeforeMaterializationOutput, ExecutionStatus, ExecutorTask,
+        TransactionOutput,
+    },
     types::delayed_field_mock_serialization::{
         deserialize_to_delayed_field_id, serialize_from_delayed_field_id,
     },
@@ -25,7 +28,7 @@ use aptos_types::{
     executable::ModulePath,
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
-    transaction::{AuxiliaryInfo, BlockExecutableTransaction as Transaction},
+    transaction::AuxiliaryInfo,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -694,15 +697,12 @@ impl<K, E> MockOutput<K, E> {
     }
 }
 
-/// Wrapper that provides AsRef access to module write set without cloning.
-struct ModuleWriteSetRefWrapper<'a, K, V> {
-    writes: &'a BTreeMap<K, ModuleWrite<V>>,
-}
-
-impl<'a, K, V> AsRef<BTreeMap<K, ModuleWrite<V>>> for ModuleWriteSetRefWrapper<'a, K, V> {
-    fn as_ref(&self) -> &BTreeMap<K, ModuleWrite<V>> {
-        self.writes
-    }
+fn mock_fee_statement(total_gas: u64) -> FeeStatement {
+    // First argument is supposed to be total (not important for the test though).
+    // Next two arguments are different kinds of execution gas that are counted
+    // towards the block limit. We split the total into two pieces for these arguments.
+    // TODO: add variety to generating fee statement based on total gas.
+    FeeStatement::new(total_gas, total_gas / 2, (total_gas + 1) / 2, 0, 0)
 }
 
 impl<K, E> TransactionOutput for MockOutput<K, E>
@@ -710,11 +710,65 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
+    type AfterMaterializationGuard<'a> = &'a Self;
+    type BeforeMaterializationGuard<'a> = &'a Self;
     type Txn = MockTransaction<K, E>;
 
-    // TODO[agg_v2](tests): Assigning MoveTypeLayout as None for all the writes for now.
-    // That means, the resources do not have any DelayedFields embedded in them.
-    // Change it to test resources with DelayedFields as well.
+    fn skip_output() -> Self {
+        Self::skipped_output(None)
+    }
+
+    fn discard_output(discard_code: StatusCode) -> Self {
+        Self::with_discard_code(discard_code)
+    }
+
+    fn before_materialization(&self) -> Result<Self::BeforeMaterializationGuard<'_>, PanicError> {
+        Ok(self)
+    }
+
+    fn after_materialization(&self) -> Result<Self::AfterMaterializationGuard<'_>, PanicError> {
+        Ok(self)
+    }
+
+    fn check_materialization(&self) -> Result<bool, PanicError> {
+        Ok(!self.skipped)
+    }
+
+    fn legacy_sequential_materialize_agg_v1(&self, _view: &impl TAggregatorV1View<Identifier = K>) {
+        // TODO[agg_v2](tests): implement this method and compare
+        // against sequential execution results v. aggregator v1.
+    }
+
+    fn incorporate_materialized_txn_output(
+        &self,
+        aggregator_v1_writes: Vec<(K, WriteOp)>,
+        patched_resource_write_set: Vec<(K, ValueType)>,
+        _patched_events: Vec<E>,
+    ) -> Result<(), PanicError> {
+        assert_ok!(self
+            .patched_resource_write_set
+            .set(patched_resource_write_set.clone().into_iter().collect()));
+        assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
+        // TODO: Also test patched events.
+        Ok(())
+    }
+
+    fn set_txn_output_for_non_dynamic_change_set(&self) {
+        // No compatibility issues here since the move-vm doesn't use the dynamic flag.
+    }
+
+    fn is_materialized_and_success(&self) -> bool {
+        // TODO(BlockSTMv2): Actually test that materialize is called.
+        // A skipped transaction is not a success.
+        !self.skipped
+    }
+}
+
+impl<'a, K, E> BeforeMaterializationOutput<MockTransaction<K, E>> for &'a MockOutput<K, E>
+where
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
+    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
+{
     fn resource_write_set(&self) -> Vec<(K, Arc<ValueType>, Option<Arc<MoveTypeLayout>>)> {
         self.writes
             .iter()
@@ -724,14 +778,10 @@ where
             .collect()
     }
 
-    fn module_write_set(&self) -> impl AsRef<BTreeMap<K, ModuleWrite<ValueType>>> + '_ {
-        ModuleWriteSetRefWrapper {
-            writes: &self.module_writes,
-        }
+    fn module_write_set(&self) -> &BTreeMap<K, ModuleWrite<ValueType>> {
+        &self.module_writes
     }
 
-    // Aggregator v1 writes are included in resource_write_set for tests (writes are produced
-    // for all keys including ones for v1_aggregators without distinguishing).
     fn aggregator_v1_write_set(&self) -> BTreeMap<K, ValueType> {
         self.aggregator_v1_writes.clone().into_iter().collect()
     }
@@ -773,20 +823,14 @@ where
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        StateValueMetadata,
-        Arc<MoveTypeLayout>,
-    )> {
+    ) -> Vec<(K, StateValueMetadata, Arc<MoveTypeLayout>)> {
         self.reads_needing_exchange
             .iter()
             .map(|(key, (metadata, layout))| (key.clone(), metadata.clone(), layout.clone()))
             .collect()
     }
 
-    fn group_reads_needing_delayed_field_exchange(
-        &self,
-    ) -> Vec<(<Self::Txn as Transaction>::Key, StateValueMetadata)> {
+    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(K, StateValueMetadata)> {
         self.group_reads_needing_exchange
             .iter()
             .map(|(key, metadata)| (key.clone(), metadata.clone()))
@@ -809,100 +853,52 @@ where
             .collect()
     }
 
-    fn for_each_resource_group_key_and_tags<F>(&self, mut callback: F) -> Result<(), PanicError>
-    where
-        F: FnMut(&K, HashSet<&u32>) -> Result<(), PanicError>,
-    {
+    fn for_each_resource_group_key_and_tags(
+        &self,
+        callback: &mut dyn FnMut(&K, HashSet<&u32>) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
         for (key, _, _, ops) in self.group_writes.iter() {
-            callback(key, ops.iter().map(|(tag, _)| tag).collect())?;
+            callback(key, ops.keys().collect())?;
         }
         Ok(())
     }
 
-    fn skip_output() -> Self {
-        Self::skipped_output(None)
-    }
-
-    fn discard_output(discard_code: StatusCode) -> Self {
-        Self::with_discard_code(discard_code)
-    }
-
     fn output_approx_size(&self) -> u64 {
-        // TODO add block output limit testing
+        // TODO: add block output limit testing
         0
     }
 
-    fn get_write_summary(
-        &self,
-    ) -> HashSet<
-        crate::types::InputOutputKey<
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Tag,
-        >,
-    > {
+    fn get_write_summary(&self) -> HashSet<crate::types::InputOutputKey<K, u32>> {
         _ = self.called_write_summary.set(());
         HashSet::new()
     }
 
-    fn legacy_sequential_materialize_agg_v1(
-        &self,
-        _view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
-    ) {
-        // TODO[agg_v2](tests): implement this method and compare
-        // against sequential execution results v. aggregator v1.
-    }
-
-    // TODO[agg_v2](tests): Currently, appending None to all events, which means none of the
-    // events have aggregators. Test it with aggregators as well.
     fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {
         self.events.iter().map(|e| (e.clone(), None)).collect()
     }
 
-    fn incorporate_materialized_txn_output(
-        &self,
-        aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
-        patched_resource_write_set: Vec<(
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Value,
-        )>,
-        _patched_events: Vec<<Self::Txn as Transaction>::Event>,
-    ) -> Result<(), PanicError> {
-        assert_ok!(self
-            .patched_resource_write_set
-            .set(patched_resource_write_set.clone().into_iter().collect()));
-        assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
-        // TODO: Also test patched events.
-        Ok(())
-    }
-
-    fn set_txn_output_for_non_dynamic_change_set(&self) {
-        // No compatibility issues here since the move-vm doesn't use the dynamic flag.
-    }
-
     fn fee_statement(&self) -> FeeStatement {
-        // First argument is supposed to be total (not important for the test though).
-        // Next two arguments are different kinds of execution gas that are counted
-        // towards the block limit. We split the total into two pieces for these arguments.
-        // TODO: add variety to generating fee statement based on total gas.
-        FeeStatement::new(
-            self.total_gas,
-            self.total_gas / 2,
-            (self.total_gas + 1) / 2,
-            0,
-            0,
-        )
-    }
-
-    fn is_retry(&self) -> bool {
-        self.skipped
+        mock_fee_statement(self.total_gas)
     }
 
     fn has_new_epoch_event(&self) -> bool {
+        // For tests, it is ok to return false.
         false
     }
+}
 
-    fn is_success(&self) -> bool {
-        !self.skipped
+impl<'a, K, E> AfterMaterializationOutput<MockTransaction<K, E>> for &'a MockOutput<K, E>
+where
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
+    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
+{
+    fn fee_statement(&self) -> FeeStatement {
+        mock_fee_statement(self.total_gas)
+    }
+
+    fn has_new_epoch_event(&self) -> bool {
+        // For tests, it is ok to return false.
+        false
     }
 }
 

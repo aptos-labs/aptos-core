@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cached_resources::CachedResources, error::PepperServiceError, jwk::JWKCache, HandlerTrait,
-    V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
+    dedicated_handlers::handlers::{
+        HandlerTrait, V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
+    },
+    error::PepperServiceError,
+    external_resources::{jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
 };
 use aptos_build_info::build_information;
 use aptos_keyless_pepper_common::BadPepperRequestError;
@@ -25,10 +28,10 @@ pub const DEFAULT_PEPPER_SERVICE_PORT: u16 = 8000;
 // The list of endpoints/paths offered by the Pepper Service.
 // Note: if you update these paths, please also update the "ALL_PATHS" array below.
 pub const ABOUT_PATH: &str = "/about";
+pub const FETCH_PATH: &str = "/v0/fetch";
 pub const GROTH16_VK_PATH: &str = "/cached/groth16-vk";
 pub const JWK_PATH: &str = "/cached/jwk";
 pub const KEYLESS_CONFIG_PATH: &str = "/cached/keyless-config";
-pub const FETCH_PATH: &str = "/v0/fetch";
 pub const SIGNATURE_PATH: &str = "/v0/signature";
 pub const VERIFY_PATH: &str = "/v0/verify";
 pub const VUF_PUB_KEY_PATH: &str = "/v0/vuf-pub-key";
@@ -94,7 +97,7 @@ where
 
     // Invoke the handler and generate the response
     match request_handler
-        .handle(vuf_private_key, jwk_cache, cached_resources, pepper_request)
+        .handle_request(vuf_private_key, jwk_cache, cached_resources, pepper_request)
         .await
     {
         Ok(pepper_response) => {
@@ -186,7 +189,7 @@ fn generate_bad_request_response(
 fn generate_cached_resource_response<T: Serialize>(
     origin: String,
     request_method: &Method,
-    path: &str,
+    request_path: &str,
     cached_resource: Option<T>,
 ) -> Result<Response<Body>, Infallible> {
     if let Some(cached_resource) = cached_resource {
@@ -200,7 +203,7 @@ fn generate_cached_resource_response<T: Serialize>(
         }
     } else {
         // The cached resource was not found, return a missing resource error
-        generate_not_found_response(origin, request_method, path)
+        generate_not_found_response(origin, request_method, request_path)
     }
 }
 
@@ -255,11 +258,11 @@ fn generate_method_not_allowed_response(origin: String) -> Result<Response<Body>
 fn generate_not_found_response(
     origin: String,
     request_method: &Method,
-    invalid_path: &str,
+    request_path: &str,
 ) -> Result<Response<Body>, Infallible> {
     let response_message = format!(
         "The request for '{}' with method '{}' was not found!",
-        invalid_path, request_method
+        request_path, request_method
     );
     generate_text_response(origin, StatusCode::NOT_FOUND, response_message)
 }
@@ -314,8 +317,9 @@ pub async fn handle_request(
     }
 
     // Handle any GET requests
+    let request_path = request.uri().path();
     if request_method == Method::GET {
-        match request.uri().path() {
+        match request_path {
             ABOUT_PATH => return generate_about_response(origin),
             GROTH16_VK_PATH => {
                 let groth16_vk = cached_resources.read_on_chain_groth16_vk();
@@ -349,7 +353,7 @@ pub async fn handle_request(
     // Handle any POST requests
     let (_, vuf_priv_key) = vuf_keypair.deref();
     if request_method == Method::POST {
-        match request.uri().path() {
+        match request_path {
             FETCH_PATH => {
                 return call_dedicated_request_handler(
                     origin,
@@ -388,15 +392,15 @@ pub async fn handle_request(
     }
 
     // If the request is to a known path but with an invalid method, return a method not allowed response
-    if is_known_path(request.uri().path()) {
+    if is_known_path(request_path) {
         return generate_method_not_allowed_response(origin);
     }
 
     // Otherwise, no matching route was found
-    generate_not_found_response(origin, request_method, request.uri().path())
+    generate_not_found_response(origin, request_method, request_path)
 }
 
 /// Returns true if the given URI path is a known path/endpoint
-fn is_known_path(uri_path: &str) -> bool {
+pub fn is_known_path(uri_path: &str) -> bool {
     ALL_PATHS.contains(&uri_path)
 }

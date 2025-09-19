@@ -5,6 +5,7 @@ module aptos_experimental::market_tests_common {
     use std::signer;
     use std::vector;
     use aptos_framework::timestamp;
+    use aptos_experimental::market_bulk_order;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::clearinghouse_test::{
         test_market_callbacks,
@@ -20,7 +21,8 @@ module aptos_experimental::market_tests_common {
         verify_fills
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::market::{new_market, new_market_config, Market, OrderMatchResult};
+    use aptos_experimental::order_placement::{OrderMatchResult};
+    use aptos_experimental::market_types::{new_market, new_market_config, Market};
     use aptos_experimental::order_book_types::OrderIdType;
     use aptos_experimental::order_book_types::{good_till_cancelled, post_only, immediate_or_cancel};
 
@@ -95,12 +97,14 @@ module aptos_experimental::market_tests_common {
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>,
     ): Option<OrderIdType> {
-        market.place_bulk_order(
+        market_bulk_order::place_bulk_order(
+            market,
             signer::address_of(maker),
             bid_prices,
             bid_sizes,
             ask_prices,
             ask_sizes,
+            clearinghouse_test::new_test_order_metadata(1),
             &test_market_callbacks()
         )
     }

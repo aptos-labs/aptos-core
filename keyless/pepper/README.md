@@ -117,11 +117,11 @@ These commands will connect to the Pepper Service (running on port `8000`) and a
 
 Next, to mock an Aptos fullnode, run a naive HTTP server to serve the resources to the Pepper Service:
 ```bash
-cd keyless/pepper/service/resources
+cd keyless/pepper/service/src/tests/test_resources
 python3 -m http.server 4444
 ```
 
-The HTTP server above will simply provide access to all files in the `resources/` directory.
+The HTTP server above will simply provide access to all files in the `test_resources/` directory.
 
 After waiting a while (e.g., 10 seconds), the Pepper Service should have fetched and cached the resources.
 You can verify this by running the same curl commands again, which should now return the cached data:

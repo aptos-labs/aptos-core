@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_keyless_pepper_service::{
-    account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
-    account_managers::ACCOUNT_MANAGERS,
-    cached_resources,
-    cached_resources::CachedResources,
-    jwk::{self, JWKCache},
+    accounts::{
+        account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
+        account_managers::ACCOUNT_MANAGERS,
+    },
+    external_resources::{
+        jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher, resource_fetcher::CachedResources,
+    },
     metrics,
     metrics::DEFAULT_METRICS_SERVER_PORT,
     request_handler,
@@ -18,7 +20,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Server,
 };
-use std::{convert::Infallible, net::SocketAddr, ops::Deref, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
 
 #[tokio::main]
 async fn main() {
@@ -35,7 +37,7 @@ async fn main() {
     info!("Retrieved the VUF public key: {:?}", vuf_public_key);
 
     // Start the cached resource fetcher
-    let cached_resources = cached_resources::start_cached_resource_fetcher();
+    let cached_resources = resource_fetcher::start_cached_resource_fetcher();
 
     // Initialize the account recovery database
     let _ = ACCOUNT_MANAGERS.deref();
@@ -44,7 +46,7 @@ async fn main() {
     }
 
     // Start the JWK fetchers
-    let jwk_cache = jwk::start_jwk_fetchers();
+    let jwk_cache = jwk_fetcher::start_jwk_fetchers();
 
     // Start the pepper service
     let vuf_keypair = Arc::new((vuf_public_key, vuf_private_key));
@@ -58,7 +60,7 @@ fn start_metrics_server() {
 
         // Create a service function that handles the metrics requests
         let make_service = make_service_fn(|_conn| async {
-            Ok::<_, Infallible>(service_fn(metrics::handle_request))
+            Ok::<_, Infallible>(service_fn(metrics::handle_metrics_request))
         });
 
         // Bind the socket address, and start the server
@@ -83,17 +85,46 @@ async fn start_pepper_service(
 
     // Create the service function that handles the endpoint requests
     let make_service = make_service_fn(move |_conn| {
+        // Clone the required Arcs for the service function
         let vuf_keypair = vuf_keypair.clone();
         let jwk_cache = jwk_cache.clone();
         let cached_resources = cached_resources.clone();
+
         async move {
             Ok::<_, Infallible>(service_fn(move |request| {
-                request_handler::handle_request(
-                    request,
-                    vuf_keypair.clone(),
-                    jwk_cache.clone(),
-                    cached_resources.clone(),
-                )
+                // Get the request start time, method and request path
+                let request_start_time = Instant::now();
+                let request_method = request.method().clone();
+                let request_path = request.uri().path().to_owned();
+
+                // Clone the required Arcs for the request handler
+                let vuf_keypair = vuf_keypair.clone();
+                let jwk_cache = jwk_cache.clone();
+                let cached_resources = cached_resources.clone();
+
+                // Handle the request
+                async move {
+                    // Call the request handler
+                    let result = request_handler::handle_request(
+                        request,
+                        vuf_keypair.clone(),
+                        jwk_cache.clone(),
+                        cached_resources.clone(),
+                    )
+                    .await;
+
+                    // Update the request handling metrics
+                    if let Ok(response) = &result {
+                        metrics::update_request_handling_metrics(
+                            &request_path,
+                            request_method,
+                            response.status(),
+                            request_start_time,
+                        );
+                    }
+
+                    result
+                }
             }))
         }
     });

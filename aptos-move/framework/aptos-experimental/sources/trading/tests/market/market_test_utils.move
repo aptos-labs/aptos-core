@@ -9,12 +9,13 @@ module aptos_experimental::market_test_utils {
         order_status_cancelled,
         order_status_filled,
         order_status_open,
-        MarketClearinghouseCallbacks
+        MarketClearinghouseCallbacks, Market, get_order_id_from_event
     };
     use aptos_experimental::order_book_types::OrderIdType;
     use aptos_experimental::order_book_types::TimeInForce;
 
-    use aptos_experimental::market::{OrderEvent, Market, OrderMatchResult};
+    use aptos_experimental::order_placement::{OrderMatchResult, place_limit_order, place_market_order};
+    use aptos_experimental::market_types::{OrderEvent};
 
     const U64_MAX: u64 = 0xffffffffffffffff;
 
@@ -34,7 +35,8 @@ module aptos_experimental::market_test_utils {
     ): OrderIdType {
         let user_addr = signer::address_of(user);
         let (limit_price, is_taker) = if (price.is_some()) {
-            market.place_limit_order(
+            place_limit_order(
+                market,
                 user,
                 price.destroy_some(),
                 size,
@@ -50,7 +52,8 @@ module aptos_experimental::market_test_utils {
             (price.destroy_some(), is_taker)
         } else {
             // Market order
-            market.place_market_order(
+            place_market_order(
+                market,
                 user,
                 size,
                 is_bid, // is_buy
@@ -73,11 +76,11 @@ module aptos_experimental::market_test_utils {
             assert!(events.length() == 2);
         };
         let order_place_event = events[0];
-        let order_id = order_place_event.get_order_id_from_event();
+        let order_id = get_order_id_from_event(order_place_event);
         order_place_event.verify_order_event(
             order_id,
-            client_order_id, // client_order_id
-            market.get_market(),
+            client_order_id,
+            market.get_market_address(),
             user_addr,
             size,
             size,
@@ -99,10 +102,10 @@ module aptos_experimental::market_test_utils {
             order_cancel_event.verify_order_event(
                 order_id,
                 client_order_id,
-                market.get_market(),
+                market.get_market_address(),
                 user_addr,
                 size,
-                0, // Remaining size is always 0 when the order is cancelled
+                0,
                 size,
                 limit_price,
                 is_bid,
@@ -135,7 +138,8 @@ module aptos_experimental::market_test_utils {
         // Taker order will be immediately match in the same transaction
         let result =
             if (taker_price.is_some()) {
-                market.place_limit_order(
+                place_limit_order(
+                    market,
                     taker,
                     taker_price.destroy_some(),
                     size,
@@ -149,7 +153,8 @@ module aptos_experimental::market_test_utils {
                     callbacks
                 )
             } else {
-                market.place_market_order(
+                place_market_order(
+                    market,
                     taker,
                     size,
                     is_bid, // is_bid
@@ -163,7 +168,7 @@ module aptos_experimental::market_test_utils {
 
         let events = latest_emitted_events<OrderEvent>(event_store, option::some(1));
         let order_place_event = events[0];
-        let order_id = order_place_event.get_order_id_from_event();
+        let order_id = get_order_id_from_event(order_place_event);
         let limit_price = if (taker_price.is_some()) {
             taker_price.destroy_some()
         } else {
@@ -173,7 +178,7 @@ module aptos_experimental::market_test_utils {
         order_place_event.verify_order_event(
             order_id,
             client_order_id,
-            market.get_market(),
+            market.get_market_address(),
             taker_addr,
             size,
             size,
@@ -263,12 +268,12 @@ module aptos_experimental::market_test_utils {
         order_cancel_event.verify_order_event(
             order_id,
             client_order_id,
-            market.get_market(),
+            market.get_market_address(),
             user_addr,
             orig_size,
             remaining_size,
             size_delta,
-            price, // price
+            price,
             is_bid,
             is_taker,
             order_status_cancelled()
@@ -324,7 +329,7 @@ module aptos_experimental::market_test_utils {
             taker_order_fill_event.verify_order_event(
                 taker_order_id,
                 taker_client_order_id,
-                market.get_market(),
+                market.get_market_address(),
                 taker_addr,
                 size,
                 size - taker_total_fill,
@@ -339,7 +344,7 @@ module aptos_experimental::market_test_utils {
             maker_order_fill_event.verify_order_event(
                 maker_order_id,
                 maker_client_order_id,
-                market.get_market(),
+                market.get_market_address(),
                 maker_addr,
                 maker_orig_size,
                 maker_remaining_size - fill_size,
@@ -357,10 +362,10 @@ module aptos_experimental::market_test_utils {
             order_cancel_event.verify_order_event(
                 taker_order_id,
                 taker_client_order_id,
-                market.get_market(),
+                market.get_market_address(),
                 taker_addr,
                 size,
-                0, // Remaining size is always 0 when the order is cancelled
+                0,
                 size - taker_total_fill,
                 taker_price,
                 is_bid,
@@ -373,7 +378,7 @@ module aptos_experimental::market_test_utils {
             order_open_event.verify_order_event(
                 taker_order_id,
                 taker_client_order_id,
-                market.get_market(),
+                market.get_market_address(),
                 taker_addr,
                 size,
                 size - total_fill_size,

@@ -660,6 +660,7 @@ async fn test_validator_sync_and_participate(fast_sync: bool, epoch_changes: boo
                 OnChainConsensusConfig::V2(consensus_config) => consensus_config,
                 OnChainConsensusConfig::V3 { alg, .. } => alg.unwrap_jolteon_config_v1().clone(),
                 OnChainConsensusConfig::V4 { alg, .. } => alg.unwrap_jolteon_config_v1().clone(),
+                OnChainConsensusConfig::V5 { alg, .. } => alg.unwrap_jolteon_config_v1().clone(),
             };
             let leader_reputation_type = match &consensus_config.proposer_election_type {
                 ProposerElectionType::LeaderReputation(leader_reputation_type) => {

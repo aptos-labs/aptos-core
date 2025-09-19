@@ -10,7 +10,10 @@ use aptos_storage_interface::state_store::{
     state::State, state_view::hot_state_view::HotStateView,
 };
 use aptos_types::state_store::{
-    hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS,
+    hot_state::{HotStateConfig, THotStateSlot},
+    state_key::StateKey,
+    state_slot::StateSlot,
+    NUM_STATE_SHARDS,
 };
 use arr_macro::arr;
 use dashmap::{
@@ -46,11 +49,11 @@ where
         self.inner.contains_key(key)
     }
 
-    fn get(&self, key: &K) -> Option<Ref<K, V>> {
+    fn get(&self, key: &K) -> Option<Ref<'_, K, V>> {
         self.inner.get(key)
     }
 
-    fn get_mut(&self, key: &K) -> Option<RefMut<K, V>> {
+    fn get_mut(&self, key: &K) -> Option<RefMut<'_, K, V>> {
         self.inner.get_mut(key)
     }
 
@@ -75,12 +78,6 @@ where
     /// After committing a new batch to `inner`, items are evicted so that
     ///  1. total number of items doesn't exceed this number
     max_items_per_shard: usize,
-    ///  2. total number of bytes, incl. both keys and values doesn't exceed this number
-    #[allow(dead_code)] // TODO(HotState): not enforced for now
-    max_bytes_per_shard: usize,
-    /// No item is accepted to `inner` if the size of the value exceeds this number
-    #[allow(dead_code)] // TODO(HotState): not enforced for now
-    max_single_value_bytes: usize,
 
     shards: [Shard<K, V>; NUM_STATE_SHARDS],
 }
@@ -90,20 +87,14 @@ where
     K: Eq + std::hash::Hash,
     V: Clone,
 {
-    fn new_empty(
-        max_items_per_shard: usize,
-        max_bytes_per_shard: usize,
-        max_single_value_bytes: usize,
-    ) -> Self {
+    fn new_empty(max_items_per_shard: usize) -> Self {
         Self {
             max_items_per_shard,
-            max_bytes_per_shard,
-            max_single_value_bytes,
             shards: arr![Shard::new(max_items_per_shard); 16],
         }
     }
 
-    fn get_from_shard(&self, shard_id: usize, key: &K) -> Option<Ref<K, V>> {
+    fn get_from_shard(&self, shard_id: usize, key: &K) -> Option<Ref<'_, K, V>> {
         self.shards[shard_id].get(key)
     }
 
@@ -127,17 +118,8 @@ pub struct HotState {
 }
 
 impl HotState {
-    pub fn new(
-        state: State,
-        max_items_per_shard: usize,
-        max_bytes_per_shard: usize,
-        max_single_value_bytes: usize,
-    ) -> Self {
-        let base = Arc::new(HotStateBase::new_empty(
-            max_items_per_shard,
-            max_bytes_per_shard,
-            max_single_value_bytes,
-        ));
+    pub fn new(state: State, config: HotStateConfig) -> Self {
+        let base = Arc::new(HotStateBase::new_empty(config.max_items_per_shard));
         let committed = Arc::new(Mutex::new(state));
         let commit_tx = Committer::spawn(base.clone(), committed.clone());
 

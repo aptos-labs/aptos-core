@@ -125,7 +125,7 @@ impl LedgerMetadataDb {
         &self,
         start_epoch: u64,
         end_epoch: u64,
-    ) -> Result<EpochEndingLedgerInfoIter> {
+    ) -> Result<EpochEndingLedgerInfoIter<'_>> {
         let mut iter = self.db.iter::<LedgerInfoSchema>()?;
         iter.seek(&start_epoch)?;
         Ok(EpochEndingLedgerInfoIter::new(iter, start_epoch, end_epoch))

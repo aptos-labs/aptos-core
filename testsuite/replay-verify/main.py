@@ -101,7 +101,7 @@ class ReplayConfig:
             self.timeout_secs = 9000
         else:
             self.concurrent_replayer = 35
-            self.pvc_number = 49
+            self.pvc_number = 7
             self.min_range_size = 10_000
             self.range_size = 2_000_000
             self.timeout_secs = 9000
@@ -479,8 +479,8 @@ class ReplayScheduler:
         )
         # Because PVCs can be shared among multiple replay-verify runs, a more correct TTL
         # would be computed from the number of shards and the expected run time of the replay-verify
-        # run. However, for simplicity, we set the TTL to 3 hours.
-        pvc_ttl = 5 * 60 * 60  # 3 hours
+        # run. However, for simplicity, we set the TTL to 9 hours.
+        pvc_ttl = 9 * 60 * 60  # 9 hours
         pvcs = create_replay_verify_pvcs_from_snapshot(
             self.id,
             snapshot_name,
@@ -758,7 +758,7 @@ if __name__ == "__main__":
     run_id = f"{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}-{image[-5:]}"
     network = Network.from_string(args.network)
     config = ReplayConfig(network)
-    worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number
+    worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 7
     range_size = args.range_size if args.range_size else config.range_size
 
     if args.start is not None:

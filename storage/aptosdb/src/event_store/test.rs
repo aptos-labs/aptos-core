@@ -238,7 +238,7 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
         event_db
             .put_events(
                 *ver,
-                &[event.clone()],
+                std::slice::from_ref(event),
                 /*skip_index=*/ false,
                 &mut batch,
             )

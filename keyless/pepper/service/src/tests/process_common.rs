@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::PepperServiceError, process_common, tests::utils};
+use crate::{
+    dedicated_handlers::process_common::process_common, error::PepperServiceError, tests::utils,
+};
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_infallible::Mutex;
 use aptos_types::{

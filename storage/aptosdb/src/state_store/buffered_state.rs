@@ -112,7 +112,7 @@ impl BufferedState {
         }
     }
 
-    fn current_state_locked(&self) -> MutexGuard<LedgerStateWithSummary> {
+    fn current_state_locked(&self) -> MutexGuard<'_, LedgerStateWithSummary> {
         self.current_state.lock()
     }
 

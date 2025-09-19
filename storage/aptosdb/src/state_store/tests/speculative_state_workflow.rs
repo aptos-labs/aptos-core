@@ -19,11 +19,11 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
-        hot_state::LRUEntry,
+        hot_state::{HotStateConfig, LRUEntry},
         state_key::StateKey,
         state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, ARB_STATE_VALUE_MAX_SIZE},
+        state_value::StateValue,
         StateViewId, StateViewResult, TStateView,
     },
     transaction::Version,
@@ -34,7 +34,7 @@ use lru::LruCache;
 use proptest::{collection::vec, prelude::*, sample::Index};
 use rayon::prelude::*;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fmt::{Debug, Formatter},
     num::NonZeroUsize,
     ops::Deref,
@@ -47,21 +47,23 @@ use std::{
 
 const NUM_KEYS: usize = 10;
 const HOT_STATE_MAX_ITEMS: usize = NUM_KEYS / 2;
-const HOT_STATE_MAX_BYTES: usize = NUM_KEYS / 2 * ARB_STATE_VALUE_MAX_SIZE / 3;
-const HOT_STATE_MAX_SINGLE_VALUE_BYTES: usize = ARB_STATE_VALUE_MAX_SIZE / 2;
 const MAX_PROMOTIONS_PER_BLOCK: usize = 10;
 const REFRESH_INTERVAL_VERSIONS: usize = 50;
 
+const TEST_CONFIG: HotStateConfig = HotStateConfig {
+    max_items_per_shard: HOT_STATE_MAX_ITEMS,
+};
+
 #[derive(Debug)]
 struct UserTxn {
-    reads: Vec<StateKey>,
-    writes: Vec<(StateKey, Option<StateValue>)>,
+    reads: BTreeSet<StateKey>,
+    writes: BTreeMap<StateKey, Option<StateValue>>,
 }
 
 #[derive(Debug)]
 struct Txn {
-    reads: Vec<StateKey>,
-    write_set: Vec<(StateKey, BaseStateOp)>,
+    reads: BTreeSet<StateKey>,
+    write_set: BTreeMap<StateKey, BaseStateOp>,
     is_checkpoint: bool,
 }
 
@@ -80,9 +82,7 @@ impl Chunk {
             update_refs_builder: |txn_outs| {
                 StateUpdateRefs::index(
                     first_version,
-                    txn_outs
-                        .iter()
-                        .map(|t| t.write_set.iter().map(|(key, op)| (key, op))),
+                    txn_outs.iter().map(|t| t.write_set.iter()),
                     txn_outs.len(),
                     txn_outs.iter().rposition(|t| t.is_checkpoint),
                 )
@@ -95,7 +95,7 @@ impl Chunk {
         self.borrow_txns().iter().flat_map(|t| &t.reads)
     }
 
-    fn update_refs(&self) -> &StateUpdateRefs {
+    fn update_refs(&self) -> &StateUpdateRefs<'_> {
         self.borrow_update_refs()
     }
 }
@@ -130,20 +130,21 @@ prop_compose! {
         input
             .into_iter()
             .map(|(reads, writes)| {
-                let write_set: HashMap<_, _> = writes
+                let write_set: BTreeMap<_, _> = writes
                     .into_iter()
                     .map(|(idx, value)| (idx.get(&keys).clone(), value))
                     .collect();
 
                 // The read set is a super set of the write set.
-                let read_set: HashSet<_> = write_set
+                let read_set: BTreeSet<_> = write_set
                     .keys()
-                    .chain(reads.iter().map(|idx| idx.get(&keys)))
+                    .cloned()
+                    .chain(reads.iter().map(|idx| idx.get(&keys)).cloned())
                     .collect();
 
                 UserTxn {
-                    reads: read_set.into_iter().cloned().collect(),
-                    writes: write_set.into_iter().collect(),
+                    reads: read_set,
+                    writes: write_set,
                 }
             })
             .collect_vec()
@@ -174,7 +175,7 @@ impl VersionState {
         &self,
         version: Version,
         writes: impl IntoIterator<Item = (&'a StateKey, Option<&'a StateValue>)>,
-        promotions: impl IntoIterator<Item = (&'a StateKey, &'a StateSlot)>,
+        promotions: impl IntoIterator<Item = &'a StateKey>,
     ) -> Self {
         assert_eq!(version, self.next_version);
 
@@ -207,14 +208,24 @@ impl VersionState {
             }
         }
 
-        for (k, prev_slot) in promotions {
-            if prev_slot.is_cold() {
-                hot_state.put(k.clone(), prev_slot.clone().to_hot(version));
-            } else {
-                let mut slot = prev_slot.clone();
+        for k in promotions {
+            if let Some(slot) = hot_state.get_mut(k) {
                 slot.refresh(version);
-                hot_state.put(k.clone(), slot);
+                continue;
             }
+            let slot = match state.get(k) {
+                Some((value_version, value)) => StateSlot::HotOccupied {
+                    value_version: *value_version,
+                    value: value.clone(),
+                    hot_since_version: version,
+                    lru_info: LRUEntry::uninitialized(),
+                },
+                None => StateSlot::HotVacant {
+                    hot_since_version: version,
+                    lru_info: LRUEntry::uninitialized(),
+                },
+            };
+            hot_state.put(k.clone(), slot);
         }
 
         let summary = self.summary.clone().update(&smt_updates);
@@ -276,7 +287,7 @@ impl StateByVersion {
     fn append_version<'a>(
         &mut self,
         writes: impl IntoIterator<Item = (&'a StateKey, Option<&'a StateValue>)>,
-        promotions: impl IntoIterator<Item = (&'a StateKey, &'a StateSlot)>,
+        promotions: impl IntoIterator<Item = &'a StateKey>,
     ) {
         self.state_by_next_version.push(Arc::new(
             self.state_by_next_version.last().unwrap().update(
@@ -544,13 +555,8 @@ fn commit_state_buffer(
 fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVersion) {
     let mut all_txns = vec![];
     let mut state_by_version = StateByVersion::new_empty();
-    let mut next_version: Version = 0;
     for (block_txns, append_epilogue) in blocks {
-        let base_view = state_by_version
-            .get_state(next_version.checked_sub(1))
-            .clone();
-        let mut op_accu = BlockHotStateOpAccumulator::<StateKey, _>::new_with_config(
-            &base_view,
+        let mut op_accu = BlockHotStateOpAccumulator::<StateKey>::new_with_config(
             MAX_PROMOTIONS_PER_BLOCK,
             REFRESH_INTERVAL_VERSIONS,
         );
@@ -558,7 +564,7 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
             // No promotions except for block epilogue.
             state_by_version
                 .append_version(txn.writes.iter().map(|(k, v)| (k, v.as_ref())), vec![]);
-            op_accu.add_transaction(txn.writes.iter().map(|(k, _v)| k), txn.reads.iter());
+            op_accu.add_transaction(txn.writes.keys(), txn.reads.iter());
             all_txns.push(Txn {
                 reads: txn.reads,
                 write_set: txn
@@ -571,23 +577,21 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
                     .collect(),
                 is_checkpoint: false,
             });
-            next_version += 1;
         }
         if append_epilogue {
-            let to_make_hot = op_accu.get_slots_to_make_hot();
+            let to_make_hot = op_accu.get_keys_to_make_hot();
             state_by_version.append_version(vec![], to_make_hot.iter());
 
+            let reads = to_make_hot.clone();
             let write_set = to_make_hot
                 .into_iter()
-                .map(|(k, slot)| (k, HotStateOp::make_hot(slot).into_base_op()))
-                .collect_vec();
-            let reads = write_set.iter().map(|(k, _op)| k.clone()).collect_vec();
+                .map(|k| (k, HotStateOp::make_hot().into_base_op()))
+                .collect();
             all_txns.push(Txn {
                 reads,
                 write_set,
                 is_checkpoint: true,
             });
-            next_version += 1;
         }
     }
 
@@ -595,14 +599,10 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
 }
 
 fn replay_chunks_pipelined(chunks: Vec<Chunk>, state_by_version: Arc<StateByVersion>) {
-    let empty = LedgerStateWithSummary::new_empty();
+    let empty = LedgerStateWithSummary::new_empty(TEST_CONFIG);
     let current_state = Arc::new(Mutex::new(empty.clone()));
 
-    let persisted_state = PersistedState::new_empty_with_config(
-        HOT_STATE_MAX_ITEMS,
-        HOT_STATE_MAX_BYTES,
-        HOT_STATE_MAX_SINGLE_VALUE_BYTES,
-    );
+    let persisted_state = PersistedState::new_empty_with_config(TEST_CONFIG);
     persisted_state.hack_reset(empty.deref().clone());
 
     let (to_summary_update, from_state_update) = channel();

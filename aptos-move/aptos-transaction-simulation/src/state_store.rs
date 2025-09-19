@@ -67,7 +67,7 @@ pub trait SimulationStateStore: TStateView<Key = StateKey> {
         let state_key = StateKey::resource_typed::<R>(&addr)?;
 
         match self.get_state_value_bytes(&state_key)? {
-            Some(blob) => Ok(bcs::from_bytes(&blob)?),
+            Some(blob) => Ok(Some(bcs::from_bytes::<R>(&blob)?)),
             None => Ok(None),
         }
     }
