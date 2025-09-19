@@ -1,4 +1,4 @@
-use crate::ExecError;
+use crate::{on_chain_config::jwks::JWKStruct, ExecError};
 use async_trait::async_trait;
 use std::sync::{Arc, OnceLock};
 
@@ -6,7 +6,7 @@ use std::sync::{Arc, OnceLock};
 pub trait Relayer: Send + Sync + 'static {
     async fn add_uri(&self, uri: &str, rpc_url: &str) -> Result<(), ExecError>;
 
-    async fn get_last_state(&self, uri: &str) -> Result<Vec<u8>, ExecError>;
+    async fn get_last_state(&self, uri: &str) -> Result<Vec<JWKStruct>, ExecError>;
 }
 
 pub static GLOBAL_RELAYER: OnceLock<Arc<dyn Relayer>> = OnceLock::new();

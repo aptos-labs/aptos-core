@@ -117,11 +117,11 @@ impl JWKObserver {
 async fn fetch_jwks_with_relayer(issuer: &str) -> Result<Vec<JWK>> {
     let relayer = GLOBAL_RELAYER.get().unwrap();
     let last_state = relayer.get_last_state(issuer).await.unwrap();
-    let jwks = JWK::Unsupported(UnsupportedJWK {
-        id: issuer.as_bytes().to_vec(),
-        payload: last_state,
-    });
-    Ok(vec![jwks])
+    let jwks = last_state.into_iter().map(|jwk| JWK::Unsupported(UnsupportedJWK {
+        id: jwk.type_name.into_bytes(),
+        payload: jwk.data,
+    })).collect();
+    Ok(jwks)
 }
 
 async fn fetch_jwks(open_id_config_url: &str, my_addr: Option<AccountAddress>, issuer: &str) -> Result<Vec<JWK>> {

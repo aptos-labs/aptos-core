@@ -104,7 +104,7 @@ impl JWKManager {
             .into_provider_vec()
             .into_iter()
             .filter_map(|provider| {
-                let OIDCProvider { name, config_url } = provider;
+                let OIDCProvider { name, config_url, onchain_block_number } = provider;
                 let maybe_issuer = String::from_utf8(name);
                 let maybe_config_url = String::from_utf8(config_url);
                 match (maybe_issuer, maybe_config_url) {

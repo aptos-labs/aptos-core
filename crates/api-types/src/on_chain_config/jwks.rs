@@ -1,6 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
+pub struct UnsupportedJWK {
+    pub id: String,
+    #[serde(with = "serde_bytes")]
+    pub payload: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct JWKStruct {
     pub type_name: String,
     #[serde(with = "serde_bytes")]
@@ -29,6 +36,7 @@ pub struct ObservedJWKs {
 pub struct OIDCProvider {
     pub name: String,
     pub config_url: String,
+    pub onchain_block_number: Option<u64>,
 }
 
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]

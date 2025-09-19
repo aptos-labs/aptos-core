@@ -63,6 +63,7 @@ pub fn construct_oidc_providers(bytes: &[u8]) -> Result<Vec<OIDCProvider>, JwkId
         .map(|oidc_provider| OIDCProvider {
             name: oidc_provider.name.clone(),
             config_url: oidc_provider.config_url.clone(),
+            onchain_block_number: oidc_provider.onchain_block_number,
         })
         .collect())
 }
