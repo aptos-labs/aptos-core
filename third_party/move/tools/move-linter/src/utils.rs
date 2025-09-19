@@ -42,7 +42,7 @@ pub(crate) fn is_simple_access_equal(expr1: &ExpData, expr2: &ExpData) -> bool {
 }
 
 /// Detects if the given Loop expression matches the pattern of a while loop.
-/// ```
+/// ```ignore
 /// loop {
 ///     if (condition) {
 ///         // loop body
@@ -67,7 +67,7 @@ pub(crate) fn detect_while_loop(expr: &ExpData) -> bool {
 /// Detects if the Loop expression matches the pattern of an expanded for loop.
 ///
 /// The expanded for loop has this structure:
-/// ```
+/// ```ignore
 /// loop {
 ///     if (true) {
 ///         if (flag) {
