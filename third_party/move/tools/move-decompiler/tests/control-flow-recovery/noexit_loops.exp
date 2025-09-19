@@ -8,8 +8,8 @@ module 0x99::noexit_loops {
         ()
     }
     fun f1() {
-        let _t0 = 0;
-        loop _t0 = _t0 + 1
+        let _v0 = 0;
+        loop _v0 = _v0 + 1
     }
     fun f10() {
         loop continue
@@ -21,10 +21,10 @@ module 0x99::noexit_loops {
         ()
     }
     fun f13(cond: bool) {
-        let _t2;
-        if (cond) _t2 = 0 else _t2 = 1;
-        let _t3 = _t2 + 2;
-        let _t12 = 1 + _t3;
+        let _v0;
+        if (cond) _v0 = 0 else _v0 = 1;
+        let _v1 = _v0 + 2;
+        let _v2 = 1 + _v1;
         loop continue
     }
     fun f14(p: bool, q: bool) {
@@ -32,21 +32,21 @@ module 0x99::noexit_loops {
             if (q) loop continue};
     }
     fun f15() {
-        let _t0 = 0;
-        _t0 = _t0 + 1;
+        let _v0 = 0;
+        _v0 = _v0 + 1;
     }
     fun f16() {
         loop continue
     }
     fun f2(): u64 {
-        let _t0 = 1 + 1;
-        loop _t0 = _t0 + 1
+        let _v0 = 1 + 1;
+        loop _v0 = _v0 + 1
     }
     fun f3(): u64 {
-        let _t0 = 1;
+        let _v0 = 1;
         loop {
-            let _t4 = foo(_t0);
-            _t0 = _t0 + _t4;
+            let _v1 = foo(_v0);
+            _v0 = _v0 + _v1;
             continue
         }
     }
@@ -79,8 +79,8 @@ error: cannot return nothing from a function with result type `u64`
    ┌─ noexit_loops.move:47:9
    │
 47 │ ╭         loop {
-48 │ │             let _t4 = foo(_t0);
-49 │ │             _t0 = _t0 + _t4;
+48 │ │             let _v1 = foo(_v0);
+49 │ │             _v0 = _v0 + _v1;
 50 │ │             continue
 51 │ │         }
    │ ╰─────────^

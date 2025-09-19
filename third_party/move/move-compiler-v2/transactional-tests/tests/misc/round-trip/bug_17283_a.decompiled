@@ -6,9 +6,9 @@ module 0xc0ffee::m {
         x: u64,
     }
     fun foo(p0: &mut S): u64 {
-        let _t1 = S{x: 0};
-        let _t8 = &mut (&mut _t1).x;
-        *_t8 = 12;
+        let _v0 = S{x: 0};
+        let _v1 = &mut (&mut _v0).x;
+        *_v1 = 12;
         mod(&mut p0.x);
         *&p0.x
     }
@@ -16,8 +16,8 @@ module 0xc0ffee::m {
         *p0 = 42;
     }
     public fun test(): u64 {
-        let _t0 = S{x: 0};
-        foo(&mut _t0)
+        let _v0 = S{x: 0};
+        foo(&mut _v0)
     }
 }
 

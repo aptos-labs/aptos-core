@@ -3,13 +3,13 @@
 //# publish
 module 0xc0ffee::m {
     public fun main() {
-        if (!(test(true) == 3)) abort 0;
-        if (!(test(false) == 3)) abort 1;
+        assert!(test(true) == 3, 0);
+        assert!(test(false) == 3, 1);
     }
     fun test(p0: bool): u64 {
-        let _t1;
-        if (p0) _t1 = 3 else _t1 = 3;
-        _t1
+        let _v0;
+        if (p0) _v0 = 3 else _v0 = 3;
+        _v0
     }
 }
 

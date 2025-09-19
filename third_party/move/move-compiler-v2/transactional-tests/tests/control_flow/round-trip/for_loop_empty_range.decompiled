@@ -3,8 +3,8 @@
 //# run
 script {
     fun main() {
-        let _t0 = 10;
-        if (false) _t0 = _t0 + 1;
-        if (_t0 < 9) abort 42;
+        let _v0 = 10;
+        if (false) _v0 = _v0 + 1;
+        if (_v0 < 9) abort 42;
     }
 }

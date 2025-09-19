@@ -566,19 +566,19 @@ module 0x815::m {
     fun loop_1(c: u64): u64 {
         loop {
             c = c + 1;
-            let _t6 = c % 2;
-            if (_t6 == 0) continue;
+            let _v0 = c % 2;
+            if (_v0 == 0) continue;
             c = c + 3;
-            let _t14 = c % 2;
-            if (!(_t14 == 1)) continue;
+            let _v1 = c % 2;
+            if (!(_v1 == 1)) continue;
             break
         };
         c
     }
     fun nested_loop(x: u64): u64 {
         while (x > 0) {
-            let _t6 = x > 10;
-            if (_t6) x = x - 1;
+            let _v0 = x > 10;
+            if (_v0) x = x - 1;
             x = x - 1;
             continue
         };

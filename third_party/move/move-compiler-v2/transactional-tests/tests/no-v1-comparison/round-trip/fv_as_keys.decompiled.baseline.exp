@@ -2,28 +2,28 @@ processed 23 tasks
 task 0 lines 3-79:  publish [module 0x99::test_struct {]
 Error: compilation errors:
  error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has copy + drop + store` was provided
-   ┌─ TEMPFILE:34:15
+   ┌─ TEMPFILE:34:17
    │
-34 │         if (!(_t8(_t5) == 1)) abort 14566554180833181696;
-   │               ^^^^^^^^
+34 │         assert!(_v3(_v2) == 1, 14566554180833181696);
+   │                 ^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has copy + drop + store` was provided
-   ┌─ TEMPFILE:37:15
+   ┌─ TEMPFILE:37:17
    │
-37 │         if (!(_t15(_t12) == 2)) abort 14566554180833181696;
-   │               ^^^^^^^^^^
+37 │         assert!(_v5(_v4) == 2, 14566554180833181696);
+   │                 ^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has drop + store` was provided
-   ┌─ TEMPFILE:52:15
+   ┌─ TEMPFILE:52:17
    │
-52 │         if (!(_t8(_t5) == 1)) abort 14566554180833181696;
-   │               ^^^^^^^^
+52 │         assert!(_v3(_v2) == 1, 14566554180833181696);
+   │                 ^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has drop + store` was provided
-   ┌─ TEMPFILE:55:15
+   ┌─ TEMPFILE:55:17
    │
-55 │         if (!(_t15(_t12) == 2)) abort 14566554180833181696;
-   │               ^^^^^^^^^^
+55 │         assert!(_v5(_v4) == 2, 14566554180833181696);
+   │                 ^^^^^^^^
 
 
 task 1 lines 82-82:  run --verbose --signers 0x1 -- 0x99::test_struct::init
@@ -131,19 +131,19 @@ Error: compilation errors:
  error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has copy + drop + store` was provided
     ┌─ TEMPFILE1:151:19
     │
-151 │             _t4 = _t14(_t15)
-    │                   ^^^^^^^^^^
+151 │             _v0 = _v4(_v5)
+    │                   ^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has copy + drop + store` was provided
     ┌─ TEMPFILE1:155:19
     │
-155 │             _t4 = _t25(_t26)
-    │                   ^^^^^^^^^^
+155 │             _v0 = _v6(_v7)
+    │                   ^^^^^^^^
 
 error: cannot select field `fv1` since it has different types in variants of enum `Wrapper<||u64 has drop + store>`
     ┌─ TEMPFILE1:166:24
     │
-166 │             let _t2 = &_t1.fv1;
+166 │             let _v3 = &_v2.fv1;
     │                        ^^^
     │
     = field `fv1` has type `|||u64 has drop + store|u64 has copy + drop + store` in variant `V2` and type `|||u64 has drop + store|u64 has copy + store` in variant `V1`
@@ -151,7 +151,7 @@ error: cannot select field `fv1` since it has different types in variants of enu
 error: cannot select field `fv1` since it has different types in variants of enum `Wrapper<||u64 has drop + store>`
     ┌─ TEMPFILE1:171:24
     │
-171 │             let _t4 = &_t1.fv1;
+171 │             let _v6 = &_v2.fv1;
     │                        ^^^
     │
     = field `fv1` has type `|||u64 has drop + store|u64 has copy + drop + store` in variant `V2` and type `|||u64 has drop + store|u64 has copy + store` in variant `V1`
@@ -159,14 +159,14 @@ error: cannot select field `fv1` since it has different types in variants of enu
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has drop + store` was provided
     ┌─ TEMPFILE1:192:19
     │
-192 │             _t4 = _t14(_t15)
-    │                   ^^^^^^^^^^
+192 │             _v0 = _v4(_v5)
+    │                   ^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has drop + store` was provided
     ┌─ TEMPFILE1:196:19
     │
-196 │             _t4 = _t25(_t26)
-    │                   ^^^^^^^^^^
+196 │             _v0 = _v6(_v7)
+    │                   ^^^^^^^^
 
 
 task 12 lines 215-215:  run --verbose --signers 0x1 -- 0x99::test_enum::init

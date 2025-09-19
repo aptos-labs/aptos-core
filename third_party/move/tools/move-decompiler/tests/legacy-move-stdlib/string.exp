@@ -11,59 +11,59 @@ module 0x1::string {
         &self.bytes
     }
     public fun index_of(self: &String, r: &String): u64 {
-        let _t3 = &self.bytes;
-        let _t5 = &r.bytes;
-        internal_index_of(_t3, _t5)
+        let _v0 = &self.bytes;
+        let _v1 = &r.bytes;
+        internal_index_of(_v0, _v1)
     }
     native fun internal_index_of(v: &vector<u8>, r: &vector<u8>): u64;
     public fun append(self: &mut String, r: String) {
-        let _t3 = &mut self.bytes;
-        let _t6 = *&(&r).bytes;
-        vector::append<u8>(_t3, _t6);
+        let _v0 = &mut self.bytes;
+        let _v1 = *&(&r).bytes;
+        vector::append<u8>(_v0, _v1);
     }
     public fun insert(self: &mut String, at: u64, o: String) {
-        let _t4;
-        let _t3 = &self.bytes;
-        let _t12 = vector::length<u8>(_t3);
-        if (at <= _t12) _t4 = internal_is_char_boundary(_t3, at) else _t4 = false;
-        if (!_t4) abort 2;
-        let _t5 = length(freeze(self));
-        let _t6 = sub_string(freeze(self), 0, at);
-        let _t7 = sub_string(freeze(self), at, _t5);
-        append(&mut _t6, o);
-        append(&mut _t6, _t7);
-        *self = _t6;
+        let _v0;
+        let _v1 = &self.bytes;
+        let _v2 = vector::length<u8>(_v1);
+        if (at <= _v2) _v0 = internal_is_char_boundary(_v1, at) else _v0 = false;
+        assert!(_v0, 2);
+        let _v3 = length(freeze(self));
+        let _v4 = sub_string(freeze(self), 0, at);
+        let _v5 = sub_string(freeze(self), at, _v3);
+        append(&mut _v4, o);
+        append(&mut _v4, _v5);
+        *self = _v4;
     }
     native fun internal_is_char_boundary(v: &vector<u8>, i: u64): bool;
     public fun sub_string(self: &String, i: u64, j: u64): String {
-        let _t7;
-        let _t6;
-        let _t5;
-        let _t3 = &self.bytes;
-        let _t4 = vector::length<u8>(_t3);
-        if (j <= _t4) _t5 = i <= j else _t5 = false;
-        if (_t5) _t6 = internal_is_char_boundary(_t3, i) else _t6 = false;
-        if (_t6) _t7 = internal_is_char_boundary(_t3, j) else _t7 = false;
-        if (!_t7) abort 2;
-        String{bytes: internal_sub_string(_t3, i, j)}
+        let _v0;
+        let _v1;
+        let _v2;
+        let _v3 = &self.bytes;
+        let _v4 = vector::length<u8>(_v3);
+        if (j <= _v4) _v2 = i <= j else _v2 = false;
+        if (_v2) _v1 = internal_is_char_boundary(_v3, i) else _v1 = false;
+        if (_v1) _v0 = internal_is_char_boundary(_v3, j) else _v0 = false;
+        assert!(_v0, 2);
+        String{bytes: internal_sub_string(_v3, i, j)}
     }
     public fun is_empty(self: &String): bool {
         vector::is_empty<u8>(&self.bytes)
     }
     public fun append_utf8(self: &mut String, bytes: vector<u8>) {
-        let _t4 = utf8(bytes);
-        append(self, _t4);
+        let _v0 = utf8(bytes);
+        append(self, _v0);
     }
     public fun utf8(bytes: vector<u8>): String {
-        if (!internal_check_utf8(&bytes)) abort 1;
+        assert!(internal_check_utf8(&bytes), 1);
         String{bytes: bytes}
     }
     public native fun internal_check_utf8(v: &vector<u8>): bool;
     native fun internal_sub_string(v: &vector<u8>, i: u64, j: u64): vector<u8>;
     public fun try_utf8(bytes: vector<u8>): option::Option<String> {
-        let _t1;
-        if (internal_check_utf8(&bytes)) _t1 = option::some<String>(String{bytes: bytes}) else _t1 = option::none<String>();
-        _t1
+        let _v0;
+        if (internal_check_utf8(&bytes)) _v0 = option::some<String>(String{bytes: bytes}) else _v0 = option::none<String>();
+        _v0
     }
 }
 

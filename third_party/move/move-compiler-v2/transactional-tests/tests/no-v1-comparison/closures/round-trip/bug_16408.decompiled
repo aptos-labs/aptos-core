@@ -21,17 +21,17 @@ module 0xc0ffee::m {
         || lambda__1__make_func_3(p0, p1)
     }
     fun test() {
-        let _t3 = make_func_1();
-        let _t4 = _t3(10);
-        if (!(_t4(20) == 30)) abort 14566554180833181696;
-        let _t10 = make_func_2();
-        let _t11 = _t10(10, 20);
-        if (!(_t11() == 200)) abort 14566554180833181696;
-        let _t17 = make_func_3();
-        let _t18 = _t17(10, 20);
-        let (_t19,_t20) = _t18();
-        if (!(_t19 == 10)) abort 14566554180833181696;
-        if (!(_t20 == 20)) abort 14566554180833181696;
+        let _v0 = make_func_1();
+        let _v1 = _v0(10);
+        assert!(_v1(20) == 30, 14566554180833181696);
+        let _v2 = make_func_2();
+        let _v3 = _v2(10, 20);
+        assert!(_v3() == 200, 14566554180833181696);
+        let _v4 = make_func_3();
+        let _v5 = _v4(10, 20);
+        let (_v6,_v7) = _v5();
+        assert!(_v6 == 10, 14566554180833181696);
+        assert!(_v7 == 20, 14566554180833181696);
     }
     fun lambda__1__make_func_1(p0: u64, p1: u64): u64 {
         p0 + p1

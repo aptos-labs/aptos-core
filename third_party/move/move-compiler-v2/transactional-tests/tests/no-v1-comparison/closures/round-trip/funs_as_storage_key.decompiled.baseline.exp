@@ -20,7 +20,7 @@ Error: compilation errors:
  error: type `|&u64, &mut u8|&u64 has copy + drop` is missing required ability `store`
    ┌─ TEMPFILE3:90:89
    │
-90 │         0x1::vector::push_back<|&u64, &mut u8|(&u64) has copy + drop + store>(&mut _t3, _t2);
+90 │         0x1::vector::push_back<|&u64, &mut u8|(&u64) has copy + drop + store>(&mut _v1, _v0);
    │                                                                                         ^^^
 
 
@@ -29,19 +29,19 @@ Error: compilation errors:
  error: type `|&mut u8| has copy + drop` is missing required ability `store`
     ┌─ TEMPFILE4:131:72
     │
-131 │         0x1::vector::push_back<|&mut u8| has copy + drop + store>(_t6, _t2);
+131 │         0x1::vector::push_back<|&mut u8| has copy + drop + store>(_v4, _v0);
     │                                                                        ^^^
 
 error: type `|&mut u8| has copy + drop` is missing required ability `store`
     ┌─ TEMPFILE4:132:72
     │
-132 │         0x1::vector::push_back<|&mut u8| has copy + drop + store>(_t6, _t3);
+132 │         0x1::vector::push_back<|&mut u8| has copy + drop + store>(_v4, _v1);
     │                                                                        ^^^
 
 error: type `|&mut u8| has copy + drop` is missing required ability `store`
     ┌─ TEMPFILE4:133:72
     │
-133 │         0x1::vector::push_back<|&mut u8| has copy + drop + store>(_t6, _t4);
+133 │         0x1::vector::push_back<|&mut u8| has copy + drop + store>(_v4, _v2);
     │                                                                        ^^^
 
 

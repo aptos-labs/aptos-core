@@ -7,8 +7,8 @@ module 0xc0ffee::m {
         _0: |&signer|(u64) has copy + drop + store,
     }
     public fun init(p0: &signer) {
-        let _t1 = Wrapper{_0: |arg0| foo(arg0)};
-        move_to<Wrapper>(p0, _t1);
+        let _v0 = Wrapper{_0: |arg0| foo(arg0)};
+        move_to<Wrapper>(p0, _v0);
     }
     #[persistent]
     fun foo(p0: &signer): u64 {
@@ -17,9 +17,9 @@ module 0xc0ffee::m {
     public fun fetch_and_run(p0: &signer): u64
         acquires Wrapper
     {
-        let _t3 = signer::address_of(p0);
-        let _t1 = *&borrow_global<Wrapper>(_t3)._0;
-        _t1(p0)
+        let _v0 = signer::address_of(p0);
+        let _v1 = *&borrow_global<Wrapper>(_v0)._0;
+        _v1(p0)
     }
 }
 

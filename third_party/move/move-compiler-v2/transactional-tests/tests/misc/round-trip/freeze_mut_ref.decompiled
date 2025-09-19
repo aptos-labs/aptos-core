@@ -18,47 +18,47 @@ module 0x42::freeze_mut_ref {
         (p0, p1)
     }
     public fun t5(p0: &mut G): (u64, u64, u64) {
-        let _t1 = 0 + 1 + 1;
-        let _t2 = &mut p0.f;
-        let _t3 = 2;
-        let _t4 = &mut _t3;
-        *_t2 = 0;
-        let _t5 = freeze(_t4);
-        *_t2 = 2;
-        let _t24 = *_t5;
-        let _t26 = *_t2;
-        (_t24, _t26, _t1)
+        let _v0 = 0 + 1 + 1;
+        let _v1 = &mut p0.f;
+        let _v2 = 2;
+        let _v3 = &mut _v2;
+        *_v1 = 0;
+        let _v4 = freeze(_v3);
+        *_v1 = 2;
+        let _v5 = *_v4;
+        let _v6 = *_v1;
+        (_v5, _v6, _v0)
     }
     fun test_1() {
-        let _t0 = 0;
-        if (!(*freeze(&mut _t0) == 0)) abort 0;
-        let _t1 = G{f: 3};
-        if (!(*&t1(&mut _t1).f == 3)) abort 1;
+        let _v0 = 0;
+        assert!(*freeze(&mut _v0) == 0, 0);
+        let _v1 = G{f: 3};
+        assert!(*&t1(&mut _v1).f == 3, 1);
     }
     fun test_2() {
-        let _t0 = G{f: 50};
-        let (_t6,_t7,_t8) = t5(&mut _t0);
-        if (!(_t6 == 2)) abort 0;
-        if (!(_t7 == 2)) abort 1;
-        if (!(_t8 == 2)) abort 2;
+        let _v0 = G{f: 50};
+        let (_v1,_v2,_v3) = t5(&mut _v0);
+        assert!(_v1 == 2, 0);
+        assert!(_v2 == 2, 1);
+        assert!(_v3 == 2, 2);
     }
     fun test_3() {
-        let _t0 = vector[0];
-        if (!(*borrow_mut<u64>(&mut _t0) == 0)) abort 0;
+        let _v0 = vector[0];
+        assert!(*borrow_mut<u64>(&mut _v0) == 0, 0);
     }
     fun test_5() {
-        let _t0 = 3;
-        if (!(*borrow_mut2<u64>(&mut _t0) == 3)) abort 0;
+        let _v0 = 3;
+        assert!(*borrow_mut2<u64>(&mut _v0) == 3, 0);
     }
     fun test_6() {
-        let _t0 = G{f: 2};
-        let _t1 = G{f: 3};
-        if (!(*&(&_t0).f == 2)) abort 0;
+        let _v0 = G{f: 2};
+        let _v1 = G{f: 3};
+        assert!(*&(&_v0).f == 2, 0);
     }
     fun test_7() {
-        let _t0 = G{f: 2};
-        let _t1 = G{f: 3};
-        if (!(*&(&_t0).f == 2)) abort 0;
+        let _v0 = G{f: 2};
+        let _v1 = G{f: 3};
+        assert!(*&(&_v0).f == 2, 0);
     }
 }
 

@@ -12,13 +12,13 @@ module 0x42::test {
         p0 == p1
     }
     public fun test_S(p0: u64): bool {
-        let _t2 = S{f: p0};
-        let _t5 = eq_with<S>(S{f: 2});
-        _t5(_t2)
+        let _v0 = S{f: p0};
+        let _v1 = eq_with<S>(S{f: 2});
+        _v1(_v0)
     }
     public fun test_u64(p0: u64): bool {
-        let _t1 = eq_with<u64>(2);
-        _t1(p0)
+        let _v0 = eq_with<u64>(2);
+        _v0(p0)
     }
 }
 

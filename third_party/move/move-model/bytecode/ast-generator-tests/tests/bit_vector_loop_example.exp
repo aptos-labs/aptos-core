@@ -785,65 +785,65 @@ module 0x1::m {
         bit_field: vector<bool>,
     }
     public fun is_index_set(self: &BitVector, bit_index: u64): bool {
-        let _t5 = 0x1::vector::length<bool>(&self.bit_field);
-        if (!(bit_index < _t5)) abort 131072;
-        let _t8 = &self.bit_field;
-        *0x1::vector::borrow<bool>(_t8, bit_index)
+        let _v0 = 0x1::vector::length<bool>(&self.bit_field);
+        assert!(bit_index < _v0, 131072);
+        let _v1 = &self.bit_field;
+        *0x1::vector::borrow<bool>(_v1, bit_index)
     }
     public fun set(self: &mut BitVector, bit_index: u64) {
-        let _t7 = 0x1::vector::length<bool>(&self.bit_field);
-        if (!(bit_index < _t7)) abort 131072;
-        let _t10 = &mut self.bit_field;
-        let _t3 = 0x1::vector::borrow_mut<bool>(_t10, bit_index);
-        *_t3 = true;
+        let _v0 = 0x1::vector::length<bool>(&self.bit_field);
+        assert!(bit_index < _v0, 131072);
+        let _v1 = &mut self.bit_field;
+        let _v2 = 0x1::vector::borrow_mut<bool>(_v1, bit_index);
+        *_v2 = true;
     }
     public fun shift_left(self: &mut BitVector, amount: u64) {
-        let _t3;
-        let _t9 = *&self.length;
-        if (amount >= _t9) {
-            let _t2 = &mut self.bit_field;
-            _t3 = 0;
+        let _v0;
+        let _v1 = *&self.length;
+        if (amount >= _v1) {
+            let _v2 = &mut self.bit_field;
+            _v0 = 0;
             loop {
-                let _t17 = 0x1::vector::length<bool>(freeze(_t2));
-                if (!(_t3 < _t17)) break;
-                let _t5 = 0x1::vector::borrow_mut<bool>(_t2, _t3);
-                *_t5 = false;
-                _t3 = _t3 + 1;
+                let _v3 = 0x1::vector::length<bool>(freeze(_v2));
+                if (!(_v0 < _v3)) break;
+                let _v4 = 0x1::vector::borrow_mut<bool>(_v2, _v0);
+                *_v4 = false;
+                _v0 = _v0 + 1;
                 continue
             }
         } else {
-            _t3 = amount;
+            _v0 = amount;
             loop {
-                let _t32 = *&self.length;
-                if (!(_t3 < _t32)) break;
-                let _t35 = freeze(self);
-                let _t37 = is_index_set(_t35, _t3);
-                if (_t37) {
-                    let _t41 = _t3 - amount;
-                    set(self, _t41)
+                let _v5 = *&self.length;
+                if (!(_v0 < _v5)) break;
+                let _v6 = freeze(self);
+                let _v7 = is_index_set(_v6, _v0);
+                if (_v7) {
+                    let _v8 = _v0 - amount;
+                    set(self, _v8)
                 } else {
-                    let _t48 = _t3 - amount;
-                    unset(self, _t48)
+                    let _v9 = _v0 - amount;
+                    unset(self, _v9)
                 };
-                _t3 = _t3 + 1;
+                _v0 = _v0 + 1;
                 continue
             };
-            let _t51 = *&self.length;
-            _t3 = _t51 - amount;
+            let _v10 = *&self.length;
+            _v0 = _v10 - amount;
             loop {
-                let _t57 = *&self.length;
-                if (!(_t3 < _t57)) break;
-                unset(self, _t3);
-                _t3 = _t3 + 1;
+                let _v11 = *&self.length;
+                if (!(_v0 < _v11)) break;
+                unset(self, _v0);
+                _v0 = _v0 + 1;
                 continue
             }
         };
     }
     public fun unset(self: &mut BitVector, bit_index: u64) {
-        let _t7 = 0x1::vector::length<bool>(&self.bit_field);
-        if (!(bit_index < _t7)) abort 131072;
-        let _t10 = &mut self.bit_field;
-        let _t3 = 0x1::vector::borrow_mut<bool>(_t10, bit_index);
-        *_t3 = false;
+        let _v0 = 0x1::vector::length<bool>(&self.bit_field);
+        assert!(bit_index < _v0, 131072);
+        let _v1 = &mut self.bit_field;
+        let _v2 = 0x1::vector::borrow_mut<bool>(_v1, bit_index);
+        *_v2 = false;
     }
 }

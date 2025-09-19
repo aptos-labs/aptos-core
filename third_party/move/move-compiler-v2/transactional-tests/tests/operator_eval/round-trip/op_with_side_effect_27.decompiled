@@ -3,16 +3,16 @@
 //# publish
 module 0xc0ffee::m {
     public fun test(p0: bool): bool {
-        let _t3;
-        let _t2;
-        if (p0) _t2 = false else {
-            let _t1;
-            if (p0) _t1 = false else _t1 = false;
-            p0 = _t1;
-            _t2 = p0
+        let _v0;
+        let _v1;
+        if (p0) _v1 = false else {
+            let _v2;
+            if (p0) _v2 = false else _v2 = false;
+            p0 = _v2;
+            _v1 = p0
         };
-        if (_t2) _t3 = true else _t3 = !!p0;
-        _t3
+        if (_v1) _v0 = true else _v0 = !!p0;
+        _v0
     }
 }
 

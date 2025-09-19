@@ -7,16 +7,16 @@ module 0x42::m {
         10
     }
     fun main(): u64 {
-        let _t0 = 0;
-        let _t1 = 0;
-        let _t2 = false;
-        let _t3 = foo(&mut _t0);
+        let _v0 = 0;
+        let _v1 = 0;
+        let _v2 = false;
+        let _v3 = foo(&mut _v0);
         loop {
-            if (_t2) _t1 = _t1 + 1 else _t2 = true;
-            if (_t1 < _t3) continue;
+            if (_v2) _v1 = _v1 + 1 else _v2 = true;
+            if (_v1 < _v3) continue;
             break
         };
-        _t0
+        _v0
     }
 }
 

@@ -3,19 +3,19 @@
 //# publish
 module 0x42::Test {
     public fun test(): u64 {
-        let _t0 = 0;
-        let _t1 = vector[1, 2, 3];
-        let _t2 = &_t1;
-        let _t3 = 0;
+        let _v0 = 0;
+        let _v1 = vector[1, 2, 3];
+        let _v2 = &_v1;
+        let _v3 = 0;
         loop {
-            let _t11 = 0x1::vector::length<u64>(_t2);
-            if (!(_t3 < _t11)) break;
-            let _t18 = *0x1::vector::borrow<u64>(_t2, _t3);
-            _t0 = _t0 + _t18;
-            _t3 = _t3 + 1;
+            let _v4 = 0x1::vector::length<u64>(_v2);
+            if (!(_v3 < _v4)) break;
+            let _v5 = *0x1::vector::borrow<u64>(_v2, _v3);
+            _v0 = _v0 + _v5;
+            _v3 = _v3 + 1;
             continue
         };
-        _t0
+        _v0
     }
 }
 

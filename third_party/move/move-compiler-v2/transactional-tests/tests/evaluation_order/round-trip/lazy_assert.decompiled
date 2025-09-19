@@ -11,8 +11,8 @@ script {
 //# run
 script {
     fun main() {
-        let _t2 = 1 / 0;
-        abort _t2
+        let _v0 = 1 / 0;
+        abort _v0
     }
 }
 
