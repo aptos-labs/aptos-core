@@ -3,7 +3,7 @@
 //# publish
 module 0x42::Test {
     public fun main() {
-        if (!(test() == 3)) abort 5;
+        assert!(test() == 3, 5);
     }
     public fun test(): u64 {
         3

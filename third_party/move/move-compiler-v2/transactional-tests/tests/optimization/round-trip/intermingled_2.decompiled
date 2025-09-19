@@ -3,7 +3,7 @@
 //# publish
 module 0xc0ffee::m {
     public fun main() {
-        if (!(test() == 4)) abort 6;
+        assert!(test() == 4, 6);
     }
     fun test(): u64 {
         let _t0 = 1 + 1;

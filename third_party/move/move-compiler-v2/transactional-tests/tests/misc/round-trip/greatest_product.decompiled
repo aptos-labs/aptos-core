@@ -34,7 +34,7 @@ module 0xc0ffee::greatest_product {
         _t0
     }
     public fun test_find_greatest_product() {
-        if (!(find_greatest_product() == 3969)) abort 0;
+        assert!(find_greatest_product() == 3969, 0);
     }
 }
 

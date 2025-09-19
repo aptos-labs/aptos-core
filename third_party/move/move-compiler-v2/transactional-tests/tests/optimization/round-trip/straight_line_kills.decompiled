@@ -8,7 +8,7 @@ module 0xc0ffee::m {
         _t1 + _t1
     }
     public fun main() {
-        if (!(copy_kill(10) == 20)) abort 0;
+        assert!(copy_kill(10) == 20, 0);
     }
 }
 

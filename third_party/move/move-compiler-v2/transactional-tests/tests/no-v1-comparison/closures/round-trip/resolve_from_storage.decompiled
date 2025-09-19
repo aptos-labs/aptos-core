@@ -16,7 +16,7 @@ module 0x66::test {
         acquires Func
     {
         let _t4 = *&borrow_global<Func>(p0).f;
-        if (!(_t4() == 23)) abort 777;
+        assert!(_t4() == 23, 777);
     }
 }
 

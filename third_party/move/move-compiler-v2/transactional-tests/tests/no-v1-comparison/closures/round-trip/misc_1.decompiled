@@ -23,13 +23,13 @@ module 0xc0ffee::m {
         let _t1: || has drop = || bar();
         let _t5 = bcs::to_bytes<|| has drop>(&_t0);
         let _t7 = bcs::to_bytes<|| has drop>(&_t1);
-        if (!(_t5 != _t7)) abort 1;
+        assert!(_t5 != _t7, 1);
     }
     public fun test3() {
         let _t0: || has drop = || foo();
         let _t3 = bcs::to_bytes<|| has drop>(&_t0);
         let _t5 = bcs::to_bytes<|| has drop>(&_t0);
-        if (!(_t3 == _t5)) abort 2;
+        assert!(_t3 == _t5, 2);
     }
 }
 

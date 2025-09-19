@@ -37,7 +37,7 @@ module 0x66::delayed_work {
     }
     entry fun eval(p0: &signer, p1: u64, p2: u64) {
         let Work{_0: _t6} = registry::remove<Work>(p0);
-        if (!(_t6(p1) == p2)) abort 14566554180833181696;
+        assert!(_t6(p1) == p2, 14566554180833181696);
     }
     public fun id_fun(p0: u64): u64 {
         p0

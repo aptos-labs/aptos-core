@@ -19,6 +19,6 @@ script {
             };
             break
         };
-        if (!(_t0 == 65)) abort 42;
+        assert!(_t0 == 65, 42);
     }
 }

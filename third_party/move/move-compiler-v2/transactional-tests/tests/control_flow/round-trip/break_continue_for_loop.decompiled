@@ -15,6 +15,6 @@ script {
             if (_t1 % 2 == 0) continue;
             _t0 = _t0 * 2
         };
-        if (!(_t0 == 16)) abort _t0;
+        assert!(_t0 == 16, _t0);
     }
 }

@@ -13,6 +13,6 @@ script {
         let _t6 = &_t5;
         let _t7 = 5;
         let _t2 = &_t7;
-        if (!(*_t6 == 2)) abort 42;
+        assert!(*_t6 == 2, 42);
     }
 }

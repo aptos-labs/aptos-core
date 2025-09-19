@@ -11,7 +11,7 @@ module 0x42::test {
         _t5 - _t6
     }
     fun test_ok() {
-        if (!(baz(2, 1) == 1)) abort 42;
+        assert!(baz(2, 1) == 1, 42);
     }
 }
 

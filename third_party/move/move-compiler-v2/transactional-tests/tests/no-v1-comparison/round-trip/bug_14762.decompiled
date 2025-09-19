@@ -43,13 +43,13 @@ module 0x42::m {
         vector::push_back<T>(_t13, _t11);
         let _t2 = S{entries: _t12};
         let _t3 = test(&mut _t2, vector[0u8]);
-        if (!option::is_none<T>(&_t3)) abort 0;
+        assert!(option::is_none<T>(&_t3), 0);
         let _t4 = test(&mut _t2, vector[1u8]);
-        if (!option::is_some<T>(&_t4)) abort 0;
-        if (!(*&option::borrow<T>(&_t4).issuer == vector[1u8])) abort 0;
+        assert!(option::is_some<T>(&_t4), 0);
+        assert!(*&option::borrow<T>(&_t4).issuer == vector[1u8], 0);
         let _t5 = test(&mut _t2, vector[2u8]);
-        if (!option::is_some<T>(&_t5)) abort 0;
-        if (!(*&option::borrow<T>(&_t5).issuer == vector[2u8])) abort 0;
+        assert!(option::is_some<T>(&_t5), 0);
+        assert!(*&option::borrow<T>(&_t5).issuer == vector[2u8], 0);
     }
 }
 

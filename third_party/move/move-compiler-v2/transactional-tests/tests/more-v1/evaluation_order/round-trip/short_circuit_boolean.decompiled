@@ -16,9 +16,9 @@ module 0x42::X {
 script {
     use 0x42::X;
     fun main() {
-        if (!(X::tester(false, false) == 70)) abort 1;
-        if (!(X::tester(false, true) == 10)) abort 2;
-        if (!(X::tester(true, false) == 210)) abort 3;
-        if (!(X::tester(true, true) == 30)) abort 4;
+        assert!(X::tester(false, false) == 70, 1);
+        assert!(X::tester(false, true) == 10, 2);
+        assert!(X::tester(true, false) == 210, 3);
+        assert!(X::tester(true, true) == 30, 4);
     }
 }

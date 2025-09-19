@@ -15,6 +15,6 @@ script {
             };
             break
         };
-        if (!(_t1 == 21)) abort 42;
+        assert!(_t1 == 21, 42);
     }
 }

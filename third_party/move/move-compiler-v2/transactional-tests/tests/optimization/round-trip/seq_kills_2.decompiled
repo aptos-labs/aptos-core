@@ -3,7 +3,7 @@
 //# publish
 module 0xc0ffee::m {
     public fun main() {
-        if (!(test(100) == true)) abort 0;
+        assert!(test(100) == true, 0);
     }
     fun test(p0: u64): bool {
         let _t1 = p0;

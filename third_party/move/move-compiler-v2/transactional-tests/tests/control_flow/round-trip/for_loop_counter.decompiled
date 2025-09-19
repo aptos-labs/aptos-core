@@ -11,6 +11,6 @@ script {
             if (!(_t1 < 1)) break;
             _t0 = _t0 + 1
         };
-        if (!(_t0 == 1)) abort 20;
+        assert!(_t0 == 1, 20);
     }
 }

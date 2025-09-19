@@ -10,31 +10,31 @@ module 0xc0ffee::m {
     }
     public fun main() {
         let _t0 = test_01(new_p());
-        if (!(*&(&(&_t0).q).r == 1)) abort 0;
-        if (!(test_02(new_p()) == 10)) abort 0;
+        assert!(*&(&(&_t0).q).r == 1, 0);
+        assert!(test_02(new_p()) == 10, 0);
         let _t1 = new_p();
         test_03(&mut _t1);
-        if (!(*&(&(&_t1).q).r == 12)) abort 0;
+        assert!(*&(&(&_t1).q).r == 12, 0);
         let _t2 = test_04(new_p());
-        if (!(*&(&(&_t2).q).r == 14)) abort 0;
+        assert!(*&(&(&_t2).q).r == 14, 0);
         let _t3 = test_05(new_p());
-        if (!(*&(&(&_t3).q).r == 15)) abort 0;
+        assert!(*&(&(&_t3).q).r == 15, 0);
         let _t4 = test_06(new_p());
-        if (!(*&(&(&_t4).q).r == 16)) abort 0;
+        assert!(*&(&(&_t4).q).r == 16, 0);
         let _t5 = test_07(new_p());
-        if (!(*&(&(&_t5).q).r == 0)) abort 0;
-        if (!(test_08(1) == 1)) abort 0;
-        if (!test_09(3)) abort 0;
+        assert!(*&(&(&_t5).q).r == 0, 0);
+        assert!(test_08(1) == 1, 0);
+        assert!(test_09(3), 0);
         let _t6 = test_10(new_p());
-        if (!(*&(&(&_t6).q).r == 20)) abort 0;
+        assert!(*&(&(&_t6).q).r == 20, 0);
         let _t7 = test_11(new_p());
-        if (!(*&(&(&_t7).q).r == 0)) abort 0;
+        assert!(*&(&(&_t7).q).r == 0, 0);
         let _t8 = test_12(new_p());
-        if (!(*&(&(&_t8).q).r == 5)) abort 0;
+        assert!(*&(&(&_t8).q).r == 5, 0);
         let _t9 = test_13(new_p());
-        if (!(*&(&(&_t9).q).r == 0)) abort 0;
+        assert!(*&(&(&_t9).q).r == 0, 0);
         let _t10 = test_14(new_p());
-        if (!(*&(&(&_t10).q).r == 24)) abort 0;
+        assert!(*&(&(&_t10).q).r == 24, 0);
     }
     fun new_p(): P {
         P{q: Q{r: 0}}

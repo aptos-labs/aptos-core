@@ -10,7 +10,7 @@ module 0xcafe::m0 {
     }
     fun f(p0: S) {
         let _t2 = E::E1{};
-        if (!(&_t2 is E1)) abort 14566554180833181697;
+        assert!(&_t2 is E1, 14566554180833181697);
         let E::E1{} = _t2;
         let _t13 = *&(&p0).x;
         let _t3 = true;

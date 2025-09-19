@@ -78,7 +78,7 @@ module 0x1::simple_map {
         let _t6 = _t4;
         let _t7 = vector::length<Key>(&_t5);
         let _t20 = vector::length<Value>(&_t6);
-        if (!(_t7 == _t20)) abort 131074;
+        assert!(_t7 == _t20, 131074);
         while (_t7 > 0) {
             let _t8 = vector::pop_back<Key>(&mut _t5);
             let _t9 = vector::pop_back<Value>(&mut _t6);

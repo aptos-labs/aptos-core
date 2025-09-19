@@ -19,7 +19,7 @@ module 0xc0ffee::n {
         let _t5: |u64|(|u64|(u64)) has copy + drop = |arg0| lambda__4__test_composed_captures(2, arg0);
         let _t1 = |arg0| lambda__6__test_composed_captures(_t3, _t5, arg0);
         let _t10 = _t1(3);
-        if (!(_t10(4) == 54)) abort 0;
+        assert!(_t10(4) == 54, 0);
     }
     fun lambda__2__test_composed_captures(p0: u64, p1: u64): |u64|(u64) {
         |arg0| lambda__1__test_composed_captures(p0, p1, arg0)
@@ -33,13 +33,13 @@ module 0xc0ffee::n {
     fun test_nested_functions() {
         let _t0 = create_adder(10);
         let _t1 = _t0(5);
-        if (!(_t1(3) == 18)) abort 0;
+        assert!(_t1(3) == 18, 0);
         _t0 = create_multiplier(2);
         _t1 = _t0(3);
-        if (!(_t1(4) == 24)) abort 1;
+        assert!(_t1(4) == 24, 1);
         let _t2 = |arg0| lambda__2__test_nested_functions(5, 3, arg0);
         _t1 = _t2(2);
-        if (!(_t1(4) == 120)) abort 2;
+        assert!(_t1(4) == 120, 2);
     }
     fun lambda__2__test_nested_functions(p0: u64, p1: u64, p2: u64): |u64|(u64) {
         |arg0| lambda__1__test_nested_functions(p2, p0, p1, arg0)

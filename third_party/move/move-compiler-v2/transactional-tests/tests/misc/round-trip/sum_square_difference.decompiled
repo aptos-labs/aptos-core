@@ -24,8 +24,8 @@ module 0xc0ffee::sum_square_difference {
         _t1
     }
     public fun test_difference() {
-        if (!(difference(10) == 2640)) abort 0;
-        if (!(difference(100) == 25164150)) abort 1;
+        assert!(difference(10) == 2640, 0);
+        assert!(difference(100) == 25164150, 1);
     }
 }
 

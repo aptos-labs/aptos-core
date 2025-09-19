@@ -19,12 +19,12 @@ module 0x42::power_function {
         _t2
     }
     public fun test_pow() {
-        if (!(pow(2, 0) == 1)) abort 0;
-        if (!(pow(2, 1) == 2)) abort 1;
-        if (!(pow(2, 2) == 4)) abort 2;
-        if (!(pow(2, 3) == 8)) abort 3;
-        if (!(pow(3, 3) == 27)) abort 4;
-        if (!(pow(5, 4) == 625)) abort 5;
+        assert!(pow(2, 0) == 1, 0);
+        assert!(pow(2, 1) == 2, 1);
+        assert!(pow(2, 2) == 4, 2);
+        assert!(pow(2, 3) == 8, 3);
+        assert!(pow(3, 3) == 27, 4);
+        assert!(pow(5, 4) == 625, 5);
     }
 }
 

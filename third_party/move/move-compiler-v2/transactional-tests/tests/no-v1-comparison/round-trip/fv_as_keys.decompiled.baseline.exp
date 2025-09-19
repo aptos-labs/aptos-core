@@ -2,28 +2,28 @@ processed 23 tasks
 task 0 lines 3-79:  publish [module 0x99::test_struct {]
 Error: compilation errors:
  error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has copy + drop + store` was provided
-   ┌─ TEMPFILE:34:15
+   ┌─ TEMPFILE:34:17
    │
-34 │         if (!(_t8(_t5) == 1)) abort 14566554180833181696;
-   │               ^^^^^^^^
+34 │         assert!(_t8(_t5) == 1, 14566554180833181696);
+   │                 ^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has copy + drop + store` was provided
-   ┌─ TEMPFILE:37:15
+   ┌─ TEMPFILE:37:17
    │
-37 │         if (!(_t15(_t12) == 2)) abort 14566554180833181696;
-   │               ^^^^^^^^^^
+37 │         assert!(_t15(_t12) == 2, 14566554180833181696);
+   │                 ^^^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has drop + store` was provided
-   ┌─ TEMPFILE:52:15
+   ┌─ TEMPFILE:52:17
    │
-52 │         if (!(_t8(_t5) == 1)) abort 14566554180833181696;
-   │               ^^^^^^^^
+52 │         assert!(_t8(_t5) == 1, 14566554180833181696);
+   │                 ^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has drop + store` was provided
-   ┌─ TEMPFILE:55:15
+   ┌─ TEMPFILE:55:17
    │
-55 │         if (!(_t15(_t12) == 2)) abort 14566554180833181696;
-   │               ^^^^^^^^^^
+55 │         assert!(_t15(_t12) == 2, 14566554180833181696);
+   │                 ^^^^^^^^^^
 
 
 task 1 lines 82-82:  run --verbose --signers 0x1 -- 0x99::test_struct::init

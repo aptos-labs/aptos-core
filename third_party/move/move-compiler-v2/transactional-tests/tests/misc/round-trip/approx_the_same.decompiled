@@ -15,7 +15,7 @@ module 0x42::m {
             p2 = p2 / 2u128;
             _t4 = _t4 * _t4
         };
-        if (!((p0 - p1) * _t3 < p0)) abort 0;
+        assert!((p0 - p1) * _t3 < p0, 0);
     }
     fun exec() {
         assert_approx_the_same(5672u256, 5672u256, 0u128);

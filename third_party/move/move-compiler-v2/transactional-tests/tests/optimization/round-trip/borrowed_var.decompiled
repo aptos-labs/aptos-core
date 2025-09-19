@@ -6,7 +6,7 @@ module 0xc0ffee::m {
         let _t0 = 5;
         let _t4 = &_t0;
         let _t2 = 5;
-        if (!(*&_t2 == 5)) abort 0;
+        assert!(*&_t2 == 5, 0);
     }
 }
 

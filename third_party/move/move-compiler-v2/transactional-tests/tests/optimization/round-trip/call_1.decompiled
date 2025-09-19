@@ -6,7 +6,7 @@ module 0xc0ffee::m {
         p0
     }
     public fun run() {
-        if (!(test(50) == 50)) abort 0;
+        assert!(test(50) == 50, 0);
     }
     fun test(p0: u64): u64 {
         id(id(id(p0)))

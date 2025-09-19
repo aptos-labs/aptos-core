@@ -10,7 +10,7 @@ module 0x42::m {
             *_t1 = 2;
             _t2 = false
         };
-        if (!(_t0 == 2)) abort 0;
+        assert!(_t0 == 2, 0);
     }
 }
 

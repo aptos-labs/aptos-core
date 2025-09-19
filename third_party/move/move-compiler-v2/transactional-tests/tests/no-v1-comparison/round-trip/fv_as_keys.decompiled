@@ -31,10 +31,10 @@ module 0x99::test_struct {
         let _t1 = borrow_global<Wrapper<||(u64) has copy + drop + store>>(_t3);
         let _t5: ||u64 has copy + drop = || test1();
         let _t8 = *&_t1.fv;
-        if (!(_t8(_t5) == 1)) abort 14566554180833181696;
+        assert!(_t8(_t5) == 1, 14566554180833181696);
         let _t12: ||u64 has copy + drop = || test2();
         let _t15 = *&_t1.fv;
-        if (!(_t15(_t12) == 2)) abort 14566554180833181696;
+        assert!(_t15(_t12) == 2, 14566554180833181696);
     }
     public fun test_bad_move_from(p0: &signer)
         acquires Wrapper
@@ -49,14 +49,14 @@ module 0x99::test_struct {
         let _t1 = borrow_global<Wrapper<||(u64) has drop + store>>(_t3);
         let _t5: ||u64 has copy + drop = || test1();
         let _t8 = *&_t1.fv;
-        if (!(_t8(_t5) == 1)) abort 14566554180833181696;
+        assert!(_t8(_t5) == 1, 14566554180833181696);
         let _t12: ||u64 has copy + drop = || test2();
         let _t15 = *&_t1.fv;
-        if (!(_t15(_t12) == 2)) abort 14566554180833181696;
+        assert!(_t15(_t12) == 2, 14566554180833181696);
     }
     public fun test_exist(p0: &signer) {
         let _t2 = signer::address_of(p0);
-        if (!exists<Wrapper<||(u64) has drop + store>>(_t2)) abort 14566554180833181696;
+        assert!(exists<Wrapper<||(u64) has drop + store>>(_t2), 14566554180833181696);
     }
     public fun test_move_from(p0: &signer)
         acquires Wrapper
@@ -154,7 +154,7 @@ module 0x99::test_enum {
             let _t26: ||u64 has copy + drop = || test2();
             _t4 = _t25(_t26)
         } else abort 14566554180833181697;
-        if (!(_t4 == 1)) abort 0;
+        assert!(_t4 == 1, 0);
     }
     public fun test_borrow_from(p0: &signer)
         acquires Wrapper
@@ -173,11 +173,11 @@ module 0x99::test_enum {
             let _t26 = *_t4;
             _t3 = _t26(_t24)
         } else abort 14566554180833181697;
-        if (!(_t3 == 1)) abort 0;
+        assert!(_t3 == 1, 0);
     }
     public fun test_exist(p0: &signer) {
         let _t2 = signer::address_of(p0);
-        if (!exists<Wrapper<||(u64) has drop + store>>(_t2)) abort 14566554180833181696;
+        assert!(exists<Wrapper<||(u64) has drop + store>>(_t2), 14566554180833181696);
     }
     public fun test_move_from(p0: &signer)
         acquires Wrapper
@@ -195,7 +195,7 @@ module 0x99::test_enum {
             let _t26: ||u64 has copy + drop = || test2();
             _t4 = _t25(_t26)
         } else abort 14566554180833181697;
-        if (!(_t4 == 1)) abort 0;
+        assert!(_t4 == 1, 0);
     }
     public fun test_not_exist_1(p0: &signer) {
         let _t2 = signer::address_of(p0);

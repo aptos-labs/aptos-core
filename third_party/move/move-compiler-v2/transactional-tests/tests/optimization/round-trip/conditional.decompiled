@@ -3,8 +3,8 @@
 //# publish
 module 0xc0ffee::m {
     public fun main() {
-        if (!(test(true) == 3)) abort 0;
-        if (!(test(false) == 3)) abort 1;
+        assert!(test(true) == 3, 0);
+        assert!(test(false) == 3, 1);
     }
     fun test(p0: bool): u64 {
         let _t1;

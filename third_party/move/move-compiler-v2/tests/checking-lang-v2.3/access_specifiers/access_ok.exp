@@ -95,8 +95,7 @@ module 0x42::m {
     {
     }
     fun f11()
-        !reads *(0x42)
-        !reads *(0x43)
+        !reads *(0x42), *(0x43)
     {
     }
     fun f12()
@@ -135,10 +134,8 @@ module 0x42::m {
     {
     }
     fun f_multiple()
-        reads R
-        writes T
-        writes S
-        reads G<u64>
+        reads G<u64>, R
+        writes S, T
     {
     }
     fun make_up_address(_x: u64): address {

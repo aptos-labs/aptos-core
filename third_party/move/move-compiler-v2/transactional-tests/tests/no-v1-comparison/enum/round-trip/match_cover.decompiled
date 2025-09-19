@@ -229,7 +229,7 @@ module 0xc0ffee::o {
                     let F::F2{a: _t26} = _t24;
                     break
                 }};
-            if (!(_t1 is V2)) abort 14566554180833181697;
+            assert!(_t1 is V2, 14566554180833181697);
             let E::V2{a: _t15, b: _t16, c: _t17} = p0;
             break
         };
@@ -268,7 +268,7 @@ module 0xc0ffee::o {
                     let F::F1{} = _t25;
                     break
                 }};
-            if (!(_t1 is V2)) abort 14566554180833181697;
+            assert!(_t1 is V2, 14566554180833181697);
             let E::V2{a: _t16, b: _t17, c: _t18} = p0;
             break
         };

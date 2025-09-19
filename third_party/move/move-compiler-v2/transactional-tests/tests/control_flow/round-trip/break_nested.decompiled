@@ -3,7 +3,7 @@
 //# run
 script {
     fun main() {
-        if (!(3 == 3)) abort 42;
-        if (!(5 == 5)) abort 42;
+        assert!(3 == 3, 42);
+        assert!(5 == 5, 42);
     }
 }

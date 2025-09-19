@@ -18,7 +18,7 @@ module 0x42::Test {
         let _t36 = _t32 + _t35;
         let _t39 = 7 * _t0;
         _t2 = _t36 + _t39;
-        if (!(_t2 == 9637)) abort _t2;
+        assert!(_t2 == 9637, _t2);
     }
 }
 

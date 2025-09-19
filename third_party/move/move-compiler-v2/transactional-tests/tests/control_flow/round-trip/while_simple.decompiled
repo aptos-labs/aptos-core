@@ -5,6 +5,6 @@ script {
     fun main() {
         let _t0 = 0;
         while (_t0 < 5) _t0 = _t0 + 1;
-        if (!(_t0 == 5)) abort 42;
+        assert!(_t0 == 5, 42);
     }
 }

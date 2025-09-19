@@ -27,7 +27,7 @@ module 0x42::Test {
             _t3 = _t3 + 1;
             continue
         };
-        if (!(_t2 == 3)) abort 0;
+        assert!(_t2 == 3, 0);
     }
 }
 

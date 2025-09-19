@@ -37,7 +37,7 @@ module 0xc0ffee::largest_prime_factor {
         true
     }
     public fun test_largest_prime_factor() {
-        if (!(largest_prime_factor(13195) == 29)) abort 0;
+        assert!(largest_prime_factor(13195) == 29, 0);
     }
 }
 

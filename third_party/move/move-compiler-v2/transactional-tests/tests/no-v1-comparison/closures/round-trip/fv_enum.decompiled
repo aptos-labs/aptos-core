@@ -47,7 +47,7 @@ module 0x66::fv_enum_basic {
             let Action::Call{_0: _t9} = _t1;
             _t3 = _t9(p0)
         } else _t3 = 0;
-        if (!(_t3 == 49)) abort 14566554180833181696;
+        assert!(_t3 == 49, 14566554180833181696);
     }
     fun square(p0: u64): u64 {
         p0 * p0
@@ -70,7 +70,7 @@ module 0x66::fv_enum_basic {
             let _t38 = *&_t2._0;
             _t4 = _t38(10)
         } else abort 14566554180833181697;
-        if (!(_t4 == 16)) abort 99;
+        assert!(_t4 == 16, 99);
     }
     fun test_fun_vec(p0: &signer)
         acquires FunVec
@@ -92,8 +92,8 @@ module 0x66::fv_enum_basic {
             let _t7 = 3;
             let _t31 = &mut _t7;
             let _t8 = _t6(_t31);
-            if (!(_t7 == 4)) abort 0;
-            if (!(_t8 == 7)) abort 1;
+            assert!(_t7 == 4, 0);
+            assert!(_t8 == 7, 1);
             0x1::vector::push_back<|&mut u64|(u64) has copy + store>(&mut _t5, _t6);
             _t2 = FunVec::V2<u64>{v0: 10, v1: _t5};
             move_to<FunVec<u64>>(p0, _t2)

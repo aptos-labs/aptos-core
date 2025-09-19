@@ -21,7 +21,7 @@ module 0xc0ffee::m {
         let _t5 = S{x: T{y: 42}};
         let _t8 = S{x: T{y: 43}};
         let _t2 = foo(_t5, _t8);
-        if (!(*&(&(&_t2).x).y == 43)) abort 0;
+        assert!(*&(&(&_t2).x).y == 43, 0);
     }
 }
 
