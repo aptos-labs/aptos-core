@@ -854,7 +854,10 @@ impl CliTestFramework {
         TestPackage {
             instruction_execution_bound: 100_000,
             move_options: self.move_options(account_strs),
-            filter: filter.map(|str| str.to_string()),
+            filter_options: move_unit_test::FilterOptions {
+                filter: filter.map(|str| str.to_string()),
+                exact: false,
+            },
             ignore_compile_warnings: false,
             compute_coverage: false,
             dump_state: false,

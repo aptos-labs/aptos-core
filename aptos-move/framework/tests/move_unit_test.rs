@@ -34,7 +34,10 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, use_latest_language: bool) 
     }
 
     let utc = UnitTestingConfig {
-        filter: std::env::var("TEST_FILTER").ok(),
+        filter_options: move_unit_test::FilterOptions {
+            filter: std::env::var("TEST_FILTER").ok(),
+            exact: false,
+        },
         report_statistics: matches!(std::env::var("REPORT_STATS"), Ok(s) if s.as_str() == "1"),
         ..Default::default()
     };

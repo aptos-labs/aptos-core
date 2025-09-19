@@ -8,6 +8,7 @@ use crate::{
         FailureReason, MoveError, TestFailure, TestResults, TestRunInfo, TestStatistics,
         UnitTestFactory,
     },
+    FilterOptions,
 };
 use anyhow::Result;
 use colored::*;
@@ -178,21 +179,16 @@ impl TestRunner {
             })
     }
 
-    pub fn filter(&mut self, test_name_slice: &str) {
-        for (module_id, module_test) in self.tests.module_tests.iter_mut() {
-            if module_id.name().as_str().contains(test_name_slice) {
+    pub fn filter(&mut self, filter_opts: &FilterOptions) {
+        for (module_id, module_test_plan) in self.tests.module_tests.iter_mut() {
+            let module_name = module_id.name().as_str();
+            if filter_opts.matches(module_name) {
                 continue;
-            } else {
-                let tests = std::mem::take(&mut module_test.tests);
-                module_test.tests = tests
-                    .into_iter()
-                    .filter(|(test_name, _)| {
-                        let full_name =
-                            format!("{}::{}", module_id.name().as_str(), test_name.as_str());
-                        full_name.contains(test_name_slice)
-                    })
-                    .collect();
             }
+            module_test_plan.tests.retain(|test_name, _| {
+                let test_fullname = format!("{}::{}", module_name, test_name.as_str());
+                filter_opts.matches(&test_fullname)
+            });
         }
     }
 }
