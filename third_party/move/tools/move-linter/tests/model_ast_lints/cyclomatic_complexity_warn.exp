@@ -1,0 +1,181 @@
+
+Diagnostics:
+warning: [lint] Function `complexity::high_complexity` has cyclomatic complexity 12, which exceeds the allowed threshold of 10
+   ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:3:5
+   │
+ 3 │ ╭     public fun high_complexity(a: bool, b: bool): bool {
+ 4 │ │         assert!(a || b, 100); // +1
+ 5 │ │         if (a) { // +1
+ 6 │ │             return b; // +1
+   · │
+25 │ │         a
+26 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Function `complexity::inline_fun` has cyclomatic complexity 11, which exceeds the allowed threshold of 10
+   ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:36:5
+   │
+36 │ ╭     inline fun inline_fun(b: u64): u64 {
+37 │ │             if (b == 1) { // +1
+38 │ │                 1
+39 │ │             }else if (b == 2) { // +1
+   · │
+59 │ │             }
+60 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Function `complexity::triple_nested_while_loops` has cyclomatic complexity 14, which exceeds the allowed threshold of 10
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:455:5
+    │
+455 │ ╭     public fun triple_nested_while_loops(a: u64, b: u64, c: u64): u64 {
+456 │ │         let sum = 0;
+457 │ │         let i = 0;
+458 │ │         while (i < a) { // +1
+    · │
+492 │ │         sum
+493 │ │     }
+    │ ╰─────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Function `complexity::massive_switch_like` has cyclomatic complexity 13, which exceeds the allowed threshold of 10
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:623:5
+    │
+623 │ ╭     public fun massive_switch_like(n: u64): u64 {
+624 │ │         let result = 0;
+625 │ │         let i = 0;
+626 │ │         while (i < n) { // +1
+    · │
+654 │ │         result
+655 │ │     }
+    │ ╰─────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Function `complexity::ultra_complex_nested` has cyclomatic complexity 16, which exceeds the allowed threshold of 10
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:687:5
+    │
+687 │ ╭     public fun ultra_complex_nested(x: u64, y: u64, z: u64): u64 {
+688 │ │         let a = x;
+689 │ │         let b = y;
+690 │ │         let c = z;
+    · │
+743 │ │         a + b + c
+744 │ │     }
+    │ ╰─────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Function `complexity::enormous_switch` has cyclomatic complexity 17, which exceeds the allowed threshold of 10
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:789:5
+    │
+789 │ ╭     public fun enormous_switch(n: u64): u64 {
+790 │ │         let sum = 0;
+791 │ │         let i = 0;
+792 │ │         while (i < n) { // +1
+    · │
+828 │ │         sum
+829 │ │     }
+    │ ╰─────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Function `complexity::maximum_complexity_test` has cyclomatic complexity 16, which exceeds the allowed threshold of 10
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:832:5
+    │
+832 │ ╭     public fun maximum_complexity_test(a: u64, b: u64, c: u64, flag: bool): u64 {
+833 │ │         let x = a;
+834 │ │         let y = b;
+835 │ │         let z = c;
+    · │
+895 │ │         x + y + z
+896 │ │     }
+    │ ╰─────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Function `complexity::for_with_early_return` has cyclomatic complexity 11, which exceeds the allowed threshold of 10
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1062:5
+     │
+1062 │ ╭     public fun for_with_early_return(n: u64): u64 {
+1063 │ │         let sum = 0;
+1064 │ │         for (i in 0..n) { // +1
+1065 │ │             if (i == 42) { // +1
+     · │
+1085 │ │         sum
+1086 │ │     }
+     │ ╰─────^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Function `complexity::complex_nested_for_with_boolean_ops` has cyclomatic complexity 13, which exceeds the allowed threshold of 10
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1089:5
+     │
+1089 │ ╭     public fun complex_nested_for_with_boolean_ops(n: u64, m: u64): u64 {
+1090 │ │         let result = 0;
+1091 │ │         for (i in 0..n) { // +1
+1092 │ │             for (j in 0..m) { // +1
+     · │
+1118 │ │         result
+1119 │ │     }
+     │ ╰─────^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Function `complexity::massive_triple_for_with_conditions` has cyclomatic complexity 15, which exceeds the allowed threshold of 10
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1122:5
+     │
+1122 │ ╭     public fun massive_triple_for_with_conditions(a: u64, b: u64, c: u64): u64 {
+1123 │ │         let sum = 0;
+1124 │ │         for (i in 0..a) { // +1
+1125 │ │             for (j in 0..b) { // +1
+     · │
+1155 │ │         sum
+1156 │ │     }
+     │ ╰─────^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Function `complexity::comprehensive_control_flow_test` has cyclomatic complexity 62, which exceeds the allowed threshold of 10
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1213:5
+     │
+1213 │ ╭     public fun comprehensive_control_flow_test(x: u64, y: u64, z: u64, flag: bool): u64 {
+1214 │ │         assert!(x > 0, 1001); // +1
+1215 │ │         assert!(y > 0, 1002); // +1
+1216 │ │         assert!(z > 0, 1003); // +1
+     · │
+1363 │ │         result
+1364 │ │     }
+     │ ╰─────^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Function `complexity::block_return_4` has cyclomatic complexity 11, which exceeds the allowed threshold of 10
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1473:9
+     │
+1473 │ ╭         public fun block_return_4(b: u64): u64 {
+1474 │ │             let a = if (b == 1) { // +1
+1475 │ │                 1
+1476 │ │             }else if (b == 2) { // +1
+     · │
+1495 │ │             return {return a} // +1
+1496 │ │     }
+     │ ╰─────^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
