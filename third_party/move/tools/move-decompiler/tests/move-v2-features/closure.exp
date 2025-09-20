@@ -44,7 +44,7 @@ module 0x99::lambda_arg {
         f(x)
     }
     public fun main() {
-        if (!(test() == 3)) abort 5;
+        assert!(test() == 3, 5);
     }
 }
 module 0x99::lambda_basic {
@@ -134,7 +134,7 @@ module 0x99::lambda_inline1 {
         let _t36 = _t32 + _t35;
         let _t39 = 7 * _t0;
         _t2 = _t36 + _t39;
-        if (!(_t2 == 9637)) abort _t2;
+        assert!(_t2 == 9637, _t2);
     }
 }
 module 0x99::lambda_no_param {
@@ -146,7 +146,7 @@ module 0x99::lambda_no_param1 {
     public fun test() {
         let _t0: |u64, u64|u64 has copy + drop = |arg0,arg1| lambda__1__test(arg0, arg1);
         let _t1: |u64, u64|u64 has copy + drop = |arg0,arg1| lambda__2__test(arg0, arg1);
-        if (!(foo(_t0, _t1, 10, 100) == 110)) abort 0;
+        assert!(foo(_t0, _t1, 10, 100) == 110, 0);
     }
     fun lambda__1__test(x: u64, param_1: u64): u64 {
         x

@@ -8,15 +8,15 @@ module 0xc0ffee::m {
         let _t2 = 0;
         let _t3 = &_t2;
         let _t11 = 0 + 0;
-        if (!(*_t1 == 0)) abort 1;
-        if (!(*_t3 == 0)) abort 1;
+        assert!(*_t1 == 0, 1);
+        assert!(*_t3 == 0, 1);
     }
     fun test2() {
         let _t0 = 2;
         let _t1 = &_t0;
         let _t2 = 2;
         let _t3 = &_t2;
-        if (!(2 + 2 == 4)) abort 1;
+        assert!(2 + 2 == 4, 1);
     }
 }
 

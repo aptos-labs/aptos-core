@@ -10,20 +10,20 @@ module 0x42::test {
         move_to<R<bool>>(p0, _t3);
     }
     fun fail1(): bool
-        reads R<u64>
         acquires R
+        reads R<u64>
     {
         *&borrow_global<R<bool>>(@0x1).value
     }
     fun ok1(): bool
-        reads R
         acquires R
+        reads R
     {
         *&borrow_global<R<bool>>(@0x1).value
     }
     fun ok2(): bool
-        reads R<bool>
         acquires R
+        reads R<bool>
     {
         *&borrow_global<R<bool>>(@0x1).value
     }

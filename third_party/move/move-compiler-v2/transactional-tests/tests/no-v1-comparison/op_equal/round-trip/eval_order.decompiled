@@ -13,21 +13,21 @@ module 0xc0ffee::m {
     public fun test0() {
         let _t0 = 1 + 2;
         _t0 = _t0 + _t0;
-        if (!(_t0 + _t0 == 12)) abort 14566554180833181696;
+        assert!(_t0 + _t0 == 12, 14566554180833181696);
     }
     public fun test1() {
         let _t0 = 1 + 2;
-        if (!(_t0 + _t0 == 6)) abort 14566554180833181696;
+        assert!(_t0 + _t0 == 6, 14566554180833181696);
     }
     public fun test2() {
         let _t0 = 1;
         mod1(&mut _t0);
-        if (!(_t0 + _t0 == 6)) abort 14566554180833181696;
+        assert!(_t0 + _t0 == 6, 14566554180833181696);
     }
     public fun test3() {
         let _t0 = 1;
         let _t1 = mod2(&mut _t0);
-        if (!(_t0 + _t1 == 6)) abort 14566554180833181696;
+        assert!(_t0 + _t1 == 6, 14566554180833181696);
     }
     public fun test4() {
         let _t0 = vector[1, 2, 3];
@@ -39,7 +39,7 @@ module 0xc0ffee::m {
         let _t18 = _t2 + 1;
         let _t4 = 0x1::vector::borrow_mut<u64>(_t15, _t18);
         *_t4 = *_t4 + _t3;
-        if (!(_t0 == vector[1, 2, 5])) abort 14566554180833181696;
+        assert!(_t0 == vector[1, 2, 5], 14566554180833181696);
     }
 }
 

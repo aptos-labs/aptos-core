@@ -47,10 +47,10 @@ module 0x42::mod3 {
             move_to<MyStruct1>(_t19, _t5)
         };
         if (p1) mod2::save_item<|address|(bool) has copy + drop + store>(&p0, _t2) else mod2::save_item<|address|(bool) has copy + drop + store>(&p0, _t3);
-        if (!mod2::item_exists<|address|(bool) has copy + drop + store>(_t4)) abort 14566554180833181696;
+        assert!(mod2::item_exists<|address|(bool) has copy + drop + store>(_t4), 14566554180833181696);
         let _t27 = mod2::get_item<|address|(bool) has copy + drop + store>(_t4);
         let _t8 = _t27(_t4);
-        if (!(p1 == _t8)) abort 14566554180833181696;
+        assert!(p1 == _t8, 14566554180833181696);
         let _t36 = mod2::remove_item<|address|(bool) has copy + drop + store>(_t4);
         true
     }
@@ -63,7 +63,7 @@ module 0x42::mod4 {
         fv: T0,
     }
     fun check_exists(p0: &signer) {
-        if (!exists<Wrapper<|&u64, &mut u8|(&u64) has copy + drop + store>>(@0x42)) abort 404;
+        assert!(exists<Wrapper<|&u64, &mut u8|(&u64) has copy + drop + store>>(@0x42), 404);
     }
     fun initialize(p0: &signer) {
         let _t3 = Wrapper<|&u64, &mut u8|(&u64) has copy + drop + store>{fv: |arg0,arg1| test(arg0, arg1)};
@@ -82,7 +82,7 @@ module 0x42::mod5 {
         fvs: vector<T0>,
     }
     fun check_exists(p0: &signer) {
-        if (!exists<VecWrapper<|&u64, &mut u8|(&u64) has copy + drop + store>>(@0x42)) abort 404;
+        assert!(exists<VecWrapper<|&u64, &mut u8|(&u64) has copy + drop + store>>(@0x42), 404);
     }
     fun initialize(p0: &signer) {
         let _t2: |&u64, &mut u8|&u64 has copy + drop = |arg0,arg1| test(arg0, arg1);
@@ -108,7 +108,7 @@ module 0x42::mod6 {
     {
         let _t1;
         if (exists<VecWrapper<|&mut u8| has drop + store>>(@0x42)) _t1 = false else _t1 = !exists<VecWrapper<|&mut u8| has store>>(@0x42);
-        if (!_t1) abort 404;
+        assert!(_t1, 404);
         let _t2 = &borrow_global<VecWrapper<|&mut u8| has copy + drop + store>>(@0x42).fvs;
         let _t3 = 0u8;
         let _t4 = 0;

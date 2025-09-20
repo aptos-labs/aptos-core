@@ -16,7 +16,7 @@ script {
             };
             break
         };
-        if (!(_t0 == 15)) abort 42;
+        assert!(_t0 == 15, 42);
         let _t3 = 0;
         'l1: while (_t3 < 6) {
             let _t4 = 0;
@@ -28,6 +28,6 @@ script {
             };
             break
         };
-        if (!(_t3 == 10)) abort 43;
+        assert!(_t3 == 10, 43);
     }
 }

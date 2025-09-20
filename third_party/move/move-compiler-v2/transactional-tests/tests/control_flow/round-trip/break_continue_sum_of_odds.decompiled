@@ -10,6 +10,6 @@ script {
             if (_t0 % 2 == 0) continue;
             _t1 = _t1 + _t0
         };
-        if (!(_t1 == 25)) abort 42;
+        assert!(_t1 == 25, 42);
     }
 }

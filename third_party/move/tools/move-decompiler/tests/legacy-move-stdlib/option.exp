@@ -4,15 +4,15 @@ module 0x1::option {
         vec: vector<Element>,
     }
     public fun borrow<Element>(self: &Option<Element>): &Element {
-        if (!is_some<Element>(self)) abort 262145;
+        assert!(is_some<Element>(self), 262145);
         vector::borrow<Element>(&self.vec, 0)
     }
     public fun borrow_mut<Element>(self: &mut Option<Element>): &mut Element {
-        if (!is_some<Element>(freeze(self))) abort 262145;
+        assert!(is_some<Element>(freeze(self)), 262145);
         vector::borrow_mut<Element>(&mut self.vec, 0)
     }
     public fun swap<Element>(self: &mut Option<Element>, e: Element): Element {
-        if (!is_some<Element>(freeze(self))) abort 262145;
+        assert!(is_some<Element>(freeze(self)), 262145);
         let _t2 = &mut self.vec;
         let _t9 = vector::pop_back<Element>(_t2);
         vector::push_back<Element>(_t2, e);
@@ -31,7 +31,7 @@ module 0x1::option {
         _t3
     }
     public fun destroy_none<Element>(self: Option<Element>) {
-        if (!is_none<Element>(&self)) abort 262144;
+        assert!(is_none<Element>(&self), 262144);
         let Option<Element>{vec: _t4} = self;
         vector::destroy_empty<Element>(_t4);
     }
@@ -39,7 +39,7 @@ module 0x1::option {
         vector::is_empty<Element>(&self.vec)
     }
     public fun destroy_some<Element>(self: Option<Element>): Element {
-        if (!is_some<Element>(&self)) abort 262145;
+        assert!(is_some<Element>(&self), 262145);
         let Option<Element>{vec: _t5} = self;
         let _t1 = _t5;
         let _t7 = vector::pop_back<Element>(&mut _t1);
@@ -54,16 +54,16 @@ module 0x1::option {
         _t3
     }
     public fun extract<Element>(self: &mut Option<Element>): Element {
-        if (!is_some<Element>(freeze(self))) abort 262145;
+        assert!(is_some<Element>(freeze(self)), 262145);
         vector::pop_back<Element>(&mut self.vec)
     }
     public fun fill<Element>(self: &mut Option<Element>, e: Element) {
         let _t2 = &mut self.vec;
-        if (!vector::is_empty<Element>(freeze(_t2))) abort 262144;
+        assert!(vector::is_empty<Element>(freeze(_t2)), 262144);
         vector::push_back<Element>(_t2, e);
     }
     public fun from_vec<Element>(vec: vector<Element>): Option<Element> {
-        if (!(vector::length<Element>(&vec) <= 1)) abort 262146;
+        assert!(vector::length<Element>(&vec) <= 1, 262146);
         Option<Element>{vec: vec}
     }
     public fun get_with_default<Element: copy + drop>(self: &Option<Element>, default: Element): Element {

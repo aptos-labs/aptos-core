@@ -20,8 +20,8 @@ module 0x42::Mutual {
         _t1
     }
     public fun recursion_check() {
-        if (!even(4)) abort 0;
-        if (!even(4)) abort 0;
+        assert!(even(4), 0);
+        assert!(even(4), 0);
     }
 }
 

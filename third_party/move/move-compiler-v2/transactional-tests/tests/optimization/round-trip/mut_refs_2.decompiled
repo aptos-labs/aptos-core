@@ -7,7 +7,7 @@ module 0xc0ffee::m {
         b: u64,
     }
     public fun main() {
-        if (!(test(S{a: 1, b: 2}) == 1)) abort 5;
+        assert!(test(S{a: 1, b: 2}) == 1, 5);
     }
     fun test(p0: S): u64 {
         let _t1 = p0;

@@ -11,6 +11,6 @@ script {
             _t1 = _t1 + _t9;
             continue
         };
-        if (!(_t1 == 10)) abort _t1;
+        assert!(_t1 == 10, _t1);
     }
 }

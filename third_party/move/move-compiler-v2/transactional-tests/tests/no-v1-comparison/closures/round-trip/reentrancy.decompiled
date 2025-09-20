@@ -26,7 +26,7 @@ module 0x42::caller {
         callee::call_me<R>(_t0, _t5);
         let _t1 = &mut _t0.count;
         *_t1 = *_t1 + 1;
-        if (!(*&_t0.count == 2)) abort 14566554180833181696;
+        assert!(*&_t0.count == 2, 14566554180833181696);
         false
     }
     fun lambda__1__callback_fails(p0: &mut R)
@@ -43,7 +43,7 @@ module 0x42::caller {
         callee::call_me<R>(_t0, _t5);
         let _t1 = &mut _t0.count;
         *_t1 = *_t1 + 1;
-        if (!(*&_t0.count == 2)) abort 14566554180833181696;
+        assert!(*&_t0.count == 2, 14566554180833181696);
         true
     }
     fun do_something(p0: &mut R) {

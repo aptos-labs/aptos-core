@@ -8,8 +8,8 @@ module 0xc0ffee::m {
         _t2
     }
     public fun test() {
-        if (!(foo(true, 5) == 5)) abort 0;
-        if (!(foo(false, 5) == 5)) abort 2;
+        assert!(foo(true, 5) == 5, 0);
+        assert!(foo(false, 5) == 5, 2);
     }
 }
 

@@ -6,7 +6,7 @@ module 0xc0ffee::m {
         2
     }
     public fun test() {
-        if (!(foo() == 2)) abort 45;
+        assert!(foo() == 2, 45);
     }
 }
 

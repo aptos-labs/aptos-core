@@ -14,7 +14,7 @@ module 0xc0ffee::m {
         }
     }
     fun get_func(p0: &Function): &||(u64) has copy {
-        if (!(p0 is NoParam)) abort 42;
+        assert!(p0 is NoParam, 42);
         &p0._0
     }
     fun get_func_recursive(p0: Function): ||(u64) {
@@ -83,11 +83,11 @@ module 0xc0ffee::m {
         _t2()
     }
     public fun test_1() {
-        if (!(runner_1(Function::NoParam{_0: || lambda__1__test_1()}) == 0)) abort 14566554180833181696;
-        if (!(runner_1(Function::OneParam{_0: |arg0| lambda__2__test_1(arg0)}) == 0)) abort 14566554180833181696;
-        if (!(runner_1(Function::TwoParam{_0: |arg0,arg1| lambda__3__test_1(arg0, arg1)}) == 0)) abort 14566554180833181696;
-        if (!(runner_1(Function::NoParam{_0: || lambda__4__test_1(1)}) == 1)) abort 14566554180833181696;
-        if (!(runner_1(Function::OneParam{_0: |arg0| lambda__5__test_1(1, arg0)}) == 1)) abort 14566554180833181696;
+        assert!(runner_1(Function::NoParam{_0: || lambda__1__test_1()}) == 0, 14566554180833181696);
+        assert!(runner_1(Function::OneParam{_0: |arg0| lambda__2__test_1(arg0)}) == 0, 14566554180833181696);
+        assert!(runner_1(Function::TwoParam{_0: |arg0,arg1| lambda__3__test_1(arg0, arg1)}) == 0, 14566554180833181696);
+        assert!(runner_1(Function::NoParam{_0: || lambda__4__test_1(1)}) == 1, 14566554180833181696);
+        assert!(runner_1(Function::OneParam{_0: |arg0| lambda__5__test_1(1, arg0)}) == 1, 14566554180833181696);
     }
     fun lambda__1__test_1(): u64 {
         0
@@ -105,11 +105,11 @@ module 0xc0ffee::m {
         p0 + p1
     }
     public fun test_2() {
-        if (!(runner_2(Function::NoParam{_0: || lambda__1__test_2()}) == 0)) abort 14566554180833181696;
-        if (!(runner_2(Function::OneParam{_0: |arg0| lambda__2__test_2(arg0)}) == 0)) abort 14566554180833181696;
-        if (!(runner_2(Function::TwoParam{_0: |arg0,arg1| lambda__3__test_2(arg0, arg1)}) == 0)) abort 14566554180833181696;
-        if (!(runner_2(Function::NoParam{_0: || lambda__4__test_2(1)}) == 1)) abort 14566554180833181696;
-        if (!(runner_2(Function::OneParam{_0: |arg0| lambda__5__test_2(1, arg0)}) == 1)) abort 14566554180833181696;
+        assert!(runner_2(Function::NoParam{_0: || lambda__1__test_2()}) == 0, 14566554180833181696);
+        assert!(runner_2(Function::OneParam{_0: |arg0| lambda__2__test_2(arg0)}) == 0, 14566554180833181696);
+        assert!(runner_2(Function::TwoParam{_0: |arg0,arg1| lambda__3__test_2(arg0, arg1)}) == 0, 14566554180833181696);
+        assert!(runner_2(Function::NoParam{_0: || lambda__4__test_2(1)}) == 1, 14566554180833181696);
+        assert!(runner_2(Function::OneParam{_0: |arg0| lambda__5__test_2(1, arg0)}) == 1, 14566554180833181696);
     }
     fun lambda__1__test_2(): u64 {
         0
@@ -128,17 +128,17 @@ module 0xc0ffee::m {
     }
     fun test_3() {
         let _t0 = Function::NoParam{_0: || lambda__1__test_3()};
-        if (!(runner_3(&_t0) == 0)) abort 14566554180833181696;
+        assert!(runner_3(&_t0) == 0, 14566554180833181696);
     }
     fun lambda__1__test_3(): u64 {
         0
     }
     public fun test_4() {
-        if (!(runner_4(Function::NoParam{_0: || lambda__1__test_4()}) == 0)) abort 14566554180833181696;
-        if (!(runner_4(Function::OneParam{_0: |arg0| lambda__2__test_4(arg0)}) == 0)) abort 14566554180833181696;
-        if (!(runner_4(Function::TwoParam{_0: |arg0,arg1| lambda__3__test_4(arg0, arg1)}) == 0)) abort 14566554180833181696;
-        if (!(runner_4(Function::NoParam{_0: || lambda__4__test_4(1)}) == 1)) abort 14566554180833181696;
-        if (!(runner_4(Function::OneParam{_0: |arg0| lambda__5__test_4(1, arg0)}) == 1)) abort 14566554180833181696;
+        assert!(runner_4(Function::NoParam{_0: || lambda__1__test_4()}) == 0, 14566554180833181696);
+        assert!(runner_4(Function::OneParam{_0: |arg0| lambda__2__test_4(arg0)}) == 0, 14566554180833181696);
+        assert!(runner_4(Function::TwoParam{_0: |arg0,arg1| lambda__3__test_4(arg0, arg1)}) == 0, 14566554180833181696);
+        assert!(runner_4(Function::NoParam{_0: || lambda__4__test_4(1)}) == 1, 14566554180833181696);
+        assert!(runner_4(Function::OneParam{_0: |arg0| lambda__5__test_4(1, arg0)}) == 1, 14566554180833181696);
     }
     fun lambda__1__test_4(): u64 {
         0

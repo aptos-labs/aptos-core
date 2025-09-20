@@ -16,7 +16,7 @@ module 0xcafe::vectors {
             _t3 = _t3 + 1;
             continue
         };
-        if (!(_t0 == vector[2, 3, 4])) abort 0;
+        assert!(_t0 == vector[2, 3, 4], 0);
     }
 }
 

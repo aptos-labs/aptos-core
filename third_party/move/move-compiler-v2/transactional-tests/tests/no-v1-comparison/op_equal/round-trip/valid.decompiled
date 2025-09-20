@@ -80,14 +80,14 @@ module 0x42::test {
     fun test1() {
         let _t1 = add1_old(42u256);
         let _t3 = add1_new(42u256);
-        if (!(_t1 == _t3)) abort 14566554180833181696;
+        assert!(_t1 == _t3, 14566554180833181696);
     }
     fun test2() {
         let _t0 = 42u256;
         let _t1 = _t0;
         inc_new(&mut _t0);
         inc_old(&mut _t1);
-        if (!(_t0 == _t1)) abort 14566554180833181696;
+        assert!(_t0 == _t1, 14566554180833181696);
     }
     fun test3() {
         let _t0 = Coin{_0: 42u256};
@@ -100,27 +100,27 @@ module 0x42::test {
         coin_inc_old_2(&mut _t3);
         let _t16 = &_t0;
         let _t17 = &_t1;
-        if (!(_t16 == _t17)) abort 14566554180833181696;
+        assert!(_t16 == _t17, 14566554180833181696);
         let _t19 = &_t0;
         let _t20 = &_t2;
-        if (!(_t19 == _t20)) abort 14566554180833181696;
+        assert!(_t19 == _t20, 14566554180833181696);
         let _t22 = &_t0;
         let _t23 = &_t3;
-        if (!(_t22 == _t23)) abort 14566554180833181696;
+        assert!(_t22 == _t23, 14566554180833181696);
     }
     fun test4() {
         let _t0 = Wrapper<Coin>{_0: Coin{_0: 42u256}};
         let _t1 = Wrapper<Coin>{_0: Coin{_0: 42u256}};
         inc_wrapped_coin_new(&mut _t0);
         inc_wrapped_coin_old(&mut _t1);
-        if (!(_t0 == _t1)) abort 14566554180833181696;
+        assert!(_t0 == _t1, 14566554180833181696);
     }
     fun test5() {
         let _t0 = vector[42u256];
         let _t1 = vector[42u256];
         inc_vec_new(&mut _t0, 0);
         inc_vec_old(&mut _t1, 0);
-        if (!(_t0 == _t1)) abort 14566554180833181696;
+        assert!(_t0 == _t1, 14566554180833181696);
     }
     fun test6() {
         let _t3 = Coin{_0: 42u256};
@@ -131,7 +131,7 @@ module 0x42::test {
         0x1::vector::push_back<Coin>(&mut _t8, _t7);
         let _t11 = inc_vec_coin_new(_t4, 0);
         let _t14 = inc_vec_coin_old(_t8, 0);
-        if (!(_t11 == _t14)) abort 14566554180833181696;
+        assert!(_t11 == _t14, 14566554180833181696);
     }
     fun test7() {
         let _t4 = Wrapper<Coin>{_0: Coin{_0: 42u256}};
@@ -142,7 +142,7 @@ module 0x42::test {
         0x1::vector::push_back<Wrapper<Coin>>(&mut _t10, _t9);
         let _t13 = inc_vec_wrapped_coin_new(_t5, 0);
         let _t16 = inc_vec_wrapped_coin_old(_t10, 0);
-        if (!(_t13 == _t16)) abort 14566554180833181696;
+        assert!(_t13 == _t16, 14566554180833181696);
     }
     fun test8() {
         let _t0 = 0;
@@ -151,7 +151,7 @@ module 0x42::test {
         let _t7 = x_plusplus(&mut _t0);
         let _t2 = 0x1::vector::borrow_mut<u256>(_t5, _t7);
         *_t2 = *_t2 + 1u256;
-        if (!(_t1 == vector[1u256, 1u256])) abort 14566554180833181696;
+        assert!(_t1 == vector[1u256, 1u256], 14566554180833181696);
     }
     fun x_plusplus(p0: &mut u64): u64 {
         let _t2 = *p0;

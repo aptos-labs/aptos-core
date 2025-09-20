@@ -26,7 +26,7 @@ script {
     use 0x42::Test;
     fun main() {
         let _t0 = Test::new();
-        if (!(Test::len(&_t0) == 10)) abort 70002;
+        assert!(Test::len(&_t0) == 10, 70002);
         let _t1 = 0;
         'l0: loop {
             loop {

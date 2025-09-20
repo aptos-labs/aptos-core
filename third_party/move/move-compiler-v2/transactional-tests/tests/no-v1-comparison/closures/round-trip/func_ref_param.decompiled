@@ -10,7 +10,7 @@ module 0x77::m {
         let _t1 = 1;
         let _t5 = &_t1;
         let Func{_0: _t7} = _t0;
-        if (!_t7(_t5)) abort 14566554180833181696;
+        assert!(_t7(_t5), 14566554180833181696);
     }
     fun lambda__1__test(p0: &u64): bool {
         *p0 > 0

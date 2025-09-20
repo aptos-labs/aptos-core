@@ -155,12 +155,12 @@ module 0xcafe::ConstantFailure {
         let _t8 = sum_u64(&_t3);
         let _t9 = sum_u128(&_t4);
         let _t10 = sum_u256(&_t5);
-        if (!(_t236 != 0u8)) abort 1;
-        if (!(_t6 != 0u16)) abort 1;
-        if (!(_t7 != 0u32)) abort 1;
-        if (!(_t8 != 0)) abort 1;
-        if (!(_t9 != 0u128)) abort 1;
-        if (!(_t10 != 0u256)) abort 1;
+        assert!(_t236 != 0u8, 1);
+        assert!(_t6 != 0u16, 1);
+        assert!(_t7 != 0u32, 1);
+        assert!(_t8 != 0, 1);
+        assert!(_t9 != 0u128, 1);
+        assert!(_t10 != 0u256, 1);
     }
     fun sum_u8(p0: &vector<u8>): u8 {
         let _t1 = 0u8;

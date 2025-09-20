@@ -47,7 +47,7 @@ module 0x42::TestFeatures {
         let _t3 = Features{features: vector[1u8, 2u8, 3u8]};
         move_to<Features>(_t1, _t3);
         enable_feature_flags(vector[2]);
-        if (!contains(&borrow_global<Features>(@0xbeef).features, 2)) abort 0;
+        assert!(contains(&borrow_global<Features>(@0xbeef).features, 2), 0);
         if (contains(&borrow_global<Features>(@0xbeef).features, 1)) abort 1;
         if (contains(&borrow_global<Features>(@0xbeef).features, 3)) abort 2;
     }

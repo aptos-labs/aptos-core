@@ -52,7 +52,7 @@ pub struct Disassemble {
     #[clap(flatten)]
     pub command: BytecodeCommand,
     /// (Optional) Disassembler version to use
-    #[arg(long, value_enum, default_value = "v1")]
+    #[arg(long, value_enum, default_value = "v2")]
     pub disassembler_version: DisassemblerVersion,
 }
 
@@ -66,7 +66,7 @@ pub struct Decompile {
     #[clap(flatten)]
     pub command: BytecodeCommand,
     /// (Optional) Decompiler version to use
-    #[arg(long, value_enum, default_value = "v1")]
+    #[arg(long, value_enum, default_value = "v2")]
     pub decompiler_version: DecompilerVersion,
 }
 

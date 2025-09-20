@@ -202,65 +202,90 @@ impl<'a> Sourcifier<'a> {
     }
 
     fn print_access_specifiers(&self, tctx: &TypeDisplayContext, fun: &FunctionEnv) {
-        if let Some(specs) = fun.get_access_specifiers() {
-            self.writer.indent();
-            for spec in specs {
-                emitln!(self.writer);
-                if spec.negated {
-                    emit!(self.writer, "!")
-                }
-                match &spec.kind {
-                    AccessSpecifierKind::Reads => emit!(self.writer, "reads "),
-                    AccessSpecifierKind::Writes => emit!(self.writer, "writes "),
-                    AccessSpecifierKind::LegacyAcquires => emit!(self.writer, "acquires "),
-                }
-                match &spec.resource.1 {
-                    ResourceSpecifier::Any => emit!(self.writer, "*"),
-                    ResourceSpecifier::DeclaredAtAddress(addr) => {
-                        emit!(
-                            self.writer,
-                            "0x{}::*::*",
-                            addr.expect_numerical().short_str_lossless()
-                        )
-                    },
-                    ResourceSpecifier::DeclaredInModule(mid) => {
-                        emit!(
-                            self.writer,
-                            "{}::*",
-                            self.env().get_module(*mid).get_full_name_str()
-                        )
-                    },
-                    ResourceSpecifier::Resource(sid) => {
-                        emit!(self.writer, "{}", sid.to_type().display(tctx))
-                    },
-                }
-                match &spec.address.1 {
-                    AddressSpecifier::Any => {},
-                    AddressSpecifier::Address(addr) => {
-                        emit!(
-                            self.writer,
-                            "(0x{})",
-                            addr.expect_numerical().short_str_lossless()
-                        )
-                    },
-                    AddressSpecifier::Parameter(sym) => {
-                        emit!(self.writer, "({})", self.sym(*sym))
-                    },
-                    AddressSpecifier::Call(fun, sym) => {
-                        let func_env = self.env().get_function(fun.to_qualified_id());
-                        emit!(
-                            self.writer,
-                            "({}{}({}))",
-                            self.module_qualifier(tctx, func_env.module_env.get_id()),
-                            func_env.get_name_str(),
-                            self.sym(*sym)
-                        )
-                    },
-                }
-            }
-            self.writer.unindent();
-            emitln!(self.writer)
+        let Some(specs) = fun.get_access_specifiers() else {
+            return;
+        };
+        self.writer.indent();
+        let mut acc_spec_map = BTreeMap::new();
+
+        // gather resources together under each spec kind
+        for spec_kind in [
+            "!reads",
+            "!writes",
+            "!acquires",
+            "reads",
+            "writes",
+            "acquires",
+        ] {
+            acc_spec_map.insert(spec_kind.to_string(), BTreeSet::new());
         }
+
+        for spec in specs {
+            let resource = match &spec.resource.1 {
+                ResourceSpecifier::Any => "*".to_string(),
+                ResourceSpecifier::DeclaredAtAddress(addr) => {
+                    format!("0x{}::*::*", addr.expect_numerical().short_str_lossless())
+                },
+                ResourceSpecifier::DeclaredInModule(mid) => {
+                    format!("{}::*", self.env().get_module(*mid).get_full_name_str())
+                },
+                ResourceSpecifier::Resource(sid) => {
+                    format!("{}", sid.to_type().display(tctx))
+                },
+            };
+
+            let address = match &spec.address.1 {
+                AddressSpecifier::Any => "".to_string(),
+                AddressSpecifier::Address(addr) => {
+                    format!("(0x{})", addr.expect_numerical().short_str_lossless())
+                },
+                AddressSpecifier::Parameter(sym) => {
+                    format!("({})", self.sym(*sym))
+                },
+                AddressSpecifier::Call(fun, sym) => {
+                    let func_env = self.env().get_function(fun.to_qualified_id());
+                    format!(
+                        "({}{}({}))",
+                        self.module_qualifier(tctx, func_env.module_env.get_id()),
+                        func_env.get_name_str(),
+                        self.sym(*sym)
+                    )
+                },
+            };
+
+            let spec_kind = match spec.kind {
+                AccessSpecifierKind::Reads => "reads",
+                AccessSpecifierKind::Writes => "writes",
+                AccessSpecifierKind::LegacyAcquires => "acquires",
+            };
+
+            let spec_key = if spec.negated {
+                format!("!{}", spec_kind)
+            } else {
+                spec_kind.to_string()
+            };
+
+            acc_spec_map
+                .get_mut(&spec_key)
+                .expect("spec kind key expected")
+                .insert(format!("{}{}", resource, address));
+        }
+
+        // print the spec kind and associated resources one by one
+        for (spec_kind, resources) in &acc_spec_map {
+            if !resources.is_empty() {
+                emitln!(self.writer);
+                self.print_list(
+                    &format!("{} ", spec_kind),
+                    ", ",
+                    "",
+                    resources.iter(),
+                    |resource| emit!(self.writer, "{}", resource),
+                );
+            }
+        }
+        self.writer.unindent();
+        emitln!(self.writer)
     }
 
     pub fn print_value(&self, value: &Value, ty: Option<&Type>) {
@@ -738,6 +763,10 @@ impl<'a> ExpSourcifier<'a> {
                 }
             },
             IfElse(_, cond, if_exp, else_exp) => {
+                // Special case: the if-else can be printed as an `assert!`
+                if self.print_assert(context_prio, cond, if_exp, else_exp) {
+                    return;
+                }
                 self.parenthesize(context_prio, Prio::General, || {
                     emit!(self.wr(), "if (");
                     self.print_exp(Prio::General, false, cond);
@@ -1209,6 +1238,31 @@ impl<'a> ExpSourcifier<'a> {
                 emitln!(self.wr(), "/* unsupported spec operation {:?} */", oper)
             },
         }
+    }
+
+    fn print_assert(&self, context_prio: Priority, cond_: &Exp, then_: &Exp, else_: &Exp) -> bool {
+        // Match the pattern `if (!cond) abort(code) else ()`
+        let inner_cond = match cond_.as_ref() {
+            ExpData::Call(_, Operation::Not, args) if args.len() == 1 => args[0].clone(),
+            _ => return false,
+        };
+        let abort_code = match then_.as_ref() {
+            ExpData::Call(_, Operation::Abort, args) if args.len() == 1 => args[0].clone(),
+            _ => return false,
+        };
+        if !else_.is_unit_exp() {
+            return false;
+        }
+
+        // All matched, print as `assert!(cond, code)`
+        self.parenthesize(context_prio, Prio::General, || {
+            emit!(self.wr(), "assert!(");
+            self.print_exp(Prio::General, false, &inner_cond);
+            emit!(self.wr(), ", ");
+            self.print_exp(Prio::General, false, &abort_code);
+            emit!(self.wr(), ")");
+        });
+        true
     }
 
     fn print_constructor<I>(

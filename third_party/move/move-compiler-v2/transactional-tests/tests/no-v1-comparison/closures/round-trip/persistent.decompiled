@@ -11,7 +11,7 @@ module 0x66::test {
     {
         let _t2 = signer::address_of(p0);
         let Work{_0: _t4} = move_from<Work>(_t2);
-        if (!(_t4() == 3)) abort 14566554180833181696;
+        assert!(_t4() == 3, 14566554180833181696);
     }
     #[persistent]
     fun should_be_storable(): u64 {

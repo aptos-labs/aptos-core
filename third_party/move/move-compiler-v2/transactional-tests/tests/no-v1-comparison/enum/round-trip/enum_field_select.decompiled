@@ -12,7 +12,7 @@ module 0x42::m {
         }
     }
     fun get_y(p0: &Data): bool {
-        if (!(p0 is V2)) abort 33;
+        assert!(p0 is V2, 33);
         *&p0.y
     }
     fun test_get_x_v1(): u64 {

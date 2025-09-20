@@ -28,6 +28,6 @@ module 0xc0ffee::m {
 script {
     use 0xc0ffee::m;
     fun main(p0: &signer) {
-        if (!m::compare(|arg0| m::identity<u64>(arg0), p0)) abort 14566554180833181696;
+        assert!(m::compare(|arg0| m::identity<u64>(arg0), p0), 14566554180833181696);
     }
 }

@@ -22,8 +22,8 @@ module 0xc0ffee::smallest_multiple {
         gcd(p1, _t9)
     }
     public fun test_smallest_multiple() {
-        if (!(smallest_multiple(10) == 2520)) abort 0;
-        if (!(smallest_multiple(20) == 232792560)) abort 1;
+        assert!(smallest_multiple(10) == 2520, 0);
+        assert!(smallest_multiple(20) == 232792560, 1);
     }
 }
 

@@ -31,34 +31,34 @@ module 0x42::freeze_mut_ref {
     }
     fun test_1() {
         let _t0 = 0;
-        if (!(*freeze(&mut _t0) == 0)) abort 0;
+        assert!(*freeze(&mut _t0) == 0, 0);
         let _t1 = G{f: 3};
-        if (!(*&t1(&mut _t1).f == 3)) abort 1;
+        assert!(*&t1(&mut _t1).f == 3, 1);
     }
     fun test_2() {
         let _t0 = G{f: 50};
         let (_t6,_t7,_t8) = t5(&mut _t0);
-        if (!(_t6 == 2)) abort 0;
-        if (!(_t7 == 2)) abort 1;
-        if (!(_t8 == 2)) abort 2;
+        assert!(_t6 == 2, 0);
+        assert!(_t7 == 2, 1);
+        assert!(_t8 == 2, 2);
     }
     fun test_3() {
         let _t0 = vector[0];
-        if (!(*borrow_mut<u64>(&mut _t0) == 0)) abort 0;
+        assert!(*borrow_mut<u64>(&mut _t0) == 0, 0);
     }
     fun test_5() {
         let _t0 = 3;
-        if (!(*borrow_mut2<u64>(&mut _t0) == 3)) abort 0;
+        assert!(*borrow_mut2<u64>(&mut _t0) == 3, 0);
     }
     fun test_6() {
         let _t0 = G{f: 2};
         let _t1 = G{f: 3};
-        if (!(*&(&_t0).f == 2)) abort 0;
+        assert!(*&(&_t0).f == 2, 0);
     }
     fun test_7() {
         let _t0 = G{f: 2};
         let _t1 = G{f: 3};
-        if (!(*&(&_t0).f == 2)) abort 0;
+        assert!(*&(&_t0).f == 2, 0);
     }
 }
 

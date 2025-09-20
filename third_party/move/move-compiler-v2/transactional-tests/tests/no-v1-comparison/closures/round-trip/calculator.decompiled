@@ -89,7 +89,7 @@ module 0x66::calculator {
     {
         let _t3 = signer::address_of(p0);
         let _t1 = borrow_global<State>(_t3);
-        if (!(_t1 is Value)) abort 1;
+        assert!(_t1 is Value, 1);
         *&_t1._0
     }
 }

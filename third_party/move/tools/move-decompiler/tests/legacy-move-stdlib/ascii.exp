@@ -15,7 +15,7 @@ module 0x1::ascii {
     }
     public fun string(bytes: vector<u8>): String {
         let _t1 = try_string(bytes);
-        if (!option::is_some<String>(&_t1)) abort 65536;
+        assert!(option::is_some<String>(&_t1), 65536);
         option::destroy_some<String>(_t1)
     }
     public fun as_bytes(string: &String): &vector<u8> {
@@ -53,7 +53,7 @@ module 0x1::ascii {
         option::some<String>(String{bytes: bytes})
     }
     public fun char(byte: u8): Char {
-        if (!is_valid_char(byte)) abort 65536;
+        assert!(is_valid_char(byte), 65536);
         Char{byte: byte}
     }
     public fun is_valid_char(b: u8): bool {

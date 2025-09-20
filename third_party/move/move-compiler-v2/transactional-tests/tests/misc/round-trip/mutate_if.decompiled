@@ -24,10 +24,10 @@ module 0xc0ffee::m {
     fun test() {
         let _t0 = S{x: true, y: 1, z: 3};
         let _t1 = foo1(_t0);
-        if (!(_t0 == _t1)) abort 0;
+        assert!(_t0 == _t1, 0);
         _t0 = S{x: false, y: 4, z: 5};
         _t1 = foo2(_t0);
-        if (!(_t0 == _t1)) abort 1;
+        assert!(_t0 == _t1, 1);
     }
 }
 

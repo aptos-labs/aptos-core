@@ -3,6 +3,6 @@
 //# run
 script {
     fun main() {
-        if (!(0 == 0)) abort 42;
+        assert!(0 == 0, 42);
     }
 }

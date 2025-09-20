@@ -8,12 +8,12 @@ module 0x1::bit_vector {
     }
     public fun is_index_set(self: &BitVector, bit_index: u64): bool {
         let _t5 = 0x1::vector::length<bool>(&self.bit_field);
-        if (!(bit_index < _t5)) abort 131072;
+        assert!(bit_index < _t5, 131072);
         *0x1::vector::borrow<bool>(&self.bit_field, bit_index)
     }
     public fun longest_set_sequence_starting_at(self: &BitVector, start_index: u64): u64 {
         let _t6 = *&self.length;
-        if (!(start_index < _t6)) abort 131072;
+        assert!(start_index < _t6, 131072);
         let _t2 = start_index;
         loop {
             let _t12 = *&self.length;
@@ -25,8 +25,8 @@ module 0x1::bit_vector {
         _t2 - start_index
     }
     public fun new(length: u64): BitVector {
-        if (!(length > 0)) abort 131073;
-        if (!(length < 1024)) abort 131073;
+        assert!(length > 0, 131073);
+        assert!(length < 1024, 131073);
         let _t1 = 0;
         let _t2 = 0x1::vector::empty<bool>();
         while (_t1 < length) {
@@ -37,7 +37,7 @@ module 0x1::bit_vector {
     }
     public fun set(self: &mut BitVector, bit_index: u64) {
         let _t7 = 0x1::vector::length<bool>(&self.bit_field);
-        if (!(bit_index < _t7)) abort 131072;
+        assert!(bit_index < _t7, 131072);
         let _t3 = 0x1::vector::borrow_mut<bool>(&mut self.bit_field, bit_index);
         *_t3 = true;
     }
@@ -81,7 +81,7 @@ module 0x1::bit_vector {
     }
     public fun unset(self: &mut BitVector, bit_index: u64) {
         let _t7 = 0x1::vector::length<bool>(&self.bit_field);
-        if (!(bit_index < _t7)) abort 131072;
+        assert!(bit_index < _t7, 131072);
         let _t3 = 0x1::vector::borrow_mut<bool>(&mut self.bit_field, bit_index);
         *_t3 = false;
     }

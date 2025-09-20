@@ -3,7 +3,7 @@
 //# publish
 module 0x32::m {
     public fun main() {
-        if (!(0 + 1 == 1)) abort 42;
+        assert!(0 + 1 == 1, 42);
     }
 }
 

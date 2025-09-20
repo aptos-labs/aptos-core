@@ -10,7 +10,7 @@ module 0x42::M {
     {
         let _t3 = R{f: 1};
         move_to<R>(p0, _t3);
-        if (!(*&borrow_global<R>(@0x42).f == 1)) abort 1;
+        assert!(*&borrow_global<R>(@0x42).f == 1, 1);
     }
 }
 

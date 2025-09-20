@@ -37,7 +37,7 @@ module 0x1::vector {
         range_with_step(start, end, 1)
     }
     public fun range_with_step(start: u64, end: u64, step: u64): vector<u64> {
-        if (!(step > 0)) abort 131075;
+        assert!(step > 0, 131075);
         let _t3 = empty<u64>();
         while (start < end) {
             push_back<u64>(&mut _t3, start);
@@ -65,7 +65,7 @@ module 0x1::vector {
     }
     public fun insert<Element>(self: &mut vector<Element>, i: u64, e: Element) {
         let _t3 = length<Element>(freeze(self));
-        if (!(i <= _t3)) abort 131072;
+        assert!(i <= _t3, 131072);
         push_back<Element>(self, e);
         while (i < _t3) {
             swap<Element>(self, i, _t3);
@@ -99,7 +99,7 @@ module 0x1::vector {
         _t3
     }
     public fun reverse_slice<Element>(self: &mut vector<Element>, left: u64, right: u64) {
-        if (!(left <= right)) abort 131073;
+        assert!(left <= right, 131073);
         let _t8 = left == right;
         'l0: loop {
             if (!_t8) {
@@ -136,7 +136,7 @@ module 0x1::vector {
             let _t10 = length<Element>(self);
             _t3 = end <= _t10
         } else _t3 = false;
-        if (!_t3) abort 131076;
+        assert!(_t3, 131076);
         let _t4 = empty<Element>();
         while (start < end) {
             let _t17 = &mut _t4;
@@ -160,7 +160,7 @@ module 0x1::vector {
     }
     public fun trim_reverse<Element>(self: &mut vector<Element>, new_len: u64): vector<Element> {
         let _t2 = length<Element>(freeze(self));
-        if (!(new_len <= _t2)) abort 131072;
+        assert!(new_len <= _t2, 131072);
         let _t3 = empty<Element>();
         while (new_len < _t2) {
             let _t14 = &mut _t3;

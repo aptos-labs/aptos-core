@@ -786,13 +786,13 @@ module 0x1::m {
     }
     public fun is_index_set(self: &BitVector, bit_index: u64): bool {
         let _t5 = 0x1::vector::length<bool>(&self.bit_field);
-        if (!(bit_index < _t5)) abort 131072;
+        assert!(bit_index < _t5, 131072);
         let _t8 = &self.bit_field;
         *0x1::vector::borrow<bool>(_t8, bit_index)
     }
     public fun set(self: &mut BitVector, bit_index: u64) {
         let _t7 = 0x1::vector::length<bool>(&self.bit_field);
-        if (!(bit_index < _t7)) abort 131072;
+        assert!(bit_index < _t7, 131072);
         let _t10 = &mut self.bit_field;
         let _t3 = 0x1::vector::borrow_mut<bool>(_t10, bit_index);
         *_t3 = true;
@@ -841,7 +841,7 @@ module 0x1::m {
     }
     public fun unset(self: &mut BitVector, bit_index: u64) {
         let _t7 = 0x1::vector::length<bool>(&self.bit_field);
-        if (!(bit_index < _t7)) abort 131072;
+        assert!(bit_index < _t7, 131072);
         let _t10 = &mut self.bit_field;
         let _t3 = 0x1::vector::borrow_mut<bool>(_t10, bit_index);
         *_t3 = false;

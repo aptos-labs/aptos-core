@@ -32,7 +32,7 @@ module 0x42::simple_map {
         0x1::vector::push_back<Element<u64, u64>>(_t9, _t0);
         0x1::vector::push_back<Element<u64, u64>>(_t9, _t0);
         let _t1 = SimpleMap<u64,u64>{data: _t8};
-        if (!(keys<u64,u64>(&_t1) == vector[1, 1, 1])) abort 33;
+        assert!(keys<u64,u64>(&_t1) == vector[1, 1, 1], 33);
     }
 }
 

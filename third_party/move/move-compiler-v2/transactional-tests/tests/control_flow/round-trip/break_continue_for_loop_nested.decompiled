@@ -36,6 +36,6 @@ script {
             abort _t4
         };
         _t4 = 3 * _t0 + _t1;
-        if (!(_t4 == 160)) abort _t4;
+        assert!(_t4 == 160, _t4);
     }
 }

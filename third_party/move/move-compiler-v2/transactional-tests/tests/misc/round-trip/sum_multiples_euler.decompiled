@@ -16,8 +16,8 @@ module 0xc0ffee::sum_multiples {
         _t1
     }
     public fun test_sum_multiples() {
-        if (!(sum_multiples_3_or_5(10) == 23)) abort 0;
-        if (!(sum_multiples_3_or_5(1000) == 233168)) abort 1;
+        assert!(sum_multiples_3_or_5(10) == 23, 0);
+        assert!(sum_multiples_3_or_5(1000) == 233168, 1);
     }
 }
 
