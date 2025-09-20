@@ -695,7 +695,10 @@ impl BlockTransactionPayload {
 
                 // TODO: verify the block gas limit?
             },
-            Payload::OptQuorumStore(opt_qs_payload) => {
+            Payload::OptQuorumStore(_) | Payload::MoonBlock(_) | Payload::EarthBlock(_) => {
+                let opt_qs_payload = ordered_block_payload
+                    .as_opt_qs_payload()
+                    .expect("Should have OptQuorumStore payload");
                 // Verify the batches in the requested block
                 self.verify_batches(opt_qs_payload.proof_with_data())?;
 

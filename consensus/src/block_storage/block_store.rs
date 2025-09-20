@@ -32,7 +32,12 @@ use aptos_consensus_types::{
     timeout_2chain::TwoChainTimeoutCertificate,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
-use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
+use aptos_crypto::{
+    hash::{
+        ACCUMULATOR_PLACEHOLDER_HASH, MOON_BLOCK_HAS_EARTH_QC_HASH, MOON_BLOCK_NO_EARTH_QC_HASH,
+    },
+    HashValue,
+};
 use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
@@ -202,6 +207,8 @@ impl BlockStore {
         assert!(
             // decoupled execution allows dummy executed_state_id
             root_qc.certified_block().executed_state_id() == *ACCUMULATOR_PLACEHOLDER_HASH
+                || root_qc.certified_block().executed_state_id() == *MOON_BLOCK_NO_EARTH_QC_HASH
+                || root_qc.certified_block().executed_state_id() == *MOON_BLOCK_HAS_EARTH_QC_HASH
                 || root_qc.certified_block().executed_state_id() == root_metadata.accu_hash,
             "root qc state id {} doesn't match committed trees {}",
             root_qc.certified_block().executed_state_id(),

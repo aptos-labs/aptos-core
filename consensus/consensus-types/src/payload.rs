@@ -290,6 +290,19 @@ pub struct OptQuorumStorePayloadV1 {
 }
 
 impl OptQuorumStorePayloadV1 {
+    pub fn new_empty() -> Self {
+        Self {
+            inline_batches: InlineBatches(Vec::new()),
+            opt_batches: BatchPointer {
+                batch_summary: Vec::new(),
+            },
+            proofs: BatchPointer {
+                batch_summary: Vec::new(),
+            },
+            execution_limits: PayloadExecutionLimit::None,
+        }
+    }
+
     pub fn get_all_batch_infos(self) -> Vec<BatchInfo> {
         let Self {
             inline_batches,
