@@ -138,7 +138,6 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     time_service: Arc<dyn TimeService>,
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
-    timeout_sender: aptos_channels::Sender<Round>,
     quorum_store_enabled: bool,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     execution_client: Arc<dyn TExecutionClient>,
@@ -188,7 +187,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         time_service: Arc<dyn TimeService>,
         self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
-        timeout_sender: aptos_channels::Sender<Round>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         execution_client: Arc<dyn TExecutionClient>,
         storage: Arc<dyn PersistentLivenessStorage>,
@@ -217,7 +215,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             time_service,
             self_sender,
             network_sender,
-            timeout_sender,
             // This default value is updated at epoch start
             quorum_store_enabled: false,
             quorum_store_to_mempool_sender,
@@ -837,9 +834,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Ok(()) => (),
         }
 
+        let (timeout_sender, timeout_receiver) =
+        aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
+
         info!(epoch = epoch, "Create RoundState");
         let round_state =
-            self.create_round_state(self.time_service.clone(), self.timeout_sender.clone());
+            self.create_round_state(self.time_service.clone(), timeout_sender);
 
         info!(epoch = epoch, "Create ProposerElection");
         let proposer_election =
@@ -987,6 +987,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             round_manager_rx,
             buffered_proposal_rx,
             opt_proposal_loopback_rx,
+            timeout_receiver,
             close_rx,
         ));
 
@@ -1859,22 +1860,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
-    fn process_local_timeout(&mut self, round: u64) {
-        let Some(sender) = self.round_manager_tx.as_mut() else {
-            warn!(
-                "Received local timeout for round {} without Round Manager",
-                round
-            );
-            return;
-        };
-
-        let peer_id = self.author;
-        let event = VerifiedEvent::LocalTimeout(round);
-        if let Err(e) = sender.push((peer_id, discriminant(&event)), (peer_id, event)) {
-            error!("Failed to send event to round manager {:?}", e);
-        }
-    }
-
     async fn await_reconfig_notification(&mut self) {
         let reconfig_notification = self
             .reconfig_events
@@ -1887,7 +1872,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     pub async fn start(
         mut self,
-        mut round_timeout_sender_rx: aptos_channels::Receiver<Round>,
         mut network_receivers: NetworkReceivers,
     ) {
         // initial start of the processor
@@ -1911,10 +1895,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     if let Err(e) = self.process_rpc_request(peer, request) {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     });
-                },
-                round = round_timeout_sender_rx.select_next_some() => {
-                    monitor!("epoch_manager_process_round_timeout",
-                    self.process_local_timeout(round));
                 },
             }
             // Continually capture the time of consensus process to ensure that clock skew between

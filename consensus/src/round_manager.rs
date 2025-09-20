@@ -242,8 +242,6 @@ pub enum VerifiedEvent {
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
-    // local messages
-    LocalTimeout(Round),
     // Shutdown the NetworkListener
     Shutdown(TokioOneshot::Sender<()>),
     OptProposalMsg(Box<OptProposalMsg>),
@@ -2034,6 +2032,7 @@ impl RoundManager {
         >,
         mut buffered_proposal_rx: aptos_channel::Receiver<Author, VerifiedEvent>,
         mut opt_proposal_loopback_rx: aptos_channels::UnboundedReceiver<OptBlockData>,
+        mut timeout_receiver: aptos_channels::Receiver<Round>,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         info!(epoch = self.epoch_state.epoch, "RoundManager started");
@@ -2110,6 +2109,20 @@ impl RoundManager {
                         }
                     }
                 },
+                timeout_round = timeout_receiver.select_next_some() => {
+                    let result = monitor!(
+                        "process_local_timeout",
+                        self.process_local_timeout(timeout_round).await
+                    );
+                    let round_state = self.round_state();
+                    match result {
+                        Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
+                        Err(e) => {
+                            counters::ERROR_COUNT.inc();
+                            warn!(kind = error_kind(&e), RoundStateLogSchema::new(round_state), "Error: {:#}", e);
+                        }
+                    }
+                },
                 Some((result, block, start_time)) = self.futures.next() => {
                     let elapsed = start_time.elapsed().as_secs_f64();
                     let id = block.id();
@@ -2142,11 +2155,7 @@ impl RoundManager {
                                 "process_sync_info",
                                 self.process_sync_info_msg(*sync_info, peer_id).await
                             )
-                        }
-                        VerifiedEvent::LocalTimeout(round) => monitor!(
-                            "process_local_timeout",
-                            self.process_local_timeout(round).await
-                        ),
+                        },
                         unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
                     }
                     .with_context(|| format!("from peer {}", peer_id));
