@@ -214,7 +214,6 @@ impl LazyLoadedFunction {
             .runtime_environment()
             .vm_config()
             .ty_builder;
-
         mask.extract(fun.param_tys(), true)
             .into_iter()
             .map(|ty| {
@@ -223,6 +222,7 @@ impl LazyLoadedFunction {
                         gas_meter,
                         traversal_context,
                         ty,
+                        true,
                     )?
                 } else {
                     let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
@@ -230,6 +230,7 @@ impl LazyLoadedFunction {
                         gas_meter,
                         traversal_context,
                         &ty,
+                        true,
                     )?
                 };
 
