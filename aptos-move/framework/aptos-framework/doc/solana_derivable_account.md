@@ -27,7 +27,6 @@ Nonce: <aptos_txn_digest>
 -  [Constants](#@Constants_0)
 -  [Function `deserialize_abstract_public_key`](#0x1_solana_derivable_account_deserialize_abstract_public_key)
 -  [Function `deserialize_abstract_signature`](#0x1_solana_derivable_account_deserialize_abstract_signature)
--  [Function `construct_message`](#0x1_solana_derivable_account_construct_message)
 -  [Function `to_public_key_bytes`](#0x1_solana_derivable_account_to_public_key_bytes)
 -  [Function `authenticate_auth_data`](#0x1_solana_derivable_account_authenticate_auth_data)
 -  [Function `authenticate`](#0x1_solana_derivable_account_authenticate)
@@ -247,52 +246,6 @@ Returns a tuple of the signature type and the signature.
 
 </details>
 
-<a id="0x1_solana_derivable_account_construct_message"></a>
-
-## Function `construct_message`
-
-
-
-<pre><code><b>fun</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_construct_message">construct_message</a>(base58_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, domain: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, digest_utf8: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_construct_message">construct_message</a>(
-    base58_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    domain: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    digest_utf8: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <b>let</b> message = &<b>mut</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    message.append(*domain);
-    message.append(b" wants you <b>to</b> sign in <b>with</b> your Solana <a href="account.md#0x1_account">account</a>:\n");
-    message.append(*base58_public_key);
-    message.append(b"\n\nPlease confirm you explicitly initiated this request from ");
-    message.append(*domain);
-    message.append(b".");
-    message.append(b" You are approving <b>to</b> execute transaction ");
-    message.append(*entry_function_name);
-    message.append(b" on Aptos blockchain");
-    <b>let</b> network_name = network_name();
-    message.append(b" (");
-    message.append(network_name);
-    message.append(b")");
-    message.append(b".");
-    message.append(b"\n\nNonce: ");
-    message.append(*digest_utf8);
-    *message
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_solana_derivable_account_to_public_key_bytes"></a>
 
 ## Function `to_public_key_bytes`
@@ -327,26 +280,26 @@ Returns a tuple of the signature type and the signature.
             <b>let</b> new_carry = current * base + carry;
             bytes[j] = ((new_carry & 0xff) <b>as</b> u8);
             carry = new_carry &gt;&gt; 8;
-            j = j + 1;
+            j += 1;
         };
 
         // Add <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> remaining carry <b>as</b> new bytes
         <b>while</b> (carry &gt; 0) {
             bytes.push_back((carry & 0xff) <b>as</b> u8);
-            carry = carry &gt;&gt; 8;
+            carry &gt;&gt;= 8;
         };
 
-        i = i + 1;
+        i += 1;
     };
 
     // Handle leading zeros (1's in Base58)
     <b>let</b> i = 0;
     <b>while</b> (i &lt; base58_public_key.length() && base58_public_key[i] == 49) { // '1' is 49 in ASCII
         bytes.push_back(0);
-        i = i + 1;
+        i += 1;
     };
 
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_reverse">vector::reverse</a>(&<b>mut</b> bytes);
+    bytes.reverse();
     <b>assert</b>!(bytes.length() == <a href="solana_derivable_account.md#0x1_solana_derivable_account_PUBLIC_KEY_NUM_BYTES">PUBLIC_KEY_NUM_BYTES</a>, <a href="solana_derivable_account.md#0x1_solana_derivable_account_EINVALID_PUBLIC_KEY_LENGTH">EINVALID_PUBLIC_KEY_LENGTH</a>);
     bytes
 }
@@ -385,7 +338,7 @@ Returns a tuple of the signature type and the signature.
     <b>let</b> abstract_signature = <a href="solana_derivable_account.md#0x1_solana_derivable_account_deserialize_abstract_signature">deserialize_abstract_signature</a>(aa_auth_data.derivable_abstract_signature());
     match (abstract_signature) {
         SIWSAbstractSignature::MessageV1 { signature: signature_bytes } =&gt; {
-            <b>let</b> message = <a href="solana_derivable_account.md#0x1_solana_derivable_account_construct_message">construct_message</a>(&base58_public_key, &domain, entry_function_name, digest_utf8);
+            <b>let</b> message = construct_message(&b"Solana", &base58_public_key, &domain, entry_function_name, digest_utf8);
 
             <b>let</b> signature = new_signature_from_bytes(signature_bytes);
             <b>assert</b>!(
