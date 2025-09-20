@@ -1,0 +1,36 @@
+[package]
+name = "aptos-move-linter"
+description = "The Move Linter"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+codespan-reporting = { workspace = true }
+legacy-move-compiler = { workspace = true }
+move-binary-format = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-model = { workspace = true }
+move-stackless-bytecode = { workspace = true }
+num = { workspace = true }
+
+[dev-dependencies]
+datatest-stable = { workspace = true }
+move-prover-test-utils = { workspace = true }
+
+[features]
+default = []
+
+[[test]]
+name = "testsuite"
+harness = false
+
+[lib]
+doctest = false
