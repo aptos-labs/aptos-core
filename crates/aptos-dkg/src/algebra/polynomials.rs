@@ -9,10 +9,20 @@ use crate::{
     pvss::{input_secret::InputSecret, ThresholdConfig},
     utils::{is_power_of_two, random::random_scalars},
 };
+use ark_ff::Field;
 use blstrs::Scalar;
-use ff::Field;
+use ff::Field as FieldOld;
 use more_asserts::debug_assert_le;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
+
+pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
+    let degree = coeffs.len() - 1;
+    for i in 0..degree {
+        coeffs[i] = coeffs[i + 1].mul(F::from((i + 1) as u64));
+    }
+
+    coeffs.truncate(degree);
+}
 
 /// Returns $\[1, \tau, \tau^2, \tau^3, \ldots, \tau^{n-1}\]$.
 pub fn get_powers_of_tau(tau: &Scalar, n: usize) -> Vec<Scalar> {

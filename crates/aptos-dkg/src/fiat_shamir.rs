@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! For what it's worth, I don't understand why the `merlin` library wants the user to first define
-//! a trait with their 'append' operations and them implement that trait on `merlin::Transcript`.
+//! a trait with their 'append' operations and then implement that trait on `merlin::Transcript`.
 //! I also don't understand how that doesn't break the orphan rule in Rust.
 //! I suspect the reason they want the developer to do things these ways is to force them to cleanly
 //! define all the things that are appended to the transcript.
 
 use crate::{
     pvss::{traits::Transcript, ThresholdConfig},
-    range_proof,
+    range_proofs::dekart_univariate,
     utils::random::random_scalar_from_uniform_bytes,
     SCALAR_NUM_BYTES,
 };
 use aptos_crypto::ValidCryptoMaterial;
-use blstrs::{G1Projective, G2Projective, Scalar};
-use ff::PrimeField;
+use ark_ec::pairing::Pairing;
+use ark_ff::Field;
 use serde::Serialize;
 
 pub const PVSS_DOM_SEP: &[u8; 21] = b"APTOS_SCRAPE_PVSS_DST"; // TODO: Name needs work, but check backwards-compatibility
@@ -31,11 +31,11 @@ pub const PVSS_DOM_SEP: &[u8; 21] = b"APTOS_SCRAPE_PVSS_DST"; // TODO: Name need
 /// labelled scalar generation across protocols.
 trait ScalarProtocol {
     /// **Auxiliary** function to return random scalars
-    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<Scalar>;
+    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<blstrs::Scalar>;
 }
 
 impl ScalarProtocol for merlin::Transcript {
-    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<Scalar> {
+    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<blstrs::Scalar> {
         let mut buf = vec![0u8; num_scalars * 2 * SCALAR_NUM_BYTES];
         self.challenge_bytes(label, &mut buf);
 
@@ -78,23 +78,26 @@ pub trait PVSS<T: Transcript>: ScalarProtocol {
     fn append_transcript(&mut self, trx: &T);
 
     /// Returns a random dual-code word check polynomial for the SCRAPE LDT test.
-    fn challenge_dual_code_word_polynomial(&mut self, t: usize, n: usize) -> Vec<Scalar>;
+    fn challenge_dual_code_word_polynomial(&mut self, t: usize, n: usize) -> Vec<blstrs::Scalar>;
 
     /// Returns one or more scalars `r` useful for doing linear combinations (e.g., combining
     /// pairings in the SCRAPE multipairing check using coefficients $1, r, r^2, r^3, \ldots$
-    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<Scalar>;
+    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<blstrs::Scalar>;
 }
 
-pub trait RangeProof {
-    fn append_sep(&mut self);
+pub trait RangeProof<E: Pairing> {
+    fn append_sep(&mut self, dst: &[u8]);
 
-    fn append_vk(&mut self, vk: &(&G1Projective, &G2Projective, &G2Projective, &G2Projective));
+    fn append_vk(&mut self, vk: &(&E::G1, &E::G2, &E::G2, &E::G2));
 
-    fn append_public_statement(&mut self, public_statement: &(usize, &range_proof::Commitment));
+    fn append_public_statement(
+        &mut self,
+        public_statement: &(usize, &dekart_univariate::Commitment<E>),
+    );
 
-    fn append_bit_commitments(&mut self, bit_commitments: &(&[G1Projective], &[G2Projective]));
+    fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1Affine], &[E::G2Affine]));
 
-    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<Scalar>;
+    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<E::ScalarField>;
 }
 
 #[allow(non_snake_case)]
@@ -142,7 +145,11 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
         self.append_message(b"transcript", trx.to_bytes().as_slice());
     }
 
-    fn challenge_dual_code_word_polynomial(&mut self, t: usize, n_plus_1: usize) -> Vec<Scalar> {
+    fn challenge_dual_code_word_polynomial(
+        &mut self,
+        t: usize,
+        n_plus_1: usize,
+    ) -> Vec<blstrs::Scalar> {
         let num_coeffs = n_plus_1 - t;
         <merlin::Transcript as ScalarProtocol>::challenge_scalars(
             self,
@@ -151,7 +158,7 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
         )
     }
 
-    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<Scalar> {
+    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<blstrs::Scalar> {
         <merlin::Transcript as ScalarProtocol>::challenge_scalars(
             self,
             b"challenge_linear_combination",
@@ -160,30 +167,53 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
     }
 }
 
+use ark_serialize::CanonicalSerialize;
+
 #[allow(non_snake_case)]
-impl RangeProof for merlin::Transcript {
-    fn append_sep(&mut self) {
-        self.append_message(b"dom-sep", range_proof::DST);
+impl<E: Pairing> RangeProof<E> for merlin::Transcript {
+    fn append_sep(&mut self, dst: &[u8]) {
+        self.append_message(b"dom-sep", dst);
     }
 
-    fn append_vk(&mut self, vk: &(&G1Projective, &G2Projective, &G2Projective, &G2Projective)) {
-        let vk_bytes = bcs::to_bytes(vk).expect("vk serialization should succeed");
+    fn append_vk(&mut self, vk: &(&E::G1, &E::G2, &E::G2, &E::G2)) {
+        let mut vk_bytes = Vec::new();
+        vk.0.serialize_compressed(&mut vk_bytes) // TODO: change this
+            .expect("vk0 serialization should succeed");
+        vk.1.serialize_compressed(&mut vk_bytes)
+            .expect("vk1 serialization should succeed");
+        vk.2.serialize_compressed(&mut vk_bytes)
+            .expect("vk2 serialization should succeed");
+        vk.3.serialize_compressed(&mut vk_bytes)
+            .expect("vk3 serialization should succeed");
         self.append_message(b"vk", vk_bytes.as_slice());
     }
 
-    fn append_public_statement(&mut self, public_statement: &(usize, &range_proof::Commitment)) {
-        let public_statement_bytes =
-            bcs::to_bytes(public_statement).expect("public_statement serialization should succeed");
+    fn append_public_statement(
+        &mut self,
+        public_statement: &(usize, &dekart_univariate::Commitment<E>),
+    ) {
+        let mut public_statement_bytes = Vec::new();
+        public_statement
+            .0
+            .serialize_compressed(&mut public_statement_bytes)
+            .expect("public_statement0 serialization should succeed");
+        public_statement
+            .1
+            .serialize_compressed(&mut public_statement_bytes)
+            .expect("public_statement1 serialization should succeed");
+        // TODO: CHANGE THIS STUFF
         self.append_message(b"public-statements", public_statement_bytes.as_slice());
     }
 
-    fn append_bit_commitments(&mut self, bit_commitments: &(&[G1Projective], &[G2Projective])) {
-        let bit_commitments_bytes =
-            bcs::to_bytes(bit_commitments).expect("bit_commitments serialization should succeed");
+    fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1Affine], &[E::G2Affine])) {
+        let mut bit_commitments_bytes = Vec::new();
+        bit_commitments
+            .serialize_compressed(&mut bit_commitments_bytes)
+            .expect("bit_commitments serialization should succeed");
         self.append_message(b"bit-commitments", bit_commitments_bytes.as_slice());
     }
 
-    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<Scalar> {
+    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<E::ScalarField> {
         let mut buf = vec![0u8; num_scalars * 16];
         self.challenge_bytes(b"challenge_linear_combination", &mut buf);
 
@@ -192,7 +222,10 @@ impl RangeProof for merlin::Transcript {
         for chunk in buf.chunks(16) {
             match chunk.try_into() {
                 Ok(chunk) => {
-                    v.push(Scalar::from_u128(u128::from_le_bytes(chunk)));
+                    v.push(
+                        E::ScalarField::from_random_bytes(chunk)
+                            .expect("Error sampling field elements from bytes"),
+                    );
                 },
                 Err(_) => panic!("Expected a 16-byte slice, but got a different size"),
             }
@@ -217,7 +250,7 @@ pub(crate) fn fiat_shamir_das<T: Transcript, A: Serialize>(
     auxs: &Vec<A>,
     dst: &'static [u8],
     num_scalars: usize,
-) -> (Vec<Scalar>, Vec<Scalar>) {
+) -> (Vec<blstrs::Scalar>, Vec<blstrs::Scalar>) {
     let mut fs_t = merlin::Transcript::new(dst);
 
     <merlin::Transcript as PVSS<T>>::pvss_domain_sep(&mut fs_t, sc);
