@@ -80,10 +80,13 @@ pub struct MoveHarness {
     /// The executor being used.
     pub executor: FakeExecutor,
     /// The last counted transaction sequence number, by account address.
-    txn_seq_no: BTreeMap<AccountAddress, u64>,
+    txn_seq_no: BTreeMap<AccountAddress, Option<u64>>,
 
     pub default_gas_unit_price: u64,
     pub max_gas_per_txn: u64,
+    // Uses the new transaction format with TransactionPayload
+    pub use_txn_payload_v2_format: bool,
+    pub use_orderless_transactions: bool,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -104,6 +107,8 @@ impl MoveHarness {
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_txn_payload_v2_format: false,
+            use_orderless_transactions: false,
         }
     }
 
@@ -114,6 +119,8 @@ impl MoveHarness {
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_txn_payload_v2_format: false,
+            use_orderless_transactions: false,
         }
     }
 
@@ -124,6 +131,8 @@ impl MoveHarness {
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_txn_payload_v2_format: false,
+            use_orderless_transactions: false,
         }
     }
 
@@ -134,6 +143,22 @@ impl MoveHarness {
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_txn_payload_v2_format: false,
+            use_orderless_transactions: false,
+        }
+    }
+
+    pub fn new_with_orderless_flags(
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) -> Self {
+        Self {
+            executor: FakeExecutor::from_head_genesis(),
+            txn_seq_no: BTreeMap::default(),
+            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         }
     }
 
@@ -173,6 +198,8 @@ impl MoveHarness {
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: gas_params.vm.txn.min_price_per_gas_unit.into(),
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_txn_payload_v2_format: false,
+            use_orderless_transactions: false,
         }
     }
 
@@ -216,10 +243,17 @@ impl MoveHarness {
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_txn_payload_v2_format: false,
+            use_orderless_transactions: false,
         }
     }
 
-    pub fn store_and_fund_account(&mut self, acc: &Account, balance: u64, seq_num: u64) -> Account {
+    pub fn store_and_fund_account(
+        &mut self,
+        acc: &Account,
+        balance: u64,
+        seq_num: Option<u64>,
+    ) -> Account {
         let data = self
             .executor
             .store_and_fund_account(acc.clone(), balance, seq_num);
@@ -237,19 +271,29 @@ impl MoveHarness {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
         // Mint the account 10M Aptos coins (with 8 decimals).
-        self.store_and_fund_account(&acc, balance, 10)
+        self.store_and_fund_account(&acc, balance, Some(10))
     }
 
     // Creates an account with a randomly generated address and key pair
     pub fn new_account_with_key_pair(&mut self) -> Account {
         // Mint the account 10M Aptos coins (with 8 decimals).
-        self.store_and_fund_account(&Account::new(), 1_000_000_000_000_000, 0)
+        self.store_and_fund_account(&Account::new(), 1_000_000_000_000_000, Some(0))
+    }
+
+    // If the sequence_number is Some(.), then the Account resource is created.
+    // If the sequence_number is None, then the Account resource is not created.
+    pub fn new_account_with_key_pair_and_sequence_number(
+        &mut self,
+        sequence_number: Option<u64>,
+    ) -> Account {
+        // Mint the account 10M Aptos coins (with 8 decimals).
+        self.store_and_fund_account(&Account::new(), 1_000_000_000_000_000, sequence_number)
     }
 
     pub fn new_account_with_balance_and_sequence_number(
         &mut self,
         balance: u64,
-        sequence_number: u64,
+        sequence_number: Option<u64>,
     ) -> Account {
         self.store_and_fund_account(&Account::new(), balance, sequence_number)
     }
@@ -318,20 +362,28 @@ impl MoveHarness {
         account: &Account,
         payload: TransactionPayload,
     ) -> TransactionBuilder {
-        let on_chain_seq_no = self.sequence_number_opt(account.address()).unwrap_or(0);
-        let seq_no_ref = self.txn_seq_no.entry(*account.address()).or_insert(0);
-        let seq_no = std::cmp::max(on_chain_seq_no, *seq_no_ref);
-        *seq_no_ref = seq_no + 1;
+        let seq_no = if !self.use_orderless_transactions {
+            let on_chain_seq_no = self.sequence_number_opt(account.address()).unwrap_or(0);
+            let seq_no_ref = self.txn_seq_no.entry(*account.address()).or_insert(Some(0));
+            let seq_no = std::cmp::max(on_chain_seq_no, (*seq_no_ref).unwrap_or(0));
+            *seq_no_ref = Some(seq_no + 1);
+            seq_no
+        } else {
+            u64::MAX
+        };
         account
             .transaction()
             .chain_id(self.executor.get_chain_id())
-            .ttl(
-                self.executor.get_block_time() + 3_600_000_000, /* an hour after the current time */
-            )
             .sequence_number(seq_no)
             .max_gas_amount(self.max_gas_per_txn)
             .gas_unit_price(self.default_gas_unit_price)
+            .current_time(self.executor.get_block_time_seconds())
             .payload(payload)
+            .upgrade_payload(
+                &mut rand::thread_rng(),
+                self.use_txn_payload_v2_format,
+                self.use_orderless_transactions,
+            )
     }
 
     /// Creates a transaction, based on provided payload.
