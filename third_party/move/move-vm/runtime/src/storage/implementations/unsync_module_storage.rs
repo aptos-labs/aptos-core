@@ -13,7 +13,10 @@ use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    account_address::AccountAddress,
+    ident_str,
+    identifier::{IdentStr, Identifier},
+    language_storage::ModuleId,
     metadata::Metadata,
 };
 use move_vm_types::{
@@ -24,6 +27,8 @@ use move_vm_types::{
     sha3_256,
 };
 use std::{borrow::Borrow, ops::Deref, sync::Arc};
+
+const OPTION_MODULE_BYTES: &[u8] = include_bytes!("../../../../../option.mv");
 
 /// Represents owned or borrowed types, similar to [std::borrow::Cow] but without enforcing
 /// [ToOwned] trait bound on types it stores. We use it to be able to construct different storages
@@ -134,10 +139,20 @@ where
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        let bytes = match self.ctx.fetch_module_bytes(key.address(), key.name())? {
+        let mut bytes = match self.ctx.fetch_module_bytes(key.address(), key.name())? {
             Some(bytes) => bytes,
             None => return Ok(None),
         };
+        if self
+            .ctx
+            .runtime_environment()
+            .vm_config()
+            .override_option_module
+            && key.address() == &AccountAddress::ONE
+            && *key.name() == *Identifier::from(ident_str!("option"))
+        {
+            bytes = Bytes::from(OPTION_MODULE_BYTES.to_vec());
+        }
         let compiled_module = self
             .ctx
             .runtime_environment()

@@ -17,16 +17,21 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
+    ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
     metadata::Metadata,
     vm_status::StatusCode,
 };
 use move_vm_types::{code::ModuleBytesStorage, module_linker_error, sha3_256};
+use once_cell::sync::Lazy;
 use std::{
     collections::{btree_map, BTreeMap},
     sync::Arc,
 };
+
+static OPTION_MODULE_ID: Lazy<ModuleId> =
+    Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("option"))));
 
 /// Represents a verified module bundle that can be extracted from [StagingModuleStorage].
 pub struct VerifiedModuleBundle<K: Ord, V: Clone> {
@@ -126,6 +131,7 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
             .runtime_environment()
             .vm_config()
             .enable_lazy_loading;
+        let is_enum_option_enabled = staged_runtime_environment.vm_config().enable_enum_option;
         let deserializer_config = &staged_runtime_environment.vm_config().deserializer_config;
 
         // For every module in bundle, run compatibility checks and construct a new bytes storage
@@ -170,6 +176,12 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
                 if let Some(old_module_ref) =
                     existing_module_storage.unmetered_get_deserialized_module(addr, name)?
                 {
+                    if is_enum_option_enabled
+                        && old_module_ref.self_id() == *OPTION_MODULE_ID
+                        && old_module_ref.self_id() == compiled_module.self_id()
+                    {
+                        continue;
+                    }
                     let old_module = old_module_ref.as_ref();
                     compatibility
                         .check(old_module, &compiled_module)

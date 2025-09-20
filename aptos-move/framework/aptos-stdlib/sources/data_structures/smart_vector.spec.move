@@ -2,18 +2,18 @@ spec aptos_std::smart_vector {
 
     spec SmartVector {
         // `bucket_size` shouldn't be 0, if specified.
-        invariant bucket_size.is_none()
-            || (bucket_size.is_some() && bucket_size.borrow() != 0);
+        invariant option::spec_is_none(bucket_size)
+            || (option::spec_is_some(bucket_size) && option::spec_borrow(bucket_size) != 0);
         // vector length should be <= `inline_capacity`, if specified.
-        invariant inline_capacity.is_none()
-            || (len(inline_vec) <= inline_capacity.borrow());
+        invariant option::spec_is_none(inline_capacity)
+            || (len(inline_vec) <= option::spec_borrow(inline_capacity));
         // both `inline_capacity` and `bucket_size` should either exist or shouldn't exist at all.
-        invariant (inline_capacity.is_none() && bucket_size.is_none())
-            || (inline_capacity.is_some() && bucket_size.is_some());
+        invariant (option::spec_is_none(inline_capacity) && option::spec_is_none(bucket_size))
+            || (option::spec_is_some(inline_capacity) && option::spec_is_some(bucket_size));
     }
 
     spec length {
-        aborts_if self.big_vec.is_some() && len(self.inline_vec) + option::spec_borrow(
+        aborts_if option::spec_is_some(self.big_vec) && len(self.inline_vec) + option::spec_borrow(
             self.big_vec).length() > MAX_U64;
     }
 
@@ -26,15 +26,15 @@ spec aptos_std::smart_vector {
     }
 
     spec destroy_empty {
-        aborts_if !(self.is_empty());
+        aborts_if !(spec_is_empty(self));
         aborts_if len(self.inline_vec) != 0
-            || self.big_vec.is_some();
+            || option::spec_is_some(self.big_vec);
     }
 
     spec borrow {
-        aborts_if i >= self.length();
-        aborts_if self.big_vec.is_some() && (
-            (len(self.inline_vec) + self.big_vec.borrow().length::<T>()) > MAX_U64
+        aborts_if i >= spec_len(self);
+        aborts_if option::spec_is_some(self.big_vec) && (
+            (len(self.inline_vec) + option::spec_borrow(self.big_vec).length::<T>()) > MAX_U64
         );
     }
 
@@ -66,24 +66,24 @@ spec aptos_std::smart_vector {
 
         pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
 
-        aborts_if  self.big_vec.is_some()
+        aborts_if  option::spec_is_some(self.big_vec)
             &&
-            (table_with_length::spec_len(self.big_vec.borrow().buckets) == 0);
-        aborts_if self.is_empty();
-        aborts_if self.big_vec.is_some() && (
-            (len(self.inline_vec) + self.big_vec.borrow().length::<T>()) > MAX_U64
+            (table_with_length::spec_len(option::spec_borrow(self.big_vec).buckets) == 0);
+        aborts_if spec_is_empty(self);
+        aborts_if option::spec_is_some(self.big_vec) && (
+            (len(self.inline_vec) + option::spec_borrow(self.big_vec).length::<T>()) > MAX_U64
         );
 
-        ensures self.length() == old(self).length() - 1;
+        ensures spec_len(self) == old(spec_len(self)) - 1;
     }
 
     spec swap_remove {
         pragma verify = false; // TODO: set because of timeout
-        aborts_if i >= self.length();
-        aborts_if self.big_vec.is_some() && (
-            (len(self.inline_vec) + self.big_vec.borrow().length::<T>()) > MAX_U64
+        aborts_if i >= spec_len(self);
+        aborts_if option::spec_is_some(self.big_vec) && (
+            (len(self.inline_vec) + option::spec_borrow(self.big_vec).length::<T>()) > MAX_U64
         );
-        ensures self.length() == old(self).length() - 1;
+        ensures spec_len(self) == old(spec_len(self)) - 1;
     }
 
     spec swap {
@@ -101,5 +101,17 @@ spec aptos_std::smart_vector {
 
     spec singleton {
         pragma verify = false;
+    }
+
+    spec fun spec_len<T>(self: &SmartVector<T>): u64 {
+        self.inline_vec.length() + if (option::spec_is_none(self.big_vec)) {
+            0
+        } else {
+            option::spec_borrow(self.big_vec).length()
+        }
+    }
+
+    spec fun spec_is_empty<T>(self: &SmartVector<T>): bool {
+        spec_len(self) == 0
     }
 }

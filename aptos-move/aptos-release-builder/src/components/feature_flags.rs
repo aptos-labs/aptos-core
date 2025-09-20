@@ -151,6 +151,8 @@ pub enum FeatureFlag {
     DistributeTransactionFee,
     MonotonicallyIncreasingCounter,
     EnableTrustedCode,
+    EnableEnumOption,
+    OverrideOptionModule,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -401,6 +403,8 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER
             },
             FeatureFlag::EnableTrustedCode => AptosFeatureFlag::ENABLE_TRUSTED_CODE,
+            FeatureFlag::EnableEnumOption => AptosFeatureFlag::ENABLE_ENUM_OPTION,
+            FeatureFlag::OverrideOptionModule => AptosFeatureFlag::OVERRIDE_OPTION_MODULE,
         }
     }
 }
@@ -578,6 +582,8 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::MonotonicallyIncreasingCounter
             },
             AptosFeatureFlag::ENABLE_TRUSTED_CODE => FeatureFlag::EnableTrustedCode,
+            AptosFeatureFlag::ENABLE_ENUM_OPTION => FeatureFlag::EnableEnumOption,
+            AptosFeatureFlag::OVERRIDE_OPTION_MODULE => FeatureFlag::OverrideOptionModule,
         }
     }
 }

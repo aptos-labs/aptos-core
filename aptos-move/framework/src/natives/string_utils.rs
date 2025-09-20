@@ -9,6 +9,7 @@ use aptos_native_interface::{
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_std::iterable::Iterable;
+use itertools::Itertools;
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     account_address::AccountAddress,
@@ -312,23 +313,46 @@ fn native_format_impl(
                 && type_.module.as_str() == "option"
                 && type_.address == AccountAddress::ONE
             {
-                let mut v = strct
-                    .unpack()?
-                    .next()
-                    .unwrap()
-                    .value_as::<Vector>()?
-                    .unpack_unchecked()?;
-                if v.is_empty() {
-                    out.push_str("None");
-                } else {
-                    out.push_str("Some(");
-                    let inner_ty = if let MoveTypeLayout::Vector(inner_ty) = &fields[0].layout {
-                        inner_ty.deref()
+                if context
+                    .context
+                    .get_feature_flags()
+                    .is_enable_enum_option_enabled()
+                {
+                    let mut vv = strct.unpack()?.collect_vec();
+                    if vv[0].equals(&Value::u16(0))? {
+                        assert!(vv.len() == 1);
+                        out.push_str("None");
                     } else {
-                        unreachable!()
-                    };
-                    native_format_impl(context, inner_ty, v.pop().unwrap(), depth, out)?;
-                    out.push(')');
+                        assert!(vv.len() == 2);
+                        out.push_str("Some(");
+                        let inner_ty = if let MoveTypeLayout::Vector(inner_ty) = &fields[0].layout {
+                            inner_ty.deref()
+                        } else {
+                            unreachable!()
+                        };
+                        let v2 = vv.pop().unwrap();
+                        native_format_impl(context, inner_ty, v2, depth, out)?;
+                        out.push(')');
+                    }
+                } else {
+                    let mut v = strct
+                        .unpack()?
+                        .next()
+                        .unwrap()
+                        .value_as::<Vector>()?
+                        .unpack_unchecked()?;
+                    if v.is_empty() {
+                        out.push_str("None");
+                    } else {
+                        out.push_str("Some(");
+                        let inner_ty = if let MoveTypeLayout::Vector(inner_ty) = &fields[0].layout {
+                            inner_ty.deref()
+                        } else {
+                            unreachable!()
+                        };
+                        native_format_impl(context, inner_ty, v.pop().unwrap(), depth, out)?;
+                        out.push(')');
+                    }
                 }
                 return Ok(());
             }

@@ -146,10 +146,10 @@ spec aptos_std::big_ordered_map {
     spec upsert {
         pragma opaque;
         pragma verify = false;
-        ensures [abstract] !spec_contains_key(old(self), key) ==> option::is_none(result);
+        ensures [abstract] !spec_contains_key(old(self), key) ==> option::spec_is_none(result);
         ensures [abstract] spec_contains_key(self, key);
         ensures [abstract] spec_get(self, key) == value;
-        ensures [abstract] spec_contains_key(old(self), key) ==> ((option::is_some(result)) && (option::spec_borrow(result) == spec_get(old(
+        ensures [abstract] spec_contains_key(old(self), key) ==> ((option::spec_is_some(result)) && (option::spec_borrow(result) == spec_get(old(
             self), key)));
         ensures [abstract] !spec_contains_key(old(self), key) ==> spec_len(old(self)) + 1 == spec_len(self);
         ensures [abstract] spec_contains_key(old(self), key) ==> spec_len(old(self)) == spec_len(self);
