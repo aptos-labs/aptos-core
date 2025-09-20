@@ -783,6 +783,7 @@ serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev =
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 serde_with = "3.4.0"
 serde_yaml = "0.8.24"
+serial_test = "3.2.0"
 set_env = "1.3.4"
 shadow-rs = "0.16.2"
 smallbitvec = "2.5.1"
@@ -846,6 +847,7 @@ wasm-bindgen = "0.2.100"
 wasm-bindgen-futures = "0.4.50"
 which = "4.2.5"
 whoami = "1.5.0"
+wiremock = "0.6.5"
 # This allows for zeroize 1.6 to be used. Version 1.2.0 of x25519-dalek locks zeroize to 1.3.
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e" }
 z3tracer = "0.8.0"

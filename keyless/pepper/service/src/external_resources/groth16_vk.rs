@@ -33,6 +33,16 @@ pub struct OnChainGroth16VerificationKey {
 }
 
 impl OnChainGroth16VerificationKey {
+    #[cfg(test)]
+    /// Creates a new OnChainGroth16VerificationKey for testing.
+    /// Note: internally, the fields will contain empty/default values.
+    pub fn new_for_testing() -> Self {
+        OnChainGroth16VerificationKey {
+            r#type: "0x1::keyless_account::Groth16VerificationKey".to_string(),
+            data: Groth16VerificationKeyData::default(),
+        }
+    }
+
     /// Converts the on-chain verification key to a prepared verifying key
     pub fn to_ark_prepared_verifying_key(&self) -> Result<PreparedVerifyingKey<Bn254>> {
         // Collect and parse the gamma_abc_g1 elements

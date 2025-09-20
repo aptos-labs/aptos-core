@@ -5,7 +5,8 @@ use crate::{metrics, utils};
 use anyhow::{anyhow, Result};
 use aptos_infallible::Mutex;
 use aptos_keyless_pepper_common::jwt::parse;
-use aptos_logger::{info, prelude::SampleRate, sample, warn};
+use aptos_logger::{info, warn};
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{jwks::rsa::RSA_JWK, keyless::test_utils::get_sample_iss};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -22,10 +23,10 @@ const ISSUER_GOOGLE: &str = "https://accounts.google.com";
 const JWK_URL_GOOGLE: &str = "https://www.googleapis.com/oauth2/v3/certs";
 
 // The interval (in seconds) at which to refresh the JWKs
-const JWK_REFRESH_INTERVAL_SECS: u64 = 10;
+pub const JWK_REFRESH_INTERVAL_SECS: u64 = 10;
 
-// The interval (in seconds) at which to log the JWK refresh status
-const JWK_REFRESH_LOG_INTERVAL_SECS: u64 = 60;
+// The frequency at which to log the JWK refresh status (per loop iteration)
+const JWK_REFRESH_LOOP_LOG_FREQUENCY: u64 = 6; // e.g., 6 * 10s (per loop) = 60s per log
 
 // Useful type declarations
 pub type Issuer = String;
@@ -174,21 +175,43 @@ pub fn start_jwk_fetchers() -> JWKCache {
     // integration tests that run as a part of testing pipeline.
     insert_test_jwk(jwk_cache.clone());
 
+    // Create the time service
+    let time_service = TimeService::real();
+
     // Start the JWK refresh loops for known issuers
     start_jwk_refresh_loop(
         ISSUER_GOOGLE.into(),
         JWK_URL_GOOGLE.into(),
         jwk_cache.clone(),
+        time_service.clone(),
     );
-    start_jwk_refresh_loop(ISSUER_APPLE.into(), JWK_URL_APPLE.into(), jwk_cache.clone());
+    start_jwk_refresh_loop(
+        ISSUER_APPLE.into(),
+        JWK_URL_APPLE.into(),
+        jwk_cache.clone(),
+        time_service.clone(),
+    );
 
     // Return the JWK cache
     jwk_cache
 }
 
 /// Starts a background task that periodically fetches and caches the JWKs from the given URL
-fn start_jwk_refresh_loop(issuer: String, jwk_url: String, jwk_cache: JWKCache) {
+pub fn start_jwk_refresh_loop(
+    issuer: String,
+    jwk_url: String,
+    jwk_cache: JWKCache,
+    time_service: TimeService,
+) {
+    info!(
+        issuer = issuer,
+        "Starting the JWK refresh loop for {}!", jwk_url
+    );
+
+    // Start the task
     tokio::spawn(async move {
+        let mut loop_iteration_counter: u64 = 0;
+
         loop {
             // Fetch the JWKs from the URL
             let time_now = Instant::now();
@@ -199,8 +222,7 @@ fn start_jwk_refresh_loop(issuer: String, jwk_url: String, jwk_cache: JWKCache) 
             match &fetch_result {
                 Ok(key_set) => {
                     // Log the successful fetch
-                    sample!(
-                        SampleRate::Duration(Duration::from_secs(JWK_REFRESH_LOG_INTERVAL_SECS)),
+                    if loop_iteration_counter % JWK_REFRESH_LOOP_LOG_FREQUENCY == 0 {
                         info!(
                             issuer = issuer,
                             jwk_url = jwk_url,
@@ -209,7 +231,7 @@ fn start_jwk_refresh_loop(issuer: String, jwk_url: String, jwk_cache: JWKCache) 
                             issuer,
                             key_set
                         )
-                    );
+                    }
 
                     // Update the cache
                     jwk_cache.lock().insert(issuer.clone(), key_set.clone());
@@ -229,9 +251,12 @@ fn start_jwk_refresh_loop(issuer: String, jwk_url: String, jwk_cache: JWKCache) 
             // Update the fetch metrics
             metrics::update_jwk_fetch_metrics(&issuer, fetch_result.is_ok(), fetch_time);
 
+            // Increment the loop iteration counter
+            loop_iteration_counter = loop_iteration_counter.wrapping_add(1);
+
             // Sleep until the next refresh interval
             let refresh_interval = Duration::from_secs(JWK_REFRESH_INTERVAL_SECS);
-            tokio::time::sleep(refresh_interval).await;
+            time_service.sleep(refresh_interval).await;
         }
     });
 }

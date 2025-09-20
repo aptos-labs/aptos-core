@@ -21,6 +21,7 @@ aptos-inspection-service = { workspace = true }
 aptos-keyless-pepper-common = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-bn254 = { workspace = true }
@@ -28,7 +29,9 @@ ark-ec = { workspace = true }
 ark-ff = { workspace = true }
 ark-groth16 = { workspace = true }
 ark-serialize = { workspace = true }
+async-trait = { workspace = true }
 bcs = { workspace = true }
+clap = { workspace = true }
 firestore = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
@@ -41,5 +44,11 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha3 = { workspace = true }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+
+[dev-dependencies]
+aptos-time-service = { workspace = true, features = ["testing"] }
+wiremock = { workspace = true }
+serial_test = { workspace = true }

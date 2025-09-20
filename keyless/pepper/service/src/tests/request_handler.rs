@@ -69,7 +69,7 @@ async fn test_get_about_request() {
 #[tokio::test]
 async fn test_get_groth16_vk_request() {
     // Create a cached resources object with no cached resources
-    let cached_resources = CachedResources::default();
+    let cached_resources = CachedResources::new_for_testing();
 
     // Send a GET request to the groth16 vk endpoint
     let response = send_request_to_path(
@@ -210,7 +210,7 @@ async fn test_get_jwk_request() {
 #[tokio::test]
 async fn test_get_keyless_config_request() {
     // Create a cached resources object with no cached resources
-    let cached_resources = CachedResources::default();
+    let cached_resources = CachedResources::new_for_testing();
 
     // Send a GET request to the keyless config endpoint
     let response = send_request_to_path(
@@ -331,7 +331,6 @@ async fn test_get_invalid_path_or_method_request() {
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
 }
 
-// TODO: add tests that check the fetch logic
 #[tokio::test]
 async fn test_post_fetch_request_bad_request() {
     // Send a POST request to the fetch endpoint
@@ -342,7 +341,6 @@ async fn test_post_fetch_request_bad_request() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
-// TODO: add tests that check the signature logic
 #[tokio::test]
 async fn test_post_signature_request_bad_request() {
     // Send a POST request to the signature endpoint
@@ -360,7 +358,6 @@ async fn test_post_signature_request_bad_request() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
-// TODO: add tests that check the verify logic
 #[tokio::test]
 async fn test_post_verify_request_bad_request() {
     // Send a POST request to the verify endpoint
@@ -414,10 +411,19 @@ async fn send_request_to_path(
     let jwk_cache = jwk_cache.unwrap_or_else(|| Arc::new(Mutex::new(HashMap::new())));
 
     // Get or create cached resources
-    let cached_resources = cached_resources.unwrap_or_default();
+    let cached_resources = cached_resources.unwrap_or(CachedResources::new_for_testing());
+
+    // Create the mock account recovery DB
+    let account_recovery_db = utils::get_mock_account_recovery_db();
 
     // Serve the request
-    handle_request(request, vuf_keypair, jwk_cache, cached_resources)
-        .await
-        .unwrap()
+    handle_request(
+        request,
+        vuf_keypair,
+        jwk_cache,
+        cached_resources,
+        account_recovery_db,
+    )
+    .await
+    .unwrap()
 }

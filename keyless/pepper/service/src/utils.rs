@@ -12,6 +12,7 @@ const CLIENT_REQUEST_TIMEOUT_SECS: u64 = 10;
 /// Creates and returns a reqwest HTTP client with a timeout
 pub fn create_request_client() -> Client {
     Client::builder()
+        .no_proxy()
         .timeout(Duration::from_secs(CLIENT_REQUEST_TIMEOUT_SECS))
         .build()
         .expect("Failed to build the request client!")

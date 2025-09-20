@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    accounts::account_recovery_db::AccountRecoveryDBInterface,
     dedicated_handlers::pepper_request::handle_pepper_request,
     error::PepperServiceError,
     external_resources::{jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
@@ -40,6 +41,7 @@ pub trait HandlerTrait<TRequest, TResponse>: Send + Sync {
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: TRequest,
+        account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
     ) -> Result<TResponse, PepperServiceError>;
 }
 
@@ -54,6 +56,7 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: PepperRequest,
+        account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
     ) -> Result<PepperResponse, PepperServiceError> {
         // Parse the request
         let PepperRequest {
@@ -77,7 +80,7 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
             uid_key,
             derivation_path,
             None,
-            true,
+            account_recovery_db,
         )
         .await?;
 
@@ -100,6 +103,7 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: PepperRequest,
+        account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
     ) -> Result<SignatureResponse, PepperServiceError> {
         // Parse the request
         let PepperRequest {
@@ -123,7 +127,7 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
             uid_key,
             derivation_path,
             None,
-            false,
+            account_recovery_db,
         )
         .await?;
 
@@ -146,6 +150,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: VerifyRequest,
+        _account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
     ) -> Result<VerifyResponse, PepperServiceError> {
         // Parse the request
         let VerifyRequest {
