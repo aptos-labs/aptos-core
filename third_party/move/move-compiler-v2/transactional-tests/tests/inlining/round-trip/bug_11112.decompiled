@@ -8,8 +8,8 @@ module 0xcafe::vectors {
         let _t2 = &mut _t0;
         let _t3 = 0;
         loop {
-            let _t12 = 0x1::vector::length<u64>(freeze(_t2));
-            if (!(_t3 < _t12)) break;
+            let _t11 = 0x1::vector::length<u64>(_t2);
+            if (!(_t3 < _t11)) break;
             let _t4 = 0x1::vector::borrow_mut<u64>(_t2, _t3);
             *_t4 = _t1;
             _t1 = _t1 + 1;

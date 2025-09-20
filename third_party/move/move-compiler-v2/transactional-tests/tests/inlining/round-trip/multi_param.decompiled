@@ -15,15 +15,15 @@ module 0x42::Test {
         let _t2 = 0;
         let _t3 = 0;
         loop {
-            let _t17 = 0x1::vector::length<Elem<u64, u64>>(freeze(_t1));
-            if (!(_t3 < _t17)) break;
+            let _t16 = 0x1::vector::length<Elem<u64, u64>>(_t1);
+            if (!(_t3 < _t16)) break;
             let _t4 = 0x1::vector::borrow_mut<Elem<u64, u64>>(_t1, _t3);
-            let _t24 = &_t4.k;
+            let _t23 = &_t4.k;
             let _t5 = &mut _t4.v;
-            let _t27 = *_t24;
-            let _t29 = *_t5;
-            let _t30 = _t27 + _t29;
-            _t2 = _t2 + _t30;
+            let _t26 = *_t23;
+            let _t28 = *_t5;
+            let _t29 = _t26 + _t28;
+            _t2 = _t2 + _t29;
             _t3 = _t3 + 1;
             continue
         };

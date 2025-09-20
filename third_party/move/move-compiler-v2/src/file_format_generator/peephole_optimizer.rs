@@ -169,4 +169,29 @@ mod tests {
         );
         assert!(optimized_code_chunk == expected_code_chunk);
     }
+
+    #[test]
+    fn test_freeze_ref_vec_len() {
+        let pipeline = BasicBlockOptimizerPipeline::default();
+        use move_binary_format::file_format::SignatureIndex;
+        use Bytecode::*;
+        let code = vec![
+            Nop,                       // 0
+            CopyLoc(0),                // 1
+            FreezeRef,                 // 2
+            VecLen(SignatureIndex(0)), // 3
+            Ret,                       // 4
+        ];
+        let optimized_code_chunk = pipeline.optimize(&code);
+        let expected_code_chunk = TransformedCodeChunk::new(
+            vec![
+                Nop,                       // 0
+                CopyLoc(0),                // 1
+                VecLen(SignatureIndex(0)), // 3
+                Ret,                       // 4
+            ],
+            vec![0, 1, 3, 4],
+        );
+        assert!(optimized_code_chunk == expected_code_chunk);
+    }
 }

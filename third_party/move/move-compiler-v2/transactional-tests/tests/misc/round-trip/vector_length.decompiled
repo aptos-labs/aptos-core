@@ -1,0 +1,19 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/vector_length.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun run(p0: &mut vector<u64>) {
+        if (0x1::vector::length<u64>(p0) > 0) 0x1::vector::push_back<u64>(p0, 1);
+    }
+    public fun test() {
+        let _t0 = 0x1::vector::empty<u64>();
+        run(&mut _t0);
+        if (!(0x1::vector::length<u64>(&_t0) == 0)) abort 1;
+        0x1::vector::push_back<u64>(&mut _t0, 42);
+        run(&mut _t0);
+        if (!(0x1::vector::length<u64>(&_t0) == 2)) abort 2;
+    }
+}
+
+
+//# run 0xc0ffee::m::test
