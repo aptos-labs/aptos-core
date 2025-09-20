@@ -513,9 +513,8 @@ pub struct CompileScriptOutput {
 /// turned on.  Note, that move code warnings currently block tests from running.
 #[derive(Parser)]
 pub struct TestPackage {
-    /// A filter string to determine which unit tests to run
-    #[clap(long, short)]
-    pub filter: Option<String>,
+    #[clap(flatten)]
+    pub filter_options: move_unit_test::FilterOptions,
 
     /// A boolean value to skip warnings.
     #[clap(long)]
@@ -600,7 +599,7 @@ impl CliCommand<&'static str> for TestPackage {
             path.as_path(),
             config.clone(),
             UnitTestingConfig {
-                filter: self.filter.clone(),
+                filter_options: self.filter_options.clone(),
                 report_storage_on_error: self.dump_state,
                 ignore_compile_warnings: self.ignore_compile_warnings,
                 named_address_values: self
@@ -636,7 +635,7 @@ impl CliCommand<&'static str> for TestPackage {
             let summary = SummaryCoverage {
                 summarize_functions: false,
                 output_csv: false,
-                filter: self.filter,
+                filter_options: self.filter_options,
                 move_options: self.move_options,
             };
             summary.coverage()?;
