@@ -932,7 +932,21 @@ impl Generator<'_> {
             Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
 
             Operation::NoOp => {}, // do nothing
-
+            Operation::Neg => {
+                if self
+                    .env()
+                    .language_version()
+                    .is_at_least(LanguageVersion::signed_int_ver())
+                {
+                    // after language version 2.3, `negation` should not propagate to this point
+                    self.internal_error(id, "unexpected `negation` operation");
+                } else {
+                    unimplemented!(
+                        "negation not supported before language version `{:?}`",
+                        LanguageVersion::signed_int_ver()
+                    )
+                }
+            },
             // Non-supported specification related operations
             Operation::Exists(Some(_))
             | Operation::SpecFunction(_, _, _)

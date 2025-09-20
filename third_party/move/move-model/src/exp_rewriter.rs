@@ -5,7 +5,7 @@
 use crate::{
     ast::{
         Condition, Exp, ExpData, LambdaCaptureKind, MatchArm, MemoryLabel, Operation, Pattern,
-        Spec, SpecBlockTarget, TempIndex, Value,
+        QuantKind, Spec, SpecBlockTarget, TempIndex, Value,
     },
     model::{GlobalEnv, Loc, ModuleId, NodeId, SpecVarId},
     symbol::Symbol,
@@ -259,6 +259,7 @@ pub trait ExpRewriterFunctions {
     fn rewrite_quant(
         &mut self,
         id: NodeId,
+        kind: &QuantKind,
         ranges: &[(Pattern, Exp)],
         triggers: &[Vec<Exp>],
         cond: &Option<Exp>,
@@ -443,9 +444,14 @@ pub trait ExpRewriterFunctions {
                 });
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
                 self.rewrite_exit_scope(new_id);
-                if let Some(new_exp) =
-                    self.rewrite_quant(new_id, &new_ranges, &new_triggers, &new_cond, &new_body)
-                {
+                if let Some(new_exp) = self.rewrite_quant(
+                    new_id,
+                    kind,
+                    &new_ranges,
+                    &new_triggers,
+                    &new_cond,
+                    &new_body,
+                ) {
                     new_exp
                 } else if id_changed
                     || ranges_changed

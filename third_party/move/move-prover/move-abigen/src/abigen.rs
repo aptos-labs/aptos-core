@@ -17,6 +17,7 @@ use move_core_types::{
 };
 use move_model::{
     ast::Address,
+    metadata::LanguageVersion,
     model::{FunctionEnv, GlobalEnv, ModuleEnv},
     ty,
     ty::ReferenceKind,
@@ -277,6 +278,20 @@ impl<'env> Abigen<'env> {
                     U256 => TypeTag::U256,
                     Address => TypeTag::Address,
                     Signer => TypeTag::Signer,
+                    I64 | I128 => {
+                        if module_env
+                            .env
+                            .language_version()
+                            .is_at_least(LanguageVersion::signed_int_ver())
+                        {
+                            bail!("unexpected `{:?}` type", ty0)
+                        } else {
+                            unimplemented!(
+                                "`i64/i128` not supported before language version `{:?}`",
+                                LanguageVersion::signed_int_ver()
+                            )
+                        }
+                    },
                     Num | Range | EventStore => {
                         bail!("Type {:?} is not allowed in scripts.", ty0)
                     },
