@@ -1,0 +1,20 @@
+{
+  "relaxed": [
+    {
+      "filter": {
+        "soft_status_change": {
+          "from": {
+            "MiscellaneousError": 1124
+          },
+          "to": {
+            "MiscellaneousError": 1130
+          }
+        }
+      },
+      "range": {
+        "start": 0,
+        "end": 9223372036854775807
+      }
+    }
+  ]
+}
