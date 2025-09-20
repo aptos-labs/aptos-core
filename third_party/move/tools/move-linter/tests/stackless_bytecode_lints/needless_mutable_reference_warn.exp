@@ -27,6 +27,19 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:258:34
+    │
+258 │       fun no_warn_01(_x: &mut u64) {
+    │ ╭──────────────────────────────────^
+259 │ │         let x = 1;
+260 │ │         let _y = &mut x;
+261 │ │     }
+    │ ╰─────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:14:17
    │
