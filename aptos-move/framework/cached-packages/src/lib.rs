@@ -15,7 +15,19 @@ const HEAD_RELEASE_BUNDLE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"),
 const HEAD_RELEASE_BUNDLE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "\\head.mrb"));
 
 static HEAD_RELEASE_BUNDLE: Lazy<ReleaseBundle> = Lazy::new(|| {
-    bcs::from_bytes::<ReleaseBundle>(HEAD_RELEASE_BUNDLE_BYTES).expect("bcs succeeds")
+    #[cfg(debug_assertions)]
+    let head_release_bundle_bytes = {
+        match std::env::var("APTOS_FRAMEWORK_BUILD_PATH").ok() {
+            Some(cached_framework_path) => std::fs::read(cached_framework_path).expect(
+                "APTOS_FRAMEWORK_BUILD_PATH file is created at the earlier compilation step",
+            ),
+            None => Vec::from(HEAD_RELEASE_BUNDLE_BYTES),
+        }
+    };
+    #[cfg(not(debug_assertions))]
+    let head_release_bundle_bytes = Vec::from(HEAD_RELEASE_BUNDLE_BYTES);
+
+    bcs::from_bytes::<ReleaseBundle>(head_release_bundle_bytes.as_slice()).expect("bcs succeeds")
 });
 
 /// Returns the release bundle for the current code.
