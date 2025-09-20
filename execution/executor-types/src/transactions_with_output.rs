@@ -111,12 +111,11 @@ impl TransactionsToKeep {
                     .transaction_outputs
                     .iter()
                     .map(TransactionOutput::write_set);
-                let last_checkpoint_index = all_checkpoint_indices.last().copied();
                 StateUpdateRefs::index_write_sets(
                     first_version,
                     write_sets,
                     transactions_with_output.len(),
-                    last_checkpoint_index,
+                    all_checkpoint_indices,
                 )
             },
         }

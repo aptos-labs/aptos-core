@@ -418,6 +418,7 @@ impl Parser {
         )?;
 
         let result_state = parent_state.update_with_memorized_reads(
+            base_state_view.persisted_hot_state(),
             base_state_view.persisted_state(),
             to_commit.state_update_refs(),
             base_state_view.memorized_reads(),

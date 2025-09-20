@@ -108,6 +108,10 @@ impl LedgerStateWithSummary {
         )
     }
 
+    pub fn is_at_checkpoint(&self) -> bool {
+        self.latest.next_version() == self.last_checkpoint.next_version()
+    }
+
     pub fn last_checkpoint(&self) -> &StateWithSummary {
         &self.last_checkpoint
     }
