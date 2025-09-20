@@ -43,7 +43,7 @@ module aptos_experimental::order_operations {
             );
         if (order.is_some()) {
             // Order is already placed in the order book, so we can cancel it
-            return cancel_single_order_helper(market, order.destroy_some(), callbacks);
+            return cancel_single_order_helper(market, order.destroy_some(), true, callbacks);
         };
         pre_cancel_order_for_tracker(
             market.get_pre_cancellation_tracker_mut(),
@@ -64,11 +64,13 @@ module aptos_experimental::order_operations {
         market: &mut Market<M>,
         account: address,
         order_id: OrderIdType,
+        emit_event: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
-    ) {
+    ): SingleOrder<M> {
         let order = market.get_order_book_mut().cancel_order(account, order_id);
         assert!(account == order.get_account(), ENOT_ORDER_CREATOR);
-        cancel_single_order_helper(market, order, callbacks);
+        cancel_single_order_helper(market, order, emit_event, callbacks);
+        order
     }
 
     /// Reduces the size of an existing order.
@@ -140,6 +142,7 @@ module aptos_experimental::order_operations {
     fun cancel_single_order_helper<M: store + copy + drop>(
         market: &mut Market<M>,
         order: SingleOrder<M>,
+        emit_event: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let (
@@ -158,23 +161,25 @@ module aptos_experimental::order_operations {
         cleanup_order_internal(
             account, order_id, single_order_book_type(), is_bid, remaining_size, metadata, callbacks
         );
-        market.emit_event_for_order(
-            order_id,
-            client_order_id,
-            account,
-            orig_size,
-            0,
-            remaining_size,
-            price,
-            is_bid,
-            false,
-            aptos_experimental::market_types::order_status_cancelled(),
-            std::string::utf8(b"Order cancelled"),
-            metadata,
-            option::none(), // trigger_condition
-            time_in_force,
-            callbacks
-        );
+        if (emit_event) {
+            market.emit_event_for_order(
+                order_id,
+                client_order_id,
+                account,
+                orig_size,
+                0,
+                remaining_size,
+                price,
+                is_bid,
+                false,
+                aptos_experimental::market_types::order_status_cancelled(),
+                std::string::utf8(b"Order cancelled"),
+                metadata,
+                option::none(), // trigger_condition
+                time_in_force,
+                callbacks
+            );
+        }
     }
 
 }
