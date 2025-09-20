@@ -169,6 +169,7 @@ impl CallFrame {
     fn to_erased(&self, keep_generic_types: bool) -> Node<InternalGas> {
         let name = match &self.name {
             FrameName::Script => "script".to_string(),
+            FrameName::TransactionBatch => "transaction batch".to_string(),
             FrameName::Function {
                 module_id,
                 name,
