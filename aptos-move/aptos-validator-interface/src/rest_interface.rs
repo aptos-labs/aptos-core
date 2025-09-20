@@ -16,8 +16,8 @@ use aptos_types::{
     account_address::AccountAddress,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        EntryFunction, ExecutionStatus::MiscellaneousError, Transaction, TransactionExecutableRef,
-        TransactionInfo, TransactionPayload, Version,
+        EntryFunction, ExecutionStatus::MiscellaneousError, PersistedAuxiliaryInfo, Transaction,
+        TransactionExecutableRef, TransactionInfo, TransactionPayload, Version,
     },
 };
 use async_recursion::async_recursion;
@@ -222,7 +222,11 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         &self,
         start: Version,
         limit: u64,
-    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>)> {
+    ) -> Result<(
+        Vec<Transaction>,
+        Vec<TransactionInfo>,
+        Vec<PersistedAuxiliaryInfo>,
+    )> {
         let mut txns = Vec::with_capacity(limit as usize);
         let mut txn_infos = Vec::with_capacity(limit as usize);
 
@@ -242,7 +246,14 @@ impl AptosValidatorInterface for RestDebuggerInterface {
             println!("Got {}/{} txns from RestApi.", txns.len(), limit);
         }
 
-        Ok((txns, txn_infos))
+        // Get auxiliary info from REST client
+        let auxiliary_infos = self
+            .0
+            .get_persisted_auxiliary_infos(start, limit)
+            .await
+            .map_err(|e| anyhow!("Failed to get auxiliary info: {}", e))?;
+
+        Ok((txns, txn_infos, auxiliary_infos))
     }
 
     async fn get_and_filter_committed_transactions(
@@ -270,7 +281,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         )>,
     > {
         let mut txns = Vec::with_capacity(limit as usize);
-        let (tns, infos) = self.get_committed_transactions(start, limit).await?;
+        let (tns, infos, _auxiliary_infos) = self.get_committed_transactions(start, limit).await?;
         let temp_txns = tns
             .iter()
             .zip(infos)
@@ -352,5 +363,16 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                 .into_inner()[0]
                 .version,
         ))
+    }
+
+    async fn get_persisted_auxiliary_infos(
+        &self,
+        start: Version,
+        limit: u64,
+    ) -> Result<Vec<PersistedAuxiliaryInfo>> {
+        self.0
+            .get_persisted_auxiliary_infos(start, limit)
+            .await
+            .map_err(|e| anyhow!(e))
     }
 }

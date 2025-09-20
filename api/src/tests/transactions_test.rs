@@ -2579,3 +2579,199 @@ fn gen_string(len: u64) -> String {
 fn build_path(path: &str) -> String {
     format!("/v1/transactions{}", path)
 }
+
+// Tests for the /transactions/auxiliary_info endpoint
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_transactions_auxiliary_info_with_valid_params() {
+    let mut context = new_test_context(current_function_name!());
+
+    // Create and commit transactions individually to ensure they're properly added to the ledger
+    let account1 = context.gen_account();
+    let account2 = context.gen_account();
+    let account3 = context.gen_account();
+
+    // Get root account and create transactions with proper sequence number management
+    let mut root_account = context.root_account().await;
+
+    // Create all transactions with consecutive sequence numbers
+    let txn1 = context.create_user_account_by(&mut root_account, &account1);
+    let txn2 = context.create_user_account_by(&mut root_account, &account2);
+    let txn3 = context.create_user_account_by(&mut root_account, &account3);
+
+    // Commit all transactions in a single block with auxiliary info
+    // This will create: [BlockMetadata(idx=0), UserTxn1(idx=1), UserTxn2(idx=2), UserTxn3(idx=3)]
+    context.try_commit_block(&vec![txn1, txn2, txn3]).await;
+
+    // Based on debug output, we know we have versions 0-5 after the commit
+    // Test starting from version 1 (skip genesis) to version 4
+    let (start_version, limit) = (1u64, 4u16);
+
+    println!(
+        "Testing auxiliary info with start_version={}, limit={} (should get versions 1-4 with transaction_index 0-3)",
+        start_version, limit
+    );
+
+    let resp = context
+        .get(&format!(
+            "/transactions/auxiliary_info?start_version={}&limit={}",
+            start_version, limit
+        ))
+        .await;
+
+    // Should return an array of auxiliary info objects
+    assert!(resp.is_array());
+    let aux_info_array = resp.as_array().unwrap();
+    assert_eq!(aux_info_array.len() as u16, limit);
+
+    // Assert auxiliary info structure - should contain transaction indices
+    for (i, aux_info) in aux_info_array.iter().enumerate() {
+        let version = start_version + i as u64;
+        let expected_tx_index = i as u32; // Sequential indices: 0, 1, 2, 3
+
+        // Verify structure: object with transaction_index field that has the correct value
+        let obj = aux_info.as_object().unwrap();
+        assert_eq!(
+            obj.len(),
+            1,
+            "Version {} should have exactly 1 field",
+            version
+        );
+        assert!(
+            obj.contains_key("transaction_index"),
+            "Version {} missing transaction_index",
+            version
+        );
+        assert_eq!(
+            obj["transaction_index"].as_u64().unwrap(),
+            expected_tx_index as u64,
+            "Version {} should have transaction_index {}",
+            version,
+            expected_tx_index
+        );
+
+        // Verify exact JSON serialization
+        let serialized = serde_json::to_string(aux_info).unwrap();
+        assert_eq!(
+            serialized,
+            format!("{{\"transaction_index\":{}}}", expected_tx_index),
+            "Version {} incorrect JSON format",
+            version
+        );
+    }
+
+    // Verify overall response format - all entries should have sequential transaction indices
+    let response_str = serde_json::to_string(&resp).unwrap();
+    let expected_entries: Vec<String> = (0..limit)
+        .map(|i| format!("{{\"transaction_index\":{}}}", i))
+        .collect();
+    let expected_response = format!("[{}]", expected_entries.join(","));
+    assert_eq!(
+        response_str, expected_response,
+        "Response should be array of sequential transaction indices"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_transactions_auxiliary_info_invalid_start_version() {
+    let mut context = new_test_context(current_function_name!());
+
+    // Test with invalid start_version parameter - should return 400
+    let resp = context
+        .expect_status_code(400)
+        .get("/transactions/auxiliary_info?start_version=invalid&limit=5")
+        .await;
+
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_transactions_auxiliary_info_invalid_limit() {
+    let mut context = new_test_context(current_function_name!());
+
+    // Test with invalid limit parameter - should return 400
+    let resp = context
+        .expect_status_code(400)
+        .get("/transactions/auxiliary_info?start_version=0&limit=invalid")
+        .await;
+
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_transactions_auxiliary_info_start_version_too_large() {
+    let mut context = new_test_context(current_function_name!());
+
+    // Test with start_version beyond ledger version - should return 400
+    let resp = context
+        .expect_status_code(400)
+        .get("/transactions/auxiliary_info?start_version=1000000&limit=5")
+        .await;
+
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_transactions_auxiliary_info_pagination() {
+    let mut context = new_test_context(current_function_name!());
+
+    // Create several transactions to test pagination using root account to avoid sequence issues
+    let mut root_account = context.root_account().await;
+    let mut transactions = vec![];
+
+    for _i in 0..5 {
+        let account = context.gen_account();
+        let txn = context.create_user_account_by(&mut root_account, &account);
+        transactions.push(txn);
+    }
+
+    // Commit all transactions in one block to ensure they exist
+    context.commit_block(&transactions).await;
+
+    // Test first page
+    let resp1 = context
+        .get("/transactions/auxiliary_info?start_version=0&limit=3")
+        .await;
+    assert!(resp1.is_array());
+    let page1 = resp1.as_array().unwrap();
+    assert_eq!(page1.len(), 3);
+
+    // Test second page
+    let resp2 = context
+        .get("/transactions/auxiliary_info?start_version=3&limit=3")
+        .await;
+    assert!(resp2.is_array());
+    let page2 = resp2.as_array().unwrap();
+    assert!(!page2.is_empty()); // Should have at least some transactions
+
+    // Since all auxiliary info is currently {"transaction_index":null}, pages will have same structure
+    // but different starting versions - validate the pagination worked by checking both pages are valid
+    for aux_info in page1.iter().chain(page2.iter()) {
+        assert!(aux_info.is_object());
+        let obj = aux_info.as_object().unwrap();
+        assert!(obj.contains_key("transaction_index"));
+        assert_eq!(obj.len(), 1);
+    }
+
+    println!("✅ Page 1: {} entries", page1.len());
+    println!("✅ Page 2: {} entries", page2.len());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_transactions_auxiliary_info_empty_range() {
+    let mut context = new_test_context(current_function_name!());
+
+    // Get current ledger info to find a valid empty range
+    let ledger_info = context.get_latest_ledger_info();
+    let ledger_version = u64::from(ledger_info.ledger_version);
+
+    // Request range beyond current ledger version
+    let resp = context
+        .expect_status_code(400)
+        .get(&format!(
+            "/transactions/auxiliary_info?start_version={}&limit=5",
+            ledger_version + 100
+        ))
+        .await;
+
+    context.check_golden_output(resp);
+}
