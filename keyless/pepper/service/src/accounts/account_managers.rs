@@ -9,7 +9,7 @@ use std::{
     env,
 };
 
-/// If a pepper request v1 comes with a JWT from one of the priviliged auds,
+/// If a pepper request v1 comes with a JWT from one of the privileged auds,
 /// aud overriding is allowed.
 ///
 /// ## How to use
@@ -18,7 +18,7 @@ use std::{
 /// `ACCOUNT_MANAGER_<some-short-name>_ISSUER=<some-issuer>
 /// `ACCOUNT_MANAGER_<some-short-name>_AUD=<some-aud>
 ///
-/// Multiple account managers can be specified, as long as their each have a unique short name.
+/// Multiple account managers can be specified, as long as they each have a unique short name.
 ///
 /// Here is an example command.
 /// ```bash

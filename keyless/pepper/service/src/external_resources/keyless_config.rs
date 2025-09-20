@@ -35,6 +35,31 @@ pub struct OnChainKeylessConfiguration {
 }
 
 impl OnChainKeylessConfiguration {
+    #[cfg(test)]
+    /// Creates a new OnChainKeylessConfiguration for testing
+    pub fn new_for_testing() -> Self {
+        let data = KeylessConfigurationData {
+            max_commited_epk_bytes: 93,
+            max_exp_horizon_secs: "10000000".to_string(),
+            max_extra_field_bytes: 350,
+            max_iss_val_bytes: 120,
+            max_jwt_header_b64_bytes: 300,
+            max_signatures_per_txn: 3,
+            override_aud_vals: vec![],
+            training_wheels_pubkey: TrainingWheelsPubKey {
+                vec: vec![
+                    "0x1388de358cf4701696bd58ed4b96e9d670cbbb914b888be1ceda6374a3098ed4"
+                        .to_string(),
+                ],
+            },
+        };
+
+        OnChainKeylessConfiguration {
+            r#type: "0x1::keyless_account::Configuration".to_string(),
+            data,
+        }
+    }
+
     /// Converts the on-chain keyless configuration to the internal representation
     pub fn get_keyless_configuration(&self) -> Result<Configuration> {
         // Extract the training wheels public key
