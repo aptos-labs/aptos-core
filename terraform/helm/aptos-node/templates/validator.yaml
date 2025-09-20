@@ -102,6 +102,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       initContainers:
+        {{- if empty $.Values.genesis_bucket_path }}
         - name: run-script
           image: curlimages/curl:latest
           args:
@@ -125,6 +126,31 @@ spec:
               mountPath: /opt/aptos/genesis_readonly
             - name: writable-genesis
               mountPath: /opt/aptos/genesis
+        {{- else }}
+        - name: fetch-genesis
+          image: {{ $.Values.tools.image.repo }}:{{ $.Values.tools.image.tag | default $.Values.imageTag }}
+          command:
+            - bash
+            - -c
+            - |
+              set -x
+              cp /opt/aptos/genesis_readonly/* /opt/aptos/genesis
+              if [[ ! -f /opt/aptos/genesis/genesis.blob ]]; then
+                gcloud storage cp "{{ $.Values.genesis_bucket_path }}/genesis.blob" /opt/aptos/genesis/genesis.blob
+              else
+                echo "genesis.blob found locally"
+              fi
+              ls -l /opt/aptos/genesis
+          workingDir: /tmp
+          env:
+          - name: HOME
+            value: /tmp
+          volumeMounts:
+            - name: genesis-config
+              mountPath: /opt/aptos/genesis_readonly
+            - name: writable-genesis
+              mountPath: /opt/aptos/genesis
+        {{- end }} # .Values.genesis_blob_bucket_path
       containers:
       - name: validator
         {{- if and $validator_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
@@ -134,17 +160,38 @@ spec:
         {{- end }}
       {{- with $.Values.validator }}
         imagePullPolicy: {{ .image.pullPolicy }}
-        {{- if $.Values.validator.useConsensusHealthCheckAsStartupProbe }}
+        {{- with .healthChecks }}
+        {{- if and .enabled (or (not .filterReplicas) (index .filterReplicas $i)) }}
+        # Wait for up to 300 seconds before starting the liveness and readiness probes.
+        # The node will open the API port only after initializing the storage.
         startupProbe:
+          tcpSocket:
+            port: api
+          periodSeconds: 3
+          timeoutSeconds: 1
+          failureThreshold: 100
+        # Mark pod unhealthy if it falls out of consensus.
+        readinessProbe:
           httpGet:
+            port: metrics
             path: /consensus_health_check
-            port: 9101
-            scheme: HTTP
-          failureThreshold: 2147483647 # set it to the max value since we don't want to restart the pod automatically even if it can't participate in consensus
-          periodSeconds: 1
-          successThreshold: 1
+          # Delay probe execution to ensure the node has had the time to connect to the network.
+          initialDelaySeconds: 30
+          periodSeconds: 5
           timeoutSeconds: 3
-        {{- end }}
+          failureThreshold: 2
+        # Restart the pod if the REST API is ever unresponsive for 60 seconds.
+        {{- if .enableLivenessProbe }}
+        livenessProbe:
+          httpGet:
+            port: api
+            path: /v1/-/healthy
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 4
+        {{- end }} # if .enableLivenessProbe
+        {{- end }} # if .enabled
+        {{- end }} # with .healthChecks
         args:
           - /bin/bash
           - -c
@@ -242,7 +289,7 @@ spec:
           claimName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator-e{{ $.Values.chain.era }}
       - name: writable-genesis
         emptyDir: {}
-      serviceAccountName: {{ include "aptos-validator.fullname" $ }}-validator
+      serviceAccountName: {{ include "aptos-validator.validatorServiceAccountName" $ }}
       {{- if $.Values.imagePullSecret }}
       imagePullSecrets:
       - name: {{ $.Values.imagePullSecret }}
