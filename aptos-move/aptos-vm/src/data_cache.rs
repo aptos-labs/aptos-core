@@ -45,8 +45,8 @@ use move_vm_types::{
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 pub fn get_resource_group_member_from_metadata(
     struct_tag: &StructTag,
@@ -234,7 +234,7 @@ impl<E: ExecutorView> TDelayedFieldView for StorageAdapter<'_, E> {
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
     ) -> Result<
-        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
         PanicError,
     > {
         self.executor_view

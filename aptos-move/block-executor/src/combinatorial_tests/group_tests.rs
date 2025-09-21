@@ -6,7 +6,7 @@ use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     combinatorial_tests::{
         baseline::BaselineOutput,
-        mock_executor::{MockEvent, MockOutput, MockTask},
+        mock_executor::{MockEvent, MockTask},
         resource_tests::{
             create_executor_thread_pool, execute_block_parallel, get_gas_limit_variants,
         },
@@ -94,7 +94,7 @@ pub(crate) fn run_tests_with_groups(
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
+            NoOpTransactionCommitHook<usize>,
             DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>, AuxiliaryInfo>,
             AuxiliaryInfo,
         >::new(

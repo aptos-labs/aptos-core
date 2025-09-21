@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
+    block_executor::AptosVMBlockExecutorWrapper,
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::{discarded_output, expect_only_successful_execution},
@@ -2956,7 +2956,7 @@ impl AptosVMBlockExecutor {
 
         let result = AptosVMBlockExecutorWrapper::execute_block::<
             _,
-            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            NoOpTransactionCommitHook<VMStatus>,
             DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         >(
             txn_provider,

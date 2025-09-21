@@ -466,6 +466,7 @@ dependencies = [
  "move-vm-types",
  "once_cell",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -750,6 +751,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -2007,6 +2009,7 @@ dependencies = [
  "tempfile",
  "tiny-keccak",
  "toml 0.7.8",
+ "triomphe",
 ]
 
 [[package]]
@@ -3192,6 +3195,7 @@ dependencies = [
  "rayon",
  "serde",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -4319,6 +4323,7 @@ dependencies = [
  "move-vm-types",
  "sha3 0.9.1",
  "smallvec",
+ "triomphe",
 ]
 
 [[package]]
@@ -4866,13 +4871,13 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "ouroboros",
- "parking_lot 0.12.1",
  "proptest",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "rayon",
  "serde",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -5002,6 +5007,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -18679,9 +18685,9 @@ dependencies = [
 
 [[package]]
 name = "triomphe"
-version = "0.1.11"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "859eb650cfee7434994602c3a68b25d77ad9e68c8a6cd491616ef86661382eb3"
+checksum = "ef8f7726da4807b58ea5c96fdc122f80702030edc33b35aff9190a51148ccc85"
 dependencies = [
  "serde",
  "stable_deref_trait",

@@ -60,7 +60,7 @@ use aptos_types::{
 };
 use aptos_validator_interface::{DebuggerStateView, RestDebuggerInterface};
 use aptos_vm::{
-    block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
+    block_executor::AptosVMBlockExecutorWrapper,
     data_cache::AsMoveResolver,
     gas::make_prod_gas_meter,
     move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionExt, SessionId},
@@ -748,7 +748,7 @@ impl FakeExecutor {
         let txn_provider = DefaultTxnProvider::new_without_info(txn_block);
         AptosVMBlockExecutorWrapper::execute_block_on_thread_pool::<
             _,
-            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            NoOpTransactionCommitHook<VMStatus>,
             _,
         >(
             self.executor_thread_pool.clone(),

@@ -46,12 +46,12 @@ use move_core_types::{
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::{Lazy, OnceCell};
-use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     marker::PhantomData,
     sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 use vm_wrapper::AptosExecutorTask;
 
 static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
@@ -68,20 +68,16 @@ static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 /// transformed into TransactionOutput type that is returned.
 #[derive(Debug)]
 pub struct AptosTransactionOutput {
-    vm_output: RwLock<Option<VMOutput>>,
+    vm_output: Option<VMOutput>,
     committed_output: OnceCell<TransactionOutput>,
 }
 
 impl AptosTransactionOutput {
     pub fn new(output: VMOutput) -> Self {
         Self {
-            vm_output: RwLock::new(Some(output)),
+            vm_output: Some(output),
             committed_output: OnceCell::new(),
         }
-    }
-
-    pub(crate) fn committed_output(&self) -> &TransactionOutput {
-        self.committed_output.get().unwrap()
     }
 
     fn take_output(mut self) -> TransactionOutput {
@@ -92,7 +88,6 @@ impl AptosTransactionOutput {
             // This is currently used because we do not commit skip_output() transactions.
             None => self
                 .vm_output
-                .write()
                 .take()
                 .expect("Output must be set")
                 .into_transaction_output()
@@ -122,21 +117,7 @@ impl<'a> AfterMaterializationOutput<SignatureVerifiedTransaction>
 
 /// Before materialization guard wrapper that holds a read lock.
 pub struct BeforeMaterializationGuard<'a> {
-    guard: MappedRwLockReadGuard<'a, VMOutput>,
-}
-
-impl<'a> BeforeMaterializationGuard<'a> {
-    fn new(rwlock: &'a RwLock<Option<VMOutput>>) -> Result<Self, PanicError> {
-        // This is the critical check that ensures that the output is not None.
-        // Using try_map on the guard allows to check the invariant once, and then
-        // use the guard without further checks in the downstream APIs.
-        let guard = rwlock.read();
-        let mapped_guard = RwLockReadGuard::try_map(guard, |vm_output_opt| vm_output_opt.as_ref())
-            .map_err(|_guard| code_invariant_error("Output must be set but not materialized"))?;
-        Ok(Self {
-            guard: mapped_guard,
-        })
-    }
+    guard: &'a VMOutput,
 }
 
 impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMaterializationGuard<'_> {
@@ -194,7 +175,7 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
         (
             WriteOp,
             ResourceGroupSize,
-            BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+            BTreeMap<StructTag, (WriteOp, Option<TriompheArc<MoveTypeLayout>>)>,
         ),
     > {
         self.guard
@@ -223,6 +204,25 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
                 }
             })
             .collect()
+    }
+
+    fn for_each_resource_key_no_aggregator_v1(
+        &self,
+        callback: &mut dyn FnMut(&StateKey) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
+        for key in self
+            .guard
+            .resource_write_set()
+            .iter()
+            .flat_map(|(key, write)| match write {
+                AbstractResourceWriteOp::Write(_)
+                | AbstractResourceWriteOp::WriteWithDelayedFields(_) => Some(key),
+                _ => None,
+            })
+        {
+            callback(key)?;
+        }
+        Ok(())
     }
 
     fn for_each_resource_group_key_and_tags(
@@ -262,18 +262,22 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
             .collect()
     }
 
-    fn resource_write_set(&self) -> Vec<(StateKey, Arc<WriteOp>, Option<Arc<MoveTypeLayout>>)> {
+    fn resource_write_set(
+        &self,
+    ) -> HashMap<StateKey, (TriompheArc<WriteOp>, Option<TriompheArc<MoveTypeLayout>>)> {
         self.guard
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| match write {
                 AbstractResourceWriteOp::Write(write_op) => {
-                    Some((key.clone(), Arc::new(write_op.clone()), None))
+                    Some((key.clone(), (TriompheArc::new(write_op.clone()), None)))
                 },
                 AbstractResourceWriteOp::WriteWithDelayedFields(write) => Some((
                     key.clone(),
-                    Arc::new(write.write_op.clone()),
-                    Some(write.layout.clone()),
+                    (
+                        TriompheArc::new(write.write_op.clone()),
+                        Some(write.layout.clone()),
+                    ),
                 )),
                 _ => None,
             })
@@ -302,7 +306,7 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(StateKey, StateValueMetadata, Arc<MoveTypeLayout>)> {
+    ) -> Vec<(StateKey, StateValueMetadata, TriompheArc<MoveTypeLayout>)> {
         self.guard
             .resource_write_set()
             .iter()
@@ -366,6 +370,10 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     type BeforeMaterializationGuard<'a> = BeforeMaterializationGuard<'a>;
     type Txn = SignatureVerifiedTransaction;
 
+    fn committed_output(&self) -> &OnceCell<TransactionOutput> {
+        &self.committed_output
+    }
+
     /// Execution output for transactions that comes after SkipRest signal or when there was a
     /// problem creating the output (e.g. group serialization issue).
     fn skip_output() -> Self {
@@ -379,7 +387,12 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     fn before_materialization<'a>(&'a self) -> Result<BeforeMaterializationGuard<'a>, PanicError> {
-        BeforeMaterializationGuard::new(&self.vm_output)
+        Ok(BeforeMaterializationGuard {
+            guard: self
+                .vm_output
+                .as_ref()
+                .ok_or_else(|| code_invariant_error("Output must be set but not materialized"))?,
+        })
     }
 
     fn after_materialization<'a>(&'a self) -> Result<AfterMaterializationGuard<'a>, PanicError> {
@@ -412,7 +425,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         } else {
             if !self
                 .vm_output
-                .read()
                 .as_ref()
                 .map_or(false, |output| output.status().is_retry())
             {
@@ -425,7 +437,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     fn incorporate_materialized_txn_output(
-        &self,
+        &mut self,
         aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
         materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
         materialized_events: Vec<ContractEvent>,
@@ -433,7 +445,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.committed_output
             .set(
                 self.vm_output
-                    .write()
                     .take()
                     .expect("Output must be set to incorporate materialized data")
                     .into_transaction_output_with_materialized_write_set(
@@ -449,12 +460,11 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             })
     }
 
-    fn set_txn_output_for_non_dynamic_change_set(&self) {
+    fn set_txn_output_for_non_dynamic_change_set(&mut self) {
         assert!(
             self.committed_output
                 .set(
                     self.vm_output
-                        .write()
                         .take()
                         .expect("Output must be set to incorporate materialized data")
                         .into_transaction_output()
@@ -467,11 +477,10 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     // Used only by the sequential execution, does not set committed_output.
     fn legacy_sequential_materialize_agg_v1(
-        &self,
+        &mut self,
         view: &impl TAggregatorV1View<Identifier = StateKey>,
     ) {
         self.vm_output
-            .write()
             .as_mut()
             .expect("Output must be set to incorporate materialized data")
             .try_materialize(view)
@@ -500,7 +509,7 @@ impl<
 {
     pub fn execute_block_on_thread_pool<
         S: StateView + Sync,
-        L: TransactionCommitHook<Output = AptosTransactionOutput>,
+        L: TransactionCommitHook,
         TP: TxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo> + Sync,
     >(
         executor_thread_pool: Arc<rayon::ThreadPool>,
@@ -574,7 +583,7 @@ impl<
     /// Uses shared thread pool to execute blocks.
     pub(crate) fn execute_block<
         S: StateView + Sync,
-        L: TransactionCommitHook<Output = AptosTransactionOutput>,
+        L: TransactionCommitHook,
         TP: TxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo> + Sync,
     >(
         signature_verified_block: &TP,

@@ -22,8 +22,8 @@ use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
-    sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 /// We differentiate between deprecated way to interact with aggregators (TAggregatorV1View),
 /// and new, more general, TDelayedFieldView.
@@ -181,7 +181,7 @@ pub trait TDelayedFieldView {
         delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
     ) -> Result<
-        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
         PanicError,
     >;
 
@@ -260,7 +260,7 @@ where
         _delayed_write_set_ids: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
     ) -> Result<
-        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
         PanicError,
     > {
         unimplemented!("get_reads_needing_exchange not implemented")

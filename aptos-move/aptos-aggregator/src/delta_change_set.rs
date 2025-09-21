@@ -229,10 +229,8 @@ mod test {
     use move_binary_format::errors::{PartialVMError, PartialVMResult};
     use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
     use once_cell::sync::Lazy;
-    use std::{
-        collections::{BTreeMap, HashSet},
-        sync::Arc,
-    };
+    use std::collections::{BTreeMap, HashSet};
+    use triomphe::Arc as TriompheArc;
 
     fn delta_add_with_history(v: u128, max_value: u128, max: u128, min: u128) -> DeltaOp {
         let mut delta = delta_add(v, max_value);
@@ -542,7 +540,7 @@ mod test {
             _delayed_write_set_keys: &HashSet<Self::Identifier>,
             _skip: &HashSet<Self::ResourceKey>,
         ) -> Result<
-            BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+            BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
             PanicError,
         > {
             unimplemented!("Irrelevant for the test")

@@ -42,8 +42,8 @@ use std::{
         BTreeMap,
     },
     hash::Hash,
-    sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 /// Sporadically checks if the given two input type layouts match.
 pub fn randomly_check_layout_matches(
@@ -134,14 +134,14 @@ impl VMChangeSet {
 
     // TODO[agg_v2](cleanup) see if we can remove in favor of `new`.
     pub fn new_expanded(
-        resource_write_set: BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+        resource_write_set: BTreeMap<StateKey, (WriteOp, Option<TriompheArc<MoveTypeLayout>>)>,
         resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
         delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
         reads_needing_delayed_field_exchange: BTreeMap<
             StateKey,
-            (StateValueMetadata, u64, Arc<MoveTypeLayout>),
+            (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>),
         >,
         group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (StateValueMetadata, u64)>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
@@ -522,8 +522,8 @@ impl VMChangeSet {
     fn squash_additional_resource_write_ops<
         K: Hash + Eq + PartialEq + Ord + Clone + std::fmt::Debug,
     >(
-        write_set: &mut BTreeMap<K, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
-        additional_write_set: BTreeMap<K, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+        write_set: &mut BTreeMap<K, (WriteOp, Option<TriompheArc<MoveTypeLayout>>)>,
+        additional_write_set: BTreeMap<K, (WriteOp, Option<TriompheArc<MoveTypeLayout>>)>,
     ) -> Result<(), PanicError> {
         for (key, additional_entry) in additional_write_set.into_iter() {
             match write_set.entry(key.clone()) {

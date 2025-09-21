@@ -31,7 +31,7 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::{Module, RuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     fmt::Debug,
     iter::{empty, Iterator},
     sync::{
@@ -39,6 +39,7 @@ use std::{
         Arc,
     },
 };
+use triomphe::Arc as TriompheArc;
 
 type TxnInput<T> = CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
 
@@ -55,7 +56,8 @@ macro_rules! with_success_or_skip_rest {
     // The flexible form for any expression.
     ($self:ident, $txn_idx:ident, | $t:ident | $body:expr, $fallback:expr) => {{
         let wrapper = $self.output_wrappers[$txn_idx as usize].lock();
-        match (&wrapper.output_status_kind, &wrapper.output) {
+        let status_kind = wrapper.output_status_kind.clone();
+        match (&status_kind, &wrapper.output) {
             (OutputStatusKind::Success, Some($t)) | (OutputStatusKind::SkipRest, Some($t)) => $body,
             (OutputStatusKind::Abort(_), None)
             | (OutputStatusKind::SpeculativeExecutionAbortError, None)
@@ -70,14 +72,38 @@ macro_rules! with_success_or_skip_rest {
             | (OutputStatusKind::None, Some(_)) => {
                 unreachable!(
                     "Inconsistent wrapper status kind {:?} and output {:?}",
-                    wrapper.output_status_kind, wrapper.output
+                    status_kind, wrapper.output
+                )
+            },
+        }
+    }};
+    // The flexible form for any expression where the output needs to be mutable.
+    ($self:ident, $txn_idx:ident, | mut $t:ident | $body:expr, $fallback:expr) => {{
+        let mut wrapper = $self.output_wrappers[$txn_idx as usize].lock();
+        let status_kind = wrapper.output_status_kind.clone();
+        match (&status_kind, &mut wrapper.output) {
+            (OutputStatusKind::Success, Some($t)) | (OutputStatusKind::SkipRest, Some($t)) => $body,
+            (OutputStatusKind::Abort(_), None)
+            | (OutputStatusKind::SpeculativeExecutionAbortError, None)
+            | (OutputStatusKind::DelayedFieldsCodeInvariantError, None)
+            | (OutputStatusKind::None, None) => $fallback,
+            // The remaining arms are all unreachable.
+            (OutputStatusKind::Success, None)
+            | (OutputStatusKind::SkipRest, None)
+            | (OutputStatusKind::Abort(_), Some(_))
+            | (OutputStatusKind::SpeculativeExecutionAbortError, Some(_))
+            | (OutputStatusKind::DelayedFieldsCodeInvariantError, Some(_))
+            | (OutputStatusKind::None, Some(_)) => {
+                unreachable!(
+                    "Inconsistent wrapper status kind {:?} and output {:?}",
+                    status_kind, wrapper.output
                 )
             },
         }
     }};
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum OutputStatusKind {
     Success,
     SkipRest,
@@ -241,7 +267,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         &self,
         key: &T::Key,
         txn_idx: TxnIndex,
-    ) -> Result<(Arc<T::Value>, Arc<MoveTypeLayout>), PanicError> {
+    ) -> Result<(TriompheArc<T::Value>, TriompheArc<MoveTypeLayout>), PanicError> {
         self.inputs[txn_idx as usize].load().as_ref().map_or_else(
             || {
                 Err(code_invariant_error(
@@ -380,7 +406,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         Ok(())
     }
 
-    pub(crate) fn notify_listener<L: TransactionCommitHook<Output = O>>(
+    pub(crate) fn notify_listener<L: TransactionCommitHook>(
         &self,
         txn_idx: TxnIndex,
         txn_listener: &L,
@@ -393,7 +419,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
                     output_wrapper
                         .output
                         .as_ref()
-                        .expect("Output must be set when status is success or skip rest"),
+                        .expect("Output must be set when status is success or skip rest")
+                        .committed_output(),
                 );
             },
             OutputStatusKind::Abort(_) => {
@@ -407,6 +434,21 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
                     output_wrapper.output_status_kind
                 )));
             },
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn for_each_resource_key_no_aggregator_v1(
+        &self,
+        txn_idx: TxnIndex,
+        mut callback: impl FnMut(&T::Key) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
+        let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
+        if let Some(output) = output_wrapper.output.as_ref() {
+            output
+                .before_materialization()?
+                .for_each_resource_key_no_aggregator_v1(&mut callback)?;
         }
 
         Ok(())
@@ -454,7 +496,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
                     inner
                         .resource_write_set()
                         .into_iter()
-                        .map(|(k, _, _)| (k, false))
+                        .map(|(k, (_, _))| (k, false))
                         .chain(
                             inner
                                 .aggregator_v1_write_set()
@@ -469,24 +511,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
                         ),
                 )
             },
-            None
-        )
-    }
-
-    pub(crate) fn modified_resource_keys_no_aggregator_v1(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Option<impl Iterator<Item = T::Key>> {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |t| Some(
-                t.before_materialization()
-                    .expect("Output must be set")
-                    .resource_write_set()
-                    .into_iter()
-                    .map(|(k, _, _)| k),
-            ),
             None
         )
     }
@@ -572,7 +596,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     pub(crate) fn reads_needing_delayed_field_exchange(
         &self,
         txn_idx: TxnIndex,
-    ) -> Vec<(T::Key, StateValueMetadata, Arc<MoveTypeLayout>)> {
+    ) -> Vec<(T::Key, StateValueMetadata, TriompheArc<MoveTypeLayout>)> {
         with_success_or_skip_rest!(self, txn_idx, reads_needing_delayed_field_exchange, vec![])
             .expect("Output must be set")
     }
@@ -632,8 +656,11 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     pub(crate) fn resource_write_set(
         &self,
         txn_idx: TxnIndex,
-    ) -> Result<Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>, PanicError> {
-        with_success_or_skip_rest!(self, txn_idx, resource_write_set, vec![])
+    ) -> Result<
+        HashMap<T::Key, (TriompheArc<T::Value>, Option<TriompheArc<MoveTypeLayout>>)>,
+        PanicError,
+    > {
+        with_success_or_skip_rest!(self, txn_idx, resource_write_set, HashMap::new())
     }
 
     // Called when a transaction is committed to record WriteOps for materialized aggregator values
@@ -649,7 +676,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         with_success_or_skip_rest!(
             self,
             txn_idx,
-            |t| t.incorporate_materialized_txn_output(
+            |mut t| t.incorporate_materialized_txn_output(
                 delta_writes,
                 patched_resource_write_set,
                 patched_events

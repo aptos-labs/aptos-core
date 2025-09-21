@@ -1,12 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    block_executor::AptosTransactionOutput,
-    sharded_block_executor::{
-        cross_shard_state_view::CrossShardStateView,
-        messages::{CrossShardMsg, CrossShardMsg::RemoteTxnWriteMsg, RemoteTxnWrite},
-    },
+use crate::sharded_block_executor::{
+    cross_shard_state_view::CrossShardStateView,
+    messages::{CrossShardMsg, CrossShardMsg::RemoteTxnWriteMsg, RemoteTxnWrite},
 };
 use aptos_block_executor::txn_commit_hook::TransactionCommitHook;
 use aptos_logger::trace;
@@ -14,9 +11,10 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_executor::partitioner::{RoundId, ShardId, SubBlock, GLOBAL_ROUND_ID},
     state_store::{state_key::StateKey, StateView},
-    transaction::analyzed_transaction::AnalyzedTransaction,
+    transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
     write_set::TransactionWrite,
 };
+use once_cell::sync::OnceCell;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -105,11 +103,13 @@ impl CrossShardCommitSender {
     fn send_remote_update_for_success(
         &self,
         txn_idx: TxnIndex,
-        txn_output: &AptosTransactionOutput,
+        txn_output: &OnceCell<TransactionOutput>,
     ) {
         let edges = self.dependent_edges.get(&txn_idx).unwrap();
-        let output = txn_output.committed_output();
-        let write_set = output.write_set();
+        let write_set = txn_output
+            .get()
+            .expect("Committed output must be set")
+            .write_set();
 
         for (state_key, write_op) in write_set.expect_write_op_iter() {
             if let Some(dependent_shard_ids) = edges.get(state_key) {
@@ -135,9 +135,11 @@ impl CrossShardCommitSender {
 }
 
 impl TransactionCommitHook for CrossShardCommitSender {
-    type Output = AptosTransactionOutput;
-
-    fn on_transaction_committed(&self, txn_idx: TxnIndex, txn_output: &Self::Output) {
+    fn on_transaction_committed(
+        &self,
+        txn_idx: TxnIndex,
+        txn_output: &OnceCell<TransactionOutput>,
+    ) {
         let global_txn_idx = txn_idx + self.index_offset;
         if self.dependent_edges.contains_key(&global_txn_idx) {
             self.send_remote_update_for_success(global_txn_idx, txn_output);
