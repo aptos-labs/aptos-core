@@ -3,7 +3,10 @@
 
 use crate::{algebra::polynomials, fiat_shamir, utils, utils::pad_to_pow2_len_minus_one};
 use anyhow::ensure;
-use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, PrimeGroup, VariableBaseMSM};
+use ark_ec::{
+    pairing::{Pairing, PairingOutput},
+    AffineRepr, CurveGroup, PrimeGroup, VariableBaseMSM,
+};
 use ark_ff::{AdditiveGroup, Field};
 use ark_poly::{self, EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -538,7 +541,7 @@ pub fn batch_verify<E: Pairing>(
             .chain(once(pp.vanishing_com)) // add vanishing commitment
             .collect::<Vec<_>>(), // collect into Vec<E::G2>
     );
-    ensure!(E::TargetField::ONE == h_check.0);
+    ensure!(PairingOutput::<E>::ZERO == h_check);
 
     // Ensure duality: c[j] matches c_hat[j].
 
@@ -557,7 +560,7 @@ pub fn batch_verify<E: Pairing>(
             g2_comb,       // from MSM in G2
         ],
     );
-    ensure!(E::TargetField::ONE == c_check.0);
+    ensure!(PairingOutput::<E>::ZERO == c_check);
 
     Ok(())
 }
