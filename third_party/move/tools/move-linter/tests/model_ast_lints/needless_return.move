@@ -2,7 +2,6 @@ module 0xc0ffee::m {
 
     use std::option::{Option, none, some};
 
-
     // Tests with only return statements in the body of the function
     public fun with_return_void(_x : bool) {
         return  // Should warn here.
@@ -19,7 +18,7 @@ module 0xc0ffee::m {
     // Should warn only in the last return statement
     public fun with_return_void_bigger_body(x : bool){
         if (x) {
-            return // Should not warn here.
+            return; // Should not warn here.
         };
 
         return  // Should warn here.
@@ -54,10 +53,30 @@ module 0xc0ffee::m {
         (1, 2) // Should not warn here.
     }
 
-    #[lint::skip(nonminimal_bool)]
-    fun test_no_warn(): bool {
-        !true  // Should not warn here.
-    }
+    fun explicit_return_if(x: u64, b: bool): u64 {  
+        if (b) {  
+            return x + 1 // Should warn here.
+        } else {  
+            x - 1  
+        }  
+    }  
+
+
+    fun explicit_return_if_else(x: u64, b: bool): u64 {  
+        if (b) {  
+            return x + 1 // Should warn here.
+        } else {  
+            return x - 1 // Should warn here.
+        }  
+    }  
+
+    fun explicit_return_if_else_void_semicolon(b: bool) {  
+        if (b) {  
+            return; // Should warn here.
+        } else {  
+            return; // Should warn here.
+        }
+    }  
 
     #[lint::skip(needless_return)]
     fun test_skip(): bool {
