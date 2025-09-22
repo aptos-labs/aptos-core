@@ -262,6 +262,12 @@ impl<'a> TypeTagConverter<'a> {
             Type::U64 => TypeTag::U64,
             Type::U128 => TypeTag::U128,
             Type::U256 => TypeTag::U256,
+            Type::I8 => TypeTag::I8,
+            Type::I16 => TypeTag::I16,
+            Type::I32 => TypeTag::I32,
+            Type::I64 => TypeTag::I64,
+            Type::I128 => TypeTag::I128,
+            Type::I256 => TypeTag::I256,
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
 

@@ -306,6 +306,12 @@ impl RuntimeEnvironment {
             | U64
             | U128
             | U256
+            | I8
+            | I16
+            | I32
+            | I64
+            | I128
+            | I256
             | Address
             | Signer
             | TyParam(_)

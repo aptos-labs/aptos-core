@@ -18,8 +18,8 @@ use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::Identifier,
+    int256,
     language_storage::TypeTag,
-    u256::U256,
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
@@ -368,7 +368,7 @@ fn good_signatures_and_arguments() -> Vec<(Signature, Vec<MoveValue>)> {
         )]),
         // U256 arg
         (Signature(vec![SignatureToken::U256]), vec![
-            MoveValue::U256(U256::zero()),
+            MoveValue::U256(int256::U256::ZERO),
         ]),
         // All constants
         (

@@ -738,7 +738,9 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
                 U8 => ("U8Vector", "Some(value)".to_string()),
                 _ => common::type_not_allowed(type_tag),
             },
-            Struct(_) | Signer | Function(..) => common::type_not_allowed(type_tag),
+            Struct(_) | Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
+                common::type_not_allowed(type_tag)
+            },
         };
         writeln!(
             self.out,
@@ -881,7 +883,9 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
                 tag if &**tag == Lazy::force(&str_tag) => "Vec<u8>".into(),
                 _ => common::type_not_allowed(type_tag),
             },
-            Signer | Function(..) => common::type_not_allowed(type_tag),
+            Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
+                common::type_not_allowed(type_tag)
+            },
         }
     }
 
@@ -910,7 +914,9 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
                 _ => common::type_not_allowed(type_tag),
             },
 
-            Struct(_) | Signer | Function(..) => common::type_not_allowed(type_tag),
+            Struct(_) | Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
+                common::type_not_allowed(type_tag)
+            },
         }
     }
 }

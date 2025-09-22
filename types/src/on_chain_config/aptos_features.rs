@@ -148,6 +148,9 @@ pub enum FeatureFlag {
     /// Whether to allow trusted code optimizations.
     ENABLE_TRUSTED_CODE = 100,
     ENABLE_ENUM_OPTION = 101,
+    /// Enables bytecode version v9
+    VM_BINARY_FORMAT_V9 = 102,
+
 }
 
 impl FeatureFlag {
@@ -251,6 +254,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_CAPTURE_OPTION,
             FeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::ENABLE_ENUM_OPTION,
+            FeatureFlag::VM_BINARY_FORMAT_V9,
         ]
     }
 }
@@ -461,7 +465,9 @@ impl Features {
     }
 
     pub fn get_max_binary_format_version(&self) -> u32 {
-        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V8) {
+        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V9) {
+            file_format_common::VERSION_9
+        } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V8) {
             file_format_common::VERSION_8
         } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
             file_format_common::VERSION_7
@@ -517,7 +523,7 @@ mod test {
             file_format_common::VERSION_MIN
         );
         assert_eq!(
-            file_format_common::VERSION_8,
+            file_format_common::VERSION_9,
             file_format_common::VERSION_MAX
         );
     }

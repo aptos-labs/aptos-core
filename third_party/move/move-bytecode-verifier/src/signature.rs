@@ -285,6 +285,18 @@ impl<'a> SignatureChecker<'a> {
                 | CastU64
                 | CastU128
                 | CastU256
+                | LdI8(_)
+                | LdI16(_)
+                | LdI32(_)
+                | LdI64(_)
+                | LdI128(_)
+                | LdI256(_)
+                | CastI8
+                | CastI16
+                | CastI32
+                | CastI64
+                | CastI128
+                | CastI256
                 | LdTrue
                 | LdFalse
                 | Call(_)
@@ -301,6 +313,7 @@ impl<'a> SignatureChecker<'a> {
                 | Mul
                 | Mod
                 | Div
+                | Negate
                 | BitOr
                 | BitAnd
                 | Xor
@@ -384,6 +397,12 @@ impl<'a> SignatureChecker<'a> {
             | SignatureToken::U64
             | SignatureToken::U128
             | SignatureToken::U256
+            | SignatureToken::I8
+            | SignatureToken::I16
+            | SignatureToken::I32
+            | SignatureToken::I64
+            | SignatureToken::I128
+            | SignatureToken::I256
             | SignatureToken::Address
             | SignatureToken::Signer => {},
         }
@@ -418,8 +437,8 @@ impl<'a> SignatureChecker<'a> {
     fn check_signature_token(&self, ty: &SignatureToken) -> PartialVMResult<()> {
         use SignatureToken::*;
         match ty {
-            U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address | Signer | Struct(_)
-            | TypeParameter(_) => Ok(()),
+            U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256 | Bool
+            | Address | Signer | Struct(_) | TypeParameter(_) => Ok(()),
             Reference(_) | MutableReference(_) => {
                 // TODO: Prop tests expect us to NOT check the inner types.
                 // Revisit this once we rework prop tests.
@@ -494,6 +513,12 @@ impl<'a> SignatureChecker<'a> {
             | SignatureToken::U64
             | SignatureToken::U128
             | SignatureToken::U256
+            | SignatureToken::I8
+            | SignatureToken::I16
+            | SignatureToken::I32
+            | SignatureToken::I64
+            | SignatureToken::I128
+            | SignatureToken::I256
             | SignatureToken::Address
             | SignatureToken::Signer => Ok(()),
         }

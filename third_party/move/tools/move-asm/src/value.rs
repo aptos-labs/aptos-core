@@ -5,12 +5,13 @@
 
 use anyhow::anyhow;
 use move_binary_format::file_format::SignatureToken;
-use move_core_types::{account_address::AccountAddress, u256::U256, value::MoveValue};
+use move_core_types::{account_address::AccountAddress, int256::U256, value::MoveValue};
 use std::fmt;
 
 /// An untyped numeric value, or a vector of such values.
 #[derive(Debug)]
 pub enum AsmValue {
+    // TODO(#17645): represent signed ints
     Number(U256),
     Vector(Vec<AsmValue>),
 }
@@ -38,28 +39,27 @@ impl AsmValue {
     pub fn to_move_value(&self, ty: &SignatureToken) -> anyhow::Result<MoveValue> {
         match ty {
             SignatureToken::Bool => {
-                let num = self.check_number(U256::from(1u8))?;
-                Ok(MoveValue::Bool(num != U256::zero()))
+                let num = self.check_number(U256::ONE)?;
+                Ok(MoveValue::Bool(num != U256::ZERO))
             },
             SignatureToken::U8 => Ok(MoveValue::U8(
-                self.check_number(U256::from(u8::MAX))?.unchecked_as_u8(),
+                self.check_number(U256::from(u8::MAX))?.try_into()?,
             )),
             SignatureToken::U16 => Ok(MoveValue::U16(
-                self.check_number(U256::from(u16::MAX))?.unchecked_as_u16(),
+                self.check_number(U256::from(u16::MAX))?.try_into()?,
             )),
             SignatureToken::U32 => Ok(MoveValue::U32(
-                self.check_number(U256::from(u32::MAX))?.unchecked_as_u32(),
+                self.check_number(U256::from(u32::MAX))?.try_into()?,
             )),
             SignatureToken::U64 => Ok(MoveValue::U64(
-                self.check_number(U256::from(u64::MAX))?.unchecked_as_u64(),
+                self.check_number(U256::from(u64::MAX))?.try_into()?,
             )),
             SignatureToken::U128 => Ok(MoveValue::U128(
-                self.check_number(U256::from(u128::MAX))?
-                    .unchecked_as_u128(),
+                self.check_number(U256::from(u128::MAX))?.try_into()?,
             )),
-            SignatureToken::U256 => Ok(MoveValue::U256(self.check_number(U256::max_value())?)),
+            SignatureToken::U256 => Ok(MoveValue::U256(self.check_number(U256::MAX)?)),
             SignatureToken::Address => Ok(MoveValue::Address(u256_to_address(
-                self.check_number(U256::max_value())?,
+                self.check_number(U256::MAX)?,
             ))),
             SignatureToken::Vector(elem_type) => {
                 if let AsmValue::Vector(vals) = self {
@@ -79,6 +79,16 @@ impl AsmValue {
             | SignatureToken::Reference(_)
             | SignatureToken::MutableReference(_)
             | SignatureToken::TypeParameter(_) => Err(anyhow!("invalid type for constant value")),
+
+            SignatureToken::I8
+            | SignatureToken::I16
+            | SignatureToken::I32
+            | SignatureToken::I64
+            | SignatureToken::I128
+            | SignatureToken::I256 => {
+                // TODO(#17645): support signed integers in MASM
+                Err(anyhow!("signed integers not yet supported"))
+            },
         }
     }
 
@@ -123,5 +133,5 @@ pub(crate) fn u256_to_address(num: U256) -> AccountAddress {
 pub(crate) fn address_to_u256(addr: AccountAddress) -> U256 {
     let mut bytes = addr.into_bytes();
     bytes.reverse();
-    U256::from_le_bytes(&bytes)
+    U256::from_le_bytes(bytes)
 }
