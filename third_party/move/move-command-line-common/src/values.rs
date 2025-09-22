@@ -42,13 +42,13 @@ pub enum ValueToken {
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub enum ParsedValue<Extra: ParsableValue = ()> {
     Address(ParsedAddress),
-    InferredNum(move_core_types::u256::U256),
+    InferredNum(move_core_types::int256::U256),
     U8(u8),
     U16(u16),
     U32(u32),
     U64(u64),
     U128(u128),
-    U256(move_core_types::u256::U256),
+    U256(move_core_types::int256::U256),
     Bool(bool),
     Vector(Vec<ParsedValue<Extra>>),
     Struct(
@@ -314,7 +314,7 @@ impl<Extra: ParsableValue> ParsedValue<Extra> {
             ParsedValue::U16(u) => Extra::move_value_into_concrete(MoveValue::U16(u)),
             ParsedValue::U32(u) => Extra::move_value_into_concrete(MoveValue::U32(u)),
             ParsedValue::U64(u) => Extra::move_value_into_concrete(MoveValue::U64(u)),
-            ParsedValue::InferredNum(u) if u <= (u64::MAX.into()) => {
+            ParsedValue::InferredNum(u) if u <= u64::MAX.into() => {
                 Extra::move_value_into_concrete(MoveValue::U64(u.try_into()?))
             },
             ParsedValue::U128(u) => Extra::move_value_into_concrete(MoveValue::U128(u)),

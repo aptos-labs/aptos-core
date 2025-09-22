@@ -3093,13 +3093,13 @@ impl ExpTranslator<'_, '_, '_> {
             )),
             EA::Value_::U256(x) => Some(self.translate_number(
                 &loc,
-                BigInt::from(x),
+                BigInt::from(*x),
                 Some(PrimitiveType::U256),
                 expected_type,
                 context,
             )),
             EA::Value_::InferredNum(x) => {
-                Some(self.translate_number(&loc, BigInt::from(x), None, expected_type, context))
+                Some(self.translate_number(&loc, BigInt::from(*x), None, expected_type, context))
             },
             EA::Value_::Bool(x) => Some((Value::Bool(*x), Type::new_prim(PrimitiveType::Bool))),
             EA::Value_::Bytearray(x) => {

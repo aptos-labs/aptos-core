@@ -78,7 +78,7 @@ public fun m::test() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module c0ffee.m {
 struct S {
 	x: u64,

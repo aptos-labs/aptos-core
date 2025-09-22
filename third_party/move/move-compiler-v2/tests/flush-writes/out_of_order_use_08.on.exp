@@ -80,7 +80,7 @@ fun m::two(): (u64, u64) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module c0ffee.m {
 
 

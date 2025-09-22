@@ -321,6 +321,12 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::LdU64(_)
             | Bytecode::LdU128(_)
             | Bytecode::LdU256(_)
+            | Bytecode::LdI8(_)
+            | Bytecode::LdI16(_)
+            | Bytecode::LdI32(_)
+            | Bytecode::LdI64(_)
+            | Bytecode::LdI128(_)
+            | Bytecode::LdI256(_)
             | Bytecode::LdTrue
             | Bytecode::LdFalse
             | Bytecode::LdConst(_)
@@ -346,11 +352,18 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::CastU64
             | Bytecode::CastU128
             | Bytecode::CastU256
+            | Bytecode::CastI8
+            | Bytecode::CastI16
+            | Bytecode::CastI32
+            | Bytecode::CastI64
+            | Bytecode::CastI128
+            | Bytecode::CastI256
             | Bytecode::Add
             | Bytecode::Sub
             | Bytecode::Mul
             | Bytecode::Mod
             | Bytecode::Div
+            | Bytecode::Negate
             | Bytecode::BitOr
             | Bytecode::BitAnd
             | Bytecode::Xor
@@ -453,6 +466,30 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::LdU256(_) => {
                 let u256_ty = ty_builder.create_u256_ty();
+                operand_stack.push_ty(u256_ty)?
+            },
+            Bytecode::LdI8(_) => {
+                let u8_ty = ty_builder.create_i8_ty();
+                operand_stack.push_ty(u8_ty)?
+            },
+            Bytecode::LdI16(_) => {
+                let u16_ty = ty_builder.create_i16_ty();
+                operand_stack.push_ty(u16_ty)?
+            },
+            Bytecode::LdI32(_) => {
+                let u32_ty = ty_builder.create_i32_ty();
+                operand_stack.push_ty(u32_ty)?
+            },
+            Bytecode::LdI64(_) => {
+                let u64_ty = ty_builder.create_i64_ty();
+                operand_stack.push_ty(u64_ty)?
+            },
+            Bytecode::LdI128(_) => {
+                let u128_ty = ty_builder.create_i128_ty();
+                operand_stack.push_ty(u128_ty)?
+            },
+            Bytecode::LdI256(_) => {
+                let u256_ty = ty_builder.create_i256_ty();
                 operand_stack.push_ty(u256_ty)?
             },
             Bytecode::LdTrue | Bytecode::LdFalse => {
@@ -688,6 +725,36 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let u256_ty = ty_builder.create_u256_ty();
                 operand_stack.push_ty(u256_ty)?;
             },
+            Bytecode::CastI8 => {
+                operand_stack.pop_ty()?;
+                let i8_ty = ty_builder.create_i8_ty();
+                operand_stack.push_ty(i8_ty)?;
+            },
+            Bytecode::CastI16 => {
+                operand_stack.pop_ty()?;
+                let i16_ty = ty_builder.create_i16_ty();
+                operand_stack.push_ty(i16_ty)?;
+            },
+            Bytecode::CastI32 => {
+                operand_stack.pop_ty()?;
+                let i32_ty = ty_builder.create_i32_ty();
+                operand_stack.push_ty(i32_ty)?;
+            },
+            Bytecode::CastI64 => {
+                operand_stack.pop_ty()?;
+                let i64_ty = ty_builder.create_i64_ty();
+                operand_stack.push_ty(i64_ty)?;
+            },
+            Bytecode::CastI128 => {
+                operand_stack.pop_ty()?;
+                let i128_ty = ty_builder.create_i128_ty();
+                operand_stack.push_ty(i128_ty)?;
+            },
+            Bytecode::CastI256 => {
+                operand_stack.pop_ty()?;
+                let i256_ty = ty_builder.create_i256_ty();
+                operand_stack.push_ty(i256_ty)?;
+            },
             Bytecode::Add
             | Bytecode::Sub
             | Bytecode::Mul
@@ -703,6 +770,9 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // NO-OP, same as the two lines below when the types are indeed the same:
                 // let lhs_ty = operand_stack.pop_ty()?;
                 // operand_stack.push_ty(rhs_ty)?;
+            },
+            Bytecode::Negate => {
+                // NO-OP, leave stack as is
             },
             Bytecode::Shl | Bytecode::Shr => {
                 let _rhs = operand_stack.pop_ty()?;

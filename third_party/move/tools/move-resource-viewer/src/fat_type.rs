@@ -394,6 +394,12 @@ impl FatType {
                     layout
                 )))
             },
+            I8 | I16 | I32 | I64 | I128 | I256 => {
+                // TODO(#17645): implement fat types for supporting REST api
+                return Err(PartialVMError::new_invariant_violation(
+                    "signed integers not yet supported",
+                ));
+            },
         })
     }
 
@@ -424,6 +430,15 @@ impl From<&TypeTag> for FatType {
             TypeTag::Struct(inner) => Struct(Box::new(inner.as_ref().into())),
             TypeTag::Function(inner) => Function(Box::new(inner.as_ref().into())),
             TypeTag::U256 => U256,
+            TypeTag::I8
+            | TypeTag::I16
+            | TypeTag::I32
+            | TypeTag::I64
+            | TypeTag::I128
+            | TypeTag::I256 => {
+                // TODO(#17645): implement for REST api support
+                panic!("signed integers not yet supported")
+            },
         }
     }
 }

@@ -1015,7 +1015,7 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module 42.m {
 struct T has copy, drop, store {
 	issuer: vector<u8>,

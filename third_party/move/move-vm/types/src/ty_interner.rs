@@ -29,6 +29,12 @@ enum TypeRepr {
     U64,
     U128,
     U256,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
     Address,
     Signer,
     Vector(TypeId),
@@ -209,6 +215,12 @@ impl InternedTypePool {
         let u64_id = self.ty_interner.intern(TypeRepr::U64);
         self.ty_interner.intern(TypeRepr::U128);
         self.ty_interner.intern(TypeRepr::U256);
+        self.ty_interner.intern(TypeRepr::I8);
+        self.ty_interner.intern(TypeRepr::I16);
+        self.ty_interner.intern(TypeRepr::I32);
+        self.ty_interner.intern(TypeRepr::I64);
+        self.ty_interner.intern(TypeRepr::I128);
+        self.ty_interner.intern(TypeRepr::I256);
         self.ty_interner.intern(TypeRepr::Address);
         self.ty_interner.intern(TypeRepr::Signer);
 
@@ -240,6 +252,12 @@ impl InternedTypePool {
             U64 => self.ty_interner.intern(TypeRepr::U64),
             U128 => self.ty_interner.intern(TypeRepr::U128),
             U256 => self.ty_interner.intern(TypeRepr::U256),
+            I8 => self.ty_interner.intern(TypeRepr::I8),
+            I16 => self.ty_interner.intern(TypeRepr::I16),
+            I32 => self.ty_interner.intern(TypeRepr::I32),
+            I64 => self.ty_interner.intern(TypeRepr::I64),
+            I128 => self.ty_interner.intern(TypeRepr::I128),
+            I256 => self.ty_interner.intern(TypeRepr::I256),
             Address => self.ty_interner.intern(TypeRepr::Address),
             Signer => self.ty_interner.intern(TypeRepr::Signer),
             TyParam(idx) => subst[*idx as usize],
@@ -324,6 +342,12 @@ mod test {
             Type::U64,
             Type::U128,
             Type::U256,
+            Type::I8,
+            Type::I16,
+            Type::I32,
+            Type::I64,
+            Type::I128,
+            Type::I256,
             Type::Address,
             Type::Signer,
         ];

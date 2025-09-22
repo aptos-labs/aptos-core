@@ -481,7 +481,7 @@ public fun m::test($t0: &signer, $t1: vector<address>, $t2: vector<u64>) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module c0ffee.m {
 
 

@@ -7,10 +7,7 @@ use crate::{
     values::{ParsableValue, ParsedValue, ValueToken},
 };
 use anyhow::{anyhow, bail, Result};
-use move_core_types::{
-    account_address::AccountAddress,
-    u256::{U256FromStrError, U256},
-};
+use move_core_types::{account_address::AccountAddress, int256::U256};
 use num_bigint::BigUint;
 use std::{collections::BTreeMap, fmt::Display, iter::Peekable, num::ParseIntError};
 
@@ -194,7 +191,7 @@ impl<'a, I: Iterator<Item = (ValueToken, &'a str)>> Parser<'a, ValueToken, I> {
         let (tok, contents) = self.advance_any()?;
         Ok(match tok {
             ValueToken::Number if !matches!(self.peek_tok(), Some(ValueToken::ColonColon)) => {
-                let (u, _) = parse_u256(contents)?;
+                let u = parse_u256(contents)?;
                 ParsedValue::InferredNum(u)
             },
             ValueToken::NumberTyped => {
@@ -214,7 +211,7 @@ impl<'a, I: Iterator<Item = (ValueToken, &'a str)>> Parser<'a, ValueToken, I> {
                     let (u, _) = parse_u128(s)?;
                     ParsedValue::U128(u)
                 } else {
-                    let (u, _) = parse_u256(contents.strip_suffix("u256").unwrap())?;
+                    let u = parse_u256(contents.strip_suffix("u256").unwrap())?;
                     ParsedValue::U256(u)
                 }
             },
@@ -398,12 +395,9 @@ pub fn parse_u128(s: &str) -> Result<(u128, NumberFormat), ParseIntError> {
 }
 
 // Parse a u256 from a decimal or hex encoding
-pub fn parse_u256(s: &str) -> Result<(U256, NumberFormat), U256FromStrError> {
+pub fn parse_u256(s: &str) -> anyhow::Result<U256> {
     let (txt, base) = determine_num_text_and_base(s);
-    Ok((
-        U256::from_str_radix(&txt.replace('_', ""), base as u32)?,
-        base,
-    ))
+    U256::from_str_radix(&txt.replace('_', ""), base as u32)
 }
 
 // Parse an address from a decimal or hex encoding
@@ -429,7 +423,7 @@ mod tests {
         types::{ParsedStructType, ParsedType},
         values::ParsedValue,
     };
-    use move_core_types::{account_address::AccountAddress, u256::U256};
+    use move_core_types::{account_address::AccountAddress, int256::U256};
 
     #[allow(clippy::unreadable_literal)]
     #[test]
