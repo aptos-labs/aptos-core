@@ -1,46 +1,91 @@
 
 Diagnostics:
-warning: [lint] The return keyword can be removed, as the last value is automatically returned.
-  ┌─ tests/model_ast_lints/needless_return.move:8:9
+warning: [lint] The `return` keyword is unnecessary here and can be removed.
+  ┌─ tests/model_ast_lints/needless_return.move:7:9
   │
-8 │         return  // Should warn here.
+7 │         return  // Should warn here.
   │         ^^^^^^
   │
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_return)]`.
   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_return.
 
-warning: [lint] The return keyword can be removed, as the last value is automatically returned.
-   ┌─ tests/model_ast_lints/needless_return.move:12:9
+warning: [lint] The `return` keyword is unnecessary here and can be removed.
+   ┌─ tests/model_ast_lints/needless_return.move:11:9
    │
-12 │         return;  // Should warn here.
+11 │         return;  // Should warn here.
    │         ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_return)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_return.
 
-warning: [lint] The return keyword can be removed, as the last value is automatically returned.
-   ┌─ tests/model_ast_lints/needless_return.move:16:9
+warning: [lint] The `return` keyword is unnecessary here and can be removed.
+   ┌─ tests/model_ast_lints/needless_return.move:15:9
    │
-16 │         return some(!x)  // Should warn here.
+15 │         return some(!x)  // Should warn here.
    │         ^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_return)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_return.
 
-warning: [lint] The return keyword can be removed, as the last value is automatically returned.
-   ┌─ tests/model_ast_lints/needless_return.move:25:9
+warning: [lint] The `return` keyword is unnecessary here and can be removed.
+   ┌─ tests/model_ast_lints/needless_return.move:24:9
    │
-25 │         return  // Should warn here.
+24 │         return  // Should warn here.
    │         ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_return)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_return.
 
-warning: [lint] The return keyword can be removed, as the last value is automatically returned.
-   ┌─ tests/model_ast_lints/needless_return.move:33:9
+warning: [lint] The `return` keyword is unnecessary here and can be removed.
+   ┌─ tests/model_ast_lints/needless_return.move:32:9
    │
-33 │         return some(!x)  // Should warn here.
+32 │         return some(!x)  // Should warn here.
    │         ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_return)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_return.
+
+warning: [lint] The `return` keyword is unnecessary here and can be removed.
+   ┌─ tests/model_ast_lints/needless_return.move:58:13
+   │
+58 │             return x + 1 // Should warn here.
+   │             ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_return)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_return.
+
+warning: [lint] The `return` keyword is unnecessary here and can be removed.
+   ┌─ tests/model_ast_lints/needless_return.move:67:13
+   │
+67 │             return x + 1 // Should warn here.
+   │             ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_return)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_return.
+
+warning: [lint] The `return` keyword is unnecessary here and can be removed.
+   ┌─ tests/model_ast_lints/needless_return.move:69:13
+   │
+69 │             return x - 1 // Should warn here.
+   │             ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_return)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_return.
+
+warning: [lint] The `return` keyword is unnecessary here and can be removed.
+   ┌─ tests/model_ast_lints/needless_return.move:75:13
+   │
+75 │             return; // Should warn here.
+   │             ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_return)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_return.
+
+warning: [lint] The `return` keyword is unnecessary here and can be removed.
+   ┌─ tests/model_ast_lints/needless_return.move:77:13
+   │
+77 │             return; // Should warn here.
+   │             ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_return)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_return.

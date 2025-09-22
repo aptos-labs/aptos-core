@@ -10,7 +10,7 @@
 
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
-    ast::{ExpData, Operation},
+    ast::{Exp, ExpData, Operation},
     model::{FunctionEnv, GlobalEnv},
 };
 
@@ -33,38 +33,52 @@ impl ExpChecker for NeedlessReturn {
 
         let env = fenv.env();
 
+        self.check_expr(env, expr, true);
+    }
+}
+
+impl NeedlessReturn {
+    fn check_expr(&mut self, env: &GlobalEnv, expr: &ExpData, main_function: bool) {
         match expr {
             ExpData::Sequence(_, seq) => {
-                let Some(last_val) = seq.last() else { return };
+                if main_function {
+                    seq.iter().for_each(|x| self.check_expr(env, x, false));
+                } else {
+                    self.sequence_ends_in_explicit_return(env, seq);
+                }
+            },
 
-                // Case:
-                // ```
-                //   public fun foo(...): ... {
-                //      return ...
-                //   }
-                //
-                // ```
-                if self.report_if_return(env, last_val) {
+            ExpData::IfElse(.., if_branch, else_branch) => {
+                let span_end = { |x: &Exp| env.get_node_loc(x.node_id()).span().end() };
+
+                if span_end(if_branch) == span_end(else_branch) {
+                    // In this case, there's no `else` branch.
+                    //   fun test(b: bool) {
+                    //      if (b) {
+                    //          return
+                    //      };
+                    //  }
+                    //
                     return;
                 }
 
-                // The semicolon "adds" an empty tuple after all statements.
-                // If the function does not return anything, this can happen
-                // Case:                         |
-                // ```                           |
-                //   public fun foo(...) {       |
-                //      return;                  |
-                //      // ()     <--------------|
-                //   }
-                //
-                // ```
-                if let ExpData::Call(_, Operation::Tuple, args) = last_val.as_ref() {
-                    if !args.is_empty() {
-                        return;
-                    }
-                    if let Some(snd_to_last) = seq.get(seq.len() - 2) {
-                        self.report_if_return(env, snd_to_last);
-                    }
+                // This case is for empty `else` branches with a semicolon in the return
+                //   fun test(b: bool) {
+                //      if (b) {
+                //          return;
+                //      };
+                //  }
+                // As it gets compiled differently
+                is_empty_tuple(else_branch.as_ref());
+
+                self.report_if_return(env, if_branch);
+                if let ExpData::Sequence(_, seq) = if_branch.as_ref() {
+                    self.sequence_ends_in_explicit_return(env, seq);
+                }
+
+                self.report_if_return(env, else_branch);
+                if let ExpData::Sequence(_, seq) = else_branch.as_ref() {
+                    self.sequence_ends_in_explicit_return(env, seq);
                 }
             },
             _ => {
@@ -72,9 +86,7 @@ impl ExpChecker for NeedlessReturn {
             },
         }
     }
-}
 
-impl NeedlessReturn {
     fn report_if_return(&mut self, env: &GlobalEnv, expr: &ExpData) -> bool {
         if let ExpData::Return(nid_r, _) = expr {
             self.report(
@@ -87,4 +99,45 @@ impl NeedlessReturn {
             false
         }
     }
+
+    fn sequence_ends_in_explicit_return(&mut self, env: &GlobalEnv, seq: &Vec<Exp>) {
+        let Some(last_val) = seq.last() else { return };
+
+        // Case:
+        // ```
+        //   public fun foo(...): ... {
+        //      return ...
+        //   }
+        //
+        // ```
+        if self.report_if_return(env, last_val) {
+            return;
+        }
+        self.semicolon_case(env, seq, &last_val);
+    }
+
+    // The semicolon "adds" an empty tuple after all statements.
+    // If the function does not return anything, this can happen
+    // Case:                         |
+    // ```                           |
+    //   public fun foo(...) {       |
+    //      return;                  |
+    //      // ()     <--------------|
+    //   }
+    //
+    // ```
+    fn semicolon_case(&mut self, env: &GlobalEnv, seq: &Vec<Exp>, expr: &ExpData) {
+        if seq.len() < 2 {
+            return;
+        }
+        if !is_empty_tuple(expr) {
+            if let Some(snd_to_last) = seq.get(seq.len() - 2) {
+                self.report_if_return(env, snd_to_last);
+            }
+        }
+    }
+}
+
+fn is_empty_tuple(expr: &ExpData) -> bool {
+    matches!(expr, ExpData::Call(_, Operation::Tuple, args) if !args.is_empty())
 }
