@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_dkg::{
-    range_proofs::dekart_univariate::{batch_prove, batch_verify, DST},
+    range_proofs::{
+        dekart_univariate::{Proof, DST},
+        traits::BatchedRangeProof,
+    },
     utils::test_utils,
 };
 use ark_ec::pairing::Pairing;
@@ -10,7 +13,7 @@ use ark_std::rand::thread_rng;
 use criterion::{criterion_group, criterion_main, Criterion};
 
 /// Generic benchmark function over any pairing curve
-fn bench_range_proof<E: Pairing>(c: &mut Criterion, curve_name: &str) {
+fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(c: &mut Criterion, curve_name: &str) {
     let mut group = c.benchmark_group(format!("range_proof/{}", curve_name));
 
     let ell = std::env::var("L")
@@ -27,14 +30,14 @@ fn bench_range_proof<E: Pairing>(c: &mut Criterion, curve_name: &str) {
         b.iter_with_setup(
             || {
                 let mut rng = thread_rng();
-                let (pp, zz, cc, r) = test_utils::range_proof_random_instance(n, ell, &mut rng);
-                (pp, zz, cc, r)
+                let (pk, _, witnesses, comm, comm_r) =
+                    test_utils::range_proof_random_instance::<E, B, _>(n, ell, &mut rng);
+                (pk, witnesses, comm, comm_r)
             },
-            |(pp, z_vals, com, prover_state)| {
+            |(pk, values, comm, r)| {
                 let mut fs_t = merlin::Transcript::new(DST);
                 let mut rng = thread_rng();
-                let _proof =
-                    batch_prove::<E, _>(&mut rng, &pp, &z_vals, &com, &prover_state, &mut fs_t);
+                let _proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
             },
         )
     });
@@ -43,14 +46,15 @@ fn bench_range_proof<E: Pairing>(c: &mut Criterion, curve_name: &str) {
         b.iter_with_setup(
             || {
                 let mut rng = thread_rng();
-                let (pp, zz, cc, r) = test_utils::range_proof_random_instance(n, ell, &mut rng);
+                let (pk, vk, values, comm, r) =
+                    test_utils::range_proof_random_instance::<E, B, _>(n, ell, &mut rng);
                 let mut fs_t = merlin::Transcript::new(DST);
-                let proof = batch_prove::<E, _>(&mut rng, &pp, &zz, &cc, &r, &mut fs_t);
-                (pp, cc, proof)
+                let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
+                (vk, comm, proof)
             },
-            |(pp, com, proof)| {
+            |(vk, comm, proof)| {
                 let mut fs_t = merlin::Transcript::new(DST);
-                batch_verify::<E>(&pp, &com, &proof, &mut fs_t).unwrap();
+                proof.verify(&vk, &comm, &mut fs_t).unwrap();
             },
         )
     });
@@ -58,8 +62,11 @@ fn bench_range_proof<E: Pairing>(c: &mut Criterion, curve_name: &str) {
 
 // Specialize benchmark for a concrete pairing curve
 fn bench_groups(c: &mut Criterion) {
-    bench_range_proof::<ark_bn254::Bn254>(c, "BN254");
-    bench_range_proof::<ark_bls12_381::Bls12_381>(c, "BLS12-381");
+    use ark_bls12_381::Bls12_381;
+    use ark_bn254::Bn254;
+
+    bench_range_proof::<Bn254, Proof<Bn254>>(c, "BN254");
+    bench_range_proof::<Bls12_381, Proof<Bls12_381>>(c, "BLS12-381");
 }
 
 criterion_group!(
