@@ -14,7 +14,8 @@ module aptos_framework::scheduled_txns {
     use aptos_framework::coin;
     use aptos_framework::coin::ensure_paired_metadata;
     use aptos_framework::event;
-    use aptos_framework::fungible_asset::upgrade_store_to_concurrent;
+    use aptos_framework::fungible_asset::{upgrade_store_to_concurrent, Metadata};
+    use aptos_framework::object::address_to_object;
     use aptos_framework::primary_fungible_store;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -277,7 +278,7 @@ module aptos_framework::scheduled_txns {
             account::create_framework_reserved_account(owner_addr);
 
         // Initialize fungible store for the owner
-        let metadata = ensure_paired_metadata<AptosCoin>();
+        let metadata = address_to_object<Metadata>(@aptos_fungible_asset);
         let deposit_store =
             primary_fungible_store::ensure_primary_store_exists(
                 signer::address_of(&owner_signer), metadata
@@ -682,10 +683,11 @@ module aptos_framework::scheduled_txns {
                 &gas_deposit_store_cap.gas_fee_deposit_store_signer_cap
             );
 
-        coin::transfer<AptosCoin>(
+        primary_fungible_store::transfer(
             sender,
+            address_to_object<Metadata>(@aptos_fungible_asset),
             gas_deposit_store_addr,
-            txn.max_gas_amount * txn.gas_unit_price
+            txn.max_gas_amount * txn.gas_unit_price,
         );
 
         // Emit event that txn has been scheduled; for now indexer wants to consume this
@@ -813,10 +815,11 @@ module aptos_framework::scheduled_txns {
             );
 
         // Refund deposit from owner's store to sender
-        coin::transfer<AptosCoin>(
+        primary_fungible_store::transfer(
             &gas_deposit_store_signer,
+            address_to_object<Metadata>(@aptos_fungible_asset),
             account_addr,
-            deposit_amt
+            deposit_amt,
         );
     }
 
