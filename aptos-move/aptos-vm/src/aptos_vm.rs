@@ -301,6 +301,15 @@ pub struct AptosVM {
 }
 
 impl AptosVM {
+    pub fn new_fuzzer(env: &AptosEnvironment) -> Self {
+        // TODO: what's use of is_simulation?
+        Self {
+            is_simulation: false,
+            move_vm: MoveVmExt::new(env),
+            pvk: None,
+        }
+    }
+
     /// Creates a new VM instance based on the runtime environment. The VM can then be used by
     /// block executor to create multiple tasks sharing the same execution configurations extracted
     /// from the environment.
