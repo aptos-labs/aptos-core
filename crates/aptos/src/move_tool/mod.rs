@@ -63,7 +63,7 @@ use colored::Colorize;
 use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
-use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
+use move_core_types::{identifier::Identifier, int256::U256, language_storage::ModuleId};
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;

@@ -8,7 +8,7 @@ warning: Unused value of parameter `x`. Consider removing the parameter, or pref
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module 42.globals {
 struct R has store, key {
 	f: u64

@@ -14,7 +14,7 @@ warning: Unused value of parameter `h`. Consider removing the parameter, or pref
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module 42.assign {
 struct T has drop {
 	h: u64

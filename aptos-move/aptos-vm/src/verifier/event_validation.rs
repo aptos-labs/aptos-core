@@ -166,12 +166,24 @@ pub(crate) fn validate_emit_calls(
                     | LdU64(_)
                     | LdU128(_)
                     | LdU256(_)
+                    | LdI8(_)
+                    | LdI16(_)
+                    | LdI32(_)
+                    | LdI64(_)
+                    | LdI128(_)
+                    | LdI256(_)
                     | CastU8
                     | CastU16
                     | CastU32
                     | CastU64
                     | CastU128
                     | CastU256
+                    | CastI8
+                    | CastI16
+                    | CastI32
+                    | CastI64
+                    | CastI128
+                    | CastI256
                     | LdConst(_)
                     | LdTrue
                     | LdFalse
@@ -207,6 +219,7 @@ pub(crate) fn validate_emit_calls(
                     | Mul
                     | Mod
                     | Div
+                    | Negate
                     | BitOr
                     | BitAnd
                     | Xor

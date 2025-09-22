@@ -193,6 +193,9 @@ impl Type {
             MutableReference(t) => Type::MutableReference(Box::new(Type::new(m, t))),
 
             Function(..) => panic!("normalized representation does not support function types"),
+            I8 | I16 | I32 | I64 | I128 | I256 => {
+                panic!("normalized representation does not support signed integer types")
+            },
         }
     }
 
@@ -398,6 +401,12 @@ impl From<TypeTag> for Type {
                 type_arguments: s.type_args.into_iter().map(|ty| ty.into()).collect(),
             },
             TypeTag::Function(_) => panic!("function types not supported in normalized types"),
+            TypeTag::I8
+            | TypeTag::I16
+            | TypeTag::I32
+            | TypeTag::I64
+            | TypeTag::I128
+            | TypeTag::I256 => panic!("signed integer types not supported in normalized types"),
         }
     }
 }

@@ -1168,7 +1168,7 @@ fun Test::__lambda__1_inline_1_393__test_apply($t0: u64, $t1: u64, $t2: u64): bo
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module 42.Test {
 
 

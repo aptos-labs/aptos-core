@@ -42,6 +42,12 @@ pub(crate) fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
         | L::U64
         | L::U128
         | L::U256
+        | L::I8
+        | L::I16
+        | L::I32
+        | L::I64
+        | L::I128
+        | L::I256
         | L::Address
         | L::Signer
         | L::Function => true,
