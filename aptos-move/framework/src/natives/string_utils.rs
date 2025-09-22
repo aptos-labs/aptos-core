@@ -13,8 +13,8 @@ use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     account_address::AccountAddress,
     function::ClosureMask,
+    int256,
     language_storage::TypeTag,
-    u256,
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET},
 };
 use move_vm_runtime::native_functions::NativeFunction;
@@ -222,9 +222,39 @@ fn native_format_impl(
             suffix = "u32";
         },
         MoveTypeLayout::U256 => {
-            let u = val.value_as::<u256::U256>()?;
+            let u = val.value_as::<int256::U256>()?;
             write!(out, "{}", u).unwrap();
             suffix = "u256";
+        },
+        MoveTypeLayout::I8 => {
+            let u = val.value_as::<i8>()?;
+            write!(out, "{}", u).unwrap();
+            suffix = "i8";
+        },
+        MoveTypeLayout::I64 => {
+            let u = val.value_as::<i64>()?;
+            write!(out, "{}", u).unwrap();
+            suffix = "i64";
+        },
+        MoveTypeLayout::I128 => {
+            let u = val.value_as::<i128>()?;
+            write!(out, "{}", u).unwrap();
+            suffix = "i128";
+        },
+        MoveTypeLayout::I16 => {
+            let u = val.value_as::<i16>()?;
+            write!(out, "{}", u).unwrap();
+            suffix = "i16";
+        },
+        MoveTypeLayout::I32 => {
+            let u = val.value_as::<i32>()?;
+            write!(out, "{}", u).unwrap();
+            suffix = "i32";
+        },
+        MoveTypeLayout::I256 => {
+            let u = val.value_as::<int256::I256>()?;
+            write!(out, "{}", u).unwrap();
+            suffix = "i256";
         },
         MoveTypeLayout::Address => {
             let addr = val.value_as::<AccountAddress>()?;

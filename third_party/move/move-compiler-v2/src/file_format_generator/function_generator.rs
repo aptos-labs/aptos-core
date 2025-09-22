@@ -911,7 +911,7 @@ impl<'a> FunctionGenerator<'a> {
             U64(n) => self.emit(FF::Bytecode::LdU64(*n)),
             U128(n) => self.emit(FF::Bytecode::LdU128(*n)),
             U256(n) => self.emit(FF::Bytecode::LdU256(
-                move_core_types::u256::U256::from_le_bytes(&n.to_le_bytes()),
+                move_core_types::int256::U256::from_le_bytes(n.to_le_bytes()),
             )),
             Vector(vec) if vec.is_empty() => {
                 self.gen_vector_load_push(ctx, vec, dest_type);

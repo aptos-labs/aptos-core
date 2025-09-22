@@ -13,7 +13,7 @@ use aptos_native_interface::{
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{NumBytes, NumTypeNodes},
-    u256,
+    int256,
     value::{MoveStructLayout, MoveTypeLayout},
     vm_status::{sub_status::NFE_BCS_SERIALIZATION_FAILURE, StatusCode},
 };
@@ -205,7 +205,13 @@ fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> (u64, PartialVMResult
         MoveTypeLayout::U32 => bcs::serialized_size(&0u32).map(Some),
         MoveTypeLayout::U64 => bcs::serialized_size(&0u64).map(Some),
         MoveTypeLayout::U128 => bcs::serialized_size(&0u128).map(Some),
-        MoveTypeLayout::U256 => bcs::serialized_size(&u256::U256::zero()).map(Some),
+        MoveTypeLayout::U256 => bcs::serialized_size(&int256::U256::ZERO).map(Some),
+        MoveTypeLayout::I8 => bcs::serialized_size(&0i8).map(Some),
+        MoveTypeLayout::I16 => bcs::serialized_size(&0i16).map(Some),
+        MoveTypeLayout::I32 => bcs::serialized_size(&0i32).map(Some),
+        MoveTypeLayout::I64 => bcs::serialized_size(&0i64).map(Some),
+        MoveTypeLayout::I128 => bcs::serialized_size(&0i128).map(Some),
+        MoveTypeLayout::I256 => bcs::serialized_size(&int256::I256::ZERO).map(Some),
         MoveTypeLayout::Address => bcs::serialized_size(&AccountAddress::ZERO).map(Some),
         // signer's size is VM implementation detail, and can change at will.
         MoveTypeLayout::Signer => Ok(None),

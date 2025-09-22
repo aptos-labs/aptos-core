@@ -5,7 +5,7 @@
 use crate::{loaded_data::runtime_types::TypeBuilder, values::*, views::*};
 use claims::{assert_err, assert_ok};
 use move_binary_format::errors::*;
-use move_core_types::{account_address::AccountAddress, u256::U256};
+use move_core_types::{account_address::AccountAddress, int256::U256};
 
 #[test]
 fn locals() -> PartialVMResult<()> {
@@ -42,7 +42,7 @@ fn struct_pack_and_unpack() -> PartialVMResult<()> {
         Value::u32(15),
         Value::u64(20),
         Value::u128(30),
-        Value::u256(U256::max_value()),
+        Value::u256(U256::MAX),
     ];
     let s = Struct::pack(vec![
         Value::u8(10),
@@ -50,7 +50,7 @@ fn struct_pack_and_unpack() -> PartialVMResult<()> {
         Value::u32(15),
         Value::u64(20),
         Value::u128(30),
-        Value::u256(U256::max_value()),
+        Value::u256(U256::MAX),
     ]);
     let unpacked: Vec<_> = s.unpack()?.collect();
 
@@ -187,7 +187,7 @@ fn legacy_val_abstract_memory_size_consistency() -> PartialVMResult<()> {
         Value::u32(0),
         Value::u64(0),
         Value::u128(0),
-        Value::u256(U256::zero()),
+        Value::u256(U256::ZERO),
         Value::bool(true),
         Value::address(AccountAddress::ZERO),
         Value::vector_u8([0, 1, 2]),
@@ -331,7 +331,7 @@ mod native_values {
         assert_err!(Value::u32(0).equals(&v));
         assert_err!(Value::u64(0).equals(&v));
         assert_err!(Value::u128(0).equals(&v));
-        assert_err!(Value::u256(U256::zero()).equals(&v));
+        assert_err!(Value::u256(U256::ZERO).equals(&v));
 
         assert_err!(Value::address(AccountAddress::ONE).equals(&v));
         assert_err!(Value::master_signer(AccountAddress::ONE).equals(&v));
@@ -344,7 +344,7 @@ mod native_values {
         assert_err!(Value::vector_u32(vec![0, 1]).equals(&v));
         assert_err!(Value::vector_u64(vec![0, 1]).equals(&v));
         assert_err!(Value::vector_u128(vec![0, 1]).equals(&v));
-        assert_err!(Value::vector_u256(vec![U256::zero(), U256::one()]).equals(&v));
+        assert_err!(Value::vector_u256(vec![U256::ZERO, U256::ONE]).equals(&v));
 
         assert_err!(
             Value::vector_address(vec![AccountAddress::ONE, AccountAddress::TWO]).equals(&v)

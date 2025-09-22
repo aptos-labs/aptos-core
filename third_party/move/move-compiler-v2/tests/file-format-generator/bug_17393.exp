@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module cafe.Module0 {
 enum E has copy, drop {
  V1{

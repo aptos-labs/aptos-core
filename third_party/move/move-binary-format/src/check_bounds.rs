@@ -670,9 +670,11 @@ impl<'a> BoundsChecker<'a> {
                 // bytecode gets added.
                 FreezeRef | Pop | Ret | LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU256(_)
                 | LdU128(_) | CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256
-                | LdTrue | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr
-                | BitAnd | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge
-                | Abort | Nop => (),
+                | LdI8(_) | LdI16(_) | LdI32(_) | LdI64(_) | LdI256(_) | LdI128(_) | CastI8
+                | CastI16 | CastI32 | CastI64 | CastI128 | CastI256 | LdTrue | LdFalse
+                | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | Negate | BitOr | BitAnd
+                | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | Abort | Nop => {
+                },
             }
         }
         Ok(())
@@ -687,7 +689,8 @@ impl<'a> BoundsChecker<'a> {
         for ty in ty.preorder_traversal() {
             match ty {
                 Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | TypeParameter(_)
-                | Reference(_) | MutableReference(_) | Vector(_) | Function(..) => (),
+                | Reference(_) | MutableReference(_) | Vector(_) | Function(..) | I8 | I16
+                | I32 | I64 | I128 | I256 => (),
                 Struct(idx) => {
                     check_bounds_impl(self.view.struct_handles(), *idx)?;
                     if let Some(sh) = self.view.struct_handles().get(idx.into_index()) {

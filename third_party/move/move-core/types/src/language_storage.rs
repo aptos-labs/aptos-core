@@ -81,6 +81,20 @@ pub enum TypeTag {
         )]
         Box<FunctionTag>,
     ),
+
+    // NOTED: added in bytecode version v9
+    #[serde(rename = "i8")]
+    I8,
+    #[serde(rename = "i16")]
+    I16,
+    #[serde(rename = "i32")]
+    I32,
+    #[serde(rename = "i64")]
+    I64,
+    #[serde(rename = "i128")]
+    I128,
+    #[serde(rename = "i256")]
+    I256,
 }
 
 impl TypeTag {
@@ -98,6 +112,12 @@ impl TypeTag {
             U64 => "u64".to_owned(),
             U128 => "u128".to_owned(),
             U256 => "u256".to_owned(),
+            I8 => "i8".to_owned(),
+            I16 => "i16".to_owned(),
+            I32 => "i32".to_owned(),
+            I64 => "i64".to_owned(),
+            I128 => "i128".to_owned(),
+            I256 => "i256".to_owned(),
             Address => "address".to_owned(),
             Signer => "signer".to_owned(),
             Vector(t) => format!("vector<{}>", t.to_canonical_string()),
@@ -110,8 +130,8 @@ impl TypeTag {
         use TypeTag::*;
         match self {
             Struct(struct_tag) => Some(struct_tag.as_ref()),
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | Vector(_)
-            | Function(_) => None,
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+            | Address | Signer | Vector(_) | Function(_) => None,
         }
     }
 
@@ -133,7 +153,8 @@ impl<'a> Iterator for TypeTagPreorderTraversalIter<'a> {
         match self.stack.pop() {
             Some(ty) => {
                 match ty {
-                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 => (),
+                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16
+                    | I32 | I64 | I128 | I256 => (),
                     Vector(ty) => self.stack.push(ty),
                     Struct(struct_tag) => self.stack.extend(struct_tag.type_args.iter().rev()),
                     Function(fun_tag) => {

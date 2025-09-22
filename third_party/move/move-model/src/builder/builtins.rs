@@ -14,7 +14,7 @@ use crate::{
 use legacy_move_compiler::parser::ast as PA;
 use move_core_types::{
     ability::{Ability, AbilitySet},
-    u256::U256,
+    int256::U256,
 };
 use num::BigInt;
 use std::collections::BTreeMap;
@@ -70,7 +70,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U256"),
-            mk_num_const(BigInt::from(&U256::max_value()), Spec),
+            mk_num_const(BigInt::from(U256::MAX), Spec),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("EXECUTION_FAILURE"),
