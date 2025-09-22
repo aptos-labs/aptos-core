@@ -23,7 +23,8 @@ use aptos_types::{
     chain_id::ChainId,
     transaction::{
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
-        ReplayProtector, SignedTransaction, TransactionPayload, TransactionStatus,
+        PersistedAuxiliaryInfo, ReplayProtector, SignedTransaction, TransactionPayload,
+        TransactionStatus,
     },
 };
 use aptos_vm_types::output::VMOutput;
@@ -254,6 +255,7 @@ impl TxnOptions {
             u64,
             SignedTransaction,
             aptos_crypto::HashValue,
+            PersistedAuxiliaryInfo,
         ) -> CliTypedResult<(VMStatus, VMOutput)>,
     {
         let client = self.rest_client()?;
@@ -297,7 +299,13 @@ impl TxnOptions {
         let hash = transaction.committed_hash();
 
         let debugger = AptosDebugger::rest_client(client)?;
-        let (vm_status, vm_output) = execute(&debugger, version, transaction, hash)?;
+        let (vm_status, vm_output) = execute(
+            &debugger,
+            version,
+            transaction,
+            hash,
+            PersistedAuxiliaryInfo::None,
+        )?;
 
         let success = match vm_output.status() {
             TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),

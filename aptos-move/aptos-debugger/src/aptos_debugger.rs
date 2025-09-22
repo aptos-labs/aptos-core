@@ -15,8 +15,8 @@ use aptos_types::{
     state_store::TStateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
-        SignedTransaction, Transaction, TransactionExecutableRef, TransactionInfo,
-        TransactionOutput, TransactionPayload, Version,
+        PersistedAuxiliaryInfo, SignedTransaction, Transaction, TransactionExecutableRef,
+        TransactionInfo, TransactionOutput, TransactionPayload, Version,
     },
     vm_status::VMStatus,
 };
@@ -55,7 +55,11 @@ impl AptosDebugger {
         &self,
         begin: Version,
         limit: u64,
-    ) -> anyhow::Result<(Vec<Transaction>, Vec<TransactionInfo>)> {
+    ) -> anyhow::Result<(
+        Vec<Transaction>,
+        Vec<TransactionInfo>,
+        Vec<PersistedAuxiliaryInfo>,
+    )> {
         self.debugger.get_committed_transactions(begin, limit).await
     }
 
@@ -63,13 +67,20 @@ impl AptosDebugger {
         &self,
         version: Version,
         txns: Vec<Transaction>,
+        auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
     ) -> anyhow::Result<Vec<TransactionOutput>> {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
-        // TODO(grao): Pass in persisted info.
-        let txn_provider = DefaultTxnProvider::new_without_info(sig_verified_txns);
+
+        // Convert persisted auxiliary infos to auxiliary infos
+        let auxiliary_infos = auxiliary_infos
+            .into_iter()
+            .map(|persisted_info| AuxiliaryInfo::new(persisted_info, None))
+            .collect::<Vec<_>>();
+
+        let txn_provider = DefaultTxnProvider::new(sig_verified_txns, auxiliary_infos);
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
 
         print_transaction_stats(txn_provider.get_txns(), version);
@@ -177,7 +188,8 @@ impl AptosDebugger {
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
     ) -> anyhow::Result<Vec<TransactionOutput>> {
-        let (txns, txn_infos) = self.get_committed_transactions(begin, limit).await?;
+        let (txns, txn_infos, auxiliary_infos) =
+            self.get_committed_transactions(begin, limit).await?;
 
         if use_same_block_boundaries {
             // when going block by block, no need to worry about epoch boundaries
@@ -186,6 +198,7 @@ impl AptosDebugger {
                 .execute_transactions_by_block(
                     begin,
                     txns.clone(),
+                    auxiliary_infos.clone(),
                     repeat_execution_times,
                     concurrency_levels,
                 )
@@ -195,6 +208,7 @@ impl AptosDebugger {
                 limit,
                 begin,
                 txns,
+                auxiliary_infos,
                 repeat_execution_times,
                 concurrency_levels,
                 txn_infos,
@@ -243,12 +257,14 @@ impl AptosDebugger {
         &self,
         begin: Version,
         txns: Vec<Transaction>,
+        auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
     ) -> anyhow::Result<Vec<TransactionOutput>> {
         let results = self.execute_transactions_at_version(
             begin,
             txns,
+            auxiliary_infos,
             repeat_execution_times,
             concurrency_levels,
         )?;
@@ -272,6 +288,7 @@ impl AptosDebugger {
         mut limit: u64,
         mut begin: u64,
         mut txns: Vec<Transaction>,
+        mut auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
         mut txn_infos: Vec<TransactionInfo>,
@@ -287,6 +304,7 @@ impl AptosDebugger {
                 .execute_transactions_until_epoch_end(
                     begin,
                     txns.clone(),
+                    auxiliary_infos.clone(),
                     repeat_execution_times,
                     concurrency_levels,
                 )
@@ -294,6 +312,7 @@ impl AptosDebugger {
             begin += epoch_result.len() as u64;
             limit -= epoch_result.len() as u64;
             txns = txns.split_off(epoch_result.len());
+            auxiliary_infos = auxiliary_infos.split_off(epoch_result.len());
             let epoch_txn_infos = txn_infos.drain(0..epoch_result.len()).collect::<Vec<_>>();
             Self::print_mismatches(&epoch_result, &epoch_txn_infos, begin);
 
@@ -306,18 +325,22 @@ impl AptosDebugger {
         &self,
         begin: Version,
         txns: Vec<Transaction>,
+        auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
     ) -> anyhow::Result<Vec<TransactionOutput>> {
         let mut ret = vec![];
         let mut cur = vec![];
+        let mut cur_aux_infos = vec![];
         let mut cur_version = begin;
-        for txn in txns {
+        for (txn, aux_info) in txns.into_iter().zip(auxiliary_infos.into_iter()) {
             if txn.is_block_start() && !cur.is_empty() {
                 let to_execute = std::mem::take(&mut cur);
+                let to_execute_aux_infos = std::mem::take(&mut cur_aux_infos);
                 let results = self.execute_transactions_at_version(
                     cur_version,
                     to_execute,
+                    to_execute_aux_infos,
                     repeat_execution_times,
                     concurrency_levels,
                 )?;
@@ -325,11 +348,13 @@ impl AptosDebugger {
                 ret.extend(results);
             }
             cur.push(txn);
+            cur_aux_infos.push(aux_info);
         }
         if !cur.is_empty() {
             let results = self.execute_transactions_at_version(
                 cur_version,
                 cur,
+                cur_aux_infos,
                 repeat_execution_times,
                 concurrency_levels,
             )?;
@@ -352,15 +377,19 @@ impl AptosDebugger {
     pub async fn get_committed_transaction_at_version(
         &self,
         version: Version,
-    ) -> anyhow::Result<(Transaction, TransactionInfo)> {
-        let (mut txns, mut info) = self.debugger.get_committed_transactions(version, 1).await?;
+    ) -> anyhow::Result<(Transaction, TransactionInfo, PersistedAuxiliaryInfo)> {
+        let (mut txns, mut info, mut aux_infos) =
+            self.get_committed_transactions(version, 1).await?;
 
         let txn = txns.pop().expect("there must be exactly 1 txn in the vec");
         let info = info
             .pop()
             .expect("there must be exactly 1 txn info in the vec");
+        let aux_info = aux_infos
+            .pop()
+            .expect("there must be exactly 1 auxiliary info in the vec");
 
-        Ok((txn, info))
+        Ok((txn, info, aux_info))
     }
 
     pub fn state_view_at_version(&self, version: Version) -> DebuggerStateView {

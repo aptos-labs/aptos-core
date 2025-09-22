@@ -108,6 +108,20 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_persisted_auxiliary_info_by_version(
+        &self,
+        version: Version,
+    ) -> Result<PersistedAuxiliaryInfo> {
+        gauged_api("get_persisted_auxiliary_info_by_version", || {
+            self.error_if_ledger_pruned("PersistedAuxiliaryInfo", version)?;
+            Ok(self
+                .ledger_db
+                .persisted_auxiliary_info_db()
+                .get_persisted_auxiliary_info(version)?
+                .unwrap_or(PersistedAuxiliaryInfo::None))
+        })
+    }
+
     fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
         gauged_api("get_latest_ledger_info_option", || {
             Ok(self.ledger_db.metadata_db().get_latest_ledger_info_option())

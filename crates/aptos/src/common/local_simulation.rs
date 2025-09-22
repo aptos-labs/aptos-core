@@ -20,6 +20,7 @@ pub fn run_transaction_using_debugger(
     version: u64,
     transaction: SignedTransaction,
     _hash: HashValue,
+    persisted_auxiliary_info: PersistedAuxiliaryInfo,
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
     let state_view = debugger.state_view_at_version(version);
     let env = AptosEnvironment::new(&state_view);
@@ -34,7 +35,7 @@ pub fn run_transaction_using_debugger(
         &code_storage,
         &transaction,
         &log_context,
-        &AuxiliaryInfo::default(),
+        &AuxiliaryInfo::new(persisted_auxiliary_info, None),
     );
 
     Ok((vm_status, vm_output))
@@ -45,6 +46,7 @@ pub fn benchmark_transaction_using_debugger(
     version: u64,
     transaction: SignedTransaction,
     _hash: HashValue,
+    persisted_auxiliary_info: PersistedAuxiliaryInfo,
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
     let state_view = debugger.state_view_at_version(version);
     let env = AptosEnvironment::new(&state_view);
@@ -58,7 +60,7 @@ pub fn benchmark_transaction_using_debugger(
         &code_storage,
         &transaction,
         &log_context,
-        &AuxiliaryInfo::default(),
+        &AuxiliaryInfo::new(persisted_auxiliary_info, None),
     );
 
     let time_cold = {
@@ -78,7 +80,7 @@ pub fn benchmark_transaction_using_debugger(
                 &code_storage,
                 &transaction,
                 &log_context,
-                &AuxiliaryInfo::default(),
+                &AuxiliaryInfo::new(persisted_auxiliary_info, None),
             ));
             let t2 = Instant::now();
 
@@ -93,7 +95,7 @@ pub fn benchmark_transaction_using_debugger(
         let mut times = vec![];
         let n = 15;
 
-        for i in 0..n {
+        for _i in 0..n {
             // Reuse the existing VM with warm code cache so to measure only the
             // execution time.
             let t1 = Instant::now();
@@ -102,12 +104,7 @@ pub fn benchmark_transaction_using_debugger(
                 &code_storage,
                 &transaction,
                 &log_context,
-                &AuxiliaryInfo::new(
-                    PersistedAuxiliaryInfo::V1 {
-                        transaction_index: i,
-                    },
-                    None,
-                ),
+                &AuxiliaryInfo::new(persisted_auxiliary_info, None),
             ));
             let t2 = Instant::now();
 
@@ -129,17 +126,13 @@ pub fn profile_transaction_using_debugger(
     version: u64,
     transaction: SignedTransaction,
     hash: HashValue,
+    persisted_auxiliary_info: PersistedAuxiliaryInfo,
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
     let (vm_status, vm_output, gas_log) = debugger
         .execute_transaction_at_version_with_gas_profiler(
             version,
             transaction,
-            AuxiliaryInfo::new(
-                PersistedAuxiliaryInfo::V1 {
-                    transaction_index: 2,
-                },
-                None,
-            ),
+            AuxiliaryInfo::new(persisted_auxiliary_info, None),
         )
         .map_err(|err| {
             CliError::UnexpectedError(format!("failed to simulate txn with gas profiler: {}", err))
