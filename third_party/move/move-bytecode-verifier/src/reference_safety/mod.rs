@@ -469,6 +469,12 @@ fn execute_inner(
         | Bytecode::CastU64
         | Bytecode::CastU128
         | Bytecode::CastU256
+        | Bytecode::CastI8
+        | Bytecode::CastI16
+        | Bytecode::CastI32
+        | Bytecode::CastI64
+        | Bytecode::CastI128
+        | Bytecode::CastI256
         | Bytecode::Not
         | Bytecode::Exists(_)
         | Bytecode::ExistsGeneric(_) => (),
@@ -492,6 +498,12 @@ fn execute_inner(
         Bytecode::LdU64(_) => verifier.stack.push(state.value_for(&SignatureToken::U64)),
         Bytecode::LdU128(_) => verifier.stack.push(state.value_for(&SignatureToken::U128)),
         Bytecode::LdU256(_) => verifier.stack.push(state.value_for(&SignatureToken::U256)),
+        Bytecode::LdI8(_) => verifier.stack.push(state.value_for(&SignatureToken::I8)),
+        Bytecode::LdI16(_) => verifier.stack.push(state.value_for(&SignatureToken::I16)),
+        Bytecode::LdI32(_) => verifier.stack.push(state.value_for(&SignatureToken::I32)),
+        Bytecode::LdI64(_) => verifier.stack.push(state.value_for(&SignatureToken::I64)),
+        Bytecode::LdI128(_) => verifier.stack.push(state.value_for(&SignatureToken::I128)),
+        Bytecode::LdI256(_) => verifier.stack.push(state.value_for(&SignatureToken::I256)),
         Bytecode::LdConst(idx) => {
             let signature = &verifier.resolver.constant_at(*idx).type_;
             verifier.stack.push(state.value_for(signature))
@@ -502,6 +514,7 @@ fn execute_inner(
         | Bytecode::Mul
         | Bytecode::Mod
         | Bytecode::Div
+        | Bytecode::Negate
         | Bytecode::BitOr
         | Bytecode::BitAnd
         | Bytecode::Xor

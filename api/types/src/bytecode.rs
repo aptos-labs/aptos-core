@@ -115,6 +115,15 @@ pub trait Bytecode {
                     abilities: *abilities,
                 }
             },
+            SignatureToken::I8
+            | SignatureToken::I16
+            | SignatureToken::I32
+            | SignatureToken::I64
+            | SignatureToken::I128
+            | SignatureToken::I256 => {
+                // TODO(#17645): signed integers
+                MoveType::Unparsable("signed integer NYI".to_string())
+            },
         }
     }
 

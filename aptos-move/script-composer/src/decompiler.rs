@@ -203,6 +203,12 @@ impl LocalState {
             SignatureToken::U64 => TypeTag::U64,
             SignatureToken::U128 => TypeTag::U128,
             SignatureToken::U256 => TypeTag::U256,
+            SignatureToken::I8 => TypeTag::I8,
+            SignatureToken::I16 => TypeTag::I16,
+            SignatureToken::I32 => TypeTag::I32,
+            SignatureToken::I64 => TypeTag::I64,
+            SignatureToken::I128 => TypeTag::I128,
+            SignatureToken::I256 => TypeTag::I256,
             SignatureToken::Bool => TypeTag::Bool,
             SignatureToken::Signer => TypeTag::Signer,
             SignatureToken::Vector(s) => {
