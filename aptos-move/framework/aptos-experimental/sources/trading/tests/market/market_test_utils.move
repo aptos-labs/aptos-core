@@ -19,7 +19,7 @@ module aptos_experimental::market_test_utils {
 
     const U64_MAX: u64 = 0xffffffffffffffff;
 
-    public fun place_order_and_verify<M: store + copy + drop>(
+    public fun place_order_and_verify<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user: &signer,
         price: Option<u64>,
@@ -31,7 +31,7 @@ module aptos_experimental::market_test_utils {
         is_cancelled: bool,
         metadata: M,
         client_order_id: Option<u64>,
-        callbacks: &MarketClearinghouseCallbacks<M>
+        callbacks: &MarketClearinghouseCallbacks<M, R>
     ): OrderIdType {
         let user_addr = signer::address_of(user);
         let (limit_price, is_taker) = if (price.is_some()) {
@@ -116,7 +116,7 @@ module aptos_experimental::market_test_utils {
         order_id
     }
 
-    public fun place_taker_order<M: store + copy + drop>(
+    public fun place_taker_order<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         taker: &signer,
         client_order_id: Option<u64>,
@@ -127,8 +127,8 @@ module aptos_experimental::market_test_utils {
         event_store: &mut EventStore,
         max_matches: Option<u32>,
         metadata: M,
-        callbacks: &MarketClearinghouseCallbacks<M>
-    ): (OrderIdType, OrderMatchResult) {
+        callbacks: &MarketClearinghouseCallbacks<M, R>
+    ): (OrderIdType, OrderMatchResult<R>) {
         let taker_addr = signer::address_of(taker);
         let max_matches =
             if (max_matches.is_none()) { 1000 }
@@ -191,7 +191,7 @@ module aptos_experimental::market_test_utils {
         (order_id, result)
     }
 
-    public fun place_taker_order_and_verify_fill<M: store + copy + drop>(
+    public fun place_taker_order_and_verify_fill<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         taker: &signer,
         limit_price: u64,
@@ -209,8 +209,8 @@ module aptos_experimental::market_test_utils {
         is_cancelled: bool,
         max_matches: Option<u32>,
         metadata: M,
-        callbacks: &MarketClearinghouseCallbacks<M>
-    ): (OrderIdType, OrderMatchResult) {
+        callbacks: &MarketClearinghouseCallbacks<M, R>
+    ): (OrderIdType, OrderMatchResult<R>) {
         let (order_id, result) =
             place_taker_order(
                 market,
