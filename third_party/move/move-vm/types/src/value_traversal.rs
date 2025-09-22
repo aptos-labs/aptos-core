@@ -30,6 +30,12 @@ fn find_identifiers_in_value_impl(
         | ValueImpl::U64(_)
         | ValueImpl::U128(_)
         | ValueImpl::U256(_)
+        | ValueImpl::I8(_)
+        | ValueImpl::I16(_)
+        | ValueImpl::I32(_)
+        | ValueImpl::I64(_)
+        | ValueImpl::I128(_)
+        | ValueImpl::I256(_)
         | ValueImpl::Bool(_)
         | ValueImpl::Address(_) => {},
 
@@ -47,7 +53,13 @@ fn find_identifiers_in_value_impl(
             | Container::VecAddress(_)
             | Container::VecU16(_)
             | Container::VecU32(_)
-            | Container::VecU256(_) => {},
+            | Container::VecU256(_)
+            | Container::VecI8(_)
+            | Container::VecI16(_)
+            | Container::VecI32(_)
+            | Container::VecI64(_)
+            | Container::VecI128(_)
+            | Container::VecI256(_) => {},
 
             Container::Vec(v) | Container::Struct(v) => {
                 for val in v.borrow().iter() {

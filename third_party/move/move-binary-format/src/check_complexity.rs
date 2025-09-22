@@ -67,8 +67,9 @@ impl BinaryComplexityMeter<'_> {
                     cost = cost.saturating_add(struct_name.len() as u64 * COST_PER_IDENT_BYTE);
                     cost = cost.saturating_add(moduel_name.len() as u64 * COST_PER_IDENT_BYTE);
                 },
-                U8 | U16 | U32 | U64 | U128 | U256 | Signer | Address | Bool | Vector(_)
-                | Function(..) | TypeParameter(_) | Reference(_) | MutableReference(_) => (),
+                U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+                | Signer | Address | Bool | Vector(_) | Function(..) | TypeParameter(_)
+                | Reference(_) | MutableReference(_) => (),
             }
         }
 
@@ -309,6 +310,12 @@ impl BinaryComplexityMeter<'_> {
                 | LdU64(_)
                 | LdU128(_)
                 | LdU256(_)
+                | LdI8(_)
+                | LdI16(_)
+                | LdI32(_)
+                | LdI64(_)
+                | LdI128(_)
+                | LdI256(_)
                 | LdConst(_)
                 | CastU8
                 | CastU16
@@ -316,6 +323,12 @@ impl BinaryComplexityMeter<'_> {
                 | CastU64
                 | CastU128
                 | CastU256
+                | CastI8
+                | CastI16
+                | CastI32
+                | CastI64
+                | CastI128
+                | CastI256
                 | LdTrue
                 | LdFalse
                 | Call(_)
@@ -333,6 +346,7 @@ impl BinaryComplexityMeter<'_> {
                 | Mul
                 | Mod
                 | Div
+                | Negate
                 | BitOr
                 | BitAnd
                 | Xor

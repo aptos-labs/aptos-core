@@ -31,7 +31,7 @@ use move_binary_format::{
     },
     CompiledModule,
 };
-use move_core_types::{function::ClosureMask, identifier::Identifier, u256::U256};
+use move_core_types::{function::ClosureMask, identifier::Identifier, int256::U256};
 use std::{collections::BTreeMap, fs, io::Write, path::PathBuf};
 // ===================================================================================
 // Driver
@@ -568,31 +568,31 @@ impl<'a> Assembler<'a> {
             "ld_u8" => {
                 let arg = self.args1(instr)?;
                 let num = self.number(instr, arg, U256::from(u8::MAX))?;
-                LdU8(num.unchecked_as_u8())
+                LdU8(num.try_into().ok()?)
             },
             "ld_u16" => {
                 let arg = self.args1(instr)?;
                 let num = self.number(instr, arg, U256::from(u16::MAX))?;
-                LdU16(num.unchecked_as_u16())
+                LdU16(num.try_into().ok()?)
             },
             "ld_u32" => {
                 let arg = self.args1(instr)?;
                 let num = self.number(instr, arg, U256::from(u32::MAX))?;
-                LdU32(num.unchecked_as_u32())
+                LdU32(num.try_into().ok()?)
             },
             "ld_u64" => {
                 let arg = self.args1(instr)?;
                 let num = self.number(instr, arg, U256::from(u64::MAX))?;
-                LdU64(num.unchecked_as_u64())
+                LdU64(num.try_into().ok()?)
             },
             "ld_u128" => {
                 let arg = self.args1(instr)?;
                 let num = self.number(instr, arg, U256::from(u128::MAX))?;
-                LdU128(num.unchecked_as_u128())
+                LdU128(num.try_into().ok()?)
             },
             "ld_u256" => {
                 let arg = self.args1(instr)?;
-                let num = self.number(instr, arg, U256::max_value())?;
+                let num = self.number(instr, arg, U256::MAX)?;
                 LdU256(num)
             },
             "cast_u8" => {
@@ -773,8 +773,10 @@ impl<'a> Assembler<'a> {
             "vec_pack" => {
                 let [arg1, arg2] = self.args2(instr)?;
                 let sign_idx = self.type_index(instr, arg1)?;
-                let count = self.number(instr, arg2, U256::from(u64::MAX))?;
-                VecPack(sign_idx, count.unchecked_as_u64())
+                let count: u64 = self
+                    .number(instr, arg2, U256::from(u64::MAX))
+                    .and_then(|x| x.try_into().ok())?;
+                VecPack(sign_idx, count)
             },
             "vec_len" => {
                 let arg = self.args1(instr)?;
@@ -804,8 +806,10 @@ impl<'a> Assembler<'a> {
             "vec_unpack" => {
                 let [arg1, arg2] = self.args2(instr)?;
                 let sign_idx = self.type_index(instr, arg1)?;
-                let count = self.number(instr, arg2, U256::from(u64::MAX))?;
-                VecUnpack(sign_idx, count.unchecked_as_u64())
+                let count: u64 = self
+                    .number(instr, arg2, U256::from(u64::MAX))
+                    .and_then(|x| x.try_into().ok())?;
+                VecUnpack(sign_idx, count)
             },
             "vec_swap" => {
                 let arg = self.args1(instr)?;
@@ -816,8 +820,8 @@ impl<'a> Assembler<'a> {
                 let [arg1, arg2] = self.args2(instr)?;
                 let (handle_idx, targs_opt) = self.fun_ref(instr, arg1)?;
                 let closure_mask = ClosureMask::new(
-                    self.number(instr, arg2, U256::from(u64::MAX))?
-                        .unchecked_as_u64(),
+                    self.number(instr, arg2, U256::from(u64::MAX))
+                        .and_then(|x| x.try_into().ok())?,
                 );
                 if let Some(targs) = targs_opt {
                     let res = self.builder.fun_inst_index(handle_idx, targs);
