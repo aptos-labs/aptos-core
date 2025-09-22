@@ -17,6 +17,7 @@ use move_core_types::{
 };
 use move_model::{
     ast::Address,
+    metadata::LanguageVersion,
     model::{FunctionEnv, GlobalEnv, ModuleEnv},
     ty,
     ty::ReferenceKind,
@@ -277,6 +278,7 @@ impl<'env> Abigen<'env> {
                     U256 => TypeTag::U256,
                     Address => TypeTag::Address,
                     Signer => TypeTag::Signer,
+                    I64 | I128 => unimplemented!("signed integers not supported"),
                     Num | Range | EventStore => {
                         bail!("Type {:?} is not allowed in scripts.", ty0)
                     },

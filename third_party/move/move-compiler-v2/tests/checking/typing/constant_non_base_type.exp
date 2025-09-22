@@ -14,7 +14,7 @@ error: Invalid type for constant
 3 │     const C1: &u64 = &0;
   │     -----------------^^-
   │     │
-  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: expected `&mut u64` but found a value of type `&u64` (mutability mismatch)
   ┌─ tests/checking/typing/constant_non_base_type.move:4:26
@@ -36,7 +36,7 @@ error: Invalid type for constant
 4 │     const C2: &mut u64 = &0;
   │     ---------------------^^-
   │     │
-  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: Invalid type for constant
   ┌─ tests/checking/typing/constant_non_base_type.move:5:20
@@ -44,7 +44,7 @@ error: Invalid type for constant
 5 │     const C3: () = ();
   │     ---------------^^-
   │     │
-  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: Invalid type for constant
   ┌─ tests/checking/typing/constant_non_base_type.move:6:33
@@ -52,4 +52,4 @@ error: Invalid type for constant
 6 │     const C4: (address, bool) = (@0x0, false);
   │     ----------------------------^^^^^^^^^^^^^-
   │     │
-  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.

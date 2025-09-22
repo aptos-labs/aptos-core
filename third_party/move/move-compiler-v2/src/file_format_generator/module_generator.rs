@@ -334,6 +334,8 @@ impl ModuleGenerator {
                 U64 => FF::SignatureToken::U64,
                 U128 => FF::SignatureToken::U128,
                 U256 => FF::SignatureToken::U256,
+                I64 => FF::SignatureToken::I64,
+                I128 => FF::SignatureToken::I128,
                 Address => FF::SignatureToken::Address,
                 Signer => FF::SignatureToken::Signer,
                 Num | Range | EventStore => {

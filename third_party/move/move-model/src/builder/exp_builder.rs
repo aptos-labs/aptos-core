@@ -44,7 +44,7 @@ use move_ir_types::{
     location::{sp, Spanned},
     sp,
 };
-use num::{BigInt, FromPrimitive, Zero};
+use num::{BigInt, FromPrimitive};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, LinkedList},
@@ -844,6 +844,19 @@ impl UnificationContext for ExpTranslator<'_, '_, '_> {
         self.parent.parent.lookup_struct_field_decl(id, field_name)
     }
 
+    fn get_struct_name(&self, id: &QualifiedId<StructId>) -> (Address, String, String) {
+        let struct_name = self.parent.parent.get_struct_name(*id);
+        (
+            struct_name.module_name.addr().clone(),
+            struct_name
+                .module_name
+                .name()
+                .display(self.symbol_pool())
+                .to_string(),
+            struct_name.symbol.display(self.symbol_pool()).to_string(),
+        )
+    }
+
     fn get_function_wrapper_type(&self, id: &QualifiedInstId<StructId>) -> Option<Type> {
         self.parent.parent.get_function_wrapper_type(id)
     }
@@ -883,6 +896,10 @@ impl UnificationContext for ExpTranslator<'_, '_, '_> {
 
     fn type_display_context(&self) -> TypeDisplayContext<'_> {
         self.type_display_context()
+    }
+
+    fn get_lang_version(&self) -> LanguageVersion {
+        self.env().language_version
     }
 }
 
@@ -954,6 +971,12 @@ impl ExpTranslator<'_, '_, '_> {
                         },
                         "u256" => {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::U256));
+                        },
+                        "i64" => {
+                            return check_zero_args(self, Type::new_prim(PrimitiveType::I64));
+                        },
+                        "i128" => {
+                            return check_zero_args(self, Type::new_prim(PrimitiveType::I128));
                         },
                         "num" => return check_zero_args(self, Type::new_prim(PrimitiveType::Num)),
                         "range" => {
@@ -3098,9 +3121,27 @@ impl ExpTranslator<'_, '_, '_> {
                 expected_type,
                 context,
             )),
-            EA::Value_::InferredNum(x) => {
-                Some(self.translate_number(&loc, BigInt::from(x), None, expected_type, context))
-            },
+            EA::Value_::I64(x) => Some(self.translate_number(
+                &loc,
+                BigInt::from(*x),
+                Some(PrimitiveType::I64),
+                expected_type,
+                context,
+            )),
+            EA::Value_::I128(x) => Some(self.translate_number(
+                &loc,
+                BigInt::from(*x),
+                Some(PrimitiveType::I128),
+                expected_type,
+                context,
+            )),
+            EA::Value_::InferredNum(x) => Some(self.translate_number(
+                &loc,
+                BigInt::from(x),
+                None,
+                expected_type,
+                context,
+            )),
             EA::Value_::Bool(x) => Some((Value::Bool(*x), Type::new_prim(PrimitiveType::Bool))),
             EA::Value_::Bytearray(x) => {
                 let ty = Type::Vector(Box::new(Type::new_prim(PrimitiveType::U8)));
@@ -3157,7 +3198,8 @@ impl ExpTranslator<'_, '_, '_> {
     /// Check whether value fits into primitive type, report error if not.
     fn check_range(&mut self, loc: &Loc, ty: PrimitiveType, value: BigInt) {
         let max = ty.get_max_value().unwrap_or(value.clone());
-        if value < BigInt::zero() || value > max {
+        let min = ty.get_min_value().unwrap_or(value.clone());
+        if value < min || value > max {
             let tcx = self.type_display_context();
             self.error(
                 loc,
@@ -4399,6 +4441,7 @@ impl ExpTranslator<'_, '_, '_> {
     ) -> ExpData {
         // Translate arguments: arg_types is needed to do candidate matching.
         let (mut arg_types, mut translated_args) = self.translate_exp_list(args);
+
         // Special handling of receiver call functions
         if kind == CallKind::Receiver {
             debug_assert!(

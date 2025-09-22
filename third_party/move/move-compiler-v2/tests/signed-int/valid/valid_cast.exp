@@ -1,0 +1,1283 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::valid_cast {
+    enum E1 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i64::I64>,
+        }
+    }
+    enum E2 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i128::I128>,
+        }
+    }
+    enum E3<T> {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 {
+        x: u64,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S2 {
+        x: S1,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S3<T> {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    private fun test_cast1(x: u64): 0x1::i64::I64 {
+        i64::pack(x)
+    }
+    private fun test_cast2(x: 0x1::i64::I64): u64 {
+        i64::unpack(x)
+    }
+    private fun test_cast3(x: u128): 0x1::i128::I128 {
+        i128::pack(x)
+    }
+    private fun test_cast4(x: 0x1::i128::I128): u128 {
+        i128::unpack(x)
+    }
+    private fun test_cast5(a: 0x1::i64::I64,b: 0x1::i128::I128): u64 {
+        {
+          let s1: S1 = pack valid_cast::S1(1, a, b);
+          {
+            let s2: S2 = pack valid_cast::S2(s1, a, b);
+            {
+              let s3: S3<0x1::i64::I64> = pack valid_cast::S3<0x1::i64::I64>(a, s1, s2);
+              Add<u64>(Add<u64>(i64::unpack(select valid_cast::S1.y<S1>(s1)), i64::unpack(select valid_cast::S2.y<S2>(s2))), i64::unpack(select valid_cast::S3.x<S3<0x1::i64::I64>>(s3)))
+            }
+          }
+        }
+    }
+    private fun test_cast6(a: 0x1::i64::I64,b: 0x1::i128::I128): u128 {
+        {
+          let s1: S1 = pack valid_cast::S1(1, a, b);
+          {
+            let s2: S2 = pack valid_cast::S2(s1, a, b);
+            {
+              let s3: S3<0x1::i128::I128> = pack valid_cast::S3<0x1::i128::I128>(b, s1, s2);
+              Add<u128>(Add<u128>(i128::unpack(select valid_cast::S1.z<S1>(s1)), i128::unpack(select valid_cast::S2.z<S2>(s2))), i128::unpack(select valid_cast::S3.x<S3<0x1::i128::I128>>(s3)))
+            }
+          }
+        }
+    }
+} // end 0x42::valid_cast
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::valid_cast {
+    enum E1 has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i64::I64>,
+        }
+    }
+    enum E2 has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i128::I128>,
+        }
+    }
+    enum E3<T> has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 has copy, drop {
+        x: u64,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S2 has copy, drop {
+        x: S1,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S3<T> has copy, drop {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    fun test_cast1(x: u64): 0x1::i64::I64 {
+        0x1::i64::pack(x)
+    }
+    fun test_cast2(x: 0x1::i64::I64): u64 {
+        0x1::i64::unpack(x)
+    }
+    fun test_cast3(x: u128): 0x1::i128::I128 {
+        0x1::i128::pack(x)
+    }
+    fun test_cast4(x: 0x1::i128::I128): u128 {
+        0x1::i128::unpack(x)
+    }
+    fun test_cast5(a: 0x1::i64::I64, b: 0x1::i128::I128): u64 {
+        let s1 = S1{x: 1, y: a, z: b};
+        let s2 = S2{x: s1, y: a, z: b};
+        let s3 = S3<0x1::i64::I64>{x: a, y: s1, z: s2};
+        0x1::i64::unpack(s1.y) + 0x1::i64::unpack(s2.y) + 0x1::i64::unpack(s3.x)
+    }
+    fun test_cast6(a: 0x1::i64::I64, b: 0x1::i128::I128): u128 {
+        let s1 = S1{x: 1, y: a, z: b};
+        let s2 = S2{x: s1, y: a, z: b};
+        let s3 = S3<0x1::i128::I128>{x: b, y: s1, z: s2};
+        0x1::i128::unpack(s1.z) + 0x1::i128::unpack(s2.z) + 0x1::i128::unpack(s3.x)
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_cast::test_cast1($t0: u64): 0x1::i64::I64 {
+     var $t1: 0x1::i64::I64
+  0: $t1 := i64::pack($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast2($t0: 0x1::i64::I64): u64 {
+     var $t1: u64
+  0: $t1 := i64::unpack($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast3($t0: u128): 0x1::i128::I128 {
+     var $t1: 0x1::i128::I128
+  0: $t1 := i128::pack($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast4($t0: 0x1::i128::I128): u128 {
+     var $t1: u128
+  0: $t1 := i128::unpack($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast5($t0: 0x1::i64::I64, $t1: 0x1::i128::I128): u64 {
+     var $t2: u64
+     var $t3: 0x42::valid_cast::S1
+     var $t4: u64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x42::valid_cast::S2
+     var $t7: 0x42::valid_cast::S1
+     var $t8: 0x1::i64::I64
+     var $t9: 0x42::valid_cast::S3<0x1::i64::I64>
+     var $t10: 0x1::i64::I64
+     var $t11: 0x42::valid_cast::S1
+     var $t12: u64
+     var $t13: u64
+     var $t14: 0x1::i64::I64
+     var $t15: &0x42::valid_cast::S1
+     var $t16: &0x1::i64::I64
+     var $t17: u64
+     var $t18: 0x1::i64::I64
+     var $t19: &0x42::valid_cast::S2
+     var $t20: &0x1::i64::I64
+     var $t21: u64
+     var $t22: 0x1::i64::I64
+     var $t23: &0x42::valid_cast::S3<0x1::i64::I64>
+     var $t24: &0x1::i64::I64
+  0: $t4 := 1
+  1: $t5 := infer($t0)
+  2: $t3 := pack 0x42::valid_cast::S1($t4, $t5, $t1)
+  3: $t7 := infer($t3)
+  4: $t8 := infer($t0)
+  5: $t6 := pack 0x42::valid_cast::S2($t7, $t8, $t1)
+  6: $t10 := infer($t0)
+  7: $t11 := infer($t3)
+  8: $t9 := pack 0x42::valid_cast::S3<0x1::i64::I64>($t10, $t11, $t6)
+  9: $t15 := borrow_local($t3)
+ 10: $t16 := borrow_field<0x42::valid_cast::S1>.y($t15)
+ 11: $t14 := read_ref($t16)
+ 12: $t13 := i64::unpack($t14)
+ 13: $t19 := borrow_local($t6)
+ 14: $t20 := borrow_field<0x42::valid_cast::S2>.y($t19)
+ 15: $t18 := read_ref($t20)
+ 16: $t17 := i64::unpack($t18)
+ 17: $t12 := +($t13, $t17)
+ 18: $t23 := borrow_local($t9)
+ 19: $t24 := borrow_field<0x42::valid_cast::S3<0x1::i64::I64>>.x($t23)
+ 20: $t22 := read_ref($t24)
+ 21: $t21 := i64::unpack($t22)
+ 22: $t2 := +($t12, $t21)
+ 23: return $t2
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast6($t0: 0x1::i64::I64, $t1: 0x1::i128::I128): u128 {
+     var $t2: u128
+     var $t3: 0x42::valid_cast::S1
+     var $t4: u64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x42::valid_cast::S2
+     var $t7: 0x42::valid_cast::S1
+     var $t8: 0x1::i64::I64
+     var $t9: 0x42::valid_cast::S3<0x1::i128::I128>
+     var $t10: 0x1::i128::I128
+     var $t11: 0x42::valid_cast::S1
+     var $t12: u128
+     var $t13: u128
+     var $t14: 0x1::i128::I128
+     var $t15: &0x42::valid_cast::S1
+     var $t16: &0x1::i128::I128
+     var $t17: u128
+     var $t18: 0x1::i128::I128
+     var $t19: &0x42::valid_cast::S2
+     var $t20: &0x1::i128::I128
+     var $t21: u128
+     var $t22: 0x1::i128::I128
+     var $t23: &0x42::valid_cast::S3<0x1::i128::I128>
+     var $t24: &0x1::i128::I128
+  0: $t4 := 1
+  1: $t5 := infer($t0)
+  2: $t3 := pack 0x42::valid_cast::S1($t4, $t5, $t1)
+  3: $t7 := infer($t3)
+  4: $t8 := infer($t0)
+  5: $t6 := pack 0x42::valid_cast::S2($t7, $t8, $t1)
+  6: $t10 := infer($t1)
+  7: $t11 := infer($t3)
+  8: $t9 := pack 0x42::valid_cast::S3<0x1::i128::I128>($t10, $t11, $t6)
+  9: $t15 := borrow_local($t3)
+ 10: $t16 := borrow_field<0x42::valid_cast::S1>.z($t15)
+ 11: $t14 := read_ref($t16)
+ 12: $t13 := i128::unpack($t14)
+ 13: $t19 := borrow_local($t6)
+ 14: $t20 := borrow_field<0x42::valid_cast::S2>.z($t19)
+ 15: $t18 := read_ref($t20)
+ 16: $t17 := i128::unpack($t18)
+ 17: $t12 := +($t13, $t17)
+ 18: $t23 := borrow_local($t9)
+ 19: $t24 := borrow_field<0x42::valid_cast::S3<0x1::i128::I128>>.x($t23)
+ 20: $t22 := read_ref($t24)
+ 21: $t21 := i128::unpack($t22)
+ 22: $t2 := +($t12, $t21)
+ 23: return $t2
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_cast::test_cast1($t0: u64): 0x1::i64::I64 {
+     var $t1: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t1 := i64::pack($t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast2($t0: 0x1::i64::I64): u64 {
+     var $t1: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t1 := i64::unpack($t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast3($t0: u128): 0x1::i128::I128 {
+     var $t1: 0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t1 := i128::pack($t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast4($t0: 0x1::i128::I128): u128 {
+     var $t1: u128
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t1 := i128::unpack($t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast5($t0: 0x1::i64::I64, $t1: 0x1::i128::I128): u64 {
+     var $t2: u64
+     var $t3: 0x42::valid_cast::S1
+     var $t4: u64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x42::valid_cast::S2
+     var $t7: 0x42::valid_cast::S1
+     var $t8: 0x1::i64::I64
+     var $t9: 0x42::valid_cast::S3<0x1::i64::I64>
+     var $t10: 0x1::i64::I64
+     var $t11: 0x42::valid_cast::S1
+     var $t12: u64
+     var $t13: u64
+     var $t14: 0x1::i64::I64
+     var $t15: &0x42::valid_cast::S1
+     var $t16: &0x1::i64::I64
+     var $t17: u64
+     var $t18: 0x1::i64::I64
+     var $t19: &0x42::valid_cast::S2
+     var $t20: &0x1::i64::I64
+     var $t21: u64
+     var $t22: 0x1::i64::I64
+     var $t23: &0x42::valid_cast::S3<0x1::i64::I64>
+     var $t24: &0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t5 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  2: $t3 := pack 0x42::valid_cast::S1($t4, $t5, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  3: $t7 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t7
+     # refs: []
+     #
+  4: $t8 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t7, $t8
+     # refs: []
+     #
+  5: $t6 := pack 0x42::valid_cast::S2($t7, $t8, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t6
+     # refs: []
+     #
+  6: $t10 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t6, $t10
+     # refs: []
+     #
+  7: $t11 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t6, $t10, $t11
+     # refs: []
+     #
+  8: $t9 := pack 0x42::valid_cast::S3<0x1::i64::I64>($t10, $t11, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t6, $t9
+     # refs: []
+     #
+  9: $t15 := borrow_local($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t9, $t15
+     # refs: [$t15 => #15]
+     # #15
+     #   <no edges>
+     # #root
+     #   => #15 via [local `s1`] at line 46
+     #
+ 10: $t16 := borrow_field<0x42::valid_cast::S1>.y($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t9, $t16
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => #16 via [local `s1`, field `y`] at line 46
+     #
+ 11: $t14 := read_ref($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t9, $t14
+     # refs: []
+     #
+ 12: $t13 := i64::unpack($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t9, $t13
+     # refs: []
+     #
+ 13: $t19 := borrow_local($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t13, $t19
+     # refs: [$t19 => #19]
+     # #19
+     #   <no edges>
+     # #root
+     #   => #19 via [local `s2`] at line 46
+     #
+ 14: $t20 := borrow_field<0x42::valid_cast::S2>.y($t19)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t13, $t20
+     # refs: [$t20 => #20]
+     # #20
+     #   <no edges>
+     # #root
+     #   => #20 via [local `s2`, field `y`] at line 46
+     #
+ 15: $t18 := read_ref($t20)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t13, $t18
+     # refs: []
+     #
+ 16: $t17 := i64::unpack($t18)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t13, $t17
+     # refs: []
+     #
+ 17: $t12 := +($t13, $t17)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t12
+     # refs: []
+     #
+ 18: $t23 := borrow_local($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t23
+     # refs: [$t23 => #23]
+     # #23
+     #   <no edges>
+     # #root
+     #   => #23 via [local `s3`] at line 46
+     #
+ 19: $t24 := borrow_field<0x42::valid_cast::S3<0x1::i64::I64>>.x($t23)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t24
+     # refs: [$t24 => #24]
+     # #24
+     #   <no edges>
+     # #root
+     #   => #24 via [local `s3`, field `x`] at line 46
+     #
+ 20: $t22 := read_ref($t24)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t22
+     # refs: []
+     #
+ 21: $t21 := i64::unpack($t22)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t21
+     # refs: []
+     #
+ 22: $t2 := +($t12, $t21)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 23: return $t2
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast6($t0: 0x1::i64::I64, $t1: 0x1::i128::I128): u128 {
+     var $t2: u128
+     var $t3: 0x42::valid_cast::S1
+     var $t4: u64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x42::valid_cast::S2
+     var $t7: 0x42::valid_cast::S1
+     var $t8: 0x1::i64::I64
+     var $t9: 0x42::valid_cast::S3<0x1::i128::I128>
+     var $t10: 0x1::i128::I128
+     var $t11: 0x42::valid_cast::S1
+     var $t12: u128
+     var $t13: u128
+     var $t14: 0x1::i128::I128
+     var $t15: &0x42::valid_cast::S1
+     var $t16: &0x1::i128::I128
+     var $t17: u128
+     var $t18: 0x1::i128::I128
+     var $t19: &0x42::valid_cast::S2
+     var $t20: &0x1::i128::I128
+     var $t21: u128
+     var $t22: 0x1::i128::I128
+     var $t23: &0x42::valid_cast::S3<0x1::i128::I128>
+     var $t24: &0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t5 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  2: $t3 := pack 0x42::valid_cast::S1($t4, $t5, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  3: $t7 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t7
+     # refs: []
+     #
+  4: $t8 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t7, $t8
+     # refs: []
+     #
+  5: $t6 := pack 0x42::valid_cast::S2($t7, $t8, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t6
+     # refs: []
+     #
+  6: $t10 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t6, $t10
+     # refs: []
+     #
+  7: $t11 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t6, $t10, $t11
+     # refs: []
+     #
+  8: $t9 := pack 0x42::valid_cast::S3<0x1::i128::I128>($t10, $t11, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t6, $t9
+     # refs: []
+     #
+  9: $t15 := borrow_local($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t9, $t15
+     # refs: [$t15 => #15]
+     # #15
+     #   <no edges>
+     # #root
+     #   => #15 via [local `s1`] at line 53
+     #
+ 10: $t16 := borrow_field<0x42::valid_cast::S1>.z($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t9, $t16
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => #16 via [local `s1`, field `z`] at line 53
+     #
+ 11: $t14 := read_ref($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t9, $t14
+     # refs: []
+     #
+ 12: $t13 := i128::unpack($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t9, $t13
+     # refs: []
+     #
+ 13: $t19 := borrow_local($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t13, $t19
+     # refs: [$t19 => #19]
+     # #19
+     #   <no edges>
+     # #root
+     #   => #19 via [local `s2`] at line 53
+     #
+ 14: $t20 := borrow_field<0x42::valid_cast::S2>.z($t19)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t13, $t20
+     # refs: [$t20 => #20]
+     # #20
+     #   <no edges>
+     # #root
+     #   => #20 via [local `s2`, field `z`] at line 53
+     #
+ 15: $t18 := read_ref($t20)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t13, $t18
+     # refs: []
+     #
+ 16: $t17 := i128::unpack($t18)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t13, $t17
+     # refs: []
+     #
+ 17: $t12 := +($t13, $t17)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t12
+     # refs: []
+     #
+ 18: $t23 := borrow_local($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t23
+     # refs: [$t23 => #23]
+     # #23
+     #   <no edges>
+     # #root
+     #   => #23 via [local `s3`] at line 53
+     #
+ 19: $t24 := borrow_field<0x42::valid_cast::S3<0x1::i128::I128>>.x($t23)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t24
+     # refs: [$t24 => #24]
+     # #24
+     #   <no edges>
+     # #root
+     #   => #24 via [local `s3`, field `x`] at line 53
+     #
+ 20: $t22 := read_ref($t24)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t22
+     # refs: []
+     #
+ 21: $t21 := i128::unpack($t22)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t21
+     # refs: []
+     #
+ 22: $t2 := +($t12, $t21)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 23: return $t2
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::valid_cast {
+    enum E1 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i64::I64>,
+        }
+    }
+    enum E2 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i128::I128>,
+        }
+    }
+    enum E3<T> {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 {
+        x: u64,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S2 {
+        x: S1,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S3<T> {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    private fun test_cast1(x: u64): 0x1::i64::I64 {
+        i64::pack(x)
+    }
+    private fun test_cast2(x: 0x1::i64::I64): u64 {
+        i64::unpack(x)
+    }
+    private fun test_cast3(x: u128): 0x1::i128::I128 {
+        i128::pack(x)
+    }
+    private fun test_cast4(x: 0x1::i128::I128): u128 {
+        i128::unpack(x)
+    }
+    private fun test_cast5(a: 0x1::i64::I64,b: 0x1::i128::I128): u64 {
+        {
+          let s1: S1 = pack valid_cast::S1(1, a, b);
+          {
+            let s2: S2 = pack valid_cast::S2(s1, a, b);
+            {
+              let s3: S3<0x1::i64::I64> = pack valid_cast::S3<0x1::i64::I64>(a, s1, s2);
+              Add<u64>(Add<u64>(i64::unpack(select valid_cast::S1.y<S1>(s1)), i64::unpack(select valid_cast::S2.y<S2>(s2))), i64::unpack(select valid_cast::S3.x<S3<0x1::i64::I64>>(s3)))
+            }
+          }
+        }
+    }
+    private fun test_cast6(a: 0x1::i64::I64,b: 0x1::i128::I128): u128 {
+        {
+          let s1: S1 = pack valid_cast::S1(1, a, b);
+          {
+            let s2: S2 = pack valid_cast::S2(s1, a, b);
+            {
+              let s3: S3<0x1::i128::I128> = pack valid_cast::S3<0x1::i128::I128>(b, s1, s2);
+              Add<u128>(Add<u128>(i128::unpack(select valid_cast::S1.z<S1>(s1)), i128::unpack(select valid_cast::S2.z<S2>(s2))), i128::unpack(select valid_cast::S3.x<S3<0x1::i128::I128>>(s3)))
+            }
+          }
+        }
+    }
+} // end 0x42::valid_cast
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_cast::test_cast1($t0: u64): 0x1::i64::I64 {
+     var $t1: 0x1::i64::I64
+  0: $t1 := i64::pack($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast2($t0: 0x1::i64::I64): u64 {
+     var $t1: u64
+  0: $t1 := i64::unpack($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast3($t0: u128): 0x1::i128::I128 {
+     var $t1: 0x1::i128::I128
+  0: $t1 := i128::pack($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast4($t0: 0x1::i128::I128): u128 {
+     var $t1: u128
+  0: $t1 := i128::unpack($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast5($t0: 0x1::i64::I64, $t1: 0x1::i128::I128): u64 {
+     var $t2: u64
+     var $t3: 0x42::valid_cast::S1
+     var $t4: u64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x42::valid_cast::S2
+     var $t7: 0x42::valid_cast::S1
+     var $t8: 0x1::i64::I64
+     var $t9: 0x42::valid_cast::S3<0x1::i64::I64>
+     var $t10: 0x1::i64::I64
+     var $t11: 0x42::valid_cast::S1
+     var $t12: u64
+     var $t13: u64
+     var $t14: 0x1::i64::I64
+     var $t15: &0x42::valid_cast::S1
+     var $t16: &0x1::i64::I64
+     var $t17: u64
+     var $t18: 0x1::i64::I64
+     var $t19: &0x42::valid_cast::S2
+     var $t20: &0x1::i64::I64
+     var $t21: u64
+     var $t22: 0x1::i64::I64
+     var $t23: &0x42::valid_cast::S3<0x1::i64::I64>
+     var $t24: &0x1::i64::I64
+  0: $t4 := 1
+  1: $t5 := infer($t0)
+  2: $t3 := pack 0x42::valid_cast::S1($t4, $t5, $t1)
+  3: $t7 := infer($t3)
+  4: $t8 := infer($t0)
+  5: $t6 := pack 0x42::valid_cast::S2($t7, $t8, $t1)
+  6: $t10 := infer($t0)
+  7: $t11 := infer($t3)
+  8: $t9 := pack 0x42::valid_cast::S3<0x1::i64::I64>($t10, $t11, $t6)
+  9: $t15 := borrow_local($t3)
+ 10: $t16 := borrow_field<0x42::valid_cast::S1>.y($t15)
+ 11: $t14 := read_ref($t16)
+ 12: $t13 := i64::unpack($t14)
+ 13: $t19 := borrow_local($t6)
+ 14: $t20 := borrow_field<0x42::valid_cast::S2>.y($t19)
+ 15: $t18 := read_ref($t20)
+ 16: $t17 := i64::unpack($t18)
+ 17: $t12 := +($t13, $t17)
+ 18: $t23 := borrow_local($t9)
+ 19: $t24 := borrow_field<0x42::valid_cast::S3<0x1::i64::I64>>.x($t23)
+ 20: $t22 := read_ref($t24)
+ 21: $t21 := i64::unpack($t22)
+ 22: $t2 := +($t12, $t21)
+ 23: return $t2
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast6($t0: 0x1::i64::I64, $t1: 0x1::i128::I128): u128 {
+     var $t2: u128
+     var $t3: 0x42::valid_cast::S1
+     var $t4: u64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x42::valid_cast::S2
+     var $t7: 0x42::valid_cast::S1
+     var $t8: 0x1::i64::I64
+     var $t9: 0x42::valid_cast::S3<0x1::i128::I128>
+     var $t10: 0x1::i128::I128
+     var $t11: 0x42::valid_cast::S1
+     var $t12: u128
+     var $t13: u128
+     var $t14: 0x1::i128::I128
+     var $t15: &0x42::valid_cast::S1
+     var $t16: &0x1::i128::I128
+     var $t17: u128
+     var $t18: 0x1::i128::I128
+     var $t19: &0x42::valid_cast::S2
+     var $t20: &0x1::i128::I128
+     var $t21: u128
+     var $t22: 0x1::i128::I128
+     var $t23: &0x42::valid_cast::S3<0x1::i128::I128>
+     var $t24: &0x1::i128::I128
+  0: $t4 := 1
+  1: $t5 := infer($t0)
+  2: $t3 := pack 0x42::valid_cast::S1($t4, $t5, $t1)
+  3: $t7 := infer($t3)
+  4: $t8 := infer($t0)
+  5: $t6 := pack 0x42::valid_cast::S2($t7, $t8, $t1)
+  6: $t10 := infer($t1)
+  7: $t11 := infer($t3)
+  8: $t9 := pack 0x42::valid_cast::S3<0x1::i128::I128>($t10, $t11, $t6)
+  9: $t15 := borrow_local($t3)
+ 10: $t16 := borrow_field<0x42::valid_cast::S1>.z($t15)
+ 11: $t14 := read_ref($t16)
+ 12: $t13 := i128::unpack($t14)
+ 13: $t19 := borrow_local($t6)
+ 14: $t20 := borrow_field<0x42::valid_cast::S2>.z($t19)
+ 15: $t18 := read_ref($t20)
+ 16: $t17 := i128::unpack($t18)
+ 17: $t12 := +($t13, $t17)
+ 18: $t23 := borrow_local($t9)
+ 19: $t24 := borrow_field<0x42::valid_cast::S3<0x1::i128::I128>>.x($t23)
+ 20: $t22 := read_ref($t24)
+ 21: $t21 := i128::unpack($t22)
+ 22: $t2 := +($t12, $t21)
+ 23: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_cast::test_cast1($t0: u64): 0x1::i64::I64 {
+     var $t1: 0x1::i64::I64
+     # live vars: $t0
+  0: $t1 := i64::pack($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast2($t0: 0x1::i64::I64): u64 {
+     var $t1: u64
+     # live vars: $t0
+  0: $t1 := i64::unpack($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast3($t0: u128): 0x1::i128::I128 {
+     var $t1: 0x1::i128::I128
+     # live vars: $t0
+  0: $t1 := i128::pack($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast4($t0: 0x1::i128::I128): u128 {
+     var $t1: u128
+     # live vars: $t0
+  0: $t1 := i128::unpack($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast5($t0: 0x1::i64::I64, $t1: 0x1::i128::I128): u64 {
+     var $t2: u64 [unused]
+     var $t3: 0x42::valid_cast::S1
+     var $t4: u64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x42::valid_cast::S2
+     var $t7: 0x42::valid_cast::S1
+     var $t8: 0x1::i64::I64 [unused]
+     var $t9: 0x42::valid_cast::S3<0x1::i64::I64>
+     var $t10: 0x1::i64::I64 [unused]
+     var $t11: 0x42::valid_cast::S1 [unused]
+     var $t12: u64 [unused]
+     var $t13: u64 [unused]
+     var $t14: 0x1::i64::I64 [unused]
+     var $t15: &0x42::valid_cast::S1
+     var $t16: &0x1::i64::I64
+     var $t17: u64
+     var $t18: 0x1::i64::I64 [unused]
+     var $t19: &0x42::valid_cast::S2
+     var $t20: &0x1::i64::I64 [unused]
+     var $t21: u64 [unused]
+     var $t22: 0x1::i64::I64 [unused]
+     var $t23: &0x42::valid_cast::S3<0x1::i64::I64>
+     var $t24: &0x1::i64::I64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t3 := pack 0x42::valid_cast::S1($t4, $t5, $t1)
+     # live vars: $t0, $t1, $t3
+  3: $t7 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t7
+  4: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t3, $t5, $t7
+  5: $t6 := pack 0x42::valid_cast::S2($t7, $t5, $t1)
+     # live vars: $t0, $t3, $t6
+  6: $t0 := move($t0)
+     # live vars: $t0, $t3, $t6
+  7: $t7 := copy($t3)
+     # live vars: $t0, $t3, $t6, $t7
+  8: $t9 := pack 0x42::valid_cast::S3<0x1::i64::I64>($t0, $t7, $t6)
+     # live vars: $t3, $t6, $t9
+  9: $t15 := borrow_local($t3)
+     # live vars: $t6, $t9, $t15
+ 10: $t16 := borrow_field<0x42::valid_cast::S1>.y($t15)
+     # live vars: $t6, $t9, $t16
+ 11: $t0 := read_ref($t16)
+     # live vars: $t0, $t6, $t9
+ 12: $t4 := i64::unpack($t0)
+     # live vars: $t4, $t6, $t9
+ 13: $t19 := borrow_local($t6)
+     # live vars: $t4, $t9, $t19
+ 14: $t16 := borrow_field<0x42::valid_cast::S2>.y($t19)
+     # live vars: $t4, $t9, $t16
+ 15: $t0 := read_ref($t16)
+     # live vars: $t0, $t4, $t9
+ 16: $t17 := i64::unpack($t0)
+     # live vars: $t4, $t9, $t17
+ 17: $t4 := +($t4, $t17)
+     # live vars: $t4, $t9
+ 18: $t23 := borrow_local($t9)
+     # live vars: $t4, $t23
+ 19: $t16 := borrow_field<0x42::valid_cast::S3<0x1::i64::I64>>.x($t23)
+     # live vars: $t4, $t16
+ 20: $t0 := read_ref($t16)
+     # live vars: $t0, $t4
+ 21: $t17 := i64::unpack($t0)
+     # live vars: $t4, $t17
+ 22: $t4 := +($t4, $t17)
+     # live vars: $t4
+ 23: return $t4
+}
+
+
+[variant baseline]
+fun valid_cast::test_cast6($t0: 0x1::i64::I64, $t1: 0x1::i128::I128): u128 {
+     var $t2: u128 [unused]
+     var $t3: 0x42::valid_cast::S1
+     var $t4: u64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x42::valid_cast::S2
+     var $t7: 0x42::valid_cast::S1
+     var $t8: 0x1::i64::I64 [unused]
+     var $t9: 0x42::valid_cast::S3<0x1::i128::I128>
+     var $t10: 0x1::i128::I128 [unused]
+     var $t11: 0x42::valid_cast::S1 [unused]
+     var $t12: u128 [unused]
+     var $t13: u128
+     var $t14: 0x1::i128::I128 [unused]
+     var $t15: &0x42::valid_cast::S1
+     var $t16: &0x1::i128::I128
+     var $t17: u128
+     var $t18: 0x1::i128::I128 [unused]
+     var $t19: &0x42::valid_cast::S2
+     var $t20: &0x1::i128::I128 [unused]
+     var $t21: u128 [unused]
+     var $t22: 0x1::i128::I128 [unused]
+     var $t23: &0x42::valid_cast::S3<0x1::i128::I128>
+     var $t24: &0x1::i128::I128 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t3 := pack 0x42::valid_cast::S1($t4, $t5, $t1)
+     # live vars: $t0, $t1, $t3
+  3: $t7 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t7
+  4: $t0 := move($t0)
+     # live vars: $t0, $t1, $t3, $t7
+  5: $t6 := pack 0x42::valid_cast::S2($t7, $t0, $t1)
+     # live vars: $t1, $t3, $t6
+  6: $t1 := move($t1)
+     # live vars: $t1, $t3, $t6
+  7: $t7 := copy($t3)
+     # live vars: $t1, $t3, $t6, $t7
+  8: $t9 := pack 0x42::valid_cast::S3<0x1::i128::I128>($t1, $t7, $t6)
+     # live vars: $t3, $t6, $t9
+  9: $t15 := borrow_local($t3)
+     # live vars: $t6, $t9, $t15
+ 10: $t16 := borrow_field<0x42::valid_cast::S1>.z($t15)
+     # live vars: $t6, $t9, $t16
+ 11: $t1 := read_ref($t16)
+     # live vars: $t1, $t6, $t9
+ 12: $t13 := i128::unpack($t1)
+     # live vars: $t6, $t9, $t13
+ 13: $t19 := borrow_local($t6)
+     # live vars: $t9, $t13, $t19
+ 14: $t16 := borrow_field<0x42::valid_cast::S2>.z($t19)
+     # live vars: $t9, $t13, $t16
+ 15: $t1 := read_ref($t16)
+     # live vars: $t1, $t9, $t13
+ 16: $t17 := i128::unpack($t1)
+     # live vars: $t9, $t13, $t17
+ 17: $t13 := +($t13, $t17)
+     # live vars: $t9, $t13
+ 18: $t23 := borrow_local($t9)
+     # live vars: $t13, $t23
+ 19: $t16 := borrow_field<0x42::valid_cast::S3<0x1::i128::I128>>.x($t23)
+     # live vars: $t13, $t16
+ 20: $t1 := read_ref($t16)
+     # live vars: $t1, $t13
+ 21: $t17 := i128::unpack($t1)
+     # live vars: $t13, $t17
+ 22: $t13 := +($t13, $t17)
+     # live vars: $t13
+ 23: return $t13
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module 42.valid_cast {
+use 0000000000000000000000000000000000000000000000000000000000000001::i64;
+use 0000000000000000000000000000000000000000000000000000000000000001::i128;
+
+
+enum E1 has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<I64>
+ }
+}
+enum E2 has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<I128>
+ }
+}
+enum E3<T> has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<T>
+ }
+}
+struct S1 has copy, drop {
+	x: u64,
+	y: I64,
+	z: I128
+}
+struct S2 has copy, drop {
+	x: S1,
+	y: I64,
+	z: I128
+}
+struct S3<T> has copy, drop {
+	x: T,
+	y: S1,
+	z: S2
+}
+
+test_cast1(x: u64): I64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](x: u64)
+	1: Call i64::pack(u64): I64
+	2: Ret
+}
+test_cast2(x: I64): u64 /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](x: I64)
+	1: Call i64::unpack(I64): u64
+	2: Ret
+}
+test_cast3(x: u128): I128 /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](x: u128)
+	1: Call i128::pack(u128): I128
+	2: Ret
+}
+test_cast4(x: I128): u128 /* def_idx: 3 */ {
+B0:
+	0: MoveLoc[0](x: I128)
+	1: Call i128::unpack(I128): u128
+	2: Ret
+}
+test_cast5(a: I64, b: I128): u64 /* def_idx: 4 */ {
+L2:	s1: S1
+L3:	s2: S2
+L4:	s3: S3<I64>
+B0:
+	0: LdU64(1)
+	1: CopyLoc[0](a: I64)
+	2: CopyLoc[1](b: I128)
+	3: Pack[3](S1)
+	4: StLoc[2](s1: S1)
+	5: CopyLoc[2](s1: S1)
+	6: CopyLoc[0](a: I64)
+	7: MoveLoc[1](b: I128)
+	8: Pack[4](S2)
+	9: StLoc[3](s2: S2)
+	10: MoveLoc[0](a: I64)
+	11: CopyLoc[2](s1: S1)
+	12: CopyLoc[3](s2: S2)
+	13: PackGeneric[0](S3<I64>)
+	14: StLoc[4](s3: S3<I64>)
+	15: ImmBorrowLoc[2](s1: S1)
+	16: ImmBorrowField[0](S1.y: I64)
+	17: ReadRef
+	18: Call i64::unpack(I64): u64
+	19: ImmBorrowLoc[3](s2: S2)
+	20: ImmBorrowField[1](S2.y: I64)
+	21: ReadRef
+	22: Call i64::unpack(I64): u64
+	23: Add
+	24: ImmBorrowLoc[4](s3: S3<I64>)
+	25: ImmBorrowFieldGeneric[0](S3.x: T)
+	26: ReadRef
+	27: Call i64::unpack(I64): u64
+	28: Add
+	29: Ret
+}
+test_cast6(a: I64, b: I128): u128 /* def_idx: 5 */ {
+L2:	s1: S1
+L3:	s2: S2
+L4:	s3: S3<I128>
+B0:
+	0: LdU64(1)
+	1: CopyLoc[0](a: I64)
+	2: CopyLoc[1](b: I128)
+	3: Pack[3](S1)
+	4: StLoc[2](s1: S1)
+	5: CopyLoc[2](s1: S1)
+	6: MoveLoc[0](a: I64)
+	7: CopyLoc[1](b: I128)
+	8: Pack[4](S2)
+	9: StLoc[3](s2: S2)
+	10: MoveLoc[1](b: I128)
+	11: CopyLoc[2](s1: S1)
+	12: CopyLoc[3](s2: S2)
+	13: PackGeneric[1](S3<I128>)
+	14: StLoc[4](s3: S3<I128>)
+	15: ImmBorrowLoc[2](s1: S1)
+	16: ImmBorrowField[3](S1.z: I128)
+	17: ReadRef
+	18: Call i128::unpack(I128): u128
+	19: ImmBorrowLoc[3](s2: S2)
+	20: ImmBorrowField[4](S2.z: I128)
+	21: ReadRef
+	22: Call i128::unpack(I128): u128
+	23: Add
+	24: ImmBorrowLoc[4](s3: S3<I128>)
+	25: ImmBorrowFieldGeneric[1](S3.x: T)
+	26: ReadRef
+	27: Call i128::unpack(I128): u128
+	28: Add
+	29: Ret
+}
+}
+============ bytecode verification succeeded ========

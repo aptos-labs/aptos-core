@@ -7,11 +7,13 @@
 use crate::{
     ast::{Address, ModuleName, QualifiedSymbol},
     builder::{ith_str, pluralize},
+    metadata::LanguageVersion,
     model::{
         FunId, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructEnv, StructId,
         TypeParameter, TypeParameterKind,
     },
     symbol::Symbol,
+    well_known,
 };
 use itertools::Itertools;
 #[allow(deprecated)]
@@ -98,6 +100,8 @@ pub enum PrimitiveType {
     U64,
     U128,
     U256,
+    I64,
+    I128,
     Address,
     Signer,
     // Types only appearing in specifications
@@ -822,9 +826,14 @@ impl PrimitiveType {
     pub fn is_spec(&self) -> bool {
         use PrimitiveType::*;
         match self {
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer => false,
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I64 | I128 | Address | Signer => false,
             Num | Range | EventStore => true,
         }
+    }
+
+    /// Return true if this is a signed integer type
+    pub fn is_signed_int(&self) -> bool {
+        matches!(self, PrimitiveType::I64 | PrimitiveType::I128)
     }
 
     /// Attempt to convert this type into a normalized::Type
@@ -841,20 +850,34 @@ impl PrimitiveType {
             U256 => MType::U256,
             Address => MType::Address,
             Signer => MType::Signer,
+            I64 | I128 => unimplemented!("`{:?}` not supported.", self),
             Num | Range | EventStore => return None,
         })
     }
 
-    /// Infer a type from a value. Returns the set of int types which can fit the
-    /// value.
+    /// Infer a type from a value. Returns the set of int types which can fit the value.
     pub fn possible_int_types(value: BigInt) -> Vec<PrimitiveType> {
         Self::all_int_types()
             .into_iter()
-            .filter(|t| value <= Self::get_max_value(t).expect("type has max"))
+            .filter(|t| {
+                 value <= Self::get_max_value(t).expect("type has max")
+                 &&
+                 value >= Self::get_min_value(t).expect("type has min")
+            })
             .collect()
     }
 
     pub fn all_int_types() -> Vec<PrimitiveType> {
+        let mut types = Self::all_signed_int_types();
+        types.extend(Self::all_unsigned_int_types());
+        types
+    }
+
+    pub fn all_signed_int_types() -> Vec<PrimitiveType> {
+        vec![PrimitiveType::I64, PrimitiveType::I128]
+    }
+
+    pub fn all_unsigned_int_types() -> Vec<PrimitiveType> {
         vec![
             PrimitiveType::U8,
             PrimitiveType::U16,
@@ -874,6 +897,8 @@ impl PrimitiveType {
             PrimitiveType::U64 => Some(BigInt::from(u64::MAX)),
             PrimitiveType::U128 => Some(BigInt::from(u128::MAX)),
             PrimitiveType::U256 => Some(BigInt::from(&U256::max_value())),
+            PrimitiveType::I64 => Some(BigInt::from(i64::MAX)),
+            PrimitiveType::I128 => Some(BigInt::from(i128::MAX)),
             PrimitiveType::Num => None,
             _ => unreachable!("no num type"),
         }
@@ -888,6 +913,8 @@ impl PrimitiveType {
             PrimitiveType::U64 => Some(BigInt::zero()),
             PrimitiveType::U128 => Some(BigInt::zero()),
             PrimitiveType::U256 => Some(BigInt::zero()),
+            PrimitiveType::I64 => Some(BigInt::from(i64::MIN)),
+            PrimitiveType::I128 => Some(BigInt::from(i128::MIN)),
             PrimitiveType::Num => None,
             _ => unreachable!("no num type"),
         }
@@ -1045,14 +1072,17 @@ impl Type {
         use PrimitiveType::*;
         use Type::*;
         match self {
-            Primitive(p) => matches!(p, U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address),
+            Primitive(p) => matches!(
+                p,
+                U8 | U16 | U32 | U64 | U128 | U256 | I64 | I128 | Bool | Address
+            ),
             Vector(ety) => ety.is_valid_for_constant(),
             _ => false,
         }
     }
 
     pub fn describe_valid_for_constant() -> &'static str {
-        "Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, \
+        "Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, \
          or `vector<_>` with valid element type."
     }
 
@@ -1177,6 +1207,8 @@ impl Type {
             | PrimitiveType::U64
             | PrimitiveType::U128
             | PrimitiveType::U256
+            | PrimitiveType::I64
+            | PrimitiveType::I128
             | PrimitiveType::Num = p
             {
                 return true;
@@ -1627,6 +1659,8 @@ impl Type {
             SignatureToken::U64 => Type::Primitive(PrimitiveType::U64),
             SignatureToken::U128 => Type::Primitive(PrimitiveType::U128),
             SignatureToken::U256 => Type::Primitive(PrimitiveType::U256),
+            SignatureToken::I64 => Type::Primitive(PrimitiveType::I64),
+            SignatureToken::I128 => Type::Primitive(PrimitiveType::I128),
             SignatureToken::Address => Type::Primitive(PrimitiveType::Address),
             SignatureToken::Signer => Type::Primitive(PrimitiveType::Signer),
             SignatureToken::Reference(t) => Type::Reference(
@@ -1893,6 +1927,8 @@ pub trait UnificationContext: AbilityContext {
         field_name: Symbol,
     ) -> (Vec<(Option<Symbol>, Type)>, bool);
 
+    fn get_struct_name(&self, id: &QualifiedId<StructId>) -> (Address, String, String);
+
     /// If this is a function type wrapper (`struct W(|T|R)`), get the underlying
     /// function type.
     fn get_function_wrapper_type(&self, id: &QualifiedInstId<StructId>) -> Option<Type>;
@@ -1907,6 +1943,8 @@ pub trait UnificationContext: AbilityContext {
 
     /// Returns a type display context.
     fn type_display_context(&self) -> TypeDisplayContext<'_>;
+
+    fn get_lang_version(&self) -> LanguageVersion;
 }
 
 /// Information returned about an instantiated function
@@ -1965,6 +2003,14 @@ impl UnificationContext for NoUnificationContext {
 
     fn type_display_context(&self) -> TypeDisplayContext<'_> {
         unimplemented!("NoUnificationContext does not support type display")
+    }
+
+    fn get_lang_version(&self) -> LanguageVersion {
+        unimplemented!("NoUnificationContext does not support language version")
+    }
+
+    fn get_struct_name(&self, _: &QualifiedId<StructId>) -> (Address, String, String) {
+        unimplemented!("NoUnificationContext does not support getting struct names")
     }
 }
 
@@ -2184,6 +2230,15 @@ impl Substitution {
                 {
                     Ok(())
                 },
+                // special case to allow `i64` and `i128` to unify with `Struct std::i64::I64` and `Struct std::i128::I128`
+                (Constraint::SomeNumber(options), Type::Struct(..))
+                    if options
+                        .iter()
+                        .any(|p| self.unifiable_signed_int(context, &Type::Primitive(*p), ty)) =>
+                {
+                    Ok(())
+                },
+
                 (Constraint::SomeReference(inner_type), Type::Reference(_, target_type)) => self
                     .unify(context, variance, order, target_type, inner_type)
                     .map(|_| ())
@@ -2766,6 +2821,19 @@ impl Substitution {
                     e2,
                 )?)));
             },
+            // Special case to accommodate signed int:
+            // - primitive types `i64`/`i128` are unifiable with `Struct std::i64::I64`/`Struct std::i128::I128` so that users can directly pass `i64`/`i128` types to functions expecting `Struct std::i64::I64`/`Struct std::i128::I128`
+            // - we directly return the struct types since all primitive types will be rewritten eventually
+            (Type::Primitive(_), Type::Struct(..)) => {
+                if self.unifiable_signed_int(context, t1, t2) {
+                    return Ok(t2.clone());
+                }
+            },
+            (Type::Struct(..), Type::Primitive(_)) => {
+                if self.unifiable_signed_int(context, t2, t1) {
+                    return Ok(t1.clone());
+                }
+            },
             _ => {},
         }
         match order {
@@ -2827,6 +2895,38 @@ impl Substitution {
             rs.push(res?);
         }
         Ok(rs)
+    }
+
+    /// Check if a primitive signed integer type is unifiable with a struct type representing the same signed integer type.
+    /// - true case 1: `i64` is unifiable with `Struct std::i64::I64`
+    /// - true case 2: `i128` is unifiable with `Struct std::i128::I128`
+    /// - false all other cases
+    pub fn unifiable_signed_int(
+        &mut self,
+        context: &mut impl UnificationContext,
+        t1: &Type,
+        t2: &Type,
+    ) -> bool {
+        // language version is not high enough
+        if !context
+            .get_lang_version()
+            .is_at_least(LanguageVersion::signed_int_ver())
+        {
+            return false;
+        }
+        match (t1, t2) {
+            (Type::Primitive(PrimitiveType::I64), Type::Struct(mid, sid, _)) => {
+                let (addr, mname, sname) = context.get_struct_name(&mid.qualified(*sid));
+                addr.is_one() && mname == well_known::I64_MODULE && sname == well_known::I64_STRUCT
+            },
+            (Type::Primitive(PrimitiveType::I128), Type::Struct(mid, sid, _)) => {
+                let (addr, mname, sname) = context.get_struct_name(&mid.qualified(*sid));
+                addr.is_one()
+                    && mname == well_known::I128_MODULE
+                    && sname == well_known::I128_STRUCT
+            },
+            _ => false,
+        }
     }
 
     /// Tries to substitute or assign a variable. Returned option is Some if unification
@@ -3903,6 +4003,8 @@ impl fmt::Display for PrimitiveType {
             U64 => f.write_str("u64"),
             U128 => f.write_str("u128"),
             U256 => f.write_str("u256"),
+            I64 => f.write_str("i64"),
+            I128 => f.write_str("i128"),
             Address => f.write_str("address"),
             Signer => f.write_str("signer"),
             Range => f.write_str("range"),
@@ -3926,6 +4028,8 @@ pub trait AbilityInference: AbilityContext {
                 | PrimitiveType::U64
                 | PrimitiveType::U128
                 | PrimitiveType::U256
+                | PrimitiveType::I64
+                | PrimitiveType::I128
                 | PrimitiveType::Num
                 | PrimitiveType::Range
                 | PrimitiveType::EventStore

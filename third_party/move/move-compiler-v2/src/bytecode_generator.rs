@@ -909,6 +909,7 @@ impl Generator<'_> {
                 self.gen_test_variants(targets, id, mid.qualified(*sid), variants, args)
             },
             Operation::Cast => self.gen_cast_call(targets, id, args),
+            Operation::Neg => self.gen_op_call(targets, id, BytecodeOperation::Neg, args),
             Operation::Add => self.gen_op_call(targets, id, BytecodeOperation::Add, args),
             Operation::Sub => self.gen_op_call(targets, id, BytecodeOperation::Sub, args),
             Operation::Mul => self.gen_op_call(targets, id, BytecodeOperation::Mul, args),

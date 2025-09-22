@@ -954,6 +954,10 @@ pub enum SignatureToken {
     U32,
     /// Unsigned integers, 256 bits length.
     U256,
+    /// Signed integers, 64 bits length.
+    I64,
+    /// Signed integers, 128 bits length.
+    I128,
 }
 
 /// An iterator to help traverse the `SignatureToken` in a non-recursive fashion to avoid
@@ -986,7 +990,7 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIter<'a> {
                         self.stack.extend(args.iter().rev());
                     },
 
-                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
+                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | I64 | I128 | Struct(_)
                     | TypeParameter(_) => (),
                 }
                 Some(tok)
@@ -1026,7 +1030,7 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIterWithDepth<'a> {
                             .extend(args.iter().map(|tok| (tok, depth + 1)).rev());
                     },
 
-                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
+                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | I64 | I128 | Struct(_)
                     | TypeParameter(_) => (),
                 }
                 Some((tok, depth))
@@ -1083,6 +1087,8 @@ impl std::fmt::Debug for SignatureToken {
             SignatureToken::U64 => write!(f, "U64"),
             SignatureToken::U128 => write!(f, "U128"),
             SignatureToken::U256 => write!(f, "U256"),
+            SignatureToken::I64 => write!(f, "I64"),
+            SignatureToken::I128 => write!(f, "I128"),
             SignatureToken::Address => write!(f, "Address"),
             SignatureToken::Signer => write!(f, "Signer"),
             SignatureToken::Vector(boxed) => write!(f, "Vector({:?})", boxed),
@@ -1105,7 +1111,7 @@ impl SignatureToken {
     pub fn is_integer(&self) -> bool {
         use SignatureToken::*;
         match self {
-            U8 | U16 | U32 | U64 | U128 | U256 => true,
+            U8 | U16 | U32 | U64 | U128 | U256 | I64 | I128 => true,
             Bool
             | Address
             | Signer
@@ -1146,7 +1152,7 @@ impl SignatureToken {
         use SignatureToken::*;
 
         match self {
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I64 | I128 | Address => true,
             Vector(inner) => inner.is_valid_for_constant(),
             Signer
             | Function(..)
@@ -1221,6 +1227,8 @@ impl SignatureToken {
             U64 => U64,
             U128 => U128,
             U256 => U256,
+            I64 => I64,
+            I128 => I128,
             Address => Address,
             Signer => Signer,
             Vector(ty) => Vector(Box::new(ty.instantiate(subst_mapping))),

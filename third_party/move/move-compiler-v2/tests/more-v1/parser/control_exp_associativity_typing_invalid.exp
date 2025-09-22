@@ -6,7 +6,7 @@ error: expected expression with no value but found `u64`
 12 │         if (cond) bar() + 1;
    │         ^^^^^^^^^^^^^^^^^^^
 
-error: cannot use `()` with an operator which expects a value of type `integer`
+error: cannot use `()` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/more-v1/parser/control_exp_associativity_typing_invalid.move:15:9
    │
 15 │         if (cond) { foo() } + 1;
@@ -18,7 +18,7 @@ error: expected expression with no value but found `u64`
 19 │         while (cond) bar() + 2;
    │                      ^^^^^^^^^
 
-error: cannot use `()` with an operator which expects a value of type `integer`
+error: cannot use `()` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/more-v1/parser/control_exp_associativity_typing_invalid.move:22:9
    │
 22 │         while (cond) { foo() } + 2;

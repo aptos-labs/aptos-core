@@ -22,6 +22,7 @@ pub mod model_ast_lints;
 pub mod recursive_struct_checker;
 pub mod rewrite_target;
 pub mod seqs_in_binop_checker;
+pub mod signed_int_rewriter;
 pub mod spec_checker;
 pub mod spec_rewriter;
 pub mod unused_params_checker;

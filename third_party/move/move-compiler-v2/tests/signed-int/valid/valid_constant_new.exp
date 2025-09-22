@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: invalid number literal
+  ┌─ tests/signed-int/valid/valid_constant_new.move:7:23
+  │
+7 │   const V10_64: i64 = 9223372036854775808i64;
+  │                       ^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i64'
+
+error: invalid number literal
+  ┌─ tests/signed-int/valid/valid_constant_new.move:8:23
+  │
+8 │   const V11_64: i64 = -   9223372036854775809i64;
+  │                       ^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i64'

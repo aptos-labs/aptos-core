@@ -63,7 +63,7 @@ impl StDefnMaterializeState {
         use SignatureToken::*;
 
         match ty {
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => AbilitySet::PRIMITIVES,
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I64 | I128 | Address => AbilitySet::PRIMITIVES,
 
             Reference(_) | MutableReference(_) => AbilitySet::REFERENCES,
             Signer => AbilitySet::SIGNER,
