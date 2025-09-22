@@ -8,7 +8,7 @@ warning: Unused value of parameter `p0`. Consider removing the parameter, or pre
 
 
 == BEGIN Bytecode ==
-// Bytecode version v8
+// Bytecode version v9
 module 0x42::m
 // Function definition at index 0
 #[persistent] public fun bar()

@@ -75,8 +75,8 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
+    int256::U256,
     language_storage::ModuleId,
-    u256::U256,
 };
 use std::{
     collections::{BTreeMap, VecDeque},

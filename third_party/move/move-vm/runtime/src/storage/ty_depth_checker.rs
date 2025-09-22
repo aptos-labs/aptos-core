@@ -143,6 +143,12 @@ where
             | Type::U64
             | Type::U128
             | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
             | Type::Address
             | Type::Signer => check_depth!(0),
             // For function types, we ignore the return/argument types because they do not bound
@@ -297,7 +303,13 @@ where
             | Type::Signer
             | Type::U16
             | Type::U32
-            | Type::U256 => DepthFormula::constant(1),
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256 => DepthFormula::constant(1),
             // For function types, we ignore the return/argument types because they do not bound
             // value size, and we do not to error on a false positive (function operates on a
             // nested value, but does not capture it). Hence, we simply return a constant here.

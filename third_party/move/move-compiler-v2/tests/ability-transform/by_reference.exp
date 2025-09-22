@@ -3782,7 +3782,7 @@ fun <SELF>_0::check() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 script {
 
 
