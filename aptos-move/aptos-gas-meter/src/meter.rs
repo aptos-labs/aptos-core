@@ -137,6 +137,14 @@ where
             LdU64 => LD_U64,
             LdU128 => LD_U128,
             LdU256 => LD_U256,
+
+            LdI8 => LD_U8,  // same cost as for unsigned
+            LdI16 => LD_U16,
+            LdI32 => LD_U32,
+            LdI64 => LD_U64,
+            LdI128 => LD_U128,
+            LdI256 => LD_U256,
+
             LdTrue => LD_TRUE,
             LdFalse => LD_FALSE,
 
@@ -162,11 +170,19 @@ where
             CastU128 => CAST_U128,
             CastU256 => CAST_U256,
 
+            CastI8 => CAST_U8,  // same cost as for unsigned
+            CastI16 => CAST_U16,
+            CastI32 => CAST_U32,
+            CastI64 => CAST_U64,
+            CastI128 => CAST_U128,
+            CastI256 => CAST_U256,
+
             Add => ADD,
             Sub => SUB,
             Mul => MUL,
             Mod => MOD_,
             Div => DIV,
+            Negate => SUB,  // same cost as for subtraction
 
             BitOr => BIT_OR,
             BitAnd => BIT_AND,

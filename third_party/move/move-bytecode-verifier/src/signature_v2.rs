@@ -149,7 +149,8 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
 
         match ty {
             TypeParameter(param_idx) => param_constraints.insert(*param_idx, required_abilities),
-            U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address => {
+            U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256 | Bool
+            | Address => {
                 assert_abilities(AbilitySet::PRIMITIVES, required_abilities)?;
             },
             Signer => {
@@ -290,7 +291,7 @@ fn check_phantom_params(
         },
 
         Struct(_) | Reference(_) | MutableReference(_) | Bool | U8 | U16 | U32 | U64 | U128
-        | U256 | Address | Signer => {},
+        | U256 | I8 | I16 | I32 | I64 | I128 | I256 | Address | Signer => {},
     }
 
     Ok(())
@@ -972,6 +973,18 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 | CastU64
                 | CastU128
                 | CastU256
+                | LdI8(_)
+                | LdI16(_)
+                | LdI32(_)
+                | LdI64(_)
+                | LdI128(_)
+                | LdI256(_)
+                | CastI8
+                | CastI16
+                | CastI32
+                | CastI64
+                | CastI128
+                | CastI256
                 | LdTrue
                 | LdFalse
                 | Call(_)
@@ -989,6 +1002,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 | Mul
                 | Mod
                 | Div
+                | Negate
                 | BitOr
                 | BitAnd
                 | Xor

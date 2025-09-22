@@ -290,6 +290,12 @@ pub enum Type {
     U16,
     U32,
     U256,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
 }
 
 pub struct TypePreorderTraversalIter<'a> {
@@ -314,6 +320,12 @@ impl<'a> Iterator for TypePreorderTraversalIter<'a> {
                     | U64
                     | U128
                     | U256
+                    | I8
+                    | I16
+                    | I32
+                    | I64
+                    | I128
+                    | I256
                     | Struct { .. }
                     | TyParam(..) => (),
 
@@ -423,6 +435,12 @@ impl Type {
             | U64
             | U128
             | U256
+            | I8
+            | I16
+            | I32
+            | I64
+            | I128
+            | I256
             | Address
             | Vector(_)
             | Struct { .. }
@@ -678,6 +696,12 @@ impl Type {
             | Type::U32
             | Type::U256
             | Type::U128
+            | Type::I8
+            | Type::I64
+            | Type::I16
+            | Type::I32
+            | Type::I128
+            | Type::I256
             | Type::Address
             | Type::Signer
             | Type::Vector(_)
@@ -697,6 +721,12 @@ impl Type {
             | Type::U64
             | Type::U128
             | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
             | Type::Address => Ok(AbilitySet::PRIMITIVES),
 
             // Technically unreachable but, no point in erroring if we don't have to
@@ -803,6 +833,12 @@ impl Type {
                     | U64
                     | U128
                     | U256
+                    | I8
+                    | I16
+                    | I32
+                    | I64
+                    | I128
+                    | I256
                     | Vector(..)
                     | Struct { .. }
                     | Reference(..)
@@ -839,6 +875,12 @@ impl fmt::Display for Type {
             U64 => f.write_str("u64"),
             U128 => f.write_str("u128"),
             U256 => f.write_str("u256"),
+            I8 => f.write_str("i8"),
+            I16 => f.write_str("i16"),
+            I32 => f.write_str("i32"),
+            I64 => f.write_str("i64"),
+            I128 => f.write_str("i128"),
+            I256 => f.write_str("i256"),
             Address => f.write_str("address"),
             Signer => f.write_str("signer"),
             Vector(et) => write!(f, "vector<{}>", et),
@@ -922,6 +964,36 @@ impl TypeBuilder {
     #[inline]
     pub fn create_u256_ty(&self) -> Type {
         Type::U256
+    }
+
+    #[inline]
+    pub fn create_i8_ty(&self) -> Type {
+        Type::I8
+    }
+
+    #[inline]
+    pub fn create_i16_ty(&self) -> Type {
+        Type::I16
+    }
+
+    #[inline]
+    pub fn create_i32_ty(&self) -> Type {
+        Type::I32
+    }
+
+    #[inline]
+    pub fn create_i64_ty(&self) -> Type {
+        Type::I64
+    }
+
+    #[inline]
+    pub fn create_i128_ty(&self) -> Type {
+        Type::I128
+    }
+
+    #[inline]
+    pub fn create_i256_ty(&self) -> Type {
+        Type::I256
     }
 
     pub fn create_address_ty(&self) -> Type {
@@ -1209,6 +1281,12 @@ impl TypeBuilder {
             U64 => U64,
             U128 => U128,
             U256 => U256,
+            I8 => I8,
+            I16 => I16,
+            I32 => I32,
+            I64 => I64,
+            I128 => I128,
+            I256 => I256,
             Address => Address,
             Signer => Signer,
             Vector(elem_ty) => {
@@ -1291,6 +1369,12 @@ impl TypeBuilder {
             T::U64 => U64,
             T::U128 => U128,
             T::U256 => U256,
+            T::I8 => I8,
+            T::I16 => I16,
+            T::I32 => I32,
+            T::I64 => I64,
+            T::I128 => I128,
+            T::I256 => I256,
             T::Address => Address,
             T::Signer => Signer,
             T::Vector(elem_ty_tag) => {
@@ -1462,6 +1546,12 @@ impl<'a> TypeParamMap<'a> {
             | (Type::U64, Type::U64)
             | (Type::U128, Type::U128)
             | (Type::U256, Type::U256)
+            | (Type::I8, Type::I8)
+            | (Type::I16, Type::I16)
+            | (Type::I32, Type::I32)
+            | (Type::I64, Type::I64)
+            | (Type::I128, Type::I128)
+            | (Type::I256, Type::I256)
             | (Type::Bool, Type::Bool)
             | (Type::Address, Type::Address)
             | (Type::Signer, Type::Signer) => true,
@@ -1474,6 +1564,12 @@ impl<'a> TypeParamMap<'a> {
             | (Type::U64, _)
             | (Type::U128, _)
             | (Type::U256, _)
+            | (Type::I8, _)
+            | (Type::I16, _)
+            | (Type::I32, _)
+            | (Type::I64, _)
+            | (Type::I128, _)
+            | (Type::I256, _)
             | (Type::Bool, _)
             | (Type::Address, _)
             | (Type::Signer, _)

@@ -152,6 +152,7 @@ pub enum FeatureFlag {
     MonotonicallyIncreasingCounter,
     EnableCaptureOption,
     EnableTrustedCode,
+    VMBinaryFormatV9,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -403,6 +404,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::EnableCaptureOption => AptosFeatureFlag::ENABLE_CAPTURE_OPTION,
             FeatureFlag::EnableTrustedCode => AptosFeatureFlag::ENABLE_TRUSTED_CODE,
+            FeatureFlag::VMBinaryFormatV9 => AptosFeatureFlag::VM_BINARY_FORMAT_V9,
         }
     }
 }
@@ -581,6 +583,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::ENABLE_CAPTURE_OPTION => FeatureFlag::EnableCaptureOption,
             AptosFeatureFlag::ENABLE_TRUSTED_CODE => FeatureFlag::EnableTrustedCode,
+            AptosFeatureFlag::VM_BINARY_FORMAT_V9 => FeatureFlag::VMBinaryFormatV9,
         }
     }
 }

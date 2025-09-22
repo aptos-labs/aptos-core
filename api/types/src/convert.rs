@@ -935,6 +935,15 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             MoveTypeLayout::Signer | MoveTypeLayout::Native(..) => {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
             },
+            MoveTypeLayout::I8
+            | MoveTypeLayout::I16
+            | MoveTypeLayout::I32
+            | MoveTypeLayout::I64
+            | MoveTypeLayout::I128
+            | MoveTypeLayout::I256 => {
+                // TODO(#17645): signed integers
+                bail!("unimplemented support for signed integers")
+            },
         })
     }
 

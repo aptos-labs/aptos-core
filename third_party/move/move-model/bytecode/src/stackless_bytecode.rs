@@ -6,7 +6,7 @@ use crate::function_target::FunctionTarget;
 use ethnum::U256;
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
-use move_core_types::{function::ClosureMask, u256, value::MoveValue};
+use move_core_types::{function::ClosureMask, value::MoveValue};
 use move_model::{
     ast,
     ast::{Address, Exp, ExpData, MemoryLabel, Spec, TempIndex, TraceKind, Value},
@@ -112,12 +112,7 @@ pub enum Constant {
     U16(u16),
     U32(u32),
     U256(U256),
-}
-
-impl From<&u256::U256> for Constant {
-    fn from(n: &u256::U256) -> Constant {
-        Constant::U256(U256::from(n))
-    }
+    // TODO(#17645): replace use of BigInt by new int256 in core types, add I<N> types here
 }
 
 impl Constant {
@@ -131,9 +126,9 @@ impl Constant {
             Constant::U32(x) => MoveValue::U32(*x),
             Constant::U64(x) => MoveValue::U64(*x),
             Constant::U128(x) => MoveValue::U128(*x),
-            Constant::U256(x) => {
-                MoveValue::U256(move_core_types::u256::U256::from_le_bytes(&x.to_le_bytes()))
-            },
+            Constant::U256(x) => MoveValue::U256(move_core_types::int256::U256::from_le_bytes(
+                x.to_le_bytes(),
+            )),
             Constant::Address(a) => MoveValue::Address(a.expect_numerical()),
             Constant::ByteArray(v) => {
                 MoveValue::Vector(v.iter().map(|x| MoveValue::U8(*x)).collect())

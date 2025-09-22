@@ -1351,7 +1351,7 @@ fun m::drop_after_loop() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module 42.m {
 
 
