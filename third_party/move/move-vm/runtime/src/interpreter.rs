@@ -471,6 +471,52 @@ where
                         continue;
                     }
 
+                    // Fast Call
+                    if function.function.is_fast_callable {
+                        let callee = &function.function;
+                        let callee_module = function.owner_as_module()?;
+
+                        let mut fast_frame = FastFrame {
+                            num_locals: callee.local_tys().len(),
+                            num_rets: callee.return_tys().len(),
+
+                            locals: None,
+                            locals_mask: [0; 4],
+
+                            module: callee_module,
+
+                            code: &callee.code,
+                            pc: 0,
+                            bp: self.operand_stack.value.len() - callee.param_tys().len(),
+                        };
+
+                        let n_locals = callee.local_tys().len() - callee.param_tys().len();
+                        self.operand_stack
+                            .value
+                            .extend(std::iter::repeat_with(|| Value::invalid()).take(n_locals));
+
+                        let res = execute_code_ex::<RTTCheck, RTCaches, FastFrame<'_>>(
+                            &callee.code,
+                            &mut fast_frame,
+                            &mut self,
+                            data_cache,
+                            resource_resolver,
+                            gas_meter,
+                            traversal_context,
+                        );
+                        current_frame.pc += 1;
+
+                        res.map_err(|e| {
+                            let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
+                                e.with_exec_state(self.get_internal_state())
+                            } else {
+                                e
+                            };
+                            set_err_info!(current_frame, e)
+                        })?;
+                        continue;
+                    }
+
                     self.set_new_call_frame::<RTTCheck, RTCaches>(
                         &mut current_frame,
                         gas_meter,
@@ -573,6 +619,52 @@ where
                             ClosureMask::empty(),
                             vec![],
                         )?;
+                        continue;
+                    }
+
+                    // Fast Call
+                    if function.function.is_fast_callable {
+                        let callee = &function.function;
+                        let callee_module = function.owner_as_module()?;
+
+                        let mut fast_frame = FastFrame {
+                            num_locals: callee.local_tys().len(),
+                            num_rets: callee.return_tys().len(),
+
+                            locals: None,
+                            locals_mask: [0; 4],
+
+                            module: callee_module,
+
+                            code: &callee.code,
+                            pc: 0,
+                            bp: self.operand_stack.value.len() - callee.param_tys().len(),
+                        };
+
+                        let n_locals = callee.local_tys().len() - callee.param_tys().len();
+                        self.operand_stack
+                            .value
+                            .extend(std::iter::repeat_with(|| Value::invalid()).take(n_locals));
+
+                        let res = execute_code_ex::<RTTCheck, RTCaches, FastFrame<'_>>(
+                            &callee.code,
+                            &mut fast_frame,
+                            &mut self,
+                            data_cache,
+                            resource_resolver,
+                            gas_meter,
+                            traversal_context,
+                        );
+                        current_frame.pc += 1;
+
+                        res.map_err(|e| {
+                            let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
+                                e.with_exec_state(self.get_internal_state())
+                            } else {
+                                e
+                            };
+                            set_err_info!(current_frame, e)
+                        })?;
                         continue;
                     }
 
@@ -2332,6 +2424,8 @@ fn execute_code_ex<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits, F: 
                     )?;
                 },
                 Bytecode::Call(idx) => {
+                    return Ok(ExitCode::Call(*idx));
+
                     let frame = frame.as_regular_frame();
 
                     let cur_module = match frame.function.owner() {
@@ -2406,6 +2500,8 @@ fn execute_code_ex<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits, F: 
                     //println!("returned from fastcall");
                 },
                 Bytecode::CallGeneric(idx) => {
+                    return Ok(ExitCode::CallGeneric(*idx));
+
                     let frame = frame.as_regular_frame();
 
                     // FASTCALL: dispatch
