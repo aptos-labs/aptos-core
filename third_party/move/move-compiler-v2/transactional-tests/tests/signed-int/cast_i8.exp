@@ -1,0 +1,44 @@
+processed 7 tasks
+task 0 lines 1-43:  run --verbose [script {]
+task 1 lines 45-87:  run --verbose [script {]
+task 2 lines 89-113:  run --verbose [script {]
+task 3 lines 115-121:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast u16(128) to i8,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 4 lines 123-129:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast U256(128) to i8,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 5 lines 131-137:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i16(128) to i8,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 6 lines 139-145:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i16(-129) to i8,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

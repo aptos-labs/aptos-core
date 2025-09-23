@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::function_target::FunctionTarget;
-use ethnum::U256;
+use ethnum::{I256, U256};
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
 use move_core_types::{function::ClosureMask, value::MoveValue};
@@ -112,7 +112,12 @@ pub enum Constant {
     U16(u16),
     U32(u32),
     U256(U256),
-    // TODO(#17645): replace use of BigInt by new int256 in core types, add I<N> types here
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    I128(i128),
+    I256(I256),
 }
 
 impl Constant {
@@ -127,6 +132,14 @@ impl Constant {
             Constant::U64(x) => MoveValue::U64(*x),
             Constant::U128(x) => MoveValue::U128(*x),
             Constant::U256(x) => MoveValue::U256(move_core_types::int256::U256::from_le_bytes(
+                x.to_le_bytes(),
+            )),
+            Constant::I8(x) => MoveValue::I8(*x),
+            Constant::I16(x) => MoveValue::I16(*x),
+            Constant::I32(x) => MoveValue::I32(*x),
+            Constant::I64(x) => MoveValue::I64(*x),
+            Constant::I128(x) => MoveValue::I128(*x),
+            Constant::I256(x) => MoveValue::I256(move_core_types::int256::I256::from_le_bytes(
                 x.to_le_bytes(),
             )),
             Constant::Address(a) => MoveValue::Address(a.expect_numerical()),
@@ -151,6 +164,12 @@ impl Constant {
             Constant::U64(x) => Value::Number((*x).into()),
             Constant::U128(x) => Value::Number((*x).into()),
             Constant::U256(x) => Value::Number(BigInt::from_bytes_le(Sign::Plus, &x.to_le_bytes())),
+            Constant::I8(x) => Value::Number((*x).into()),
+            Constant::I16(x) => Value::Number((*x).into()),
+            Constant::I32(x) => Value::Number((*x).into()),
+            Constant::I64(x) => Value::Number((*x).into()),
+            Constant::I128(x) => Value::Number((*x).into()),
+            Constant::I256(x) => Value::Number(BigInt::from_signed_bytes_le(&x.to_le_bytes())),
             Constant::Address(a) => Value::Address(a.clone()),
             Constant::Vector(v) => Value::Vector(v.iter().map(|x| x.to_model_value()).collect()),
             Constant::ByteArray(v) => {
@@ -226,7 +245,15 @@ pub enum Operation {
     CastU32,
     CastU64,
     CastU128,
+    CastU256,
+    CastI8,
+    CastI16,
+    CastI32,
+    CastI64,
+    CastI128,
+    CastI256,
     Not,
+    Negate,
 
     // Binary
     Add,
@@ -247,7 +274,6 @@ pub enum Operation {
     And,
     Eq,
     Neq,
-    CastU256,
 
     // ==============================================================
     // Extended Bytecodes (part of the verification IL)
@@ -334,7 +360,14 @@ impl Operation {
             Operation::CastU64 => true,
             Operation::CastU128 => true,
             Operation::CastU256 => true,
+            Operation::CastI8 => true,
+            Operation::CastI16 => true,
+            Operation::CastI32 => true,
+            Operation::CastI64 => true,
+            Operation::CastI128 => true,
+            Operation::CastI256 => true,
             Operation::Not => false,
+            Operation::Negate => true,
             Operation::Add => true,
             Operation::Sub => true,
             Operation::Mul => true,
@@ -1373,7 +1406,14 @@ impl fmt::Display for OperationDisplay<'_> {
             CastU64 => write!(f, "(u64)")?,
             CastU128 => write!(f, "(u128)")?,
             CastU256 => write!(f, "(u256)")?,
+            CastI8 => write!(f, "(i8)")?,
+            CastI16 => write!(f, "(i16)")?,
+            CastI32 => write!(f, "(i32)")?,
+            CastI64 => write!(f, "(i64)")?,
+            CastI128 => write!(f, "(i128)")?,
+            CastI256 => write!(f, "(i256)")?,
             Not => write!(f, "!")?,
+            Negate => write!(f, "-")?,
 
             // Binary
             Add => write!(f, "+")?,
@@ -1455,6 +1495,12 @@ impl fmt::Display for Constant {
             U64(x) => write!(f, "{}", x)?,
             U128(x) => write!(f, "{}", x)?,
             U256(x) => write!(f, "{}", x)?,
+            I8(x) => write!(f, "{}", x)?,
+            I16(x) => write!(f, "{}", x)?,
+            I32(x) => write!(f, "{}", x)?,
+            I64(x) => write!(f, "{}", x)?,
+            I128(x) => write!(f, "{}", x)?,
+            I256(x) => write!(f, "{}", x)?,
             Address(x) => write!(f, "{}", address_to_string(x))?,
             ByteArray(x) => write!(f, "{:?}", x)?,
             AddressArray(x) => write!(f, "{:?}", x.iter().map(address_to_string).collect_vec())?,

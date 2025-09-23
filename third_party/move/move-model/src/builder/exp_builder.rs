@@ -44,7 +44,7 @@ use move_ir_types::{
     location::{sp, Spanned},
     sp,
 };
-use num::{BigInt, FromPrimitive, Zero};
+use num::{BigInt, FromPrimitive};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, LinkedList},
@@ -954,6 +954,24 @@ impl ExpTranslator<'_, '_, '_> {
                         },
                         "u256" => {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::U256));
+                        },
+                        "i8" => {
+                            return check_zero_args(self, Type::new_prim(PrimitiveType::I8));
+                        },
+                        "i16" => {
+                            return check_zero_args(self, Type::new_prim(PrimitiveType::I16));
+                        },
+                        "i32" => {
+                            return check_zero_args(self, Type::new_prim(PrimitiveType::I32));
+                        },
+                        "i64" => {
+                            return check_zero_args(self, Type::new_prim(PrimitiveType::I64));
+                        },
+                        "i128" => {
+                            return check_zero_args(self, Type::new_prim(PrimitiveType::I128));
+                        },
+                        "i256" => {
+                            return check_zero_args(self, Type::new_prim(PrimitiveType::I256));
                         },
                         "num" => return check_zero_args(self, Type::new_prim(PrimitiveType::Num)),
                         "range" => {
@@ -3098,6 +3116,51 @@ impl ExpTranslator<'_, '_, '_> {
                 expected_type,
                 context,
             )),
+            EA::Value_::I8(x) => Some(self.translate_number(
+                &loc,
+                BigInt::from_i8(*x).unwrap(),
+                Some(PrimitiveType::I8),
+                expected_type,
+                context,
+            )),
+            EA::Value_::I16(x) => Some(self.translate_number(
+                &loc,
+                BigInt::from_i16(*x).unwrap(),
+                Some(PrimitiveType::I16),
+                expected_type,
+                context,
+            )),
+            EA::Value_::I32(x) => Some(self.translate_number(
+                &loc,
+                BigInt::from_i32(*x).unwrap(),
+                Some(PrimitiveType::I32),
+                expected_type,
+                context,
+            )),
+            EA::Value_::I64(x) => Some(self.translate_number(
+                &loc,
+                BigInt::from_i64(*x).unwrap(),
+                Some(PrimitiveType::I64),
+                expected_type,
+                context,
+            )),
+            EA::Value_::I128(x) => Some(self.translate_number(
+                &loc,
+                BigInt::from_i128(*x).unwrap(),
+                Some(PrimitiveType::I128),
+                expected_type,
+                context,
+            )),
+            EA::Value_::I256(x) => Some(self.translate_number(
+                &loc,
+                BigInt::from(*x),
+                Some(PrimitiveType::I256),
+                expected_type,
+                context,
+            )),
+            EA::Value_::InferredNegNum(x) => {
+                Some(self.translate_number(&loc, BigInt::from(*x), None, expected_type, context))
+            },
             EA::Value_::InferredNum(x) => {
                 Some(self.translate_number(&loc, BigInt::from(*x), None, expected_type, context))
             },
@@ -3157,7 +3220,8 @@ impl ExpTranslator<'_, '_, '_> {
     /// Check whether value fits into primitive type, report error if not.
     fn check_range(&mut self, loc: &Loc, ty: PrimitiveType, value: BigInt) {
         let max = ty.get_max_value().unwrap_or(value.clone());
-        if value < BigInt::zero() || value > max {
+        let min = ty.get_min_value().unwrap_or(value.clone());
+        if value < min || value > max {
             let tcx = self.type_display_context();
             self.error(
                 loc,
