@@ -90,10 +90,7 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 
     fn append_vk(&mut self, vk: &B::VerificationKey);
 
-    fn append_public_statement(
-        &mut self,
-        public_statement: B::PublicStatement,
-    );
+    fn append_public_statement(&mut self, public_statement: B::PublicStatement);
 
     fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1Affine], &[E::G2Affine]));
 
@@ -182,12 +179,10 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
         self.append_message(b"vk", vk_bytes.as_slice());
     }
 
-    fn append_public_statement(
-        &mut self,
-        public_statement: B::PublicStatement,
-    ) {
+    fn append_public_statement(&mut self, public_statement: B::PublicStatement) {
         let mut public_statement_bytes = Vec::new();
-        public_statement.serialize_compressed(&mut public_statement_bytes)
+        public_statement
+            .serialize_compressed(&mut public_statement_bytes)
             .expect("public_statement0 serialization should succeed");
         self.append_message(b"public-statements", public_statement_bytes.as_slice());
     }
