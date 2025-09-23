@@ -2,7 +2,7 @@ processed 6 tasks
 task 0 lines 6-17:  publish --print-bytecode [module 0x66::h_1]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::h_1
 // Function definition at index 0
 public fun f()
@@ -21,7 +21,7 @@ task 1 lines 19-19:  run --verbose 0x66::h_1::f
 task 2 lines 23-34:  publish --print-bytecode [module 0x66::h_5]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::h_5
 // Function definition at index 0
 public fun f()
@@ -40,7 +40,7 @@ task 3 lines 36-36:  run --verbose 0x66::h_5::f
 task 4 lines 40-51:  publish --print-bytecode [module 0x66::h_10]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::h_10
 // Function definition at index 0
 public fun f()

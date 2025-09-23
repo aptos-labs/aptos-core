@@ -1,6 +1,6 @@
 processed 9 tasks
 task 0 lines 1-11:  print-bytecode [// Borrowing a local produces a reference type.]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -17,7 +17,7 @@ entry public fun main()
 
 
 task 1 lines 13-24:  print-bytecode [// Borrowing a local reference produces a reference type.]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -35,7 +35,7 @@ entry public fun main()
 
 
 task 2 lines 26-59:  print-bytecode --input=module [module 0x1d4.M {]
-// Bytecode version v7
+// Bytecode version v8
 module 0x1d4::M
 struct T
   u: u64
@@ -75,7 +75,7 @@ public fun h(l0: &mut T)
 
 
 task 3 lines 61-80:  print-bytecode --input=module [module 0x2d4.M {]
-// Bytecode version v7
+// Bytecode version v8
 module 0x2d4::M
 struct T<T0>
   u: T0

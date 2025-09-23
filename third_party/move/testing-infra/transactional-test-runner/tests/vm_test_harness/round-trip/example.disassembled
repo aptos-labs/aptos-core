@@ -60,7 +60,7 @@ entry public fun main(l0: signer)
 //# view --address 0x1 --resource 0x42::N::R<u64>
 
 //# run --signers 0x1 
-// Bytecode version v7
+// Bytecode version v8
 script
 use 0x42::N
 // Function definition at index 0

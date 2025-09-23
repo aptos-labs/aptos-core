@@ -459,7 +459,7 @@ module aptos_std::big_vector {
     #[test]
     fun big_vector_empty_contains() {
         let v = empty<u64>(10);
-        assert!(!v.contains::<u64>(&(1 as u64)), 0);
+        assert!(!v.contains<u64>(&(1 as u64)), 0);
         v.destroy_empty();
     }
 }

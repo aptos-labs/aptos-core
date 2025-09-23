@@ -1,6 +1,6 @@
 processed 4 tasks
 task 0 lines 1-14:  print-bytecode --input=module [// Borrowing a global of a type defined as part of the same module is valid.]
-// Bytecode version v7
+// Bytecode version v8
 module 0x1d6::M
 use 0x1::signer
 struct T has key

@@ -1,7 +1,7 @@
 //**** Cross-compiled for `masm` syntax from `tests/assembler/resource_generic.masm`
 
 //# publish --print-bytecode --verbose
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test
 struct S<T0> has drop + key
   x: T0

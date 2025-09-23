@@ -11,7 +11,7 @@ struct OuterStruct has key
   any_field: vector<InnerStruct>
 
 // Function definition at index 0
-entry public fun test_upgrade(l0: &signer) acquires OuterStruct
+#[persistent] entry public fun test_upgrade(l0: &signer) acquires OuterStruct
     local l1: &mut vector<InnerStruct>
     local l2: u64
     local l3: u64

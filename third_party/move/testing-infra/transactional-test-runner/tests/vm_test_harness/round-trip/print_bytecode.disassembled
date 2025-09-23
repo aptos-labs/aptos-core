@@ -1,7 +1,7 @@
 //**** Cross-compiled for `masm` syntax from `tests/vm_test_harness/print_bytecode.mvir`
 
 //# print-bytecode
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main<T0, T1>()
@@ -10,7 +10,7 @@ entry public fun main<T0, T1>()
 
 
 //# print-bytecode --input=module
-// Bytecode version v7
+// Bytecode version v8
 module 0x42::M
 // Function definition at index 0
 fun f<T0, T1>()

@@ -26,6 +26,7 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `swap`](#0x1_vector_swap)
 -  [Function `singleton`](#0x1_vector_singleton)
 -  [Function `reverse`](#0x1_vector_reverse)
+-  [Function `find`](#0x1_vector_find)
 -  [Function `append`](#0x1_vector_append)
 -  [Function `is_empty`](#0x1_vector_is_empty)
 -  [Function `contains`](#0x1_vector_contains)
@@ -338,6 +339,53 @@ Reverses the order of the elements in the vector <code>v</code> in place.
 
 
 <pre><code><b>pragma</b> intrinsic = <b>true</b>;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_vector_find"></a>
+
+## Function `find`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_find">find</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&Element|bool): (bool, u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_find">find</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&Element|bool): (bool, u64) {
+    <b>let</b> find = <b>false</b>;
+    <b>let</b> found_index = 0;
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> i &lt;= len;
+            <b>invariant</b> <b>forall</b> j: num <b>where</b> j &gt;= 0 && j &lt; i: !f(<a href="vector.md#0x1_vector_borrow">borrow</a>(v, j));
+            <b>invariant</b> find ==&gt; i &lt; len && f(<a href="vector.md#0x1_vector_borrow">borrow</a>(v, i));
+        };
+        i &lt; len
+        }) {
+        // Cannot call <b>return</b> in an inline function so we need <b>to</b> resort <b>to</b> <b>break</b> here.
+        <b>if</b> (f(<a href="vector.md#0x1_vector_borrow">borrow</a>(v, i))) {
+            find = <b>true</b>;
+            found_index = i;
+            <b>break</b>
+        };
+        i = i + 1;
+    };
+    <b>spec</b> {
+        <b>assert</b> !<a href="vector.md#0x1_vector_find">find</a> &lt;==&gt; (<b>forall</b> j: num <b>where</b> j &gt;= 0 && j &lt; len: !f(v[j]));
+    };
+    (find, found_index)
+}
 </code></pre>
 
 
