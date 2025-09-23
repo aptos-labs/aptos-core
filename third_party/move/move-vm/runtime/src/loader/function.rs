@@ -14,7 +14,8 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
+        Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, SignatureToken,
+        StructFieldInformation, Visibility,
     },
 };
 use move_core_types::{
@@ -503,7 +504,7 @@ impl Debug for Function {
     }
 }
 
-fn is_fast_callable(_module: &CompiledModule, code: &[Bytecode]) -> bool {
+fn is_fast_callable(module: &CompiledModule, code: &[Bytecode]) -> bool {
     use Bytecode::*;
 
     // Check if the function only contains allowed instructions
@@ -511,9 +512,7 @@ fn is_fast_callable(_module: &CompiledModule, code: &[Bytecode]) -> bool {
         match instruction {
             // Disallowed instructions
             CallClosure(_)
-            | Pack(_)
             | PackVariant(_)
-            | PackGeneric(_)
             | PackVariantGeneric(_)
             | PackClosure(_, _)
             | PackClosureGeneric(_, _)
@@ -533,6 +532,64 @@ fn is_fast_callable(_module: &CompiledModule, code: &[Bytecode]) -> bool {
             // Disallowed for now, but may be allowed in the future
             Call(_) | CallGeneric(_) => {
                 return false;
+            },
+
+            Pack(idx) => {
+                use SignatureToken::*;
+
+                let struct_def = module.struct_def_at(*idx);
+                let fields = match &struct_def.field_information {
+                    StructFieldInformation::Declared(fields) => fields,
+                    _ => unreachable!(),
+                };
+                for field in fields {
+                    match &field.signature.0 {
+                        Bool | Address | Signer => continue,
+                        U8 | U16 | U32 | U64 | U128 | U256 => continue,
+
+                        Vector(inner) => match &**inner {
+                            Bool | Address | Signer => continue,
+                            U8 | U16 | U32 | U64 | U128 | U256 => continue,
+                            _ => return false,
+                        },
+
+                        Function(_, _, _)
+                        | Struct(_)
+                        | StructInstantiation(_, _)
+                        | TypeParameter(_) => return false,
+
+                        Reference(_) | MutableReference(_) => unreachable!(),
+                    }
+                }
+            },
+            PackGeneric(idx) => {
+                use SignatureToken::*;
+
+                let struct_inst = module.struct_instantiation_at(*idx);
+                let struct_def = module.struct_def_at(struct_inst.def);
+                let fields = match &struct_def.field_information {
+                    StructFieldInformation::Declared(fields) => fields,
+                    _ => unreachable!(),
+                };
+                for field in fields {
+                    match &field.signature.0 {
+                        Bool | Address | Signer => continue,
+                        U8 | U16 | U32 | U64 | U128 | U256 => continue,
+
+                        Vector(inner) => match &**inner {
+                            Bool | Address | Signer => continue,
+                            U8 | U16 | U32 | U64 | U128 | U256 => continue,
+                            _ => return false,
+                        },
+
+                        Function(_, _, _)
+                        | Struct(_)
+                        | StructInstantiation(_, _)
+                        | TypeParameter(_) => return false,
+
+                        Reference(_) | MutableReference(_) => unreachable!(),
+                    }
+                }
             },
 
             // Allowed instructions
