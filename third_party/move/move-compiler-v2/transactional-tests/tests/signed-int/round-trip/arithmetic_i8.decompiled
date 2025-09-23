@@ -1,0 +1,152 @@
+//**** Cross-compiled for `move` syntax from `tests/signed-int/arithmetic_i8.move`
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 1i8 + 127i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -1i8 + -128i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -2i8 - 127i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 1i8 - -127i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 8i8 * 16i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -8i8 * -16i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 9i8 * -16i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -9i8 * 16i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 1i8 / 0i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -1i8 / 0i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 1i8 % 0i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -1i8 % 0i8;
+    }
+}
+
+
+//# publish
+module 0xff::negate_i8 {
+    public fun main() {
+        let _v0 = -20i8;
+        let _v1 = negate(20i8);
+        assert!(_v0 == _v1, 14566554180833181696);
+    }
+    fun negate(p0: i8): i8 {
+        -p0
+    }
+}
+
+
+//# run 0xff::negate_i8::main
