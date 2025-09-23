@@ -4,7 +4,7 @@
 
 use crate::{Options, COMPILER_BUG_REPORT_MSG};
 use codespan_reporting::diagnostic::Severity;
-use ethnum::U256;
+use ethnum::{I256, U256};
 use itertools::Itertools;
 use move_core_types::ability::Ability;
 use move_model::{
@@ -26,7 +26,7 @@ use move_stackless_bytecode::{
     },
     stackless_bytecode_generator::BytecodeGeneratorContext,
 };
-use num::ToPrimitive;
+use num::{BigInt, ToPrimitive, Zero};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -555,8 +555,38 @@ impl Generator<'_> {
                 },
                 Type::Primitive(PrimitiveType::U256) => {
                     // No direct way to go from BigInt to ethnum::U256...
-                    let x = U256::from_str_radix(&x.to_str_radix(16), 16).unwrap();
-                    Constant::U256(x)
+                    // Detour: convert BitInt to little-endian bytes, then interpret as U256.
+                    let x = x.to_bytes_le();
+                    // Must fit into 32 bytes. This `assert!` should not be triggered as previous value translator has checked the value range of the BigInt.
+                    assert!(x.0 != num::bigint::Sign::Minus && x.1.len() <= 32);
+                    let mut bytes = [0u8; 32];
+                    bytes[..x.1.len()].copy_from_slice(&x.1);
+                    Constant::U256(U256::from_le_bytes(bytes))
+                },
+                Type::Primitive(PrimitiveType::I8) => Constant::I8(x.to_i8().unwrap_or_default()),
+                Type::Primitive(PrimitiveType::I16) => {
+                    Constant::I16(x.to_i16().unwrap_or_default())
+                },
+                Type::Primitive(PrimitiveType::I32) => {
+                    Constant::I32(x.to_i32().unwrap_or_default())
+                },
+                Type::Primitive(PrimitiveType::I64) => {
+                    Constant::I64(x.to_i64().unwrap_or_default())
+                },
+                Type::Primitive(PrimitiveType::I128) => {
+                    Constant::I128(x.to_i128().unwrap_or_default())
+                },
+                Type::Primitive(PrimitiveType::I256) => {
+                    // No direct way to go from BigInt to ethnum::I256...
+                    // Detour: convert BitInt to signed little-endian bytes (i.e., 2's complement), then interpret as I256.
+                    let pad = if *x < BigInt::zero() { 0xFFu8 } else { 0x00u8 };
+                    let x = x.to_signed_bytes_le();
+                    // Must fit into 32 bytes. This `assert!` should not be triggered as previous value translator has checked the value range of the BigInt.
+                    assert!(x.len() <= 32);
+                    // `BigInt::to_signed_bytes_le` returns the shortest representation, so we need to sign-extend to 32 bytes.
+                    let mut bytes = [pad; 32];
+                    bytes[..x.len()].copy_from_slice(&x);
+                    Constant::I256(I256::from_le_bytes(bytes))
                 },
                 ty => {
                     self.internal_error(id, format!("inconsistent numeric constant: {:?}", ty));
@@ -930,6 +960,7 @@ impl Generator<'_> {
             Operation::Le => self.gen_op_call_auto_freeze(targets, id, BytecodeOperation::Le, args),
             Operation::Ge => self.gen_op_call_auto_freeze(targets, id, BytecodeOperation::Ge, args),
             Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
+            Operation::Negate => self.gen_op_call(targets, id, BytecodeOperation::Negate, args),
 
             Operation::NoOp => {}, // do nothing
 
@@ -1018,6 +1049,12 @@ impl Generator<'_> {
             Type::Primitive(PrimitiveType::U64) => BytecodeOperation::CastU64,
             Type::Primitive(PrimitiveType::U128) => BytecodeOperation::CastU128,
             Type::Primitive(PrimitiveType::U256) => BytecodeOperation::CastU256,
+            Type::Primitive(PrimitiveType::I8) => BytecodeOperation::CastI8,
+            Type::Primitive(PrimitiveType::I16) => BytecodeOperation::CastI16,
+            Type::Primitive(PrimitiveType::I32) => BytecodeOperation::CastI32,
+            Type::Primitive(PrimitiveType::I64) => BytecodeOperation::CastI64,
+            Type::Primitive(PrimitiveType::I128) => BytecodeOperation::CastI128,
+            Type::Primitive(PrimitiveType::I256) => BytecodeOperation::CastI256,
             _ => {
                 self.internal_error(id, "inconsistent type");
                 return;

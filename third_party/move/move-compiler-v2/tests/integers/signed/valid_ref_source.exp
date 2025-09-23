@@ -1,0 +1,1290 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::valid_ref_resource {
+    use std::signer;
+    struct S1 {
+        x: u64,
+        y: i64,
+        z: i128,
+    }
+    private fun test_borrow1(a: &i64): &i64 {
+        a
+    }
+    private fun test_borrow2(a: &i128): &i128 {
+        a
+    }
+    private fun test_deref1(a: &i64): i64 {
+        Deref(a)
+    }
+    private fun test_deref2(a: &i128): i128 {
+        Deref(a)
+    }
+    private fun test_exist1(addr: address): i64 {
+        if exists<S1>(addr) {
+          {
+            let s: &S1 = BorrowGlobal(Immutable)<S1>(addr);
+            select valid_ref_resource::S1.y<&S1>(s)
+          }
+        } else {
+          1
+        }
+    }
+    private fun test_exist2(addr: address): i128 {
+        if exists<S1>(addr) {
+          {
+            let s: &S1 = BorrowGlobal(Immutable)<S1>(addr);
+            select valid_ref_resource::S1.z<&S1>(s)
+          }
+        } else {
+          1
+        }
+    }
+    private fun test_move_from(account: &signer,addr: address): i64 {
+        {
+          let s1: S1 = pack valid_ref_resource::S1(1, -1, -2);
+          if exists<S1>(addr) {
+            select valid_ref_resource::S1.y<S1>(MoveFrom<S1>(signer::address_of(account)))
+          } else {
+            select valid_ref_resource::S1.y<S1>(s1)
+          }
+        }
+    }
+    private fun test_move_to(account: &signer,addr: address) {
+        {
+          let s1: S1 = pack valid_ref_resource::S1(1, -1, -2);
+          if Not(exists<S1>(addr)) {
+            MoveTo<S1>(account, s1)
+          } else {
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::valid_ref_resource
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::valid_ref_resource {
+    use std::signer;
+    struct S1 has copy, drop, key {
+        x: u64,
+        y: i64,
+        z: i128,
+    }
+    fun test_borrow1(a: &i64): &i64 {
+        a
+    }
+    fun test_borrow2(a: &i128): &i128 {
+        a
+    }
+    fun test_deref1(a: &i64): i64 {
+        *a
+    }
+    fun test_deref2(a: &i128): i128 {
+        *a
+    }
+    fun test_exist1(addr: address): i64 {
+        if (exists<S1>(addr)) {
+            let s = borrow_global<S1>(addr);
+            s.y
+        } else 1i64
+    }
+    fun test_exist2(addr: address): i128 {
+        if (exists<S1>(addr)) {
+            let s = borrow_global<S1>(addr);
+            s.z
+        } else 1i128
+    }
+    fun test_move_from(account: &signer, addr: address): i64 {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        if (exists<S1>(addr)) move_from<S1>(0x1::signer::address_of(account)).y else s1.y
+    }
+    fun test_move_to(account: &signer, addr: address) {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        if (!exists<S1>(addr)) move_to<S1>(s1, account)
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_ref_resource::test_borrow1($t0: &i64): &i64 {
+     var $t1: &i64
+  0: $t1 := infer($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_borrow2($t0: &i128): &i128 {
+     var $t1: &i128
+  0: $t1 := infer($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_deref1($t0: &i64): i64 {
+     var $t1: i64
+  0: $t1 := read_ref($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_deref2($t0: &i128): i128 {
+     var $t1: i128
+  0: $t1 := read_ref($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_exist1($t0: address): i64 {
+     var $t1: i64
+     var $t2: bool
+     var $t3: &0x42::valid_ref_resource::S1
+     var $t4: &i64
+  0: $t2 := exists<0x42::valid_ref_resource::S1>($t0)
+  1: if ($t2) goto 2 else goto 7
+  2: label L0
+  3: $t3 := borrow_global<0x42::valid_ref_resource::S1>($t0)
+  4: $t4 := borrow_field<0x42::valid_ref_resource::S1>.y($t3)
+  5: $t1 := read_ref($t4)
+  6: goto 9
+  7: label L1
+  8: $t1 := 1
+  9: label L2
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_exist2($t0: address): i128 {
+     var $t1: i128
+     var $t2: bool
+     var $t3: &0x42::valid_ref_resource::S1
+     var $t4: &i128
+  0: $t2 := exists<0x42::valid_ref_resource::S1>($t0)
+  1: if ($t2) goto 2 else goto 7
+  2: label L0
+  3: $t3 := borrow_global<0x42::valid_ref_resource::S1>($t0)
+  4: $t4 := borrow_field<0x42::valid_ref_resource::S1>.z($t3)
+  5: $t1 := read_ref($t4)
+  6: goto 9
+  7: label L1
+  8: $t1 := 1
+  9: label L2
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_move_from($t0: &signer, $t1: address): i64 {
+     var $t2: i64
+     var $t3: 0x42::valid_ref_resource::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: bool
+     var $t8: 0x42::valid_ref_resource::S1
+     var $t9: address
+     var $t10: &0x42::valid_ref_resource::S1
+     var $t11: &i64
+     var $t12: &0x42::valid_ref_resource::S1
+     var $t13: &i64
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_ref_resource::S1($t4, $t5, $t6)
+  4: $t7 := exists<0x42::valid_ref_resource::S1>($t1)
+  5: if ($t7) goto 6 else goto 13
+  6: label L0
+  7: $t9 := signer::address_of($t0)
+  8: $t8 := move_from<0x42::valid_ref_resource::S1>($t9)
+  9: $t10 := borrow_local($t8)
+ 10: $t11 := borrow_field<0x42::valid_ref_resource::S1>.y($t10)
+ 11: $t2 := read_ref($t11)
+ 12: goto 17
+ 13: label L1
+ 14: $t12 := borrow_local($t3)
+ 15: $t13 := borrow_field<0x42::valid_ref_resource::S1>.y($t12)
+ 16: $t2 := read_ref($t13)
+ 17: label L2
+ 18: return $t2
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_move_to($t0: &signer, $t1: address) {
+     var $t2: 0x42::valid_ref_resource::S1
+     var $t3: u64
+     var $t4: i64
+     var $t5: i128
+     var $t6: bool
+     var $t7: bool
+     var $t8: &signer
+  0: $t3 := 1
+  1: $t4 := -1
+  2: $t5 := -2
+  3: $t2 := pack 0x42::valid_ref_resource::S1($t3, $t4, $t5)
+  4: $t7 := exists<0x42::valid_ref_resource::S1>($t1)
+  5: $t6 := !($t7)
+  6: if ($t6) goto 7 else goto 11
+  7: label L0
+  8: $t8 := infer($t0)
+  9: move_to<0x42::valid_ref_resource::S1>($t8, $t2)
+ 10: goto 12
+ 11: label L1
+ 12: label L2
+ 13: return ()
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_ref_resource::test_borrow1($t0: &i64): &i64 {
+     var $t1: &i64
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_borrow2($t0: &i128): &i128 {
+     var $t1: &i128
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_deref1($t0: &i64): i64 {
+     var $t1: i64
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := read_ref($t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_deref2($t0: &i128): i128 {
+     var $t1: i128
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := read_ref($t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_exist1($t0: address): i64 {
+     var $t1: i64
+     var $t2: bool
+     var $t3: &0x42::valid_ref_resource::S1
+     var $t4: &i64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := exists<0x42::valid_ref_resource::S1>($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  1: if ($t2) goto 2 else goto 7
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  2: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  3: $t3 := borrow_global<0x42::valid_ref_resource::S1>($t0)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `valid_ref_resource::S1`] at line 24
+     #
+  4: $t4 := borrow_field<0x42::valid_ref_resource::S1>.y($t3)
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `valid_ref_resource::S1`] at line 25
+     #
+  5: $t1 := read_ref($t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  6: goto 9
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  7: label L1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  8: $t1 := 1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  9: label L2
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_exist2($t0: address): i128 {
+     var $t1: i128
+     var $t2: bool
+     var $t3: &0x42::valid_ref_resource::S1
+     var $t4: &i128
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := exists<0x42::valid_ref_resource::S1>($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  1: if ($t2) goto 2 else goto 7
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  2: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  3: $t3 := borrow_global<0x42::valid_ref_resource::S1>($t0)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `valid_ref_resource::S1`] at line 33
+     #
+  4: $t4 := borrow_field<0x42::valid_ref_resource::S1>.z($t3)
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `valid_ref_resource::S1`] at line 34
+     #
+  5: $t1 := read_ref($t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  6: goto 9
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  7: label L1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  8: $t1 := 1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  9: label L2
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_move_from($t0: &signer, $t1: address): i64 {
+     var $t2: i64
+     var $t3: 0x42::valid_ref_resource::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: bool
+     var $t8: 0x42::valid_ref_resource::S1
+     var $t9: address
+     var $t10: &0x42::valid_ref_resource::S1
+     var $t11: &i64
+     var $t12: &0x42::valid_ref_resource::S1
+     var $t13: &i64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t4 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t5 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t6 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5, $t6
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: $t3 := pack 0x42::valid_ref_resource::S1($t4, $t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t7 := exists<0x42::valid_ref_resource::S1>($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  5: if ($t7) goto 6 else goto 13
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  6: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  7: $t9 := signer::address_of($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t9
+     # refs: []
+     #
+  8: $t8 := move_from<0x42::valid_ref_resource::S1>($t9)
+     # abort state: {returns}
+     # live vars: $t8
+     # refs: []
+     #
+  9: $t10 := borrow_local($t8)
+     # abort state: {returns}
+     # live vars: $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [value] at line 50
+     #
+ 10: $t11 := borrow_field<0x42::valid_ref_resource::S1>.y($t10)
+     # abort state: {returns}
+     # live vars: $t11
+     # refs: [$t11 => #11]
+     # #11
+     #   <no edges>
+     # #root
+     #   => #11 via [value, field `y`] at line 50
+     #
+ 11: $t2 := read_ref($t11)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 12: goto 17
+     # abort state: {returns}
+     # live vars: $t0, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 13: label L1
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 14: $t12 := borrow_local($t3)
+     # abort state: {returns}
+     # live vars: $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s1`] at line 52
+     #
+ 15: $t13 := borrow_field<0x42::valid_ref_resource::S1>.y($t12)
+     # abort state: {returns}
+     # live vars: $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s1`, field `y`] at line 52
+     #
+ 16: $t2 := read_ref($t13)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 17: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 18: return $t2
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_move_to($t0: &signer, $t1: address) {
+     var $t2: 0x42::valid_ref_resource::S1
+     var $t3: u64
+     var $t4: i64
+     var $t5: i128
+     var $t6: bool
+     var $t7: bool
+     var $t8: &signer
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t4 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t4
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t5 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t4, $t5
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: $t2 := pack 0x42::valid_ref_resource::S1($t3, $t4, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t7 := exists<0x42::valid_ref_resource::S1>($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t7
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  5: $t6 := !($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  6: if ($t6) goto 7 else goto 11
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  7: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  8: $t8 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  9: move_to<0x42::valid_ref_resource::S1>($t8, $t2)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 10: goto 12
+     # abort state: {returns}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 11: label L1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 12: label L2
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 13: return ()
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::valid_ref_resource {
+    use std::signer;
+    struct S1 {
+        x: u64,
+        y: i64,
+        z: i128,
+    }
+    private fun test_borrow1(a: &i64): &i64 {
+        a
+    }
+    private fun test_borrow2(a: &i128): &i128 {
+        a
+    }
+    private fun test_deref1(a: &i64): i64 {
+        Deref(a)
+    }
+    private fun test_deref2(a: &i128): i128 {
+        Deref(a)
+    }
+    private fun test_exist1(addr: address): i64 {
+        if exists<S1>(addr) {
+          {
+            let s: &S1 = BorrowGlobal(Immutable)<S1>(addr);
+            select valid_ref_resource::S1.y<&S1>(s)
+          }
+        } else {
+          1
+        }
+    }
+    private fun test_exist2(addr: address): i128 {
+        if exists<S1>(addr) {
+          {
+            let s: &S1 = BorrowGlobal(Immutable)<S1>(addr);
+            select valid_ref_resource::S1.z<&S1>(s)
+          }
+        } else {
+          1
+        }
+    }
+    private fun test_move_from(account: &signer,addr: address): i64 {
+        {
+          let s1: S1 = pack valid_ref_resource::S1(1, -1, -2);
+          if exists<S1>(addr) {
+            select valid_ref_resource::S1.y<S1>(MoveFrom<S1>(signer::address_of(account)))
+          } else {
+            select valid_ref_resource::S1.y<S1>(s1)
+          }
+        }
+    }
+    private fun test_move_to(account: &signer,addr: address) {
+        {
+          let s1: S1 = pack valid_ref_resource::S1(1, -1, -2);
+          if Not(exists<S1>(addr)) {
+            MoveTo<S1>(account, s1)
+          } else {
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::valid_ref_resource
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_ref_resource::test_borrow1($t0: &i64): &i64 {
+     var $t1: &i64
+  0: $t1 := infer($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_borrow2($t0: &i128): &i128 {
+     var $t1: &i128
+  0: $t1 := infer($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_deref1($t0: &i64): i64 {
+     var $t1: i64
+  0: $t1 := read_ref($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_deref2($t0: &i128): i128 {
+     var $t1: i128
+  0: $t1 := read_ref($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_exist1($t0: address): i64 {
+     var $t1: i64
+     var $t2: bool
+     var $t3: &0x42::valid_ref_resource::S1
+     var $t4: &i64
+  0: $t2 := exists<0x42::valid_ref_resource::S1>($t0)
+  1: if ($t2) goto 2 else goto 7
+  2: label L0
+  3: $t3 := borrow_global<0x42::valid_ref_resource::S1>($t0)
+  4: $t4 := borrow_field<0x42::valid_ref_resource::S1>.y($t3)
+  5: $t1 := read_ref($t4)
+  6: goto 9
+  7: label L1
+  8: $t1 := 1
+  9: label L2
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_exist2($t0: address): i128 {
+     var $t1: i128
+     var $t2: bool
+     var $t3: &0x42::valid_ref_resource::S1
+     var $t4: &i128
+  0: $t2 := exists<0x42::valid_ref_resource::S1>($t0)
+  1: if ($t2) goto 2 else goto 7
+  2: label L0
+  3: $t3 := borrow_global<0x42::valid_ref_resource::S1>($t0)
+  4: $t4 := borrow_field<0x42::valid_ref_resource::S1>.z($t3)
+  5: $t1 := read_ref($t4)
+  6: goto 9
+  7: label L1
+  8: $t1 := 1
+  9: label L2
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_move_from($t0: &signer, $t1: address): i64 {
+     var $t2: i64
+     var $t3: 0x42::valid_ref_resource::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: bool
+     var $t8: 0x42::valid_ref_resource::S1
+     var $t9: address
+     var $t10: &0x42::valid_ref_resource::S1
+     var $t11: &i64
+     var $t12: &0x42::valid_ref_resource::S1
+     var $t13: &i64
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_ref_resource::S1($t4, $t5, $t6)
+  4: $t7 := exists<0x42::valid_ref_resource::S1>($t1)
+  5: if ($t7) goto 6 else goto 13
+  6: label L0
+  7: $t9 := signer::address_of($t0)
+  8: $t8 := move_from<0x42::valid_ref_resource::S1>($t9)
+  9: $t10 := borrow_local($t8)
+ 10: $t11 := borrow_field<0x42::valid_ref_resource::S1>.y($t10)
+ 11: $t2 := read_ref($t11)
+ 12: goto 17
+ 13: label L1
+ 14: $t12 := borrow_local($t3)
+ 15: $t13 := borrow_field<0x42::valid_ref_resource::S1>.y($t12)
+ 16: $t2 := read_ref($t13)
+ 17: label L2
+ 18: return $t2
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_move_to($t0: &signer, $t1: address) {
+     var $t2: 0x42::valid_ref_resource::S1
+     var $t3: u64
+     var $t4: i64
+     var $t5: i128
+     var $t6: bool
+     var $t7: bool
+     var $t8: &signer
+  0: $t3 := 1
+  1: $t4 := -1
+  2: $t5 := -2
+  3: $t2 := pack 0x42::valid_ref_resource::S1($t3, $t4, $t5)
+  4: $t7 := exists<0x42::valid_ref_resource::S1>($t1)
+  5: $t6 := !($t7)
+  6: if ($t6) goto 7 else goto 11
+  7: label L0
+  8: $t8 := infer($t0)
+  9: move_to<0x42::valid_ref_resource::S1>($t8, $t2)
+ 10: goto 12
+ 11: label L1
+ 12: label L2
+ 13: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_ref_resource::test_borrow1($t0: &i64): &i64 {
+     var $t1: &i64 [unused]
+     # live vars: $t0
+  0: return $t0
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_borrow2($t0: &i128): &i128 {
+     var $t1: &i128 [unused]
+     # live vars: $t0
+  0: return $t0
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_deref1($t0: &i64): i64 {
+     var $t1: i64
+     # live vars: $t0
+  0: $t1 := read_ref($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_deref2($t0: &i128): i128 {
+     var $t1: i128
+     # live vars: $t0
+  0: $t1 := read_ref($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_exist1($t0: address): i64 {
+     var $t1: i64
+     var $t2: bool
+     var $t3: &0x42::valid_ref_resource::S1
+     var $t4: &i64
+     # live vars: $t0
+  0: $t2 := exists<0x42::valid_ref_resource::S1>($t0)
+     # live vars: $t0, $t2
+  1: if ($t2) goto 2 else goto 8
+     # live vars: $t0
+  2: label L0
+     # live vars: $t0
+  3: $t3 := borrow_global<0x42::valid_ref_resource::S1>($t0)
+     # live vars: $t3
+  4: $t4 := borrow_field<0x42::valid_ref_resource::S1>.y($t3)
+     # live vars: $t4
+  5: $t1 := read_ref($t4)
+     # live vars: $t1
+  6: label L2
+     # live vars: $t1
+  7: return $t1
+     # live vars: $t0
+  8: label L1
+     # live vars:
+  9: $t1 := 1
+     # live vars: $t1
+ 10: goto 6
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_exist2($t0: address): i128 {
+     var $t1: i128
+     var $t2: bool
+     var $t3: &0x42::valid_ref_resource::S1
+     var $t4: &i128
+     # live vars: $t0
+  0: $t2 := exists<0x42::valid_ref_resource::S1>($t0)
+     # live vars: $t0, $t2
+  1: if ($t2) goto 2 else goto 8
+     # live vars: $t0
+  2: label L0
+     # live vars: $t0
+  3: $t3 := borrow_global<0x42::valid_ref_resource::S1>($t0)
+     # live vars: $t3
+  4: $t4 := borrow_field<0x42::valid_ref_resource::S1>.z($t3)
+     # live vars: $t4
+  5: $t1 := read_ref($t4)
+     # live vars: $t1
+  6: label L2
+     # live vars: $t1
+  7: return $t1
+     # live vars: $t0
+  8: label L1
+     # live vars:
+  9: $t1 := 1
+     # live vars: $t1
+ 10: goto 6
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_move_from($t0: &signer, $t1: address): i64 {
+     var $t2: i64 [unused]
+     var $t3: 0x42::valid_ref_resource::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: bool
+     var $t8: 0x42::valid_ref_resource::S1
+     var $t9: address [unused]
+     var $t10: &0x42::valid_ref_resource::S1
+     var $t11: &i64
+     var $t12: &0x42::valid_ref_resource::S1 [unused]
+     var $t13: &i64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t5 := -1
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t6 := -2
+     # live vars: $t0, $t1, $t4, $t5, $t6
+  3: $t3 := pack 0x42::valid_ref_resource::S1($t4, $t5, $t6)
+     # live vars: $t0, $t1, $t3
+  4: $t7 := exists<0x42::valid_ref_resource::S1>($t1)
+     # live vars: $t0, $t3, $t7
+  5: if ($t7) goto 6 else goto 14
+     # live vars: $t0, $t3
+  6: label L0
+     # live vars: $t0
+  7: $t1 := signer::address_of($t0)
+     # live vars: $t1
+  8: $t8 := move_from<0x42::valid_ref_resource::S1>($t1)
+     # live vars: $t8
+  9: $t10 := borrow_local($t8)
+     # live vars: $t10
+ 10: $t11 := borrow_field<0x42::valid_ref_resource::S1>.y($t10)
+     # live vars: $t11
+ 11: $t5 := read_ref($t11)
+     # live vars: $t5
+ 12: label L2
+     # live vars: $t5
+ 13: return $t5
+     # live vars: $t0, $t3
+ 14: label L1
+     # live vars: $t0, $t3
+ 15: drop($t0)
+     # live vars: $t3
+ 16: $t10 := borrow_local($t3)
+     # live vars: $t10
+ 17: $t11 := borrow_field<0x42::valid_ref_resource::S1>.y($t10)
+     # live vars: $t11
+ 18: $t5 := read_ref($t11)
+     # live vars: $t5
+ 19: goto 12
+}
+
+
+[variant baseline]
+fun valid_ref_resource::test_move_to($t0: &signer, $t1: address) {
+     var $t2: 0x42::valid_ref_resource::S1
+     var $t3: u64
+     var $t4: i64
+     var $t5: i128
+     var $t6: bool [unused]
+     var $t7: bool
+     var $t8: &signer
+     # live vars: $t0, $t1
+  0: $t3 := 1
+     # live vars: $t0, $t1, $t3
+  1: $t4 := -1
+     # live vars: $t0, $t1, $t3, $t4
+  2: $t5 := -2
+     # live vars: $t0, $t1, $t3, $t4, $t5
+  3: $t2 := pack 0x42::valid_ref_resource::S1($t3, $t4, $t5)
+     # live vars: $t0, $t1, $t2
+  4: $t7 := exists<0x42::valid_ref_resource::S1>($t1)
+     # live vars: $t0, $t2, $t7
+  5: $t7 := !($t7)
+     # live vars: $t0, $t2, $t7
+  6: if ($t7) goto 7 else goto 12
+     # live vars: $t0, $t2
+  7: label L0
+     # live vars: $t0, $t2
+  8: $t8 := move($t0)
+     # live vars: $t2, $t8
+  9: move_to<0x42::valid_ref_resource::S1>($t8, $t2)
+     # live vars:
+ 10: label L2
+     # live vars:
+ 11: return ()
+     # live vars: $t0, $t2
+ 12: label L1
+     # live vars: $t0
+ 13: drop($t0)
+     # live vars:
+ 14: goto 10
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v9
+module 42.valid_ref_resource {
+use 0000000000000000000000000000000000000000000000000000000000000001::signer;
+
+
+struct S1 has copy, drop, key {
+	x: u64,
+	y: i64,
+	z: i128
+}
+
+test_borrow1(a: &i64): &i64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](a: &i64)
+	1: Ret
+}
+test_borrow2(a: &i128): &i128 /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](a: &i128)
+	1: Ret
+}
+test_deref1(a: &i64): i64 /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](a: &i64)
+	1: ReadRef
+	2: Ret
+}
+test_deref2(a: &i128): i128 /* def_idx: 3 */ {
+B0:
+	0: MoveLoc[0](a: &i128)
+	1: ReadRef
+	2: Ret
+}
+test_exist1(addr: address): i64 /* def_idx: 4 */ {
+L1:	return: i64
+B0:
+	0: CopyLoc[0](addr: address)
+	1: Exists[0](S1)
+	2: BrFalse(10)
+B1:
+	3: MoveLoc[0](addr: address)
+	4: ImmBorrowGlobal[0](S1)
+	5: ImmBorrowField[0](S1.y: i64)
+	6: ReadRef
+	7: StLoc[1](return: i64)
+B2:
+	8: MoveLoc[1](return: i64)
+	9: Ret
+B3:
+	10: LdI64(1)
+	11: StLoc[1](return: i64)
+	12: Branch(8)
+}
+test_exist2(addr: address): i128 /* def_idx: 5 */ {
+L1:	return: i128
+B0:
+	0: CopyLoc[0](addr: address)
+	1: Exists[0](S1)
+	2: BrFalse(10)
+B1:
+	3: MoveLoc[0](addr: address)
+	4: ImmBorrowGlobal[0](S1)
+	5: ImmBorrowField[1](S1.z: i128)
+	6: ReadRef
+	7: StLoc[1](return: i128)
+B2:
+	8: MoveLoc[1](return: i128)
+	9: Ret
+B3:
+	10: LdI128(1)
+	11: StLoc[1](return: i128)
+	12: Branch(8)
+}
+test_move_from(account: &signer, addr: address): i64 /* def_idx: 6 */ {
+L2:	s1: S1
+L3:	$t8: S1
+L4:	$t5: i64
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[0](S1)
+	4: StLoc[2](s1: S1)
+	5: MoveLoc[1](addr: address)
+	6: Exists[0](S1)
+	7: BrFalse(18)
+B1:
+	8: MoveLoc[0](account: &signer)
+	9: Call signer::address_of(&signer): address
+	10: MoveFrom[0](S1)
+	11: StLoc[3]($t8: S1)
+	12: ImmBorrowLoc[3]($t8: S1)
+	13: ImmBorrowField[0](S1.y: i64)
+	14: ReadRef
+	15: StLoc[4]($t5: i64)
+B2:
+	16: MoveLoc[4]($t5: i64)
+	17: Ret
+B3:
+	18: MoveLoc[0](account: &signer)
+	19: Pop
+	20: ImmBorrowLoc[2](s1: S1)
+	21: ImmBorrowField[0](S1.y: i64)
+	22: ReadRef
+	23: StLoc[4]($t5: i64)
+	24: Branch(16)
+}
+test_move_to(account: &signer, addr: address) /* def_idx: 7 */ {
+L2:	s1: S1
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[0](S1)
+	4: StLoc[2](s1: S1)
+	5: MoveLoc[1](addr: address)
+	6: Exists[0](S1)
+	7: BrTrue(12)
+B1:
+	8: MoveLoc[0](account: &signer)
+	9: MoveLoc[2](s1: S1)
+	10: MoveTo[0](S1)
+B2:
+	11: Ret
+B3:
+	12: MoveLoc[0](account: &signer)
+	13: Pop
+	14: Branch(11)
+}
+}
+============ bytecode verification succeeded ========

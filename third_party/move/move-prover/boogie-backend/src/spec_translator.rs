@@ -1161,6 +1161,10 @@ impl SpecTranslator<'_> {
                     ),
                 );
             },
+            Operation::Negate => {
+                // TODO(#17645): add support
+                unimplemented!("negation not supported");
+            },
         }
     }
 
