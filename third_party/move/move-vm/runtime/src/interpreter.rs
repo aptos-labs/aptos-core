@@ -31,8 +31,8 @@ use move_binary_format::{
     file_format::{
         AccessKind, Bytecode, Constant, ConstantPoolIndex, FieldHandleIndex,
         FieldInstantiationIndex, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
-        StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
-        VariantFieldInstantiationIndex,
+        StructDefInstantiationIndex, StructDefinitionIndex, StructVariantHandleIndex,
+        StructVariantInstantiationIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
     },
 };
 use move_core_types::{
@@ -1830,6 +1830,7 @@ impl<'a> FastFrame<'a> {
 trait TFrame {
     fn assert_regular_frame(&self);
     fn as_regular_frame(&mut self) -> &mut Frame;
+    fn is_regular_frame() -> bool;
 
     fn name(&self) -> &str;
     fn code(&self) -> &[Bytecode];
@@ -1854,6 +1855,8 @@ trait TFrame {
 
     fn field_offset(&self, idx: FieldHandleIndex) -> usize;
     fn field_instantiation_offset(&self, idx: FieldInstantiationIndex) -> usize;
+    fn field_count(&self, idx: StructDefinitionIndex) -> u16;
+    fn field_instantiation_count(&self, idx: StructDefInstantiationIndex) -> u16;
 
     fn variant_field_info_at(&self, idx: VariantFieldHandleIndex) -> &VariantFieldInfo;
     fn variant_field_instantiation_info_at(
@@ -1891,6 +1894,11 @@ impl TFrame for Frame {
     #[inline(always)]
     fn as_regular_frame(&mut self) -> &mut Frame {
         self
+    }
+
+    #[inline(always)]
+    fn is_regular_frame() -> bool {
+        true
     }
 
     #[inline(always)]
@@ -1952,6 +1960,16 @@ impl TFrame for Frame {
     #[inline(always)]
     fn field_instantiation_offset(&self, idx: FieldInstantiationIndex) -> usize {
         self.field_instantiation_offset(idx)
+    }
+
+    #[inline(always)]
+    fn field_count(&self, idx: StructDefinitionIndex) -> u16 {
+        self.field_count(idx)
+    }
+
+    #[inline(always)]
+    fn field_instantiation_count(&self, idx: StructDefInstantiationIndex) -> u16 {
+        self.field_instantiation_count(idx)
     }
 
     #[inline(always)]
@@ -2036,6 +2054,11 @@ impl<'a> TFrame for FastFrame<'a> {
     #[inline(always)]
     fn as_regular_frame(&mut self) -> &mut Frame {
         panic!("not a regular frame");
+    }
+
+    #[inline(always)]
+    fn is_regular_frame() -> bool {
+        false
     }
 
     #[inline(always)]
@@ -2168,6 +2191,16 @@ impl<'a> TFrame for FastFrame<'a> {
     #[inline(always)]
     fn field_instantiation_offset(&self, idx: FieldInstantiationIndex) -> usize {
         self.module.field_instantiation_offset(idx)
+    }
+
+    #[inline(always)]
+    fn field_count(&self, idx: StructDefinitionIndex) -> u16 {
+        self.module.field_count(idx.0)
+    }
+
+    #[inline(always)]
+    fn field_instantiation_count(&self, idx: StructDefInstantiationIndex) -> u16 {
+        self.module.field_instantiation_count(idx.0)
     }
 
     #[inline(always)]
@@ -2688,35 +2721,41 @@ fn execute_code_ex<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits, F: 
                     interpreter.operand_stack.push(field_ref)?;
                 },
                 Bytecode::Pack(sd_idx) => {
-                    let frame = frame.as_regular_frame();
+                    let field_count = if F::is_regular_frame() {
+                        let frame = frame.as_regular_frame();
 
-                    let mut get_field_count_charge_gas_and_check_depth =
-                        || -> PartialVMResult<u16> {
-                            let field_count = frame.field_count(*sd_idx);
-                            let struct_type = frame.get_struct_ty(*sd_idx);
-                            interpreter.ty_depth_checker.check_depth_of_type(
-                                gas_meter,
-                                traversal_context,
-                                &struct_type,
-                            )?;
-                            Ok(field_count)
+                        let mut get_field_count_charge_gas_and_check_depth =
+                            || -> PartialVMResult<u16> {
+                                let field_count = frame.field_count(*sd_idx);
+                                let struct_type = frame.get_struct_ty(*sd_idx);
+                                interpreter.ty_depth_checker.check_depth_of_type(
+                                    gas_meter,
+                                    traversal_context,
+                                    &struct_type,
+                                )?;
+                                Ok(field_count)
+                            };
+
+                        let frame_cache = &mut *frame.frame_cache.borrow_mut();
+
+                        let field_count = if RTCaches::caches_enabled() {
+                            let cached_field_count =
+                                &frame_cache.per_instruction_cache[frame.pc as usize];
+                            if let PerInstructionCache::Pack(ref field_count) = cached_field_count {
+                                *field_count
+                            } else {
+                                let field_count = get_field_count_charge_gas_and_check_depth()?;
+                                frame_cache.per_instruction_cache[frame.pc as usize] =
+                                    PerInstructionCache::Pack(field_count);
+                                field_count
+                            }
+                        } else {
+                            get_field_count_charge_gas_and_check_depth()?
                         };
 
-                    let frame_cache = &mut *frame.frame_cache.borrow_mut();
-
-                    let field_count = if RTCaches::caches_enabled() {
-                        let cached_field_count =
-                            &frame_cache.per_instruction_cache[frame.pc as usize];
-                        if let PerInstructionCache::Pack(ref field_count) = cached_field_count {
-                            *field_count
-                        } else {
-                            let field_count = get_field_count_charge_gas_and_check_depth()?;
-                            frame_cache.per_instruction_cache[frame.pc as usize] =
-                                PerInstructionCache::Pack(field_count);
-                            field_count
-                        }
+                        field_count
                     } else {
-                        get_field_count_charge_gas_and_check_depth()?
+                        frame.field_count(*sd_idx)
                     };
 
                     gas_meter.charge_pack(
@@ -2750,30 +2789,35 @@ fn execute_code_ex<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits, F: 
                         .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
                 },
                 Bytecode::PackGeneric(si_idx) => {
-                    let frame = frame.as_regular_frame();
+                    let field_count = if F::is_regular_frame() {
+                        let frame = frame.as_regular_frame();
 
-                    // TODO: Even though the types are not needed for execution, we still
-                    //       instantiate them for gas metering.
-                    //
-                    //       This is a bit wasteful since the newly created types are
-                    //       dropped immediately.
+                        // TODO: Even though the types are not needed for execution, we still
+                        //       instantiate them for gas metering.
+                        //
+                        //       This is a bit wasteful since the newly created types are
+                        //       dropped immediately.
 
-                    let frame_cache = &mut *frame.frame_cache.borrow_mut();
+                        let frame_cache = &mut *frame.frame_cache.borrow_mut();
 
-                    let field_count = if RTCaches::caches_enabled() {
-                        let cached_field_count =
-                            &frame_cache.per_instruction_cache[frame.pc as usize];
+                        let field_count = if RTCaches::caches_enabled() {
+                            let cached_field_count =
+                                &frame_cache.per_instruction_cache[frame.pc as usize];
 
-                        if let PerInstructionCache::PackGeneric(ref field_count) =
-                            cached_field_count
-                        {
-                            *field_count
+                            if let PerInstructionCache::PackGeneric(ref field_count) =
+                                cached_field_count
+                            {
+                                *field_count
+                            } else {
+                                let field_count = frame.field_instantiation_count(*si_idx);
+                                frame_cache.per_instruction_cache[frame.pc as usize] =
+                                    PerInstructionCache::PackGeneric(field_count);
+                                field_count
+                            }
                         } else {
-                            let field_count = frame.field_instantiation_count(*si_idx);
-                            frame_cache.per_instruction_cache[frame.pc as usize] =
-                                PerInstructionCache::PackGeneric(field_count);
-                            field_count
-                        }
+                            frame.field_instantiation_count(*si_idx)
+                        };
+                        field_count
                     } else {
                         frame.field_instantiation_count(*si_idx)
                     };
