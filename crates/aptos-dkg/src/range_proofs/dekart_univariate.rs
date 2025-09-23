@@ -192,7 +192,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         r: &Self::CommitmentRandomness,
     ) -> Commitment<E> {
         debug_assert!(
-            pk.lagr_g1.len() >= values.len() + 1,
+            pk.lagr_g1.len() > values.len(),
             "pp.lagr_g1 must have at least z.len() + 1 elements"
         );
 
