@@ -106,7 +106,7 @@ module aptos_experimental::market_types {
             /// cleanup_order_f arguments: account, order_id, is_bid, remaining_size, order_metadata
             cleanup_order_f: |address, OrderIdType, bool, u64, M| has drop + copy,
             /// cleanup_bulk_orders_f arguments: account, is_bid, remaining_sizes
-            cleanup_bulk_orders_f: |address, bool, u64| has drop + copy,
+            cleanup_bulk_orders_f: |address, OrderIdType| has drop + copy,
             /// decrease_order_size_f arguments: account, order_id, is_bid, price, size
             decrease_order_size_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
             /// get a string representation of order metadata to be used in events
@@ -140,7 +140,7 @@ module aptos_experimental::market_types {
         // cleanup_order_f arguments: account, order_id, is_bid, remaining_size, order_metadata
         cleanup_order_f: |address, OrderIdType, bool, u64, M| has drop + copy,
         // cleanup_bulk_orders_f arguments: account, is_bid, remaining_sizes
-        cleanup_bulk_orders_f: |address, bool, u64| has drop + copy,
+        cleanup_bulk_orders_f: |address, OrderIdType| has drop + copy,
         // decrease_order_size_f arguments: account, order_id, is_bid, price, size
         decrease_order_size_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
         // get a string representation of order metadata to be used in events
@@ -275,9 +275,8 @@ module aptos_experimental::market_types {
     public fun cleanup_bulk_orders<M: store + copy + drop, R: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M, R>,
         account: address,
-        is_bid: bool,
-        remaining_sizes: u64) {
-        (self.cleanup_bulk_orders_f)(account, is_bid, remaining_sizes)
+        order_id: OrderIdType) {
+        (self.cleanup_bulk_orders_f)(account, order_id)
     }
 
     public fun decrease_order_size<M: store + copy + drop, R: store + copy + drop>(
@@ -356,6 +355,36 @@ module aptos_experimental::market_types {
         trigger_condition: Option<TriggerCondition>, // Only emitted with order placement events
     }
 
+    #[event]
+    struct BulkOrderPlacedEvent has drop, copy, store {
+        parent: address,
+        market: address,
+        order_id: u128,
+        user: address,
+        bid_sizes: vector<u64>,
+        bid_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+    }
+
+    #[event]
+    struct BulkOrderCancelledEvent has drop, copy, store {
+        parent: address,
+        market: address,
+        order_id: u128,
+        user: address,
+    }
+
+    #[event]
+    struct BulkOrderFilledEvent has drop, copy, store {
+        parent: address,
+        market: address,
+        order_id: u128,
+        user: address,
+        filled_size: u64,
+        price: u64,
+        is_bid: bool,
+    }
 
     public fun new_market_config(
         allow_self_matching: bool, allow_events_emission: bool, pre_cancellation_window_secs: u64
@@ -550,6 +579,74 @@ module aptos_experimental::market_types {
         };
     }
 
+    public fun emit_event_for_bulk_order_placed<M: store + copy + drop>(
+        self: &Market<M>,
+        order_id: OrderIdType,
+        user: address,
+        bid_sizes: vector<u64>,
+        bid_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+    ) {
+        // Final check whether event sending is enabled
+        if (self.config.allow_events_emission) {
+            event::emit(
+                BulkOrderPlacedEvent {
+                    parent: self.parent,
+                    market: self.market,
+                    order_id: order_id.get_order_id_value(),
+                    user,
+                    bid_sizes,
+                    bid_prices,
+                    ask_sizes,
+                    ask_prices,
+                }
+            );
+        };
+    }
+
+    public fun emit_event_for_bulk_order_cancelled<M: store + copy + drop>(
+        self: &Market<M>,
+        order_id: OrderIdType,
+        user: address,
+    ) {
+        // Final check whether event sending is enabled
+        if (self.config.allow_events_emission) {
+            event::emit(
+                BulkOrderCancelledEvent {
+                    parent: self.parent,
+                    market: self.market,
+                    order_id: order_id.get_order_id_value(),
+                    user,
+                }
+            );
+        };
+    }
+
+    public fun emit_event_for_bulk_order_filled<M: store + copy + drop>(
+        self: &Market<M>,
+        order_id: OrderIdType,
+        user: address,
+        filled_size: u64,
+        price: u64,
+        is_bid: bool,
+    ) {
+        // Final check whether event sending is enabled
+        if (self.config.allow_events_emission) {
+            event::emit(
+                BulkOrderFilledEvent {
+                    parent: self.parent,
+                    market: self.market,
+                    order_id: order_id.get_order_id_value(),
+                    user,
+                    filled_size,
+                    price,
+                    is_bid,
+                }
+            );
+        };
+    }
+
     // ============================= test_only APIs ====================================
     #[test_only]
     public fun destroy_market<M: store + copy + drop>(self: Market<M>) {
@@ -606,4 +703,53 @@ module aptos_experimental::market_types {
         assert!(self.status == status);
     }
 
+    #[test_only]
+    public fun verify_bulk_order_placed_event(
+        self: BulkOrderPlacedEvent,
+        order_id: OrderIdType,
+        market: address,
+        user: address,
+        bid_sizes: vector<u64>,
+        bid_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+    ) {
+        assert!(self.order_id == order_id.get_order_id_value());
+        assert!(self.market == market);
+        assert!(self.user == user);
+        assert!(self.bid_sizes == bid_sizes);
+        assert!(self.bid_prices == bid_prices);
+        assert!(self.ask_sizes == ask_sizes);
+        assert!(self.ask_prices == ask_prices);
+    }
+
+    #[test_only]
+    public fun verify_bulk_order_cancelled_event(
+        self: BulkOrderCancelledEvent,
+        order_id: OrderIdType,
+        market: address,
+        user: address,
+    ) {
+        assert!(self.order_id == order_id.get_order_id_value());
+        assert!(self.market == market);
+        assert!(self.user == user);
+    }
+
+    #[test_only]
+    public fun verify_bulk_order_filled_event(
+        self: BulkOrderFilledEvent,
+        order_id: OrderIdType,
+        market: address,
+        user: address,
+        filled_size: u64,
+        price: u64,
+        is_bid: bool,
+    ) {
+        assert!(self.order_id == order_id.get_order_id_value());
+        assert!(self.market == market);
+        assert!(self.user == user);
+        assert!(self.filled_size == filled_size);
+        assert!(self.price == price);
+        assert!(self.is_bid == is_bid);
+    }
 }

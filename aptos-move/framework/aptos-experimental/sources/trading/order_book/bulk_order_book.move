@@ -336,7 +336,7 @@ module aptos_experimental::bulk_order_book {
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
         ascending_id_generator: &mut AscendingIdGenerator,
         order_req: BulkOrderRequest<M>
-    ) : OrderIdType {
+    ) : BulkOrder<M> {
         let account = get_account_from_order_request(&order_req);
         let new_sequence_number = aptos_experimental::bulk_order_book_types::get_sequence_number_from_order_request(&order_req);
         let existing_order = self.orders.contains(&account);
@@ -351,17 +351,17 @@ module aptos_experimental::bulk_order_book {
             self.order_id_to_address.add(order_id, account);
             order_id
         };
-        let new_order = new_bulk_order(
+        let bulk_order = new_bulk_order(
             order_id,
             new_unique_idx_type(ascending_id_generator.next_ascending_id()),
             order_req,
             price_time_idx.best_bid_price(),
             price_time_idx.best_ask_price(),
         );
-        self.orders.add(account, new_order);
+        self.orders.add(account, bulk_order);
         // Activate the first price levels in the active order book
-        activate_first_price_levels(price_time_idx, &new_order, order_id);
-        order_id
+        activate_first_price_levels(price_time_idx, &bulk_order, order_id);
+        bulk_order
     }
 
     #[test_only]

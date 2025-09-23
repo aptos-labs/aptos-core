@@ -20,7 +20,7 @@ module aptos_experimental::market_single_order_tests {
         verify_cancel_event,
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::market_types::{order_status_open, get_order_id_from_event};
+    use aptos_experimental::market_types::{order_status_open};
     use aptos_experimental::market_types::{OrderEvent};
     use aptos_experimental::order_book_types::OrderIdType;
     use aptos_experimental::order_book_types::{good_till_cancelled};
@@ -200,7 +200,7 @@ module aptos_experimental::market_single_order_tests {
 
         let events = latest_emitted_events<OrderEvent>(&mut event_store, option::some(1));
         let order_place_event = events[0];
-        let order_id = get_order_id_from_event(order_place_event);
+        let order_id = order_place_event.get_order_id_from_event();
         order_place_event.verify_order_event(
             order_id,
             option::none(),
@@ -225,7 +225,8 @@ module aptos_experimental::market_single_order_tests {
             0, // filled size
             1000000, // remaining size
             false, // Order is cancelled
-            &mut event_store
+            &mut event_store,
+            false,
         );
         market.destroy_market()
     }
@@ -274,6 +275,7 @@ module aptos_experimental::market_single_order_tests {
             false,
             option::none(),
             new_test_order_metadata(1),
+            false,
             &test_market_callbacks()
         );
 
@@ -353,6 +355,7 @@ module aptos_experimental::market_single_order_tests {
             false,
             option::none(),
             new_test_order_metadata(1),
+            false,
             &test_market_callbacks()
         );
         verify_positions(maker_addr, taker_addr, total_fill_size, total_fill_size);
@@ -466,7 +469,8 @@ module aptos_experimental::market_single_order_tests {
             0,
             2000000,
             true,
-            &mut event_store
+            &mut event_store,
+            false,
         );
 
         verify_positions(maker1_addr, maker2_addr, 0, 0);

@@ -257,8 +257,6 @@ module aptos_experimental::order_book_types {
 
     /// Validates that a reinsertion request is valid for the given original order.
     ///
-
-
     public(friend) fun get_account_from_match_details<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
     ): address {
