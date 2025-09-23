@@ -311,6 +311,12 @@ impl<'a> Sourcifier<'a> {
                         PrimitiveType::U64 => "",
                         PrimitiveType::U128 => "u128",
                         PrimitiveType::U256 => "u256",
+                        PrimitiveType::I8 => "i8",
+                        PrimitiveType::I16 => "i16",
+                        PrimitiveType::I32 => "i32",
+                        PrimitiveType::I64 => "i64",
+                        PrimitiveType::I128 => "i128",
+                        PrimitiveType::I256 => "i256",
                         _ => "",
                     })
                 }
@@ -1212,6 +1218,10 @@ impl<'a> ExpSourcifier<'a> {
             },
             Operation::Not => self.parenthesize(context_prio, Prio::Prefix, || {
                 emit!(self.wr(), "!");
+                self.print_exp(Prio::Prefix, false, &args[0])
+            }),
+            Operation::Negate => self.parenthesize(context_prio, Prio::Prefix, || {
+                emit!(self.wr(), "-");
                 self.print_exp(Prio::Prefix, false, &args[0])
             }),
             Operation::Cast => self.parenthesize(context_prio, Prio::General, || {

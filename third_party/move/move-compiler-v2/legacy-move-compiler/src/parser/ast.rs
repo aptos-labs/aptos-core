@@ -571,6 +571,8 @@ pub type Value = Spanned<Value_>;
 pub enum UnaryOp_ {
     // !
     Not,
+    // - (negate)
+    Negate,
 }
 pub type UnaryOp = Spanned<UnaryOp_>;
 
@@ -924,12 +926,14 @@ impl Type_ {
 }
 
 impl UnaryOp_ {
+    pub const NEGATE: &'static str = "-";
     pub const NOT: &'static str = "!";
 
     pub fn symbol(&self) -> &'static str {
         use UnaryOp_ as U;
         match self {
             U::Not => U::NOT,
+            U::Negate => U::NEGATE,
         }
     }
 
@@ -937,6 +941,7 @@ impl UnaryOp_ {
         use UnaryOp_ as U;
         match self {
             U::Not => true,
+            U::Negate => false, // negating the minimal value will overflow
         }
     }
 }
