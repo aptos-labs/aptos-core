@@ -476,6 +476,8 @@ pub enum Value_ {
     Address(Address),
     // <num>
     InferredNum(move_core_types::int256::U256),
+    // <num>
+    InferredNegNum(move_core_types::int256::I256),
     // <num>u8
     U8(u8),
     // <num>u16
@@ -488,6 +490,18 @@ pub enum Value_ {
     U128(u128),
     // <num>u256
     U256(move_core_types::int256::U256),
+    // <num>i8
+    I8(i8),
+    // <num>i16
+    I16(i16),
+    // <num>i32
+    I32(i32),
+    // <num>i64
+    I64(i64),
+    // <num>i128
+    I128(i128),
+    // <num>i256
+    I256(move_core_types::int256::I256),
     // true
     // false
     Bool(bool),
@@ -1596,6 +1610,13 @@ impl AstDebug for Value_ {
             V::U64(u) => w.write(format!("{}u64", u)),
             V::U128(u) => w.write(format!("{}u128", u)),
             V::U256(u) => w.write(format!("{}u256", u)),
+            V::InferredNegNum(i) => w.write(format!("{}", i)),
+            V::I8(i) => w.write(format!("{}i8", i)),
+            V::I16(i) => w.write(format!("{}i16", i)),
+            V::I32(i) => w.write(format!("{}i32", i)),
+            V::I64(i) => w.write(format!("{}i64", i)),
+            V::I128(i) => w.write(format!("{}i128", i)),
+            V::I256(i) => w.write(format!("{}i256", i)),
             V::Bool(b) => w.write(format!("{}", b)),
             V::Bytearray(v) => w.write(format!("{:?}", v)),
         }

@@ -1173,7 +1173,8 @@ impl Generator {
                 self.gen_call_stm(ctx, None, dests, Operation::Freeze(*explicit), srcs)
             },
             Vector => self.gen_call_stm(ctx, None, dests, Operation::Vector, srcs),
-            CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 => {
+            CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | CastI8 | CastI16
+            | CastI32 | CastI64 | CastI128 | CastI256 => {
                 self.gen_call_stm(ctx, None, dests, Operation::Cast, srcs)
             },
             Not => self.gen_call_stm(ctx, None, dests, Operation::Not, srcs),
@@ -1195,6 +1196,7 @@ impl Generator {
             And => self.gen_call_stm(ctx, None, dests, Operation::And, srcs),
             Eq => self.gen_call_stm(ctx, None, dests, Operation::Eq, srcs),
             Neq => self.gen_call_stm(ctx, None, dests, Operation::Neq, srcs),
+            Negate => self.gen_call_stm(ctx, None, dests, Operation::Negate, srcs),
 
             OpaqueCallBegin(_, _, _)
             | OpaqueCallEnd(_, _, _)
@@ -2268,6 +2270,7 @@ impl AssignTransformer<'_> {
                 | Operation::Borrow(_)
                 | Operation::Deref
                 | Operation::Not
+                | Operation::Negate
                 | Operation::Cast
                 | Operation::Select(_, _, _)
                 | Operation::SelectVariants(_, _, _)
