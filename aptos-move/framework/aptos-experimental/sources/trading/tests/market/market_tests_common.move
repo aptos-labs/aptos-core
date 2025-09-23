@@ -18,7 +18,7 @@ module aptos_experimental::market_tests_common {
         place_taker_order_and_verify_fill,
         place_taker_order,
         verify_cancel_event,
-        verify_fills
+        verify_fills, verify_fills_with_bulk
     };
     use aptos_experimental::event_utils;
     use aptos_experimental::order_placement::{OrderMatchResult};
@@ -140,6 +140,7 @@ module aptos_experimental::market_tests_common {
             false,
             option::none(),
             new_test_order_metadata(1),
+            false,
             &test_market_callbacks()
         )
     }
@@ -223,6 +224,7 @@ module aptos_experimental::market_tests_common {
             false,
             option::none(),
             new_test_order_metadata(1),
+            use_bulk,
             &test_market_callbacks()
         );
         verify_positions(maker_addr, taker_addr, 1000000, 1000000);
@@ -246,6 +248,7 @@ module aptos_experimental::market_tests_common {
             false,
             option::none(),
             new_test_order_metadata(1),
+            use_bulk,
             &test_market_callbacks()
         );
         verify_positions(maker_addr, taker_addr, 2000000, 2000000);
@@ -292,6 +295,7 @@ module aptos_experimental::market_tests_common {
             false,
             option::none(),
             new_test_order_metadata(2),
+            is_bulk,
             &test_market_callbacks()
         );
         verify_positions(maker_addr, taker_addr, 1000000, 1000000);
@@ -456,6 +460,7 @@ module aptos_experimental::market_tests_common {
             false,
             option::none(),
             new_test_order_metadata(1),
+            is_bulk,
             &test_market_callbacks()
         );
 
@@ -514,6 +519,7 @@ module aptos_experimental::market_tests_common {
             true,
             option::none(),
             new_test_order_metadata(1),
+            is_bulk,
             &test_market_callbacks()
         );
 
@@ -627,6 +633,7 @@ module aptos_experimental::market_tests_common {
             true,
             option::none(),
             new_test_order_metadata(1),
+            is_bulk,
             &test_market_callbacks_with_taker_cancelled()
         );
         // Make sure the taker was cancelled
@@ -706,27 +713,46 @@ module aptos_experimental::market_tests_common {
             0,
             2000000,
             true,
-            &mut event_store
+            &mut event_store,
+            is_bulk
         );
 
-        verify_fills(
-            &mut market,
-            maker1,
-            taker_order_id,
-            option::none(),
-            1000,
-            1000000,
-            false,
-            vector[1000000],
-            vector[1000],
-            maker2_addr,
-            vector[maker2_order_id],
-            vector[option::none()],
-            vector[2000000],
-            vector[2000000],
-            &mut event_store,
-            false
-        );
+        if (is_bulk) {
+            verify_fills_with_bulk(
+                &mut market,
+                maker1,
+                taker_order_id,
+                option::none(),
+                1000,
+                1000000,
+                false,
+                vector[1000000],
+                vector[1000],
+                maker2_addr,
+                vector[maker2_order_id],
+                &mut event_store,
+                false
+            );
+        } else {
+            verify_fills(
+                &mut market,
+                maker1,
+                taker_order_id,
+                option::none(),
+                1000,
+                1000000,
+                false,
+                vector[1000000],
+                vector[1000],
+                maker2_addr,
+                vector[maker2_order_id],
+                vector[option::none()],
+                vector[2000000],
+                vector[2000000],
+                &mut event_store,
+                false
+            );
+        };
 
         verify_positions(maker1_addr, maker2_addr, 1000000, 1000000);
         market.destroy_market()
@@ -783,24 +809,43 @@ module aptos_experimental::market_tests_common {
             &test_market_callbacks()
         );
 
-        verify_fills(
-            &mut market,
-            maker1,
-            taker_order_id,
-            option::some(1),
-            1001,
-            1000000,
-            false,
-            vector[1000000],
-            vector[1001],
-            maker1_addr,
-            vector[maker1_order_id],
-            vector[option::none()],
-            vector[2000000],
-            vector[2000000],
-            &mut event_store,
-            false
-        );
+        if (is_bulk) {
+            verify_fills_with_bulk(
+                &mut market,
+                maker1,
+                taker_order_id,
+                option::some(1),
+                1001,
+                1000000,
+                false,
+                vector[1000000],
+                vector[1001],
+                maker1_addr,
+                vector[maker1_order_id],
+                &mut event_store,
+                false
+            );
+        } else {
+            verify_fills(
+                &mut market,
+                maker1,
+                taker_order_id,
+                option::some(1),
+                1001,
+                1000000,
+                false,
+                vector[1000000],
+                vector[1001],
+                maker1_addr,
+                vector[maker1_order_id],
+                vector[option::none()],
+                vector[2000000],
+                vector[2000000],
+                &mut event_store,
+                false
+            );
+        };
+
         market.destroy_market()
     }
 }
