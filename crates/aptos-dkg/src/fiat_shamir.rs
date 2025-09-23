@@ -9,7 +9,7 @@
 
 use crate::{
     pvss::{traits::Transcript, ThresholdConfig},
-    range_proofs::{dekart_univariate, traits::BatchedRangeProof},
+    range_proofs::traits::BatchedRangeProof,
     utils::random::random_scalar_from_uniform_bytes,
     SCALAR_NUM_BYTES,
 };
@@ -92,7 +92,7 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 
     fn append_public_statement(
         &mut self,
-        public_statement: &(usize, &dekart_univariate::Commitment<E>),
+        public_statement: B::PublicStatement,
     );
 
     fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1Affine], &[E::G2Affine]));
@@ -184,18 +184,11 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
 
     fn append_public_statement(
         &mut self,
-        public_statement: &(usize, &dekart_univariate::Commitment<E>),
+        public_statement: B::PublicStatement,
     ) {
         let mut public_statement_bytes = Vec::new();
-        public_statement
-            .0
-            .serialize_compressed(&mut public_statement_bytes)
+        public_statement.serialize_compressed(&mut public_statement_bytes)
             .expect("public_statement0 serialization should succeed");
-        public_statement
-            .1
-            .serialize_compressed(&mut public_statement_bytes)
-            .expect("public_statement1 serialization should succeed");
-        // TODO: CHANGE THIS STUFF
         self.append_message(b"public-statements", public_statement_bytes.as_slice());
     }
 

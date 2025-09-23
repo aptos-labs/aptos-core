@@ -1,54 +1,42 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-use crate::{algebra::polynomials, fiat_shamir, utils, utils::pad_to_pow2_len_minus_one};
+use crate::{
+    algebra::polynomials,
+    fiat_shamir,
+    range_proofs::traits,
+    utils,
+};
 use anyhow::ensure;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
-    AffineRepr, CurveGroup, PrimeGroup, VariableBaseMSM,
+    CurveGroup, PrimeGroup, VariableBaseMSM,
 };
 use ark_ff::{AdditiveGroup, Field};
 use ark_poly::{self, EvaluationDomain, Radix2EvaluationDomain};
-========
-use crate::{fiat_shamir, utils::pad_to_pow2_len_minus_one};
-use anyhow::ensure;
-use ark_bn254::{
-    // TODO: move this elsewhere
-    g1::Config as G1Config,
-    Bn254 as PairingSetting,
-    Config,
-    Fq,
-    Fq12,
-    Fr,
-    G1Affine,
-    G1Projective,
-    G2Affine,
-    G2Projective,
-};
-use ark_ec::{CurveGroup, PrimeGroup, VariableBaseMSM};
-use ark_ff::{Field, PrimeField};
-use ark_poly::{self, EvaluationDomain, GeneralEvaluationDomain};
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
 use ark_std::{
-    rand::{thread_rng, CryptoRng, RngCore},
+    rand::{CryptoRng, RngCore},
     UniformRand,
 };
 #[cfg(feature = "range_proof_timing")]
 use ff::derive::bitvec::macros::internal::funty::Fundamental;
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-use num_traits::Zero;
-========
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
 #[cfg(feature = "range_proof_timing")]
 use std::time::{Duration, Instant};
 use std::{
+    io::Write,
     iter::once,
     ops::{AddAssign, Mul},
 };
 
 pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V1_RANGE_PROOF_DST";
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct Proof<E: Pairing> {
+    d: E::G1,                // commitment to h(X) = \sum_{j=0}^{\ell-1} beta_j h_j(X)
+    c: Vec<E::G1Affine>,     // of size \ell
+    c_hat: Vec<E::G2Affine>, // of size \ell
+}
 
 pub struct PowersOfTau<E: Pairing> {
     t1: Vec<E::G1>, // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}, where `n` is the batch size
@@ -71,834 +59,588 @@ where
     PowersOfTau { t1, t2 }
 }
 
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-pub struct PublicParameters<E: Pairing> {
-    taus: PowersOfTau<E>,      // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}
-    ell: usize,                // the range is [0, 2^\ell)
-    n: usize,                  // the number of values we are batch proving; i.e., batch size
-    lagr_g1: Vec<E::G1Affine>, // of size n + 1
-    lagr_g2: Vec<E::G2Affine>, // of size n + 1
-    pub vanishing_com: E::G2, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - \omega^n) used to test h(X)
-    eval_dom: Radix2EvaluationDomain<E::ScalarField>,
-    roots_of_unity_in_eval_dom: Vec<E::ScalarField>, // setup times are a bit slow, probably because of this?
-    powers_of_two: Vec<E::ScalarField>,              // [1, 2, 4, ..., 2^{\ell - 1}]
-}
-
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Commitment<E: Pairing>(E::G1);
 
-========
-pub struct PublicParameters {
-    taus: PowersOfTau,               // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}
-    ell: usize,                      // the range is [0, 2^\ell)
-    n: usize,                        // the number of values we are batch proving; i.e., batch size
-    lagr_g1: Vec<G1Affine>,          // of size n + 1
-    lagr_g2: Vec<G2Affine>,          // of size n + 1
-    pub vanishing_com: G2Projective, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - \omega^n) used to test h(X)
-    eval_dom: GeneralEvaluationDomain<Fr>,
-    roots_of_unity_in_eval_dom: Vec<Fr>,
+pub struct ProverKey<E: Pairing> {
+    max_n: usize,
+    max_ell: usize,
+    taus: PowersOfTau<E>,      // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n},
+    lagr_g1: Vec<E::G1Affine>, // of size n + 1
+    lagr_g2: Vec<E::G2Affine>, // of size n + 1
+    eval_dom: Radix2EvaluationDomain<E::ScalarField>,
+    roots_of_unity_in_eval_dom: Vec<E::ScalarField>,
+    roots_of_unity_minus_one: Vec<E::ScalarField>,   // [omega - 1, ..., omega^n - 1]
+    vk: VerificationKey<E>,                              // Needed for Fiat-Shamir
 }
 
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-pub struct Proof<E: Pairing> {
-    d: E::G1,                // commitment to h(X) = \sum_{j=0}^{\ell-1} beta_j h_j(X)
-    c: Vec<E::G1Affine>,     // of size \ell
-    c_hat: Vec<E::G2Affine>, // of size \ell
+#[derive(CanonicalSerialize)]
+pub struct PublicStatement<E: Pairing> {
+    n: usize,
+    ell: usize,
+    comm: Commitment<E>,
 }
 
-impl<E: Pairing> Proof<E> {
-    pub fn maul(&mut self) {
+#[derive(Clone)]
+pub struct VerificationKey<E: Pairing> {
+    max_ell: usize,
+    tau_1: E::G1,
+    tau_2: E::G2,
+    vanishing_com: E::G2, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - 1) used to test h(X)
+    powers_of_two: Vec<E::ScalarField>, // [1, 2, 4, ..., 2^{max_ell - 1}]
+}
+
+impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
+    fn serialize_with_mode<W: Write>(
+        &self,
+        mut writer: W,
+        compress: Compress,
+    ) -> Result<(), SerializationError> {
+        self.max_ell.serialize_with_mode(&mut writer, compress)?;
+        self.tau_1.serialize_with_mode(&mut writer, compress)?;
+        self.tau_2.serialize_with_mode(&mut writer, compress)?;
+        self.vanishing_com
+            .serialize_with_mode(&mut writer, compress)?;
+        // NOTE: powers_of_two is intentionally not serialized
+        Ok(())
+    }
+
+    fn serialized_size(&self, compress: Compress) -> usize {
+        let mut size = 0;
+        size += self.max_ell.serialized_size(compress);
+        size += self.tau_1.serialized_size(compress);
+        size += self.tau_2.serialized_size(compress);
+        size += self.vanishing_com.serialized_size(compress);
+        size
+    }
+}
+
+
+impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
+    type Commitment = Commitment<E>;
+    type CommitmentRandomness = E::ScalarField;
+    type Input = E::ScalarField;
+    type ProverKey = ProverKey<E>;
+    type PublicStatement = PublicStatement<E>;
+    type VerificationKey = VerificationKey<E>;
+
+    // The main bottlenecks are `powers_of_tau` and the IFFT steps.
+    fn setup<R: RngCore + CryptoRng>(
+        ell: usize,
+        max_n: usize,
+        rng: &mut R,
+    ) -> (ProverKey<E>, VerificationKey<E>) {
+        let max_n = (max_n + 1).next_power_of_two() - 1;
+        let num_omegas = max_n + 1;
+        debug_assert!(num_omegas.is_power_of_two());
+
+        let taus = powers_of_tau(rng, max_n); // The taus have length `max_n+1`
+
+        let eval_dom = Radix2EvaluationDomain::<E::ScalarField>::new(num_omegas)
+            .expect("Could not construct evaluation domain");
+        let roots_of_unity_in_eval_dom: Vec<E::ScalarField> = eval_dom.elements().collect();
+        let roots_of_unity_minus_one: Vec<_> = roots_of_unity_in_eval_dom
+            .iter()
+            .skip(1) // skip index 0
+            .map(|&omega| omega - E::ScalarField::ONE)
+            .collect();
+
+        // Lagrange bases
+        let lagr_g1 = eval_dom.ifft(&taus.t1);
+        let lagr_g2 = eval_dom.ifft(&taus.t2);
+
+        let lagr_g1_aff = E::G1::normalize_batch(&lagr_g1);
+        let lagr_g2_aff = E::G2::normalize_batch(&lagr_g2);
+
+        // Vanishing polynomial that we test h(X) with is (X^{n+1} - 1) / (X - 1)
+        //
+        // Zhoujun's faster algorithm in Lagrange basis:
+        // Let $V(X) = \frac{X^{n+1} - 1}{X - 1}$ denote the vanishing polynomial.
+
+        // Note that the $0$-th Lagrange polynomial (w.r.t. our $(n+1)$-sized FFT evaluation domain) is $\ell_0(X) = \frac{V(X)}{ \prod_{i > 0} (1 - \omega^i) }$.
+
+        // Therefore, we can commit to $V(X)$ by simply scaling it down by $\prod_{i > 0} (1 - \omega^i)$!
+
+        // Notice that $\prod_{i > 0} (1 - \omega^i)$ is the evaluation of (X^{n+1} - 1) / (X - 1) = 1 + X + ... + X^n at X = 1, which is just n + 1.
+        let vanishing_com = { lagr_g2[0] * E::ScalarField::from((max_n + 1) as u64) };
+
+        let powers_of_two: Vec<E::ScalarField> =
+            std::iter::successors(Some(E::ScalarField::ONE), |x| Some(x.double()))
+                .take(ell)
+                .collect();
+
+        let vk = VerificationKey {
+            max_ell: ell,
+            tau_1: taus.t1[0],
+            tau_2: taus.t2[0],
+            vanishing_com,
+            powers_of_two,
+        };
+
+        let pk = ProverKey {
+            max_n,
+            max_ell: ell,
+            taus,
+            lagr_g1: lagr_g1_aff,
+            lagr_g2: lagr_g2_aff,
+            eval_dom,
+            roots_of_unity_in_eval_dom,
+            roots_of_unity_minus_one,
+            vk: vk.clone(),
+        };
+
+        (pk, vk)
+    }
+
+    fn commit_with_randomness(
+        pk: &Self::ProverKey,
+        witnesses: &[Self::Input],
+        r: &Self::CommitmentRandomness,
+    ) -> Commitment<E> {
+        debug_assert!(
+            pk.lagr_g1.len() >= witnesses.len() + 1,
+            "pp.lagr_g1 must have at least z.len() + 1 elements"
+        );
+
+        let mut scalars = Vec::with_capacity(witnesses.len() + 1);
+        scalars.push(*r);
+        scalars.extend_from_slice(witnesses);
+
+        Commitment(
+            E::G1::msm(&pk.lagr_g1[..scalars.len()], &scalars)
+                .expect("Failed to compute MSM in range proof commitment"),
+        )
+    }
+
+    #[allow(non_snake_case)]
+    fn prove<R>(
+        pk: &ProverKey<E>,
+        values: &[Self::Input],
+        ell: usize,
+        comm: &Self::Commitment,
+        r: &Self::CommitmentRandomness,
+        fs_transcript: &mut merlin::Transcript,
+        rng: &mut R,
+    ) -> Proof<E>
+    where
+        R: RngCore + CryptoRng,
+    {
+        let mut zz = values.to_vec();
+        zz.resize(pk.max_n, E::ScalarField::ZERO);
+
+        assert_eq!(zz.len(), pk.max_n);
+        assert_eq!(pk.taus.t1.len(), pk.max_n + 1); // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}
+        assert_eq!(pk.taus.t2.len(), pk.max_n + 1);
+
+        #[cfg(feature = "range_proof_timing")]
+        println!("n = {:?}, ell = {:?}", pp.n, pp.ell);
+        #[cfg(feature = "range_proof_timing")]
+        let mut cumulative = Duration::ZERO;
+        #[cfg(feature = "range_proof_timing")]
+        let mut print_cumulative = |duration: Duration| {
+            cumulative += duration;
+            println!("     \\--> Cumulative time: {:?}", cumulative);
+        };
+
+        // Step 1: Convert z_i's to bits.
+        #[cfg(feature = "range_proof_timing")]
+        let start = Instant::now();
+
+        let bits: Vec<Vec<bool>> = zz
+            .iter()
+            .map(|z_val| {
+                utils::scalar_to_bits_le::<E>(z_val)
+                    .into_iter()
+                    .take(ell)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        #[cfg(feature = "range_proof_timing")]
+        {
+            let duration = start.elapsed();
+            println!(
+                "{:>8.2} mus: Chunking {:?} z_i's into bits",
+                duration.as_micros().as_f64(),
+                pp.n
+            );
+            print_cumulative(duration);
+        }
+
+        assert_eq!(pk.max_n, bits.len());
+        assert_eq!(ell, bits[0].len());
+
+        // Step 2: Sample correlated randomness r_j for each f_j polynomial commitment.
+        #[cfg(feature = "range_proof_timing")]
+        let start = Instant::now();
+
+        let r = correlated_randomness(rng, 2, pk.max_ell, r);
+
+        #[cfg(feature = "range_proof_timing")]
+        {
+            let duration = start.elapsed();
+            println!(
+                "{:>8.2} mus: Correlating {:?} pieces of randomness",
+                duration.as_micros().as_f64(),
+                pp.ell
+            );
+            print_cumulative(duration);
+        }
+
+        assert_eq!(pk.max_ell, r.len());
+
+        // Step 3: Compute f_j(X) = \sum_{i=0}^{n-1} z_i[j] \ell_i(X) + r[j] \ell_n(X),
+        // where \ell_i(X) is the ith Lagrange polynomial for the (n+1)th roots-of-unity evaluation domain.
+        #[cfg(feature = "range_proof_timing")]
+        let start = Instant::now();
+        // f_evals[j] = the evaluations of f_j(x) at all the (n+1)-th roots of unity.
+        //            = (r[j], z_0[j], ..., z_{n-1}[j]), where z_i[j] is the j-th bit of z_i.
+        let f_evals_without_r: Vec<Vec<bool>> = (0..pk.max_ell)
+            .map(|j| bits.iter().map(|row| row[j]).collect())
+            .collect(); // This is just transposing the bits matrix
+                        // Assert f_evals is either 0 or 1s or r_j
+                        // for (j, evals) in f_evals.iter().enumerate() {
+                        //     for (i, e) in evals.iter().take(pp.n).enumerate() {
+                        //         assert!(e.eq(&Scalar::ZERO) || e.eq(&Scalar::ONE), "f_evals[{}][{}] = {}", j, i, e);
+                        //     }
+                        // }
+        #[cfg(feature = "range_proof_timing")]
+        {
+            let duration = start.elapsed();
+            println!(
+                "{:>8.2} mus: Convert {:?} z_{{i,j}} bits to scalars",
+                duration.as_micros().as_f64(),
+                pp.ell * pp.n
+            );
+            print_cumulative(duration);
+        }
+        // Step 4: Compute c_j = g_1^{f_j(\tau)}
+        #[cfg(feature = "range_proof_timing")]
+        let start = Instant::now();
+        // c[j] = c_j = g_1^{f_j(\tau)}
+        let c: Vec<E::G1> = (0..pk.max_ell)
+            // Note on blstrs: Using a multiexp will be 10-20% slower than manually multiplying.
+            // .map(|j|
+            //     g1_multi_exp(&pp.lagrange_basis, &f_evals[j]))
+            .map(|j| {
+                // TODO(Performance): Can we speed this up with tables? There are `n` bits, so a single
+                //  (2^n)-sized table that maps `n` bits into their multiproduct \prod_{i=0}^{n} L_i^{f_j(\omega_i)}
+                //  would be too large: e.g., for n = 24 such a table would take 768 MiB.
+                //  If we pick a chunk size of `c` bits such that it evenly divides `n`, we would have
+                //  `k = n / c` chunks. (Assuming `n` is a power of two for now; can tweak later.)
+                //  So we could have `k` tables, each of size 2^c. Each table `j \in[0, k)` maps
+                //  exponents into their multiproduct `\prod_{i=j*c}^{(j+1)*c} L_i^{f_j(\omega_i)}`
+                //  For example, if we want to handle n = 2048, we can set c = 16, which gives
+                //  `k = \ell / c = 2048 / 16 = 128` tables, each of size 2^c => 2^{16} * 48 bytes =
+                //  3 MiB / table => 384 MiB total.
+                let mut c_j: <E as Pairing>::G1 = pk.lagr_g1[0].mul(&r[j]); // start with r[j] * lagr_g1[0]
+                c_j.add_assign(&utils::msm_bool(
+                    &pk.lagr_g1[1..=pk.max_n],
+                    &f_evals_without_r[j],
+                ));
+                c_j
+            })
+            .collect();
+        #[cfg(feature = "range_proof_timing")]
+        {
+            let duration = start.elapsed();
+            println!(
+                "{:>8.2} mus: All {:?} deg-{:?} f_j G_1 commitments",
+                duration.as_micros().as_f64(),
+                pp.ell,
+                pp.n
+            );
+            print_cumulative(duration);
+            println!("        + Each c_j took: {:?}", duration / pp.ell as u32);
+        }
+
+        // Step 5: Compute c_hat[j] = \hat{c}_j = g_2^{f_j(\tau)}
+        #[cfg(feature = "range_proof_timing")]
+        let start = Instant::now();
+        let c_hat: Vec<E::G2> = (0..pk.max_ell)
+            // Note: Using a multiexp will be 10-20% slower than manually multiplying.
+            // .map(|j| g2_multi_exp(&pp.lagrange_basis_g2, &f_evals[j]))
+            .map(|j| {
+                let mut c_hat_j: <E as Pairing>::G2 = pk.lagr_g2[0].mul(&r[j]);
+                c_hat_j.add_assign(&utils::msm_bool(
+                    &pk.lagr_g2[1..=pk.max_n],
+                    &f_evals_without_r[j],
+                ));
+                c_hat_j
+            })
+            .collect();
+        #[cfg(feature = "range_proof_timing")]
+        {
+            let duration = start.elapsed();
+            println!(
+                "{:>8.2} mus: All {:?} deg-{:?} f_j G_2 commitments",
+                duration.as_micros().as_f64(),
+                pp.ell,
+                pp.n
+            );
+            print_cumulative(duration);
+            println!(
+                "        + Each \\hat{{c}}_j took: {:?}",
+                duration / pp.ell as u32
+            );
+        }
+
+        let num_omegas = pk.max_n + 1;
+
+        // Step 6:
+        //  1. Compute each f_j(X) in coefficient form via a size-(n+1) FFT on f_j(X)
+        //  2. Compute f'_j(X) via a differentiation.
+        //  3. Evaluate f'_j at all (n+1)th roots of unity via a size-(n+1) FFT.
+        //  5. for i = 0, compute N_j'(\omega^i) = r_j(r_j - 1)
+        //  4. \forall i > 0, compute N_j'(\omega^i) = (\omega^i - 1) f_j'(\omega^i)(2f_j(\omega^i) - 1)
+        //  6. \forall i \in [0,n], compute h_j(\omega^i) = N_j'(\omega^i) / ( (n+1)\omega^{i n} )
+        #[cfg(feature = "range_proof_timing")]
+        let start = Instant::now();
+        // let omega_n = pp.roots_of_unity_in_eval_dom[pp.n];
+        let n1_inv = E::ScalarField::from((pk.max_n + 1) as u64)
+            .inverse()
+            .unwrap();
+
+        let f_evals: Vec<Vec<E::ScalarField>> = f_evals_without_r
+            .iter()
+            .enumerate()
+            .map(|(j, col)| {
+                once(r[j])
+                    .chain(col.iter().map(|&b| E::ScalarField::from(b)))
+                    .collect()
+            })
+            .collect();
+
+        let h: Vec<Vec<E::ScalarField>> = (0..pk.max_ell)
+            .map(|j| {
+                // Interpolate f_j coeffs
+                let mut f_j = f_evals[j].clone();
+                pk.eval_dom.ifft_in_place(&mut f_j);
+                assert_eq!(f_j.len(), pk.max_n + 1);
+
+                // Compute f'_j derivative
+                let mut diff_f_j = f_j.clone();
+                polynomials::differentiate_in_place(&mut diff_f_j);
+                assert_eq!(diff_f_j.len(), pk.max_n);
+
+                // Evaluate f'_j at all (n+1)th roots of unity
+                let mut diff_f_j_evals = diff_f_j.clone();
+                pk.eval_dom.fft_in_place(&mut diff_f_j_evals);
+                assert_eq!(diff_f_j_evals.len(), pk.max_n + 1);
+
+                // N'_j(\omega^0) = r_j(r_j - 1)
+                let mut diff_n_j_evals = Vec::with_capacity(num_omegas);
+                diff_n_j_evals.push(r[j].square() - r[j]);
+
+                // \forall i > 0, N'_j(\omega^i) = (\omega^i - 1) f_j'(\omega^i)(2f_j(\omega^i) - 1)
+                for i in 1..(pk.max_n + 1) {
+                    diff_n_j_evals.push(
+                        (pk.roots_of_unity_minus_one[i - 1])
+                            * diff_f_j_evals[i]
+                            * (f_evals[j][i].double() - E::ScalarField::ONE),
+                    );
+                }
+                assert_eq!(diff_n_j_evals.len(), num_omegas);
+
+                // \forall i \in [0,n], h_j(\omega^i)
+                //  = N_j'(\omega^i) / ( (n+1)\omega^{i n} )
+                //  = N_j'(\omega^i) * (\omega^i / (n+1))
+                let mut h_j = Vec::with_capacity(num_omegas);
+                for i in 0..pk.max_n + 1 {
+                    h_j.push(
+                        diff_n_j_evals[i]
+                            .mul(pk.roots_of_unity_in_eval_dom[i])
+                            .mul(n1_inv),
+                    );
+                }
+                assert_eq!(h_j.len(), num_omegas);
+
+                h_j
+            })
+            .collect();
+        #[cfg(feature = "range_proof_timing")]
+        {
+            let duration = start.elapsed();
+            println!(
+                "{:>8.2} mus: All {:?} deg-{:?} h_j(X) coeffs",
+                duration.as_micros().as_f64(),
+                pp.ell,
+                num_omegas - 1
+            );
+            print_cumulative(duration);
+        }
+        // Step 7: Fiat-Shamir transform for beta_j's.
+        #[cfg(feature = "range_proof_timing")]
+        let start = Instant::now();
+        // Note: The first output of `fiat_shamir_challenges` is unused, it is intended for the verifier.
+        // This is not ideal, but it should not significantly affect performance.
+        let public_statement = PublicStatement {n: values.len(), ell, comm: comm.clone()};
+        let c_aff = E::G1::normalize_batch(&c);
+        let c_hat_aff = E::G2::normalize_batch(&c_hat);
+        let bit_commitments = (c_aff.as_slice(), c_hat_aff.as_slice());
+        let (_, betas) = fiat_shamir_challenges(
+            &pk.vk,
+            public_statement,
+            &bit_commitments,
+            c.as_slice().len(),
+            fs_transcript,
+        );
+        assert_eq!(pk.max_ell, betas.len());
+        #[cfg(feature = "range_proof_timing")]
+        {
+            let duration = start.elapsed();
+            println!(
+                "{:>8.2} mus: {:?} Fiat-Shamir challenges",
+                duration.as_micros().as_f64(),
+                betas.len()
+            );
+            print_cumulative(duration);
+        }
+        // Step 8: Compute h(X) = \sum_{j=0}^{ell-1} beta_j h_j(X)
+        #[cfg(feature = "range_proof_timing")]
+        let start = Instant::now();
+        let mut hh: Vec<E::ScalarField> = vec![E::ScalarField::ZERO; pk.max_n + 1];
+        for (h_j, &beta_j) in h.iter().zip(&betas) {
+            for (hh_coeff, &h_coeff) in hh.iter_mut().zip(h_j) {
+                *hh_coeff += h_coeff * beta_j;
+            }
+        }
+        assert_eq!(hh.len(), num_omegas);
+        #[cfg(feature = "range_proof_timing")]
+        {
+            let duration = start.elapsed();
+            println!(
+                "{:>8.2} mus: h(X) as a size-{:?} linear combination of h_j(X)'s",
+                duration.as_micros().as_f64(),
+                betas.len()
+            );
+            print_cumulative(duration);
+        }
+
+        // Step 9: Compute d = g_1^{h(X)}
+        #[cfg(feature = "range_proof_timing")]
+        let start = Instant::now();
+        let d =
+            VariableBaseMSM::msm(&pk.lagr_g1[0..num_omegas], &hh).expect("Failed computing msm"); // TODO: Not very "variable base"...
+        #[cfg(feature = "range_proof_timing")]
+        {
+            let duration = start.elapsed();
+            println!(
+                "{:>8.2} mus: deg-{:?} h(X) commitment",
+                duration.as_micros().as_f64(),
+                hh.len() - 1
+            );
+            print_cumulative(duration);
+        }
+
+        Proof {
+            d,
+            c: c_aff,
+            c_hat: c_hat_aff,
+        }
+    }
+
+    fn verify(
+        &self,
+        vk: &Self::VerificationKey,
+        n: usize,
+        ell: usize,
+        comm: &Self::Commitment,
+        fs_transcript: &mut merlin::Transcript,
+    ) -> anyhow::Result<()> {
+        assert!(
+            ell <= vk.max_ell,
+            "ell (got {}) must be ≤ max_ell (which is {})",
+            ell,
+            vk.max_ell
+        );
+
+        let commitment_recomputed: E::G1 =
+            VariableBaseMSM::msm(&self.c, &vk.powers_of_two).expect("Failed to compute msm");
+        ensure!(comm.0 == commitment_recomputed);
+
+        let public_statement = PublicStatement {n, ell, comm: comm.clone()};
+        let bit_commitments = (&self.c[..], &self.c_hat[..]);
+        let (alphas, betas) = fiat_shamir_challenges(
+            &vk,
+            public_statement,
+            &bit_commitments,
+            self.c.len(),
+            fs_transcript,
+        );
+
+        // Verify h(\tau)
+        let h_check = E::multi_pairing(
+            (0..vk.max_ell)
+                .map(|j| self.c[j] * betas[j]) // E::G1
+                .chain(once(-self.d)) // add -d
+                .collect::<Vec<_>>(), // collect into Vec<E::G1>
+            (0..vk.max_ell)
+                .map(|j| self.c_hat[j] - vk.tau_2) // E::G2
+                .chain(once(vk.vanishing_com)) // add vanishing commitment
+                .collect::<Vec<_>>(), // collect into Vec<E::G2>
+        );
+        ensure!(PairingOutput::<E>::ZERO == h_check);
+
+        // Ensure duality: c[j] matches c_hat[j].
+
+        // Compute MSM in G1: sum_j (alphas[j] * proof.c[j])
+        let g1_comb = VariableBaseMSM::msm(&self.c, &alphas).unwrap();
+
+        // Compute MSM in G2: sum_j (alphas[j] * proof.c_hat[j])
+        let g2_comb = VariableBaseMSM::msm(&self.c_hat, &alphas).unwrap();
+        let c_check = E::multi_pairing(
+            vec![
+                g1_comb,   // from MSM in G1
+                -vk.tau_1, // subtract tau_1
+            ],
+            vec![
+                vk.tau_2, // tau_2
+                g2_comb,  // from MSM in G2
+            ],
+        );
+        ensure!(PairingOutput::<E>::ZERO == c_check);
+
+        Ok(())
+    }
+
+    fn maul(&mut self) {
         self.c[0] = (self.c[0] + E::G1::generator()).into_affine();
     }
 }
 
-/// Sets up the Borgeaud range proof for proving that size-`n` batches are in the range [0, 2^\ell).
-pub fn setup<E: Pairing>(ell: usize, n: usize) -> PublicParameters<E> {
-    let mut rng = thread_rng();
-
-    let n = (n + 1).next_power_of_two() - 1;
-    let num_omegas = n + 1;
-    debug_assert!(num_omegas.is_power_of_two());
-
-    let taus = powers_of_tau(&mut rng, n); // The taus have length `n+1`
-
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-    let eval_dom = Radix2EvaluationDomain::<E::ScalarField>::new(num_omegas)
-        .expect("Could not construct evaluation domain");
-    let roots_of_unity_in_eval_dom: Vec<E::ScalarField> = eval_dom.elements().collect(); // This is probably quite slow
-
-    // Lagrange bases
-    let lagr_g1 = eval_dom.ifft(&taus.t1);
-    let lagr_g2 = eval_dom.ifft(&taus.t2);
-
-    let lagr_g1_aff = E::G1::normalize_batch(&lagr_g1);
-    let lagr_g2_aff = E::G2::normalize_batch(&lagr_g2);
-========
-    // let batch_dom_n1 = ark_poly::EvaluationDomain::new(num_omegas);
-    let eval_dom = GeneralEvaluationDomain::<Fr>::new(num_omegas).unwrap();
-    //let batch_dom_2n2 = ark_poly::EvaluationDomain::new(num_omegas * 2);
-    // let batch_dom_n1 = BatchEvaluationDomain::new(num_omegas);
-    //    let batch_dom_2n2 = BatchEvaluationDomain::new(num_omegas * 2);
-    //    let dom_n1 = batch_dom_2n2.get_subdomain(num_omegas);
-    let all_roots_of_unity: Vec<Fr> = eval_dom.elements().collect();
-    // let omega_n: Vec<Fr> = (0..num_omegas)
-    //     .map(|i| batch_dom_2n2.get_all_roots_of_unity()[i * 2])
-    //     .collect();
-
-    // Lagrange bases
-    let lagr_g1_proj = eval_dom.ifft(&taus.t1);
-    let lagr_g2_proj = eval_dom.ifft(&taus.t2);
-
-    let lagr_g1 = G1Projective::normalize_batch(&lagr_g1_proj);
-    let lagr_g2 = G2Projective::normalize_batch(&lagr_g2_proj);
-
-    // let mut lagr_g1 = taus.t1[0..num_omegas].to_vec();
-    // ifft_assign_g1(&mut lagr_g1, &dom_n1);
-    // let mut lagr_g2 = taus.t2[0..num_omegas].to_vec();
-    // ifft_assign_g2(&mut lagr_g2, &dom_n1);
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-
-    // Vanishing polynomial that we test h(X) with is (X^{n+1} - 1) / (X - \omega^n)
-    //
-    // Zhoujun's faster algorithm in Lagrange basis:
-    // Let $V(X) = \frac{X^{n+1} - 1}{X - \omega^n}$ denote the vanishing polynomial.
-
-    // Note that the $n$-th Lagrange polynomial (w.r.t. our $(n+1)$-sized FFT evaluation domain) is $\ell_n(X) = \frac{V(X)}{ \prod_{i\in[n)} (\omega^n - \omega^i) }$.
-
-    // Therefore, below we commit to $V(X)$ by simply scaling it down by $\prod_{i\in[n)} (\omega^n - \omega^i)$!
-    let vanishing_com = {
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-        let last_eval: E::ScalarField = (0..n)
-            .map(|i| roots_of_unity_in_eval_dom[n] - roots_of_unity_in_eval_dom[i])
-========
-        let last_eval: Fr = (0..n)
-            .map(|i| all_roots_of_unity[n] - all_roots_of_unity[i])
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-            .product();
-
-        lagr_g2_proj[n] * last_eval
-    };
-
-    let powers_of_two: Vec<E::ScalarField> =
-        std::iter::successors(Some(E::ScalarField::ONE), |x| Some(x.double()))
-            .take(ell)
-            .collect();
-
-    PublicParameters {
-        taus,
-        ell,
-        n,
-        lagr_g1: lagr_g1_aff,
-        lagr_g2: lagr_g2_aff,
-        vanishing_com,
-        eval_dom,
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-        roots_of_unity_in_eval_dom,
-        powers_of_two,
-========
-        roots_of_unity_in_eval_dom: all_roots_of_unity,
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-    }
-}
-
-pub fn commit<E: Pairing, R>(
-    pp: &PublicParameters<E>,
-    z: &[E::ScalarField],
-    rng: &mut R,
-) -> (Commitment<E>, E::ScalarField)
-where
-    R: RngCore + CryptoRng,
-{
-    let r = E::ScalarField::rand(rng);
-    let c = commit_with_randomness(pp, z, &r);
-    (c, r)
-}
-
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-pub(crate) fn commit_with_randomness<E: Pairing>(
-    pp: &PublicParameters<E>,
-    z: &[E::ScalarField],
-    r: &E::ScalarField,
-) -> Commitment<E> {
-========
-pub(crate) fn commit_with_randomness(pp: &PublicParameters, z: &[Fr], r: &Fr) -> Commitment {
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-    let mut scalars = z.to_vec();
-    let mut bases = pp.lagr_g1[..scalars.len()].to_vec(); // TODO: atm the range proof algorithm couples `r` with `lagr_g1.last()` causing a copy here; this can be avoided by coupling `r` with `lagr_g1.first()` instead
-
-    scalars.push(*r);
-    let last_base = pp.lagr_g1.last().expect("pp.lagr_g1 must not be empty");
-    bases.push(*last_base);
-
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-    let c = E::G1::msm(&bases, &scalars).expect("could not compute msm in range proof commitment");
-    Commitment(c)
-}
-
-fn msm_bool<G: AffineRepr>(bases: &[G], scalars: &[bool]) -> G::Group {
-    assert_eq!(bases.len(), scalars.len());
-
-    let mut acc = G::Group::zero();
-    for (base, &bit) in bases.iter().zip(scalars) {
-        if bit {
-            acc += base;
-        }
-    }
-    acc
-}
-
-========
-    let c = G1Projective::msm(&bases, &scalars)
-        .expect("could not compute msm in range proof commitment");
-    Commitment(c)
-}
-
-fn fr_to_bits_le(x: &Fr) -> Vec<bool> {
-    let bigint: <Fr as ark_ff::PrimeField>::BigInt = x.into_bigint();
-    ark_ff::BitIteratorLE::new(&bigint).collect()
-}
-
-fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
-    let degree = coeffs.len() - 1;
-    for i in 0..degree {
-        coeffs[i] = coeffs[i + 1].mul(F::from((i + 1) as u64));
-    }
-
-    coeffs.truncate(degree);
-}
-
-use ark_ff::AdditiveGroup;
-
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-#[allow(non_snake_case)]
-pub fn batch_prove<E: Pairing, R>(
-    rng: &mut R,
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-    pp: &PublicParameters<E>,
-    zz: &[E::ScalarField],
-    cc: &Commitment<E>,
-    rr: &E::ScalarField,
-========
-    pp: &PublicParameters,
-    zz: &[Fr],
-    cc: &Commitment,
-    rr: &Fr,
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-    fs_transcript: &mut merlin::Transcript,
-) -> Proof<E>
-where
-    R: RngCore + CryptoRng,
-{
-    let zz = pad_to_pow2_len_minus_one::<E>(zz.to_vec());
-
-    assert_eq!(zz.len(), pp.n);
-    assert_eq!(pp.taus.t1.len(), pp.n + 1); // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n}
-    assert_eq!(pp.taus.t2.len(), pp.n + 1);
-
-    #[cfg(feature = "range_proof_timing")]
-    println!("n = {:?}, ell = {:?}", pp.n, pp.ell);
-    #[cfg(feature = "range_proof_timing")]
-    let mut cumulative = Duration::ZERO;
-    #[cfg(feature = "range_proof_timing")]
-    let mut print_cumulative = |duration: Duration| {
-        cumulative += duration;
-        println!("     \\--> Cumulative time: {:?}", cumulative);
-    };
-
-    // Step 1: Convert z_i's to bits.
-    #[cfg(feature = "range_proof_timing")]
-    let start = Instant::now();
-
-    let bits: Vec<Vec<bool>> = zz
-        .iter()
-        .map(|z_val| {
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-            utils::scalar_to_bits_le::<E>(z_val)
-========
-            fr_to_bits_le(z_val)
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-                .into_iter()
-                .take(pp.ell)
-                .collect::<Vec<_>>()
-        })
-        .collect();
-
-    #[cfg(feature = "range_proof_timing")]
-    {
-        let duration = start.elapsed();
-        println!(
-            "{:>8.2} mus: Chunking {:?} z_i's into bits",
-            duration.as_micros().as_f64(),
-            pp.n
-        );
-        print_cumulative(duration);
-    }
-
-    assert_eq!(pp.n, bits.len());
-    assert_eq!(pp.ell, bits[0].len());
-
-    // Step 2: Sample correlated randomness r_j for each f_j polynomial commitment.
-    #[cfg(feature = "range_proof_timing")]
-    let start = Instant::now();
-
-    let r = correlated_randomness(rng, 2, pp.ell, rr);
-
-    #[cfg(feature = "range_proof_timing")]
-    {
-        let duration = start.elapsed();
-        println!(
-            "{:>8.2} mus: Correlating {:?} pieces of randomness",
-            duration.as_micros().as_f64(),
-            pp.ell
-        );
-        print_cumulative(duration);
-    }
-
-    assert_eq!(pp.ell, r.len());
-
-    // Step 3: Compute f_j(X) = \sum_{i=0}^{n-1} z_i[j] \ell_i(X) + r[j] \ell_n(X),
-    // where \ell_i(X) is the ith Lagrange polynomial for the (n+1)th roots-of-unity evaluation domain.
-    #[cfg(feature = "range_proof_timing")]
-    let start = Instant::now();
-    // f_evals[j] = the evaluations of f_j(x) at all the (n+1)-th roots of unity.
-    //            = (z_0[j], ..., z_{n-1}[j], r[j]), where z_i[j] is the j-th bit of z_i.
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-    let f_evals_without_r: Vec<Vec<bool>> = (0..pp.ell)
-        .map(|j| bits.iter().map(|row| row[j]).collect())
-        .collect(); // This is just transposing the bits matrix
-                    // Assert f_evals is either 0 or 1s or r_j
-                    // for (j, evals) in f_evals.iter().enumerate() {
-                    //     for (i, e) in evals.iter().take(pp.n).enumerate() {
-                    //         assert!(e.eq(&Scalar::ZERO) || e.eq(&Scalar::ONE), "f_evals[{}][{}] = {}", j, i, e);
-                    //     }
-                    // }
-========
-    let f_evals_without_r = (0..pp.ell)
-        .map(|j| {
-            (0..pp.n)
-                .map(|i| bits[i][j])
-                .collect::<Vec<bool>>()
-        })
-        .collect::<Vec<Vec<bool>>>();
-
-    let f_evals = (0..pp.ell)
-        .map(|j| {
-            (0..pp.n)
-                .map(|i| Fr::from(bits[i][j]))
-                .chain(once(r[j]))
-                .collect::<Vec<Fr>>()
-        })
-        .collect::<Vec<Vec<Fr>>>();
-    // Assert f_evals is either 0 or 1s or r_j
-    // for (j, evals) in f_evals.iter().enumerate() {
-    //     for (i, e) in evals.iter().take(pp.n).enumerate() {
-    //         assert!(e.eq(&Scalar::ZERO) || e.eq(&Scalar::ONE), "f_evals[{}][{}] = {}", j, i, e);
-    //     }
-    // }
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-    #[cfg(feature = "range_proof_timing")]
-    {
-        let duration = start.elapsed();
-        println!(
-            "{:>8.2} mus: Convert {:?} z_{{i,j}} bits to scalars",
-            duration.as_micros().as_f64(),
-            pp.ell * pp.n
-        );
-        print_cumulative(duration);
-    }
-    // Step 4: Compute c_j = g_1^{f_j(\tau)}
-    #[cfg(feature = "range_proof_timing")]
-    let start = Instant::now();
-    // c[j] = c_j = g_1^{f_j(\tau)}
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-    let c: Vec<E::G1> = (0..pp.ell)
-========
-    // let bits_flattened: Vec<bool> = bits.into_iter().flatten().collect();
-    let c: Vec<G1Projective> = (0..pp.ell)
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-        // Note on blstrs: Using a multiexp will be 10-20% slower than manually multiplying.
-        // .map(|j|
-        //     g1_multi_exp(&pp.lagrange_basis, &f_evals[j]))
-        // TODO: Whereas has msm's for specific scalar chunk sizes........
-        .map(|j| {
-            // TODO(Performance): Can we speed this up with tables? There are `n` bits, so a single
-            //  (2^n)-sized table that maps `n` bits into their multiproduct \prod_{i=0}^{n} L_i^{f_j(\omega_i)}
-            //  would be too large: e.g., for n = 24 such a table would take 768 MiB.
-            //  If we pick a chunk size of `c` bits such that it evenly divides `n`, we would have
-            //  `k = n / c` chunks. (Assuming `n` is a power of two for now; can tweak later.)
-            //  So we could have `k` tables, each of size 2^c. Each table `j \in[0, k)` maps
-            //  exponents into their multiproduct `\prod_{i=j*c}^{(j+1)*c} L_i^{f_j(\omega_i)}`
-            //  For example, if we want to handle n = 2048, we can set c = 16, which gives
-            //  `k = \ell / c = 2048 / 16 = 128` tables, each of size 2^c => 2^{16} * 48 bytes =
-            //  3 MiB / table => 384 MiB total.
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-            let mut c_j: <E as Pairing>::G1 = msm_bool(&pp.lagr_g1[..pp.n], &f_evals_without_r[j]);
-========
-            // let mut c: G1Projective = pp
-            //     .lagr_g1
-            //     .iter()
-            //     .take(pp.n)
-            //     .zip(f_evals[j].iter().take(pp.n))
-            //     .map(|(lagr, eval)| {
-            //         // Using G1Projective::mul here will be way slower! (Not sure why...)
-            //         if eval.is_zero_vartime() {
-            //             G1ProjectiveOLD::identity()
-            //         } else {
-            //             *lagr
-            //         }
-            //     })
-            //     .sum();
-            let mut c_j = G1Projective::msm_u1(&pp.lagr_g1[..pp.n], &f_evals_without_r[j]);
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-            c_j.add_assign(pp.lagr_g1[pp.n].mul(&r[j]));
-            c_j
-        })
-        .collect();
-    #[cfg(feature = "range_proof_timing")]
-    {
-        let duration = start.elapsed();
-        println!(
-            "{:>8.2} mus: All {:?} deg-{:?} f_j G_1 commitments",
-            duration.as_micros().as_f64(),
-            pp.ell,
-            pp.n
-        );
-        print_cumulative(duration);
-        println!("        + Each c_j took: {:?}", duration / pp.ell as u32);
-    }
-
-    // Step 5: Compute c_hat[j] = \hat{c}_j = g_2^{f_j(\tau)}
-    #[cfg(feature = "range_proof_timing")]
-    let start = Instant::now();
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-    let c_hat: Vec<E::G2> = (0..pp.ell)
-        // Note: Using a multiexp will be 10-20% slower than manually multiplying.
-        // .map(|j| g2_multi_exp(&pp.lagrange_basis_g2, &f_evals[j]))
-        .map(|j| {
-            let mut c_hat_j: <E as Pairing>::G2 =
-                msm_bool(&pp.lagr_g2[..pp.n], &f_evals_without_r[j]);
-========
-    let c_hat: Vec<G2Projective> = (0..pp.ell)
-        // Note: Using a multiexp will be 10-20% slower than manually multiplying.
-        // .map(|j| g2_multi_exp(&pp.lagrange_basis_g2, &f_evals[j]))
-        .map(|j| {
-            // let mut c_hat_j: G2ProjectiveOLD = pp
-            //     .lagr_g2
-            //     .iter()
-            //     .take(pp.n)
-            //     .zip(f_evals[j].iter().take(pp.n))
-            //     .map(|(lagr, eval)| {
-            //         // Using G1Projective::mul here will be way slower! (Not sure why...)
-            //         if eval.is_zero_vartime() {
-            //             G2ProjectiveOLD::identity()
-            //         } else {
-            //             *lagr
-            //         }
-            //     })
-            //     .sum();
-            let mut c_hat_j = G2Projective::msm_u1(&pp.lagr_g2[..pp.n], &f_evals_without_r[j]);
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-            c_hat_j.add_assign(pp.lagr_g2[pp.n].mul(&r[j]));
-            c_hat_j
-        })
-        .collect();
-    #[cfg(feature = "range_proof_timing")]
-    {
-        let duration = start.elapsed();
-        println!(
-            "{:>8.2} mus: All {:?} deg-{:?} f_j G_2 commitments",
-            duration.as_micros().as_f64(),
-            pp.ell,
-            pp.n
-        );
-        print_cumulative(duration);
-        println!(
-            "        + Each \\hat{{c}}_j took: {:?}",
-            duration / pp.ell as u32
-        );
-    }
-
-    let num_omegas = pp.n + 1;
-
-    // Step 6:
-    //  1. Compute each f_j(X) in coefficient form via a size-(n+1) FFT on f_j(X)
-    //  2. Compute f'_j(X) via a differentiation.
-    //  3. Evaluate f'_j at all (n+1)th roots of unity via a size-(n+1) FFT.
-    //  4. \forall i \in [0,n), compute N_j'(\omega^i) = (\omega^i - \omega^n) f_j'(\omega^i)(2f_j(\omega^i) - 1)
-    //  5. for i = n, compute N_j'(\omega^n) = r_j(r_j - 1)
-    //  6. \forall i \in [0,n], compute h_j(\omega^i) = N_j'(\omega^i) / ( (n+1)\omega^{i n} )
-    #[cfg(feature = "range_proof_timing")]
-    let start = Instant::now();
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-    let omega_n = pp.roots_of_unity_in_eval_dom[pp.n];
-    let n1_inv = E::ScalarField::from(pp.n as u64 + 1).inverse().unwrap();
-    let mut omega_i_minus_n = Vec::with_capacity(pp.n); // TODO: compute this in PP instead, add omega_n (if still necessary after recoupling r) then remove roots_of_unity_in_eval_dom
-========
-    let omega_n = pp.eval_dom.element(pp.n); // let omega_n = pp.all_roots_of_unity(pp.n)
-    let n1_inv = Fr::from(pp.n as u64 + 1).inverse().unwrap();
-    let mut omega_i_minus_n = Vec::with_capacity(pp.n);
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-    for i in 0..pp.n {
-        let omega_i = pp.roots_of_unity_in_eval_dom[i];
-        omega_i_minus_n.push(omega_i - omega_n);
-    }
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-
-    let f_evals: Vec<Vec<E::ScalarField>> = f_evals_without_r
-        .iter()
-        .enumerate()
-        .map(|(j, col)| {
-            col.iter()
-                .map(|&b| E::ScalarField::from(b))
-                .chain(once(r[j]))
-                .collect()
-        })
-        .collect();
-
-    let h: Vec<Vec<E::ScalarField>> = (0..pp.ell)
-========
-    let h: Vec<Vec<Fr>> = (0..pp.ell)
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-        .map(|j| {
-            // Interpolate f_j coeffs
-            let mut f_j = f_evals[j].clone();
-            pp.eval_dom.ifft_in_place(&mut f_j);
-            assert_eq!(f_j.len(), pp.n + 1);
-
-            // Compute f'_j derivative
-            let mut diff_f_j = f_j.clone();
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-            polynomials::differentiate_in_place(&mut diff_f_j);
-========
-            differentiate_in_place(&mut diff_f_j);
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-            assert_eq!(diff_f_j.len(), pp.n);
-
-            // Evaluate f'_j at all (n+1)th roots of unity
-            let mut diff_f_j_evals = diff_f_j.clone();
-            pp.eval_dom.fft_in_place(&mut diff_f_j_evals);
-            assert_eq!(diff_f_j_evals.len(), pp.n + 1);
-
-            // \forall i \in [0,n), N'_j(\omega^i) = (\omega^i - \omega^n) f_j'(\omega^i)(2f_j(\omega^i) - 1)
-            let mut diff_n_j_evals = Vec::with_capacity(num_omegas);
-            for i in 0..pp.n {
-                diff_n_j_evals.push(
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-                    (omega_i_minus_n[i])
-                        * diff_f_j_evals[i]
-                        * (f_evals[j][i].double() - E::ScalarField::ONE),
-========
-                    (omega_i_minus_n[i]) * diff_f_j_evals[i] * (f_evals[j][i].double() - Fr::ONE),
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-                );
-            }
-
-            // N'_j(\omega^n) = r_j(r_j - 1)
-            diff_n_j_evals.push(r[j].square() - r[j]);
-            assert_eq!(diff_n_j_evals.len(), num_omegas);
-
-            // \forall i \in [0,n], h_j(\omega^i)
-            //  = N_j'(\omega^i) / ( (n+1)\omega^{i n} )
-            //  = N_j'(\omega^i) * (\omega^i / (n+1))
-            let mut h_j = Vec::with_capacity(num_omegas);
-            for i in 0..pp.n + 1 {
-                h_j.push(
-                    diff_n_j_evals[i]
-                        .mul(pp.roots_of_unity_in_eval_dom[i])
-                        .mul(n1_inv),
-                );
-            }
-            assert_eq!(h_j.len(), num_omegas);
-
-            h_j
-        })
-        .collect();
-    #[cfg(feature = "range_proof_timing")]
-    {
-        let duration = start.elapsed();
-        println!(
-            "{:>8.2} mus: All {:?} deg-{:?} h_j(X) coeffs",
-            duration.as_micros().as_f64(),
-            pp.ell,
-            num_omegas - 1
-        );
-        print_cumulative(duration);
-    }
-    // Step 7: Fiat-Shamir transform for beta_j's.
-    #[cfg(feature = "range_proof_timing")]
-    let start = Instant::now();
-    // Note: The first output of `fiat_shamir_challenges` is unused, it is intended for the verifier.
-    // This is not ideal, but it should not significantly affect performance.
-    let vk = (
-        &pp.taus.t1[0],
-        &pp.taus.t2[0],
-        &pp.taus.t2[1],
-        &pp.vanishing_com,
-    );
-    let public_statement = (pp.ell, cc);
-    let c_aff = E::G1::normalize_batch(&c);
-    let c_hat_aff = E::G2::normalize_batch(&c_hat);
-    let bit_commitments = (c_aff.as_slice(), c_hat_aff.as_slice());
-    let (_, betas) = fiat_shamir_challenges(
-        &vk,
-        &public_statement,
-        &bit_commitments,
-        c.as_slice().len(),
-        fs_transcript,
-    );
-    assert_eq!(pp.ell, betas.len());
-    #[cfg(feature = "range_proof_timing")]
-    {
-        let duration = start.elapsed();
-        println!(
-            "{:>8.2} mus: {:?} Fiat-Shamir challenges",
-            duration.as_micros().as_f64(),
-            betas.len()
-        );
-        print_cumulative(duration);
-    }
-    // Step 8: Compute h(X) = \sum_{j=0}^{ell-1} beta_j h_j(X)
-    #[cfg(feature = "range_proof_timing")]
-    let start = Instant::now();
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-    let mut hh: Vec<E::ScalarField> = vec![E::ScalarField::ZERO; pp.n + 1];
-========
-    let mut hh: Vec<Fr> = vec![Fr::ZERO; pp.n + 1];
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-    for (h_j, &beta_j) in h.iter().zip(&betas) {
-        for (hh_coeff, &h_coeff) in hh.iter_mut().zip(h_j) {
-            *hh_coeff += h_coeff * beta_j;
-        }
-    }
-    // let mut hh: Vec<Fr> = vec![Fr::ZERO; pp.n + 1];
-    // for j in 0..betas.len() {
-    //     let beta_j_h_j = poly_mul_scalar(&h[j], betas[j]);
-    //     poly_add_assign(&mut hh, &beta_j_h_j);
-    // }
-    assert_eq!(hh.len(), num_omegas);
-    #[cfg(feature = "range_proof_timing")]
-    {
-        let duration = start.elapsed();
-        println!(
-            "{:>8.2} mus: h(X) as a size-{:?} linear combination of h_j(X)'s",
-            duration.as_micros().as_f64(),
-            betas.len()
-        );
-        print_cumulative(duration);
-    }
-
-    // Step 9: Compute d = g_1^{h(X)}
-    #[cfg(feature = "range_proof_timing")]
-    let start = Instant::now();
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-    let d = VariableBaseMSM::msm(&pp.lagr_g1[0..num_omegas], &hh).expect("Failed computing msm"); // TODO: Not very "variable base"...
-========
-    let d = VariableBaseMSM::msm(&pp.lagr_g1[0..num_omegas], &hh).expect("Failed computing msm");
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-    #[cfg(feature = "range_proof_timing")]
-    {
-        let duration = start.elapsed();
-        println!(
-            "{:>8.2} mus: deg-{:?} h(X) commitment",
-            duration.as_micros().as_f64(),
-            hh.len() - 1
-        );
-        print_cumulative(duration);
-    }
-
-    Proof {
-        d,
-        c: c_aff,
-        c_hat: c_hat_aff,
-    }
-}
-
-/// Verifies a batch proof against the given public parameters and commitment.
-///
-/// Returns `Ok(())` if the proof is valid, or an error otherwise.
-pub fn batch_verify<E: Pairing>(
-    pp: &PublicParameters<E>,
-    c: &Commitment<E>,
-    proof: &Proof<E>,
-    fs_transcript: &mut merlin::Transcript,
-) -> anyhow::Result<()> {
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-    let commitment_recomputed: E::G1 =
-        VariableBaseMSM::msm(&proof.c, &pp.powers_of_two).expect("Failed to compute msm");
-========
-    // TODO(Perf): Can have these precomputed in pp
-    let powers_of_two: Vec<Fr> = std::iter::successors(Some(Fr::ONE), |x| Some(x.double()))
-        .take(pp.ell)
-        .collect();
-
-    let commitment_decomp_affine: Vec<G1Affine> = proof.c.iter().map(|p| p.into_affine()).collect();
-
-    let commitment_recomputed: G1Projective =
-        VariableBaseMSM::msm(&commitment_decomp_affine, &powers_of_two)
-            .expect("Failed to compute msm");
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-    ensure!(c.0 == commitment_recomputed);
-
-    let vk = (
-        &pp.taus.t1[0],
-        &pp.taus.t2[0],
-        &pp.taus.t2[1],
-        &pp.vanishing_com,
-    );
-    let public_statement = (pp.ell, c);
-    let bit_commitments = (&proof.c[..], &proof.c_hat[..]);
-    let (alphas, betas) = fiat_shamir_challenges(
-        &vk,
-        &public_statement,
-        &bit_commitments,
-        proof.c.len(),
-        fs_transcript,
-    );
-
-    // Verify h(\tau)
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-    let h_check = E::multi_pairing(
-        (0..pp.ell)
-            .map(|j| proof.c[j] * betas[j]) // E::G1
-            .chain(once(-proof.d)) // add -d
-            .collect::<Vec<_>>(), // collect into Vec<E::G1>
-        (0..pp.ell)
-            .map(|j| proof.c_hat[j] - pp.taus.t2[0]) // E::G2
-            .chain(once(pp.vanishing_com)) // add vanishing commitment
-            .collect::<Vec<_>>(), // collect into Vec<E::G2>
-    );
-    ensure!(PairingOutput::<E>::ZERO == h_check);
-========
-    let h_check = PairingSetting::multi_pairing(
-        (0..pp.ell)
-            .map(|j| proof.c[j] * betas[j]) // G1Projective
-            .chain(once(-proof.d)) // add -d
-            .collect::<Vec<_>>(), // collect into Vec<G1Projective>
-        (0..pp.ell)
-            .map(|j| proof.c_hat[j] - pp.taus.t2[0]) // G2Projective
-            .chain(once(pp.vanishing_com)) // add vanishing commitment
-            .collect::<Vec<_>>(), // collect into Vec<G2Projective>
-    );
-    // let h_check = multi_pairing_g1_g2(
-    //     (0..pp.ell)
-    //         .map(|j| proof.c[j] * betas[j])
-    //         .chain(once(-proof.d))
-    //         .collect::<Vec<_>>()
-    //         .iter(),
-    //     (0..pp.ell)
-    //         .map(|j| proof.c_hat[j] - pp.taus.t2[0])
-    //         .chain(once(pp.vanishing_com))
-    //         .collect::<Vec<_>>()
-    //         .iter(),
-    // );
-    ensure!(Fq12::ONE == h_check.0);
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-
-    // Ensure duality: c[j] matches c_hat[j].
-
-    // Compute MSM in G1: sum_j (alphas[j] * proof.c[j])
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-    let g1_comb = VariableBaseMSM::msm(&proof.c, &alphas).unwrap();
-
-    // Compute MSM in G2: sum_j (alphas[j] * proof.c_hat[j])
-    let g2_comb = VariableBaseMSM::msm(&proof.c_hat, &alphas).unwrap();
-    let c_check = E::multi_pairing(
-========
-    let g1_comb = VariableBaseMSM::msm(
-        &proof
-            .c
-            .iter()
-            .map(|p| p.into_affine())
-            .collect::<Vec<G1Affine>>(),
-        &alphas, // <-- keep them as Fr
-    )
-    .unwrap();
-
-    // Compute MSM in G2: sum_j (alphas[j] * proof.c_hat[j])
-    let g2_comb = VariableBaseMSM::msm(
-        &proof
-            .c_hat
-            .iter()
-            .map(|p| p.into_affine())
-            .collect::<Vec<G2Affine>>(),
-        &alphas, // <-- also Fr
-    )
-    .unwrap();
-    let c_check = <Bn254 as Pairing>::multi_pairing(
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-        vec![
-            g1_comb,        // from MSM in G1
-            -pp.taus.t1[0], // subtract tau_1
-        ],
-        vec![
-            pp.taus.t2[0], // tau_2
-            g2_comb,       // from MSM in G2
-        ],
-    );
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
-    ensure!(PairingOutput::<E>::ZERO == c_check);
-========
-    // let c_check = multi_pairing_g1_g2(
-    //     vec![g1_multi_exp(&proof.c, &alphas), -pp.taus.t1[0]].iter(),
-    //     vec![pp.taus.t2[0], g2_multi_exp(&proof.c_hat, &alphas)].iter(),
-    // );
-    ensure!(Fq12::ONE == c_check.0);
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-
-    Ok(())
-}
-
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
 /// Compute alpha, beta.
 fn fiat_shamir_challenges<E: Pairing>(
-    vk: &(&E::G1, &E::G2, &E::G2, &E::G2),
-    public_statement: &(usize, &Commitment<E>),
+    // TODO: make this generic over B
+    vk: &VerificationKey<E>,
+    public_statement: PublicStatement<E>,
     bit_commitments: &(&[E::G1Affine], &[E::G2Affine]),
     num_scalars: usize,
     fs_transcript: &mut merlin::Transcript,
 ) -> (Vec<E::ScalarField>, Vec<E::ScalarField>) {
-    <merlin::Transcript as fiat_shamir::RangeProof<E>>::append_sep(fs_transcript, DST);
-========
-use ark_bn254::Bn254;
-use ark_ec::pairing::Pairing;
+    <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::append_sep(fs_transcript, DST);
 
-fn byte_to_bits_le(val: u8) -> Vec<bool> {
-    (0..8).map(|i| (val >> i) & 1 == 1).collect()
-}
+    <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::append_vk(fs_transcript, vk);
 
-/// Compute alpha, beta.
-fn fiat_shamir_challenges(
-    vk: &(&G1Projective, &G2Projective, &G2Projective, &G2Projective),
-    public_statement: &(usize, &Commitment),
-    bit_commitments: &(&[G1Projective], &[G2Projective]),
-    num_scalars: usize,
-    fs_transcript: &mut merlin::Transcript,
-) -> (Vec<Fr>, Vec<Fr>) {
-    <merlin::Transcript as fiat_shamir::RangeProof>::append_sep(fs_transcript);
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
-
-    <merlin::Transcript as fiat_shamir::RangeProof<E>>::append_vk(fs_transcript, vk);
-
-    <merlin::Transcript as fiat_shamir::RangeProof<E>>::append_public_statement(
+    <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::append_public_statement(
         fs_transcript,
         public_statement,
     );
 
-    <merlin::Transcript as fiat_shamir::RangeProof<E>>::append_bit_commitments(
+    <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::append_bit_commitments(
         fs_transcript,
         bit_commitments,
     );
 
     // Generate the Fiat–Shamir challenges from the updated transcript
     let beta_vals =
-        <merlin::Transcript as fiat_shamir::RangeProof<E>>::challenge_linear_combination_128bit(
+        <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::challenge_linear_combination_128bit(
             fs_transcript,
             num_scalars,
         );
 
     let alpha_vals =
-        <merlin::Transcript as fiat_shamir::RangeProof<E>>::challenge_linear_combination_128bit(
+        <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::challenge_linear_combination_128bit(
             fs_transcript,
             num_scalars,
         );
@@ -917,11 +659,7 @@ pub fn correlated_randomness<F, R>(
     target_sum: &F,
 ) -> Vec<F>
 where
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
     F: Field + UniformRand,
-========
-    F: PrimeField + UniformRand,
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
     R: RngCore + CryptoRng,
 {
     let mut r_vals = vec![F::zero(); num_chunks];
@@ -941,7 +679,6 @@ where
 
 #[cfg(test)]
 mod tests {
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
     use crate::range_proofs::dekart_univariate::correlated_randomness;
     use ark_ff::Field;
     use ark_std::rand::thread_rng;
@@ -950,64 +687,14 @@ mod tests {
     fn test_correlated_randomness_generic<F: Field>() {
         let mut rng = thread_rng();
         let target_sum = F::one();
-========
-    use crate::{
-        algebra::polynomials::{poly_div_xnc, poly_eval},
-        range_proofs::univariate_range_proof::{byte_to_bits_le, correlated_randomness},
-        utils::random::{random_scalar, random_scalars},
-    };
-    use ark_bn254::Fr;
-    use ark_ff::Field;
-    // use ff::Field;
-    use ark_std::rand::thread_rng;
-    use blstrs::Scalar as ScalarOLD;
-
-    // #[test]. // TODO: fix this stuff again
-    // fn test_poly_div_xnc() {
-    //     let mut rng = thread_rng();
-    //     let coefs = random_scalars(10, &mut rng);
-    //     let c = random_scalar(&mut rng);
-    //     let n = 3;
-    //     let (quotient, remainder) = poly_div_xnc(coefs.clone(), n, c);
-    //     assert_eq!(n, remainder.len());
-    //     let x = random_scalar(&mut rng);
-    //     let expected = poly_eval(&coefs, &x);
-    //     let actual =
-    //         (x.pow(&[n as u64]) + c) * poly_eval(&quotient, &x) + poly_eval(&remainder, &x);
-    //     assert_eq!(expected, actual);
-    // }
-
-    #[test]
-    fn test_byte_to_bits_le() {
-        assert_eq!(vec![true; 8], byte_to_bits_le(255));
-        assert_eq!(
-            vec![true, true, true, true, true, true, true, false],
-            byte_to_bits_le(127)
-        );
-        assert_eq!(
-            vec![false, true, true, true, true, true, true, true],
-            byte_to_bits_le(254)
-        );
-    }
-
-    #[test]
-    fn test_correlated_randomness() {
-        let mut rng = thread_rng();
-        let target_sum = Fr::ONE;
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
         let radix: u64 = 4;
         let num_chunks: usize = 8;
 
         let coefs = correlated_randomness(&mut rng, radix, num_chunks, &target_sum);
-<<<<<<<< HEAD:crates/aptos-dkg/src/range_proofs/dekart_univariate.rs
 
         // Compute actual sum: Σ coef[i] * radix^i
         let actual_sum: F = (0..num_chunks)
             .map(|i| coefs[i] * F::from(radix.pow(i as u32)))
-========
-        let actual_sum: Fr = (0..num_chunks)
-            .map(|i| coefs[i] * Fr::from(radix.pow(i as u32)))
->>>>>>>> 4c05c2b79f (Ported range proof (and tests and benches) compile):crates/aptos-dkg/src/range_proofs/univariate_range_proof.rs
             .sum();
 
         assert_eq!(target_sum, actual_sum);

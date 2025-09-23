@@ -50,11 +50,11 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(c: &mut Criterion, cur
                     test_utils::range_proof_random_instance::<E, B, _>(n, ell, &mut rng);
                 let mut fs_t = merlin::Transcript::new(DST);
                 let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
-                (vk, comm, proof)
+                (vk, n, ell, comm, proof)
             },
-            |(vk, comm, proof)| {
+            |(vk, n, ell, comm, proof)| {
                 let mut fs_t = merlin::Transcript::new(DST);
-                proof.verify(&vk, &comm, &mut fs_t).unwrap();
+                proof.verify(&vk, n, ell, &comm, &mut fs_t).unwrap();
             },
         )
     });

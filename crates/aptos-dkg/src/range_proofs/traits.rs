@@ -7,12 +7,14 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{CryptoRng, RngCore};
 
 pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalDeserialize {
+    type PublicStatement: CanonicalSerialize;
     type ProverKey;
     type VerificationKey: Clone + CanonicalSerialize;
     type Input: From<u64>; // TODO: slightly hacky
     type Commitment;
     type CommitmentRandomness: Clone + ark_ff::UniformRand;
 
+    /// Setup generates the prover and verifier keys used in the batched range proof.
     fn setup<R: RngCore + CryptoRng>(
         max_n: usize,
         max_ell: usize,
@@ -48,6 +50,8 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     fn verify(
         &self,
         vk: &Self::VerificationKey,
+        n: usize,
+        ell: usize,
         comm: &Self::Commitment,
         fs_transcript: &mut merlin::Transcript,
     ) -> anyhow::Result<()>;
