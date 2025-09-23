@@ -30,9 +30,9 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(c: &mut Criterion, cur
         b.iter_with_setup(
             || {
                 let mut rng = thread_rng();
-                let (pk, _, witnesses, comm, comm_r) =
+                let (pk, _, values, comm, comm_r) =
                     test_utils::range_proof_random_instance::<E, B, _>(n, ell, &mut rng);
-                (pk, witnesses, comm, comm_r)
+                (pk, values, comm, comm_r)
             },
             |(pk, values, comm, r)| {
                 let mut fs_t = merlin::Transcript::new(DST);
