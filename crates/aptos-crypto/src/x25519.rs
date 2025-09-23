@@ -175,11 +175,11 @@ impl traits::PrivateKey for PrivateKey {
 }
 
 impl traits::Uniform for PrivateKey {
-    fn generate<R>(rng: &mut R) -> Self
+    fn generate<R>(_rng: &mut R) -> Self
     where
-        R: RngCore + CryptoRng,
+        R: rand_core::CryptoRng + rand_core::RngCore,
     {
-        Self(x25519_dalek::StaticSecret::new(rng))
+        Self(x25519_dalek::StaticSecret::random())
     }
 }
 

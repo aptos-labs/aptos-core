@@ -910,7 +910,7 @@ wasm-bindgen = "0.2.95"
 wasm-bindgen-futures = "0.4.42"
 which = "4.2.5"
 whoami = "1.5.0"
-x25519-dalek = "1.2.0"
+x25519-dalek = {version = "^2.0", features=["static_secrets", "getrandom"]}
 z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
