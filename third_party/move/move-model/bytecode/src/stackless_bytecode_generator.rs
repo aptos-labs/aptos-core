@@ -621,6 +621,123 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 self.temp_count += 1;
             },
 
+            MoveBytecode::LdI8(number) => {
+                let temp_index = self.temp_count;
+                self.temp_stack.push(temp_index);
+                self.local_types.push(Type::Primitive(PrimitiveType::I8));
+                self.code
+                    .push(Bytecode::Load(attr_id, temp_index, Constant::I8(*number)));
+                self.temp_count += 1;
+            },
+
+            MoveBytecode::LdI16(number) => {
+                let temp_index = self.temp_count;
+                self.temp_stack.push(temp_index);
+                self.local_types.push(Type::Primitive(PrimitiveType::I16));
+                self.code
+                    .push(Bytecode::Load(attr_id, temp_index, Constant::I16(*number)));
+                self.temp_count += 1;
+            },
+
+            MoveBytecode::LdI32(number) => {
+                let temp_index = self.temp_count;
+                self.temp_stack.push(temp_index);
+                self.local_types.push(Type::Primitive(PrimitiveType::I32));
+                self.code
+                    .push(Bytecode::Load(attr_id, temp_index, Constant::I32(*number)));
+                self.temp_count += 1;
+            },
+
+            MoveBytecode::LdI64(number) => {
+                let temp_index = self.temp_count;
+                self.temp_stack.push(temp_index);
+                self.local_types.push(Type::Primitive(PrimitiveType::I64));
+                self.code
+                    .push(Bytecode::Load(attr_id, temp_index, Constant::I64(*number)));
+                self.temp_count += 1;
+            },
+
+            MoveBytecode::LdI128(number) => {
+                let temp_index = self.temp_count;
+                self.temp_stack.push(temp_index);
+                self.local_types.push(Type::Primitive(PrimitiveType::I128));
+                self.code
+                    .push(Bytecode::Load(attr_id, temp_index, Constant::I128(*number)));
+                self.temp_count += 1;
+            },
+
+            MoveBytecode::LdI256(number) => {
+                let temp_index = self.temp_count;
+                self.temp_stack.push(temp_index);
+                self.local_types.push(Type::Primitive(PrimitiveType::I256));
+                self.code.push(Bytecode::Load(
+                    attr_id,
+                    temp_index,
+                    Constant::I256(number.repr()),
+                ));
+                self.temp_count += 1;
+            },
+
+            MoveBytecode::CastI8 => {
+                let operand_index = self.temp_stack.pop().unwrap();
+                let temp_index = self.temp_count;
+                self.temp_stack.push(temp_index);
+                self.local_types.push(Type::Primitive(PrimitiveType::I8));
+                self.code
+                    .push(mk_unary(Operation::CastI8, temp_index, operand_index));
+                self.temp_count += 1;
+            },
+
+            MoveBytecode::CastI16 => {
+                let operand_index = self.temp_stack.pop().unwrap();
+                let temp_index = self.temp_count;
+                self.temp_stack.push(temp_index);
+                self.local_types.push(Type::Primitive(PrimitiveType::I16));
+                self.code
+                    .push(mk_unary(Operation::CastI16, temp_index, operand_index));
+                self.temp_count += 1;
+            },
+
+            MoveBytecode::CastI32 => {
+                let operand_index = self.temp_stack.pop().unwrap();
+                let temp_index = self.temp_count;
+                self.temp_stack.push(temp_index);
+                self.local_types.push(Type::Primitive(PrimitiveType::I32));
+                self.code
+                    .push(mk_unary(Operation::CastI32, temp_index, operand_index));
+                self.temp_count += 1;
+            },
+
+            MoveBytecode::CastI64 => {
+                let operand_index = self.temp_stack.pop().unwrap();
+                let temp_index = self.temp_count;
+                self.temp_stack.push(temp_index);
+                self.local_types.push(Type::Primitive(PrimitiveType::I64));
+                self.code
+                    .push(mk_unary(Operation::CastI64, temp_index, operand_index));
+                self.temp_count += 1;
+            },
+
+            MoveBytecode::CastI128 => {
+                let operand_index = self.temp_stack.pop().unwrap();
+                let temp_index = self.temp_count;
+                self.temp_stack.push(temp_index);
+                self.local_types.push(Type::Primitive(PrimitiveType::I128));
+                self.code
+                    .push(mk_unary(Operation::CastI128, temp_index, operand_index));
+                self.temp_count += 1;
+            },
+
+            MoveBytecode::CastI256 => {
+                let operand_index = self.temp_stack.pop().unwrap();
+                let temp_index = self.temp_count;
+                self.temp_stack.push(temp_index);
+                self.local_types.push(Type::Primitive(PrimitiveType::I256));
+                self.code
+                    .push(mk_unary(Operation::CastI256, temp_index, operand_index));
+                self.temp_count += 1;
+            },
+
             MoveBytecode::LdConst(idx) => {
                 let temp_index = self.temp_count;
                 self.temp_stack.push(temp_index);
@@ -1214,6 +1331,18 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     _ => {},
                 }
             },
+
+            MoveBytecode::Negate => {
+                let operand_index = self.temp_stack.pop().unwrap();
+                let operand_type = self.local_types[operand_index].clone();
+                let temp_index = self.temp_count;
+                self.local_types.push(operand_type);
+                self.temp_count += 1;
+                self.temp_stack.push(temp_index);
+                self.code
+                    .push(mk_unary(Operation::Negate, temp_index, operand_index));
+            },
+
             MoveBytecode::Or => {
                 let operand2_index = self.temp_stack.pop().unwrap();
                 let operand1_index = self.temp_stack.pop().unwrap();
@@ -1665,22 +1794,6 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     None,
                 ))
             },
-            MoveBytecode::LdI8(_)
-            | MoveBytecode::LdI16(_)
-            | MoveBytecode::LdI32(_)
-            | MoveBytecode::LdI64(_)
-            | MoveBytecode::LdI128(_)
-            | MoveBytecode::LdI256(_)
-            | MoveBytecode::CastI8
-            | MoveBytecode::CastI16
-            | MoveBytecode::CastI32
-            | MoveBytecode::CastI64
-            | MoveBytecode::CastI128
-            | MoveBytecode::CastI256
-            | MoveBytecode::Negate => {
-                // TODO(#17645): implement
-                unimplemented!("signed integers")
-            },
         }
     }
 
@@ -1823,6 +1936,12 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             (Type::Primitive(PrimitiveType::U64), MoveValue::U64(b)) => Constant::U64(*b),
             (Type::Primitive(PrimitiveType::U128), MoveValue::U128(b)) => Constant::U128(*b),
             (Type::Primitive(PrimitiveType::U256), MoveValue::U256(b)) => Constant::U256(b.repr()),
+            (Type::Primitive(PrimitiveType::I8), MoveValue::I8(b)) => Constant::I8(*b),
+            (Type::Primitive(PrimitiveType::I16), MoveValue::I16(b)) => Constant::I16(*b),
+            (Type::Primitive(PrimitiveType::I32), MoveValue::I32(b)) => Constant::I32(*b),
+            (Type::Primitive(PrimitiveType::I64), MoveValue::I64(b)) => Constant::I64(*b),
+            (Type::Primitive(PrimitiveType::I128), MoveValue::I128(b)) => Constant::I128(*b),
+            (Type::Primitive(PrimitiveType::I256), MoveValue::I256(b)) => Constant::I256(b.repr()),
             (Type::Primitive(PrimitiveType::Address), MoveValue::Address(a)) => {
                 Constant::Address(Address::Numerical(*a))
             },

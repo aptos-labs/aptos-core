@@ -21,7 +21,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     ability::{Ability, AbilitySet},
-    int256::U256,
+    int256::{I256, U256},
     language_storage::{FunctionParamOrReturnTag, FunctionTag, StructTag, TypeTag},
 };
 use num::BigInt;
@@ -98,6 +98,12 @@ pub enum PrimitiveType {
     U64,
     U128,
     U256,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
     Address,
     Signer,
     // Types only appearing in specifications
@@ -822,7 +828,8 @@ impl PrimitiveType {
     pub fn is_spec(&self) -> bool {
         use PrimitiveType::*;
         match self {
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer => false,
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+            | Address | Signer => false,
             Num | Range | EventStore => true,
         }
     }
@@ -841,6 +848,8 @@ impl PrimitiveType {
             U256 => MType::U256,
             Address => MType::Address,
             Signer => MType::Signer,
+            // TODO(#17645) add support
+            I8 | I16 | I32 | I64 | I128 | I256 => unimplemented!("signed int not supported"),
             Num | Range | EventStore => return None,
         })
     }
@@ -850,11 +859,20 @@ impl PrimitiveType {
     pub fn possible_int_types(value: BigInt) -> Vec<PrimitiveType> {
         Self::all_int_types()
             .into_iter()
-            .filter(|t| value <= Self::get_max_value(t).expect("type has max"))
+            .filter(|t| {
+                value <= Self::get_max_value(t).expect("type has max")
+                    && value >= Self::get_min_value(t).expect("type has min")
+            })
             .collect()
     }
 
     pub fn all_int_types() -> Vec<PrimitiveType> {
+        let mut types = Self::all_signed_int_types();
+        types.extend(Self::all_unsigned_int_types());
+        types
+    }
+
+    pub fn all_unsigned_int_types() -> Vec<PrimitiveType> {
         vec![
             PrimitiveType::U8,
             PrimitiveType::U16,
@@ -862,6 +880,17 @@ impl PrimitiveType {
             PrimitiveType::U64,
             PrimitiveType::U128,
             PrimitiveType::U256,
+        ]
+    }
+
+    pub fn all_signed_int_types() -> Vec<PrimitiveType> {
+        vec![
+            PrimitiveType::I8,
+            PrimitiveType::I16,
+            PrimitiveType::I32,
+            PrimitiveType::I64,
+            PrimitiveType::I128,
+            PrimitiveType::I256,
         ]
     }
 
@@ -874,6 +903,12 @@ impl PrimitiveType {
             PrimitiveType::U64 => Some(BigInt::from(u64::MAX)),
             PrimitiveType::U128 => Some(BigInt::from(u128::MAX)),
             PrimitiveType::U256 => Some(BigInt::from(U256::MAX)),
+            PrimitiveType::I8 => Some(BigInt::from(i8::MAX)),
+            PrimitiveType::I16 => Some(BigInt::from(i16::MAX)),
+            PrimitiveType::I32 => Some(BigInt::from(i32::MAX)),
+            PrimitiveType::I64 => Some(BigInt::from(i64::MAX)),
+            PrimitiveType::I128 => Some(BigInt::from(i128::MAX)),
+            PrimitiveType::I256 => Some(BigInt::from(I256::MAX)),
             PrimitiveType::Num => None,
             _ => unreachable!("no num type"),
         }
@@ -888,6 +923,12 @@ impl PrimitiveType {
             PrimitiveType::U64 => Some(BigInt::zero()),
             PrimitiveType::U128 => Some(BigInt::zero()),
             PrimitiveType::U256 => Some(BigInt::zero()),
+            PrimitiveType::I8 => Some(BigInt::from(i8::MIN)),
+            PrimitiveType::I16 => Some(BigInt::from(i16::MIN)),
+            PrimitiveType::I32 => Some(BigInt::from(i32::MIN)),
+            PrimitiveType::I64 => Some(BigInt::from(i64::MIN)),
+            PrimitiveType::I128 => Some(BigInt::from(i128::MIN)),
+            PrimitiveType::I256 => Some(BigInt::from(I256::MIN)),
             PrimitiveType::Num => None,
             _ => unreachable!("no num type"),
         }
@@ -902,8 +943,18 @@ impl PrimitiveType {
             PrimitiveType::U64 => Some(64),
             PrimitiveType::U128 => Some(128),
             PrimitiveType::U256 => Some(256),
+            PrimitiveType::I8 => Some(8),
+            PrimitiveType::I16 => Some(16),
+            PrimitiveType::I32 => Some(32),
+            PrimitiveType::I64 => Some(64),
+            PrimitiveType::I128 => Some(128),
+            PrimitiveType::I256 => Some(256),
             PrimitiveType::Num => None,
-            _ => unreachable!("no num type"),
+            PrimitiveType::Bool
+            | PrimitiveType::Address
+            | PrimitiveType::Signer
+            | PrimitiveType::Range
+            | PrimitiveType::EventStore => unreachable!("no num type"),
         }
     }
 }
@@ -1045,14 +1096,29 @@ impl Type {
         use PrimitiveType::*;
         use Type::*;
         match self {
-            Primitive(p) => matches!(p, U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address),
+            Primitive(p) => matches!(
+                p,
+                U8 | U16
+                    | U32
+                    | U64
+                    | U128
+                    | U256
+                    | I8
+                    | I16
+                    | I32
+                    | I64
+                    | I128
+                    | I256
+                    | Bool
+                    | Address
+            ),
             Vector(ety) => ety.is_valid_for_constant(),
             _ => false,
         }
     }
 
     pub fn describe_valid_for_constant() -> &'static str {
-        "Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, \
+        "Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i8`, `i16`, `i32`, `i64`, `i128`, `i256`, `bool`, `address`, \
          or `vector<_>` with valid element type."
     }
 
@@ -1177,6 +1243,12 @@ impl Type {
             | PrimitiveType::U64
             | PrimitiveType::U128
             | PrimitiveType::U256
+            | PrimitiveType::I8
+            | PrimitiveType::I16
+            | PrimitiveType::I32
+            | PrimitiveType::I64
+            | PrimitiveType::I128
+            | PrimitiveType::I256
             | PrimitiveType::Num = p
             {
                 return true;
@@ -1558,6 +1630,12 @@ impl Type {
             TypeTag::U64 => Primitive(PrimitiveType::U64),
             TypeTag::U128 => Primitive(PrimitiveType::U128),
             TypeTag::U256 => Primitive(PrimitiveType::U8),
+            TypeTag::I8 => Primitive(PrimitiveType::I8),
+            TypeTag::I16 => Primitive(PrimitiveType::I16),
+            TypeTag::I32 => Primitive(PrimitiveType::I32),
+            TypeTag::I64 => Primitive(PrimitiveType::I64),
+            TypeTag::I128 => Primitive(PrimitiveType::I128),
+            TypeTag::I256 => Primitive(PrimitiveType::I256),
             TypeTag::Address => Primitive(PrimitiveType::Address),
             TypeTag::Signer => Primitive(PrimitiveType::Signer),
             TypeTag::Struct(s) => {
@@ -1601,15 +1679,6 @@ impl Type {
                     *abilities,
                 )
             },
-            TypeTag::I8
-            | TypeTag::I16
-            | TypeTag::I32
-            | TypeTag::I64
-            | TypeTag::I128
-            | TypeTag::I256 => {
-                // TODO(#17645): implement conversion
-                unimplemented!("signed integer support")
-            },
         }
     }
 
@@ -1636,6 +1705,12 @@ impl Type {
             SignatureToken::U64 => Type::Primitive(PrimitiveType::U64),
             SignatureToken::U128 => Type::Primitive(PrimitiveType::U128),
             SignatureToken::U256 => Type::Primitive(PrimitiveType::U256),
+            SignatureToken::I8 => Type::Primitive(PrimitiveType::I8),
+            SignatureToken::I16 => Type::Primitive(PrimitiveType::I16),
+            SignatureToken::I32 => Type::Primitive(PrimitiveType::I32),
+            SignatureToken::I64 => Type::Primitive(PrimitiveType::I64),
+            SignatureToken::I128 => Type::Primitive(PrimitiveType::I128),
+            SignatureToken::I256 => Type::Primitive(PrimitiveType::I256),
             SignatureToken::Address => Type::Primitive(PrimitiveType::Address),
             SignatureToken::Signer => Type::Primitive(PrimitiveType::Signer),
             SignatureToken::Reference(t) => Type::Reference(
@@ -1676,15 +1751,6 @@ impl Type {
                 Box::new(Type::Tuple(from_slice(result))),
                 *abilities,
             ),
-            SignatureToken::I8
-            | SignatureToken::I16
-            | SignatureToken::I32
-            | SignatureToken::I64
-            | SignatureToken::I128
-            | SignatureToken::I256 => {
-                // TODO(#17645): implement
-                unimplemented!("signed integer support")
-            },
         }
     }
 
@@ -3921,6 +3987,12 @@ impl fmt::Display for PrimitiveType {
             U64 => f.write_str("u64"),
             U128 => f.write_str("u128"),
             U256 => f.write_str("u256"),
+            I8 => f.write_str("i8"),
+            I16 => f.write_str("i16"),
+            I32 => f.write_str("i32"),
+            I64 => f.write_str("i64"),
+            I128 => f.write_str("i128"),
+            I256 => f.write_str("i256"),
             Address => f.write_str("address"),
             Signer => f.write_str("signer"),
             Range => f.write_str("range"),
@@ -3944,6 +4016,12 @@ pub trait AbilityInference: AbilityContext {
                 | PrimitiveType::U64
                 | PrimitiveType::U128
                 | PrimitiveType::U256
+                | PrimitiveType::I8
+                | PrimitiveType::I16
+                | PrimitiveType::I32
+                | PrimitiveType::I64
+                | PrimitiveType::I128
+                | PrimitiveType::I256
                 | PrimitiveType::Num
                 | PrimitiveType::Range
                 | PrimitiveType::EventStore
