@@ -127,7 +127,7 @@ module aptos_experimental::clearinghouse_test {
                 maker, Position { size: 0, is_long: true }
             );
         update_position(maker_position, size, !is_taker_long);
-        new_settle_trade_result(size, option::none(), option::none(), new_callback_result_continue_matching(vector::empty()))
+        new_settle_trade_result(size, option::none(), option::none(), new_callback_result_continue_matching(size))
     }
 
     public(package) fun place_maker_order(order_id: OrderIdType) acquires GlobalState {
@@ -187,7 +187,7 @@ module aptos_experimental::clearinghouse_test {
             size / 2,
             option::none(),
             option::some(std::string::utf8(b"Max open interest violation")),
-            new_callback_result_stop_matching(vector::empty())
+            new_callback_result_stop_matching(size)
         )
     }
 

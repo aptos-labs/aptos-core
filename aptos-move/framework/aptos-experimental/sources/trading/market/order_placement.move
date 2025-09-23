@@ -69,7 +69,7 @@ module aptos_experimental::order_placement {
     use aptos_experimental::market_types::{
         Self,
         MarketClearinghouseCallbacks,
-        Market, CallbackResult, new_callback_result_continue_matching,
+        Market, CallbackResult, new_callback_result_not_available,
     };
 
     // Error codes
@@ -483,7 +483,7 @@ module aptos_experimental::order_placement {
                 maker_order.get_time_in_force_from_match_details(),
                 callbacks
             );
-            return (option::none(), new_callback_result_continue_matching(vector::empty()));
+            return (option::none(), new_callback_result_not_available());
         };
         let fill_id = market.next_fill_id();
         let settle_result = callbacks.settle_trade(
@@ -813,12 +813,9 @@ module aptos_experimental::order_placement {
                     &mut fill_sizes
                 );
             let should_stop = callback_result.should_stop_matching();
-            let results  = callback_result.extract_results();
-            let i = 0;
-            while (i < results.length()) {
-                let res = results.borrow(i);
-                callback_results.push_back(*res);
-                i += 1;
+            let result  = callback_result.extract_results();
+            if (result.is_some()) {
+                callback_results.push_back(result.destroy_some());
             };
             if (taker_cancellation_reason.is_some()) {
                 return OrderMatchResult {

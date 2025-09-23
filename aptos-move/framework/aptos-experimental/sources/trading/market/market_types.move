@@ -75,11 +75,12 @@ module aptos_experimental::market_types {
     }
 
     enum CallbackResult<R: store + copy + drop> has copy, drop {
+        NOT_AVAILABLE,
         CONTINUE_MATCHING {
-            result: vector<R>
+            result: R
         }
         STOP_MATCHING {
-            result: vector<R>,
+            result: R,
         }
     }
 
@@ -173,14 +174,19 @@ module aptos_experimental::market_types {
         &self.callback_result
     }
 
-    public fun extract_results<R: store + copy + drop>(self: CallbackResult<R>): vector<R> {
-        self.result
+    public fun extract_results<R: store + copy + drop>(self: CallbackResult<R>): Option<R> {
+        match (self) {
+            CallbackResult::NOT_AVAILABLE => option::none(),
+            CallbackResult::CONTINUE_MATCHING { result } => option::some(result),
+            CallbackResult::STOP_MATCHING { result } => option::some(result),
+        }
     }
 
     public fun should_continue_matching<R: store + copy + drop>(self: &CallbackResult<R>): bool {
         match (self) {
             CallbackResult::CONTINUE_MATCHING { result: _ } => true,
             CallbackResult::STOP_MATCHING { result: _ } => false,
+            CallbackResult::NOT_AVAILABLE => true,
         }
     }
 
@@ -188,22 +194,20 @@ module aptos_experimental::market_types {
         match (self) {
             CallbackResult::CONTINUE_MATCHING { result: _ } => false,
             CallbackResult::STOP_MATCHING { result: _ } => true,
+            CallbackResult::NOT_AVAILABLE => false,
         }
     }
 
-    public fun get_callback_result_value<R: store + copy + drop>(self: CallbackResult<R>): vector<R> {
-        match (self) {
-            CallbackResult::CONTINUE_MATCHING { result } => result,
-            CallbackResult::STOP_MATCHING { result } => result,
-        }
-    }
-
-    public fun new_callback_result_continue_matching<R: store + copy + drop>(result: vector<R>): CallbackResult<R> {
+    public fun new_callback_result_continue_matching<R: store + copy + drop>(result: R): CallbackResult<R> {
         CallbackResult::CONTINUE_MATCHING { result }
     }
 
-    public fun new_callback_result_stop_matching<R: store + copy + drop>(result: vector<R>): CallbackResult<R> {
+    public fun new_callback_result_stop_matching<R: store + copy + drop>(result: R): CallbackResult<R> {
         CallbackResult::STOP_MATCHING { result }
+    }
+
+    public fun new_callback_result_not_available<R: store + copy + drop>(): CallbackResult<R> {
+        CallbackResult::NOT_AVAILABLE
     }
 
     public fun settle_trade<M: store + copy + drop, R: store + copy + drop>(
