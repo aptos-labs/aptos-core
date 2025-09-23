@@ -1099,7 +1099,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             maker_order.get_time_in_force_from_match_details(),
             callbacks
         );
-        <b>return</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), new_callback_result_continue_matching(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>()));
+        <b>return</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), new_callback_result_not_available());
     };
     <b>let</b> fill_id = market.next_fill_id();
     <b>let</b> settle_result = callbacks.settle_trade(
@@ -1449,12 +1449,9 @@ of fill limit violation  in the previous transaction and the order is just a con
                 &<b>mut</b> fill_sizes
             );
         <b>let</b> should_stop = callback_result.should_stop_matching();
-        <b>let</b> results  = callback_result.extract_results();
-        <b>let</b> i = 0;
-        <b>while</b> (i &lt; results.length()) {
-            <b>let</b> res = results.borrow(i);
-            callback_results.push_back(*res);
-            i += 1;
+        <b>let</b> result  = callback_result.extract_results();
+        <b>if</b> (result.is_some()) {
+            callback_results.push_back(result.destroy_some());
         };
         <b>if</b> (taker_cancellation_reason.is_some()) {
             <b>return</b> <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a> {

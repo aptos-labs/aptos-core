@@ -28,9 +28,9 @@
 -  [Function `extract_results`](#0x7_market_types_extract_results)
 -  [Function `should_continue_matching`](#0x7_market_types_should_continue_matching)
 -  [Function `should_stop_matching`](#0x7_market_types_should_stop_matching)
--  [Function `get_callback_result_value`](#0x7_market_types_get_callback_result_value)
 -  [Function `new_callback_result_continue_matching`](#0x7_market_types_new_callback_result_continue_matching)
 -  [Function `new_callback_result_stop_matching`](#0x7_market_types_new_callback_result_stop_matching)
+-  [Function `new_callback_result_not_available`](#0x7_market_types_new_callback_result_not_available)
 -  [Function `settle_trade`](#0x7_market_types_settle_trade)
 -  [Function `validate_order_placement`](#0x7_market_types_validate_order_placement)
 -  [Function `validate_bulk_order_placement`](#0x7_market_types_validate_bulk_order_placement)
@@ -204,6 +204,22 @@
 
 
 <details>
+<summary>NOT_AVAILABLE</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
 <summary>CONTINUE_MATCHING</summary>
 
 
@@ -213,7 +229,7 @@
 
 <dl>
 <dt>
-<code>result: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;</code>
+<code>result: R</code>
 </dt>
 <dd>
 
@@ -235,7 +251,7 @@
 
 <dl>
 <dt>
-<code>result: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;</code>
+<code>result: R</code>
 </dt>
 <dd>
 
@@ -1017,7 +1033,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_extract_results">extract_results</a>&lt;R: <b>copy</b>, drop, store&gt;(self: <a href="market_types.md#0x7_market_types_CallbackResult">market_types::CallbackResult</a>&lt;R&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_extract_results">extract_results</a>&lt;R: <b>copy</b>, drop, store&gt;(self: <a href="market_types.md#0x7_market_types_CallbackResult">market_types::CallbackResult</a>&lt;R&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;R&gt;
 </code></pre>
 
 
@@ -1026,8 +1042,12 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_extract_results">extract_results</a>&lt;R: store + <b>copy</b> + drop&gt;(self: <a href="market_types.md#0x7_market_types_CallbackResult">CallbackResult</a>&lt;R&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt; {
-    self.result
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_extract_results">extract_results</a>&lt;R: store + <b>copy</b> + drop&gt;(self: <a href="market_types.md#0x7_market_types_CallbackResult">CallbackResult</a>&lt;R&gt;): Option&lt;R&gt; {
+    match (self) {
+        CallbackResult::NOT_AVAILABLE =&gt; <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+        CallbackResult::CONTINUE_MATCHING { result } =&gt; <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(result),
+        CallbackResult::STOP_MATCHING { result } =&gt; <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(result),
+    }
 }
 </code></pre>
 
@@ -1054,6 +1074,7 @@
     match (self) {
         CallbackResult::CONTINUE_MATCHING { result: _ } =&gt; <b>true</b>,
         CallbackResult::STOP_MATCHING { result: _ } =&gt; <b>false</b>,
+        CallbackResult::NOT_AVAILABLE =&gt; <b>true</b>,
     }
 }
 </code></pre>
@@ -1081,33 +1102,7 @@
     match (self) {
         CallbackResult::CONTINUE_MATCHING { result: _ } =&gt; <b>false</b>,
         CallbackResult::STOP_MATCHING { result: _ } =&gt; <b>true</b>,
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_market_types_get_callback_result_value"></a>
-
-## Function `get_callback_result_value`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_callback_result_value">get_callback_result_value</a>&lt;R: <b>copy</b>, drop, store&gt;(self: <a href="market_types.md#0x7_market_types_CallbackResult">market_types::CallbackResult</a>&lt;R&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_callback_result_value">get_callback_result_value</a>&lt;R: store + <b>copy</b> + drop&gt;(self: <a href="market_types.md#0x7_market_types_CallbackResult">CallbackResult</a>&lt;R&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt; {
-    match (self) {
-        CallbackResult::CONTINUE_MATCHING { result } =&gt; result,
-        CallbackResult::STOP_MATCHING { result } =&gt; result,
+        CallbackResult::NOT_AVAILABLE =&gt; <b>false</b>,
     }
 }
 </code></pre>
@@ -1122,7 +1117,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_callback_result_continue_matching">new_callback_result_continue_matching</a>&lt;R: <b>copy</b>, drop, store&gt;(result: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;): <a href="market_types.md#0x7_market_types_CallbackResult">market_types::CallbackResult</a>&lt;R&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_callback_result_continue_matching">new_callback_result_continue_matching</a>&lt;R: <b>copy</b>, drop, store&gt;(result: R): <a href="market_types.md#0x7_market_types_CallbackResult">market_types::CallbackResult</a>&lt;R&gt;
 </code></pre>
 
 
@@ -1131,7 +1126,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_callback_result_continue_matching">new_callback_result_continue_matching</a>&lt;R: store + <b>copy</b> + drop&gt;(result: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;): <a href="market_types.md#0x7_market_types_CallbackResult">CallbackResult</a>&lt;R&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_callback_result_continue_matching">new_callback_result_continue_matching</a>&lt;R: store + <b>copy</b> + drop&gt;(result: R): <a href="market_types.md#0x7_market_types_CallbackResult">CallbackResult</a>&lt;R&gt; {
     CallbackResult::CONTINUE_MATCHING { result }
 }
 </code></pre>
@@ -1146,7 +1141,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_callback_result_stop_matching">new_callback_result_stop_matching</a>&lt;R: <b>copy</b>, drop, store&gt;(result: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;): <a href="market_types.md#0x7_market_types_CallbackResult">market_types::CallbackResult</a>&lt;R&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_callback_result_stop_matching">new_callback_result_stop_matching</a>&lt;R: <b>copy</b>, drop, store&gt;(result: R): <a href="market_types.md#0x7_market_types_CallbackResult">market_types::CallbackResult</a>&lt;R&gt;
 </code></pre>
 
 
@@ -1155,8 +1150,32 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_callback_result_stop_matching">new_callback_result_stop_matching</a>&lt;R: store + <b>copy</b> + drop&gt;(result: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;): <a href="market_types.md#0x7_market_types_CallbackResult">CallbackResult</a>&lt;R&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_callback_result_stop_matching">new_callback_result_stop_matching</a>&lt;R: store + <b>copy</b> + drop&gt;(result: R): <a href="market_types.md#0x7_market_types_CallbackResult">CallbackResult</a>&lt;R&gt; {
     CallbackResult::STOP_MATCHING { result }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_new_callback_result_not_available"></a>
+
+## Function `new_callback_result_not_available`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_callback_result_not_available">new_callback_result_not_available</a>&lt;R: <b>copy</b>, drop, store&gt;(): <a href="market_types.md#0x7_market_types_CallbackResult">market_types::CallbackResult</a>&lt;R&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_callback_result_not_available">new_callback_result_not_available</a>&lt;R: store + <b>copy</b> + drop&gt;(): <a href="market_types.md#0x7_market_types_CallbackResult">CallbackResult</a>&lt;R&gt; {
+    CallbackResult::NOT_AVAILABLE
 }
 </code></pre>
 
