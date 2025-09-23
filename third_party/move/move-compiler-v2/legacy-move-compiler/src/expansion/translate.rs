@@ -23,13 +23,15 @@ use crate::{
     shared::{
         builtins,
         known_attributes::{AttributeKind, AttributePosition, KnownAttribute},
-        parse_u128, parse_u64, parse_u8,
         unique_map::UniqueMap,
         CompilationEnv, Identifier, Name, NamedAddressMap, NamedAddressMaps, NumericalAddress,
     },
     FullyCompiledProgram,
 };
-use move_command_line_common::parser::{parse_u16, parse_u256, parse_u32};
+use move_command_line_common::parser::{
+    parse_i128, parse_i16, parse_i256, parse_i32, parse_i64, parse_i8, parse_u128, parse_u16,
+    parse_u256, parse_u32, parse_u64, parse_u8,
+};
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use once_cell::sync::Lazy;
@@ -2829,50 +2831,100 @@ fn value(context: &mut Context, sp!(loc, pvalue_): P::Value) -> Option<E::Value>
         PV::Num(s) if s.ends_with("u8") => match parse_u8(&s[..s.len() - 2]) {
             Ok((u, _format)) => EV::U8(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(loc, "'u8'"));
+                context.env.add_diag(num_cannot_fit_error(loc, "'u8'"));
                 return None;
             },
         },
         PV::Num(s) if s.ends_with("u16") => match parse_u16(&s[..s.len() - 3]) {
             Ok((u, _format)) => EV::U16(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(loc, "'u16'"));
+                context.env.add_diag(num_cannot_fit_error(loc, "'u16'"));
                 return None;
             },
         },
         PV::Num(s) if s.ends_with("u32") => match parse_u32(&s[..s.len() - 3]) {
             Ok((u, _format)) => EV::U32(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(loc, "'u32'"));
+                context.env.add_diag(num_cannot_fit_error(loc, "'u32'"));
                 return None;
             },
         },
         PV::Num(s) if s.ends_with("u64") => match parse_u64(&s[..s.len() - 3]) {
             Ok((u, _format)) => EV::U64(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(loc, "'u64'"));
+                context.env.add_diag(num_cannot_fit_error(loc, "'u64'"));
                 return None;
             },
         },
         PV::Num(s) if s.ends_with("u128") => match parse_u128(&s[..s.len() - 4]) {
             Ok((u, _format)) => EV::U128(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(loc, "'u128'"));
+                context.env.add_diag(num_cannot_fit_error(loc, "'u128'"));
                 return None;
             },
         },
         PV::Num(s) if s.ends_with("u256") => match parse_u256(&s[..s.len() - 4]) {
             Ok(u) => EV::U256(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(loc, "'u256'"));
+                context.env.add_diag(num_cannot_fit_error(loc, "'u256'"));
                 return None;
             },
         },
-
+        PV::Num(s) if s.ends_with("i8") => match parse_i8(&s[..s.len() - 2]) {
+            Ok((i, _format)) => EV::I8(i),
+            Err(_) => {
+                context.env.add_diag(num_cannot_fit_error(loc, "'i8'"));
+                return None;
+            },
+        },
+        PV::Num(s) if s.ends_with("i16") => match parse_i16(&s[..s.len() - 3]) {
+            Ok((i, _format)) => EV::I16(i),
+            Err(_) => {
+                context.env.add_diag(num_cannot_fit_error(loc, "'i16'"));
+                return None;
+            },
+        },
+        PV::Num(s) if s.ends_with("i32") => match parse_i32(&s[..s.len() - 3]) {
+            Ok((i, _format)) => EV::I32(i),
+            Err(_) => {
+                context.env.add_diag(num_cannot_fit_error(loc, "'i32'"));
+                return None;
+            },
+        },
+        PV::Num(s) if s.ends_with("i64") => match parse_i64(&s[..s.len() - 3]) {
+            Ok((i, _format)) => EV::I64(i),
+            Err(_) => {
+                context.env.add_diag(num_cannot_fit_error(loc, "'i64'"));
+                return None;
+            },
+        },
+        PV::Num(s) if s.ends_with("i128") => match parse_i128(&s[..s.len() - 4]) {
+            Ok((i, _format)) => EV::I128(i),
+            Err(_) => {
+                context.env.add_diag(num_cannot_fit_error(loc, "'i128'"));
+                return None;
+            },
+        },
+        PV::Num(s) if s.ends_with("i256") => match parse_i256(&s[..s.len() - 4]) {
+            Ok(i) => EV::I256(i),
+            Err(_) => {
+                context.env.add_diag(num_cannot_fit_error(loc, "'i256'"));
+                return None;
+            },
+        },
+        // non-typed negative number literal
+        PV::Num(s) if s.starts_with("-") => match parse_i256(&s) {
+            Ok(i) => EV::InferredNegNum(i),
+            Err(_) => {
+                context.env.add_diag(num_cannot_fit_error(loc, "'i256'"));
+                return None;
+            },
+        },
+        // non-typed number literal
         PV::Num(s) => match parse_u256(&s) {
             Ok(u) => EV::InferredNum(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(
+                context.env.add_diag(num_cannot_fit_error(
                     loc,
                     "the largest possible integer type, 'u256'",
                 ));
@@ -2898,15 +2950,15 @@ fn value(context: &mut Context, sp!(loc, pvalue_): P::Value) -> Option<E::Value>
     Some(sp(loc, value_))
 }
 
-// Create an error for an integer literal that is too big to fit in its type.
+// Create an error for an integer literal that cannot fit in its type.
 // This assumes that the literal is the current token.
-fn num_too_big_error(loc: Loc, type_description: &'static str) -> Diagnostic {
+fn num_cannot_fit_error(loc: Loc, type_description: &'static str) -> Diagnostic {
     diag!(
         Syntax::InvalidNumber,
         (
             loc,
             format!(
-                "Invalid number literal. The given literal is too large to fit into {}",
+                "Invalid number literal. The given literal cannot fit into {}",
                 type_description
             )
         ),

@@ -125,13 +125,41 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             )
         };
 
-        let u8_ty = Type::Primitive(PrimitiveType::U8);
+        // Builtin function for arithmetic operations
+        // op_vec: operations to declare
+        // type_params: type parameters for the operations
+        // type_constraints: constraints on the type parameters
+        // ty1, ty2: types of the two parameters
+        // result_ty: result type
+        // visibility: impl or spec
         let declare_arithm_ops = |trans: &mut ModelBuilder,
+                                  op_vec: &[(PA::BinOp_, Operation)],
                                   type_params: &[TypeParameter],
                                   type_constraints: &BTreeMap<usize, Constraint>,
-                                  ty: Type,
+                                  ty1: Type,
+                                  ty2: Type,
+                                  result_ty: Type,
                                   visibility: EntryVisibility| {
-            for (op, oper) in [
+            for (op, oper) in op_vec {
+                declare_bin_gen(
+                    trans,
+                    *op,
+                    oper.clone(),
+                    type_params,
+                    type_constraints,
+                    &ty1,
+                    &ty2,
+                    &result_ty,
+                    visibility,
+                );
+            }
+        };
+
+        // Declare the SPEC arithm ops for `Add`, `Sub`, `Mul`, `Mod`, `Div`, `BitOr`, `BitAnd`, `Xor`
+        // Both operands and the result are of Num type.
+        declare_arithm_ops(
+            trans,
+            &[
                 (Add, Operation::Add),
                 (Sub, Operation::Sub),
                 (Mul, Operation::Mul),
@@ -140,46 +168,40 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                 (BitOr, Operation::BitOr),
                 (BitAnd, Operation::BitAnd),
                 (Xor, Operation::Xor),
-            ] {
-                declare_bin_gen(
-                    trans,
-                    op,
-                    oper,
-                    type_params,
-                    type_constraints,
-                    &ty,
-                    &ty,
-                    &ty,
-                    visibility,
-                );
-            }
-            for (op, oper) in [(Shl, Operation::Shl), (Shr, Operation::Shr)] {
-                declare_bin_gen(
-                    trans,
-                    op,
-                    oper,
-                    type_params,
-                    type_constraints,
-                    &ty,
-                    &u8_ty,
-                    &ty,
-                    visibility,
-                );
-            }
-        };
-
-        // Declare the specification arithm ops, based on Num type.
-        declare_arithm_ops(
-            trans,
+            ],
             &[],
             &BTreeMap::new(),
             Type::new_prim(PrimitiveType::Num),
+            Type::new_prim(PrimitiveType::Num),
+            Type::new_prim(PrimitiveType::Num),
             Spec, // visible only in the spec language
         );
-        // For the implementation arithm ops, we use a generic function with a constraint,
-        // conceptually: `fun _+_<A>(x: A, y: A): A where A: u8|u16|..|u256`.
+
+        // Declare the SPEC arithm ops for `Shl`, `Shr`
+        // First operand and the result are of Num type, second operand is of u8 type.
         declare_arithm_ops(
             trans,
+            &[(Shl, Operation::Shl), (Shr, Operation::Shr)],
+            &[],
+            &BTreeMap::new(),
+            Type::new_prim(PrimitiveType::Num),
+            Type::Primitive(PrimitiveType::U8),
+            Type::new_prim(PrimitiveType::Num),
+            Spec, // visible only in the spec language
+        );
+
+        // Declare the IMPL arithm ops for `Add`, `Sub`, `Mul`, `Mod`, `Div`
+        // We use a generic function with a constraint accepting all integer types,
+        // conceptually: `fun _+_<A>(x: A, y: A): A where A: u8|u16|..|u256|i8|i16|..|i256`.
+        declare_arithm_ops(
+            trans,
+            &[
+                (Add, Operation::Add),
+                (Sub, Operation::Sub),
+                (Mul, Operation::Mul),
+                (Mod, Operation::Mod),
+                (Div, Operation::Div),
+            ],
             std::slice::from_ref(&param_t_decl),
             &[(
                 0,
@@ -188,7 +210,59 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             .into_iter()
             .collect(),
             param_t.clone(),
-            Impl, // visible only in the impl language
+            param_t.clone(),
+            param_t.clone(),
+            Impl,
+        );
+
+        // Declare the IMPL arithm ops for `BitOr`, `BitAnd`, `Xor`
+        // We use a generic function with a constraint accepting only unsigned int types,
+        // conceptually: `fun _^_<A>(x: A, y: A): A where A: u8|u16|..|u256`.
+        declare_arithm_ops(
+            trans,
+            &[
+                (BitOr, Operation::BitOr),
+                (BitAnd, Operation::BitAnd),
+                (Xor, Operation::Xor),
+            ],
+            std::slice::from_ref(&param_t_decl),
+            &[(
+                0,
+                Constraint::SomeNumber(
+                    PrimitiveType::all_unsigned_int_types()
+                        .into_iter()
+                        .collect(),
+                ),
+            )]
+            .into_iter()
+            .collect(),
+            param_t.clone(),
+            param_t.clone(),
+            param_t.clone(),
+            Impl,
+        );
+
+        // Declare the IMPL arithm ops for `Shl`, `Shr`
+        // We use a generic function with a constraint accepting only unsigned int types as first arg and `u8` as second arg,
+        // conceptually: `fun _>>_<A>(x: A, y: u8): A where A: u8|u16|..|u256`.
+        declare_arithm_ops(
+            trans,
+            &[(Shl, Operation::Shl), (Shr, Operation::Shr)],
+            std::slice::from_ref(&param_t_decl),
+            &[(
+                0,
+                Constraint::SomeNumber(
+                    PrimitiveType::all_unsigned_int_types()
+                        .into_iter()
+                        .collect(),
+                ),
+            )]
+            .into_iter()
+            .collect(),
+            param_t.clone(),
+            Type::Primitive(PrimitiveType::U8),
+            param_t.clone(),
+            Impl,
         );
 
         // Builtin function for comparison operations
@@ -344,6 +418,26 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                 type_param_constraints: BTreeMap::default(),
                 params: vec![mk_param(trans, 1, bool_t.clone())],
                 result_type: bool_t.clone(),
+                visibility: SpecAndImpl,
+            },
+        );
+
+        trans.define_spec_or_builtin_fun(
+            trans.unary_op_symbol(&PA::UnaryOp_::Negate),
+            SpecOrBuiltinFunEntry {
+                loc: loc.clone(),
+                oper: Operation::Negate,
+                type_params: vec![param_t_decl.clone()],
+                type_param_constraints: [(
+                    0,
+                    Constraint::SomeNumber(
+                        PrimitiveType::all_signed_int_types().into_iter().collect(),
+                    ),
+                )]
+                .into_iter()
+                .collect(),
+                params: vec![mk_param(trans, 1, param_t.clone())],
+                result_type: param_t.clone(),
                 visibility: SpecAndImpl,
             },
         );
