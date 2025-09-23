@@ -71,6 +71,7 @@ serde_yaml = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
+tiny-keccak = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
