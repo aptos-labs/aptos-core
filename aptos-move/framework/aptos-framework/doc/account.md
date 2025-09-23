@@ -127,7 +127,7 @@
 <b>use</b> <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key">0x1::multi_key</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
-<b>use</b> <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno">0x1::sched_txns_sender_seqno</a>;
+<b>use</b> <a href="sched_txns_auth_num.md#0x1_sched_txns_auth_num">0x1::sched_txns_auth_num</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key">0x1::single_key</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -1671,7 +1671,7 @@ many contexts:
     account_resource.authentication_key = new_auth_key;
 
     // Handle key rotation for scheduled transactions
-    <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_handle_key_rotation">sched_txns_sender_seqno::handle_key_rotation</a>(addr);
+    <a href="sched_txns_auth_num.md#0x1_sched_txns_auth_num_handle_key_rotation">sched_txns_auth_num::handle_key_rotation</a>(addr);
 }
 </code></pre>
 
@@ -2735,7 +2735,7 @@ in the event of key recovery.
     account_resource.authentication_key = new_auth_key_vector;
 
     // Handle key rotation for scheduled transactions
-    <a href="sched_txns_sender_seqno.md#0x1_sched_txns_sender_seqno_handle_key_rotation">sched_txns_sender_seqno::handle_key_rotation</a>(originating_addr);
+    <a href="sched_txns_auth_num.md#0x1_sched_txns_auth_num_handle_key_rotation">sched_txns_auth_num::handle_key_rotation</a>(originating_addr);
 }
 </code></pre>
 

@@ -32,9 +32,13 @@ module aptos_framework::transaction_context {
     }
 
     struct ScheduledTxnConfig has copy, drop, store {
+        /// Indicates whether the 'user function' can reschedule another transaction
         allow_rescheduling: bool,
+        /// Expiration time in milliseconds of the auth token (hence signer) used for scheduling.
+        /// Expires when block_timestamp_ms >= expiration_time
         expiration_time: u64,
-        authorization_seqno: u64,
+        /// Monotonically increasing se
+        authorization_num: u64,
     }
 
     /// Represents the payload configuration for transactions.
@@ -208,9 +212,9 @@ module aptos_framework::transaction_context {
         payload_config.allow_rescheduling
     }
 
-    public fun payload_scheduled_txn_config_auth_seqno(payload_config: &ScheduledTxnConfig): u64 {
+    public fun payload_scheduled_txn_config_auth_num(payload_config: &ScheduledTxnConfig): u64 {
         assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
-        payload_config.authorization_seqno
+        payload_config.authorization_num
     }
 
     public fun payload_scheduled_txn_config_auth_expiration(payload_config: &ScheduledTxnConfig): u64 {
@@ -245,12 +249,12 @@ module aptos_framework::transaction_context {
     public fun new_scheduled_txn_config(
         allow_rescheduling: bool,
         expiration_time: u64,
-        authorization_seqno: u64,
+        authorization_num: u64,
     ): ScheduledTxnConfig {
         ScheduledTxnConfig {
             allow_rescheduling,
             expiration_time,
-            authorization_seqno,
+            authorization_num,
         }
     }
 

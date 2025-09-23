@@ -12,7 +12,7 @@ module aptos_framework::test_scheduled_txns {
         ScheduleMapKey,
         mark_txn_to_remove_test,
         ScheduledTxnAuthToken,
-        get_sender_seqno
+        get_or_init_auth_num
     };
 
     const EXPIRY_DELTA_DEFAULT: u64 = 10 * 1000;
@@ -83,7 +83,7 @@ module aptos_framework::test_scheduled_txns {
         let curr_mock_time_micro_s = 1000000;
         scheduled_txns::setup_test_env(fx, &user, curr_mock_time_micro_s);
 
-        let sender_seqno = get_sender_seqno(user_addr);
+        let sender_auth_num = get_or_init_auth_num(user_addr);
         let schedule_time = curr_mock_time_micro_s / 1000 + 1000; // 1 second in future
         let expiration_time = schedule_time + 10000; // Token valid for 10 seconds
 
@@ -93,7 +93,7 @@ module aptos_framework::test_scheduled_txns {
             );
 
         let auth_token =
-            scheduled_txns::create_mock_auth_token(true, expiration_time, sender_seqno);
+            scheduled_txns::create_mock_auth_token(true, expiration_time, sender_auth_num);
         let txn =
             scheduled_txns::new_scheduled_transaction_reuse_auth_token(
                 &user,
@@ -121,7 +121,7 @@ module aptos_framework::test_scheduled_txns {
         let curr_mock_time_micro_s = 1000000;
         scheduled_txns::setup_test_env(fx, &user, curr_mock_time_micro_s);
 
-        let sender_seqno = get_sender_seqno(user_addr);
+        let sender_auth_num = get_or_init_auth_num(user_addr);
         let schedule_time = curr_mock_time_micro_s / 1000 + 1000; // 1 second in future
         let expiration_time = schedule_time + 10000; // Token valid for 10 seconds
 
@@ -133,7 +133,7 @@ module aptos_framework::test_scheduled_txns {
 
         // Create auth token with allow_rescheduling = false
         let auth_token =
-            scheduled_txns::create_mock_auth_token(false, expiration_time, sender_seqno);
+            scheduled_txns::create_mock_auth_token(false, expiration_time, sender_auth_num);
         let txn =
             scheduled_txns::new_scheduled_transaction_reuse_auth_token(
                 &user,
@@ -288,7 +288,7 @@ module aptos_framework::test_scheduled_txns {
         let curr_mock_time_micro_s = 1000000;
         scheduled_txns::setup_test_env(fx, &user, curr_mock_time_micro_s);
 
-        let sender_seqno = get_sender_seqno(user_addr);
+        let sender_auth_num = get_or_init_auth_num(user_addr);
         let schedule_time = curr_mock_time_micro_s / 1000 + 2000;
         let expiration_time = schedule_time + 10000;
 
@@ -298,9 +298,9 @@ module aptos_framework::test_scheduled_txns {
                 signer, auth_token
             );
 
-        // Create 3 transactions with the same auth seqno
+        // Create 3 transactions with the same auth num
         let auth_token =
-            scheduled_txns::create_mock_auth_token(true, expiration_time, sender_seqno);
+            scheduled_txns::create_mock_auth_token(true, expiration_time, sender_auth_num);
         let txn1 =
             scheduled_txns::new_scheduled_transaction_reuse_auth_token(
                 &user,
@@ -338,12 +338,12 @@ module aptos_framework::test_scheduled_txns {
         let _txn3_key = scheduled_txns::insert(&user, txn3);
         assert!(scheduled_txns::get_num_txns() == 3, scheduled_txns::get_num_txns());
 
-        // Cancel all - this increments the sender's seqno
+        // Cancel all - this increments the sender's auth num
         scheduled_txns::cancel_all_test(&user);
 
-        // Verify the sender seqno was incremented
-        let new_seqno = get_sender_seqno(user_addr);
-        assert!(new_seqno == sender_seqno + 1, new_seqno);
+        // Verify the sender auth num was incremented
+        let new_auth_num = get_or_init_auth_num(user_addr);
+        assert!(new_auth_num == sender_auth_num + 1, new_auth_num);
 
         // The transactions are still in the queue because cancellation is lazy
         assert!(scheduled_txns::get_num_txns() == 3, scheduled_txns::get_num_txns());

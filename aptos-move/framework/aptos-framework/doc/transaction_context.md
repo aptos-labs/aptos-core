@@ -44,7 +44,7 @@
 -  [Function `payload_config`](#0x1_transaction_context_payload_config)
 -  [Function `payload_config_internal`](#0x1_transaction_context_payload_config_internal)
 -  [Function `payload_scheduled_txn_config_allow_resched`](#0x1_transaction_context_payload_scheduled_txn_config_allow_resched)
--  [Function `payload_scheduled_txn_config_auth_seqno`](#0x1_transaction_context_payload_scheduled_txn_config_auth_seqno)
+-  [Function `payload_scheduled_txn_config_auth_num`](#0x1_transaction_context_payload_scheduled_txn_config_auth_num)
 -  [Function `payload_scheduled_txn_config_auth_expiration`](#0x1_transaction_context_payload_scheduled_txn_config_auth_expiration)
 -  [Function `payload_config_scheduled_txn_auth_token`](#0x1_transaction_context_payload_config_scheduled_txn_auth_token)
 -  [Specification](#@Specification_1)
@@ -209,19 +209,20 @@ Represents the multisig payload.
 <code>allow_rescheduling: bool</code>
 </dt>
 <dd>
-
+ Indicates whether the 'user function' can reschedule another transaction
 </dd>
 <dt>
 <code>expiration_time: u64</code>
 </dt>
 <dd>
-
+ Expiration time in milliseconds of the auth token (hence signer) used for scheduling.
+ Expires when block_timestamp_ms >= expiration_time
 </dd>
 <dt>
-<code>authorization_seqno: u64</code>
+<code>authorization_num: u64</code>
 </dt>
 <dd>
-
+ Monotonically increasing se
 </dd>
 </dl>
 
@@ -1126,13 +1127,13 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 </details>
 
-<a id="0x1_transaction_context_payload_scheduled_txn_config_auth_seqno"></a>
+<a id="0x1_transaction_context_payload_scheduled_txn_config_auth_num"></a>
 
-## Function `payload_scheduled_txn_config_auth_seqno`
+## Function `payload_scheduled_txn_config_auth_num`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_scheduled_txn_config_auth_seqno">payload_scheduled_txn_config_auth_seqno</a>(payload_config: &<a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">transaction_context::ScheduledTxnConfig</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_scheduled_txn_config_auth_num">payload_scheduled_txn_config_auth_num</a>(payload_config: &<a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">transaction_context::ScheduledTxnConfig</a>): u64
 </code></pre>
 
 
@@ -1141,9 +1142,9 @@ This function aborts if called outside of the transaction prologue, execution, o
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_scheduled_txn_config_auth_seqno">payload_scheduled_txn_config_auth_seqno</a>(payload_config: &<a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">ScheduledTxnConfig</a>): u64 {
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_payload_scheduled_txn_config_auth_num">payload_scheduled_txn_config_auth_num</a>(payload_config: &<a href="transaction_context.md#0x1_transaction_context_ScheduledTxnConfig">ScheduledTxnConfig</a>): u64 {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
-    payload_config.authorization_seqno
+    payload_config.authorization_num
 }
 </code></pre>
 

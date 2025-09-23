@@ -11,7 +11,7 @@ module aptos_framework::account {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
     use aptos_framework::permissioned_signer;
-    use aptos_framework::sched_txns_sender_seqno;
+    use aptos_framework::sched_txns_auth_num;
     use aptos_framework::system_addresses;
     use aptos_std::ed25519;
     use aptos_std::from_bcs;
@@ -451,7 +451,7 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
 
         // Handle key rotation for scheduled transactions
-        sched_txns_sender_seqno::handle_key_rotation(addr);
+        sched_txns_auth_num::handle_key_rotation(addr);
     }
 
     /// Private entry function for key rotation that allows the signer to update their authentication key.
@@ -1105,7 +1105,7 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key_vector;
 
         // Handle key rotation for scheduled transactions
-        sched_txns_sender_seqno::handle_key_rotation(originating_addr);
+        sched_txns_auth_num::handle_key_rotation(originating_addr);
     }
 
     ///////////////////////////////////////////////////////////////////////////
