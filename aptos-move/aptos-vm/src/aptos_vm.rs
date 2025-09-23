@@ -392,6 +392,86 @@ impl AptosVM {
         self.move_vm.env.clone()
     }
 
+    /// Execute a single transaction payload (EntryFunction or Script) without signature,
+    /// nonce, or gas checks. Intended for fuzzing and simulation environments.
+    pub fn execute_user_payload_no_checking(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        code_storage: &impl move_vm_runtime::CodeStorage,
+        payload: &aptos_types::transaction::TransactionPayload,
+    ) -> anyhow::Result<(
+        aptos_types::write_set::WriteSet,
+        Vec<aptos_types::contract_event::ContractEvent>,
+    )> {
+        let mut session = self.new_session(resolver, SessionId::void(), None);
+
+        let mut gas = UnmeteredGasMeter;
+        let storage = TraversalStorage::new();
+        let mut traversal = TraversalContext::new(&storage);
+
+        match payload {
+            TransactionPayload::EntryFunction(entry) => {
+                let module_id = entry.module().clone();
+                let func_name = entry.function();
+                let ty_args = entry.ty_args().to_vec();
+                let args: Vec<&[u8]> = entry.args().iter().map(|v| v.as_slice()).collect();
+
+                session
+                    .execute_function_bypass_visibility(
+                        &module_id,
+                        func_name,
+                        ty_args,
+                        args,
+                        &mut gas,
+                        &mut traversal,
+                        code_storage,
+                    )
+                    .map_err(|e| anyhow::anyhow!("entry function execution failed: {e:?}"))?;
+            },
+            TransactionPayload::Script(script) => {
+                let mv_args: Vec<MoveValue> =
+                    script.args().iter().cloned().map(MoveValue::from).collect();
+                let args: Vec<Vec<u8>> = serialize_values(&mv_args);
+
+                move_vm_runtime::dispatch_loader!(code_storage, loader, {
+                    let function = loader
+                        .load_script(
+                            &move_vm_runtime::LegacyLoaderConfig::unmetered(),
+                            &mut gas,
+                            &mut traversal,
+                            &script.code(),
+                            &script.ty_args().to_vec(),
+                        )
+                        .map_err(|e| anyhow::anyhow!("load_script failed: {e:?}"))?;
+
+                    session
+                        .execute_loaded_function(function, args, &mut gas, &mut traversal, &loader)
+                        .map_err(|e| anyhow::anyhow!("script execute failed: {e:?}"))?;
+                });
+            },
+            _ => anyhow::bail!("Unsupported payload type for no-check execution"),
+        }
+
+        let change_set = session
+            .finish(
+                &aptos_vm_types::storage::change_set_configs::ChangeSetConfigs::
+                    unlimited_at_gas_feature_version(0),
+                code_storage,
+            )
+            .map_err(|e| anyhow::anyhow!("session finish failed: {e:?}"))?;
+
+        let storage_change_set = change_set
+            .try_combine_into_storage_change_set(
+                aptos_vm_types::module_write_set::ModuleWriteSet::empty(),
+            )
+            .map_err(|e| anyhow::anyhow!("convert change set failed: {e:?}"))?;
+
+        let write_set = storage_change_set.write_set().clone();
+        let events = storage_change_set.events().to_vec();
+
+        Ok((write_set, events))
+    }
+
     /// Sets execution concurrency level when invoked the first time.
     pub fn set_concurrency_level_once(mut concurrency_level: usize) {
         concurrency_level = min(concurrency_level, num_cpus::get());

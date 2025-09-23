@@ -436,6 +436,7 @@ fn matches_transaction_authenticator_address(
 ) -> bool {
     // Match all variants explicitly to ensure future enum changes are caught during compilation
     match signed_transaction.authenticator_ref() {
+        TransactionAuthenticator::NoneForFuzz => false,
         TransactionAuthenticator::Ed25519 { .. }
         | TransactionAuthenticator::MultiEd25519 { .. } => false,
         TransactionAuthenticator::MultiAgent {
@@ -477,6 +478,7 @@ fn matches_transaction_authenticator_public_key(
 ) -> bool {
     // Match all variants explicitly to ensure future enum changes are caught during compilation
     match signed_transaction.authenticator_ref() {
+        TransactionAuthenticator::NoneForFuzz => false,
         TransactionAuthenticator::Ed25519 { public_key, .. } => {
             compare_ed25519_public_key(public_key, any_public_key)
         },

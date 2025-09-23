@@ -2331,6 +2331,7 @@ impl From<TransactionAuthenticator> for TransactionSignature {
                     .into(),
             ),
             SingleSender { sender } => Self::SingleSender(sender.into()),
+            NoneForFuzz => Self::NoAccountSignature(NoAccountSignature),
         }
     }
 }
