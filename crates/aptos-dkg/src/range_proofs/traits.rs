@@ -14,6 +14,8 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     type Commitment;
     type CommitmentRandomness: Clone + ark_ff::UniformRand;
 
+    const DST: &[u8]; // TODO: Also add this to PVSS trait?
+
     /// Setup generates the prover and verifier keys used in the batched range proof.
     fn setup<R: RngCore + CryptoRng>(
         max_n: usize,

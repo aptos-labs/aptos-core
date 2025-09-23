@@ -118,6 +118,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type PublicStatement = PublicStatement<E>;
     type VerificationKey = VerificationKey<E>;
 
+    const DST: &[u8] = DST;
+
     // The main bottlenecks are `powers_of_tau` and the IFFT steps.
     fn setup<R: RngCore + CryptoRng>(
         max_n: usize,
@@ -627,10 +629,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
 /// Compute alpha, beta.
 fn fiat_shamir_challenges<E: Pairing>(
-    // TODO: make this generic over B
     vk: &VerificationKey<E>,
     public_statement: PublicStatement<E>,
-    bit_commitments: &(&[E::G1Affine], &[E::G2Affine]),
+    bit_commitments: &(&[E::G1Affine], &[E::G2Affine]), // TODO: make this generic over B?
     num_scalars: usize,
     fs_transcript: &mut merlin::Transcript,
 ) -> (Vec<E::ScalarField>, Vec<E::ScalarField>) {

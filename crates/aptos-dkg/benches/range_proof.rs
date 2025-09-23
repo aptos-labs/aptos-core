@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_dkg::{
-    range_proofs::{
-        dekart_univariate::{Proof, DST},
-        traits::BatchedRangeProof,
-    },
+    range_proofs::{dekart_univariate::Proof as DeKARTProof, traits::BatchedRangeProof},
     utils::test_utils,
 };
 use ark_ec::pairing::Pairing;
@@ -31,11 +28,11 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(c: &mut Criterion, cur
             || {
                 let mut rng = thread_rng();
                 let (pk, _, values, comm, comm_r) =
-                    test_utils::range_proof_random_instance::<E, B, _>(n, ell, &mut rng);
+                    test_utils::range_proof_random_instance::<_, B, _>(n, ell, &mut rng);
                 (pk, values, comm, comm_r)
             },
             |(pk, values, comm, r)| {
-                let mut fs_t = merlin::Transcript::new(DST);
+                let mut fs_t = merlin::Transcript::new(B::DST);
                 let mut rng = thread_rng();
                 let _proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
             },
@@ -47,13 +44,13 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(c: &mut Criterion, cur
             || {
                 let mut rng = thread_rng();
                 let (pk, vk, values, comm, r) =
-                    test_utils::range_proof_random_instance::<E, B, _>(n, ell, &mut rng);
-                let mut fs_t = merlin::Transcript::new(DST);
+                    test_utils::range_proof_random_instance::<_, B, _>(n, ell, &mut rng);
+                let mut fs_t = merlin::Transcript::new(B::DST);
                 let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
                 (vk, n, ell, comm, proof)
             },
             |(vk, n, ell, comm, proof)| {
-                let mut fs_t = merlin::Transcript::new(DST);
+                let mut fs_t = merlin::Transcript::new(B::DST);
                 proof.verify(&vk, n, ell, &comm, &mut fs_t).unwrap();
             },
         )
@@ -65,8 +62,8 @@ fn bench_groups(c: &mut Criterion) {
     use ark_bls12_381::Bls12_381;
     use ark_bn254::Bn254;
 
-    bench_range_proof::<Bn254, Proof<Bn254>>(c, "BN254");
-    bench_range_proof::<Bls12_381, Proof<Bls12_381>>(c, "BLS12-381");
+    bench_range_proof::<Bn254, DeKARTProof<Bn254>>(c, "BN254");
+    bench_range_proof::<Bls12_381, DeKARTProof<Bls12_381>>(c, "BLS12-381");
 }
 
 criterion_group!(

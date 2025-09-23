@@ -18,7 +18,7 @@ pub fn range_proof_random_instance<E: Pairing, B: BatchedRangeProof<E>, R: RngCo
 ) {
     let (pk, vk) = B::setup(n + 10, ell + 10, rng); // TODO: change these values?
 
-    let zz: Vec<B::Input> = (0..n) // TODO: make generic
+    let zz: Vec<B::Input> = (0..n)
         .map(|_| {
             let val = rng.next_u64() >> (64 - ell);
             B::Input::from(val)
