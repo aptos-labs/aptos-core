@@ -1,0 +1,97 @@
+
+Diagnostics:
+error: invalid number literal
+  ┌─ tests/integers/signed/invalid_constants.move:4:22
+  │
+4 │   const V3_64: i64 = 9223372036854775808i64; // out of upper bound: max value of i64 is 9223372036854775807
+  │                      ^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i64'
+
+error: invalid number literal
+  ┌─ tests/integers/signed/invalid_constants.move:6:22
+  │
+6 │   const V5_64: i64 = -9223372036854775809i64; // out of lower bound: min value of i64 is -9223372036854775808
+  │                      ^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i64'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:10:24
+   │
+10 │   const V3_128: i128 = 170141183460469231731687303715884105728i128; // out of upper bound: max value of i128 is 170141183460469231731687303715884105727
+   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i128'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:12:24
+   │
+12 │   const V5_128: i128 = -170141183460469231731687303715884105729i128; // out of lower bound: min value of i64 is -170141183460469231731687303715884105728
+   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i128'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:17:13
+   │
+17 │     let c = 9223372036854775808i64; // constant does not fit into i64 && type mismatch in `res7 + c`, expected u64|u128|u256|i128, actual i64
+   │             ^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i64'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:19:13
+   │
+19 │     let e = -9223372036854775809i64; // constant does not fit into i64 && type mismatch in `res9 + e`, expected i128, actual i64
+   │             ^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i64'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:35:13
+   │
+35 │     let c = 170141183460469231731687303715884105728i128; // type mismatch in `res7 + c`, expected u128|u256, actual i128
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i128'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:37:13
+   │
+37 │     let e = -170141183460469231731687303715884105729i128; // constant does not fit into i128
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i128'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:55:22
+   │
+55 │   const V3_64: i64 = 9223372036854775808i64; // out of upper bound: max value of i64 is 9223372036854775807
+   │                      ^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i64'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:57:22
+   │
+57 │   const V5_64: i64 = -9223372036854775809i64; // out of lower bound: min value of i64 is -9223372036854775808
+   │                      ^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i64'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:61:24
+   │
+61 │   const V3_128: i128 = 170141183460469231731687303715884105728i128; // out of upper bound: max value of i128 is 170141183460469231731687303715884105727
+   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i128'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:63:24
+   │
+63 │   const V5_128: i128 = -170141183460469231731687303715884105729i128; // out of lower bound: min value of i64 is -170141183460469231731687303715884105728
+   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i128'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:68:13
+   │
+68 │     let c = 9223372036854775808i64; // constant does not fit into i64 && type mismatch in `res7 + c`, expected u64|u128|u256|i128, actual i64
+   │             ^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i64'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:70:13
+   │
+70 │     let e = -9223372036854775809i64; // constant does not fit into i64 && type mismatch in `res9 + e`, expected i128, actual i64
+   │             ^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i64'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:86:13
+   │
+86 │     let c = 170141183460469231731687303715884105728i128; // type mismatch in `res7 + c`, expected u128|u256, actual i128
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i128'
+
+error: invalid number literal
+   ┌─ tests/integers/signed/invalid_constants.move:88:13
+   │
+88 │     let e = -170141183460469231731687303715884105729i128; // constant does not fit into i128
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into 'i128'

@@ -602,6 +602,12 @@ impl<'a> FunctionGenerator<'a> {
             Operation::CastU64 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU64, source),
             Operation::CastU128 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU128, source),
             Operation::CastU256 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU256, source),
+            Operation::CastI8 => self.gen_builtin(ctx, dest, FF::Bytecode::CastI8, source),
+            Operation::CastI16 => self.gen_builtin(ctx, dest, FF::Bytecode::CastI16, source),
+            Operation::CastI32 => self.gen_builtin(ctx, dest, FF::Bytecode::CastI32, source),
+            Operation::CastI64 => self.gen_builtin(ctx, dest, FF::Bytecode::CastI64, source),
+            Operation::CastI128 => self.gen_builtin(ctx, dest, FF::Bytecode::CastI128, source),
+            Operation::CastI256 => self.gen_builtin(ctx, dest, FF::Bytecode::CastI256, source),
             Operation::Not => self.gen_builtin(ctx, dest, FF::Bytecode::Not, source),
             Operation::Add => self.gen_builtin(ctx, dest, FF::Bytecode::Add, source),
             Operation::Sub => self.gen_builtin(ctx, dest, FF::Bytecode::Sub, source),
@@ -621,6 +627,7 @@ impl<'a> FunctionGenerator<'a> {
             Operation::And => self.gen_builtin(ctx, dest, FF::Bytecode::And, source),
             Operation::Eq => self.gen_builtin(ctx, dest, FF::Bytecode::Eq, source),
             Operation::Neq => self.gen_builtin(ctx, dest, FF::Bytecode::Neq, source),
+            Operation::Negate => self.gen_builtin(ctx, dest, FF::Bytecode::Negate, source),
 
             Operation::TraceLocal(_)
             | Operation::TraceReturn(_)
@@ -912,6 +919,14 @@ impl<'a> FunctionGenerator<'a> {
             U128(n) => self.emit(FF::Bytecode::LdU128(*n)),
             U256(n) => self.emit(FF::Bytecode::LdU256(
                 move_core_types::int256::U256::from_le_bytes(n.to_le_bytes()),
+            )),
+            I8(n) => self.emit(FF::Bytecode::LdI8(*n)),
+            I16(n) => self.emit(FF::Bytecode::LdI16(*n)),
+            I32(n) => self.emit(FF::Bytecode::LdI32(*n)),
+            I64(n) => self.emit(FF::Bytecode::LdI64(*n)),
+            I128(n) => self.emit(FF::Bytecode::LdI128(*n)),
+            I256(n) => self.emit(FF::Bytecode::LdI256(
+                move_core_types::int256::I256::from_le_bytes(n.to_le_bytes()),
             )),
             Vector(vec) if vec.is_empty() => {
                 self.gen_vector_load_push(ctx, vec, dest_type);
