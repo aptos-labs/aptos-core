@@ -50,7 +50,7 @@ impl DownloadCommand {
         // Explicitly get transaction corresponding to the end, so we can verify that blocks are
         // fully selected.
         let limit = self.end_version - self.begin_version + 1;
-        let (mut txns, _) = debugger
+        let (mut txns, _, _) = debugger
             .get_committed_transactions(self.begin_version, limit)
             .await?;
 

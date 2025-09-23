@@ -18,6 +18,7 @@ use std::{
 
 pub struct DataStateView {
     debugger_view: DebuggerStateView,
+    debugger: Arc<dyn AptosValidatorInterface + Send>,
     code_data: Option<InMemoryStateStore>,
     data_read_state_keys: Option<Arc<Mutex<HashMap<StateKey, StateValue>>>>,
 }
@@ -29,7 +30,8 @@ impl DataStateView {
         code_data: InMemoryStateStore,
     ) -> Self {
         Self {
-            debugger_view: DebuggerStateView::new(db, version),
+            debugger_view: DebuggerStateView::new(db.clone(), version),
+            debugger: db,
             code_data: Some(code_data),
             data_read_state_keys: None,
         }
@@ -40,7 +42,8 @@ impl DataStateView {
         version: Version,
     ) -> Self {
         Self {
-            debugger_view: DebuggerStateView::new(db, version),
+            debugger_view: DebuggerStateView::new(db.clone(), version),
+            debugger: db,
             code_data: None,
             data_read_state_keys: Some(Arc::new(Mutex::new(HashMap::new()))),
         }
@@ -48,6 +51,10 @@ impl DataStateView {
 
     pub fn get_state_keys(self) -> Arc<Mutex<HashMap<StateKey, StateValue>>> {
         self.data_read_state_keys.unwrap()
+    }
+
+    pub fn debugger(&self) -> &Arc<dyn AptosValidatorInterface + Send> {
+        &self.debugger
     }
 }
 

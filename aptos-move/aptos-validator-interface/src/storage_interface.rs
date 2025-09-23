@@ -14,7 +14,7 @@ use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_address::AccountAddress,
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{Transaction, TransactionInfo, Version},
+    transaction::{PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version},
 };
 use move_core_types::language_storage::ModuleId;
 use std::{collections::HashMap, path::Path, sync::Arc};
@@ -55,7 +55,11 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         &self,
         start: Version,
         limit: u64,
-    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>)> {
+    ) -> Result<(
+        Vec<Transaction>,
+        Vec<TransactionInfo>,
+        Vec<PersistedAuxiliaryInfo>,
+    )> {
         let txn_iter = self.0.get_transaction_iterator(start, limit)?;
         let txn_info_iter = self.0.get_transaction_info_iterator(start, limit)?;
         let txns = txn_iter
@@ -64,8 +68,18 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         let txn_infos = txn_info_iter
             .map(|res| res.map_err(Into::into))
             .collect::<Result<Vec<_>>>()?;
+
+        // Get auxiliary infos using iterator for better performance
+        let aux_info_iter = self
+            .0
+            .get_persisted_auxiliary_info_iterator(start, limit as usize)?;
+        let auxiliary_infos = aux_info_iter
+            .map(|res| res.map_err(Into::into))
+            .collect::<Result<Vec<_>>>()?;
+
         ensure!(txns.len() == txn_infos.len());
-        Ok((txns, txn_infos))
+        ensure!(txns.len() == auxiliary_infos.len());
+        Ok((txns, txn_infos, auxiliary_infos))
     }
 
     async fn get_and_filter_committed_transactions(
@@ -111,5 +125,20 @@ impl AptosValidatorInterface for DBDebuggerInterface {
                 |e| Err(anyhow::Error::from(e)),
                 |tp| Ok(tp.map(|e| e.version)),
             )
+    }
+
+    async fn get_persisted_auxiliary_infos(
+        &self,
+        start: Version,
+        limit: u64,
+    ) -> Result<Vec<PersistedAuxiliaryInfo>> {
+        // Use iterator for more efficient batch retrieval
+        let aux_info_iter = self
+            .0
+            .get_persisted_auxiliary_info_iterator(start, limit as usize)?;
+        let result = aux_info_iter
+            .map(|res| res.map_err(Into::into))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(result)
     }
 }

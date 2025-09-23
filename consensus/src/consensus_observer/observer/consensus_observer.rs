@@ -972,14 +972,14 @@ impl ConsensusObserver {
     ) {
         // Get the epoch and round for the synced commit decision
         let ledger_info = latest_synced_ledger_info.ledger_info();
-        let epoch = ledger_info.epoch();
-        let round = ledger_info.round();
+        let synced_epoch = ledger_info.epoch();
+        let synced_round = ledger_info.round();
 
         // Log the state sync notification
         info!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Received state sync notification for commit completion! Epoch {}, round: {}!",
-                epoch, round
+                "Received state sync notification for commit completion! Synced epoch {}, round: {}!",
+                synced_epoch, synced_round
             ))
         );
 
@@ -992,26 +992,41 @@ impl ConsensusObserver {
             return;
         }
 
-        // Verify that the state sync notification is for the current epoch and round
-        if !self
-            .observer_block_data
-            .lock()
-            .check_root_epoch_and_round(epoch, round)
-        {
+        // Get the block data root epoch and round
+        let block_data_root = self.observer_block_data.lock().root();
+        let block_data_epoch = block_data_root.ledger_info().epoch();
+        let block_data_round = block_data_root.ledger_info().round();
+
+        // If the commit sync notification is behind the block data root, ignore it. This
+        // is possible due to a race condition where we started syncing to a newer commit
+        // at the same time that state sync sent the notification for a previous commit.
+        if (synced_epoch, synced_round) < (block_data_epoch, block_data_round) {
+            info!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Ignoring old commit sync notification for epoch: {}, round: {}! Current root: {:?}",
+                    synced_epoch, synced_round, block_data_root
+                ))
+            );
+            return;
+        }
+
+        // If the commit sync notification is ahead the block data root, something has gone wrong!
+        if (synced_epoch, synced_round) > (block_data_epoch, block_data_round) {
             // Log the error, reset the state sync manager and return early
             error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                     "Received invalid commit sync notification for epoch: {}, round: {}! Current root: {:?}",
-                    epoch, round, self.observer_block_data.lock().root()
+                    synced_epoch, synced_round, block_data_root
                 ))
             );
             self.state_sync_manager.clear_active_commit_sync();
             return;
         }
 
-        // If the epoch has changed, end the current epoch and start the latest one
+        // Otherwise, the commit sync notification matches the block data root.
+        // If the epoch has changed, end the current epoch and start the latest one.
         let current_epoch_state = self.get_epoch_state();
-        if epoch > current_epoch_state.epoch {
+        if synced_epoch > current_epoch_state.epoch {
             // Wait for the latest epoch to start
             self.execution_client.end_epoch().await;
             self.wait_for_epoch_start().await;

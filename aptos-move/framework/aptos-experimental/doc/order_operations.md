@@ -87,7 +87,7 @@ Parameters:
         );
     <b>if</b> (order.is_some()) {
         // Order is already placed in the order book, so we can cancel it
-        <b>return</b> <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order.destroy_some(), callbacks);
+        <b>return</b> <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order.destroy_some(), <b>true</b>, callbacks);
     };
     pre_cancel_order_for_tracker(
         market.get_pre_cancellation_tracker_mut(),
@@ -115,7 +115,7 @@ Parameters:
 - callbacks: The market clearinghouse callbacks for cleanup operations
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_operations.md#0x7_order_operations_cancel_order">cancel_order</a>&lt;M: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="order_operations.md#0x7_order_operations_cancel_order">cancel_order</a>&lt;M: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, emit_event: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;): <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;
 </code></pre>
 
 
@@ -128,11 +128,13 @@ Parameters:
     market: &<b>mut</b> Market&lt;M&gt;,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     order_id: OrderIdType,
+    emit_event: bool,
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
-) {
+): SingleOrder&lt;M&gt; {
     <b>let</b> order = market.get_order_book_mut().<a href="order_operations.md#0x7_order_operations_cancel_order">cancel_order</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
     <b>assert</b>!(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> == order.get_account(), <a href="order_operations.md#0x7_order_operations_ENOT_ORDER_CREATOR">ENOT_ORDER_CREATOR</a>);
-    <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order, callbacks);
+    <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order, emit_event, callbacks);
+    order
 }
 </code></pre>
 
@@ -232,7 +234,7 @@ Parameters:
 - callbacks: The market clearinghouse callbacks for cleanup operations
 
 
-<pre><code><b>fun</b> <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>&lt;M: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;)
+<pre><code><b>fun</b> <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>&lt;M: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;, emit_event: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -244,6 +246,7 @@ Parameters:
 <pre><code><b>fun</b> <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>&lt;M: store + <b>copy</b> + drop&gt;(
     market: &<b>mut</b> Market&lt;M&gt;,
     order: SingleOrder&lt;M&gt;,
+    emit_event: bool,
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ) {
     <b>let</b> (
@@ -262,23 +265,25 @@ Parameters:
     cleanup_order_internal(
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, single_order_book_type(), is_bid, remaining_size, metadata, callbacks
     );
-    market.emit_event_for_order(
-        order_id,
-        client_order_id,
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-        orig_size,
-        0,
-        remaining_size,
-        price,
-        is_bid,
-        <b>false</b>,
-        aptos_experimental::market_types::order_status_cancelled(),
-        std::string::utf8(b"Order cancelled"),
-        metadata,
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
-        time_in_force,
-        callbacks
-    );
+    <b>if</b> (emit_event) {
+        market.emit_event_for_order(
+            order_id,
+            client_order_id,
+            <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+            orig_size,
+            0,
+            remaining_size,
+            price,
+            is_bid,
+            <b>false</b>,
+            aptos_experimental::market_types::order_status_cancelled(),
+            std::string::utf8(b"Order cancelled"),
+            metadata,
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
+            time_in_force,
+            callbacks
+        );
+    }
 }
 </code></pre>
 

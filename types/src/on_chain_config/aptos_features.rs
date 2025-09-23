@@ -144,9 +144,9 @@ pub enum FeatureFlag {
     CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
     DISTRIBUTE_TRANSACTION_FEE = 97,
     MONOTONICALLY_INCREASING_COUNTER = 98,
-
+    ENABLE_CAPTURE_OPTION = 99,
     /// Whether to allow trusted code optimizations.
-    ENABLE_TRUSTED_CODE = 99,
+    ENABLE_TRUSTED_CODE = 100,
 }
 
 impl FeatureFlag {

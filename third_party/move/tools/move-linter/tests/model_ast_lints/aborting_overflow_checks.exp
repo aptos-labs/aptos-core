@@ -1,108 +1,108 @@
 
 Diagnostics:
 warning: [lint] This looks like a C-style overflow check. In Move, overflows abort, and such checks are unnecessary.
-   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:23:9
+   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:24:9
    │
-23 │     if (a + b < a) {
+24 │     if (a + b < a) {
    │         ^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(aborting_overflow_checks)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#aborting_overflow_checks.
 
 warning: [lint] This looks like a C-style overflow check. In Move, overflows abort, and such checks are unnecessary.
-   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:29:9
+   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:30:9
    │
-29 │     if (a + b > a) {
+30 │     if (a + b > a) {
    │         ^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(aborting_overflow_checks)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#aborting_overflow_checks.
 
 warning: [lint] This looks like a C-style overflow check. In Move, overflows abort, and such checks are unnecessary.
-   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:35:9
+   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:36:9
    │
-35 │     if (a < a + b) {
+36 │     if (a < a + b) {
    │         ^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(aborting_overflow_checks)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#aborting_overflow_checks.
 
 warning: [lint] This looks like a C-style overflow check. In Move, overflows abort, and such checks are unnecessary.
-   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:41:9
+   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:42:9
    │
-41 │     if (a > a + b) {
+42 │     if (a > a + b) {
    │         ^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(aborting_overflow_checks)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#aborting_overflow_checks.
 
 warning: [lint] This looks like a C-style overflow check. In Move, overflows abort, and such checks are unnecessary.
-   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:48:9
+   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:49:9
    │
-48 │     if (a - b > a) {
+49 │     if (a - b > a) {
    │         ^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(aborting_overflow_checks)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#aborting_overflow_checks.
 
 warning: [lint] This looks like a C-style overflow check. In Move, overflows abort, and such checks are unnecessary.
-   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:68:9
+   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:69:9
    │
-68 │     if (a < a - b) {
+69 │     if (a < a - b) {
    │         ^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(aborting_overflow_checks)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#aborting_overflow_checks.
 
 warning: [lint] This looks like a C-style overflow check. In Move, overflows abort, and such checks are unnecessary.
-   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:87:9
+   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:88:9
    │
-87 │     if (c > c + b) {
+88 │     if (c > c + b) {
    │         ^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(aborting_overflow_checks)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#aborting_overflow_checks.
 
 warning: [lint] This looks like a C-style overflow check. In Move, overflows abort, and such checks are unnecessary.
-   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:94:9
+   ┌─ tests/model_ast_lints/aborting_overflow_checks.move:95:9
    │
-94 │     if (nc.n.i > nc.n.i + b) {
+95 │     if (nc.n.i > nc.n.i + b) {
    │         ^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(aborting_overflow_checks)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#aborting_overflow_checks.
 
 warning: [lint] This looks like a C-style overflow check. In Move, overflows abort, and such checks are unnecessary.
-    ┌─ tests/model_ast_lints/aborting_overflow_checks.move:101:9
+    ┌─ tests/model_ast_lints/aborting_overflow_checks.move:102:9
     │
-101 │     if (hnc.n.n.i > hnc.n.n.i + b) {
+102 │     if (hnc.n.n.i > hnc.n.n.i + b) {
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(aborting_overflow_checks)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#aborting_overflow_checks.
 
 warning: [lint] This looks like a C-style overflow check. In Move, overflows abort, and such checks are unnecessary.
-    ┌─ tests/model_ast_lints/aborting_overflow_checks.move:108:12
+    ┌─ tests/model_ast_lints/aborting_overflow_checks.move:109:12
     │
-108 │     while (a + b > a) {
+109 │     while (a + b > a) {
     │            ^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(aborting_overflow_checks)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#aborting_overflow_checks.
 
 warning: [lint] This looks like a C-style overflow check. In Move, overflows abort, and such checks are unnecessary.
-    ┌─ tests/model_ast_lints/aborting_overflow_checks.move:112:9
+    ┌─ tests/model_ast_lints/aborting_overflow_checks.move:113:9
     │
-112 │     if ((a + 1) + (b + 1) < (a + 1)) {
+113 │     if ((a + 1) + (b + 1) < (a + 1)) {
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(aborting_overflow_checks)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#aborting_overflow_checks.
 
 warning: [lint] This looks like a C-style overflow check. In Move, overflows abort, and such checks are unnecessary.
-    ┌─ tests/model_ast_lints/aborting_overflow_checks.move:122:5
+    ┌─ tests/model_ast_lints/aborting_overflow_checks.move:123:5
     │
-122 │     a + b < a
+123 │     a + b < a
     │     ^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(aborting_overflow_checks)]`.

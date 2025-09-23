@@ -12,8 +12,8 @@ use aptos_rest_client::Client;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue, TStateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
-        TransactionOutput, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
+        PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version,
     },
     write_set::TOTAL_SUPPLY_STATE_KEY,
 };
@@ -84,6 +84,7 @@ impl DataCollection {
 
     fn execute_transactions_at_version_with_state_view(
         txns: Vec<Transaction>,
+        auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
         debugger_state_view: &DataStateView,
     ) -> Result<Vec<TransactionOutput>> {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
@@ -93,8 +94,14 @@ impl DataCollection {
         // FIXME(#10412): remove the assert
         let val = debugger_state_view.get_state_value(TOTAL_SUPPLY_STATE_KEY.deref());
         assert!(val.is_ok() && val.unwrap().is_some());
-        // TODO(grao): Pass in persisted info here if necessary.
-        let txn_provider = DefaultTxnProvider::new_without_info(sig_verified_txns);
+
+        // Convert persisted auxiliary info to auxiliary info for execution
+        let auxiliary_infos = auxiliary_infos
+            .into_iter()
+            .map(|persisted_aux_info| AuxiliaryInfo::new(persisted_aux_info, None))
+            .collect::<Vec<_>>();
+
+        let txn_provider = DefaultTxnProvider::new(sig_verified_txns, auxiliary_infos);
         AptosVMBlockExecutor::new()
             .execute_block_no_limit(&txn_provider, debugger_state_view)
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
@@ -211,9 +218,27 @@ impl DataCollection {
                         DataStateView::new_with_data_reads(self.debugger.clone(), version);
 
                     let txn_execution_thread = tokio::task::spawn_blocking(move || {
+                        // Get auxiliary info for this transaction from the debugger
+                        let aux_info = tokio::runtime::Handle::current().block_on(async {
+                            match state_view
+                                .debugger()
+                                .get_committed_transactions(version, 1)
+                                .await
+                            {
+                                Ok((_, _, mut aux_infos)) => {
+                                    aux_infos.pop().unwrap_or(PersistedAuxiliaryInfo::None)
+                                },
+                                Err(_) => {
+                                    // Fallback to default auxiliary info if not found
+                                    PersistedAuxiliaryInfo::None
+                                },
+                            }
+                        });
+
                         let epoch_result_res =
                             Self::execute_transactions_at_version_with_state_view(
                                 vec![txn.clone()],
+                                vec![aux_info],
                                 &state_view,
                             );
                         if let Err(err) = epoch_result_res {
