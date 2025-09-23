@@ -502,6 +502,7 @@ ark-bn254 = "0.5.0"
 ark-ec = "0.5.0"
 ark-ff = "0.5.0"
 ark-groth16 = "0.5.0"
+ark-poly = "0.5.0"
 ark-relations = "0.5.0"
 ark-serialize = "0.5.0"
 ark-std = { version = "0.5.0", features = ["getrandom"] }

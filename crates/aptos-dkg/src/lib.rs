@@ -25,6 +25,6 @@ pub mod algebra;
 pub mod constants;
 pub(crate) mod fiat_shamir;
 pub mod pvss;
-pub mod range_proof;
+pub mod range_proofs;
 pub mod utils;
 pub mod weighted_vuf;
