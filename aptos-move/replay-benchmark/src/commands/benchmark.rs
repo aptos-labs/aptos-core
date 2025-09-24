@@ -9,7 +9,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail};
 use aptos_logger::Level;
-use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
+use aptos_vm_environment::prod_configs::{set_async_runtime_checks, set_paranoid_type_checks};
 use clap::Parser;
 use std::path::PathBuf;
 use tokio::fs;
@@ -69,6 +69,13 @@ pub struct BenchmarkCommand {
         help = "If false, Move VM runs in paranoid mode, if true, paranoid mode is not used"
     )]
     disable_paranoid_mode: bool,
+
+    #[clap(
+        long,
+        default_value_t = false,
+        help = "If true, Move VM runs traces execution, and Block-STM performs checks later"
+    )]
+    async_runtime_checks: bool,
 }
 
 impl BenchmarkCommand {
@@ -118,6 +125,7 @@ impl BenchmarkCommand {
             .collect::<Vec<_>>();
 
         set_paranoid_type_checks(!self.disable_paranoid_mode);
+        set_async_runtime_checks(self.async_runtime_checks);
         BenchmarkRunner::new(
             self.concurrency_levels,
             self.num_repeats,
