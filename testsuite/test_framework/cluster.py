@@ -233,7 +233,7 @@ def list_gke_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
                 )
         return clusters
     except Exception as e:
-        raise GcpError("Failed to parse GKE clusters") from e
+        raise GcpError("Failed to list GKE clusters") from e
 
 
 def find_forge_cluster(
