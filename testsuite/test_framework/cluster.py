@@ -219,6 +219,10 @@ def list_gke_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
     cluster_json = shell.run(
         ["gcloud", "container", "clusters", "list", "--format=json"]
     ).unwrap()
+
+    if cluster_json.exit_code != 0:
+        raise GcpError("Failed to list GKE clusters: " + cluster_json.output_str() + "\nexit code: " + str(cluster_json.exit_code))
+
     try:
         cluster_result = json.loads(cluster_json.decode())
         clusters: Dict[str, ForgeCluster] = {}
@@ -232,7 +236,7 @@ def list_gke_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
                 )
         return clusters
     except Exception as e:
-        raise GcpError("Failed to list GKE clusters") from e
+        raise GcpError("Failed to parse GKE clusters data") from e
 
 
 def find_forge_cluster(
