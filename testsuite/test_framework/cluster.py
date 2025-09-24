@@ -216,14 +216,9 @@ def list_eks_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
 
 @retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=stop_after_attempt(3))
 def list_gke_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
-    cluster_json_run_result = shell.run(
+    cluster_json = shell.run(
         ["gcloud", "container", "clusters", "list", "--format=json"]
-    )
-
-    if cluster_json_run_result.exit_code != 0:
-        raise GcpError("Failed to list GKE clusters. Exit code: " + str(cluster_json_run_result.exit_code))
-
-    cluster_json = cluster_json_run_result.unwrap()
+    ).unwrap()
 
     try:
         cluster_result = json.loads(cluster_json.decode())
@@ -238,7 +233,7 @@ def list_gke_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
                 )
         return clusters
     except Exception as e:
-        raise GcpError("Failed to parse GKE clusters data") from e
+        raise GcpError("Failed to parse GKE clusters") from e
 
 
 def find_forge_cluster(
