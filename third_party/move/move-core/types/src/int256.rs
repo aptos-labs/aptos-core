@@ -324,6 +324,12 @@ impl Neg for I256 {
     }
 }
 
+impl I256 {
+    pub fn checked_neg(self) -> Option<I256> {
+        self.repr.checked_neg().map(|x| x.into())
+    }
+}
+
 // ---- Conversions
 
 macro_rules! conversions {
