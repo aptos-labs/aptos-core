@@ -23,8 +23,8 @@ use move_binary_format::{
     },
 };
 use move_core_types::{
-    ability::Ability, account_address::AccountAddress, gas_algebra::NumTypeNodes,
-    identifier::IdentStr, language_storage::ModuleId, vm_status::StatusCode,
+    account_address::AccountAddress, gas_algebra::NumTypeNodes, identifier::IdentStr,
+    language_storage::ModuleId, vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -47,7 +47,6 @@ pub(crate) struct Frame {
     call_type: CallType,
     // Locals for this execution context and their instantiated types.
     pub(crate) locals: Locals,
-    pub(crate) local_tys: Vec<Type>,
     // Cache of types accessed in this frame, to improve performance when accessing
     // and constructing types.
     pub(crate) frame_cache: Rc<RefCell<FrameTypeCache>>,
@@ -144,21 +143,7 @@ impl Frame {
             gas_meter
                 .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
         }
-
         let ty_builder = vm_config.ty_builder.clone();
-        let local_tys = if RTTCheck::should_perform_checks(&function.function) {
-            if ty_args.is_empty() {
-                function.local_tys().to_vec()
-            } else {
-                function
-                    .local_tys()
-                    .iter()
-                    .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
-                    .collect::<PartialVMResult<Vec<_>>>()?
-            }
-        } else {
-            vec![]
-        };
 
         Ok(Frame {
             pc: 0,
@@ -166,11 +151,11 @@ impl Frame {
             locals,
             function,
             call_type,
-            local_tys,
             frame_cache,
         })
     }
 
+    #[allow(dead_code)]
     pub(crate) fn ty_builder(&self) -> &TypeBuilder {
         &self.ty_builder
     }
@@ -179,19 +164,22 @@ impl Frame {
         self.call_type
     }
 
-    pub(crate) fn local_ty_at(&self, idx: usize) -> &Type {
-        &self.local_tys[idx]
+    #[allow(dead_code)]
+    pub(crate) fn local_ty_at(&self, _idx: usize) -> &Type {
+        unreachable!() // &self.local_tys[idx]
     }
 
+    #[allow(dead_code)]
     pub(crate) fn check_local_tys_have_drop_ability(&self) -> PartialVMResult<()> {
-        for (idx, ty) in self.local_tys.iter().enumerate() {
-            if !self.locals.is_invalid(idx)? {
-                ty.paranoid_check_has_ability(Ability::Drop)?;
-            }
-        }
+        // for (idx, ty) in self.local_tys.iter().enumerate() {
+        //     if !self.locals.is_invalid(idx)? {
+        //         ty.paranoid_check_has_ability(Ability::Drop)?;
+        //     }
+        // }
         Ok(())
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub(crate) fn untrusted_code(&self) -> bool {
         !self.function.function.is_trusted
@@ -254,6 +242,7 @@ impl Frame {
         )
     }
 
+    #[allow(dead_code)]
     pub(crate) fn get_field_ty(&self, idx: FieldHandleIndex) -> PartialVMResult<&Type> {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -312,6 +301,7 @@ impl Frame {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn get_struct(&self, idx: StructDefinitionIndex) -> &Arc<StructType> {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -441,6 +431,7 @@ impl Frame {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> Type {
         use LoadedFunctionOwner::*;
         match self.function.owner() {

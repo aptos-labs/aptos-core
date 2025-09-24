@@ -23,6 +23,7 @@ use aptos_vm_types::{
     },
 };
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_runtime::trace::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -237,7 +238,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
             <Self::Txn as Transaction>::Value,
         )>,
         patched_events: Vec<<Self::Txn as Transaction>::Event>,
-    ) -> Result<(), PanicError>;
+    ) -> Result<Trace, PanicError>;
 
     fn set_txn_output_for_non_dynamic_change_set(&self);
 

@@ -148,7 +148,7 @@ pub fn aptos_prod_vm_config(
 ) -> VMConfig {
     let check_invariant_in_swap_loc =
         !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
-    let paranoid_type_checks = get_paranoid_type_checks();
+    let paranoid_type_checks = false; //get_paranoid_type_checks();
     let paranoid_ref_checks = get_paranoid_ref_checks();
 
     let deserializer_config = aptos_prod_deserializer_config(features);
@@ -191,7 +191,7 @@ pub fn aptos_prod_vm_config(
             .is_call_tree_and_instruction_vm_cache_enabled(),
         enable_lazy_loading: features.is_lazy_loading_enabled(),
         enable_depth_checks,
-        optimize_trusted_code: features.is_trusted_code_enabled(),
+        optimize_trusted_code: false, //features.is_trusted_code_enabled(),
         paranoid_ref_checks,
         enable_capture_option,
     };

@@ -43,6 +43,7 @@ use move_vm_runtime::{
     module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
+    trace::TraceLogger,
     AsFunctionValueExtension, InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction,
     Loader, ModuleStorage, VerifiedModuleBundle,
 };
@@ -156,6 +157,28 @@ where
                 self.resolver,
             )
         })
+    }
+
+    pub fn execute_loaded_function_with_tracing(
+        &mut self,
+        func: LoadedFunction,
+        args: Vec<impl Borrow<[u8]>>,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        loader: &impl Loader,
+        trace_logger: &mut impl TraceLogger,
+    ) -> VMResult<SerializedReturnValues> {
+        MoveVM::execute_loaded_function_with_tracing(
+            func,
+            args,
+            &mut self.data_cache,
+            gas_meter,
+            traversal_context,
+            &mut self.extensions,
+            loader,
+            self.resolver,
+            trace_logger,
+        )
     }
 
     pub fn execute_loaded_function(

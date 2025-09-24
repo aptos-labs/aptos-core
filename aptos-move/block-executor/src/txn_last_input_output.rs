@@ -25,7 +25,7 @@ use crossbeam::utils::CachePadded;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
-use move_vm_runtime::{Module, RuntimeEnvironment};
+use move_vm_runtime::{trace::Trace, Module, RuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeSet, HashSet},
@@ -544,7 +544,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         delta_writes: Vec<(T::Key, WriteOp)>,
         patched_resource_write_set: Vec<(T::Key, T::Value)>,
         patched_events: Vec<T::Event>,
-    ) -> Result<(), PanicError> {
+    ) -> Result<Trace, PanicError> {
         with_success_or_skip_rest!(
             self,
             txn_idx,
@@ -553,7 +553,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 patched_resource_write_set,
                 patched_events
             ),
-            Ok(())
+            Ok(Trace::empty()) // TODO: default as lambda
         )
     }
 

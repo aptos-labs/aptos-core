@@ -30,6 +30,7 @@ mod reentrancy_checker;
 mod runtime_ref_checks;
 mod runtime_type_checks;
 mod storage;
+pub mod trace;
 
 pub use loader::{Function, LoadedFunction, LoadedFunctionOwner, Module, Script};
 pub use storage::{
