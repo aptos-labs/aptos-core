@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    accounts::account_recovery_db::AccountRecoveryDBInterface,
     dedicated_handlers::handlers::{
         HandlerTrait, V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
     },
@@ -69,6 +70,7 @@ async fn call_dedicated_request_handler<TRequest, TResponse, TRequestHandler>(
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
     request_handler: &TRequestHandler,
+    account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
 ) -> Result<Response<Body>, Infallible>
 where
     TRequest: Debug + Serialize + DeserializeOwned,
@@ -97,7 +99,13 @@ where
 
     // Invoke the handler and generate the response
     match request_handler
-        .handle_request(vuf_private_key, jwk_cache, cached_resources, pepper_request)
+        .handle_request(
+            vuf_private_key,
+            jwk_cache,
+            cached_resources,
+            pepper_request,
+            account_recovery_db,
+        )
         .await
     {
         Ok(pepper_response) => {
@@ -306,6 +314,7 @@ pub async fn handle_request(
     vuf_keypair: Arc<(String, ark_bls12_381::Fr)>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
+    account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
 ) -> Result<Response<Body>, Infallible> {
     // Get the request origin
     let origin = get_request_origin(&request);
@@ -362,6 +371,7 @@ pub async fn handle_request(
                     jwk_cache,
                     cached_resources,
                     &V0FetchHandler,
+                    account_recovery_db,
                 )
                 .await
             },
@@ -373,6 +383,7 @@ pub async fn handle_request(
                     jwk_cache,
                     cached_resources,
                     &V0SignatureHandler,
+                    account_recovery_db,
                 )
                 .await
             },
@@ -384,6 +395,7 @@ pub async fn handle_request(
                     jwk_cache,
                     cached_resources,
                     &V0VerifyHandler,
+                    account_recovery_db,
                 )
                 .await
             },
