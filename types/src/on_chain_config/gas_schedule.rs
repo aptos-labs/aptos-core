@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
+use serde::de::{self, Deserializer};
+use serde::ser::{SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map, BTreeMap};
 
@@ -15,6 +17,9 @@ pub struct GasSchedule {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct GasScheduleV2 {
     pub feature_version: u64,
+    #[serde(
+        deserialize_with = "deserialize_gas_schedule_entries",
+    )]
     pub entries: Vec<(String, u64)>,
 }
 
@@ -110,6 +115,47 @@ impl GasScheduleV2 {
     }
 }
 
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum GasEntryHelper {
+    Tuple((String, u64)),
+    Map { key: String, val: GasEntryValue },
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum GasEntryValue {
+    Number(u64),
+    String(String),
+}
+
+fn deserialize_gas_schedule_entries<'de, D>(
+    deserializer: D,
+) -> Result<Vec<(String, u64)>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let raw_entries: Vec<GasEntryHelper> = Vec::deserialize(deserializer)?;
+    raw_entries
+        .into_iter()
+        .map(|entry| match entry {
+            GasEntryHelper::Tuple(pair) => Ok(pair),
+            GasEntryHelper::Map { key, val } => {
+                let parsed_val = match val {
+                    GasEntryValue::Number(n) => n,
+                    GasEntryValue::String(s) => s.parse::<u64>().map_err(|e| {
+                        de::Error::custom(format!(
+                            "failed to parse gas entry value for {}: {}",
+                            key, e
+                        ))
+                    })?,
+                };
+                Ok((key, parsed_val))
+            },
+        })
+        .collect()
+}
+
 impl OnChainConfig for GasSchedule {
     const MODULE_IDENTIFIER: &'static str = "gas_schedule";
     const TYPE_IDENTIFIER: &'static str = "GasSchedule";
@@ -154,7 +200,7 @@ mod tests {
         assert_eq!(gas_schedule.entries[1], (KEY_MIN_PRICE_PER_GAS.to_string(), 500));
 
         gas_schedule.scale_min_gas_price_by(0.1);
-        assert_eq!(gas_schedule.entries[1], (KEY_MIN_PRICE_PER_GAS.to_string(), 500));
+        assert_eq!(gas_schedule.entries[1], (KEY_MIN_PRICE_PER_GAS.to_string(), 50));
     }
 
     #[test]
@@ -183,7 +229,31 @@ mod tests {
         // Should not panic with large factor
         gas_schedule.scale_min_gas_price_by(2.0);
         // The result will be clamped to u64::MAX due to overflow in f64 to u64 conversion
-        println!("{:?}", gas_schedule);
-        assert!(gas_schedule.entries[0].1 > 0);
+        assert_eq!(gas_schedule.entries[0].1, u64::MAX);
+    }
+
+    #[test]
+    fn test_deserialize_map_entries_with_string_values() {
+        let json = r#"{
+            "feature_version": 42,
+            "entries": [
+                { "key": "foo", "val": "123" },
+                { "key": "bar", "val": 456 },
+                { "key": "txn.min_price_per_gas_unit", "val": 50 }
+            ]
+        }"#
+        .to_string();
+
+        let mut schedule = GasScheduleV2::from_json_string(json);
+
+        assert_eq!(schedule.feature_version, 42);
+        assert_eq!(schedule.entries.len(), 3);
+        assert_eq!(schedule.entries[0], ("foo".to_string(), 123));
+        assert_eq!(schedule.entries[1], ("bar".to_string(), 456));
+        assert_eq!(schedule.entries[2], ("txn.min_price_per_gas_unit".to_string(), 50));
+
+        schedule.scale_min_gas_price_by(10.0);
+
+        assert_eq!(schedule.entries[2], ("txn.min_price_per_gas_unit".to_string(), 500));
     }
 }

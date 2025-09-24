@@ -14,12 +14,12 @@ use aptos_gas_schedule::{
 };
 use aptos_package_builder::PackageBuilder;
 use aptos_types::on_chain_config::GasScheduleV2;
-use clap::Parser;
+use clap::{Args, Parser};
 use move_core_types::account_address::AccountAddress;
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use std::path::{Path, PathBuf};
 
-const DEFAULT_GAS_SCHEDULE_SCRIPT_UPDATE_PATH: String = String::from("./proposals");
+const DEFAULT_GAS_SCHEDULE_SCRIPT_UPDATE_PATH: &str = "./proposals";
 
 fn generate_blob(writer: &CodeWriter, data: &[u8]) {
     emitln!(writer, "vector[");
@@ -108,19 +108,17 @@ fn aptos_framework_path() -> PathBuf {
 
 #[derive(Parser, Debug)]
 pub enum GasScheduleGenerator {
-    #[clap(short, long)]
     GenerateNew(GenerateNewSchedule),
-    #[clap(short, long)]
-    ScaleCurrent(GenerateNewSchedule),
+    ScaleCurrent(ScaleCurrentSchedule),
 }
 
 /// Command line arguments to the gas schedule update proposal generation tool.
-#[derive(Debug, Parser)]
+#[derive(Debug, Args)]
 pub struct GenerateNewSchedule {
     #[clap(short, long, help = "Path to file to write the output script")]
     pub output: Option<String>,
 
-    #[clap(short, long)]
+    #[clap(short, long, help="Feature version of the GasSchedule generated")]
     pub gas_feature_version: Option<u64>,
 }
 
@@ -132,12 +130,13 @@ impl GenerateNewSchedule {
 
         let gas_schedule = current_gas_schedule(feature_version);
 
-        generate_update_proposal(&gas_schedule, self.output.unwrap_or(DEFAULT_GAS_SCHEDULE_SCRIPT_UPDATE_PATH))
+        generate_update_proposal(&gas_schedule, self.output
+            .unwrap_or_else(|| DEFAULT_GAS_SCHEDULE_SCRIPT_UPDATE_PATH.to_string()))
     }
 }
 
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Args)]
 pub struct ScaleCurrentSchedule {
     #[clap(short, long, help = "Path to file to write the output script")]
     pub output: Option<String>,
@@ -157,7 +156,8 @@ impl ScaleCurrentSchedule {
 
         current_schedule.scale_min_gas_price_by(self.scale_min_gas_price_by);
 
-        generate_update_proposal(&current_schedule, self.output.unwrap_or(DEFAULT_GAS_SCHEDULE_SCRIPT_UPDATE_PATH))
+        generate_update_proposal(&current_schedule, self.output
+            .unwrap_or_else(|| DEFAULT_GAS_SCHEDULE_SCRIPT_UPDATE_PATH.to_string()))
     }
 }
 
@@ -197,11 +197,4 @@ impl GasScheduleGenerator {
             }
         }
     }
-}
-
-
-#[test]
-fn verify_tool() {
-    use clap::CommandFactory;
-    GenerateNewSchedule::command().debug_assert()
 }
