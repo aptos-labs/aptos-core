@@ -2732,7 +2732,7 @@ impl Frame {
                     },
                     Bytecode::Negate => {
                         gas_meter.charge_simple_instr(S::Negate)?;
-                        interpreter.unop_int(IntegerValue::negate)?
+                        interpreter.unop_int(IntegerValue::negate_checked)?
                     },
                     Bytecode::BitOr => {
                         gas_meter.charge_simple_instr(S::BitOr)?;
