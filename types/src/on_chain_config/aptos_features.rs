@@ -148,6 +148,9 @@ pub enum FeatureFlag {
     /// Whether to allow trusted code optimizations.
     ENABLE_TRUSTED_CODE = 100,
     ENABLE_ENUM_OPTION = 101,
+    /// If enabled, runtime type checks for user payload (paranoid mode) are not run at execution
+    /// time, and instead done as post-commit hook by Block-STM.
+    ENABLE_USER_TRANSACTION_TRACING = 102,
 }
 
 impl FeatureFlag {
@@ -251,6 +254,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_CAPTURE_OPTION,
             FeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::ENABLE_ENUM_OPTION,
+            FeatureFlag::ENABLE_USER_TRANSACTION_TRACING,
         ]
     }
 }
@@ -422,6 +426,10 @@ impl Features {
 
     pub fn is_trusted_code_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_TRUSTED_CODE)
+    }
+
+    pub fn is_user_transaction_tracing_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_USER_TRANSACTION_TRACING)
     }
 
     pub fn is_default_account_resource_enabled(&self) -> bool {

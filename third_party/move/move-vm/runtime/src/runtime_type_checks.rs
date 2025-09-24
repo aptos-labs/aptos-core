@@ -15,6 +15,7 @@ use move_vm_types::loaded_data::runtime_types::{Type, TypeBuilder};
 
 pub(crate) trait RuntimeTypeCheck {
     /// Paranoid type checks to perform before instruction execution.
+    #[allow(dead_code)]
     fn pre_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
@@ -107,6 +108,7 @@ pub(crate) trait RuntimeTypeCheck {
     ) -> PartialVMResult<()>;
 }
 
+#[allow(dead_code)]
 fn verify_pack<'a>(
     operand_stack: &mut Stack,
     field_count: u16,
@@ -143,6 +145,7 @@ fn verify_pack<'a>(
     operand_stack.push_ty(output_ty)
 }
 
+#[allow(dead_code)]
 pub fn verify_pack_closure(
     ty_builder: &TypeBuilder,
     operand_stack: &mut Stack,
@@ -191,6 +194,7 @@ pub fn verify_pack_closure(
     Ok(())
 }
 
+#[allow(dead_code)]
 fn with_instantiation<R>(
     ty_builder: &TypeBuilder,
     func: &LoadedFunction,
@@ -204,6 +208,7 @@ fn with_instantiation<R>(
     }
 }
 
+#[allow(dead_code)]
 fn with_owned_instantiation<R>(
     ty_builder: &TypeBuilder,
     func: &LoadedFunction,

@@ -40,11 +40,11 @@ use std::{cell::RefCell, rc::Rc, sync::Arc};
 /// pushed and then popped to/from the call stack.
 pub(crate) struct Frame {
     pub(crate) pc: u16,
-    ty_builder: TypeBuilder,
+    pub(crate) ty_builder: TypeBuilder,
     // Currently being executed function.
     pub(crate) function: Rc<LoadedFunction>,
     // How this frame was established.
-    call_type: CallType,
+    pub(crate) call_type: CallType,
     // Locals for this execution context and their instantiated types.
     pub(crate) locals: Locals,
     pub(crate) local_tys: Vec<Type>,
@@ -164,9 +164,9 @@ impl Frame {
             pc: 0,
             ty_builder,
             locals,
+            local_tys,
             function,
             call_type,
-            local_tys,
             frame_cache,
         })
     }
@@ -254,6 +254,7 @@ impl Frame {
         )
     }
 
+    #[allow(dead_code)]
     pub(crate) fn get_field_ty(&self, idx: FieldHandleIndex) -> PartialVMResult<&Type> {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -312,6 +313,7 @@ impl Frame {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn get_struct(&self, idx: StructDefinitionIndex) -> &Arc<StructType> {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -441,6 +443,7 @@ impl Frame {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> Type {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
