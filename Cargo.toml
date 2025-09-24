@@ -665,7 +665,7 @@ libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
 libtest-mimic = "0.5.2"
 log = "0.4.17"
-lru = "0.16.0"
+lru = "0.16.1"
 lz4 = "1.28.0"
 maplit = "1.0.2"
 merlin = "3"
@@ -950,6 +950,3 @@ futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "ba
 # so we cannot simply change the version and package for `jemalloc-sys` in one repo without running into conflicts.
 # We have to keep this shim until everything uses the same jemalloc dependency.
 jemalloc-sys = { git = "https://github.com/aptos-labs/jemalloc-sys-shim", rev = "e0920246dd74303fab9a14b990768c6ac990a59b" }
-
-# There is a bug in the lru crate. Patch it until https://github.com/jeromefroe/lru-rs/pull/219 is merged and released.
-lru = { git = "https://github.com/aptos-labs/lru-rs", rev = "d16747e8b119c48315a1c76669f962456d06dfe7" }
