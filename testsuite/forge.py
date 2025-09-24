@@ -106,12 +106,6 @@ except ImportError:
     install_dependency("psutil")
     import psutil
 
-try:
-    import tenacity
-except ImportError:
-    install_dependency("tenacity")
-    import tenacity
-
 
 @click.group()
 @click.option(

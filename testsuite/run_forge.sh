@@ -26,6 +26,7 @@ source testsuite/forge.env
 set +a # stop exporting variables
 
 echo "Executing python testsuite/forge.py test $@"
+exec poetry install tenacity
 exec python3 testsuite/forge.py test "$@"
 
 if $FAIL_AFTER_FORGE_RUNS; then
