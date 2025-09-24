@@ -10,6 +10,7 @@
 -  [Function `new_order_book`](#0x7_order_book_new_order_book)
 -  [Function `new_single_order_request`](#0x7_order_book_new_single_order_request)
 -  [Function `cancel_order`](#0x7_order_book_cancel_order)
+-  [Function `try_cancel_order`](#0x7_order_book_try_cancel_order)
 -  [Function `try_cancel_order_with_client_order_id`](#0x7_order_book_try_cancel_order_with_client_order_id)
 -  [Function `client_order_id_exists`](#0x7_order_book_client_order_id_exists)
 -  [Function `place_maker_order`](#0x7_order_book_place_maker_order)
@@ -209,6 +210,32 @@
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, order_id: OrderIdType
 ): SingleOrder&lt;M&gt; {
     self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_cancel_order">cancel_order</a>(&<b>mut</b> self.price_time_idx, order_creator, order_id)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_try_cancel_order"></a>
+
+## Function `try_cancel_order`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_try_cancel_order">try_cancel_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_try_cancel_order">try_cancel_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, order_id: OrderIdType
+): Option&lt;SingleOrder&lt;M&gt;&gt; {
+    self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_try_cancel_order">try_cancel_order</a>(&<b>mut</b> self.price_time_idx, order_creator, order_id)
 }
 </code></pre>
 

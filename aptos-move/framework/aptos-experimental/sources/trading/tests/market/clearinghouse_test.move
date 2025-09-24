@@ -11,7 +11,9 @@ module aptos_experimental::clearinghouse_test {
         SettleTradeResult,
         new_settle_trade_result,
         MarketClearinghouseCallbacks,
-        new_market_clearinghouse_callbacks
+        new_market_clearinghouse_callbacks,
+        new_callback_result_continue_matching,
+        new_callback_result_stop_matching
     };
 
     const EINVALID_ADDRESS: u64 = 1;
@@ -113,7 +115,7 @@ module aptos_experimental::clearinghouse_test {
         maker: address,
         size: u64,
         is_taker_long: bool
-    ): SettleTradeResult acquires GlobalState {
+    ): SettleTradeResult<u64> acquires GlobalState {
         let user_positions = &mut borrow_global_mut<GlobalState>(@0x1).user_positions;
         let taker_position =
             user_positions.borrow_mut_with_default(
@@ -125,7 +127,7 @@ module aptos_experimental::clearinghouse_test {
                 maker, Position { size: 0, is_long: true }
             );
         update_position(maker_position, size, !is_taker_long);
-        new_settle_trade_result(size, option::none(), option::none())
+        new_settle_trade_result(size, option::none(), option::none(), new_callback_result_continue_matching(size))
     }
 
     public(package) fun place_maker_order(order_id: OrderIdType) acquires GlobalState {
@@ -180,23 +182,24 @@ module aptos_experimental::clearinghouse_test {
         _maker: address,
         size: u64,
         _is_taker_long: bool
-    ): SettleTradeResult {
+    ): SettleTradeResult<u64> {
         new_settle_trade_result(
             size / 2,
             option::none(),
-            option::some(std::string::utf8(b"Max open interest violation"))
+            option::some(std::string::utf8(b"Max open interest violation")),
+            new_callback_result_stop_matching(size)
         )
     }
 
     public(package) fun test_market_callbacks():
-        MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
+        MarketClearinghouseCallbacks<TestOrderMetadata, u64> acquires GlobalState {
         new_market_clearinghouse_callbacks(
             |_market, taker, _taker_order_id, maker, _maker_order_id, _fill_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata
             | { settle_trade(taker, maker, size, is_taker_long) },
             |_account, order_id, _is_taker, _is_bid, _price, _time_in_force, _size, _order_metadata| {
                 validate_order_placement(order_id)
             },
-            |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices, _metadata| {
+            |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices, _order_metadata| {
                 validate_bulk_order_placement(account)
             },
             |_account, order_id, _is_bid, _price, _size, _order_metadata| {
@@ -218,7 +221,7 @@ module aptos_experimental::clearinghouse_test {
     }
 
     public(package) fun test_market_callbacks_with_taker_cancelled():
-        MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
+        MarketClearinghouseCallbacks<TestOrderMetadata, u64> acquires GlobalState {
         new_market_clearinghouse_callbacks(
             |_market, taker, _taker_order_id, maker, _maker_order_id, _fill_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata
             | {
@@ -227,7 +230,7 @@ module aptos_experimental::clearinghouse_test {
             |_account, order_id, _is_taker, _is_bid, _price, _time_in_force, _size, _order_metadata| {
                 validate_order_placement(order_id)
             },
-            |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices, _metadata| {
+            |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices, _order_metadata| {
                 validate_bulk_order_placement(account)
             },
             |_account, _order_id, _is_bid, _price, _size, _order_metadata| {

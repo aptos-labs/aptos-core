@@ -121,8 +121,8 @@ module aptos_experimental::market_tests_common {
         maker_order_id: OrderIdType,
         maker_orig_size: u64,
         event_store: &mut event_utils::EventStore
-    ): (OrderIdType, OrderMatchResult) {
-        place_taker_order_and_verify_fill(
+    ): (OrderIdType, OrderMatchResult<u64>) {
+        place_taker_order_and_verify_fill<clearinghouse_test::TestOrderMetadata, u64>(
             market,
             taker,
             price,
@@ -631,7 +631,8 @@ module aptos_experimental::market_tests_common {
         );
         // Make sure the taker was cancelled
         assert!(result.get_remaining_size_from_result() == 0);
-        assert!(result.get_cancel_reason().is_some());
+        let cancel_reason = result.get_cancel_reason();
+        assert!(cancel_reason.is_some());
         // Make sure the maker order is reinserted
         if (is_bulk) {
             assert!(market.get_bulk_order_remaining_size(maker_addr, true) == 1500000);
