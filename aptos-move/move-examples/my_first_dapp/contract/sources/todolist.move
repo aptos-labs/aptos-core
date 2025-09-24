@@ -3,10 +3,10 @@ module todolist_addr::todolist {
     use std::signer;
     use aptos_std::table::{Self, Table};
     use aptos_framework::account;
-    use std::string::String; 
+    use std::string::String;
 
     #[test_only]
-    use std::string::{Self}; 
+    use std::string::{Self};
 
     // Errors
     const ENOT_INITIALIZED: u64 = 1;
