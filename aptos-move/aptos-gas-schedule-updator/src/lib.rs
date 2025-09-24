@@ -7,6 +7,7 @@
 //! The generated proposal includes a comment section, listing the contents of the
 //! gas schedule in a human readable format.
 
+use std::fs;
 use anyhow::Result;
 use aptos_gas_schedule::{
     AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
@@ -17,6 +18,8 @@ use clap::Parser;
 use move_core_types::account_address::AccountAddress;
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use std::path::{Path, PathBuf};
+
+const DEFAULT_GAS_SCHEDULE_SCRIPT_UPDATE_PATH: String = String::from("./proposals");
 
 fn generate_blob(writer: &CodeWriter, data: &[u8]) {
     emitln!(writer, "vector[");
@@ -103,14 +106,59 @@ fn aptos_framework_path() -> PathBuf {
     )
 }
 
+#[derive(Parser, Debug)]
+pub enum GasScheduleGenerator {
+    #[clap(short, long)]
+    GenerateNew(GenerateNewSchedule),
+    #[clap(short, long)]
+    ScaleCurrent(GenerateNewSchedule),
+}
+
 /// Command line arguments to the gas schedule update proposal generation tool.
 #[derive(Debug, Parser)]
-pub struct GenArgs {
-    #[clap(short, long)]
+pub struct GenerateNewSchedule {
+    #[clap(short, long, help = "Path to file to write the output script")]
     pub output: Option<String>,
 
     #[clap(short, long)]
     pub gas_feature_version: Option<u64>,
+}
+
+impl GenerateNewSchedule {
+    pub fn execute(self) -> Result<()> {
+        let feature_version = self
+            .gas_feature_version
+            .unwrap_or(LATEST_GAS_FEATURE_VERSION);
+
+        let gas_schedule = current_gas_schedule(feature_version);
+
+        generate_update_proposal(&gas_schedule, self.output.unwrap_or(DEFAULT_GAS_SCHEDULE_SCRIPT_UPDATE_PATH))
+    }
+}
+
+
+#[derive(Debug, Parser)]
+pub struct ScaleCurrentSchedule {
+    #[clap(short, long, help = "Path to file to write the output script")]
+    pub output: Option<String>,
+
+    #[clap(short, long, help = "Path to JSON file containing the GasScheduleV2 to use")]
+    pub current_schedule: String,
+
+    #[clap(short, long, help = "Scale the Minimum Gas Price value with the given factor")]
+    pub scale_min_gas_price_by: f64,
+}
+
+
+impl ScaleCurrentSchedule {
+    pub fn execute(self) -> Result<()> {
+        let json_str = fs::read_to_string(self.current_schedule)?;
+        let mut current_schedule = GasScheduleV2::from_json_string(json_str);
+
+        current_schedule.scale_min_gas_price_by(self.scale_min_gas_price_by);
+
+        generate_update_proposal(&current_schedule, self.output.unwrap_or(DEFAULT_GAS_SCHEDULE_SCRIPT_UPDATE_PATH))
+    }
 }
 
 /// Constructs the current gas schedule in on-chain format.
@@ -122,27 +170,38 @@ pub fn current_gas_schedule(feature_version: u64) -> GasScheduleV2 {
 }
 
 /// Entrypoint for the update proposal generation tool.
-pub fn generate_update_proposal(args: &GenArgs) -> Result<()> {
+pub fn generate_update_proposal(gas_schedule: &GasScheduleV2, output_path: String) -> Result<()> {
     let mut pack = PackageBuilder::new("GasScheduleUpdate");
-
-    let feature_version = args
-        .gas_feature_version
-        .unwrap_or(LATEST_GAS_FEATURE_VERSION);
 
     pack.add_source(
         "update_gas_schedule.move",
-        &generate_script(&current_gas_schedule(feature_version))?,
+        &generate_script(gas_schedule)?,
     );
     // TODO: use relative path here
     pack.add_local_dep("SupraFramework", &aptos_framework_path().to_string_lossy());
 
-    pack.write_to_disk(args.output.as_deref().unwrap_or("./proposal"))?;
+    pack.write_to_disk(PathBuf::from(output_path))?;
 
     Ok(())
 }
 
+
+impl GasScheduleGenerator {
+    pub fn execute(self) -> Result<()> {
+        match self {
+            GasScheduleGenerator::GenerateNew(args) => {
+                args.execute()
+            }
+            GasScheduleGenerator::ScaleCurrent(args) => {
+                args.execute()
+            }
+        }
+    }
+}
+
+
 #[test]
 fn verify_tool() {
     use clap::CommandFactory;
-    GenArgs::command().debug_assert()
+    GenerateNewSchedule::command().debug_assert()
 }

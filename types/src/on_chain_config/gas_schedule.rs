@@ -5,6 +5,8 @@ use crate::on_chain_config::OnChainConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map, BTreeMap};
 
+const KEY_MIN_PRICE_PER_GAS: &str = "txn.min_price_per_gas_unit";
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct GasSchedule {
     pub entries: Vec<(String, u64)>,
@@ -54,6 +56,22 @@ impl GasSchedule {
 }
 
 impl GasScheduleV2 {
+
+    pub fn from_json_string(json_str: String) -> Self {
+        serde_json::from_str(&json_str).unwrap()
+    }
+
+    pub fn scale_min_gas_price_by(&mut self, factor: f64) {
+        for (name, value) in &mut self.entries {
+            if name == KEY_MIN_PRICE_PER_GAS {
+                // Convert to f64, multiply, then convert back to u64 with saturation
+                let new_value = (*value as f64 * factor).round() as u64;
+                *value = new_value;
+            }
+        }
+    }
+
+
     pub fn into_btree_map(self) -> BTreeMap<String, u64> {
         // TODO: what if the gas schedule contains duplicated entries?
         self.entries.into_iter().collect()
@@ -105,4 +123,67 @@ impl OnChainConfig for GasScheduleV2 {
 impl OnChainConfig for StorageGasSchedule {
     const MODULE_IDENTIFIER: &'static str = "storage_gas";
     const TYPE_IDENTIFIER: &'static str = "StorageGas";
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scale_min_gas_price_by() {
+        let mut gas_schedule = GasScheduleV2 {
+            feature_version: 1,
+            entries: vec![
+                ("other.param".to_string(), 100),
+                (KEY_MIN_PRICE_PER_GAS.to_string(), 50),
+                ("another.param".to_string(), 200),
+            ],
+        };
+
+        gas_schedule.scale_min_gas_price_by(0.5);
+
+        // Check that only the min gas price was scaled
+        assert_eq!(gas_schedule.entries[0], ("other.param".to_string(), 100));
+        assert_eq!(gas_schedule.entries[1], (KEY_MIN_PRICE_PER_GAS.to_string(), 25));
+        assert_eq!(gas_schedule.entries[2], ("another.param".to_string(), 200));
+
+        gas_schedule.scale_min_gas_price_by(2.0);
+        assert_eq!(gas_schedule.entries[1], (KEY_MIN_PRICE_PER_GAS.to_string(), 50));
+
+        gas_schedule.scale_min_gas_price_by(10.0);
+        assert_eq!(gas_schedule.entries[1], (KEY_MIN_PRICE_PER_GAS.to_string(), 500));
+
+        gas_schedule.scale_min_gas_price_by(0.1);
+        assert_eq!(gas_schedule.entries[1], (KEY_MIN_PRICE_PER_GAS.to_string(), 500));
+    }
+
+    #[test]
+    fn test_scale_min_gas_price_by_rounding() {
+        let mut gas_schedule = GasScheduleV2 {
+            feature_version: 1,
+            entries: vec![
+                (KEY_MIN_PRICE_PER_GAS.to_string(), 100),
+            ],
+        };
+
+        // Test rounding behavior (100 * 1.234 = 123.4, should round to 123)
+        gas_schedule.scale_min_gas_price_by(1.234);
+        assert_eq!(gas_schedule.entries[0].1, 123);
+    }
+
+    #[test]
+    fn test_scale_min_gas_price_by_overflow_protection() {
+        let mut gas_schedule = GasScheduleV2 {
+            feature_version: 1,
+            entries: vec![
+                (KEY_MIN_PRICE_PER_GAS.to_string(), u64::MAX),
+            ],
+        };
+
+        // Should not panic with large factor
+        gas_schedule.scale_min_gas_price_by(2.0);
+        // The result will be clamped to u64::MAX due to overflow in f64 to u64 conversion
+        println!("{:?}", gas_schedule);
+        assert!(gas_schedule.entries[0].1 > 0);
+    }
 }
