@@ -522,71 +522,13 @@ fn is_fast_callable(module: &CompiledModule, code: &[Bytecode]) -> bool {
             | MoveFrom(_)
             | MoveFromGeneric(_)
             | MoveTo(_)
-            | MoveToGeneric(_)
-            | VecPack(_, _) => {
+            | MoveToGeneric(_) => {
                 return false;
             },
+
             // Disallowed for now, but may be allowed in the future
             Call(_) | CallGeneric(_) => {
                 return false;
-            },
-
-            Pack(idx) => {
-                use SignatureToken::*;
-
-                let struct_def = module.struct_def_at(*idx);
-                let fields = match &struct_def.field_information {
-                    StructFieldInformation::Declared(fields) => fields,
-                    _ => unreachable!(),
-                };
-                for field in fields {
-                    match &field.signature.0 {
-                        Bool | Address | Signer => continue,
-                        U8 | U16 | U32 | U64 | U128 | U256 => continue,
-
-                        Vector(inner) => match &**inner {
-                            Bool | Address | Signer => continue,
-                            U8 | U16 | U32 | U64 | U128 | U256 => continue,
-                            _ => return false,
-                        },
-
-                        Function(_, _, _)
-                        | Struct(_)
-                        | StructInstantiation(_, _)
-                        | TypeParameter(_) => return false,
-
-                        Reference(_) | MutableReference(_) => unreachable!(),
-                    }
-                }
-            },
-            PackGeneric(idx) => {
-                use SignatureToken::*;
-
-                let struct_inst = module.struct_instantiation_at(*idx);
-                let struct_def = module.struct_def_at(struct_inst.def);
-                let fields = match &struct_def.field_information {
-                    StructFieldInformation::Declared(fields) => fields,
-                    _ => unreachable!(),
-                };
-                for field in fields {
-                    match &field.signature.0 {
-                        Bool | Address | Signer => continue,
-                        U8 | U16 | U32 | U64 | U128 | U256 => continue,
-
-                        Vector(inner) => match &**inner {
-                            Bool | Address | Signer => continue,
-                            U8 | U16 | U32 | U64 | U128 | U256 => continue,
-                            _ => return false,
-                        },
-
-                        Function(_, _, _)
-                        | Struct(_)
-                        | StructInstantiation(_, _)
-                        | TypeParameter(_) => return false,
-
-                        Reference(_) | MutableReference(_) => unreachable!(),
-                    }
-                }
             },
 
             // Allowed instructions
@@ -661,6 +603,78 @@ fn is_fast_callable(module: &CompiledModule, code: &[Bytecode]) -> bool {
             | VecUnpack(_, _)
             | VecSwap(_) => {
                 continue;
+            },
+
+            // Partially allowed instructions -- only simple cases can be handled
+            Pack(idx) => {
+                use SignatureToken::*;
+
+                let struct_def = module.struct_def_at(*idx);
+                let fields = match &struct_def.field_information {
+                    StructFieldInformation::Declared(fields) => fields,
+                    _ => unreachable!(),
+                };
+                for field in fields {
+                    match &field.signature.0 {
+                        Bool | Address | Signer => continue,
+                        U8 | U16 | U32 | U64 | U128 | U256 => continue,
+
+                        Vector(inner) => match &**inner {
+                            Bool | Address | Signer => continue,
+                            U8 | U16 | U32 | U64 | U128 | U256 => continue,
+                            _ => return false,
+                        },
+
+                        Function(_, _, _)
+                        | Struct(_)
+                        | StructInstantiation(_, _)
+                        | TypeParameter(_) => return false,
+
+                        Reference(_) | MutableReference(_) => unreachable!(),
+                    }
+                }
+            },
+            PackGeneric(idx) => {
+                use SignatureToken::*;
+
+                let struct_inst = module.struct_instantiation_at(*idx);
+                let struct_def = module.struct_def_at(struct_inst.def);
+                let fields = match &struct_def.field_information {
+                    StructFieldInformation::Declared(fields) => fields,
+                    _ => unreachable!(),
+                };
+                for field in fields {
+                    match &field.signature.0 {
+                        Bool | Address | Signer => continue,
+                        U8 | U16 | U32 | U64 | U128 | U256 => continue,
+
+                        Vector(inner) => match &**inner {
+                            Bool | Address | Signer => continue,
+                            U8 | U16 | U32 | U64 | U128 | U256 => continue,
+                            _ => return false,
+                        },
+
+                        Function(_, _, _)
+                        | Struct(_)
+                        | StructInstantiation(_, _)
+                        | TypeParameter(_) => return false,
+
+                        Reference(_) | MutableReference(_) => unreachable!(),
+                    }
+                }
+            },
+            VecPack(idx, _) => {
+                use SignatureToken::*;
+
+                let sig = module.signature_at(*idx);
+                assert!(sig.0.len() == 1);
+
+                // TODO: consider allowing all concrete types
+                match &sig.0[0] {
+                    Bool | Address | Signer => continue,
+                    U8 | U16 | U32 | U64 | U128 | U256 => continue,
+                    _ => return false,
+                }
             },
         }
     }

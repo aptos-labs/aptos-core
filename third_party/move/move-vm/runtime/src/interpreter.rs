@@ -30,9 +30,10 @@ use move_binary_format::{
     errors::{self, *},
     file_format::{
         AccessKind, Bytecode, Constant, ConstantPoolIndex, FieldHandleIndex,
-        FieldInstantiationIndex, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
-        StructDefInstantiationIndex, StructDefinitionIndex, StructVariantHandleIndex,
-        StructVariantInstantiationIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
+        FieldInstantiationIndex, FunctionHandleIndex, FunctionInstantiationIndex, Signature,
+        SignatureIndex, SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex,
+        StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
+        VariantFieldInstantiationIndex,
     },
 };
 use move_core_types::{
@@ -1872,6 +1873,8 @@ trait TFrame {
 
     fn constant_at(&self, idx: ConstantPoolIndex) -> &Constant;
 
+    fn signature_at(&self, idx: SignatureIndex) -> &Signature;
+
     fn pre_execution_checks<RTTCheck: RuntimeTypeCheck>(
         &self,
         operand_stack: &mut Stack,
@@ -2001,6 +2004,11 @@ impl TFrame for Frame {
     #[inline(always)]
     fn constant_at(&self, idx: ConstantPoolIndex) -> &Constant {
         self.constant_at(idx)
+    }
+
+    #[inline(always)]
+    fn signature_at(&self, idx: SignatureIndex) -> &Signature {
+        unreachable!()
     }
 
     #[inline(always)]
@@ -2232,6 +2240,11 @@ impl<'a> TFrame for FastFrame<'a> {
     #[inline(always)]
     fn constant_at(&self, idx: ConstantPoolIndex) -> &Constant {
         self.module.module.constant_at(idx)
+    }
+
+    #[inline(always)]
+    fn signature_at(&self, idx: SignatureIndex) -> &Signature {
+        self.module.signature_at(idx)
     }
 
     #[inline(always)]
@@ -3375,17 +3388,44 @@ fn execute_code_ex<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits, F: 
                     gas_meter.charge_simple_instr(S::Nop)?;
                 },
                 Bytecode::VecPack(si, num) => {
-                    let frame = frame.as_regular_frame();
+                    let owned_ty;
+                    let mut frame_cache;
 
-                    let frame_cache = &mut *frame.frame_cache.borrow_mut();
+                    let ty = if F::is_regular_frame() {
+                        let frame = frame.as_regular_frame();
 
-                    let (ty, _) = frame_cache.get_signature_index_type(*si, frame)?;
-                    // gas_meter.charge_create_ty(ty_count)?;
-                    interpreter.ty_depth_checker.check_depth_of_type(
-                        gas_meter,
-                        traversal_context,
-                        ty,
-                    )?;
+                        frame_cache = frame.frame_cache.borrow_mut();
+
+                        let (ty, _) = frame_cache.get_signature_index_type(*si, frame)?;
+                        // gas_meter.charge_create_ty(ty_count)?;
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            ty,
+                        )?;
+                        ty
+                    } else {
+                        use SignatureToken as S;
+                        use Type as T;
+
+                        let sig = frame.signature_at(*si);
+                        assert!(sig.0.len() == 1);
+
+                        owned_ty = match &sig.0[0] {
+                            S::Bool => T::Bool,
+                            S::Address => T::Address,
+                            S::Signer => T::Signer,
+                            S::U8 => T::U8,
+                            S::U16 => T::U16,
+                            S::U32 => T::U32,
+                            S::U64 => T::U64,
+                            S::U128 => T::U128,
+                            S::U256 => T::U256,
+                            _ => unreachable!(),
+                        };
+                        &owned_ty
+                    };
+
                     gas_meter.charge_vec_pack(
                         make_ty!(ty),
                         interpreter.operand_stack.last_n(*num as usize)?,
