@@ -1,0 +1,12 @@
+//# publish
+module 0x22::test
+
+public fun div_instr(a: u64, b: u64): u64
+    move_loc a
+    move_loc b
+    div
+    ret
+
+//# run --verbose 0x22::test::div_instr --args 200u64 2u64 --display-trace
+
+//# run --verbose 0x22::test::div_instr --args 200u64 0u64 --display-trace

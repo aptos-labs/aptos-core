@@ -1,0 +1,16 @@
+//# publish
+module 0x22::test
+
+fun br_true_instr()
+l1: nop
+    ld_true
+    br_true l3
+l2: nop
+    nop
+l3: ld_false
+    br_true l4
+l4: ld_true
+    br_true l5
+l5: ret
+
+//# run --verbose 0x22::test::br_true_instr --display-trace

@@ -27,7 +27,8 @@ use aptos_types::{
     transaction::{
         signature_verified_transaction::into_signature_verified_block,
         EntryFunction as TransactionEntryFunction, ExecutionStatus, RawTransaction,
-        Script as TransactionScript, Transaction, TransactionOutput, TransactionStatus,
+        Script as TransactionScript, SignatureCheckedTransaction, Transaction, TransactionOutput,
+        TransactionStatus,
     },
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
@@ -57,7 +58,7 @@ use move_transactional_test_runner::{
     tasks::{InitCommand, SyntaxChoice, TaskInput},
     vm_test_harness::{PrecompiledFilesModules, TestRunConfig},
 };
-use move_vm_runtime::{move_vm::SerializedReturnValues, AsFunctionValueExtension};
+use move_vm_runtime::AsFunctionValueExtension;
 use move_vm_types::{
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::Value,
@@ -806,7 +807,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         txn_args: Vec<MoveValue>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
-    ) -> Result<Option<String>> {
+    ) -> Option<String> {
         let signer0 = self.compiled_state().resolve_address(&signers[0]);
 
         if gas_budget.is_some() {
@@ -834,15 +835,20 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         };
 
         let mut script_blob = vec![];
-        script.serialize(&mut script_blob)?;
+        if let Err(err) = script.serialize(&mut script_blob) {
+            return Some(format!("Error: {}", err));
+        }
 
-        let params = self.fetch_transaction_parameters(
+        let params = match self.fetch_transaction_parameters(
             &signer0,
             extra_args.sequence_number,
             None,
             None,
             None,
-        )?;
+        ) {
+            Ok(params) => params,
+            Err(err) => return Some(format!("Error: {}", err)),
+        };
 
         let txn = RawTransaction::new_script(
             signer0,
@@ -864,14 +870,16 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         .unwrap()
         .into_inner();
 
-        let output = self.run_transaction(Transaction::UserTransaction(txn))?;
+        let output = match self.run_transaction(Transaction::UserTransaction(txn)) {
+            Ok(output) => output,
+            Err(err) => return Some(format!("Error: {}", err)),
+        };
 
-        let output = if extra_args.show_events {
+        if extra_args.show_events {
             render_events(output.events())
         } else {
             None
-        };
-        Ok(output)
+        }
     }
 
     fn call_function(
@@ -883,7 +891,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         txn_args: Vec<MoveValue>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
-    ) -> Result<(Option<String>, SerializedReturnValues)> {
+    ) -> Option<String> {
         if extra_args.script {
             panic!("Entry functions are not supported.")
         }
@@ -904,13 +912,16 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             (None, ParsedAddress::Numerical(_)) => panic_missing_private_key("run"),
         };
 
-        let params = self.fetch_transaction_parameters(
+        let params = match self.fetch_transaction_parameters(
             &signer,
             extra_args.sequence_number,
             extra_args.expiration_time,
             extra_args.gas_unit_price,
             gas_budget,
-        )?;
+        ) {
+            Ok(params) => params,
+            Err(err) => return Some(format!("Error: {}", err)),
+        };
         let txn = RawTransaction::new_entry_function(
             signer,
             params.sequence_number,
@@ -931,7 +942,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             ChainId::test(),
         );
 
-        let txn = match &extra_args.secondary_signers {
+        let result = match &extra_args.secondary_signers {
             Some(secondary_signers) => {
                 let (secondary_signers, secondary_private_keys) =
                     self.resolve_secondary_signers(secondary_signers);
@@ -940,28 +951,28 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     &private_key,
                     secondary_signers,
                     secondary_private_keys.iter().collect(),
-                )?
-                .into_inner()
+                )
+                .map(SignatureCheckedTransaction::into_inner)
             },
             None => txn
-                .sign(&private_key, Ed25519PublicKey::from(&private_key))?
-                .into_inner(),
+                .sign(&private_key, Ed25519PublicKey::from(&private_key))
+                .map(SignatureCheckedTransaction::into_inner),
+        };
+        let txn = match result {
+            Ok(txn) => txn,
+            Err(err) => return Some(format!("Error: {}", err)),
         };
 
-        let output = self.run_transaction(Transaction::UserTransaction(txn))?;
+        let output = match self.run_transaction(Transaction::UserTransaction(txn)) {
+            Ok(output) => output,
+            Err(err) => return Some(format!("Error: {}", err)),
+        };
 
-        let output = if extra_args.show_events {
+        if extra_args.show_events {
             render_events(output.events())
         } else {
             None
-        };
-
-        //TODO: replace this dummy value with actual txn return value
-        let a = SerializedReturnValues {
-            mutable_reference_outputs: vec![(0, vec![0], MoveTypeLayout::U8)],
-            return_values: vec![(vec![0], MoveTypeLayout::U8)],
-        };
-        Ok((output, a))
+        }
     }
 
     fn view_data(

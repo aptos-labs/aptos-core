@@ -55,6 +55,9 @@ pub struct ExecutionConfig {
     pub blockstm_v2_enabled: bool,
     /// Enables long-living concurrent caches for Move type layouts.
     pub layout_caches_enabled: bool,
+    /// If enabled, runtime checks like paranoid type checks may be performed in parallel in post
+    /// commit hook in Block-STM.
+    pub async_runtime_checks: bool,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -89,6 +92,7 @@ impl Default for ExecutionConfig {
             blockstm_v2_enabled: false,
             // TODO: consider setting to be true by default.
             layout_caches_enabled: false,
+            async_runtime_checks: false,
         }
     }
 }

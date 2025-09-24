@@ -1,0 +1,8 @@
+//# publish
+module 0x22::test
+
+public fun ld_i256_instr(): i256
+    ld_i256 256
+    ret
+
+//# run --verbose 0x22::test::ld_i256_instr --display-trace

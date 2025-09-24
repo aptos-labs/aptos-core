@@ -1,0 +1,10 @@
+//# publish
+module 0x22::test
+
+public fun xor_instr(): u8
+    ld_u8 1
+    ld_u8 1
+    xor
+    ret
+
+//# run --verbose 0x22::test::xor_instr --display-trace

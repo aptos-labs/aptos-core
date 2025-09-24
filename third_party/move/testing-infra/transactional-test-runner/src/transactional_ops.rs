@@ -31,7 +31,6 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::{MoveTypeLayout, MoveValue},
 };
-use move_vm_runtime::move_vm::SerializedReturnValues;
 use move_vm_types::values::Value;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -121,7 +120,7 @@ impl<'a> MoveTestAdapter<'a> for MinimalAdapter<'a> {
         _args: Vec<MoveValue>,
         _gas_budget: Option<u64>,
         _extra: Self::ExtraRunArgs,
-    ) -> Result<Option<String>> {
+    ) -> Option<String> {
         unimplemented!("MinimalAdapter is only used for compilation, not execution")
     }
 
@@ -134,7 +133,7 @@ impl<'a> MoveTestAdapter<'a> for MinimalAdapter<'a> {
         _args: Vec<MoveValue>,
         _gas_budget: Option<u64>,
         _extra: Self::ExtraRunArgs,
-    ) -> Result<(Option<String>, SerializedReturnValues)> {
+    ) -> Option<String> {
         unimplemented!("MinimalAdapter is only used for compilation, not execution")
     }
 

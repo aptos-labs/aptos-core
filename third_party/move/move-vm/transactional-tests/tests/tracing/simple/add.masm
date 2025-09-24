@@ -1,0 +1,12 @@
+//# publish
+module 0x22::test
+
+public fun add_instr(a: u8, b: u8): u8
+    move_loc a
+    move_loc b
+    add
+    ret
+
+//# run --verbose 0x22::test::add_instr --args 10u8 20u8 --display-trace
+
+//# run --verbose 0x22::test::add_instr --args 255u8 255u8 --display-trace
