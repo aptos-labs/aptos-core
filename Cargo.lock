@@ -11740,8 +11740,9 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.16.0"
-source = "git+https://github.com/aptos-labs/lru-rs?rev=d16747e8b119c48315a1c76669f962456d06dfe7#d16747e8b119c48315a1c76669f962456d06dfe7"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfe949189f46fabb938b3a9a0be30fdd93fd8a09260da863399a8cf3db756ec8"
 dependencies = [
  "hashbrown 0.15.3",
 ]
