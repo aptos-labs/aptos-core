@@ -247,6 +247,7 @@ impl FeatureFlag {
             FeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
             FeatureFlag::ENABLE_LAZY_LOADING,
             FeatureFlag::MONOTONICALLY_INCREASING_COUNTER,
+            FeatureFlag::ENABLE_CAPTURE_OPTION,
             FeatureFlag::ENABLE_TRUSTED_CODE,
         ]
     }
