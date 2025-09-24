@@ -38,7 +38,7 @@ async fn request_ephemeral_public_key_expired() {
 
     // Create a JWK cache and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
-    let cached_resources = CachedResources::default();
+    let cached_resources = CachedResources::new_for_testing();
 
     // Update the keyless config cached resource
     set_on_chain_keyless_configuration(&cached_resources);
@@ -65,7 +65,7 @@ async fn request_ephemeral_public_key_expired() {
         None,
         None,
         None,
-        false,
+        utils::get_mock_account_recovery_db(),
     )
     .await;
 
@@ -84,7 +84,7 @@ async fn request_ephemeral_public_key_expiry_too_large() {
 
     // Create a JWK cache and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
-    let cached_resources = CachedResources::default();
+    let cached_resources = CachedResources::new_for_testing();
 
     // Update the keyless config cached resource
     set_on_chain_keyless_configuration(&cached_resources);
@@ -111,7 +111,7 @@ async fn request_ephemeral_public_key_expiry_too_large() {
         None,
         None,
         None,
-        false,
+        utils::get_mock_account_recovery_db(),
     )
     .await;
 
@@ -130,7 +130,7 @@ async fn request_invalid_oath_nonce() {
 
     // Create a JWK cache and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
-    let cached_resources = CachedResources::default();
+    let cached_resources = CachedResources::new_for_testing();
 
     // Update the keyless config cached resource
     set_on_chain_keyless_configuration(&cached_resources);
@@ -157,7 +157,7 @@ async fn request_invalid_oath_nonce() {
         None,
         None,
         None,
-        false,
+        utils::get_mock_account_recovery_db(),
     )
     .await;
 
@@ -176,7 +176,7 @@ async fn request_invalid_jwt() {
 
     // Create a JWK cache and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
-    let cached_resources = CachedResources::default();
+    let cached_resources = CachedResources::new_for_testing();
 
     // Update the keyless config cached resource
     set_on_chain_keyless_configuration(&cached_resources);
@@ -193,7 +193,7 @@ async fn request_invalid_jwt() {
         None,
         None,
         None,
-        false,
+        utils::get_mock_account_recovery_db(),
     )
     .await;
 
@@ -209,7 +209,7 @@ async fn request_invalid_jwt_signature() {
 
     // Create a JWK cache and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
-    let cached_resources = CachedResources::default();
+    let cached_resources = CachedResources::new_for_testing();
 
     // Update the JWK cache
     jwk_fetcher::insert_test_jwk(jwk_cache.clone());
@@ -254,7 +254,7 @@ async fn request_invalid_jwt_signature() {
         None,
         None,
         None,
-        false,
+        utils::get_mock_account_recovery_db(),
     )
     .await;
 
@@ -270,7 +270,7 @@ async fn request_max_exp_data_secs_overflowed() {
 
     // Create a JWK cache and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
-    let cached_resources = CachedResources::default();
+    let cached_resources = CachedResources::new_for_testing();
 
     // Update the keyless config cached resource
     set_on_chain_keyless_configuration(&cached_resources);
@@ -297,7 +297,7 @@ async fn request_max_exp_data_secs_overflowed() {
         None,
         None,
         None,
-        false,
+        utils::get_mock_account_recovery_db(),
     )
     .await;
 
