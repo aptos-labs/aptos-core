@@ -21,12 +21,12 @@ module todolist_addr::todolist {
 
     struct Task has store, drop, copy {
         task_id: u64,
-        address:address,
+        address: address,
         content: String,
-        completed: bool,
+        completed: bool
     }
 
-    public entry fun create_list(account: &signer){
+    public entry fun create_list(account: &signer) {
         let tasks_holder = TodoList {
             tasks: table::new(),
             set_task_event: account::new_event_handle<Task>(account),
@@ -62,8 +62,8 @@ module todolist_addr::todolist {
         todo_list.task_counter = counter;
         // fires a new task created event
         event::emit_event<Task>(
-        &mut borrow_global_mut<TodoList>(signer_address).set_task_event,
-        new_task,
+            &mut borrow_global_mut<TodoList>(signer_address).set_task_event,
+            new_task
         );
     }
 
@@ -79,7 +79,7 @@ module todolist_addr::todolist {
         // gets the task matched the task_id
         let task_record = table::borrow_mut(&mut todo_list.tasks, task_id);
         // assert task is not completed
-        assert!(task_record.completed == false, ETASK_IS_COMPLETED);
+        assert!(!task_record.completed, ETASK_IS_COMPLETED);
 
         // gets the signer address
         let signer_address = signer::address_of(account);
@@ -100,14 +100,21 @@ module todolist_addr::todolist {
 
         // creates a task by the admin account
         create_task(&admin, string::utf8(b"Create e2e guide video for aptos devs."));
-        let task_count = event::counter(&borrow_global<TodoList>(signer::address_of(&admin)).set_task_event);
+        let task_count =
+            event::counter(
+                &borrow_global<TodoList>(signer::address_of(&admin)).set_task_event
+            );
         assert!(task_count == 1, 4);
         let todo_list = borrow_global<TodoList>(signer::address_of(&admin));
         assert!(todo_list.task_counter == 1, 5);
         let task_record = table::borrow(&todo_list.tasks, todo_list.task_counter);
         assert!(task_record.task_id == 1, 6);
         assert!(task_record.completed == false, 7);
-        assert!(task_record.content == string::utf8(b"Create e2e guide video for aptos devs."), 8);
+        assert!(
+            task_record.content
+                == string::utf8(b"Create e2e guide video for aptos devs."),
+            8
+        );
         assert!(task_record.address == signer::address_of(&admin), 9);
 
         // updates task as completed
@@ -116,7 +123,11 @@ module todolist_addr::todolist {
         let task_record = table::borrow(&todo_list.tasks, 1);
         assert!(task_record.task_id == 1, 10);
         assert!(task_record.completed == true, 11);
-        assert!(task_record.content == string::utf8(b"Create e2e guide video for aptos devs."), 12);
+        assert!(
+            task_record.content
+                == string::utf8(b"Create e2e guide video for aptos devs."),
+            12
+        );
         assert!(task_record.address == signer::address_of(&admin), 13);
     }
 
