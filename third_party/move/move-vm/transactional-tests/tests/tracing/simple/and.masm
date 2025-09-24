@@ -1,0 +1,10 @@
+//# publish
+module 0x22::test
+
+public fun and_instr(): bool
+    ld_true
+    ld_false
+    and
+    ret
+
+//# run --verbose 0x22::test::and_instr --display-trace

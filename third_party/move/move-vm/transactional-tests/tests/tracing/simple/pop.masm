@@ -1,0 +1,9 @@
+//# publish
+module 0x22::test
+
+public fun pop_instr()
+    ldu8 0
+    pop
+    ret
+
+//# run --verbose 0x22::test::pop_instr --display-trace

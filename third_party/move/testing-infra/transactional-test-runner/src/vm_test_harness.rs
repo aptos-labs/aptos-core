@@ -39,11 +39,12 @@ use move_vm_runtime::{
     config::VMConfig,
     data_cache::TransactionDataCache,
     dispatch_loader,
+    execution_tracing::{FullTraceLogger, Trace, TraceLogger},
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsFunctionValueExtension, AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage,
-    InstantiatedFunctionLoader, LegacyLoaderConfig, RuntimeEnvironment, ScriptLoader,
+    AsFunctionValueExtension, AsUnsyncCodeStorage, AsUnsyncModuleStorage, AsyncRuntimeTypeCheck,
+    CodeStorage, InstantiatedFunctionLoader, LegacyLoaderConfig, RuntimeEnvironment, ScriptLoader,
     StagingModuleStorage,
 };
 use move_vm_test_utils::{
@@ -99,9 +100,12 @@ enum EntryPoint<'a> {
 
 #[derive(Debug, Parser)]
 pub struct AdapterExecuteArgs {
-    /// print more complete information for VMErrors on run
+    /// Print more complete information for VM errors during the run.
     #[clap(long)]
     pub verbose: bool,
+    #[clap(long)]
+    /// Displays the trace collected during execution.
+    pub display_trace: bool,
 }
 
 fn move_test_debug() -> bool {
@@ -311,22 +315,24 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
 
-        self.execute_entrypoint(
-            EntryPoint::Script {
-                script_bytes: &script_bytes,
-            },
-            &type_args,
-            args,
-            gas_budget,
-            &code_storage,
-        )
-        .map_err(|err| {
-            anyhow!(
-                "Script execution failed with VMError: {}",
-                err.format_test_output(move_test_debug() || verbose)
+        let (_, trace) = self
+            .execute_entrypoint(
+                EntryPoint::Script {
+                    script_bytes: &script_bytes,
+                },
+                &type_args,
+                args,
+                gas_budget,
+                &code_storage,
             )
-        })?;
-        Ok(None)
+            .map_err(|err| {
+                anyhow!(
+                    "Script execution failed with VMError: {}",
+                    err.format_test_output(move_test_debug() || verbose)
+                )
+            })?;
+
+        Ok(trace.and_then(|t| extra_args.display_trace.then_some(t.to_string_for_tests())))
     }
 
     fn call_function(
@@ -358,7 +364,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
 
-        let serialized_return_values = self
+        let (serialized_return_values, trace) = self
             .execute_entrypoint(
                 EntryPoint::Function { module, function },
                 &type_args,
@@ -372,7 +378,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     err.format_test_output(move_test_debug() || verbose)
                 )
             })?;
-        Ok((None, serialized_return_values))
+
+        let trace_str =
+            trace.and_then(|t| extra_args.display_trace.then_some(t.to_string_for_tests()));
+        Ok((trace_str, serialized_return_values))
     }
 
     fn view_data(
@@ -425,7 +434,7 @@ impl SimpleVMTestAdapter<'_> {
         args: Vec<Vec<u8>>,
         gas_budget: Option<u64>,
         code_storage: &impl CodeStorage,
-    ) -> VMResult<SerializedReturnValues> {
+    ) -> VMResult<(SerializedReturnValues, Option<Trace>)> {
         let mut gas_meter = get_gas_status(
             &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
             gas_budget,
@@ -437,7 +446,7 @@ impl SimpleVMTestAdapter<'_> {
         let mut extensions = NativeContextExtensions::default();
         let mut data_cache = TransactionDataCache::empty();
 
-        let return_values = dispatch_loader!(code_storage, loader, {
+        let returns = dispatch_loader!(code_storage, loader, {
             let legacy_loader_config = LegacyLoaderConfig::unmetered();
             let function = match entry_point {
                 EntryPoint::Script { script_bytes } => loader.load_script(
@@ -456,23 +465,44 @@ impl SimpleVMTestAdapter<'_> {
                     ty_args,
                 )?,
             };
-            MoveVM::execute_loaded_function(
-                function,
-                args,
-                &mut data_cache,
-                &mut gas_meter,
-                &mut traversal_context,
-                &mut extensions,
-                &loader,
-                &self.storage,
-            )?
+            if self.run_config.tracing {
+                let mut logger = FullTraceLogger::new();
+                let results = MoveVM::execute_loaded_function_with_tracing(
+                    function,
+                    args,
+                    &mut data_cache,
+                    &mut gas_meter,
+                    &mut traversal_context,
+                    &mut extensions,
+                    &loader,
+                    &self.storage,
+                    &mut logger,
+                )?;
+                let trace = logger.finish();
+                AsyncRuntimeTypeCheck::new(code_storage)
+                    .replay(trace.clone())
+                    .map_err(|err| err.finish(Location::Undefined))?;
+                (results, Some(trace))
+            } else {
+                let results = MoveVM::execute_loaded_function(
+                    function,
+                    args,
+                    &mut data_cache,
+                    &mut gas_meter,
+                    &mut traversal_context,
+                    &mut extensions,
+                    &loader,
+                    &self.storage,
+                )?;
+                (results, None)
+            }
         });
 
         let change_set = data_cache
             .into_effects(code_storage)
             .map_err(|err| err.finish(Location::Undefined))?;
         self.storage.apply(change_set).unwrap();
-        Ok(return_values)
+        Ok(returns)
     }
 }
 
@@ -561,6 +591,8 @@ pub struct TestRunConfig {
     pub echo: bool,
     /// Set of targets into which to cross-compile.
     pub cross_compilation_targets: BTreeSet<CrossCompileTarget>,
+    /// If enabled, records execution trace (disabling runtime type checks).
+    pub tracing: bool,
 }
 
 /// A cross-compile target. A new transactional test source file
@@ -600,6 +632,7 @@ impl TestRunConfig {
             use_masm: true,
             echo: true,
             cross_compilation_targets: BTreeSet::new(),
+            tracing: false,
         }
     }
 
