@@ -6,7 +6,7 @@ Error: error: number 512 out of range (max 255)
 4 │     ld_u8 512
   │     ^^^^^^^^^
 
-error: expected number argument
+error: expected unsigned number argument
   ┌─ test:7:5
   │
 7 │     ld_u16 ident
