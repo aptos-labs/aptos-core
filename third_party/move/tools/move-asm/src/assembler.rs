@@ -31,7 +31,11 @@ use move_binary_format::{
     },
     CompiledModule,
 };
-use move_core_types::{function::ClosureMask, identifier::Identifier, int256::U256};
+use move_core_types::{
+    function::ClosureMask,
+    identifier::Identifier,
+    int256::{I256, U256},
+};
 use std::{collections::BTreeMap, fs, io::Write, path::PathBuf};
 // ===================================================================================
 // Driver
@@ -486,6 +490,30 @@ impl<'a> Assembler<'a> {
                             ck_inst(self, None, opt_inst.as_ref());
                             SignatureToken::U256
                         },
+                        "i8" => {
+                            ck_inst(self, None, opt_inst.as_ref());
+                            SignatureToken::I8
+                        },
+                        "i16" => {
+                            ck_inst(self, None, opt_inst.as_ref());
+                            SignatureToken::I16
+                        },
+                        "i32" => {
+                            ck_inst(self, None, opt_inst.as_ref());
+                            SignatureToken::I32
+                        },
+                        "i64" => {
+                            ck_inst(self, None, opt_inst.as_ref());
+                            SignatureToken::I64
+                        },
+                        "i128" => {
+                            ck_inst(self, None, opt_inst.as_ref());
+                            SignatureToken::I128
+                        },
+                        "i256" => {
+                            ck_inst(self, None, opt_inst.as_ref());
+                            SignatureToken::I256
+                        },
                         "bool" => {
                             ck_inst(self, None, opt_inst.as_ref());
                             SignatureToken::Bool
@@ -567,32 +595,32 @@ impl<'a> Assembler<'a> {
             },
             "ld_u8" => {
                 let arg = self.args1(instr)?;
-                let num = self.number(instr, arg, U256::from(u8::MAX))?;
+                let num = self.unsigned_number(instr, arg, U256::from(u8::MAX))?;
                 LdU8(num.try_into().ok()?)
             },
             "ld_u16" => {
                 let arg = self.args1(instr)?;
-                let num = self.number(instr, arg, U256::from(u16::MAX))?;
+                let num = self.unsigned_number(instr, arg, U256::from(u16::MAX))?;
                 LdU16(num.try_into().ok()?)
             },
             "ld_u32" => {
                 let arg = self.args1(instr)?;
-                let num = self.number(instr, arg, U256::from(u32::MAX))?;
+                let num = self.unsigned_number(instr, arg, U256::from(u32::MAX))?;
                 LdU32(num.try_into().ok()?)
             },
             "ld_u64" => {
                 let arg = self.args1(instr)?;
-                let num = self.number(instr, arg, U256::from(u64::MAX))?;
+                let num = self.unsigned_number(instr, arg, U256::from(u64::MAX))?;
                 LdU64(num.try_into().ok()?)
             },
             "ld_u128" => {
                 let arg = self.args1(instr)?;
-                let num = self.number(instr, arg, U256::from(u128::MAX))?;
+                let num = self.unsigned_number(instr, arg, U256::from(u128::MAX))?;
                 LdU128(num.try_into().ok()?)
             },
             "ld_u256" => {
                 let arg = self.args1(instr)?;
-                let num = self.number(instr, arg, U256::MAX)?;
+                let num = self.unsigned_number(instr, arg, U256::MAX)?;
                 LdU256(num)
             },
             "cast_u8" => {
@@ -618,6 +646,69 @@ impl<'a> Assembler<'a> {
             "cast_u256" => {
                 self.args0(instr)?;
                 CastU256
+            },
+            "ld_i8" => {
+                let arg = self.args1(instr)?;
+                let num =
+                    self.signed_number(instr, arg, I256::from(i8::MIN), I256::from(i8::MAX))?;
+                LdI8(num.try_into().ok()?)
+            },
+            "ld_i16" => {
+                let arg = self.args1(instr)?;
+                let num =
+                    self.signed_number(instr, arg, I256::from(i16::MIN), I256::from(i16::MAX))?;
+                LdI16(num.try_into().ok()?)
+            },
+            "ld_i32" => {
+                let arg = self.args1(instr)?;
+                let num =
+                    self.signed_number(instr, arg, I256::from(i32::MIN), I256::from(i32::MAX))?;
+                LdI32(num.try_into().ok()?)
+            },
+            "ld_i64" => {
+                let arg = self.args1(instr)?;
+                let num =
+                    self.signed_number(instr, arg, I256::from(i64::MIN), I256::from(i64::MAX))?;
+                LdI64(num.try_into().ok()?)
+            },
+            "ld_i128" => {
+                let arg = self.args1(instr)?;
+                let num =
+                    self.signed_number(instr, arg, I256::from(i128::MIN), I256::from(i128::MAX))?;
+                LdI128(num.try_into().ok()?)
+            },
+            "ld_i256" => {
+                let arg = self.args1(instr)?;
+                let num = self.signed_number(instr, arg, I256::MIN, I256::MAX)?;
+                LdI256(num)
+            },
+            "cast_i8" => {
+                self.args0(instr)?;
+                CastI8
+            },
+            "cast_i16" => {
+                self.args0(instr)?;
+                CastI16
+            },
+            "cast_i32" => {
+                self.args0(instr)?;
+                CastI32
+            },
+            "cast_i64" => {
+                self.args0(instr)?;
+                CastI64
+            },
+            "cast_i128" => {
+                self.args0(instr)?;
+                CastI128
+            },
+            "cast_i256" => {
+                self.args0(instr)?;
+                CastI256
+            },
+            "negate" => {
+                self.args0(instr)?;
+                Negate
             },
             "ld_const" => {
                 let [arg1, arg2] = self.args2(instr)?;
@@ -774,7 +865,7 @@ impl<'a> Assembler<'a> {
                 let [arg1, arg2] = self.args2(instr)?;
                 let sign_idx = self.type_index(instr, arg1)?;
                 let count: u64 = self
-                    .number(instr, arg2, U256::from(u64::MAX))
+                    .unsigned_number(instr, arg2, U256::from(u64::MAX))
                     .and_then(|x| x.try_into().ok())?;
                 VecPack(sign_idx, count)
             },
@@ -807,7 +898,7 @@ impl<'a> Assembler<'a> {
                 let [arg1, arg2] = self.args2(instr)?;
                 let sign_idx = self.type_index(instr, arg1)?;
                 let count: u64 = self
-                    .number(instr, arg2, U256::from(u64::MAX))
+                    .unsigned_number(instr, arg2, U256::from(u64::MAX))
                     .and_then(|x| x.try_into().ok())?;
                 VecUnpack(sign_idx, count)
             },
@@ -820,7 +911,7 @@ impl<'a> Assembler<'a> {
                 let [arg1, arg2] = self.args2(instr)?;
                 let (handle_idx, targs_opt) = self.fun_ref(instr, arg1)?;
                 let closure_mask = ClosureMask::new(
-                    self.number(instr, arg2, U256::from(u64::MAX))
+                    self.unsigned_number(instr, arg2, U256::from(u64::MAX))
                         .and_then(|x| x.try_into().ok())?,
                 );
                 if let Some(targs) = targs_opt {
@@ -1117,11 +1208,26 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    fn number(&mut self, instr: &Instruction, arg: &Argument, max: U256) -> Option<U256> {
+    fn unsigned_number(&mut self, instr: &Instruction, arg: &Argument, max: U256) -> Option<U256> {
         if let Argument::Constant(val) = arg {
-            self.add_diags(instr.loc, val.check_number(max))
+            self.add_diags(instr.loc, val.check_unsigned_number(max))
         } else {
-            self.error(instr.loc, "expected number argument");
+            self.error(instr.loc, "expected unsigned number argument");
+            None
+        }
+    }
+
+    fn signed_number(
+        &mut self,
+        instr: &Instruction,
+        arg: &Argument,
+        min: I256,
+        max: I256,
+    ) -> Option<I256> {
+        if let Argument::Constant(val) = arg {
+            self.add_diags(instr.loc, val.check_signed_number(min, max))
+        } else {
+            self.error(instr.loc, "expected signed number argument");
             None
         }
     }
