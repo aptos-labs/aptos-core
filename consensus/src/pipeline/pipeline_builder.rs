@@ -6,6 +6,7 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters::{self, update_counters_for_block, update_counters_for_compute_result},
     monitor,
+    network::NetworkSender,
     payload_manager::TPayloadManager,
     txn_notifier::TxnNotifier,
     IntGaugeGuard,
@@ -135,6 +136,7 @@ pub struct PipelineBuilder {
     persisted_auxiliary_info_version: u8,
     rand_check_enabled: bool,
     module_cache: Arc<Mutex<Option<ValidationState<CachedStateView>>>>,
+    network_sender: Arc<NetworkSender>,
 }
 
 fn spawn_shared_fut<
@@ -257,6 +259,7 @@ impl PipelineBuilder {
         enable_pre_commit: bool,
         consensus_onchain_config: &OnChainConsensusConfig,
         persisted_auxiliary_info_version: u8,
+        network_sender: Arc<NetworkSender>,
     ) -> Self {
         let module_cache = Arc::new(Mutex::new(None));
         Self {
@@ -274,6 +277,7 @@ impl PipelineBuilder {
             persisted_auxiliary_info_version,
             rand_check_enabled: consensus_onchain_config.rand_check_enabled(),
             module_cache,
+            network_sender,
         }
     }
 
@@ -434,7 +438,7 @@ impl PipelineBuilder {
             None,
         );
         let commit_vote_fut = spawn_shared_fut(
-            Self::sign_commit_vote(
+            Self::sign_and_broadcast_commit_vote(
                 ledger_update_fut.clone(),
                 order_vote_rx,
                 order_proof_fut.clone(),
@@ -442,6 +446,7 @@ impl PipelineBuilder {
                 self.signer.clone(),
                 block.clone(),
                 self.order_vote_enabled,
+                self.network_sender.clone(),
             ),
             Some(&mut abort_handles),
         );
@@ -860,8 +865,8 @@ impl PipelineBuilder {
     }
 
     /// Precondition: 1. ledger update finishes, 2. order vote or order proof or commit proof is received
-    /// What it does: Sign the commit vote with execution result, it needs to update the timestamp for reconfig suffix blocks
-    async fn sign_commit_vote(
+    /// What it does: Sign the commit vote with execution result and broadcast, it needs to update the timestamp for reconfig suffix blocks
+    async fn sign_and_broadcast_commit_vote(
         ledger_update_fut: TaskFuture<LedgerUpdateResult>,
         order_vote_rx: oneshot::Receiver<()>,
         order_proof_fut: TaskFuture<WrappedLedgerInfo>,
@@ -869,6 +874,7 @@ impl PipelineBuilder {
         signer: Arc<ValidatorSigner>,
         block: Arc<Block>,
         order_vote_enabled: bool,
+        network_sender: Arc<NetworkSender>,
     ) -> TaskResult<CommitVoteResult> {
         let mut tracker = Tracker::start_waiting("sign_commit_vote", &block);
         let (compute_result, _, epoch_end_timestamp) = ledger_update_fut.await?;
@@ -907,11 +913,11 @@ impl PipelineBuilder {
         let ledger_info = LedgerInfo::new(block_info, consensus_data_hash);
         info!("[Pipeline] Signed ledger info {ledger_info}");
         let signature = signer.sign(&ledger_info).expect("Signing should succeed");
-        Ok(CommitVote::new_with_signature(
-            signer.author(),
-            ledger_info,
-            signature,
-        ))
+        let commit_vote = CommitVote::new_with_signature(signer.author(), ledger_info, signature);
+        network_sender
+            .broadcast_commit_vote(commit_vote.clone())
+            .await;
+        Ok(commit_vote)
     }
 
     /// Precondition: 1. ledger update finishes, 2. parent block's phase finishes 2. order proof is received

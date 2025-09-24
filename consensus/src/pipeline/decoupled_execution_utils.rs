@@ -30,7 +30,7 @@ use std::sync::{
 pub fn prepare_phases_and_buffer_manager(
     author: Author,
     safety_rules: Arc<dyn CommitSignerProvider>,
-    commit_msg_tx: NetworkSender,
+    commit_msg_tx: Arc<NetworkSender>,
     commit_msg_rx: Receiver<AccountAddress, (AccountAddress, IncomingCommitRequest)>,
     block_rx: UnboundedReceiver<OrderedBlocks>,
     sync_rx: UnboundedReceiver<ResetRequest>,
@@ -95,7 +95,7 @@ pub fn prepare_phases_and_buffer_manager(
     let (persisting_phase_request_tx, persisting_phase_request_rx) =
         create_channel::<CountedRequest<PersistingRequest>>();
     let (persisting_phase_response_tx, persisting_phase_response_rx) = create_channel();
-    let commit_msg_tx = Arc::new(commit_msg_tx);
+    let commit_msg_tx = commit_msg_tx;
 
     let persisting_phase_processor = PersistingPhase::new(commit_msg_tx.clone());
     let persisting_phase = PipelinePhase::new(
