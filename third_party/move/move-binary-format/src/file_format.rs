@@ -1156,6 +1156,30 @@ impl SignatureToken {
         }
     }
 
+    /// Returns true if the token is a signed integer type.
+    pub fn is_unsigned_integer(&self) -> bool {
+        use SignatureToken::*;
+        match self {
+            U8 | U16 | U32 | U64 | U128 | U256 => true,
+            Bool
+            | I8
+            | I16
+            | I32
+            | I64
+            | I128
+            | I256
+            | Address
+            | Signer
+            | Vector(_)
+            | Function(..)
+            | Struct(_)
+            | StructInstantiation(_, _)
+            | Reference(_)
+            | MutableReference(_)
+            | TypeParameter(_) => false,
+        }
+    }
+
     /// Returns true if the `SignatureToken` is any kind of reference (mutable and immutable).
     pub fn is_reference(&self) -> bool {
         use SignatureToken::*;
@@ -2998,10 +3022,15 @@ pub enum Bytecode {
     #[group = "arithmetic"]
     #[description = r#"
         Negate the signed integer on top of the stack.
+        An arithmetic error will be raised if the value cannot be negated, as is the
+        case for the minimum of a given signed integer type
     "#]
     #[semantics = r#"
         stack >> num
-        stack << -num
+        if num == i<N>::MIN
+            arithmetic error
+        else
+            stack << -num
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
