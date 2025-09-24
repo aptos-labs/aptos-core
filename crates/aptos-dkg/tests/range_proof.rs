@@ -1,27 +1,22 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_dkg::range_proof::{batch_prove, batch_verify, commit, setup, DST};
-use blstrs::Scalar;
-use rand::{thread_rng, RngCore};
+use aptos_dkg::{
+    range_proofs::dekart_univariate::{batch_prove, batch_verify, Proof, DST},
+    utils::test_utils,
+};
+use ark_ec::pairing::Pairing;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::rand::thread_rng;
 
 #[cfg(test)]
-fn run_range_proof_completeness(n: usize, ell: usize) {
+fn run_range_proof_completeness<E: Pairing>(n: usize, ell: usize) {
     let mut rng = thread_rng();
-    let pp = setup(ell, n);
+    let (pp, zz, cc, r) = test_utils::range_proof_random_instance(n, ell, &mut rng);
     println!("setup finished for n={}, ell={}, prove starting", n, ell);
 
-    let zz: Vec<Scalar> = (0..n)
-        .map(|_| {
-            let val = rng.next_u64() >> (64 - ell);
-            Scalar::from(val)
-        })
-        .collect();
-
-    let (cc, r) = commit(&pp, &zz, &mut rng);
-
     let mut fs_t = merlin::Transcript::new(DST);
-    let proof = batch_prove(&mut rng, &pp, &zz, &cc, &r, &mut fs_t);
+    let proof = batch_prove::<E, _>(&mut rng, &pp, &zz, &cc, &r, &mut fs_t);
     println!("prove finished, vrfy1 starting (n={}, ell={})", n, ell);
 
     let mut fs_t = merlin::Transcript::new(DST);
@@ -35,35 +30,33 @@ fn run_range_proof_completeness(n: usize, ell: usize) {
 }
 
 #[cfg(test)]
-fn run_serialize_range_proof(n: usize, ell: usize) {
+fn run_serialize_range_proof<E: Pairing>(n: usize, ell: usize) {
     let mut rng = thread_rng();
-    let pp = setup(ell, n);
+    let (pp, zz, cc, r) = test_utils::range_proof_random_instance(n, ell, &mut rng);
 
     println!("setup finished for n={}, ell={}, prove starting", n, ell);
 
-    let zz: Vec<Scalar> = (0..n)
-        .map(|_| {
-            let val = rng.next_u64() >> (64 - ell);
-            Scalar::from(val)
-        })
-        .collect();
-
-    let (cc, r) = commit(&pp, &zz, &mut rng);
     let mut fs_t = merlin::Transcript::new(DST);
-    let proof = batch_prove(&mut rng, &pp, &zz, &cc, &r, &mut fs_t);
+    let proof = batch_prove::<E, _>(&mut rng, &pp, &zz, &cc, &r, &mut fs_t);
 
     // === Serialize to memory ===
-    let encoded = bcs::to_bytes(&proof).expect("Serialization failed");
+    let encoded = {
+        let mut v = Vec::new();
+        proof
+            .serialize_compressed(&mut v)
+            .expect("proof serialization should succeed");
+        v
+    };
     println!(
-        "Serialized proof size (n={}, ell={}): {} bytes, expected for blstrs: {} bytes",
+        "Serialized proof size (n={}, ell={}): {} bytes (expected for blstrs: {} bytes)",
         n,
         ell,
         encoded.len(),
-        2 * 8 + 48 + (48 + 96) * ell // Can get rid of the 2 * 8 by turning the Vecs in `proof` into tuples
+        2 * 8 + 48 + (48 + 96) * ell // Can get rid of the 2 * 8 here by turning the Vecs in `proof` into tuples
     );
 
     // === Round-trip deserialization ===
-    let decoded = bcs::from_bytes(&encoded).expect("Deserialization failed");
+    let decoded = Proof::deserialize_compressed(&*encoded).expect("Deserialization failed");
 
     // Verify still succeeds
     let mut fs_t = merlin::Transcript::new(DST);
@@ -81,6 +74,7 @@ fn run_serialize_range_proof(n: usize, ell: usize) {
     );
 }
 
+#[cfg(test)]
 const TEST_CASES: &[(usize, usize)] = &[
     // (n, \ell)
     (3, 16),
@@ -98,16 +92,27 @@ const TEST_CASES: &[(usize, usize)] = &[
     (2047, 32),
 ];
 
+#[cfg(test)]
+macro_rules! for_each_curve {
+    ($f:ident, $n:expr, $ell:expr) => {{
+        use ark_bls12_381::Bls12_381;
+        use ark_bn254::Bn254;
+
+        $f::<Bn254>($n, $ell);
+        $f::<Bls12_381>($n, $ell);
+    }};
+}
+
 #[test]
 fn range_proof_completeness_multi() {
     for &(n, ell) in TEST_CASES {
-        run_range_proof_completeness(n, ell);
+        for_each_curve!(run_range_proof_completeness, n, ell);
     }
 }
 
 #[test]
 fn serialize_range_proof_multi() {
     for &(n, ell) in TEST_CASES {
-        run_serialize_range_proof(n, ell);
+        for_each_curve!(run_serialize_range_proof, n, ell);
     }
 }
