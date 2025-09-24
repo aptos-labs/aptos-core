@@ -2196,6 +2196,20 @@ impl Opcodes {
             0x58 => Ok(Opcodes::PACK_CLOSURE),
             0x59 => Ok(Opcodes::PACK_CLOSURE_GENERIC),
             0x5A => Ok(Opcodes::CALL_CLOSURE),
+            // Since bytecode version 9
+            0x5B => Ok(Opcodes::LD_I8),
+            0x5C => Ok(Opcodes::LD_I16),
+            0x5D => Ok(Opcodes::LD_I32),
+            0x5E => Ok(Opcodes::LD_I64),
+            0x5F => Ok(Opcodes::LD_I128),
+            0x60 => Ok(Opcodes::LD_I256),
+            0x61 => Ok(Opcodes::CAST_I8),
+            0x62 => Ok(Opcodes::CAST_I16),
+            0x63 => Ok(Opcodes::CAST_I32),
+            0x64 => Ok(Opcodes::CAST_I64),
+            0x65 => Ok(Opcodes::CAST_I128),
+            0x66 => Ok(Opcodes::CAST_I256),
+            0x67 => Ok(Opcodes::NEGATE),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)
                 .with_message(format!("code {:X}", value))),
         }
