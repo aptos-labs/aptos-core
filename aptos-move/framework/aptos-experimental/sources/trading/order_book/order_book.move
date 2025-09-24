@@ -65,6 +65,12 @@ module aptos_experimental::order_book {
         self.single_order_book.cancel_order(&mut self.price_time_idx, order_creator, order_id)
     }
 
+    public fun try_cancel_order<M: store + copy + drop>(
+        self: &mut OrderBook<M>, order_creator: address, order_id: OrderIdType
+    ): Option<SingleOrder<M>> {
+        self.single_order_book.try_cancel_order(&mut self.price_time_idx, order_creator, order_id)
+    }
+
     public fun try_cancel_order_with_client_order_id<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_creator: address, client_order_id: u64
     ): Option<SingleOrder<M>> {

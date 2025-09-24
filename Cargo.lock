@@ -1346,12 +1346,19 @@ dependencies = [
 
 [[package]]
 name = "aptos-dkg"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-runtimes",
+ "ark-bls12-381 0.5.0",
+ "ark-bn254",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-poly 0.5.0",
+ "ark-serialize 0.5.0",
+ "ark-std 0.5.0",
  "bcs 0.1.4",
  "blst",
  "blstrs",
@@ -2824,7 +2831,6 @@ dependencies = [
 name = "aptos-keyless-pepper-service"
 version = "0.1.0"
 dependencies = [
- "aes-gcm",
  "anyhow",
  "aptos-build-info",
  "aptos-crypto",
@@ -2855,7 +2861,6 @@ dependencies = [
  "sha3 0.9.1",
  "thiserror",
  "tokio",
- "uuid 1.11.0",
 ]
 
 [[package]]

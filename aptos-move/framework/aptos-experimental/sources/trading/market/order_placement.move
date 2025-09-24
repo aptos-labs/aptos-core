@@ -69,7 +69,7 @@ module aptos_experimental::order_placement {
     use aptos_experimental::market_types::{
         Self,
         MarketClearinghouseCallbacks,
-        Market,
+        Market, CallbackResult, new_callback_result_not_available,
     };
 
     // Error codes
@@ -98,40 +98,41 @@ module aptos_experimental::order_placement {
         OrderPreCancelled,
     }
 
-    struct OrderMatchResult has drop {
+    struct OrderMatchResult<R: store + copy + drop> has drop {
         order_id: OrderIdType,
         remaining_size: u64,
         cancel_reason: Option<OrderCancellationReason>,
+        callback_results: vector<R>,
         fill_sizes: vector<u64>,
         match_count: u32, // includes fills and cancels
     }
 
-    public fun destroy_order_match_result(
-        self: OrderMatchResult
-    ): (OrderIdType, u64, Option<OrderCancellationReason>, vector<u64>, u32) {
-        let OrderMatchResult { order_id, remaining_size, cancel_reason, fill_sizes, match_count } =
+    public fun destroy_order_match_result<R: store + copy + drop>(
+        self: OrderMatchResult<R>
+    ): (OrderIdType, u64, Option<OrderCancellationReason>, vector<R>, vector<u64>, u32) {
+        let OrderMatchResult { order_id, remaining_size, cancel_reason, callback_results,  fill_sizes, match_count } =
             self;
-        (order_id, remaining_size, cancel_reason, fill_sizes, match_count)
+        (order_id, remaining_size, cancel_reason, callback_results, fill_sizes, match_count)
     }
 
-    public fun number_of_fills(self: &OrderMatchResult): u64 {
+    public fun number_of_fills<R: store + copy + drop>(self: &OrderMatchResult<R>): u64 {
         self.fill_sizes.length()
     }
 
     /// Includes fills and cancels
-    public fun number_of_matches(self: &OrderMatchResult): u32 {
+    public fun number_of_matches<R: store + copy + drop>(self: &OrderMatchResult<R>): u32 {
         self.match_count
     }
 
-    public fun total_fill_size(self: &OrderMatchResult): u64 {
+    public fun total_fill_size<R: store + copy + drop>(self: &OrderMatchResult<R>): u64 {
         self.fill_sizes.fold(0, |acc, fill_size| acc + fill_size)
     }
 
-    public fun get_cancel_reason(self: &OrderMatchResult): Option<OrderCancellationReason> {
+    public fun get_cancel_reason<R: store + copy + drop>(self: &OrderMatchResult<R>): Option<OrderCancellationReason> {
         self.cancel_reason
     }
 
-    public fun get_remaining_size_from_result(self: &OrderMatchResult): u64 {
+    public fun get_remaining_size_from_result<R: store + copy + drop>(self: &OrderMatchResult<R>): u64 {
         self.remaining_size
     }
 
@@ -145,7 +146,7 @@ module aptos_experimental::order_placement {
         return cancel_reason == OrderCancellationReason::MaxFillLimitViolation
     }
 
-    public fun get_order_id(self: OrderMatchResult): OrderIdType {
+    public fun get_order_id<R: store + copy + drop>(self: OrderMatchResult<R>): OrderIdType {
         self.order_id
     }
 
@@ -176,7 +177,7 @@ module aptos_experimental::order_placement {
     /// - callbacks: The callbacks for the market clearinghouse. This is a struct that implements the MarketClearinghouseCallbacks
     /// interface. This is used to validate the order and settle the trade.
     /// Returns the order id, remaining size, cancel reason and number of fills for the order.
-    public fun place_limit_order<M: store + copy + drop>(
+    public fun place_limit_order<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user: &signer,
         limit_price: u64,
@@ -188,8 +189,8 @@ module aptos_experimental::order_placement {
         client_order_id: Option<u64>,
         max_match_limit: u32,
         cancel_on_match_limit: bool,
-        callbacks: &MarketClearinghouseCallbacks<M>
-    ): OrderMatchResult {
+        callbacks: &MarketClearinghouseCallbacks<M, R>
+    ): OrderMatchResult<R> {
         place_order_with_order_id(
             market,
             signer::address_of(user),
@@ -210,7 +211,7 @@ module aptos_experimental::order_placement {
     }
 
     /// Places a market order - The order is guaranteed to be a taker order and will be matched immediately.
-    public fun place_market_order<M: store + copy + drop>(
+    public fun place_market_order<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user: &signer,
         orig_size: u64,
@@ -219,8 +220,8 @@ module aptos_experimental::order_placement {
         client_order_id: Option<u64>,
         max_match_limit: u32,
         cancel_on_match_limit: bool,
-        callbacks: &MarketClearinghouseCallbacks<M>
-    ): OrderMatchResult {
+        callbacks: &MarketClearinghouseCallbacks<M, R>
+    ): OrderMatchResult<R> {
         place_order_with_order_id(
             market,
             signer::address_of(user),
@@ -240,7 +241,7 @@ module aptos_experimental::order_placement {
         )
     }
 
-    fun place_maker_order_internal<M: store + copy + drop>(
+    fun place_maker_order_internal<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user_addr: address,
         limit_price: u64,
@@ -255,8 +256,9 @@ module aptos_experimental::order_placement {
         order_id: OrderIdType,
         client_order_id: Option<u64>,
         emit_order_open: bool,
-        callbacks: &MarketClearinghouseCallbacks<M>
-    ): OrderMatchResult {
+        callbacks: &MarketClearinghouseCallbacks<M, R>,
+        callback_results: vector<R>,
+    ): OrderMatchResult<R> {
         if (time_in_force == immediate_or_cancel() && trigger_condition.is_none()) {
             return cancel_single_order_internal(
                 market,
@@ -274,7 +276,8 @@ module aptos_experimental::order_placement {
                 std::string::utf8(b"IOC Violation"),
                 metadata,
                 time_in_force,
-                callbacks
+                callbacks,
+                callback_results
             );
         };
 
@@ -324,12 +327,13 @@ module aptos_experimental::order_placement {
             order_id,
             remaining_size,
             cancel_reason: option::none(),
+            callback_results,
             fill_sizes,
             match_count
         }
     }
 
-    fun cancel_maker_order_internal<M: store + copy + drop>(
+    fun cancel_maker_order_internal<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         maker_order: &OrderMatchDetails<M>,
         client_order_id: Option<u64>,
@@ -339,7 +343,7 @@ module aptos_experimental::order_placement {
         unsettled_size: u64,
         metadata: M,
         time_in_force: TimeInForce,
-        callbacks: &MarketClearinghouseCallbacks<M>
+        callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let maker_cancel_size = unsettled_size + maker_order.get_remaining_size_from_match_details();
         market.emit_event_for_order(
@@ -379,7 +383,7 @@ module aptos_experimental::order_placement {
         );
     }
 
-    fun cancel_single_order_internal<M: store + copy + drop>(
+    fun cancel_single_order_internal<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user_addr: address,
         limit_price: u64,
@@ -395,8 +399,9 @@ module aptos_experimental::order_placement {
         cancel_details: String,
         metadata: M,
         time_in_force: TimeInForce,
-        callbacks: &MarketClearinghouseCallbacks<M>
-    ): OrderMatchResult {
+        callbacks: &MarketClearinghouseCallbacks<M, R>,
+        callback_results: vector<R>,
+    ): OrderMatchResult<R> {
         market.emit_event_for_order(
             order_id,
             client_order_id,
@@ -422,18 +427,19 @@ module aptos_experimental::order_placement {
             remaining_size: 0,
             cancel_reason: option::some(cancel_reason),
             fill_sizes,
+            callback_results,
             match_count
         }
     }
 
-    public fun cleanup_order_internal<M: store + copy + drop>(
+    public fun cleanup_order_internal<M: store + copy + drop, R: store + copy + drop>(
         user_addr: address,
         order_id: OrderIdType,
         book_type: OrderBookType,
         is_bid: bool,
         remaining_size: u64,
         metadata: M,
-        callbacks: &MarketClearinghouseCallbacks<M>
+        callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         if (book_type == single_order_book_type()) {
             callbacks.cleanup_order(
@@ -446,7 +452,7 @@ module aptos_experimental::order_placement {
         }
     }
 
-    fun settle_single_trade<M: store + copy + drop>(
+    fun settle_single_trade<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user_addr: address,
         price: u64,
@@ -456,10 +462,10 @@ module aptos_experimental::order_placement {
         metadata: M,
         order_id: OrderIdType,
         client_order_id: Option<u64>,
-        callbacks: &MarketClearinghouseCallbacks<M>,
+        callbacks: &MarketClearinghouseCallbacks<M, R>,
         time_in_force: TimeInForce,
         fill_sizes: &mut vector<u64>,
-    ): Option<OrderCancellationReason> {
+    ): (Option<OrderCancellationReason>, CallbackResult<R>) {
         let result =
             market.get_order_book_mut()
                 .get_single_match_for_taker(price, *remaining_size, is_bid);
@@ -477,7 +483,7 @@ module aptos_experimental::order_placement {
                 maker_order.get_time_in_force_from_match_details(),
                 callbacks
             );
-            return option::none();
+            return (option::none(), new_callback_result_not_available());
         };
         let fill_id = market.next_fill_id();
         let settle_result = callbacks.settle_trade(
@@ -491,7 +497,6 @@ module aptos_experimental::order_placement {
             maker_order.get_price_from_match_details(), // Order is always matched at the price of the maker
             maker_matched_size,
             metadata,
-            // TODO(skedia) fix this to pass option to the callbacks
             maker_order.get_metadata_from_match_details()
         );
 
@@ -559,7 +564,8 @@ module aptos_experimental::order_placement {
                 taker_cancellation_reason.destroy_some(),
                 metadata,
                 time_in_force,
-                callbacks
+                callbacks,
+                vector[]
             );
             if (maker_cancellation_reason.is_none() && unsettled_maker_size > 0) {
                 // If the taker is cancelled but the maker is not cancelled, then we need to re-insert
@@ -570,7 +576,7 @@ module aptos_experimental::order_placement {
                     &maker_order
                 );
             };
-            return option::some(OrderCancellationReason::ClearinghouseSettleViolation);
+            return (option::some(OrderCancellationReason::ClearinghouseSettleViolation), *settle_result.get_callback_result());
         };
         if (maker_cancellation_reason.is_some()) {
             cancel_maker_order_internal(
@@ -596,7 +602,7 @@ module aptos_experimental::order_placement {
                 callbacks
             );
         };
-        option::none()
+        (option::none(), *settle_result.get_callback_result())
     }
 
     /// Similar to `place_order` API but allows few extra parameters as follows
@@ -605,7 +611,7 @@ module aptos_experimental::order_placement {
     /// - emit_taker_order_open: bool: Whether to emit an order open event for the taker order - this is used when
     /// the caller do not wants to emit an open order event for a taker in case the taker order was intterrupted because
     /// of fill limit violation  in the previous transaction and the order is just a continuation of the previous order.
-    public fun place_order_with_order_id<M: store + copy + drop>(
+    public fun place_order_with_order_id<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user_addr: address,
         limit_price: u64,
@@ -620,8 +626,8 @@ module aptos_experimental::order_placement {
         max_match_limit: u32,
         cancel_on_match_limit: bool,
         emit_taker_order_open: bool,
-        callbacks: &MarketClearinghouseCallbacks<M>
-    ): OrderMatchResult {
+        callbacks: &MarketClearinghouseCallbacks<M, R>
+    ): OrderMatchResult<R> {
         assert!(
             orig_size > 0 && remaining_size > 0,
             EINVALID_ORDER
@@ -686,7 +692,8 @@ module aptos_experimental::order_placement {
                 std::string::utf8(b"Position Update violation"),
                 metadata,
                 time_in_force,
-                callbacks
+                callbacks,
+                vector[]
             );
         };
 
@@ -709,7 +716,8 @@ module aptos_experimental::order_placement {
                     std::string::utf8(b"Duplicate client order id"),
                     metadata,
                     time_in_force,
-                    callbacks
+                    callbacks,
+                    vector[]
                 );
             };
 
@@ -734,7 +742,8 @@ module aptos_experimental::order_placement {
                     std::string::utf8(b"Order pre cancelled"),
                     metadata,
                     time_in_force,
-                    callbacks
+                    callbacks,
+                    vector[]
                 );
             };
         };
@@ -755,7 +764,8 @@ module aptos_experimental::order_placement {
                 order_id,
                 client_order_id,
                 false,
-                callbacks
+                callbacks,
+                vector[]
             );
         };
 
@@ -778,14 +788,16 @@ module aptos_experimental::order_placement {
                 std::string::utf8(b"Post Only violation"),
                 metadata,
                 time_in_force,
-                callbacks
+                callbacks,
+                vector[]
             );
         };
         let fill_sizes = vector::empty();
         let match_count = 0;
+        let callback_results = vector::empty();
         loop {
             match_count += 1;
-            let taker_cancellation_reason =
+            let (taker_cancellation_reason, callback_result) =
                 settle_single_trade(
                     market,
                     user_addr,
@@ -800,12 +812,28 @@ module aptos_experimental::order_placement {
                     time_in_force,
                     &mut fill_sizes
                 );
+            let should_stop = callback_result.should_stop_matching();
+            let result  = callback_result.extract_results();
+            if (result.is_some()) {
+                callback_results.push_back(result.destroy_some());
+            };
             if (taker_cancellation_reason.is_some()) {
                 return OrderMatchResult {
                     order_id,
                     remaining_size: 0, // 0 because the order is cancelled
                     cancel_reason: taker_cancellation_reason,
                     fill_sizes,
+                    callback_results,
+                    match_count
+                }
+            };
+            if (should_stop) {
+                return OrderMatchResult {
+                    order_id,
+                    remaining_size,
+                    cancel_reason: option::none(),
+                    fill_sizes,
+                    callback_results,
                     match_count
                 }
             };
@@ -837,7 +865,8 @@ module aptos_experimental::order_placement {
                         std::string::utf8(b"IOC_VIOLATION"),
                         metadata,
                         time_in_force,
-                        callbacks
+                        callbacks,
+                        callback_results
                     );
                 } else {
                     // If the order is not a taker order, then we can place it as a maker order
@@ -856,7 +885,8 @@ module aptos_experimental::order_placement {
                         order_id,
                         client_order_id,
                         true, // emit_order_open
-                        callbacks
+                        callbacks,
+                        callback_results,
                     );
                 };
             };
@@ -879,7 +909,8 @@ module aptos_experimental::order_placement {
                         std::string::utf8(b"Max fill limit reached"),
                         metadata,
                         time_in_force,
-                        callbacks
+                        callbacks,
+                        callback_results
                     );
                 } else {
                     return OrderMatchResult {
@@ -888,6 +919,7 @@ module aptos_experimental::order_placement {
                         cancel_reason: option::some(
                             OrderCancellationReason::MaxFillLimitViolation
                         ),
+                        callback_results,
                         fill_sizes,
                         match_count
                     }
@@ -899,6 +931,7 @@ module aptos_experimental::order_placement {
             remaining_size,
             cancel_reason: option::none(),
             fill_sizes,
+            callback_results,
             match_count
         }
     }

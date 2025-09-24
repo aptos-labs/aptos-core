@@ -43,8 +43,9 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let order_request = create_test_order_request(
+        let order_request = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1,
+            1, // sequence number 1 for initial setup
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -64,6 +65,26 @@ module aptos_experimental::bulk_order_book_tests {
     ): BulkOrderRequest<TestMetadata> {
         new_bulk_order_request(
             account,
+            1, // sequence number for tests
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            new_test_metadata(1)
+        )
+    }
+
+    fun create_test_order_request_with_sequence(
+        account: address,
+        sequence_number: u64,
+        bid_prices: vector<u64>,
+        bid_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+        ask_sizes: vector<u64>
+    ): BulkOrderRequest<TestMetadata> {
+        new_bulk_order_request(
+            account,
+            sequence_number,
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -213,8 +234,36 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices = vector[ask_price];
         let ask_sizes = vector[ask_size];
 
-        let order_request = create_test_order_request(
+        let order_request = create_test_order_request_with_sequence(
             account,
+            5, // sequence number 5 for subsequent orders
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes
+        );
+        order_book.place_bulk_order(price_time_index, id_gen, order_request);
+    }
+
+    fun place_simple_order_with_sequence(
+        order_book: &mut BulkOrderBook<TestMetadata>,
+        price_time_index: &mut price_time_index::PriceTimeIndex,
+        id_gen: &mut AscendingIdGenerator,
+        account: address,
+        sequence_number: u64,
+        bid_price: u64,
+        bid_size: u64,
+        ask_price: u64,
+        ask_size: u64
+    ) {
+        let bid_prices = vector[bid_price];
+        let bid_sizes = vector[bid_size];
+        let ask_prices = vector[ask_price];
+        let ask_sizes = vector[ask_size];
+
+        let order_request = create_test_order_request_with_sequence(
+            account,
+            sequence_number,
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -234,8 +283,9 @@ module aptos_experimental::bulk_order_book_tests {
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>
     ) {
-        let order_request = create_test_order_request(
+        let order_request = create_test_order_request_with_sequence(
             account,
+            6, // sequence number 6 for multi-level orders
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -842,8 +892,9 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let order_request = create_test_order_request(
+        let order_request = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1,
+            10, // sequence number 10 for recreation
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -1080,8 +1131,9 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let order_request = create_test_order_request(
+        let order_request = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1,
+            15, // sequence number 15 for empty bid vectors test
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -1244,8 +1296,9 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices_1 = vector[105];
         let ask_sizes_1 = vector[SIZE_1];
 
-        let order_request_1 = create_test_order_request(
+        let order_request_1 = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1,
+            20, // sequence number 20 for first order
             bid_prices_1,
             bid_sizes_1,
             ask_prices_1,
@@ -1258,8 +1311,9 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices_2 = vector[107, 108]; //
         let ask_sizes_2 = vector[SIZE_1, SIZE_2];
 
-        let order_request_2 = create_test_order_request(
+        let order_request_2 = create_test_order_request_with_sequence(
             TEST_ACCOUNT_2,
+            25, // sequence number 25 for second order
             bid_prices_2,
             bid_sizes_2,
             ask_prices_2,
@@ -1521,7 +1575,7 @@ module aptos_experimental::bulk_order_book_tests {
         setup_multi_account_scenario(&mut order_book, &mut price_time_index, &mut id_gen, accounts_and_orders);
 
         // Account 1 replaces their order with different prices
-        place_simple_order(&mut order_book, &mut price_time_index, &mut id_gen, TEST_ACCOUNT_1, 98, SIZE_3, 103, SIZE_3);
+        place_simple_order_with_sequence(&mut order_book, &mut price_time_index, &mut id_gen, TEST_ACCOUNT_1, 30, 98, SIZE_3, 103, SIZE_3);
 
         // Old prices should no longer be active
         assert!(!price_time_index.is_taker_order(101, true)); // Old ask price
@@ -1554,6 +1608,46 @@ module aptos_experimental::bulk_order_book_tests {
         );
         assert!(matches_2.length() == 1);
 
+        price_time_index.destroy_price_time_idx();
+        order_book.destroy_bulk_order_book();
+    }
+
+    #[test]
+    fun test_sequence_number_validation() {
+        let (order_book, price_time_index, id_gen) = setup_test();
+        // Test that we can place an order with higher sequence number (replacing the one from setup_test)
+        let order_req1 = create_test_order_request_with_sequence(
+            TEST_ACCOUNT_1, 10, vector[100], vector[10], vector[200], vector[10]
+        );
+        let _order_id1 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req1);
+        // Test that we can place an order with even higher sequence number
+        let order_req2 = create_test_order_request_with_sequence(
+            TEST_ACCOUNT_1, 15, vector[100], vector[10], vector[200], vector[10]
+        );
+        let _order_id2 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req2);
+        price_time_index.destroy_price_time_idx();
+        order_book.destroy_bulk_order_book();
+    }
+
+    #[test]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_book::E_INVALID_SEQUENCE_NUMBER)]
+    fun test_sequence_number_validation_failure() {
+        let (order_book, price_time_index, id_gen) = setup_test();
+        // Test that we can place an order with higher sequence number (replacing the one from setup_test)
+        let order_req1 = create_test_order_request_with_sequence(
+            TEST_ACCOUNT_1, 10, vector[100], vector[10], vector[200], vector[10]
+        );
+        let _order_id1 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req1);
+        // Test that we can place an order with even higher sequence number
+        let order_req2 = create_test_order_request_with_sequence(
+            TEST_ACCOUNT_1, 15, vector[100], vector[10], vector[200], vector[10]
+        );
+        let _order_id2 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req2);
+        // Test that we cannot place an order with lower sequence number (should abort)
+        let order_req3 = create_test_order_request_with_sequence(
+            TEST_ACCOUNT_1, 12, vector[100], vector[10], vector[200], vector[10]
+        );
+        let _ = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req3);
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
     }

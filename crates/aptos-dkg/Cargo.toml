@@ -1,6 +1,6 @@
 [package]
 name = "aptos-dkg"
-version = "0.1.0"
+version = "0.2.0"
 edition = { workspace = true }
 license = { workspace = true }
 
@@ -9,6 +9,13 @@ anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-runtimes = { workspace = true }
+ark-bls12-381 = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-ec = { workspace = true }
+ark-ff = { workspace = true }
+ark-poly = { workspace = true }
+ark-serialize = { workspace = true }
+ark-std = { workspace = true }
 bcs =  { workspace = true }
 blst = { workspace = true }
 blstrs = { workspace = true }

@@ -35,6 +35,43 @@ pub struct OnChainKeylessConfiguration {
 }
 
 impl OnChainKeylessConfiguration {
+    #[cfg(test)]
+    /// Creates a new OnChainKeylessConfiguration for testing
+    pub fn new_for_testing() -> Self {
+        // Create a test configuration
+        let configuration = Configuration::new_for_testing();
+
+        // Get the training wheels public key
+        let training_wheels_pubkey = match configuration.training_wheels_pubkey {
+            Some(public_key) => {
+                let public_key_hex = hex::encode(&public_key);
+                let public_key_string = format!("0x{}", public_key_hex);
+                TrainingWheelsPubKey {
+                    vec: vec![public_key_string],
+                }
+            },
+            None => TrainingWheelsPubKey { vec: vec![] },
+        };
+
+        // Get the corresponding on-chain configuration data
+        let data = KeylessConfigurationData {
+            max_commited_epk_bytes: configuration.max_commited_epk_bytes,
+            max_exp_horizon_secs: configuration.max_exp_horizon_secs.to_string(),
+            max_extra_field_bytes: configuration.max_extra_field_bytes,
+            max_iss_val_bytes: configuration.max_iss_val_bytes,
+            max_jwt_header_b64_bytes: configuration.max_jwt_header_b64_bytes,
+            max_signatures_per_txn: configuration.max_signatures_per_txn,
+            override_aud_vals: configuration.override_aud_vals,
+            training_wheels_pubkey,
+        };
+
+        // Return the on-chain keyless configuration
+        OnChainKeylessConfiguration {
+            r#type: "0x1::keyless_account::Configuration".to_string(),
+            data,
+        }
+    }
+
     /// Converts the on-chain keyless configuration to the internal representation
     pub fn get_keyless_configuration(&self) -> Result<Configuration> {
         // Extract the training wheels public key

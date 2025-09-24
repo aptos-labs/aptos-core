@@ -226,6 +226,19 @@ module aptos_experimental::single_order_book {
         option::some(self.cancel_order(price_time_idx, order_creator, *order_id))
     }
 
+    public(friend) fun try_cancel_order<M: store + copy + drop>(
+        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_creator: address, order_id: OrderIdType
+    ): Option<SingleOrder<M>> {
+        if (!self.orders.contains(&order_id)) {
+            return option::none();
+        };
+        let order = self.orders.borrow(&order_id);
+        if (order.get_order_from_state().get_account() != order_creator) {
+            return option::none();
+        };
+        option::some(self.cancel_order(price_time_idx, order_creator, order_id))
+    }
+
     public(friend) fun client_order_id_exists<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_creator: address, client_order_id: u64
     ): bool {
