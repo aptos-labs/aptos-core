@@ -208,14 +208,8 @@ impl ExecutionProxyClient {
         buffer_manager_back_pressure_enabled: bool,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        network_sender: Arc<NetworkSender>,
     ) {
-        let network_sender = NetworkSender::new(
-            self.author,
-            self.network_sender.clone(),
-            self.self_sender.clone(),
-            epoch_state.verifier.clone(),
-        );
-
         let (reset_buffer_manager_tx, reset_buffer_manager_rx) = unbounded::<ResetRequest>();
 
         let (commit_msg_tx, commit_msg_rx) =
@@ -240,7 +234,7 @@ impl ExecutionProxyClient {
                     rand_config,
                     fast_rand_config,
                     rand_ready_block_tx,
-                    Arc::new(network_sender.clone()),
+                    network_sender.clone(),
                     self.rand_storage.clone(),
                     self.bounded_executor.clone(),
                     &self.consensus_config.rand_rb_config,
@@ -319,6 +313,12 @@ impl TExecutionClient for ExecutionProxyClient {
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
     ) {
+        let network_sender = Arc::new(NetworkSender::new(
+            self.author,
+            self.network_sender.clone(),
+            self.self_sender.clone(),
+            epoch_state.verifier.clone(),
+        ));
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             maybe_consensus_key,
             commit_signer_provider,
@@ -331,6 +331,7 @@ impl TExecutionClient for ExecutionProxyClient {
             self.consensus_config.enable_pre_commit,
             self.consensus_observer_config,
             self.consensus_publisher.clone(),
+            network_sender.clone(),
         );
 
         let transaction_shuffler =
@@ -353,6 +354,7 @@ impl TExecutionClient for ExecutionProxyClient {
             randomness_enabled,
             onchain_consensus_config.clone(),
             aux_version,
+            network_sender,
         );
 
         maybe_rand_msg_tx

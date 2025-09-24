@@ -560,16 +560,6 @@ impl PipelinedBlock {
             let _ = fut.commit_ledger_fut.await;
         }
     }
-
-    pub async fn wait_for_commit_vote(&self) -> Option<CommitVote> {
-        // may be aborted (e.g. by reset)
-        if let Some(fut) = self.pipeline_futs() {
-            // this may be cancelled
-            fut.commit_vote_fut.await.ok()
-        } else {
-            None
-        }
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
