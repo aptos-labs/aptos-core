@@ -48,7 +48,8 @@ proptest! {
         let deserialized_module = CompiledModule::deserialize_no_check_bounds(&serialized)
             .expect("deserialization should work");
         if module != deserialized_module {
-            let expected = format!("{:?}", module); let actual = &format!("{:?}", deserialized_module);
+            let expected = format!("{:?}", module);
+            let actual = format!("{:?}", deserialized_module);
             let diff = SimpleDiff::from_str(&expected, &actual, "expected", "actual");
             prop_assert!(false, "roundtrip failed: {}\n", diff)
         }
