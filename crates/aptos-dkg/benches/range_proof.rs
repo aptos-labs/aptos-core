@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_dkg::{
-    range_proofs::{dekart_univariate::Proof as DeKARTProof, traits::BatchedRangeProof},
+    range_proofs::{dekart_univariate::Proof as UnivariateDeKART, traits::BatchedRangeProof},
     utils::test_utils,
 };
 use ark_ec::pairing::Pairing;
@@ -62,8 +62,8 @@ fn bench_groups(c: &mut Criterion) {
     use ark_bls12_381::Bls12_381;
     use ark_bn254::Bn254;
 
-    bench_range_proof::<Bn254, DeKARTProof<Bn254>>(c, "BN254");
-    bench_range_proof::<Bls12_381, DeKARTProof<Bls12_381>>(c, "BLS12-381");
+    bench_range_proof::<Bn254, UnivariateDeKART<Bn254>>(c, "BN254");
+    bench_range_proof::<Bls12_381, UnivariateDeKART<Bls12_381>>(c, "BLS12-381");
 }
 
 criterion_group!(
