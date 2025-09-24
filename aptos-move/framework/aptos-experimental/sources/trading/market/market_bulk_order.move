@@ -29,6 +29,7 @@ module aptos_experimental::market_bulk_order {
     public fun place_bulk_order<M: store + copy + drop>(
         market: &mut Market<M>,
         account: address,
+        sequence_number: u64,
         bid_prices: vector<u64>,
         bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
@@ -50,6 +51,7 @@ module aptos_experimental::market_bulk_order {
         };
         option::some(market.get_order_book_mut().place_bulk_order(new_bulk_order_request(
             account,
+            sequence_number,
             bid_prices,
             bid_sizes,
             ask_prices,

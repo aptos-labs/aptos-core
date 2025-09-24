@@ -2347,7 +2347,11 @@ Cancels an order - this will cancel the order and emit an event for the order ca
 
 
 
+<<<<<<< HEAD
 <pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_place_bulk_order">place_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, metadata: M, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;
+=======
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_place_bulk_order">place_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, sequence_number: u64, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;
+>>>>>>> 2ba3cd5efa (feat: Add sequence number validation to bulk orders)
 </code></pre>
 
 
@@ -2359,6 +2363,7 @@ Cancels an order - this will cancel the order and emit an event for the order ca
 <pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_place_bulk_order">place_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="market.md#0x7_market_Market">Market</a>&lt;M&gt;,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
+    sequence_number: u64,
     bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
@@ -2379,6 +2384,7 @@ Cancels an order - this will cancel the order and emit an event for the order ca
     };
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_place_bulk_order">place_bulk_order</a>(new_bulk_order_request(
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        sequence_number,
         bid_prices,
         bid_sizes,
         ask_prices,
