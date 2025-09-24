@@ -629,6 +629,15 @@ TimeBased(time): The order is triggered when the current time is greater than or
 
 
 
+<a id="0x7_market_EINVALID_SETTLE_PRICE"></a>
+
+
+
+<pre><code><b>const</b> <a href="market.md#0x7_market_EINVALID_SETTLE_PRICE">EINVALID_SETTLE_PRICE</a>: u64 = 13;
+</code></pre>
+
+
+
 <a id="0x7_market_EINVALID_TAKER_POSITION_UPDATE"></a>
 
 
@@ -1712,7 +1721,8 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         maker_order.get_order_id_from_match_details(),
         fill_id,
         is_bid,
-        maker_order.get_price_from_match_details(), // Order is always matched at the price of the maker
+        price,
+        maker_order.get_price_from_match_details(), // Order is usually matched at the price of the maker
         maker_matched_size,
         metadata,
         // TODO(skedia) fix this <b>to</b> pass <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">option</a> <b>to</b> the callbacks
@@ -1725,6 +1735,16 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         *remaining_size -= settled_size;
         unsettled_maker_size -= settled_size;
         fill_sizes.push_back(settled_size);
+
+        <b>let</b> settled_price = settle_result.get_settled_price();
+        <b>if</b> (is_bid) {
+            <b>assert</b>!(settled_price &lt;= price, <a href="market.md#0x7_market_EINVALID_SETTLE_PRICE">EINVALID_SETTLE_PRICE</a>);
+            <b>assert</b>!(settled_price &gt;= maker_order.get_price_from_match_details(), <a href="market.md#0x7_market_EINVALID_SETTLE_PRICE">EINVALID_SETTLE_PRICE</a>);
+        } <b>else</b> {
+            <b>assert</b>!(settled_price &gt;= price, <a href="market.md#0x7_market_EINVALID_SETTLE_PRICE">EINVALID_SETTLE_PRICE</a>);
+            <b>assert</b>!(settled_price &lt;= maker_order.get_price_from_match_details(), <a href="market.md#0x7_market_EINVALID_SETTLE_PRICE">EINVALID_SETTLE_PRICE</a>);
+        };
+
         // Event for taker fill
         self.<a href="market.md#0x7_market_emit_event_for_order">emit_event_for_order</a>(
             order_id,
@@ -1733,7 +1753,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             orig_size,
             *remaining_size,
             settled_size,
-            maker_order.get_price_from_match_details(),
+            settled_price,
             is_bid,
             <b>true</b>,
             <a href="market_types.md#0x7_market_types_order_status_filled">market_types::order_status_filled</a>(),
@@ -1751,7 +1771,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             maker_order.get_orig_size_from_match_details(),
             maker_order.get_remaining_size_from_match_details() + unsettled_maker_size,
             settled_size,
-            maker_order.get_price_from_match_details(),
+            settled_price,
             !is_bid,
             <b>false</b>,
             <a href="market_types.md#0x7_market_types_order_status_filled">market_types::order_status_filled</a>(),
