@@ -16819,6 +16819,7 @@ dependencies = [
  "move-core-types",
  "proptest",
  "proptest-derive",
+ "similar-asserts",
 ]
 
 [[package]]
@@ -17017,9 +17018,9 @@ dependencies = [
 
 [[package]]
 name = "similar-asserts"
-version = "1.5.0"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e041bb827d1bfca18f213411d51b665309f1afb37a04a5d1464530e13779fc0f"
+checksum = "b5b441962c817e33508847a22bd82f03a30cff43642dc2fae8b050566121eb9a"
 dependencies = [
  "console",
  "similar",
