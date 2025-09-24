@@ -232,7 +232,7 @@ impl StateSnapshotRestoreController {
     }
 
     fn validate_modules(blob: &[(StateKey, StateValue)]) {
-        // TODO: Instead of using default features, fetch them from the the state.
+        // TODO: Instead of using default features, fetch them from the state.
         let features = Features::default();
 
         let config = aptos_prod_verifier_config(LATEST_GAS_FEATURE_VERSION, &features);

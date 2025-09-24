@@ -284,7 +284,7 @@ def test_move_view(run_helper: RunHelper, test_name=None):
             f"View function [test_big_number] did not return correct result"
         )
 
-    # Test view function with with vector arguments
+    # Test view function with vector arguments
     # Follow 2 lines are for testing vector of u16-u256
     response = run_helper.run_command(
         test_name,
