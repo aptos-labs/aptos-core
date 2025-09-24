@@ -1031,17 +1031,20 @@ fn verify_instr(
             verifier.push(meter, ST::U128)?;
         },
 
-        Bytecode::Add
-        | Bytecode::Sub
-        | Bytecode::Mul
-        | Bytecode::Mod
-        | Bytecode::Div
-        | Bytecode::BitOr
-        | Bytecode::BitAnd
-        | Bytecode::Xor => {
+        Bytecode::Add | Bytecode::Sub | Bytecode::Mul | Bytecode::Mod | Bytecode::Div => {
             let operand1 = safe_unwrap!(verifier.stack.pop());
             let operand2 = safe_unwrap!(verifier.stack.pop());
             if operand1.is_integer() && operand1 == operand2 {
+                verifier.push(meter, operand1)?;
+            } else {
+                return Err(verifier.error(StatusCode::INTEGER_OP_TYPE_MISMATCH_ERROR, offset));
+            }
+        },
+
+        Bytecode::BitOr | Bytecode::BitAnd | Bytecode::Xor => {
+            let operand1 = safe_unwrap!(verifier.stack.pop());
+            let operand2 = safe_unwrap!(verifier.stack.pop());
+            if operand1.is_unsigned_integer() && operand1 == operand2 {
                 verifier.push(meter, operand1)?;
             } else {
                 return Err(verifier.error(StatusCode::INTEGER_OP_TYPE_MISMATCH_ERROR, offset));
@@ -1060,7 +1063,7 @@ fn verify_instr(
         Bytecode::Shl | Bytecode::Shr => {
             let operand1 = safe_unwrap!(verifier.stack.pop());
             let operand2 = safe_unwrap!(verifier.stack.pop());
-            if operand2.is_integer() && operand1 == ST::U8 {
+            if operand2.is_unsigned_integer() && operand1 == ST::U8 {
                 verifier.push(meter, operand2)?;
             } else {
                 return Err(verifier.error(StatusCode::INTEGER_OP_TYPE_MISMATCH_ERROR, offset));

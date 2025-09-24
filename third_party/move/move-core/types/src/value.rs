@@ -276,11 +276,17 @@ pub enum MoveTypeLayout {
     #[serde(rename(serialize = "fun", deserialize = "fun"))]
     Function,
     // Added in bytecode version v9
+    #[serde(rename(serialize = "i8", deserialize = "i8"))]
     I8,
+    #[serde(rename(serialize = "i16", deserialize = "i16"))]
     I16,
+    #[serde(rename(serialize = "i32", deserialize = "i32"))]
     I32,
+    #[serde(rename(serialize = "i64", deserialize = "i64"))]
     I64,
+    #[serde(rename(serialize = "i128", deserialize = "i128"))]
     I128,
+    #[serde(rename(serialize = "i256", deserialize = "i256"))]
     I256,
 }
 

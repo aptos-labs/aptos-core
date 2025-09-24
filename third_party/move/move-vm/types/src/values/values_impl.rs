@@ -698,6 +698,12 @@ impl ValueImpl {
             (U64(l), U64(r)) => l.cmp(r),
             (U128(l), U128(r)) => l.cmp(r),
             (U256(l), U256(r)) => l.cmp(r),
+            (I8(l), I8(r)) => l.cmp(r),
+            (I16(l), I16(r)) => l.cmp(r),
+            (I32(l), I32(r)) => l.cmp(r),
+            (I64(l), I64(r)) => l.cmp(r),
+            (I128(l), I128(r)) => l.cmp(r),
+            (I256(l), I256(r)) => l.cmp(r),
             (Bool(l), Bool(r)) => l.cmp(r),
             (Address(l), Address(r)) => l.cmp(r),
 
@@ -2387,6 +2393,12 @@ impl VMValueCast<IntegerValue> for Value {
             ValueImpl::U64(x) => Ok(IntegerValue::U64(x)),
             ValueImpl::U128(x) => Ok(IntegerValue::U128(x)),
             ValueImpl::U256(x) => Ok(IntegerValue::U256(x)),
+            ValueImpl::I8(x) => Ok(IntegerValue::I8(x)),
+            ValueImpl::I16(x) => Ok(IntegerValue::I16(x)),
+            ValueImpl::I32(x) => Ok(IntegerValue::I32(x)),
+            ValueImpl::I64(x) => Ok(IntegerValue::I64(x)),
+            ValueImpl::I128(x) => Ok(IntegerValue::I128(x)),
+            ValueImpl::I256(x) => Ok(IntegerValue::I256(x)),
             v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                 .with_message(format!("cannot cast {:?} to integer", v,))),
         }
@@ -2465,7 +2477,13 @@ impl VMValueCast<Vec<Value>> for Value {
             | ValueImpl::U32(_)
             | ValueImpl::U64(_)
             | ValueImpl::U128(_)
-            | ValueImpl::U256(_) => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+            | ValueImpl::U256(_)
+            | ValueImpl::I8(_)
+            | ValueImpl::I16(_)
+            | ValueImpl::I32(_)
+            | ValueImpl::I64(_)
+            | ValueImpl::I128(_)
+            | ValueImpl::I256(_) => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                 .with_message(
                     "cannot cast a specialized vector into a non-specialized one".to_string(),
                 )),
@@ -2574,6 +2592,66 @@ impl VMValueCast<int256::U256> for IntegerValue {
             Self::U256(x) => Ok(x),
             v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                 .with_message(format!("cannot cast {:?} to u256", v,))),
+        }
+    }
+}
+
+impl VMValueCast<i8> for IntegerValue {
+    fn cast(self) -> PartialVMResult<i8> {
+        match self {
+            Self::I8(x) => Ok(x),
+            v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                .with_message(format!("cannot cast {:?} to i8", v,))),
+        }
+    }
+}
+
+impl VMValueCast<i16> for IntegerValue {
+    fn cast(self) -> PartialVMResult<i16> {
+        match self {
+            Self::I16(x) => Ok(x),
+            v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                .with_message(format!("cannot cast {:?} to i16", v,))),
+        }
+    }
+}
+
+impl VMValueCast<i32> for IntegerValue {
+    fn cast(self) -> PartialVMResult<i32> {
+        match self {
+            Self::I32(x) => Ok(x),
+            v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                .with_message(format!("cannot cast {:?} to i32", v,))),
+        }
+    }
+}
+
+impl VMValueCast<i64> for IntegerValue {
+    fn cast(self) -> PartialVMResult<i64> {
+        match self {
+            Self::I64(x) => Ok(x),
+            v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                .with_message(format!("cannot cast {:?} to i64", v,))),
+        }
+    }
+}
+
+impl VMValueCast<i128> for IntegerValue {
+    fn cast(self) -> PartialVMResult<i128> {
+        match self {
+            Self::I128(x) => Ok(x),
+            v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                .with_message(format!("cannot cast {:?} to i128", v,))),
+        }
+    }
+}
+
+impl VMValueCast<int256::I256> for IntegerValue {
+    fn cast(self) -> PartialVMResult<int256::I256> {
+        match self {
+            Self::I256(x) => Ok(x),
+            v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                .with_message(format!("cannot cast {:?} to i256", v,))),
         }
     }
 }
@@ -2725,19 +2803,23 @@ impl IntegerValue {
         })
     }
 
-    pub fn negate(self) -> PartialVMResult<Self> {
+    pub fn negate_checked(self) -> PartialVMResult<Self> {
         use IntegerValue::*;
-        Ok(match self {
-            I8(x) => I8(-x),
-            I16(x) => I16(-x),
-            I32(x) => I32(-x),
-            I64(x) => I64(-x),
-            I128(x) => I128(-x),
-            I256(x) => I256(-x),
+        let res = match self {
+            I8(x) => x.checked_neg().map(I8),
+            I16(x) => x.checked_neg().map(I16),
+            I32(x) => x.checked_neg().map(I32),
+            I64(x) => x.checked_neg().map(I64),
+            I128(x) => x.checked_neg().map(I128),
+            I256(x) => x.checked_neg().map(I256),
             _ => {
                 let msg = format!("Cannot negate {:?}", self);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
+        };
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Integer negation overflow".to_string())
         })
     }
 
@@ -4585,6 +4667,12 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
             (L::U64, ValueImpl::U64(x)) => serializer.serialize_u64(*x),
             (L::U128, ValueImpl::U128(x)) => serializer.serialize_u128(*x),
             (L::U256, ValueImpl::U256(x)) => x.serialize(serializer),
+            (L::I8, ValueImpl::I8(x)) => serializer.serialize_i8(*x),
+            (L::I16, ValueImpl::I16(x)) => serializer.serialize_i16(*x),
+            (L::I32, ValueImpl::I32(x)) => serializer.serialize_i32(*x),
+            (L::I64, ValueImpl::I64(x)) => serializer.serialize_i64(*x),
+            (L::I128, ValueImpl::I128(x)) => serializer.serialize_i128(*x),
+            (L::I256, ValueImpl::I256(x)) => x.serialize(serializer),
             (L::Bool, ValueImpl::Bool(x)) => serializer.serialize_bool(*x),
             (L::Address, ValueImpl::Address(x)) => x.serialize(serializer),
 
@@ -4622,6 +4710,12 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
                     (L::U64, Container::VecU64(r)) => r.borrow().serialize(serializer),
                     (L::U128, Container::VecU128(r)) => r.borrow().serialize(serializer),
                     (L::U256, Container::VecU256(r)) => r.borrow().serialize(serializer),
+                    (L::I8, Container::VecI8(r)) => r.borrow().serialize(serializer),
+                    (L::I16, Container::VecI16(r)) => r.borrow().serialize(serializer),
+                    (L::I32, Container::VecI32(r)) => r.borrow().serialize(serializer),
+                    (L::I64, Container::VecI64(r)) => r.borrow().serialize(serializer),
+                    (L::I128, Container::VecI128(r)) => r.borrow().serialize(serializer),
+                    (L::I256, Container::VecI256(r)) => r.borrow().serialize(serializer),
                     (L::Bool, Container::VecBool(r)) => r.borrow().serialize(serializer),
                     (L::Address, Container::VecAddress(r)) => r.borrow().serialize(serializer),
                     (_, Container::Vec(r)) => {
@@ -4874,6 +4968,12 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                 L::U64 => Value::vector_u64(Vec::deserialize(deserializer)?),
                 L::U128 => Value::vector_u128(Vec::deserialize(deserializer)?),
                 L::U256 => Value::vector_u256(Vec::deserialize(deserializer)?),
+                L::I8 => Value::vector_i8(Vec::deserialize(deserializer)?),
+                L::I16 => Value::vector_i16(Vec::deserialize(deserializer)?),
+                L::I32 => Value::vector_i32(Vec::deserialize(deserializer)?),
+                L::I64 => Value::vector_i64(Vec::deserialize(deserializer)?),
+                L::I128 => Value::vector_i128(Vec::deserialize(deserializer)?),
+                L::I256 => Value::vector_i256(Vec::deserialize(deserializer)?),
                 L::Bool => Value::vector_bool(Vec::deserialize(deserializer)?),
                 L::Address => Value::vector_address(Vec::deserialize(deserializer)?),
                 layout => {
@@ -5491,6 +5591,12 @@ pub mod prop {
             1 => Just(TypeTag::U64),
             1 => Just(TypeTag::U128),
             1 => Just(TypeTag::U256),
+            1 => Just(TypeTag::I8),
+            1 => Just(TypeTag::I16),
+            1 => Just(TypeTag::I32),
+            1 => Just(TypeTag::I64),
+            1 => Just(TypeTag::I128),
+            1 => Just(TypeTag::I256),
             1 => Just(TypeTag::Address),
             1 => Just(TypeTag::Signer),
         ];
@@ -5578,6 +5684,48 @@ pub mod prop {
                 L::U256 => vec(any::<int256::U256>(), 0..10)
                     .prop_map(|vals| {
                         Value(ValueImpl::Container(Container::VecU256(Rc::new(
+                            RefCell::new(vals),
+                        ))))
+                    })
+                    .boxed(),
+                L::I8 => vec(any::<i8>(), 0..10)
+                    .prop_map(|vals| {
+                        Value(ValueImpl::Container(Container::VecI8(Rc::new(
+                            RefCell::new(vals),
+                        ))))
+                    })
+                    .boxed(),
+                L::I16 => vec(any::<i16>(), 0..10)
+                    .prop_map(|vals| {
+                        Value(ValueImpl::Container(Container::VecI16(Rc::new(
+                            RefCell::new(vals),
+                        ))))
+                    })
+                    .boxed(),
+                L::I32 => vec(any::<i32>(), 0..10)
+                    .prop_map(|vals| {
+                        Value(ValueImpl::Container(Container::VecI32(Rc::new(
+                            RefCell::new(vals),
+                        ))))
+                    })
+                    .boxed(),
+                L::I64 => vec(any::<i64>(), 0..10)
+                    .prop_map(|vals| {
+                        Value(ValueImpl::Container(Container::VecI64(Rc::new(
+                            RefCell::new(vals),
+                        ))))
+                    })
+                    .boxed(),
+                L::I128 => vec(any::<i128>(), 0..10)
+                    .prop_map(|vals| {
+                        Value(ValueImpl::Container(Container::VecI128(Rc::new(
+                            RefCell::new(vals),
+                        ))))
+                    })
+                    .boxed(),
+                L::I256 => vec(any::<int256::I256>(), 0..10)
+                    .prop_map(|vals| {
+                        Value(ValueImpl::Container(Container::VecI256(Rc::new(
                             RefCell::new(vals),
                         ))))
                     })
@@ -5685,6 +5833,12 @@ pub mod prop {
             1 => Just(L::U64),
             1 => Just(L::U128),
             1 => Just(L::U256),
+            1 => Just(L::I8),
+            1 => Just(L::I16),
+            1 => Just(L::I32),
+            1 => Just(L::I64),
+            1 => Just(L::I128),
+            1 => Just(L::I256),
             1 => Just(L::Bool),
             1 => Just(L::Address),
         ];
@@ -5734,6 +5888,12 @@ impl ValueImpl {
             (L::U64, ValueImpl::U64(x)) => MoveValue::U64(*x),
             (L::U128, ValueImpl::U128(x)) => MoveValue::U128(*x),
             (L::U256, ValueImpl::U256(x)) => MoveValue::U256(*x),
+            (L::I8, ValueImpl::I8(x)) => MoveValue::I8(*x),
+            (L::I16, ValueImpl::I16(x)) => MoveValue::I16(*x),
+            (L::I32, ValueImpl::I32(x)) => MoveValue::I32(*x),
+            (L::I64, ValueImpl::I64(x)) => MoveValue::I64(*x),
+            (L::I128, ValueImpl::I128(x)) => MoveValue::I128(*x),
+            (L::I256, ValueImpl::I256(x)) => MoveValue::I256(*x),
             (L::Bool, ValueImpl::Bool(x)) => MoveValue::Bool(*x),
             (L::Address, ValueImpl::Address(x)) => MoveValue::Address(*x),
 
