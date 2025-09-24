@@ -350,10 +350,19 @@ impl AsmParser {
     }
 
     fn value(&mut self) -> AsmResult<AsmValue> {
-        if let Token::Number(num) = &self.next {
+        if self.is_special("-") {
+            self.advance()?;
+            if let Token::Number(num) = &self.next {
+                let num = *num;
+                self.advance()?;
+                Ok(AsmValue::Number(false, num))
+            } else {
+                Err(error(self.next_loc, "expected number"))
+            }
+        } else if let Token::Number(num) = &self.next {
             let num = *num;
             self.advance()?;
-            Ok(AsmValue::Number(num))
+            Ok(AsmValue::Number(true, num))
         } else if self.is_special("[") {
             self.advance()?;
             let elems = if self.is_value() {
@@ -370,7 +379,7 @@ impl AsmParser {
 
     fn is_value(&self) -> bool {
         matches!(&self.next, Token::Number(..))
-            || matches!(&self.next, Token::Special(s) if s == "[")
+            || matches!(&self.next, Token::Special(s) if s == "[" || s == "-")
     }
 
     fn address(&mut self) -> AsmResult<AccountAddress> {
@@ -1062,7 +1071,7 @@ fn id_cont(ch: char) -> bool {
 fn special(ch: char) -> bool {
     matches!(
         ch,
-        '(' | ')' | '<' | '>' | '[' | ']' | ',' | ':' | '|' | '+' | '=' | '&' | '#'
+        '(' | ')' | '<' | '>' | '[' | ']' | ',' | ':' | '|' | '+' | '=' | '&' | '#' | '-'
     )
 }
 
