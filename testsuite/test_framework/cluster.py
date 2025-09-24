@@ -10,6 +10,8 @@ from typing import Dict, List, Optional, TypedDict
 
 from .shell import Shell
 
+from tenacity import retry, wait_exponential, stop_after_attempt
+
 
 class Cloud(Enum):
     AWS = "AWS"
@@ -212,6 +214,7 @@ def list_eks_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
         raise AwsError("Failed to list EKS clusters") from e
 
 
+@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=stop_after_attempt(3))
 def list_gke_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
     cluster_json = shell.run(
         ["gcloud", "container", "clusters", "list", "--format=json"]
