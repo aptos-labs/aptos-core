@@ -1,0 +1,14 @@
+//# publish
+module 0x22::test
+
+struct A<T> has drop
+  a: T
+
+public fun unpack_generic_instr()
+    ld_u64 3
+    pack A<u64>
+    unpack A<u64>
+    pop
+    ret
+
+//# run --verbose 0x22::test::unpack_generic_instr --display-trace

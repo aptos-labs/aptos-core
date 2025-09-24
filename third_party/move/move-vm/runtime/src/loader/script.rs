@@ -126,6 +126,7 @@ impl Script {
             ty_param_abilities,
             native: None,
             is_native: false,
+            is_dispatchable_native: false,
             visibility: Visibility::Private,
             is_entry: false,
             // TODO: main does not have a name. Revisit.

@@ -1,0 +1,10 @@
+//# publish
+module 0x22::test
+
+public fun mul_instr(a: u64, b: u64): u64
+    move_loc a
+    move_loc b
+    mul
+    ret
+
+//# run --verbose 0x22::test::mul_instr --args 5u64 5u64 --display-trace

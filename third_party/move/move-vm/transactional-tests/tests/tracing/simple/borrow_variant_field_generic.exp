@@ -1,0 +1,8 @@
+processed 2 tasks
+task 0 lines 1-16:  publish [module 0x22::test]
+task 1 lines 18-18:  run --verbose 0x22::test::borrow_variant_field_generic_instr --display-trace
+instructions: 7
+branches: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::borrow_variant_field_generic_instr
+return values: 3

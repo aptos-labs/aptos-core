@@ -108,7 +108,7 @@ impl CompiledState<'_> {
     }
 }
 
-fn merge_output(left: Option<String>, right: Option<String>) -> Option<String> {
+pub(crate) fn merge_output(left: Option<String>, right: Option<String>) -> Option<String> {
     match (left, right) {
         (None, right) => right,
         (left, None) => left,
@@ -154,7 +154,7 @@ pub trait MoveTestAdapter<'a>: Sized {
         args: Vec<<<Self as MoveTestAdapter<'a>>::ExtraValueArgs as ParsableValue>::ConcreteValue>,
         gas_budget: Option<u64>,
         extra: Self::ExtraRunArgs,
-    ) -> Result<Option<String>>;
+    ) -> Option<String>;
     fn call_function(
         &mut self,
         module: &ModuleId,
@@ -164,7 +164,7 @@ pub trait MoveTestAdapter<'a>: Sized {
         args: Vec<<<Self as MoveTestAdapter<'a>>::ExtraValueArgs as ParsableValue>::ConcreteValue>,
         gas_budget: Option<u64>,
         extra: Self::ExtraRunArgs,
-    ) -> Result<(Option<String>, SerializedReturnValues)>;
+    ) -> Option<String>;
     fn view_data(
         &mut self,
         address: AccountAddress,
@@ -243,23 +243,14 @@ pub trait MoveTestAdapter<'a>: Sized {
                     .collect::<Vec<_>>();
 
                 let (unit, opt_model, warnings_opt) = {
-                    // Run the V2 compiler if requested
-                    let TestRunConfig {
-                        language_version,
-                        experiments,
-                        vm_config: _,
-                        use_masm: _,
-                        echo: _,
-                        cross_compilation_targets: _,
-                    } = run_config;
                     compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
                         &deps,
                         data_path.to_owned(),
                         self.known_attributes(),
-                        language_version,
-                        experiments,
+                        run_config.language_version,
+                        run_config.experiments,
                     )?
                 };
                 let (named_addr_opt, module) = match unit {
@@ -323,15 +314,6 @@ pub trait MoveTestAdapter<'a>: Sized {
         let (script, opt_model, warning_opt) = match syntax {
             SyntaxChoice::Source => {
                 let (unit, opt_model, warning_opt) = {
-                    // Run the V2 compiler.
-                    let TestRunConfig {
-                        language_version,
-                        experiments: v2_experiments,
-                        vm_config: _,
-                        use_masm: _,
-                        echo: _,
-                        cross_compilation_targets: _,
-                    } = run_config;
                     compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
@@ -342,8 +324,8 @@ pub trait MoveTestAdapter<'a>: Sized {
                             .collect::<Vec<_>>(),
                         data_path.to_owned(),
                         self.known_attributes(),
-                        language_version,
-                        v2_experiments,
+                        run_config.language_version,
+                        run_config.experiments,
                     )?
                 };
                 match unit {
@@ -516,7 +498,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let args = self.compiled_state().resolve_args(args)?;
                 let type_args = self.compiled_state().resolve_type_args(type_args)?;
                 let mut output =
-                    self.execute_script(script, type_args, signers, args, gas_budget, extra_args)?;
+                    self.execute_script(script, type_args, signers, args, gas_budget, extra_args);
                 if print_bytecode {
                     output = merge_output(output, printed);
                 }
@@ -543,7 +525,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let module_id = ModuleId::new(addr, module_name);
                 let type_args = self.compiled_state().resolve_type_args(type_args)?;
                 let args = self.compiled_state().resolve_args(args)?;
-                let (output, return_values) = self.call_function(
+                let output = self.call_function(
                     &module_id,
                     name.as_ident_str(),
                     type_args,
@@ -551,9 +533,8 @@ pub trait MoveTestAdapter<'a>: Sized {
                     args,
                     gas_budget,
                     extra_args,
-                )?;
-                let rendered_return_value = self.display_return_values(return_values);
-                Ok(merge_output(output, rendered_return_value))
+                );
+                Ok(output)
             },
             TaskCommand::View(ViewCommand { address, resource }) => {
                 self.cross_compile_task(&source);

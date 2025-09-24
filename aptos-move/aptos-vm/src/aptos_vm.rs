@@ -141,6 +141,7 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
     check_dependencies_and_charge_gas, dispatch_loader,
+    execution_tracing::{FullTraceLogger, NoOpTraceLogger, TraceLogger},
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
     InstantiatedFunctionLoader, LegacyLoaderConfig, ModuleStorage, RuntimeEnvironment,
@@ -307,6 +308,9 @@ pub struct AptosVM {
     move_vm: MoveVmExt,
     /// For a new chain, or even mainnet, the VK might not necessarily be set.
     pvk: Option<PreparedVerifyingKey<Bn254>>,
+    /// If true, user payloads do not run extra checks and instead trace execution. Block-STM
+    /// replays the trace and performs these checks at post-commit time.
+    async_runtime_checks_enabled: bool,
 }
 
 impl AptosVM {
@@ -328,7 +332,21 @@ impl AptosVM {
             is_simulation: false,
             move_vm: MoveVmExt::new(env),
             pvk,
+            // There is no tracing by default because it can only be done if there is access to
+            // Block-STM.
+            async_runtime_checks_enabled: false,
         }
+    }
+
+    /// Creates the VM for Block-STM worker's to use.
+    pub fn new_for_block_executor(
+        env: &AptosEnvironment,
+        state_view: &impl StateView,
+        async_runtime_checks_enabled: bool,
+    ) -> Self {
+        let mut vm = Self::new(env, state_view);
+        vm.async_runtime_checks_enabled = async_runtime_checks_enabled;
+        vm
     }
 
     pub fn new_session<'r, R: AptosMoveResolver>(
@@ -390,6 +408,22 @@ impl AptosVM {
     #[inline(always)]
     pub fn environment(&self) -> AptosEnvironment {
         self.move_vm.env.clone()
+    }
+
+    fn should_perform_async_runtime_checks(&self, txn: &SignedTransaction) -> bool {
+        self.async_runtime_checks_enabled
+            && match txn.payload().executable_ref() {
+                Ok(TransactionExecutableRef::Script(_)) => {
+                    // For now, always delay checks for scripts.
+                    true
+                },
+                Ok(TransactionExecutableRef::EntryFunction(f)) => {
+                    // If entry function is defined at special address - it is part of trusted code
+                    // and so no need to delay any checks (as there are none).
+                    !f.module().address().is_special()
+                },
+                Ok(TransactionExecutableRef::Empty) | Err(_) => false,
+            }
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -848,6 +882,7 @@ impl AptosVM {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext<'a>,
         serialized_script: &'a Script,
+        trace_logger: &mut impl TraceLogger,
     ) -> Result<(), VMStatus> {
         if !self
             .features()
@@ -891,7 +926,14 @@ impl AptosVM {
                 self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
             )?;
 
-            session.execute_loaded_function(func, args, gas_meter, traversal_context, &loader)?;
+            session.execute_loaded_function_with_tracing(
+                func,
+                args,
+                gas_meter,
+                traversal_context,
+                &loader,
+                trace_logger,
+            )?;
             Ok(())
         })
     }
@@ -904,6 +946,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         entry_fn: &EntryFunction,
+        trace_logger: &mut impl TraceLogger,
     ) -> Result<(), VMStatus> {
         dispatch_loader!(module_storage, loader, {
             let legacy_loader_config = LegacyLoaderConfig {
@@ -956,12 +999,13 @@ impl AptosVM {
 
             // Execute the function. The function also must be an entry function!
             function.is_entry_or_err()?;
-            session.execute_loaded_function(
+            session.execute_loaded_function_with_tracing(
                 function,
                 args,
                 gas_meter,
                 traversal_context,
                 &loader,
+                trace_logger,
             )?;
             Ok(())
         })
@@ -979,6 +1023,7 @@ impl AptosVM {
         executable: TransactionExecutableRef<'a>, // TODO[Orderless]: Check what's the right lifetime to use here.
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
+        trace_logger: &mut impl TraceLogger,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         fail_point!("aptos_vm::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error {
@@ -1003,6 +1048,7 @@ impl AptosVM {
                         gas_meter,
                         traversal_context,
                         script,
+                        trace_logger,
                     )
                 })?;
             },
@@ -1015,6 +1061,7 @@ impl AptosVM {
                         gas_meter,
                         traversal_context,
                         entry_fn,
+                        trace_logger,
                     )
                 })?;
             },
@@ -1132,6 +1179,7 @@ impl AptosVM {
         multisig_address: AccountAddress,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
+        trace_logger: &mut impl TraceLogger,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         fail_point!("move_adapter::execute_multisig_transaction", |_| {
             Err(VMStatus::error(
@@ -1237,6 +1285,7 @@ impl AptosVM {
                     multisig_address,
                     &entry_function,
                     change_set_configs,
+                    trace_logger,
                 ),
         };
 
@@ -1311,6 +1360,7 @@ impl AptosVM {
         multisig_address: AccountAddress,
         payload: &EntryFunction,
         change_set_configs: &ChangeSetConfigs,
+        trace_logger: &mut impl TraceLogger,
     ) -> Result<UserSessionChangeSet, VMStatus> {
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
@@ -1322,6 +1372,7 @@ impl AptosVM {
                 gas_meter,
                 traversal_context,
                 payload,
+                trace_logger,
             )
         })?;
 
@@ -1926,6 +1977,7 @@ impl AptosVM {
         is_approved_gov_script: bool,
         log_context: &AdapterLogSchema,
         gas_meter: &mut impl AptosGasMeter,
+        mut trace_logger: impl TraceLogger,
     ) -> (VMStatus, VMOutput) {
         let _timer = VM_TIMER.timer_with_label("AptosVM::execute_user_transaction_impl");
 
@@ -2014,6 +2066,7 @@ impl AptosVM {
                 multisig_address,
                 log_context,
                 change_set_configs,
+                &mut trace_logger,
             )
         } else {
             self.execute_script_or_entry_function(
@@ -2027,6 +2080,7 @@ impl AptosVM {
                 executable,
                 log_context,
                 change_set_configs,
+                &mut trace_logger,
             )
         };
         drop(payload_timer);
@@ -2037,7 +2091,7 @@ impl AptosVM {
             .expect("Balance should always be less than or equal to max gas amount set");
         TXN_GAS_USAGE.observe(u64::from(gas_usage) as f64);
 
-        let (vm_status, output) = result.unwrap_or_else(|err| {
+        let (vm_status, mut output) = result.unwrap_or_else(|err| {
             self.on_user_transaction_execution_failure(
                 prologue_change_set,
                 err,
@@ -2051,6 +2105,11 @@ impl AptosVM {
                 &mut traversal_context,
             )
         });
+
+        // Whether user transaction succeeded or failed (e.g., abort in Move code or running out
+        // of gas in epilogue), we record the trace of all executed instructions.
+        output.set_trace(trace_logger.finish());
+
         (vm_status, output)
     }
 
@@ -2093,15 +2152,29 @@ impl AptosVM {
             code_storage,
         );
 
-        let (status, output) = self.execute_user_transaction_impl(
-            resolver,
-            code_storage,
-            txn,
-            txn_metadata,
-            is_approved_gov_script,
-            log_context,
-            &mut gas_meter,
-        );
+        let (status, output) = if self.should_perform_async_runtime_checks(txn) {
+            self.execute_user_transaction_impl(
+                resolver,
+                code_storage,
+                txn,
+                txn_metadata,
+                is_approved_gov_script,
+                log_context,
+                &mut gas_meter,
+                FullTraceLogger::new(),
+            )
+        } else {
+            self.execute_user_transaction_impl(
+                resolver,
+                code_storage,
+                txn,
+                txn_metadata,
+                is_approved_gov_script,
+                log_context,
+                &mut gas_meter,
+                NoOpTraceLogger,
+            )
+        };
 
         Ok((status, output, gas_meter))
     }
@@ -2221,6 +2294,7 @@ impl AptosVM {
                     &mut UnmeteredGasMeter,
                     &mut traversal_context,
                     script,
+                    &mut NoOpTraceLogger,
                 )?;
 
                 let change_set_configs =

@@ -1,0 +1,8 @@
+processed 2 tasks
+task 0 lines 1-7:  publish [module 0x22::test]
+task 1 lines 9-9:  run --verbose 0x22::test::cast_u256_instr --display-trace
+instructions: 3
+branches: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::cast_u256_instr
+return values: 256

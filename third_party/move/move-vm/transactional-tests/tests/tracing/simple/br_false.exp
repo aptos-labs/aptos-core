@@ -1,0 +1,8 @@
+processed 2 tasks
+task 0 lines 1-14:  publish [module 0x22::test]
+task 1 lines 16-16:  run --verbose 0x22::test::br_false_instr --display-trace
+instructions: 8
+branches: 101
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::br_false_instr
+

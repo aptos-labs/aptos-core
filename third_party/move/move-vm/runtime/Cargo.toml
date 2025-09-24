@@ -13,6 +13,7 @@ edition = { workspace = true }
 [dependencies]
 ambassador = { workspace = true }
 better_any = { workspace = true }
+bitvec = { workspace = true }
 bytes = { workspace = true }
 cfg-if = { workspace = true }
 claims = { workspace = true }
