@@ -122,14 +122,6 @@ module aptos_experimental::bulk_order_book_types {
         }
     }
 
-    struct BulkOrderPlacementResult {
-        order_id: OrderIdType,
-        bid_prices: vector<u64>,
-        bid_sizes: vector<u64>,
-        ask_prices: vector<u64>,
-        ask_sizes: vector<u64>,
-    }
-
     /// Creates a new bulk order with the specified parameters.
     ///
     /// # Arguments:
