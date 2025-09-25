@@ -1,6 +1,6 @@
 processed 1 task
 task 0 lines 1-8:  print-bytecode [main() {]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()

@@ -277,10 +277,10 @@ next 32 bytes store <code>v * G + r * Y</code>, where <code>Y</code> is the publ
     <b>let</b> left_point = <a href="ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(bytes);
     <b>let</b> right_point = <a href="ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(bytes_right);
 
-    <b>if</b> (left_point.is_some::&lt;RistrettoPoint&gt;() && right_point.is_some::&lt;RistrettoPoint&gt;()) {
+    <b>if</b> (left_point.is_some&lt;RistrettoPoint&gt;() && right_point.is_some&lt;RistrettoPoint&gt;()) {
         std::option::some&lt;<a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_Ciphertext">Ciphertext</a>&gt;(<a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_Ciphertext">Ciphertext</a> {
-            left: left_point.extract::&lt;RistrettoPoint&gt;(),
-            right: right_point.extract::&lt;RistrettoPoint&gt;()
+            left: left_point.extract&lt;RistrettoPoint&gt;(),
+            right: right_point.extract&lt;RistrettoPoint&gt;()
         })
     } <b>else</b> {
         std::option::none&lt;<a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_Ciphertext">Ciphertext</a>&gt;()
@@ -397,8 +397,8 @@ Given a ciphertext <code>ct</code>, serializes that ciphertext into bytes.
     <b>let</b> bytes_left = <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&ct.left));
     <b>let</b> bytes_right = <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&ct.right));
     <b>let</b> bytes = <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
-    bytes.append::&lt;u8&gt;(bytes_left);
-    bytes.append::&lt;u8&gt;(bytes_right);
+    bytes.append&lt;u8&gt;(bytes_left);
+    bytes.append&lt;u8&gt;(bytes_right);
     bytes
 }
 </code></pre>

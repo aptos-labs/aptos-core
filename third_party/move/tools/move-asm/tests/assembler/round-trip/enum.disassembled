@@ -1,7 +1,7 @@
 //**** Cross-compiled for `masm` syntax from `tests/assembler/enum.masm`
 
 //# publish --print-bytecode
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test
 enum E has drop
   V1

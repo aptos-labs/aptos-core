@@ -939,7 +939,7 @@ module aptos_std::ordered_map {
     fun test_upsert_test() {
         let map = new<u64, u64>();
         // test adding 3 elements using upsert
-        map.upsert::<u64, u64>(1, 1);
+        map.upsert<u64, u64>(1, 1);
         map.upsert(2, 2);
         map.upsert(3, 3);
 

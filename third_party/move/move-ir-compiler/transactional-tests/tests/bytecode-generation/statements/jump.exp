@@ -1,6 +1,6 @@
 processed 3 tasks
 task 0 lines 1-6:  print-bytecode [// An endless loop is valid Move IR.]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -8,7 +8,7 @@ l0: branch l0
 
 
 task 1 lines 8-15:  print-bytecode [// Jumping to a label that is declared after the jump statement itself is valid.]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
