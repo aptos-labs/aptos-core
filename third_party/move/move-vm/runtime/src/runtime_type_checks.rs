@@ -45,6 +45,7 @@ pub(crate) trait RuntimeTypeCheck {
 
     /// Performs a runtime check of the caller is allowed to call the callee for any type of call,
     /// including native dynamic dispatch or calling a closure.
+    #[inline(always)]
     fn check_call_visibility(
         caller: &LoadedFunction,
         callee: &LoadedFunction,
@@ -107,6 +108,7 @@ pub(crate) trait RuntimeTypeCheck {
     ) -> PartialVMResult<()>;
 }
 
+#[inline(always)]
 fn verify_pack<'a>(
     operand_stack: &mut Stack,
     field_count: u16,
@@ -260,6 +262,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         false
     }
 
+    #[inline(always)]
     fn check_cross_module_regular_call_visibility(
         _caller: &LoadedFunction,
         _callee: &LoadedFunction,
@@ -888,6 +891,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         false
     }
 
+    #[inline(always)]
     fn check_cross_module_regular_call_visibility(
         caller: &LoadedFunction,
         callee: &LoadedFunction,
@@ -985,6 +989,7 @@ impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
         true
     }
 
+    #[inline(always)]
     fn check_cross_module_regular_call_visibility(
         caller: &LoadedFunction,
         callee: &LoadedFunction,

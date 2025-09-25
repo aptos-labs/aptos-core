@@ -116,6 +116,7 @@ impl<Ctx> WithRuntimeEnvironment for UnsyncModuleStorageImpl<'_, Ctx>
 where
     Ctx: ModuleBytesStorage + WithRuntimeEnvironment,
 {
+    #[inline(always)]
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.ctx.runtime_environment()
     }
