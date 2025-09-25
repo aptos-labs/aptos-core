@@ -294,4 +294,14 @@ spec aptos_std::ordered_map {
         pragma opaque;
         pragma verify = false;
     }
+
+    spec get {
+        pragma opaque;
+        pragma verify = false;
+    }
+
+    spec get_and_map {
+        pragma opaque;
+        pragma verify = false;
+    }
 }
