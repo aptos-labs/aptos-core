@@ -145,6 +145,7 @@ impl StructType {
     /// must be None. Otherwise if its a variant struct, the variant for which the fields
     /// are requested must be given. For non-matching parameters, the function returns
     /// an empty list.
+    #[inline(always)]
     pub fn fields(&self, variant: Option<VariantIndex>) -> PartialVMResult<&[(Identifier, Type)]> {
         match (&self.layout, variant) {
             (StructLayout::Single(fields), None) => Ok(fields.as_slice()),
@@ -485,6 +486,7 @@ impl Type {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn paranoid_check_abilities(&self, expected_abilities: AbilitySet) -> PartialVMResult<()> {
         let abilities = self.abilities()?;
         if !expected_abilities.is_subset(abilities) {
@@ -580,6 +582,7 @@ impl Type {
 
     /// Returns an error if the type is not a (mutable) vector reference. Otherwise, returns
     /// a (mutable) reference to its element type.
+    #[inline(always)]
     pub fn paranoid_check_and_get_vec_elem_ref_ty<const IS_MUT: bool>(
         &self,
         expected_elem_ty: &Self,
@@ -598,6 +601,7 @@ impl Type {
 
     /// Returns an error if the type is not a (mutable) vector reference. Otherwise, returns
     /// its element type.
+    #[inline(always)]
     pub fn paranoid_check_and_get_vec_elem_ty<const IS_MUT: bool>(
         &self,
         expected_elem_ty: &Self,
@@ -618,7 +622,7 @@ impl Type {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn paranoid_freeze_ref_ty(self) -> PartialVMResult<Type> {
         match self {
             Type::MutableReference(ty) => Ok(Type::Reference(ty)),
@@ -629,7 +633,7 @@ impl Type {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn paranoid_read_ref(self) -> PartialVMResult<Type> {
         match self {
             Type::Reference(inner_ty) | Type::MutableReference(inner_ty) => {
@@ -643,7 +647,7 @@ impl Type {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn paranoid_write_ref(&self, val_ty: &Type) -> PartialVMResult<()> {
         if let Type::MutableReference(inner_ty) = self {
             val_ty.paranoid_check_assignable(inner_ty)?;
@@ -654,6 +658,7 @@ impl Type {
         }
     }
 
+    #[inline(always)]
     pub fn paranoid_check_ref_eq(
         &self,
         expected_inner_ty: &Self,
@@ -762,6 +767,7 @@ impl Type {
     ///   - `u64` has one node
     ///   - `vector<u64>` has two nodes -- one for the vector and one for the element type u64.
     ///   - `Foo<u64, Bar<u8, bool>>` has 5 nodes.
+    #[inline(always)]
     pub fn num_nodes(&self) -> usize {
         self.preorder_traversal().count()
     }
@@ -1034,6 +1040,7 @@ impl TypeBuilder {
 
     /// Creates a type for a Move constant. Note that constant types can be
     /// more restrictive and therefore have their own creation API.
+    #[inline(always)]
     pub fn create_constant_ty(&self, const_tok: &SignatureToken) -> PartialVMResult<Type> {
         let mut count = 0;
         self.create_constant_ty_impl(const_tok, &mut count, 1)
@@ -1064,7 +1071,7 @@ impl TypeBuilder {
         self.subst_impl(ty, ty_args, &mut count, 1, check)
     }
 
-    #[inline]
+    #[inline(always)]
     fn check(&self, count: &mut u64, depth: u64) -> PartialVMResult<()> {
         if *count >= self.max_ty_size {
             return Err(

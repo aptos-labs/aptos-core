@@ -183,6 +183,7 @@ impl Frame {
         &self.local_tys[idx]
     }
 
+    #[inline(always)]
     pub(crate) fn check_local_tys_have_drop_ability(&self) -> PartialVMResult<()> {
         for (idx, ty) in self.local_tys.iter().enumerate() {
             if !self.locals.is_invalid(idx)? {
@@ -192,6 +193,7 @@ impl Frame {
         Ok(())
     }
 
+    #[inline(always)]
     pub(crate) fn constant_at(&self, idx: ConstantPoolIndex) -> &Constant {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -200,6 +202,7 @@ impl Frame {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn get_struct_ty(&self, idx: StructDefinitionIndex) -> Type {
         use LoadedFunctionOwner::*;
         let struct_ty = match self.function.owner() {
@@ -307,6 +310,7 @@ impl Frame {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn get_struct(&self, idx: StructDefinitionIndex) -> &Arc<StructType> {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -420,6 +424,7 @@ impl Frame {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn field_count(&self, idx: StructDefinitionIndex) -> u16 {
         use LoadedFunctionOwner::*;
         match self.function.owner() {

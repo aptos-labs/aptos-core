@@ -60,6 +60,7 @@ impl CallType {
 }
 
 impl ReentrancyChecker {
+    #[inline(always)]
     pub fn enter_function(
         &mut self,
         caller_module: Option<&ModuleId>,
