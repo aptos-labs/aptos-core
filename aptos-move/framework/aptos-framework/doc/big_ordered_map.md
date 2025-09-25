@@ -56,6 +56,11 @@ A set of inline utility methods is provided instead, to provide guaranteed valid
 -  [Function `upsert`](#0x1_big_ordered_map_upsert)
 -  [Function `remove`](#0x1_big_ordered_map_remove)
 -  [Function `remove_or_none`](#0x1_big_ordered_map_remove_or_none)
+-  [Function `modify`](#0x1_big_ordered_map_modify)
+-  [Function `modify_and_return`](#0x1_big_ordered_map_modify_and_return)
+-  [Function `modify_or_add`](#0x1_big_ordered_map_modify_or_add)
+-  [Function `modify_if_present`](#0x1_big_ordered_map_modify_if_present)
+-  [Function `modify_if_present_and_return`](#0x1_big_ordered_map_modify_if_present_and_return)
 -  [Function `add_all`](#0x1_big_ordered_map_add_all)
 -  [Function `pop_front`](#0x1_big_ordered_map_pop_front)
 -  [Function `pop_back`](#0x1_big_ordered_map_pop_back)
@@ -85,6 +90,7 @@ A set of inline utility methods is provided instead, to provide guaranteed valid
 -  [Function `iter_borrow_key`](#0x1_big_ordered_map_iter_borrow_key)
 -  [Function `iter_borrow`](#0x1_big_ordered_map_iter_borrow)
 -  [Function `iter_borrow_mut`](#0x1_big_ordered_map_iter_borrow_mut)
+-  [Function `iter_modify`](#0x1_big_ordered_map_iter_modify)
 -  [Function `iter_remove`](#0x1_big_ordered_map_iter_remove)
 -  [Function `iter_next`](#0x1_big_ordered_map_iter_next)
 -  [Function `iter_prev`](#0x1_big_ordered_map_iter_prev)
@@ -1142,6 +1148,151 @@ Returns none if there is no entry for <code>key</code>.
 
 </details>
 
+<a id="0x1_big_ordered_map_modify"></a>
+
+## Function `modify`
+
+Modifies the element in the map via calling f.
+Aborts if element doesn't exist
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_modify">modify</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K, f: |&<b>mut</b> V|)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_modify">modify</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K, f: |&<b>mut</b> V|) {
+    self.<a href="big_ordered_map.md#0x1_big_ordered_map_modify_and_return">modify_and_return</a>(key, |v| { f(v); <b>true</b>});
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_big_ordered_map_modify_and_return"></a>
+
+## Function `modify_and_return`
+
+Modifies the element in the map via calling f, and propagates the return value of the function.
+Aborts if element doesn't exist
+
+This function cannot be inline, due to iter_modify requiring actual function value.
+This also is why we return a value
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_modify_and_return">modify_and_return</a>&lt;K: <b>copy</b>, drop, store, V: store, R&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K, f: |&<b>mut</b> V|R): R
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_modify_and_return">modify_and_return</a>&lt;K: drop + <b>copy</b> + store, V: store, R&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K, f: |&<b>mut</b> V|R): R {
+    <b>let</b> iter = self.<a href="big_ordered_map.md#0x1_big_ordered_map_internal_find">internal_find</a>(key);
+    <b>assert</b>!(!iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
+    iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_modify">iter_modify</a>(self, |v| f(v))
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_big_ordered_map_modify_or_add"></a>
+
+## Function `modify_or_add`
+
+Modifies element by calling modify_f if it exists, or calling add_f to add if it doesn't.
+Returns true if element already existed.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_modify_or_add">modify_or_add</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K, modify_f: |&<b>mut</b> V| <b>has</b> drop, add_f: ||V <b>has</b> drop): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_modify_or_add">modify_or_add</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K, modify_f: |&<b>mut</b> V| <b>has</b> drop, add_f: ||V <b>has</b> drop): bool {
+    <b>let</b> <b>exists</b> = self.<a href="big_ordered_map.md#0x1_big_ordered_map_modify_if_present_and_return">modify_if_present_and_return</a>(key, |v| { modify_f(v); <b>true</b> }).is_some();
+    <b>if</b> (!<b>exists</b>) {
+        self.<a href="big_ordered_map.md#0x1_big_ordered_map_add">add</a>(*key, add_f());
+    };
+    <b>exists</b>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_big_ordered_map_modify_if_present"></a>
+
+## Function `modify_if_present`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_modify_if_present">modify_if_present</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K, modify_f: |&<b>mut</b> V| <b>has</b> drop): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_modify_if_present">modify_if_present</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K, modify_f: |&<b>mut</b> V| <b>has</b> drop): bool {
+    self.<a href="big_ordered_map.md#0x1_big_ordered_map_modify_if_present_and_return">modify_if_present_and_return</a>(key, |v| { modify_f(v); <b>true</b> }).is_some()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_big_ordered_map_modify_if_present_and_return"></a>
+
+## Function `modify_if_present_and_return`
+
+Modifies the element in the map via calling modify_f, and propagates the return value of the function.
+Returns None if not present.
+
+Function value cannot be inlined, due to iter_modify requiring actual function value.
+This also is why we return a value
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_modify_if_present_and_return">modify_if_present_and_return</a>&lt;K: <b>copy</b>, drop, store, V: store, R&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K, modify_f: |&<b>mut</b> V|R <b>has</b> drop): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;R&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_modify_if_present_and_return">modify_if_present_and_return</a>&lt;K: drop + <b>copy</b> + store, V: store, R&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K, modify_f: |&<b>mut</b> V|R <b>has</b> drop): Option&lt;R&gt; {
+    <b>let</b> iter = self.<a href="big_ordered_map.md#0x1_big_ordered_map_internal_find">internal_find</a>(key);
+    <b>if</b> (iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(self)) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    } <b>else</b> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_modify">iter_modify</a>(self, |v| modify_f(v)))
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_big_ordered_map_add_all"></a>
 
 ## Function `add_all`
@@ -2039,6 +2190,44 @@ Note: Requires that the map is not changed after the input iterator is generated
     <b>let</b> IteratorPtr::Some { node_index, child_iter, key: _ } = self;
     <b>let</b> children = &<b>mut</b> map.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node_mut">borrow_node_mut</a>(node_index).children;
     &<b>mut</b> child_iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_mut">iter_borrow_mut</a>(children).value
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_big_ordered_map_iter_modify"></a>
+
+## Function `iter_modify`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_modify">iter_modify</a>&lt;K: drop, store, V: store, R&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;, map: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |&<b>mut</b> V|R): R
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_modify">iter_modify</a>&lt;K: drop + store, V: store, R&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">IteratorPtr</a>&lt;K&gt;, map: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, f: |&<b>mut</b> V|R): R {
+    <b>assert</b>!(!self.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(map), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
+    <b>let</b> IteratorPtr::Some { node_index, child_iter, key } = self;
+    <b>let</b> children = &<b>mut</b> map.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node_mut">borrow_node_mut</a>(node_index).children;
+    <b>let</b> value_mut = &<b>mut</b> child_iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_mut">iter_borrow_mut</a>(children).value;
+    <b>let</b> result = f(value_mut);
+
+    <b>if</b> (map.constant_kv_size) {
+        <b>return</b> result;
+    };
+
+    // validate that after modifications size invariants hold
+    <b>let</b> key_size = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_serialized_size">bcs::serialized_size</a>(&key);
+    <b>let</b> value_size = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_serialized_size">bcs::serialized_size</a>(value_mut);
+    map.<a href="big_ordered_map.md#0x1_big_ordered_map_validate_size_and_init_max_degrees">validate_size_and_init_max_degrees</a>(key_size, value_size);
+    result
 }
 </code></pre>
 
