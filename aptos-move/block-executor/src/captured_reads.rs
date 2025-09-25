@@ -33,7 +33,7 @@ use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::value::MoveTypeLayout;
-use move_vm_runtime::LayoutWithDelayedFields;
+use move_vm_runtime::{GenericKey, LayoutWithDelayedFields};
 use move_vm_types::{
     code::{ModuleCode, SyncModuleCache, WithAddress, WithName, WithSize},
     delayed_values::delayed_field_id::DelayedFieldID,
@@ -553,6 +553,7 @@ pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
 
     module_reads: hashbrown::HashMap<K, ModuleRead<DC, VC, S>>,
     non_generic_struct_layout_reads: HashMap<StructNameIndex, LayoutWithDelayedFields>,
+    generic_struct_layout_reads: HashMap<GenericKey, LayoutWithDelayedFields>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an observed
     /// inconsistency), the transaction output is irrelevant (must be discarded and transaction
@@ -583,6 +584,7 @@ impl<T: Transaction, K, DC, VC, S> CapturedReads<T, K, DC, VC, S> {
             aggregator_v1_reads: HashSet::new(),
             module_reads: hashbrown::HashMap::new(),
             non_generic_struct_layout_reads: HashMap::new(),
+            generic_struct_layout_reads: HashMap::new(),
             delayed_field_speculative_failure: false,
             non_delayed_field_speculative_failure: false,
             incorrect_use: false,
@@ -1051,6 +1053,16 @@ where
         }
     }
 
+    pub(crate) fn get_generic_struct_layout(
+        &self,
+        key: &GenericKey,
+    ) -> CacheRead<LayoutWithDelayedFields> {
+        match self.generic_struct_layout_reads.get(key) {
+            Some(l) => CacheRead::Hit(l.clone()),
+            None => CacheRead::Miss,
+        }
+    }
+
     pub(crate) fn capture_non_generic_struct_layout_read(
         &mut self,
         idx: &StructNameIndex,
@@ -1059,6 +1071,15 @@ where
         let prev = self
             .non_generic_struct_layout_reads
             .insert(*idx, layout.clone());
+        assert!(prev.is_none());
+    }
+
+    pub(crate) fn capture_generic_struct_layout_read(
+        &mut self,
+        key: GenericKey,
+        layout: &LayoutWithDelayedFields,
+    ) {
+        let prev = self.generic_struct_layout_reads.insert(key, layout.clone());
         assert!(prev.is_none());
     }
 

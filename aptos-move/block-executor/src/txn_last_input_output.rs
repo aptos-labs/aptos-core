@@ -439,7 +439,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 if published {
                     // Record validation requirements after the modules are published. Also, flush
                     // the layout cache so that new, correct layouts are picked-up by re-executions.
-                    global_module_cache.flush_non_generic_layout_cache();
+                    global_module_cache.flush_all_layout_caches();
                     scheduler.record_validation_requirements(txn_idx, module_ids_for_v2)?;
                 }
                 Ok(published)

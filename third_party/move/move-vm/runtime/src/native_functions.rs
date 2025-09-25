@@ -15,8 +15,8 @@ use crate::{
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
     },
-    LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, ModuleStorage, RuntimeEnvironment,
-    WithRuntimeEnvironment,
+    GenericKey, LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, ModuleStorage,
+    RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use ambassador::delegate_to_methods;
 use bytes::Bytes;
@@ -438,6 +438,18 @@ impl<'a> LayoutCache for ModuleStorageWrapper<'a> {
     ) -> PartialVMResult<()> {
         self.module_storage
             .store_non_generic_struct_layout(idx, entry)
+    }
+
+    fn get_generic_struct_layout(&self, key: &GenericKey) -> Option<LayoutCacheHit> {
+        self.module_storage.get_generic_struct_layout(key)
+    }
+
+    fn store_generic_struct_layout(
+        &self,
+        key: GenericKey,
+        entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        self.module_storage.store_generic_struct_layout(key, entry)
     }
 }
 

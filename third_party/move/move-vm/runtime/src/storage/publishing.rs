@@ -5,8 +5,8 @@
 
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, AsUnsyncModuleStorage,
-    LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, ModuleStorage, RuntimeEnvironment,
-    UnsyncModuleStorage, WithRuntimeEnvironment,
+    GenericKey, LayoutCache, LayoutCacheEntry, LayoutCacheHit, Module, ModuleStorage,
+    RuntimeEnvironment, UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
@@ -102,6 +102,18 @@ impl<M> LayoutCache for StagingModuleStorage<'_, M> {
     fn store_non_generic_struct_layout(
         &self,
         _idx: &StructNameIndex,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn get_generic_struct_layout(&self, _key: &GenericKey) -> Option<LayoutCacheHit> {
+        None
+    }
+
+    fn store_generic_struct_layout(
+        &self,
+        _key: GenericKey,
         _entry: LayoutCacheEntry,
     ) -> PartialVMResult<()> {
         Ok(())
