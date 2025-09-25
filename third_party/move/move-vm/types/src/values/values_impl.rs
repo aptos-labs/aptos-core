@@ -1943,6 +1943,9 @@ impl Value {
  *   the conversion will succeed. An error will be raised in case of a violation.
  *
  **************************************************************************************/
+// Note(inline): Kinda expensive to inline all the cast functions.
+//               Together they add a few seconds of compile time.
+
 pub trait VMValueCast<T> {
     fn cast(self) -> PartialVMResult<T>;
 }
@@ -1950,6 +1953,7 @@ pub trait VMValueCast<T> {
 macro_rules! impl_vm_value_cast {
     ($ty:ty, $tc:ident) => {
         impl VMValueCast<$ty> for Value {
+            #[inline(always)]
             fn cast(self) -> PartialVMResult<$ty> {
                 match self.0 {
                     ValueImpl::$tc(x) => Ok(x),
@@ -1973,6 +1977,7 @@ impl_vm_value_cast!(ContainerRef, ContainerRef);
 impl_vm_value_cast!(IndexedRef, IndexedRef);
 
 impl VMValueCast<DelayedFieldID> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<DelayedFieldID> {
         match self.0 {
             ValueImpl::DelayedFieldID { id } => Ok(id),
@@ -1987,6 +1992,7 @@ impl VMValueCast<DelayedFieldID> for Value {
 }
 
 impl VMValueCast<IntegerValue> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<IntegerValue> {
         match self.0 {
             ValueImpl::U8(x) => Ok(IntegerValue::U8(x)),
@@ -2002,6 +2008,7 @@ impl VMValueCast<IntegerValue> for Value {
 }
 
 impl VMValueCast<Reference> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Reference> {
         match self.0 {
             ValueImpl::ContainerRef(r) => Ok(Reference(ReferenceImpl::ContainerRef(r))),
@@ -2013,6 +2020,7 @@ impl VMValueCast<Reference> for Value {
 }
 
 impl VMValueCast<Container> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Container> {
         match self.0 {
             ValueImpl::Container(c) => Ok(c),
@@ -2023,6 +2031,7 @@ impl VMValueCast<Container> for Value {
 }
 
 impl VMValueCast<Struct> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Struct> {
         match self.0 {
             ValueImpl::Container(Container::Struct(r)) => Ok(Struct {
@@ -2035,12 +2044,14 @@ impl VMValueCast<Struct> for Value {
 }
 
 impl VMValueCast<StructRef> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<StructRef> {
         Ok(StructRef(VMValueCast::cast(self)?))
     }
 }
 
 impl VMValueCast<Vec<u8>> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Vec<u8>> {
         match self.0 {
             ValueImpl::Container(Container::VecU8(r)) => take_unique_ownership(r),
@@ -2051,6 +2062,7 @@ impl VMValueCast<Vec<u8>> for Value {
 }
 
 impl VMValueCast<Vec<u64>> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Vec<u64>> {
         match self.0 {
             ValueImpl::Container(Container::VecU64(r)) => take_unique_ownership(r),
@@ -2061,6 +2073,7 @@ impl VMValueCast<Vec<u64>> for Value {
 }
 
 impl VMValueCast<Vec<Value>> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Vec<Value>> {
         match self.0 {
             ValueImpl::Container(Container::Vec(c)) => {
@@ -2088,6 +2101,7 @@ impl VMValueCast<Vec<Value>> for Value {
 }
 
 impl VMValueCast<SignerRef> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<SignerRef> {
         match self.0 {
             ValueImpl::ContainerRef(r) => Ok(SignerRef(r)),
@@ -2098,6 +2112,7 @@ impl VMValueCast<SignerRef> for Value {
 }
 
 impl VMValueCast<VectorRef> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<VectorRef> {
         match self.0 {
             ValueImpl::ContainerRef(r) => Ok(VectorRef(r)),
@@ -2108,6 +2123,7 @@ impl VMValueCast<VectorRef> for Value {
 }
 
 impl VMValueCast<Vector> for Value {
+    #[inline(always)]
     fn cast(self) -> PartialVMResult<Vector> {
         match self.0 {
             ValueImpl::Container(c) => Ok(Vector(c)),
