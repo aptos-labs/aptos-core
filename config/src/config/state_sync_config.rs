@@ -10,6 +10,10 @@ use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
+// Whether to enable size and time-aware chunking (for non-production networks).
+// Note: once this becomes stable, we should enable it for all networks (e.g., Mainnet).
+const ENABLE_SIZE_AND_TIME_AWARE_CHUNKING: bool = false;
+
 // The maximum message size per state sync message
 const SERVER_MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
 
@@ -611,10 +615,11 @@ impl ConfigOptimizer for StorageServiceConfig {
         let storage_service_config = &mut node_config.state_sync.storage_service;
         let local_storage_config_yaml = &local_config_yaml["state_sync"]["storage_service"];
 
-        // Enable size and time-aware chunking for all networks except Mainnet
+        // Potentially enable size and time-aware chunking for all networks except Mainnet
         let mut modified_config = false;
         if let Some(chain_id) = chain_id {
-            if !chain_id.is_mainnet()
+            if ENABLE_SIZE_AND_TIME_AWARE_CHUNKING
+                && !chain_id.is_mainnet()
                 && local_storage_config_yaml["enable_size_and_time_aware_chunking"].is_null()
             {
                 storage_service_config.enable_size_and_time_aware_chunking = true;
@@ -824,6 +829,7 @@ mod tests {
         );
     }
 
+    #[ignore] // TODO: revert when size and time-aware chunking is healthy
     #[test]
     fn test_optimize_storage_service_devnet() {
         // Create a node config with size and time-aware chunking disabled
@@ -853,6 +859,7 @@ mod tests {
         assert!(storage_service_config.enable_size_and_time_aware_chunking);
     }
 
+    #[ignore] // TODO: revert when size and time-aware chunking is healthy
     #[test]
     fn test_optimize_storage_service_mainnet() {
         // Create a node config with size and time-aware chunking disabled
