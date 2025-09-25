@@ -520,8 +520,11 @@ pub enum SingleRunMode {
     },
 }
 
-// Optional more detailed configuration.
+/// Optional more detailed configuration.
 pub struct SingleRunAdditionalConfigs {
+    /// If num_generator_workers=1 then order in which transactions are generated
+    /// is kept in the block, otherwise transactions from different workers are
+    /// stitched together in arbitrary order
     pub num_generator_workers: usize,
     pub split_stages: bool,
 }
@@ -575,8 +578,8 @@ pub fn run_single_with_default_params(
         },
     };
     let num_generator_workers = match mode {
-        SingleRunMode::TEST
-        | SingleRunMode::BENCHMARK {
+        SingleRunMode::TEST => 1,
+        SingleRunMode::BENCHMARK {
             additional_configs: None,
             ..
         } => 4,
