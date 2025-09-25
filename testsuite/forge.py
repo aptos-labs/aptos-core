@@ -1735,6 +1735,11 @@ def test(
 
     try:
         forge_runner = forge_runner_mapping[forge_runner_mode]()
+
+        # For debug! if forge_runner_duration_secs is 0, then just quit
+        if forge_runner_duration_secs == "0":
+            raise SystemExit(0)
+
         result = forge_runner.run(forge_context)
 
         outputs = []
