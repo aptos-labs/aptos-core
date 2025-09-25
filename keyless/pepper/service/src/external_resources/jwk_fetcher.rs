@@ -14,6 +14,8 @@ use serde_json::Value;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::Instant;
 
+// TODO: at some point, we should try to merge the JWK and resource fetcher code
+
 // Issuer and JWK URL constants for Apple
 const ISSUER_APPLE: &str = "https://appleid.apple.com";
 const JWK_URL_APPLE: &str = "https://appleid.apple.com/auth/keys";
@@ -23,7 +25,7 @@ const ISSUER_GOOGLE: &str = "https://accounts.google.com";
 const JWK_URL_GOOGLE: &str = "https://www.googleapis.com/oauth2/v3/certs";
 
 // The interval (in seconds) at which to refresh the JWKs
-const JWK_REFRESH_INTERVAL_SECS: u64 = 10;
+pub const JWK_REFRESH_INTERVAL_SECS: u64 = 10;
 
 // The frequency at which to log the JWK refresh status (per loop iteration)
 const JWK_REFRESH_LOOP_LOG_FREQUENCY: u64 = 6; // e.g., 6 * 10s (per loop) = 60s per log
@@ -41,6 +43,49 @@ static AUTH_0_REGEX: Lazy<Regex> =
 static COGNITO_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^https://cognito-idp\.[a-zA-Z0-9-_]+\.amazonaws\.com/[a-zA-Z0-9-_]+$").unwrap()
 });
+
+/// A common interface offered by JWK issuers (this is especially useful for logging and testing)
+#[async_trait::async_trait]
+pub trait JWKIssuerInterface {
+    /// Returns the name of the issuer
+    fn issuer_name(&self) -> String;
+
+    /// Returns the JWK URL of the issuer
+    fn issuer_jwk_url(&self) -> String;
+
+    /// Fetches the JWKs from the issuer's JWK URL
+    async fn fetch_jwks(&self) -> Result<HashMap<KeyID, Arc<RSA_JWK>>>;
+}
+
+/// A simple JWK issuer struct
+struct JWKIssuer {
+    issuer_name: String,
+    issuer_jwk_url: String,
+}
+
+impl JWKIssuer {
+    pub fn new(issuer_name: String, issuer_jwk_url: String) -> JWKIssuer {
+        JWKIssuer {
+            issuer_name,
+            issuer_jwk_url,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl JWKIssuerInterface for JWKIssuer {
+    fn issuer_name(&self) -> String {
+        self.issuer_name.clone()
+    }
+
+    fn issuer_jwk_url(&self) -> String {
+        self.issuer_jwk_url.clone()
+    }
+
+    async fn fetch_jwks(&self) -> Result<HashMap<KeyID, Arc<RSA_JWK>>> {
+        fetch_jwks(&self.issuer_jwk_url).await
+    }
+}
 
 /// Fetches the JWKs from the given URL
 async fn fetch_jwks(jwk_url: &str) -> Result<HashMap<KeyID, Arc<RSA_JWK>>> {
@@ -178,34 +223,31 @@ pub fn start_jwk_fetchers() -> JWKCache {
     // Create the time service
     let time_service = TimeService::real();
 
+    // Create the known issuers for Google and Apple
+    let jwk_issuer_google = Arc::new(JWKIssuer::new(ISSUER_GOOGLE.into(), JWK_URL_GOOGLE.into()));
+    let jwk_issuer_apple = Arc::new(JWKIssuer::new(ISSUER_APPLE.into(), JWK_URL_APPLE.into()));
+
     // Start the JWK refresh loops for known issuers
-    start_jwk_refresh_loop(
-        ISSUER_GOOGLE.into(),
-        JWK_URL_GOOGLE.into(),
-        jwk_cache.clone(),
-        time_service.clone(),
-    );
-    start_jwk_refresh_loop(
-        ISSUER_APPLE.into(),
-        JWK_URL_APPLE.into(),
-        jwk_cache.clone(),
-        time_service.clone(),
-    );
+    for jwk_issuer in [jwk_issuer_google, jwk_issuer_apple] {
+        start_jwk_refresh_loop(jwk_issuer.clone(), jwk_cache.clone(), time_service.clone());
+    }
 
     // Return the JWK cache
     jwk_cache
 }
 
-/// Starts a background task that periodically fetches and caches the JWKs from the given URL
+/// Starts a background task that periodically fetches and caches the JWKs from the given issuer
 pub fn start_jwk_refresh_loop(
-    issuer: String,
-    jwk_url: String,
+    jwk_issuer: Arc<dyn JWKIssuerInterface + Send + Sync>,
     jwk_cache: JWKCache,
     time_service: TimeService,
 ) {
+    // Log the start of the task for the issuer
+    let issuer_name = jwk_issuer.issuer_name();
+    let issuer_jwk_url = jwk_issuer.issuer_jwk_url();
     info!(
-        issuer = issuer,
-        "Starting the JWK refresh loop for {}!", jwk_url
+        "Starting the JWK refresh loop for {}, URL: {}!",
+        issuer_name, issuer_jwk_url
     );
 
     // Start the task
@@ -215,7 +257,7 @@ pub fn start_jwk_refresh_loop(
         loop {
             // Fetch the JWKs from the URL
             let time_now = Instant::now();
-            let fetch_result = fetch_jwks(&jwk_url).await;
+            let fetch_result = jwk_issuer.fetch_jwks().await;
             let fetch_time = time_now.elapsed();
 
             // Process the fetch result
@@ -224,32 +266,29 @@ pub fn start_jwk_refresh_loop(
                     // Log the successful fetch
                     if loop_iteration_counter % JWK_REFRESH_LOOP_LOG_FREQUENCY == 0 {
                         info!(
-                            issuer = issuer,
-                            jwk_url = jwk_url,
-                            "Successfully fetched the JWK in {:?}! Issuer: {}, Key set: {:?}",
+                            "Successfully fetched the JWK in {:?}! Issuer: {}, URL: {}, Key set: {:?}",
                             fetch_time,
-                            issuer,
+                            issuer_jwk_url,
+                            issuer_name,
                             key_set
                         )
                     }
 
                     // Update the cache
-                    jwk_cache.lock().insert(issuer.clone(), key_set.clone());
+                    jwk_cache
+                        .lock()
+                        .insert(issuer_name.clone(), key_set.clone());
                 },
                 Err(error) => {
                     warn!(
-                        issuer = issuer,
-                        jwk_url = jwk_url,
-                        "Failed to fetch the JWK in {:?}! Issuer: {}, Error: {}",
-                        fetch_time,
-                        issuer,
-                        error
+                        "Failed to fetch the JWK in {:?}! Issuer: {}, URL: {}, Error: {}",
+                        fetch_time, issuer_jwk_url, issuer_name, error
                     );
                 },
             }
 
             // Update the fetch metrics
-            metrics::update_jwk_fetch_metrics(&issuer, fetch_result.is_ok(), fetch_time);
+            metrics::update_jwk_fetch_metrics(&issuer_name, fetch_result.is_ok(), fetch_time);
 
             // Increment the loop iteration counter
             loop_iteration_counter = loop_iteration_counter.wrapping_add(1);
