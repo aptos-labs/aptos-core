@@ -23,9 +23,9 @@
 
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./frontend/*"]
     }
   },
-  "include": ["src", "vite-env.d.ts"],
+  "include": ["frontend", "vite-env.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -13,7 +13,7 @@
     "deploy": "vercel",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "_fmt": "prettier 'src/**/*.ts'",
+    "_fmt": "prettier 'frontend/**/*.ts'",
     "fmt": "npm run _fmt -- --write"
   },
   "dependencies": {
