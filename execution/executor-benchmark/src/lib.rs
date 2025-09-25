@@ -17,8 +17,11 @@ pub mod transaction_executor;
 pub mod transaction_generator;
 
 use crate::{
-    db_access::DbAccessUtil, pipeline::Pipeline, transaction_committer::TransactionCommitter,
-    transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
+    db_access::DbAccessUtil,
+    pipeline::Pipeline,
+    transaction_committer::TransactionCommitter,
+    transaction_executor::TransactionExecutor,
+    transaction_generator::{create_block_metadata_transaction, TransactionGenerator},
 };
 use aptos_config::config::{NodeConfig, PrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_db::AptosDB;
@@ -433,11 +436,33 @@ fn add_accounts_impl<V>(
 
     let start_version = db.reader.get_latest_ledger_info_version().unwrap();
 
-    let (pipeline, block_sender) = Pipeline::new(
-        executor,
+    // First BlockMetadata transaction (epoch=0 to trigger epoch change)
+    let executor1 = BlockExecutor::<V>::new(db.clone());
+    let (pipeline1, block_sender1) = Pipeline::new(
+        executor1,
         start_version,
         &pipeline_config,
-        Some(1 + num_new_accounts / block_size * 101 / 100),
+        Some(1), // Only 1 block
+    );
+
+    info!("Sending the first block metadata transaction to start a new epoch");
+    block_sender1
+        .send(vec![create_block_metadata_transaction(0, &db)])
+        .unwrap();
+    drop(block_sender1); // Close the sender to indicate no more transactions
+
+    pipeline1.start_pipeline_processing();
+    let _ = pipeline1.join();
+
+    info!("Sent the first block metadata transaction to start a new epoch");
+
+    // Now create the main pipeline for account creation
+    let current_version = db.reader.get_latest_ledger_info_version().unwrap();
+    let (pipeline, block_sender) = Pipeline::new(
+        executor,
+        current_version,
+        &pipeline_config,
+        Some(num_new_accounts / block_size * 101 / 100),
     );
 
     let mut generator = TransactionGenerator::new_with_existing_db(

@@ -354,6 +354,7 @@ impl NativeVMExecutorTask {
                 }
             },
             NativeTransaction::BlockEpilogue => return Ok((VMChangeSet::empty(), 0)),
+            NativeTransaction::BlockMetadata => return Ok((VMChangeSet::empty(), 0)),
         };
 
         events.push((
