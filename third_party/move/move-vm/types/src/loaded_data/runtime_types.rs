@@ -499,6 +499,7 @@ impl Type {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn paranoid_check_eq(&self, expected_ty: &Self) -> PartialVMResult<()> {
         if self != expected_ty {
             let msg = format!("Expected type {}, got {}", expected_ty, self);
