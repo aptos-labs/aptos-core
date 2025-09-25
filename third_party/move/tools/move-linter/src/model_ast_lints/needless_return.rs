@@ -31,57 +31,70 @@ impl ExpChecker for NeedlessReturn {
             self.is_outermost_fn = true;
         }
 
-        let env = fenv.env();
-
-        self.check_expr(env, expr, true);
+        self.check_expr(fenv, expr);
     }
 }
 
 impl NeedlessReturn {
-    fn check_expr(&mut self, env: &GlobalEnv, expr: &ExpData, main_function: bool) {
+    fn check_expr(&mut self, fenv: &FunctionEnv, expr: &ExpData) {
+        let env = fenv.env();
+
         match expr {
             ExpData::Sequence(_, seq) => {
-                if main_function {
-                    seq.iter().for_each(|x| self.check_expr(env, x, false));
-                } else {
-                    self.sequence_ends_in_explicit_return(env, seq);
-                }
+                self.sequence_has_explicit_return(env, seq);
             },
-
             ExpData::IfElse(.., if_branch, else_branch) => {
-                let span_end = { |x: &Exp| env.get_node_loc(x.node_id()).span().end() };
-
-                if span_end(if_branch) == span_end(else_branch) {
-                    // In this case, there's no `else` branch.
-                    //   fun test(b: bool) {
-                    //      if (b) {
-                    //          return
-                    //      };
-                    //  }
-                    //
+                /*
+                Cases:
+                A: Function returns void, this can happen
+                    if (b) {
+                        // ...
+                        return; <----|
+                        // ()        |
+                    } else {         |--- This `;` are optional, as the compiler adds a `()` after it,
+                        // ...       |    and the function returns `()`.
+                        return; <----|
+                        // ()
+                    }
+                B: Function returns an element of type T (the return type, including `()`) with more code before that.
+                    if (b) {
+                        // ...
+                        return T
+                    } else {
+                        // ...
+                        return T
+                    }
+                C: Function returns an element of type T with no code before that. (Branches will not be a Sequence)
+                    if (b) {
+                        return T
+                    } else {
+                        return T
+                    }
+                */
+                if is_empty_tuple(else_branch.as_ref()) {
+                    // No `else` branch.
                     return;
-                }
+                };
 
-                // This case is for empty `else` branches with a semicolon in the return
-                //   fun test(b: bool) {
-                //      if (b) {
-                //          return;
-                //      };
-                //  }
-                // As it gets compiled differently
-                is_empty_tuple(else_branch.as_ref());
-
+                // Case C branches.
                 self.report_if_return(env, if_branch);
+                self.report_if_return(env, else_branch);
+
                 if let ExpData::Sequence(_, seq) = if_branch.as_ref() {
-                    self.sequence_ends_in_explicit_return(env, seq);
+                    // Case A & B
+                    self.sequence_has_explicit_return(env, seq);
                 }
 
-                self.report_if_return(env, else_branch);
                 if let ExpData::Sequence(_, seq) = else_branch.as_ref() {
-                    self.sequence_ends_in_explicit_return(env, seq);
+                    // Case A & B
+                    self.sequence_has_explicit_return(env, seq);
                 }
             },
             _ => {
+                // This will handle the case where the function looks like
+                //   public fun foo(...): T {
+                //      return T
+                //   }
                 self.report_if_return(env, expr);
             },
         }
@@ -100,24 +113,18 @@ impl NeedlessReturn {
         }
     }
 
-    fn sequence_ends_in_explicit_return(&mut self, env: &GlobalEnv, seq: &Vec<Exp>) {
+    fn sequence_has_explicit_return(&mut self, env: &GlobalEnv, seq: &Vec<Exp>) {
         let Some(last_val) = seq.last() else { return };
 
-        // Case:
-        // ```
-        //   public fun foo(...): ... {
-        //      return ...
-        //   }
-        //
-        // ```
         if self.report_if_return(env, last_val) {
             return;
         }
         self.semicolon_case(env, seq, &last_val);
     }
 
-    // The semicolon "adds" an empty tuple after all statements.
-    // If the function does not return anything, this can happen
+    // If the function returns `()`, check the previous one.
+    // The semicolon "adds" an empty tuple, so we need to check if the
+    // previous expression has a `return`
     // Case:                         |
     // ```                           |
     //   public fun foo(...) {       |
