@@ -179,6 +179,7 @@ impl Frame {
         self.call_type
     }
 
+    #[inline(always)]
     pub(crate) fn local_ty_at(&self, idx: usize) -> &Type {
         &self.local_tys[idx]
     }
