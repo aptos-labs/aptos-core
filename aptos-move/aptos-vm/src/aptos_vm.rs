@@ -143,6 +143,7 @@ use move_vm_runtime::{
     check_dependencies_and_charge_gas, dispatch_loader,
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
+    trace::{FullTraceLogger, NoOpTraceLogger, TraceLogger},
     InstantiatedFunctionLoader, LegacyLoaderConfig, ModuleStorage, RuntimeEnvironment,
     ScriptLoader, WithRuntimeEnvironment,
 };
@@ -830,6 +831,7 @@ impl AptosVM {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext<'a>,
         serialized_script: &'a Script,
+        trace_logger: &mut impl TraceLogger,
     ) -> Result<(), VMStatus> {
         if !self
             .features()
@@ -873,7 +875,14 @@ impl AptosVM {
                 self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
             )?;
 
-            session.execute_loaded_function(func, args, gas_meter, traversal_context, &loader)?;
+            session.execute_loaded_function_with_tracing(
+                func,
+                args,
+                gas_meter,
+                traversal_context,
+                &loader,
+                trace_logger,
+            )?;
             Ok(())
         })
     }
@@ -886,6 +895,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         entry_fn: &EntryFunction,
+        trace_logger: &mut impl TraceLogger,
     ) -> Result<(), VMStatus> {
         dispatch_loader!(module_storage, loader, {
             let legacy_loader_config = LegacyLoaderConfig {
@@ -938,12 +948,13 @@ impl AptosVM {
 
             // Execute the function. The function also must be an entry function!
             function.is_entry_or_err()?;
-            session.execute_loaded_function(
+            session.execute_loaded_function_with_tracing(
                 function,
                 args,
                 gas_meter,
                 traversal_context,
                 &loader,
+                trace_logger,
             )?;
             Ok(())
         })
@@ -961,6 +972,7 @@ impl AptosVM {
         executable: TransactionExecutableRef<'a>, // TODO[Orderless]: Check what's the right lifetime to use here.
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
+        trace_logger: &mut impl TraceLogger,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         fail_point!("aptos_vm::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error {
@@ -985,6 +997,7 @@ impl AptosVM {
                         gas_meter,
                         traversal_context,
                         script,
+                        trace_logger,
                     )
                 })?;
             },
@@ -997,6 +1010,7 @@ impl AptosVM {
                         gas_meter,
                         traversal_context,
                         entry_fn,
+                        trace_logger,
                     )
                 })?;
             },
@@ -1114,6 +1128,7 @@ impl AptosVM {
         multisig_address: AccountAddress,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
+        trace_logger: &mut impl TraceLogger,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         fail_point!("move_adapter::execute_multisig_transaction", |_| {
             Err(VMStatus::error(
@@ -1219,6 +1234,7 @@ impl AptosVM {
                     multisig_address,
                     &entry_function,
                     change_set_configs,
+                    trace_logger,
                 ),
         };
 
@@ -1293,6 +1309,7 @@ impl AptosVM {
         multisig_address: AccountAddress,
         payload: &EntryFunction,
         change_set_configs: &ChangeSetConfigs,
+        trace_logger: &mut impl TraceLogger,
     ) -> Result<UserSessionChangeSet, VMStatus> {
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
@@ -1304,6 +1321,7 @@ impl AptosVM {
                 gas_meter,
                 traversal_context,
                 payload,
+                trace_logger,
             )
         })?;
 
@@ -1982,6 +2000,8 @@ impl AptosVM {
             Err(_) => return unwrap_or_discard!(Err(deprecated_module_bundle!())),
         };
         let multisig_address = txn.multisig_address();
+
+        let mut trace_logger = FullTraceLogger::new();
         let result = if let Some(multisig_address) = multisig_address {
             self.execute_multisig_transaction(
                 resolver,
@@ -1996,6 +2016,7 @@ impl AptosVM {
                 multisig_address,
                 log_context,
                 change_set_configs,
+                &mut trace_logger,
             )
         } else {
             self.execute_script_or_entry_function(
@@ -2009,6 +2030,7 @@ impl AptosVM {
                 executable,
                 log_context,
                 change_set_configs,
+                &mut trace_logger,
             )
         };
         drop(payload_timer);
@@ -2019,7 +2041,7 @@ impl AptosVM {
             .expect("Balance should always be less than or equal to max gas amount set");
         TXN_GAS_USAGE.observe(u64::from(gas_usage) as f64);
 
-        let (vm_status, output) = result.unwrap_or_else(|err| {
+        let (vm_status, mut output) = result.unwrap_or_else(|err| {
             self.on_user_transaction_execution_failure(
                 prologue_change_set,
                 err,
@@ -2033,6 +2055,7 @@ impl AptosVM {
                 &mut traversal_context,
             )
         });
+        output.set_trace(trace_logger.finish());
         (vm_status, output)
     }
 
@@ -2203,6 +2226,7 @@ impl AptosVM {
                     &mut UnmeteredGasMeter,
                     &mut traversal_context,
                     script,
+                    &mut NoOpTraceLogger,
                 )?;
 
                 let change_set_configs =

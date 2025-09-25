@@ -64,7 +64,7 @@ use core::panic;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
+use move_vm_runtime::{trace::replay, Module, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use num_cpus;
 use rayon::ThreadPool;
@@ -1162,7 +1162,7 @@ where
         // This call finalizes the output and may not be concurrent with any other
         // accesses to the output (e.g. querying the write-set, events, etc), as
         // these read accesses are not synchronized and assumed to have terminated.
-        last_input_output.record_materialized_txn_output(
+        let trace = last_input_output.record_materialized_txn_output(
             txn_idx,
             aggregator_v1_delta_writes,
             materialized_resource_write_set
@@ -1170,7 +1170,14 @@ where
                 .chain(serialized_groups)
                 .collect(),
             materialized_events,
-        )
+        )?;
+
+        let result = replay(trace, &latest_view);
+        if let Err(err) = result {
+            panic!("[parallel] Error during trace replay: {:?}", err);
+        }
+
+        Ok(())
     }
 
     fn record_finalized_output(
@@ -2376,7 +2383,7 @@ where
                         // output which needs a write lock.
                         drop(output_before_guard);
 
-                        output.incorporate_materialized_txn_output(
+                        let trace = output.incorporate_materialized_txn_output(
                             // No aggregator v1 delta writes are needed for sequential execution.
                             // They are already handled because we passed materialize_deltas=true
                             // to execute_transaction.
@@ -2387,6 +2394,11 @@ where
                                 .collect(),
                             materialized_events,
                         )?;
+
+                        let result = replay(trace, &latest_view);
+                        if let Err(err) = result {
+                            panic!("[sequential] Error during trace replay: {:?}", err);
+                        }
                     }
                     // If dynamic change set is disabled, this can be used to assert nothing needs patching instead:
                     //   output.set_txn_output_for_non_dynamic_change_set();

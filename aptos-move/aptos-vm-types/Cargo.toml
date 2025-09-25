@@ -22,6 +22,7 @@ aptos-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
+derivative = { workspace = true }
 either = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }

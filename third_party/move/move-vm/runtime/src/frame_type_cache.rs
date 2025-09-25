@@ -106,6 +106,7 @@ impl FrameTypeCache {
         }
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub(crate) fn get_field_type_and_struct_type(
         &mut self,
@@ -123,6 +124,44 @@ impl FrameTypeCache {
         Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
     }
 
+    #[inline(always)]
+    pub(crate) fn get_field_type_and_struct_type_counts(
+        &mut self,
+        idx: FieldInstantiationIndex,
+        frame: &Frame,
+    ) -> PartialVMResult<(NumTypeNodes, NumTypeNodes)> {
+        let ((_, field_ty_count), (_, struct_ty_count)) =
+            Self::get_or(&mut self.field_instantiation, idx, |idx| {
+                let struct_type = frame.field_instantiation_to_struct(idx)?;
+                let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
+                let field_ty = frame.get_generic_field_ty(idx)?;
+                let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
+                Ok(((field_ty, field_ty_count), (struct_type, struct_ty_count)))
+            })?;
+        Ok((*field_ty_count, *struct_ty_count))
+    }
+
+    #[inline(always)]
+    pub(crate) fn get_or_create_field_type_and_struct_type<F>(
+        &mut self,
+        idx: FieldInstantiationIndex,
+        f: F,
+    ) -> PartialVMResult<(&Type, &Type)>
+    where
+        F: Fn(FieldInstantiationIndex) -> PartialVMResult<(Type, Type)>,
+    {
+        let ((field_ty, _), (struct_ty, _)) =
+            Self::get_or(&mut self.field_instantiation, idx, |idx| {
+                let (field_ty, struct_type) = f(idx)?;
+                Ok((
+                    (field_ty, NumTypeNodes::new(0)),
+                    (struct_type, NumTypeNodes::new(0)),
+                ))
+            })?;
+        Ok((field_ty, struct_ty))
+    }
+
+    #[allow(dead_code)]
     pub(crate) fn get_variant_field_type_and_struct_type(
         &mut self,
         idx: VariantFieldInstantiationIndex,
@@ -145,6 +184,48 @@ impl FrameTypeCache {
     }
 
     #[inline(always)]
+    pub(crate) fn get_variant_field_type_and_struct_type_counts(
+        &mut self,
+        idx: VariantFieldInstantiationIndex,
+        frame: &Frame,
+    ) -> PartialVMResult<(NumTypeNodes, NumTypeNodes)> {
+        let ((_, field_ty_count), (_, struct_ty_count)) =
+            Self::get_or(&mut self.variant_field_instantiation, idx, |idx| {
+                let info = frame.variant_field_instantiation_info_at(idx);
+                let struct_type = frame.create_struct_instantiation_ty(
+                    &info.definition_struct_type,
+                    &info.instantiation,
+                )?;
+                let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
+                let field_ty =
+                    frame.instantiate_ty(&info.uninstantiated_field_ty, &info.instantiation)?;
+                let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
+                Ok(((field_ty, field_ty_count), (struct_type, struct_ty_count)))
+            })?;
+        Ok((*field_ty_count, *struct_ty_count))
+    }
+
+    #[inline(always)]
+    pub(crate) fn get_or_create_variant_field_type_and_struct_type<F>(
+        &mut self,
+        idx: VariantFieldInstantiationIndex,
+        f: F,
+    ) -> PartialVMResult<(&Type, &Type)>
+    where
+        F: Fn(VariantFieldInstantiationIndex) -> PartialVMResult<(Type, Type)>,
+    {
+        let ((field_ty, _), (struct_ty, _)) =
+            Self::get_or(&mut self.variant_field_instantiation, idx, |idx| {
+                let (field_ty, struct_ty) = f(idx)?;
+                Ok((
+                    (field_ty, NumTypeNodes::new(0)),
+                    (struct_ty, NumTypeNodes::new(0)),
+                ))
+            })?;
+        Ok((field_ty, struct_ty))
+    }
+
+    #[inline(always)]
     pub(crate) fn get_struct_type(
         &mut self,
         idx: StructDefInstantiationIndex,
@@ -156,6 +237,23 @@ impl FrameTypeCache {
             Ok((ty, ty_count))
         })?;
         Ok((ty, *ty_count))
+    }
+
+    #[inline(always)]
+    pub(crate) fn get_or_create_generic_struct_ty<F>(
+        &mut self,
+        idx: StructDefInstantiationIndex,
+        f: F,
+    ) -> PartialVMResult<&Type>
+    where
+        F: Fn(StructDefInstantiationIndex) -> PartialVMResult<Type>,
+    {
+        let (ty, _) = Self::get_or(&mut self.struct_def_instantiation_type, idx, |idx| {
+            let ty = f(idx)?;
+            let ty_count = NumTypeNodes::new(0);
+            Ok((ty, ty_count))
+        })?;
+        Ok(ty)
     }
 
     #[inline(always)]
@@ -178,6 +276,23 @@ impl FrameTypeCache {
     }
 
     #[inline(always)]
+    pub(crate) fn get_or_create_variant_type<F>(
+        &mut self,
+        idx: StructVariantInstantiationIndex,
+        f: F,
+    ) -> PartialVMResult<&Type>
+    where
+        F: Fn(StructVariantInstantiationIndex) -> PartialVMResult<Type>,
+    {
+        let (ty, _) = Self::get_or(&mut self.struct_variant_instantiation_type, idx, |idx| {
+            let ty = f(idx)?;
+            let ty_count = NumTypeNodes::new(0);
+            Ok((ty, ty_count))
+        })?;
+        Ok(ty)
+    }
+
+    #[inline(always)]
     pub(crate) fn get_struct_fields_types(
         &mut self,
         idx: StructDefInstantiationIndex,
@@ -192,6 +307,30 @@ impl FrameTypeCache {
                     .into_iter()
                     .map(|ty| {
                         let num_nodes = NumTypeNodes::new(ty.num_nodes() as u64);
+                        (ty, num_nodes)
+                    })
+                    .collect::<Vec<_>>())
+            },
+        )?)
+    }
+
+    #[inline(always)]
+    pub(crate) fn get_or_create_generic_struct_field_tys<F>(
+        &mut self,
+        idx: StructDefInstantiationIndex,
+        f: F,
+    ) -> PartialVMResult<&[(Type, NumTypeNodes)]>
+    where
+        F: Fn(StructDefInstantiationIndex) -> PartialVMResult<Vec<Type>>,
+    {
+        Ok(Self::get_or(
+            &mut self.struct_field_type_instantiation,
+            idx,
+            |idx| {
+                Ok(f(idx)?
+                    .into_iter()
+                    .map(|ty| {
+                        let num_nodes = NumTypeNodes::new(0);
                         (ty, num_nodes)
                     })
                     .collect::<Vec<_>>())
@@ -222,6 +361,30 @@ impl FrameTypeCache {
     }
 
     #[inline(always)]
+    pub(crate) fn get_or_create_struct_variant_fields_types<F>(
+        &mut self,
+        idx: StructVariantInstantiationIndex,
+        f: F,
+    ) -> PartialVMResult<&[(Type, NumTypeNodes)]>
+    where
+        F: Fn(StructVariantInstantiationIndex) -> PartialVMResult<Vec<Type>>,
+    {
+        Ok(Self::get_or(
+            &mut self.struct_variant_field_type_instantiation,
+            idx,
+            |idx| {
+                Ok(f(idx)?
+                    .into_iter()
+                    .map(|ty| {
+                        let num_nodes = NumTypeNodes::new(0);
+                        (ty, num_nodes)
+                    })
+                    .collect::<Vec<_>>())
+            },
+        )?)
+    }
+
+    #[inline(always)]
     pub(crate) fn get_signature_index_type(
         &mut self,
         idx: SignatureIndex,
@@ -233,6 +396,22 @@ impl FrameTypeCache {
             Ok((ty, ty_count))
         })?;
         Ok((ty, *ty_count))
+    }
+
+    #[inline(always)]
+    pub(crate) fn get_or_create_signature_index_type<F>(
+        &mut self,
+        idx: SignatureIndex,
+        f: F,
+    ) -> PartialVMResult<&Type>
+    where
+        F: Fn(SignatureIndex) -> PartialVMResult<Type>,
+    {
+        let (ty, _) = Self::get_or(&mut self.single_sig_token_type, idx, |idx| {
+            let ty = f(idx)?;
+            Ok((ty, NumTypeNodes::new(0)))
+        })?;
+        Ok(ty)
     }
 
     pub(crate) fn make_rc() -> Rc<RefCell<Self>> {
