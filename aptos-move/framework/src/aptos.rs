@@ -63,17 +63,17 @@ impl ReleaseTarget {
             (
                 "aptos-framework",
                 Some("cached-packages/src/aptos_framework_sdk_builder.rs"),
-                false,
+                true,
             ),
             (
                 "aptos-token",
                 Some("cached-packages/src/aptos_token_sdk_builder.rs"),
-                false,
+                true,
             ),
             (
                 "aptos-token-objects",
                 Some("cached-packages/src/aptos_token_objects_sdk_builder.rs"),
-                false,
+                true,
             ),
             ("aptos-experimental", None, true),
         ];
