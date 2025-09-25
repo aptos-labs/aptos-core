@@ -82,7 +82,7 @@ jobs:
       forgeRetainDebugLogs: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}
       forgeIndexerDeployerProfile: ${{ inputs.FORGE_INDEXER_DEPLOYER_PROFILE }}
   adhoc-forge-test:
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@jkao97/add-retry
     needs: [determine-forge-run-metadata]
     secrets: inherit
     with:
