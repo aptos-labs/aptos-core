@@ -84,12 +84,14 @@ SKIP_PERF_IMPROVEMENT_NOTICE = IS_MAINNET
 CODE_PERF_VERSION = "v10"
 
 # default to using production number of execution threads for assertions
-NUMBER_OF_EXECUTION_THREADS = int(
-    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=32)
-)
+# but cap it at available CPU count to avoid concurrency validation errors
+import multiprocessing
+MAX_EXECUTION_THREADS = int(os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=32))
+NUMBER_OF_EXECUTION_THREADS = min(MAX_EXECUTION_THREADS, multiprocessing.cpu_count())
 
 if os.environ.get("DETAILED"):
-    EXECUTION_ONLY_NUMBER_OF_THREADS = [1, 2, 4, 8, 16, 32, 48, 60]
+    # Cap execution threads at available CPU count
+    EXECUTION_ONLY_NUMBER_OF_THREADS = [t for t in [1, 2, 4, 8, 16, 32, 48, 60] if t <= multiprocessing.cpu_count()]
 else:
     EXECUTION_ONLY_NUMBER_OF_THREADS = []
 
@@ -669,7 +671,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 part for part in line.strip().split(CALIBRATION_SEPARATOR) if part
             ]
         )
-        >= 1
+        >= 3
     }
     print(calibrated_expected_tps)
 
