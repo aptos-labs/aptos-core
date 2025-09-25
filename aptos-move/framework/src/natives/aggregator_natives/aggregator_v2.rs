@@ -617,6 +617,7 @@ pub fn make_all(
         ("try_add", native_try_add),
         ("try_sub", native_try_sub),
         ("is_at_least_impl", native_is_at_least_impl),
+        ("is_at_least", native_is_at_least_impl),
         ("read", native_read),
         ("snapshot", native_snapshot),
         ("create_snapshot", native_create_snapshot),
