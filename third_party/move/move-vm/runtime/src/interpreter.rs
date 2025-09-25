@@ -1747,6 +1747,8 @@ impl Stack {
 
     /// Pop a `Value` of a given type off the stack. Abort if the value is not of the given
     /// type or if the stack is empty.
+    // Note(inline): expensive to inline, adds a few seconds of compile time
+    #[inline(always)]
     fn pop_as<T>(&mut self) -> PartialVMResult<T>
     where
         Value: VMValueCast<T>,
