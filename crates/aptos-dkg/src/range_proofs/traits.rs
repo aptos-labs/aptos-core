@@ -14,7 +14,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     type Commitment;
     type CommitmentRandomness: Clone + ark_ff::UniformRand;
 
-    const DST: &[u8]; // TODO: Also add this to PVSS trait?
+    const DST: &[u8];
 
     /// Setup generates the prover and verifier keys used in the batched range proof.
     fn setup<R: RngCore + CryptoRng>(
@@ -24,17 +24,17 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     ) -> (Self::ProverKey, Self::VerificationKey);
 
     fn commit<R: RngCore + CryptoRng>(
-        ck: &Self::ProverKey,
+        pk: &Self::ProverKey,
         values: &[Self::Input],
         rng: &mut R,
     ) -> (Self::Commitment, Self::CommitmentRandomness) {
         let r = Self::CommitmentRandomness::rand(rng);
-        let c = Self::commit_with_randomness(ck, values, &r.clone());
-        (c, r)
+        let comm = Self::commit_with_randomness(pk, values, &r.clone());
+        (comm, r)
     }
 
     fn commit_with_randomness(
-        ck: &Self::ProverKey,
+        pk: &Self::ProverKey,
         values: &[Self::Input],
         r: &Self::CommitmentRandomness,
     ) -> Self::Commitment;
