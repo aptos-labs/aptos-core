@@ -323,6 +323,9 @@ struct Opt {
 
     #[clap(long)]
     skip_paranoid_checks: bool,
+
+    #[clap(long)]
+    use_blockstm_v2: bool,
 }
 
 impl Opt {
@@ -628,6 +631,7 @@ fn main() {
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);
     NativeConfig::set_concurrency_level_once(execution_threads_per_shard);
     AptosVM::set_processed_transactions_detailed_counters();
+    AptosVM::set_blockstm_v2_enabled_once(opt.use_blockstm_v2);
 
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
