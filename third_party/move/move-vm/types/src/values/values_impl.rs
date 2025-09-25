@@ -275,6 +275,7 @@ pub struct Locals(Rc<RefCell<Vec<ValueImpl>>>);
  **************************************************************************************/
 
 impl Container {
+    #[inline(always)]
     fn len(&self) -> usize {
         match self {
             Self::Vec(r) => r.borrow().len(),
@@ -328,6 +329,7 @@ impl Container {
  *
  **************************************************************************************/
 
+#[inline(always)]
 fn take_unique_ownership<T: Debug>(r: Rc<RefCell<T>>) -> PartialVMResult<T> {
     match Rc::try_unwrap(r) {
         Ok(cell) => Ok(cell.into_inner()),
@@ -501,6 +503,7 @@ impl Container {
 }
 
 impl IndexedRef {
+    #[inline(always)]
     fn copy_by_ref(&self) -> Self {
         Self {
             idx: self.idx,
@@ -510,6 +513,7 @@ impl IndexedRef {
 }
 
 impl ContainerRef {
+    #[inline(always)]
     fn copy_by_ref(&self) -> Self {
         match self {
             Self::Local(container) => Self::Local(container.copy_by_ref()),
@@ -1503,6 +1507,7 @@ impl Reference {
  **************************************************************************************/
 
 impl ContainerRef {
+    #[inline(always)]
     fn borrow_elem(&self, idx: usize) -> PartialVMResult<ValueImpl> {
         let len = self.container().len();
         if idx >= len {
@@ -1607,6 +1612,7 @@ impl StructRef {
 }
 
 impl Locals {
+    #[inline(always)]
     pub fn borrow_loc(&self, idx: usize) -> PartialVMResult<Value> {
         let v = self.0.borrow();
         if idx >= v.len() {
@@ -1870,54 +1876,64 @@ impl Value {
         )))
     }
 
+    #[inline(always)]
     pub fn struct_(s: Struct) -> Self {
         Self(ValueImpl::Container(Container::Struct(Rc::new(
             RefCell::new(s.fields),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_u8(it: impl IntoIterator<Item = u8>) -> Self {
         Self(ValueImpl::Container(Container::VecU8(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_u16(it: impl IntoIterator<Item = u16>) -> Self {
         Self(ValueImpl::Container(Container::VecU16(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+
+    #[inline(always)]
     pub fn vector_u32(it: impl IntoIterator<Item = u32>) -> Self {
         Self(ValueImpl::Container(Container::VecU32(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_u64(it: impl IntoIterator<Item = u64>) -> Self {
         Self(ValueImpl::Container(Container::VecU64(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_u128(it: impl IntoIterator<Item = u128>) -> Self {
         Self(ValueImpl::Container(Container::VecU128(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_u256(it: impl IntoIterator<Item = u256::U256>) -> Self {
         Self(ValueImpl::Container(Container::VecU256(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_bool(it: impl IntoIterator<Item = bool>) -> Self {
         Self(ValueImpl::Container(Container::VecBool(Rc::new(
             RefCell::new(it.into_iter().collect()),
         ))))
     }
 
+    #[inline(always)]
     pub fn vector_address(it: impl IntoIterator<Item = AccountAddress>) -> Self {
         Self(ValueImpl::Container(Container::VecAddress(Rc::new(
             RefCell::new(it.into_iter().collect()),
@@ -4646,6 +4662,7 @@ impl Struct {
 }
 
 impl Vector {
+    #[inline(always)]
     pub fn elem_views(&self) -> impl ExactSizeIterator<Item = impl ValueView + '_> + Clone {
         struct ElemView<'b> {
             container: &'b Container,
