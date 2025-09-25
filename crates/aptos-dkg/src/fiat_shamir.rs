@@ -9,7 +9,7 @@
 
 use crate::{
     pvss::{traits::Transcript, ThresholdConfig},
-    range_proofs::dekart_univariate,
+    range_proofs::traits::BatchedRangeProof,
     utils::random::random_scalar_from_uniform_bytes,
     SCALAR_NUM_BYTES,
 };
@@ -85,15 +85,12 @@ pub trait PVSS<T: Transcript>: ScalarProtocol {
     fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<blstrs::Scalar>;
 }
 
-pub trait RangeProof<E: Pairing> {
+pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
     fn append_sep(&mut self, dst: &[u8]);
 
-    fn append_vk(&mut self, vk: &(&E::G1, &E::G2, &E::G2, &E::G2));
+    fn append_vk(&mut self, vk: &B::VerificationKey);
 
-    fn append_public_statement(
-        &mut self,
-        public_statement: &(usize, &dekart_univariate::Commitment<E>),
-    );
+    fn append_public_statement(&mut self, public_statement: B::PublicStatement);
 
     fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1Affine], &[E::G2Affine]));
 
@@ -170,38 +167,23 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
 use ark_serialize::CanonicalSerialize;
 
 #[allow(non_snake_case)]
-impl<E: Pairing> RangeProof<E> for merlin::Transcript {
+impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcript {
     fn append_sep(&mut self, dst: &[u8]) {
         self.append_message(b"dom-sep", dst);
     }
 
-    fn append_vk(&mut self, vk: &(&E::G1, &E::G2, &E::G2, &E::G2)) {
+    fn append_vk(&mut self, vk: &B::VerificationKey) {
         let mut vk_bytes = Vec::new();
-        vk.0.serialize_compressed(&mut vk_bytes) // TODO: change this
-            .expect("vk0 serialization should succeed");
-        vk.1.serialize_compressed(&mut vk_bytes)
-            .expect("vk1 serialization should succeed");
-        vk.2.serialize_compressed(&mut vk_bytes)
-            .expect("vk2 serialization should succeed");
-        vk.3.serialize_compressed(&mut vk_bytes)
-            .expect("vk3 serialization should succeed");
+        vk.serialize_compressed(&mut vk_bytes)
+            .expect("vk serialization should succeed");
         self.append_message(b"vk", vk_bytes.as_slice());
     }
 
-    fn append_public_statement(
-        &mut self,
-        public_statement: &(usize, &dekart_univariate::Commitment<E>),
-    ) {
+    fn append_public_statement(&mut self, public_statement: B::PublicStatement) {
         let mut public_statement_bytes = Vec::new();
         public_statement
-            .0
             .serialize_compressed(&mut public_statement_bytes)
             .expect("public_statement0 serialization should succeed");
-        public_statement
-            .1
-            .serialize_compressed(&mut public_statement_bytes)
-            .expect("public_statement1 serialization should succeed");
-        // TODO: CHANGE THIS STUFF
         self.append_message(b"public-statements", public_statement_bytes.as_slice());
     }
 
