@@ -121,6 +121,7 @@ impl LoadedFunction {
 
     /// Returns a reference to parent [Module] owning the function. Returns an invariant violation
     /// error if the function comes from a script.
+    #[inline(always)]
     pub fn owner_as_module(&self) -> VMResult<&Module> {
         match &self.owner {
             LoadedFunctionOwner::Module(module) => Ok(module.as_ref()),
@@ -406,6 +407,7 @@ impl LoadedFunction {
     }
 
     /// Returns the module id or, if it is a script, the pseudo module id for scripts.
+    #[inline(always)]
     pub fn module_or_script_id(&self) -> &ModuleId {
         match &self.owner {
             LoadedFunctionOwner::Module(m) => Module::self_id(m),
@@ -481,6 +483,7 @@ impl LoadedFunction {
         self.function.is_native()
     }
 
+    #[inline(always)]
     pub fn get_native(&self) -> PartialVMResult<&UnboxedNativeFunction> {
         self.function.get_native()
     }

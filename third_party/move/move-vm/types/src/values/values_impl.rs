@@ -408,6 +408,9 @@ impl ValueImpl {
  *
  **************************************************************************************/
 impl ValueImpl {
+    // Note(inline): recursive function, but `#[inline(always)]` seems to improve perf slightly
+    //               and doesn't add much compile time.
+    #[inline(always)]
     fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
         use ValueImpl::*;
 
@@ -482,6 +485,7 @@ impl Container {
         })
     }
 
+    // Note(inline): expensive to inline, +10s compile time
     fn copy_by_ref(&self) -> Self {
         match self {
             Self::Vec(r) => Self::Vec(Rc::clone(r)),
@@ -1067,6 +1071,7 @@ impl Value {
  **************************************************************************************/
 
 impl ContainerRef {
+    #[inline(always)]
     fn read_ref(self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Value> {
         Ok(Value(ValueImpl::Container(
             self.container().copy_value(depth, max_depth)?,
@@ -1119,6 +1124,7 @@ impl StructRef {
 }
 
 impl Reference {
+    #[inline(always)]
     pub fn read_ref(self) -> PartialVMResult<Value> {
         self.0.read_ref(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
     }
@@ -3324,6 +3330,7 @@ impl Struct {
         }
     }
 
+    #[inline(always)]
     pub fn unpack(self) -> PartialVMResult<impl Iterator<Item = Value>> {
         Ok(self.fields.into_iter().map(Value))
     }
@@ -4487,6 +4494,7 @@ impl Value {
         })
     }
 
+    #[inline(always)]
     pub fn deserialize_constant(constant: &Constant) -> Option<Value> {
         let layout = Self::constant_sig_token_to_layout(&constant.type_)?;
         // INVARIANT:

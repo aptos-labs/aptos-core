@@ -1868,6 +1868,7 @@ impl CallStack {
     }
 
     /// Push a `Frame` on the call stack.
+    #[inline(always)]
     fn push(&mut self, frame: Frame) -> Result<(), Frame> {
         if self.0.len() < CALL_STACK_SIZE_LIMIT {
             self.0.push(frame);
@@ -1878,6 +1879,7 @@ impl CallStack {
     }
 
     /// Pop a `Frame` off the call stack.
+    #[inline(always)]
     fn pop(&mut self) -> Option<Frame> {
         self.0.pop()
     }
