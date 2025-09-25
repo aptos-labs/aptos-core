@@ -1,6 +1,6 @@
 processed 2 tasks
 task 0 lines 1-7:  print-bytecode [// `let` generates a local with the given type.]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()

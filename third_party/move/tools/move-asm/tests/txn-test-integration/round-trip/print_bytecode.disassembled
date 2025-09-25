@@ -1,7 +1,7 @@
 //**** Cross-compiled for `masm` syntax from `tests/txn-test-integration/print_bytecode.masm`
 
 //# print-bytecode --input module
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::m
 // Function definition at index 0
 public fun f(l0: u64): u64
@@ -11,7 +11,7 @@ public fun f(l0: u64): u64
 
 
 //# print-bytecode
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main(l0: u64)

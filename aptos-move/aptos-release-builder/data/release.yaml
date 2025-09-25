@@ -16,5 +16,5 @@ proposals:
           # old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/vX.WW.Z.json
           # new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/vX.YY.Z.json
       - Framework:
-          bytecode_version: 7
+          bytecode_version: 8
           git_hash: ~

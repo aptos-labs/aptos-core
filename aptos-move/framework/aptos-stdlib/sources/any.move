@@ -51,7 +51,7 @@ module aptos_std::any {
 
     #[test]
     fun test_any() {
-        assert!(pack(22).unpack::<u64>() == 22, 1);
-        assert!(pack(S { x: 22 }).unpack::<S>() == S { x: 22 }, 2);
+        assert!(pack(22).unpack<u64>() == 22, 1);
+        assert!(pack(S { x: 22 }).unpack<S>() == S { x: 22 }, 2);
     }
 }
