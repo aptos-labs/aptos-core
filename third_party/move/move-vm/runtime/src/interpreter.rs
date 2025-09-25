@@ -1757,6 +1757,7 @@ impl Stack {
     }
 
     /// Pop n values off the stack.
+    #[inline(always)]
     fn popn(&mut self, n: u16) -> PartialVMResult<Vec<Value>> {
         let remaining_stack_size = self
             .value
@@ -1767,6 +1768,7 @@ impl Stack {
         Ok(args)
     }
 
+    #[inline(always)]
     fn last_n(&self, n: usize) -> PartialVMResult<impl ExactSizeIterator<Item = &Value> + Clone> {
         if self.value.len() < n {
             return Err(
@@ -1809,6 +1811,7 @@ impl Stack {
     }
 
     /// Pop n types off the stack.
+    #[inline(always)]
     pub(crate) fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<Type>> {
         let remaining_stack_size = self.types.len().checked_sub(n as usize).ok_or_else(|| {
             PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
