@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 import os
+import time
 from typing import Dict, List, Optional, TypedDict
 
 from .shell import Shell
+from .logging import log
 
 
 class Cloud(Enum):
@@ -213,11 +215,25 @@ def list_eks_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
 
 
 def list_gke_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
-    cluster_json = shell.run(
-        ["gcloud", "container", "clusters", "list", "--format=json"]
-    ).unwrap()
+    # hack: Retry GKE cluster listing few times in case of transient failures
+    max_retries = 10
+    cluster_json_str = "[]"
+    for attempt in range(max_retries):
+        try:
+            cluster_json = shell.run(
+                ["gcloud", "container", "clusters", "list", "--format=json(name, location)"]
+            ).unwrap()
+            cluster_json_str = cluster_json.decode()
+            log.info(f"GKE clusters list (attempt {attempt + 1}): {cluster_json_str}")
+            break  # Success, exit retry loop
+        except Exception as e:
+            if attempt == max_retries - 1:
+                # Last attempt failed, re-raise the exception
+                raise e
+            log.warning(f"GKE cluster listing attempt {attempt + 1} failed: {e}. Retrying...")
+            time.sleep(10)
     try:
-        cluster_result = json.loads(cluster_json.decode())
+        cluster_result = json.loads(cluster_json_str)
         clusters: Dict[str, ForgeCluster] = {}
         for cluster_config in cluster_result:
             cluster_name = cluster_config["name"]
