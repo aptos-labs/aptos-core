@@ -222,6 +222,7 @@ pub(crate) struct FullRuntimeTypeCheck;
 pub(crate) struct UntrustedOnlyRuntimeTypeCheck;
 
 impl RuntimeTypeCheck for NoRuntimeTypeCheck {
+    #[inline(always)]
     fn pre_execution_type_stack_transition(
         _frame: &Frame,
         _operand_stack: &mut Stack,
@@ -231,6 +232,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         Ok(())
     }
 
+    #[inline(always)]
     fn post_execution_type_stack_transition(
         _frame: &Frame,
         _operand_stack: &mut Stack,
@@ -240,6 +242,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         Ok(())
     }
 
+    #[inline(always)]
     fn check_operand_stack_balance(
         _for_fun: &Function,
         _operand_stack: &Stack,
@@ -268,6 +271,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
 impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// Note that most of the checks should happen after instruction execution, because gas charging will happen during
     /// instruction execution and we want to avoid running code without charging proper gas as much as possible.
+    #[inline(always)]
     fn pre_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
@@ -399,6 +403,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// This function and `pre_execution_type_stack_transition` should
     /// constitute the full type stack transition for the paranoid
     /// mode.
+    #[inline(always)]
     fn post_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
@@ -865,6 +870,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         Ok(())
     }
 
+    #[inline(always)]
     fn check_operand_stack_balance(
         _for_fun: &Function,
         operand_stack: &Stack,
@@ -922,6 +928,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
 }
 
 impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
+    #[inline(always)]
     fn pre_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
@@ -940,6 +947,7 @@ impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
         }
     }
 
+    #[inline(always)]
     fn post_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
@@ -958,6 +966,7 @@ impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
         }
     }
 
+    #[inline(always)]
     fn check_operand_stack_balance(
         _for_fun: &Function,
         _operand_stack: &Stack,
