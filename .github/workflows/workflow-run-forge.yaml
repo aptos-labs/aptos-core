@@ -149,7 +149,7 @@ jobs:
         if: ${{ !inputs.SKIP_JOB }}
 
       - name: Install python deps
-        run: pip3 install click==8.1.3 psutil==5.9.1
+        run: pip3 install click==8.1.3 psutil==5.9.1 tenacity>=9.0.0
         if: ${{ !inputs.SKIP_JOB }}
 
       # Calculate the auth duration based on the test duration
