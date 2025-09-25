@@ -17,7 +17,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./frontend"),
+      "@": path.resolve(__dirname, "./src"),
       buffer: 'buffer',
       process: 'process/browser',
       stream: 'stream-browserify',

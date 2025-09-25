@@ -13,6 +13,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
+    // "allowSyntheticDefaultImports": true,
 
     /* Linting */
     "strict": true,
@@ -22,9 +23,9 @@
 
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./frontend/*"]
+      "@/*": ["./src/*"]
     }
   },
-  "include": ["frontend", "vite-env.d.ts"],
+  "include": ["src", "vite-env.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
