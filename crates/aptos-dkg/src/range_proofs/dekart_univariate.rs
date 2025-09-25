@@ -644,7 +644,7 @@ fn fiat_shamir_challenges<E: Pairing>(
         public_statement,
     );
 
-    <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::append_bit_commitments(
+    <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::append_commitments(
         fs_transcript,
         bit_commitments,
     );

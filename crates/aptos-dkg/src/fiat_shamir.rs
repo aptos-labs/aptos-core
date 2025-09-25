@@ -16,6 +16,7 @@ use crate::{
 use aptos_crypto::ValidCryptoMaterial;
 use ark_ec::pairing::Pairing;
 use ark_ff::Field;
+use ark_serialize::CanonicalSerialize;
 use serde::Serialize;
 
 pub const PVSS_DOM_SEP: &[u8; 21] = b"APTOS_SCRAPE_PVSS_DST"; // TODO: Name needs work, but check backwards-compatibility
@@ -92,7 +93,7 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 
     fn append_public_statement(&mut self, public_statement: B::PublicStatement);
 
-    fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1Affine], &[E::G2Affine]));
+    fn append_commitments<A: CanonicalSerialize>(&mut self, commitments: &A);
 
     fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<E::ScalarField>;
 }
@@ -164,8 +165,6 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
     }
 }
 
-use ark_serialize::CanonicalSerialize;
-
 #[allow(non_snake_case)]
 impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcript {
     fn append_sep(&mut self, dst: &[u8]) {
@@ -187,12 +186,12 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
         self.append_message(b"public-statements", public_statement_bytes.as_slice());
     }
 
-    fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1Affine], &[E::G2Affine])) {
-        let mut bit_commitments_bytes = Vec::new();
-        bit_commitments
-            .serialize_compressed(&mut bit_commitments_bytes)
-            .expect("bit_commitments serialization should succeed");
-        self.append_message(b"bit-commitments", bit_commitments_bytes.as_slice());
+    fn append_commitments<A: CanonicalSerialize>(&mut self, commitments: &A) {
+        let mut commitments_bytes = Vec::new();
+        commitments
+            .serialize_compressed(&mut commitments_bytes)
+            .expect("commitments serialization should succeed");
+        self.append_message(b"commitments", commitments_bytes.as_slice());
     }
 
     fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<E::ScalarField> {
