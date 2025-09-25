@@ -2717,8 +2717,11 @@ pub const INDEX_OUT_OF_BOUNDS: u64 = NFE_VECTOR_ERROR_BASE + 1;
 pub const POP_EMPTY_VEC: u64 = NFE_VECTOR_ERROR_BASE + 2;
 pub const VEC_UNPACK_PARITY_MISMATCH: u64 = NFE_VECTOR_ERROR_BASE + 3;
 
+// Note(inline): Inlining all vector functions adds ~10s to compile time.
+
 // TODO: this check seems to be obsolete if paranoid mode is on,
 //   and should either be removed or move over to runtime_type_checks?
+#[inline(always)]
 fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
     match (ty, v) {
         (Type::U8, Container::VecU8(_))
@@ -2766,6 +2769,7 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
 }
 
 impl VectorRef {
+    #[inline(always)]
     pub fn length_as_usize(&self) -> PartialVMResult<usize> {
         let c: &Container = self.0.container();
         //check_elem_layout(type_param, c)?;
@@ -2785,10 +2789,12 @@ impl VectorRef {
         Ok(len)
     }
 
+    #[inline(always)]
     pub fn len(&self) -> PartialVMResult<Value> {
         Ok(Value::u64(self.length_as_usize()? as u64))
     }
 
+    #[inline(always)]
     pub fn push_back(&self, e: Value) -> PartialVMResult<()> {
         let c = self.0.container();
         // check_elem_layout(type_param, c)?;
@@ -2810,6 +2816,7 @@ impl VectorRef {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn borrow_elem(&self, idx: usize) -> PartialVMResult<Value> {
         let c = self.0.container();
         // check_elem_layout(type_param, c)?;
@@ -2829,6 +2836,7 @@ impl VectorRef {
         }
     }
 
+    #[inline(always)]
     pub fn pop(&self) -> PartialVMResult<Value> {
         let c = self.0.container();
         // check_elem_layout(type_param, c)?;
@@ -2990,6 +2998,7 @@ impl VectorRef {
 }
 
 impl Vector {
+    #[inline(always)]
     pub fn pack(type_param: &Type, elements: Vec<Value>) -> PartialVMResult<Value> {
         let container = match type_param {
             Type::U8 => Value::vector_u8(
@@ -3064,6 +3073,7 @@ impl Vector {
         Self::pack(type_param, vec![])
     }
 
+    #[inline(always)]
     pub fn unpack_unchecked(self) -> PartialVMResult<Vec<Value>> {
         let elements: Vec<_> = match self.0 {
             Container::VecU8(r) => take_unique_ownership(r)?
@@ -3104,6 +3114,7 @@ impl Vector {
         Ok(elements)
     }
 
+    #[inline(always)]
     pub fn unpack(self, expected_num: u64) -> PartialVMResult<Vec<Value>> {
         // check_elem_layout(type_param, &self.0)?;
         let elements = self.unpack_unchecked()?;
