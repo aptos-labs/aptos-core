@@ -599,7 +599,7 @@ enum_dispatch = "0.3.12"
 env_logger = "0.10.0"
 equivalent = "1.0"
 erased-serde = "0.3.13"
-ethnum = "1.5.0"
+ethnum = "1.5.2"
 ethers = { version = "2" }
 dearbitrary = { version = "1.0.4", features = ["derive"] }
 fail = "0.5.0"

@@ -475,6 +475,7 @@ fn execute_inner(
         | Bytecode::CastI64
         | Bytecode::CastI128
         | Bytecode::CastI256
+        | Bytecode::Negate
         | Bytecode::Not
         | Bytecode::Exists(_)
         | Bytecode::ExistsGeneric(_) => (),
@@ -514,7 +515,6 @@ fn execute_inner(
         | Bytecode::Mul
         | Bytecode::Mod
         | Bytecode::Div
-        | Bytecode::Negate
         | Bytecode::BitOr
         | Bytecode::BitAnd
         | Bytecode::Xor
