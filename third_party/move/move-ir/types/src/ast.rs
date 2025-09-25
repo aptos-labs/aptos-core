@@ -1809,7 +1809,7 @@ fn format_move_value(v: &MoveValue) -> String {
         MoveValue::U16(u) => format!("{}u16", u),
         MoveValue::U32(u) => format!("{}u32", u),
         MoveValue::U256(u) => format!("{}u256", u),
-        MoveValue::I8(u) => format!("{}u8", u),
+        MoveValue::I8(u) => format!("{}i8", u),
         MoveValue::I16(u) => format!("{}i16", u),
         MoveValue::I32(u) => format!("{}i32", u),
         MoveValue::I64(u) => format!("{}i64", u),
