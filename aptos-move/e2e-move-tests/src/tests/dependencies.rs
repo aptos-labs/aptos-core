@@ -36,7 +36,7 @@ fn exceeding_max_num_dependencies_on_publish(
     } else {
         // Enough to cover for 2 modules combined: p1 and p2 or p2 and p3.
         h.modify_gas_schedule(|gas_params| {
-            gas_params.vm.txn.max_total_dependency_size = 320.into();
+            gas_params.vm.txn.max_total_dependency_size = 330.into();
         });
     }
 

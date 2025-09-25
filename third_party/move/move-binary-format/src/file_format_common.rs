@@ -536,10 +536,10 @@ pub const VERSION_MAX: u32 = VERSION_8;
 /// Mark which version is the default version. This is the version used by default by tools like
 /// the compiler. Notice that this version might be different from the one supported on nodes.
 /// The node's max version is determined by the on-chain config for that node.
-pub const VERSION_DEFAULT: u32 = VERSION_7;
+pub const VERSION_DEFAULT: u32 = VERSION_8;
 
 /// Mark which version is the default version if compiling Move 2.
-pub const VERSION_DEFAULT_LANG_V2: u32 = VERSION_7;
+pub const VERSION_DEFAULT_LANG_V2: u32 = VERSION_8;
 
 // Mark which oldest version is supported.
 pub const VERSION_MIN: u32 = VERSION_5;

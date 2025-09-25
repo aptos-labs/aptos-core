@@ -5,6 +5,7 @@
 use crate::{
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
+    interpreter_caches::InterpreterFunctionCaches,
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     storage::{
@@ -101,6 +102,8 @@ impl MoveVM {
                 function,
                 deserialized_args,
                 data_cache,
+                // TODO(caches): async drop
+                &mut InterpreterFunctionCaches::new(),
                 loader,
                 &ty_depth_checker,
                 &layout_converter,

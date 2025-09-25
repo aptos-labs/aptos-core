@@ -1,7 +1,7 @@
 //**** Cross-compiled for `masm` syntax from `tests/assembler/struct_use.masm`
 
 //# publish --print-bytecode
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test1
 struct S has copy + drop
   _1: u64
@@ -10,7 +10,7 @@ struct S has copy + drop
 
 
 //# publish --print-bytecode
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test2
 use 0x66::test1
 struct T has drop

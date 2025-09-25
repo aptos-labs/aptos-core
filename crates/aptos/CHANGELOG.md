@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.9.0]
+- Set language version 2.2 and bytecode version v8 as default
+
 ## [7.8.1]
 - Transaction Simulatiom Session: fixed resource deserialization bug
 

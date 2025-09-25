@@ -78,10 +78,10 @@ module aptos_std::ristretto255_elgamal {
         let left_point = ristretto255::new_point_from_bytes(bytes);
         let right_point = ristretto255::new_point_from_bytes(bytes_right);
 
-        if (left_point.is_some::<RistrettoPoint>() && right_point.is_some::<RistrettoPoint>()) {
+        if (left_point.is_some<RistrettoPoint>() && right_point.is_some<RistrettoPoint>()) {
             std::option::some<Ciphertext>(Ciphertext {
-                left: left_point.extract::<RistrettoPoint>(),
-                right: right_point.extract::<RistrettoPoint>()
+                left: left_point.extract<RistrettoPoint>(),
+                right: right_point.extract<RistrettoPoint>()
             })
         } else {
             std::option::none<Ciphertext>()
@@ -118,8 +118,8 @@ module aptos_std::ristretto255_elgamal {
         let bytes_left = ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.left));
         let bytes_right = ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.right));
         let bytes = vector::empty<u8>();
-        bytes.append::<u8>(bytes_left);
-        bytes.append::<u8>(bytes_right);
+        bytes.append<u8>(bytes_left);
+        bytes.append<u8>(bytes_right);
         bytes
     }
 
