@@ -120,12 +120,12 @@ fn native_get_txn_hash(
 }
 
 /***************************************************************************************************
- * native fun generate_unique_address
+ * native fun generate_auid_address
  *
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-fn native_generate_unique_address(
+fn native_generate_auid_address(
     context: &mut SafeNativeContext,
     _ty_args: &[Type],
     _args: VecDeque<Value>,
@@ -508,7 +508,8 @@ pub fn make_all(
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
         ("get_script_hash", native_get_script_hash as RawSafeNative),
-        ("generate_unique_address", native_generate_unique_address),
+        ("generate_unique_address", native_generate_auid_address),
+        ("generate_auid_address", native_generate_auid_address),
         (
             "monotonically_increasing_counter_internal",
             native_monotonically_increasing_counter_internal,
