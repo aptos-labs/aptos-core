@@ -155,7 +155,7 @@ impl SimpleInstruction {
             LdI16 => LD_I16,
             LdI32 => LD_I32,
             LdI64 => LD_I64,
-            LdI128 => LD_I64,
+            LdI128 => LD_I128,
             LdI256 => LD_I256,
             CastI8 => CAST_I8,
             CastI16 => CAST_I16,

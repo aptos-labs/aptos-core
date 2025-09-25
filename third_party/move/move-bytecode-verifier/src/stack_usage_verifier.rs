@@ -148,6 +148,7 @@ impl<'a> StackUsageVerifier<'a> {
 
             // Instructions that pop and push once
             Bytecode::Not
+            | Bytecode::Negate
             | Bytecode::FreezeRef
             | Bytecode::ReadRef
             | Bytecode::Exists(_)
@@ -189,7 +190,6 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::Mul
             | Bytecode::Mod
             | Bytecode::Div
-            | Bytecode::Negate
             | Bytecode::BitOr
             | Bytecode::BitAnd
             | Bytecode::Xor

@@ -779,7 +779,6 @@ pub fn instruction_key(instruction: &Bytecode) -> u8 {
         Mul => Opcodes::MUL,
         Mod => Opcodes::MOD,
         Div => Opcodes::DIV,
-        Negate => Opcodes::NEGATE,
         BitOr => Opcodes::BIT_OR,
         BitAnd => Opcodes::BIT_AND,
         Xor => Opcodes::XOR,
@@ -844,6 +843,7 @@ pub fn instruction_key(instruction: &Bytecode) -> u8 {
         CastI64 => Opcodes::CAST_I64,
         CastI128 => Opcodes::CAST_I128,
         CastI256 => Opcodes::CAST_I256,
+        Negate => Opcodes::NEGATE,
     };
     opcode as u8
 }

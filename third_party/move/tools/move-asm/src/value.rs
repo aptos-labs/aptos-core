@@ -26,7 +26,16 @@ impl AsmValue {
 
     pub fn signed(i256: I256) -> AsmValue {
         if i256 < I256::ZERO {
-            Self::Number(false, (-i256).try_into().expect("into succeeds"))
+            if i256 == I256::MIN {
+                // can't negate this one
+                let m: U256 = I256::MAX.try_into().expect("into succeeds");
+                Self::Number(
+                    false,
+                    U256::checked_add(m, U256::ONE).expect("add succeeds"),
+                )
+            } else {
+                Self::Number(false, (-i256).try_into().expect("into succeeds"))
+            }
         } else {
             Self::Number(true, i256.try_into().expect("into succeeds"))
         }
@@ -180,12 +189,19 @@ impl AsmValue {
                 true,
                 U256::from(if *v { 1u8 } else { 0u8 }),
             )),
-            MoveValue::U8(v) => Ok(AsmValue::Number(true, U256::from(*v))),
-            MoveValue::U16(v) => Ok(AsmValue::Number(true, U256::from(*v))),
-            MoveValue::U32(v) => Ok(AsmValue::Number(true, U256::from(*v))),
-            MoveValue::U64(v) => Ok(AsmValue::Number(true, U256::from(*v))),
-            MoveValue::U128(v) => Ok(AsmValue::Number(true, U256::from(*v))),
-            MoveValue::U256(v) => Ok(AsmValue::Number(true, *v)),
+            MoveValue::U8(v) => Ok(AsmValue::unsigned(U256::from(*v))),
+            MoveValue::U16(v) => Ok(AsmValue::unsigned(U256::from(*v))),
+            MoveValue::U32(v) => Ok(AsmValue::unsigned(U256::from(*v))),
+            MoveValue::U64(v) => Ok(AsmValue::unsigned(U256::from(*v))),
+            MoveValue::U128(v) => Ok(AsmValue::unsigned(U256::from(*v))),
+            MoveValue::U256(v) => Ok(AsmValue::unsigned(*v)),
+
+            MoveValue::I8(v) => Ok(AsmValue::signed(I256::from(*v))),
+            MoveValue::I16(v) => Ok(AsmValue::signed(I256::from(*v))),
+            MoveValue::I32(v) => Ok(AsmValue::signed(I256::from(*v))),
+            MoveValue::I64(v) => Ok(AsmValue::signed(I256::from(*v))),
+            MoveValue::I128(v) => Ok(AsmValue::signed(I256::from(*v))),
+            MoveValue::I256(v) => Ok(AsmValue::signed(*v)),
 
             MoveValue::Address(v) => Ok(AsmValue::Number(true, address_to_u256(*v))),
             MoveValue::Vector(vs) => Ok(AsmValue::Vector(
