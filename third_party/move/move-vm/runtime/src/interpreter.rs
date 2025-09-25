@@ -1770,6 +1770,7 @@ impl Stack {
 
     /// Push a `Value` on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
+    #[inline(always)]
     fn push(&mut self, value: Value) -> PartialVMResult<()> {
         if self.value.len() < OPERAND_STACK_SIZE_LIMIT {
             self.value.push(value);
@@ -1780,6 +1781,7 @@ impl Stack {
     }
 
     /// Pop a `Value` off the stack or abort execution if the stack is empty.
+    #[inline(always)]
     fn pop(&mut self) -> PartialVMResult<Value> {
         self.value
             .pop()
@@ -1820,6 +1822,7 @@ impl Stack {
 
     /// Push a type on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
+    #[inline(always)]
     pub(crate) fn push_ty(&mut self, ty: Type) -> PartialVMResult<()> {
         if self.types.len() < OPERAND_STACK_SIZE_LIMIT {
             self.types.push(ty);
@@ -1830,6 +1833,7 @@ impl Stack {
     }
 
     /// Pop a type off the stack or abort execution if the stack is empty.
+    #[inline(always)]
     pub(crate) fn pop_ty(&mut self) -> PartialVMResult<Type> {
         self.types.pop().ok_or_else(|| {
             PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
@@ -1837,6 +1841,7 @@ impl Stack {
         })
     }
 
+    #[inline(always)]
     pub(crate) fn top_ty(&mut self) -> PartialVMResult<&Type> {
         self.types.last().ok_or_else(|| {
             PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
@@ -1877,6 +1882,7 @@ impl Stack {
         Ok(&self.types[(len - n)..])
     }
 
+    #[inline(always)]
     pub(crate) fn check_balance(&self) -> PartialVMResult<()> {
         if self.types.len() != self.value.len() {
             return Err(

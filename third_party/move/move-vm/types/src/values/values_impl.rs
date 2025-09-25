@@ -1703,6 +1703,7 @@ impl Locals {
         )))
     }
 
+    #[inline(always)]
     pub fn copy_loc(&self, idx: usize) -> PartialVMResult<Value> {
         self.copy_loc_impl(idx, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
     }
@@ -1713,6 +1714,7 @@ impl Locals {
         self.copy_loc_impl(idx, Some(max_depth))
     }
 
+    #[inline(always)]
     fn copy_loc_impl(&self, idx: usize, max_depth: Option<u64>) -> PartialVMResult<Value> {
         let v = self.0.borrow();
         match v.get(idx) {
@@ -1729,6 +1731,7 @@ impl Locals {
         }
     }
 
+    #[inline(always)]
     fn swap_loc(&mut self, idx: usize, x: Value) -> PartialVMResult<Value> {
         let mut v = self.0.borrow_mut();
         match v.get_mut(idx) {
@@ -1741,6 +1744,7 @@ impl Locals {
         }
     }
 
+    #[inline(always)]
     pub fn move_loc(&mut self, idx: usize) -> PartialVMResult<Value> {
         match self.swap_loc(idx, Value(ValueImpl::Invalid))? {
             Value(ValueImpl::Invalid) => Err(PartialVMError::new(
@@ -1751,6 +1755,7 @@ impl Locals {
         }
     }
 
+    #[inline(always)]
     pub fn store_loc(&mut self, idx: usize, x: Value) -> PartialVMResult<()> {
         self.swap_loc(idx, x)?;
         Ok(())
@@ -1778,6 +1783,7 @@ impl Locals {
         res.into_iter()
     }
 
+    #[inline(always)]
     pub fn is_invalid(&self, idx: usize) -> PartialVMResult<bool> {
         let v = self.0.borrow();
         match v.get(idx) {
