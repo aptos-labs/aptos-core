@@ -469,28 +469,28 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(u256_ty)?
             },
             Bytecode::LdI8(_) => {
-                let u8_ty = ty_builder.create_i8_ty();
-                operand_stack.push_ty(u8_ty)?
+                let i8_ty = ty_builder.create_i8_ty();
+                operand_stack.push_ty(i8_ty)?
             },
             Bytecode::LdI16(_) => {
-                let u16_ty = ty_builder.create_i16_ty();
-                operand_stack.push_ty(u16_ty)?
+                let i16_ty = ty_builder.create_i16_ty();
+                operand_stack.push_ty(i16_ty)?
             },
             Bytecode::LdI32(_) => {
-                let u32_ty = ty_builder.create_i32_ty();
-                operand_stack.push_ty(u32_ty)?
+                let i32_ty = ty_builder.create_i32_ty();
+                operand_stack.push_ty(i32_ty)?
             },
             Bytecode::LdI64(_) => {
-                let u64_ty = ty_builder.create_i64_ty();
-                operand_stack.push_ty(u64_ty)?
+                let i64_ty = ty_builder.create_i64_ty();
+                operand_stack.push_ty(i64_ty)?
             },
             Bytecode::LdI128(_) => {
-                let u128_ty = ty_builder.create_i128_ty();
-                operand_stack.push_ty(u128_ty)?
+                let i128_ty = ty_builder.create_i128_ty();
+                operand_stack.push_ty(i128_ty)?
             },
             Bytecode::LdI256(_) => {
-                let u256_ty = ty_builder.create_i256_ty();
-                operand_stack.push_ty(u256_ty)?
+                let i256_ty = ty_builder.create_i256_ty();
+                operand_stack.push_ty(i256_ty)?
             },
             Bytecode::LdTrue | Bytecode::LdFalse => {
                 let bool_ty = ty_builder.create_bool_ty();

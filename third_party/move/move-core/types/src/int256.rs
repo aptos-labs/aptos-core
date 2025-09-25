@@ -127,6 +127,12 @@ impl From<I256> for ethnum::I256 {
     }
 }
 
+impl From<I256> for BigInt {
+    fn from(value: I256) -> Self {
+        BigInt::from_signed_bytes_le(&value.to_le_bytes())
+    }
+}
+
 // ---- Serialization
 
 macro_rules! serde_serializer {
