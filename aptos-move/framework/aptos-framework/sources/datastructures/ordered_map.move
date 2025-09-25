@@ -131,6 +131,19 @@ module aptos_std::ordered_map {
         value
     }
 
+    /// Remove a key/value pair from the map.
+    /// Returns none if `key` doesn't exist.
+    public fun remove_or_none<K: drop, V>(self: &mut OrderedMap<K, V>, key: &K): Option<V> {
+        let len = self.entries.length();
+        let index = binary_search(key, &self.entries, 0, len);
+        if (index < len && key == &self.entries[index].key) {
+            let Entry { key: _, value } = self.entries.remove(index);
+            option::some(value)
+        } else {
+            option::none()
+        }
+    }
+
     /// Returns whether map contains a given key.
     public fun contains<K, V>(self: &OrderedMap<K, V>, key: &K): bool {
         !self.find(key).iter_is_end(self)
