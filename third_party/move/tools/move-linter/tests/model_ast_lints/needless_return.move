@@ -78,6 +78,14 @@ module 0xc0ffee::m {
         }
     }  
 
+    fun ok_function(b: bool): u64 {  
+        if (b) {  
+            1
+        } else {  
+            2
+        }
+    }  
+
     #[lint::skip(needless_return)]
     fun test_skip(): bool {
         return true
