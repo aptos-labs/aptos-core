@@ -903,8 +903,9 @@ move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = 
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
 [profile.release]
-debug = true
+debug = "line-tables-only"
 overflow-checks = true
+lto = "fat"
 
 # The performance build is not currently recommended
 # for production deployments. It has not been widely tested.
@@ -926,12 +927,8 @@ codegen-units = 1
 
 [profile.ci]
 inherits = "release"
-debug = "line-tables-only"
 overflow-checks = true
 debug-assertions = true
-
-[profile.bench]
-debug = true
 
 [patch.crates-io]
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
