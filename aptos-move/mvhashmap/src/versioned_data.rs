@@ -24,11 +24,9 @@ use std::{
     collections::btree_map::{self, BTreeMap},
     fmt::Debug,
     hash::Hash,
-    sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
 };
+use triomphe::Arc;
 
 pub(crate) const FLAG_DONE: bool = false;
 pub(crate) const FLAG_ESTIMATE: bool = true;

@@ -15,14 +15,12 @@ use proptest::{
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicUsize, Ordering},
     thread::sleep,
     time::Duration,
 };
 use test_case::test_case;
+use triomphe::Arc;
 
 #[derive(Debug, Clone)]
 enum Operator<V: Debug + Clone> {

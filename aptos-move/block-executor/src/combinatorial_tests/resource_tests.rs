@@ -123,7 +123,7 @@ where
         TxnType,
         MockTask<KeyType<[u8; 32]>, MockEvent>,
         ViewType,
-        NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
+        NoOpTransactionCommitHook<usize>,
         Provider,
         AuxiliaryInfo,
     >::new(config, executor_thread_pool, None);

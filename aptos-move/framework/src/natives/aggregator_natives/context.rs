@@ -17,8 +17,8 @@ use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashSet},
-    sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -37,7 +37,8 @@ pub enum AggregatorChangeV1 {
 pub struct AggregatorChangeSet {
     pub aggregator_v1_changes: BTreeMap<StateKey, AggregatorChangeV1>,
     pub delayed_field_changes: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
-    pub reads_needing_exchange: BTreeMap<StateKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+    pub reads_needing_exchange:
+        BTreeMap<StateKey, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
     pub group_reads_needing_exchange: BTreeMap<StateKey, (StateValueMetadata, u64)>,
 }
 

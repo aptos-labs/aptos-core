@@ -31,7 +31,8 @@ use move_vm_types::{
     value_traversal::find_identifiers_in_value,
     values::Value,
 };
-use std::{cell::RefCell, collections::HashSet, sync::Arc};
+use std::{cell::RefCell, collections::HashSet};
+use triomphe::Arc as TriompheArc;
 
 pub(crate) struct TemporaryValueToIdentifierMapping<'a, T: Transaction, S: TStateView<Key = T::Key>>
 {
@@ -177,10 +178,18 @@ where
     pub(crate) fn filter_value_for_exchange(
         &self,
         value: &T::Value,
-        layout: &Arc<MoveTypeLayout>,
+        layout: &TriompheArc<MoveTypeLayout>,
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
         key: &T::Key,
-    ) -> Option<Result<(T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)), PanicError>> {
+    ) -> Option<
+        Result<
+            (
+                T::Key,
+                (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>),
+            ),
+            PanicError,
+        >,
+    > {
         if value.is_deletion() {
             None
         } else {

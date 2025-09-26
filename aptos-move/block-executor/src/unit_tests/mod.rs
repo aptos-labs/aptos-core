@@ -8,7 +8,7 @@ use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     combinatorial_tests::{
         baseline::BaselineOutput,
-        mock_executor::{MockEvent, MockOutput, MockTask},
+        mock_executor::{MockEvent, MockTask},
         types::{
             DeltaDataView, KeyType, MockIncarnation, MockTransaction, NonEmptyGroupDataView,
             ValueType,
@@ -67,7 +67,7 @@ fn test_block_epilogue_happy_path() {
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
-        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
         AuxiliaryInfo,
     >::new(
@@ -138,7 +138,7 @@ fn test_block_epilogue_block_gas_limit_reached() {
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
-        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
         AuxiliaryInfo,
     >::new(
@@ -233,7 +233,7 @@ fn test_resource_group_deletion() {
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
-        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
         AuxiliaryInfo,
     >::new(
@@ -312,7 +312,7 @@ fn resource_group_bcs_fallback() {
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
-        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
         AuxiliaryInfo,
     >::new(
@@ -428,7 +428,7 @@ fn interrupt_requested() {
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
-        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
         AuxiliaryInfo,
     >::new(
@@ -475,7 +475,7 @@ fn block_output_err_precedence() {
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
-        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
         AuxiliaryInfo,
     >::new(
@@ -519,7 +519,7 @@ fn skip_rest_gas_limit() {
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
-        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        NoOpTransactionCommitHook<usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
         AuxiliaryInfo,
     >::new(
@@ -563,7 +563,7 @@ where
             MockTransaction<K, E>,
             MockTask<K, E>,
             DeltaDataView<K>,
-            NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
+            NoOpTransactionCommitHook<usize>,
             _,
             AuxiliaryInfo,
         >::new(
@@ -583,7 +583,7 @@ where
             MockTransaction<K, E>,
             MockTask<K, E>,
             MockStateView<K>,
-            NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
+            NoOpTransactionCommitHook<usize>,
             _,
             AuxiliaryInfo,
         >::new(

@@ -24,7 +24,8 @@ use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use rand::{thread_rng, Rng};
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
+use triomphe::Arc as TriompheArc;
 
 // TODO(clean-up): refactor & replace these macros with functions for code clarity. Currently
 // not possible due to type & API mismatch.
@@ -61,7 +62,7 @@ macro_rules! resource_writes_to_materialize {
 	    .map(|(key, metadata, layout)| -> Result<_, PanicError> {
 	        let (value, existing_layout) = $data_source.fetch_exchanged_data(&key, $($txn_idx),*)?;
             randomly_check_layout_matches(Some(&existing_layout), Some(layout.as_ref()))?;
-            let new_value = Arc::new(TransactionWrite::from_state_value(Some(
+            let new_value = TriompheArc::new(TransactionWrite::from_state_value(Some(
                 StateValue::new_with_metadata(
                     value.bytes().cloned().unwrap_or_else(Bytes::new),
                     metadata,
@@ -70,7 +71,7 @@ macro_rules! resource_writes_to_materialize {
             Ok((key, new_value, layout))
         })
         .chain(
-	        $writes.into_iter().filter_map(|(key, value, maybe_layout)| {
+	        $writes.into_iter().filter_map(|(key, (value, maybe_layout))| {
 		        maybe_layout.map(|layout| {
                     (!value.is_deletion()).then_some(Ok((key, value, layout)))
                 }).flatten()
@@ -122,7 +123,7 @@ pub(crate) fn serialize_groups<T: Transaction>(
     finalized_groups: Vec<(
         T::Key,
         T::Value,
-        Vec<(T::Tag, Arc<T::Value>)>,
+        Vec<(T::Tag, TriompheArc<T::Value>)>,
         ResourceGroupSize,
     )>,
 ) -> Result<Vec<(T::Key, T::Value)>, ResourceGroupSerializationError> {
@@ -202,7 +203,7 @@ pub(crate) fn map_id_to_values_in_group_writes<
     Vec<(
         T::Key,
         T::Value,
-        Vec<(T::Tag, Arc<T::Value>)>,
+        Vec<(T::Tag, TriompheArc<T::Value>)>,
         ResourceGroupSize,
     )>,
     PanicError,
@@ -214,7 +215,7 @@ pub(crate) fn map_id_to_values_in_group_writes<
             let value = match value_with_layout {
                 ValueWithLayout::RawFromStorage(value) => value,
                 ValueWithLayout::Exchanged(value, None) => value,
-                ValueWithLayout::Exchanged(value, Some(layout)) => Arc::new(
+                ValueWithLayout::Exchanged(value, Some(layout)) => TriompheArc::new(
                     replace_ids_with_values(&value, layout.as_ref(), latest_view)?,
                 ),
             };
@@ -233,7 +234,7 @@ pub(crate) fn map_id_to_values_in_group_writes<
 // For each delayed field in resource write set, replace the identifiers with values
 // (ignoring other writes). Currently also checks the keys are unique.
 pub(crate) fn map_id_to_values_in_write_set<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
-    resource_write_set: Vec<(T::Key, Arc<T::Value>, Arc<MoveTypeLayout>)>,
+    resource_write_set: Vec<(T::Key, TriompheArc<T::Value>, TriompheArc<MoveTypeLayout>)>,
     latest_view: &LatestView<T, S>,
 ) -> Result<Vec<(T::Key, T::Value)>, PanicError> {
     resource_write_set
@@ -278,7 +279,7 @@ pub(crate) fn map_id_to_values_events<T: Transaction, S: TStateView<Key = T::Key
 
 // Parse the input `value` and replace delayed field identifiers with corresponding values
 fn replace_ids_with_values<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
-    value: &Arc<T::Value>,
+    value: &TriompheArc<T::Value>,
     layout: &MoveTypeLayout,
     latest_view: &LatestView<T, S>,
 ) -> Result<T::Value, PanicError> {

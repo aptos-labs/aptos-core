@@ -39,7 +39,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
+use triomphe::Arc as TriompheArc;
 
 /// Testcases:
 /// ```text
@@ -585,7 +586,7 @@ fn test_write_and_read_discrepancy_caught() {
             (
                 StateValueMetadata::none(),
                 10,
-                Arc::new(MoveTypeLayout::U64)
+                TriompheArc::new(MoveTypeLayout::U64)
             )
         )])
         .try_build());
@@ -640,7 +641,7 @@ mod tests {
 
     fn group_write(
         metadata_op: WriteOp,
-        inner_ops: Vec<(StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
+        inner_ops: Vec<(StructTag, (WriteOp, Option<TriompheArc<MoveTypeLayout>>))>,
         num_tagged_resources: usize,
         all_tagged_resources_size: u64,
     ) -> AbstractResourceWriteOp {

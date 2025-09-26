@@ -30,8 +30,8 @@ use std::{
     },
     fmt::Debug,
     hash::Hash,
-    sync::Arc,
 };
+use triomphe::Arc;
 
 struct SizeAndDependencies {
     size: ResourceGroupSize,

@@ -77,6 +77,7 @@ use std::{
         Arc,
     },
 };
+use triomphe::Arc as TriompheArc;
 
 struct SharedSyncParams<'a, T, E, S>
 where
@@ -111,7 +112,7 @@ where
     T: BlockExecutableTransaction,
     E: ExecutorTask<Txn = T, AuxiliaryInfo = A>,
     S: TStateView<Key = T::Key> + Sync,
-    L: TransactionCommitHook<Output = E::Output>,
+    L: TransactionCommitHook,
     TP: TxnProvider<T, A> + Sync,
     A: AuxiliaryInfoTrait,
 {
@@ -166,6 +167,65 @@ where
         }
     }
 
+    fn process_resource_output_v2(
+        maybe_output: Option<&E::Output>,
+        idx_to_execute: TxnIndex,
+        incarnation: Incarnation,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        abort_manager: &mut AbortManager,
+    ) -> Result<(), PanicError> {
+        // The order is reversed in BlockSTMv2 as opposed to V1, avoiding the necessity
+        // to clone the previous keys.
+
+        let mut resource_write_set = maybe_output.map_or(Ok(HashMap::new()), |output| {
+            output
+                .before_materialization()
+                .map(|inner| inner.resource_write_set())
+        })?;
+
+        last_input_output.for_each_resource_key_no_aggregator_v1(
+            idx_to_execute,
+            |prev_key_ref| {
+                match resource_write_set.remove_entry(prev_key_ref) {
+                    Some((key, (value, maybe_layout))) => {
+                        abort_manager.invalidate_dependencies(
+                            versioned_cache.data().write_v2::<false>(
+                                key,
+                                idx_to_execute,
+                                incarnation,
+                                value,
+                                maybe_layout,
+                            )?,
+                        )?;
+                    },
+                    None => {
+                        // Clean up the write from previous incarnation.
+                        abort_manager.invalidate_dependencies(
+                            versioned_cache
+                                .data()
+                                .remove_v2::<_, false>(prev_key_ref, idx_to_execute)?,
+                        )?;
+                    },
+                }
+                Ok(())
+            },
+        )?;
+
+        // Handle remaining entries in resource_write_set (new writes)
+        for (key, (value, maybe_layout)) in resource_write_set {
+            abort_manager.invalidate_dependencies(versioned_cache.data().write_v2::<false>(
+                key,
+                idx_to_execute,
+                incarnation,
+                value,
+                maybe_layout,
+            )?)?;
+        }
+
+        Ok(())
+    }
+
     // V1 processing is embedded in the execute method, while execute_v2 method calls
     // this method to process speculative resource group outputs.
     fn process_resource_group_output_v2(
@@ -179,7 +239,6 @@ where
         // The order of applying new group writes versus clearing previous writes is reversed
         // in BlockSTMv2 as opposed to V1, which avoids the necessity to clone group keys and
         // previous tags.
-        // TODO(BlockSTMv2): consider similar flow for resources.
 
         let mut resource_group_write_set = maybe_output.map_or(Ok(HashMap::new()), |output| {
             output
@@ -201,7 +260,7 @@ where
                                 group_key.clone(),
                                 idx_to_execute,
                                 incarnation,
-                                Arc::new(group_metadata_op),
+                                TriompheArc::new(group_metadata_op),
                                 None,
                             )?,
                         )?;
@@ -246,7 +305,7 @@ where
                     group_key.clone(),
                     idx_to_execute,
                     incarnation,
-                    Arc::new(group_metadata_op),
+                    TriompheArc::new(group_metadata_op),
                     None,
                 )?,
             )?;
@@ -381,6 +440,7 @@ where
             return Ok(());
         }
 
+        // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
         Self::process_delayed_field_output(
             maybe_output,
             idx_to_execute,
@@ -397,30 +457,21 @@ where
             versioned_cache,
             &mut abort_manager,
         )?;
+        Self::process_resource_output_v2(
+            maybe_output,
+            idx_to_execute,
+            incarnation,
+            last_input_output,
+            versioned_cache,
+            &mut abort_manager,
+        )?;
 
-        let mut prev_modified_resource_keys = last_input_output
-            .modified_resource_keys_no_aggregator_v1(idx_to_execute)
-            .map_or_else(HashSet::new, |keys| keys.collect());
+        // Legacy aggregator v1 handling.
         let mut prev_modified_aggregator_v1_keys = last_input_output
             .modified_aggregator_v1_keys(idx_to_execute)
             .map_or_else(HashSet::new, |keys| keys.collect());
-
-        // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
         if let Some(output) = maybe_output {
             let output_before_guard = output.before_materialization()?;
-
-            for (key, value, maybe_layout) in output_before_guard.resource_write_set().into_iter() {
-                prev_modified_resource_keys.remove(&key);
-                abort_manager.invalidate_dependencies(
-                    versioned_cache.data().write_v2::<false>(
-                        key,
-                        idx_to_execute,
-                        incarnation,
-                        value,
-                        maybe_layout,
-                    )?,
-                )?;
-            }
 
             // Apply aggregator v1 writes and deltas, using versioned data's V1 (write/add_delta) APIs.
             // AggregatorV1 is not push-validated, but follows the same logic as delayed fields, i.e.
@@ -432,7 +483,7 @@ where
                     key,
                     idx_to_execute,
                     incarnation,
-                    Arc::new(value),
+                    TriompheArc::new(value),
                     None,
                 );
             }
@@ -441,16 +492,6 @@ where
                 versioned_cache.data().add_delta(key, idx_to_execute, delta);
             }
         }
-
-        // Remove entries from previous write/delta set that were not overwritten.
-        for key in prev_modified_resource_keys {
-            abort_manager.invalidate_dependencies(
-                versioned_cache
-                    .data()
-                    .remove_v2::<_, false>(&key, idx_to_execute)?,
-            )?;
-        }
-
         for key in prev_modified_aggregator_v1_keys {
             versioned_cache.data().remove(&key, idx_to_execute);
         }
@@ -563,10 +604,7 @@ where
         // set (vanilla Block-STM rule), or if resource group size or metadata changed from an estimate
         // (since those resource group validations rely on estimates).
         let mut needs_suffix_validation = false;
-        let mut apply_updates = |output: &E::Output| -> Result<
-            Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>, // Cached resource writes
-            PanicError,
-        > {
+        let mut apply_updates = |output: &E::Output| -> Result<(), PanicError> {
             let output_before_guard = output.before_materialization()?;
             for (group_key, (group_metadata_op, group_size, group_ops)) in
                 output_before_guard.resource_group_write_set().into_iter()
@@ -603,12 +641,16 @@ where
             let resource_write_set = output_before_guard.resource_write_set();
 
             // Then, process resource & aggregator_v1 writes.
-            for (k, v, maybe_layout) in resource_write_set.clone().into_iter().chain(
-                output_before_guard
-                    .aggregator_v1_write_set()
-                    .into_iter()
-                    .map(|(state_key, write_op)| (state_key, Arc::new(write_op), None)),
-            ) {
+            for (k, v, maybe_layout) in resource_write_set
+                .into_iter()
+                .map(|(k, (v, maybe_layout))| (k, v, maybe_layout))
+                .chain(
+                    output_before_guard
+                        .aggregator_v1_write_set()
+                        .into_iter()
+                        .map(|(state_key, write_op)| (state_key, TriompheArc::new(write_op), None)),
+                )
+            {
                 if !prev_modified_resource_keys.remove(&k) {
                     needs_suffix_validation = true;
                 }
@@ -625,7 +667,7 @@ where
                 versioned_cache.data().add_delta(k, idx_to_execute, d);
             }
 
-            Ok(resource_write_set)
+            Ok(())
         };
 
         if let Some(output) = processed_output {
@@ -1064,7 +1106,7 @@ where
 
                         versioned_cache.data().set_base_value(
                             k.clone(),
-                            ValueWithLayout::RawFromStorage(Arc::new(w)),
+                            ValueWithLayout::RawFromStorage(TriompheArc::new(w)),
                         );
                         op.apply_to(value_u128)
                             .expect("Materializing delta w. base value set must succeed")
@@ -2004,9 +2046,12 @@ where
         >,
         unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         output_before_guard: &<E::Output as TransactionOutput>::BeforeMaterializationGuard<'_>,
-        resource_write_set: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
+        resource_write_set: HashMap<
+            T::Key,
+            (TriompheArc<T::Value>, Option<TriompheArc<MoveTypeLayout>>),
+        >,
     ) -> Result<(), SequentialBlockExecutionError<E::Error>> {
-        for (key, write_op, layout) in resource_write_set.into_iter() {
+        for (key, (write_op, layout)) in resource_write_set.into_iter() {
             unsync_map.write(key, write_op, layout);
         }
 
@@ -2014,11 +2059,11 @@ where
             output_before_guard.resource_group_write_set().into_iter()
         {
             unsync_map.insert_group_ops(&group_key, group_ops, group_size)?;
-            unsync_map.write(group_key, Arc::new(metadata_op), None);
+            unsync_map.write(group_key, TriompheArc::new(metadata_op), None);
         }
 
         for (key, write_op) in output_before_guard.aggregator_v1_write_set().into_iter() {
-            unsync_map.write(key, Arc::new(write_op), None);
+            unsync_map.write(key, TriompheArc::new(write_op), None);
         }
 
         for write in output_before_guard.module_write_set().values() {
@@ -2166,7 +2211,7 @@ where
                         BlockExecutionError::FatalBlockExecutorError(code_invariant_error(msg)),
                     ));
                 },
-                ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                ExecutionStatus::Success(mut output) | ExecutionStatus::SkipRest(mut output) => {
                     let output_before_guard = output.before_materialization()?;
                     // Calculating the accumulated gas costs of the committed txns.
 
@@ -2384,7 +2429,8 @@ where
                     }
 
                     if let Some(commit_hook) = &self.transaction_commit_hook {
-                        commit_hook.on_transaction_committed(idx as TxnIndex, &output);
+                        commit_hook
+                            .on_transaction_committed(idx as TxnIndex, output.committed_output());
                     }
                     ret.push(output);
                 },

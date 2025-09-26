@@ -56,8 +56,9 @@ use std::{
     fmt::Debug,
     hash::Hash,
     marker::PhantomData,
-    sync::{atomic::Ordering, Arc},
+    sync::atomic::Ordering,
 };
+use triomphe::Arc as TriompheArc;
 
 /// A lazily initialized empty struct layout used throughout tests
 ///
@@ -125,14 +126,14 @@ macro_rules! try_with_status {
 
 #[derive(Debug)]
 pub(crate) struct MockOutput<K, E> {
-    pub(crate) writes: Vec<(K, ValueType, Option<Arc<MoveTypeLayout>>)>,
+    pub(crate) writes: Vec<(K, ValueType, Option<TriompheArc<MoveTypeLayout>>)>,
     pub(crate) aggregator_v1_writes: Vec<(K, ValueType)>,
     // Key, metadata_op, inner_ops
     pub(crate) group_writes: Vec<(
         K,
         ValueType,
         ResourceGroupSize,
-        BTreeMap<u32, (ValueType, Option<Arc<MoveTypeLayout>>)>,
+        BTreeMap<u32, (ValueType, Option<TriompheArc<MoveTypeLayout>>)>,
     )>,
     pub(crate) module_writes: BTreeMap<K, ModuleWrite<ValueType>>,
     pub(crate) deltas: Vec<(K, DeltaOp, Option<(DelayedFieldID, bool)>)>,
@@ -147,7 +148,8 @@ pub(crate) struct MockOutput<K, E> {
     pub(crate) called_write_summary: OnceCell<()>,
     pub(crate) skipped: bool,
     pub(crate) maybe_error_msg: Option<String>,
-    pub(crate) reads_needing_exchange: HashMap<K, (StateValueMetadata, Arc<MoveTypeLayout>)>,
+    pub(crate) reads_needing_exchange:
+        HashMap<K, (StateValueMetadata, TriompheArc<MoveTypeLayout>)>,
     pub(crate) group_reads_needing_exchange: HashMap<K, StateValueMetadata>,
 }
 
@@ -393,7 +395,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
                     assert!(*tag == RESERVED_TAG);
                     let prev_id = self.get_delayed_field_id_from_resource(view, key, Some(*tag))?;
                     new_inner_op.set_bytes(serialize_from_delayed_field_id(prev_id, txn_idx));
-                    new_inner_op_layout = Some(Arc::new(MOCK_LAYOUT.clone()));
+                    new_inner_op_layout = Some(TriompheArc::new(MOCK_LAYOUT.clone()));
                 }
 
                 let maybe_op = if exists {
@@ -510,7 +512,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
             if *has_delta && delayed_fields_enabled && value_to_add.bytes().is_some() {
                 let prev_id = self.get_delayed_field_id_from_resource(view, k, None)?;
                 value_to_add.set_bytes(serialize_from_delayed_field_id(prev_id, txn_idx));
-                value_to_add_layout = Some(Arc::new(MOCK_LAYOUT.clone()));
+                value_to_add_layout = Some(TriompheArc::new(MOCK_LAYOUT.clone()));
             }
 
             self.output
@@ -599,7 +601,10 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
         } else {
             self.output.reads_needing_exchange.insert(
                 key.clone(),
-                (StateValueMetadata::none(), Arc::new(MOCK_LAYOUT.clone())),
+                (
+                    StateValueMetadata::none(),
+                    TriompheArc::new(MOCK_LAYOUT.clone()),
+                ),
             );
         }
 
@@ -714,6 +719,10 @@ where
     type BeforeMaterializationGuard<'a> = &'a Self;
     type Txn = MockTransaction<K, E>;
 
+    fn committed_output(&self) -> &OnceCell<aptos_types::transaction::TransactionOutput> {
+        unimplemented!("Not used in tests");
+    }
+
     fn skip_output() -> Self {
         Self::skipped_output(None)
     }
@@ -734,13 +743,16 @@ where
         Ok(!self.skipped)
     }
 
-    fn legacy_sequential_materialize_agg_v1(&self, _view: &impl TAggregatorV1View<Identifier = K>) {
+    fn legacy_sequential_materialize_agg_v1(
+        &mut self,
+        _view: &impl TAggregatorV1View<Identifier = K>,
+    ) {
         // TODO[agg_v2](tests): implement this method and compare
         // against sequential execution results v. aggregator v1.
     }
 
     fn incorporate_materialized_txn_output(
-        &self,
+        &mut self,
         aggregator_v1_writes: Vec<(K, WriteOp)>,
         patched_resource_write_set: Vec<(K, ValueType)>,
         _patched_events: Vec<E>,
@@ -753,7 +765,7 @@ where
         Ok(())
     }
 
-    fn set_txn_output_for_non_dynamic_change_set(&self) {
+    fn set_txn_output_for_non_dynamic_change_set(&mut self) {
         // No compatibility issues here since the move-vm doesn't use the dynamic flag.
     }
 
@@ -769,11 +781,16 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    fn resource_write_set(&self) -> Vec<(K, Arc<ValueType>, Option<Arc<MoveTypeLayout>>)> {
+    fn resource_write_set(
+        &self,
+    ) -> HashMap<K, (TriompheArc<ValueType>, Option<TriompheArc<MoveTypeLayout>>)> {
         self.writes
             .iter()
             .map(|(key, value, maybe_layout)| {
-                (key.clone(), Arc::new(value.clone()), maybe_layout.clone())
+                (
+                    key.clone(),
+                    (TriompheArc::new(value.clone()), maybe_layout.clone()),
+                )
             })
             .collect()
     }
@@ -823,7 +840,7 @@ where
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(K, StateValueMetadata, Arc<MoveTypeLayout>)> {
+    ) -> Vec<(K, StateValueMetadata, TriompheArc<MoveTypeLayout>)> {
         self.reads_needing_exchange
             .iter()
             .map(|(key, (metadata, layout))| (key.clone(), metadata.clone(), layout.clone()))
@@ -844,13 +861,23 @@ where
         (
             ValueType,
             ResourceGroupSize,
-            BTreeMap<u32, (ValueType, Option<Arc<MoveTypeLayout>>)>,
+            BTreeMap<u32, (ValueType, Option<TriompheArc<MoveTypeLayout>>)>,
         ),
     > {
         self.group_writes
             .iter()
             .map(|(key, value, size, ops)| (key.clone(), (value.clone(), *size, ops.clone())))
             .collect()
+    }
+
+    fn for_each_resource_key_no_aggregator_v1(
+        &self,
+        callback: &mut dyn FnMut(&K) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
+        for key in self.writes.iter().map(|(key, _, _)| key) {
+            callback(key)?;
+        }
+        Ok(())
     }
 
     fn for_each_resource_group_key_and_tags(
