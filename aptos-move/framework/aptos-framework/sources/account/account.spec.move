@@ -505,7 +505,7 @@ spec aptos_framework::account {
     spec get_signer_capability_offer_for(account_addr: address): address {
         aborts_if !exists<Account>(account_addr);
         let account_resource = global<Account>(account_addr);
-        aborts_if option::is_none(account_resource.signer_capability_offer.for);
+        aborts_if len(account_resource.signer_capability_offer.for.vec) == 0;
     }
 
     spec is_rotation_capability_offered(account_addr: address): bool {
@@ -515,7 +515,7 @@ spec aptos_framework::account {
     spec get_rotation_capability_offer_for(account_addr: address): address {
         aborts_if !exists<Account>(account_addr);
         let account_resource = global<Account>(account_addr);
-        aborts_if option::is_none(account_resource.rotation_capability_offer.for);
+        aborts_if len(account_resource.rotation_capability_offer.for.vec) == 0;
     }
 
     /// The Account existed under the signer.
@@ -547,7 +547,7 @@ spec aptos_framework::account {
         modifies global<Account>(addr);
         ensures exists<Account>(to_be_revoked_address);
         let post offer_for = global<Account>(addr).rotation_capability_offer.for;
-        ensures !option::is_some(offer_for);
+        ensures !option::spec_is_some(offer_for);
     }
 
     spec revoke_any_rotation_capability(account: &signer) {
@@ -558,7 +558,7 @@ spec aptos_framework::account {
         /// [high-level-req-7.3]
         aborts_if !option::is_some(account_resource.rotation_capability_offer.for);
         let post offer_for = global<Account>(addr).rotation_capability_offer.for;
-        ensures !option::is_some(offer_for);
+        ensures !option::spec_is_some(offer_for);
     }
 
     /// The Account existed under the signer.

@@ -8,8 +8,6 @@ use rstest::rstest;
 use serde_json::json;
 use std::path::PathBuf;
 
-const FEATURE_FLAG_NEW_OPTION_MODULE: u64 = 102;
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[rstest(
     use_txn_payload_v2_format,
@@ -26,10 +24,6 @@ async fn run_option(use_txn_payload_v2_format: bool, use_orderless_transactions:
     );
     let mut account = context.create_account().await;
     let account_addr = account.address();
-
-    context
-        .disable_feature(FEATURE_FLAG_NEW_OPTION_MODULE)
-        .await;
 
     // Publish packages
     let named_addresses = vec![("account".to_string(), account_addr)];
@@ -53,10 +47,6 @@ async fn run_option(use_txn_payload_v2_format: bool, use_orderless_transactions:
         )
         .await;
     context.check_golden_output_no_prune(resp);
-
-    // Simulate the behavior of turning on the feature flag to use new option module
-    // after framework upgrade
-    context.enable_feature(FEATURE_FLAG_NEW_OPTION_MODULE).await;
 
     // Publish packages after enabling new option module
     let named_addresses = vec![("account".to_string(), account_addr)];

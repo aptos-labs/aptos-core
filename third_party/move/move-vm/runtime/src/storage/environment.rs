@@ -350,10 +350,6 @@ impl RuntimeEnvironment {
         self.struct_name_index_map.idx_to_struct_name(idx)
     }
 
-    pub fn use_new_option_module(&self) -> bool {
-        self.vm_config.new_option_module
-    }
-
     pub fn get_option_module_bytes(&self) -> Bytes {
         Bytes::from(OPTION_MODULE_BYTES.to_vec())
     }
@@ -367,9 +363,8 @@ impl RuntimeEnvironment {
         addr: &AccountAddress,
         name: &IdentStr,
     ) -> Option<Bytes> {
-        let new_option_module = self.vm_config().new_option_module;
         let enable_enum_option = self.vm_config().enable_enum_option;
-        if !new_option_module && enable_enum_option {
+        if enable_enum_option {
             if addr == OPTION_MODULE_ID.address() && *name == *OPTION_MODULE_ID.name() {
                 return Some(self.get_option_module_bytes());
             } else if addr == MEM_MODULE_ID.address() && *name == *MEM_MODULE_ID.name() {

@@ -418,6 +418,7 @@ where
     let mut verified_dependencies = vec![];
     for (addr, name) in locally_verified_code.immediate_dependencies_iter() {
         let dependency_id = ModuleId::new(*addr, name.to_owned());
+
         let (dependency, dependency_version) = module_cache_with_context
             .get_module_or_build_with(&dependency_id, module_cache_with_context)?
             .ok_or_else(|| module_linker_error!(addr, name))?;

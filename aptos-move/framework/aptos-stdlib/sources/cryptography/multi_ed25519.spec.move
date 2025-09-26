@@ -19,14 +19,14 @@ spec aptos_std::multi_ed25519 {
         aborts_if false;
         let cond = len(bytes) % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES
             && spec_public_key_validate_internal(bytes);
-        ensures cond ==> result == option::some(ValidatedPublicKey{bytes});
-        ensures !cond ==> result == option::none<ValidatedPublicKey>();
+        ensures cond ==> result == option::spec_some(ValidatedPublicKey{bytes});
+        ensures !cond ==> result == option::spec_none<ValidatedPublicKey>();
     }
 
     spec new_validated_public_key_from_bytes_v2(bytes: vector<u8>): Option<ValidatedPublicKey> {
         let cond = spec_public_key_validate_v2_internal(bytes);
-        ensures cond ==> result == option::some(ValidatedPublicKey{bytes});
-        ensures !cond ==> result == option::none<ValidatedPublicKey>();
+        ensures cond ==> result == option::spec_some(ValidatedPublicKey{bytes});
+        ensures !cond ==> result == option::spec_none<ValidatedPublicKey>();
     }
 
     spec new_signature_from_bytes(bytes: vector<u8>): Signature {
@@ -117,7 +117,7 @@ spec aptos_std::multi_ed25519 {
             } else if (threshold_byte == 0 || threshold_byte > (num_of_keys as u8)) {
                 option::none<u8>()
             } else {
-                option::some(threshold_byte)
+                option::spec_some(threshold_byte)
             }
         }
     }

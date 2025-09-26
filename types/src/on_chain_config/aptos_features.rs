@@ -148,7 +148,6 @@ pub enum FeatureFlag {
     /// Whether to allow trusted code optimizations.
     ENABLE_TRUSTED_CODE = 100,
     ENABLE_ENUM_OPTION = 101,
-    NEW_OPTION_MODULE = 102,
 }
 
 impl FeatureFlag {
@@ -252,7 +251,6 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_CAPTURE_OPTION,
             FeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::ENABLE_ENUM_OPTION,
-            FeatureFlag::NEW_OPTION_MODULE,
         ]
     }
 }

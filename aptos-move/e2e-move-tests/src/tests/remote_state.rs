@@ -294,10 +294,7 @@ async fn test_option() {
             FeatureFlag::ENABLE_FUNCTION_VALUES,
             FeatureFlag::ENABLE_ENUM_TYPES,
         ],
-        vec![
-            FeatureFlag::ENABLE_ENUM_OPTION,
-            FeatureFlag::NEW_OPTION_MODULE,
-        ],
+        vec![FeatureFlag::ENABLE_ENUM_OPTION],
     );
 
     let existing_account_addr = AccountAddress::from_hex_literal(TESTNET_ACCOUNT_ADDR).unwrap();
@@ -317,9 +314,7 @@ async fn test_option() {
     );
     assert_success!(status);
 
-    h.enable_features(vec![FeatureFlag::ENABLE_ENUM_OPTION], vec![
-        FeatureFlag::NEW_OPTION_MODULE,
-    ]);
+    h.enable_features(vec![FeatureFlag::ENABLE_ENUM_OPTION], vec![]);
     let status = h.run_entry_function(
         &existing_account,
         str::parse(
@@ -339,10 +334,7 @@ async fn test_option() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_option_local() {
     let mut h = MoveHarness::new();
-    h.enable_features(vec![], vec![
-        FeatureFlag::ENABLE_ENUM_OPTION,
-        FeatureFlag::NEW_OPTION_MODULE,
-    ]);
+    h.enable_features(vec![], vec![FeatureFlag::ENABLE_ENUM_OPTION]);
 
     let existing_account =
         h.new_account_at(AccountAddress::from_hex_literal(TESTNET_ACCOUNT_ADDR).unwrap());
@@ -359,9 +351,6 @@ async fn test_option_local() {
     );
     assert_success!(status);
 
-    h.enable_features(vec![FeatureFlag::ENABLE_ENUM_OPTION], vec![
-        FeatureFlag::NEW_OPTION_MODULE,
-    ]);
     let status = h.run_entry_function(
         &existing_account,
         str::parse(
@@ -377,7 +366,7 @@ async fn test_option_local() {
     );
     assert_success!(status);
 
-    h.enable_features(vec![FeatureFlag::NEW_OPTION_MODULE], vec![]);
+    h.enable_features(vec![FeatureFlag::ENABLE_ENUM_OPTION], vec![]);
 
     let bytes = h
         .execute_view_function(

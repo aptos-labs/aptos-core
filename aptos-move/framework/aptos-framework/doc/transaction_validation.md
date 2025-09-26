@@ -1889,14 +1889,14 @@ Give some constraints that may abort according to the conditions.
         !<a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(secondary_signer_addresses[i]);
     <b>aborts_if</b> <b>exists</b> i in 0..num_secondary_signers:
         !<a href="transaction_validation.md#0x1_transaction_validation_can_skip">can_skip</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_simulation_enhancement_enabled">features::spec_simulation_enhancement_enabled</a>(), is_simulation, secondary_signer_public_key_hashes[i]) &&
-            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(secondary_signer_public_key_hashes[i]) && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(
+            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(secondary_signer_public_key_hashes[i]) && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(
             secondary_signer_public_key_hashes[i]
         ) !=
                 <a href="account.md#0x1_account_spec_get_authentication_key">account::spec_get_authentication_key</a>(secondary_signer_addresses[i]);
     <b>ensures</b> <b>forall</b> i in 0..num_secondary_signers:
         <a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(secondary_signer_addresses[i]);
     <b>ensures</b> <b>forall</b> i in 0..num_secondary_signers:
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(secondary_signer_public_key_hashes[i]) || <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(secondary_signer_public_key_hashes[i]) || <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(
             secondary_signer_public_key_hashes[i]
         ) ==
             <a href="account.md#0x1_account_spec_get_authentication_key">account::spec_get_authentication_key</a>(secondary_signer_addresses[i])
@@ -1911,7 +1911,7 @@ Give some constraints that may abort according to the conditions.
 
 
 <pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_can_skip">can_skip</a>(feature_flag: bool, is_simulation: bool, auth_key: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;): bool {
-   <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_simulation_enhancement_enabled">features::spec_simulation_enhancement_enabled</a>() && is_simulation && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(auth_key)
+   <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_simulation_enhancement_enabled">features::spec_simulation_enhancement_enabled</a>() && is_simulation && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(auth_key)
 }
 </code></pre>
 
@@ -2226,7 +2226,7 @@ Skip transaction_fee::burn_fee verification.
     <b>let</b> amount_to_burn = transaction_fee_amount - storage_fee_refunded;
     <b>let</b> apt_addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;
     <b>let</b> maybe_apt_supply = <b>global</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(apt_addr).supply;
-    <b>let</b> total_supply_enabled = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_apt_supply);
+    <b>let</b> total_supply_enabled = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(maybe_apt_supply);
     <b>let</b> apt_supply = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(maybe_apt_supply);
     <b>let</b> apt_supply_value = <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(apt_supply);
     <b>let</b> <b>post</b> post_maybe_apt_supply = <b>global</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(apt_addr).supply;

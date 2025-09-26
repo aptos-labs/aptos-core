@@ -3,7 +3,6 @@ module std::mem {
     // TODO - functions here are `friend` here for one release,
     // and to be changed to `public` one release later.
     friend std::vector;
-    friend std::option;
     #[test_only]
     friend std::mem_tests;
 
