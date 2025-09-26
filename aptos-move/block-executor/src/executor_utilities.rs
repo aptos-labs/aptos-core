@@ -306,7 +306,7 @@ fn replace_ids_with_values<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
 
 pub(crate) fn update_transaction_on_abort<T, E>(
     txn_idx: TxnIndex,
-    last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+    last_input_output: &TxnLastInputOutput<T, E::Output>,
     versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
 ) where
     T: Transaction,
