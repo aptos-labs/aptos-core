@@ -82,7 +82,10 @@ pub async fn create_data_service_grpc_client(
                 );
                 Ok(client
                     .max_decoding_message_size(usize::MAX)
-                    .max_encoding_message_size(usize::MAX))
+                    .max_encoding_message_size(usize::MAX)
+                    .send_compressed(CompressionEncoding::Zstd)
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Zstd))
             },
             Err(e) => {
                 tracing::error!(
