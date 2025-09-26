@@ -1,7 +1,7 @@
 
 Diagnostics:
 error: structs/enums with key ability cannot have public, package or friend visibility but `m::Wrapper` has key ability
-  ┌─ tests/checking-lang-v2.4/key_err.move:2:5
+  ┌─ tests/checking-lang-v2.3/key_err.move:2:5
   │
 2 │ ╭     public enum Wrapper has key {
 3 │ │         V1(u64, u64),
@@ -10,7 +10,7 @@ error: structs/enums with key ability cannot have public, package or friend visi
   │ ╰─────^
 
 error: structs/enums with key ability cannot have public, package or friend visibility but `m::Wrapper2` has key ability
-   ┌─ tests/checking-lang-v2.4/key_err.move:7:5
+   ┌─ tests/checking-lang-v2.3/key_err.move:7:5
    │
  7 │ ╭     package enum Wrapper2 has key {
  8 │ │         V1(u64, u64),
@@ -19,7 +19,7 @@ error: structs/enums with key ability cannot have public, package or friend visi
    │ ╰─────^
 
 error: structs/enums with key ability cannot have public, package or friend visibility but `m_friend::Wrapper` has key ability
-   ┌─ tests/checking-lang-v2.4/key_err.move:16:5
+   ┌─ tests/checking-lang-v2.3/key_err.move:16:5
    │
 16 │     friend struct Wrapper(u64, u64) has key;
    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

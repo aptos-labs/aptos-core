@@ -289,7 +289,7 @@ impl LanguageVersion {
     }
 
     pub fn language_version_for_public_struct(&self) -> bool {
-        self.is_at_least(LanguageVersion::V2_4)
+        self.is_at_least(LanguageVersion::V2_3)
     }
 
     /// If the bytecode version is not specified, infer it from the language version. For

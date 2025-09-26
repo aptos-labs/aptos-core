@@ -447,7 +447,7 @@ fun n::test_no_err() {
 
 Diagnostics:
 error: cannot transfer mutable value since it is borrowed
-   ┌─ tests/checking-lang-v2.4/cross_module_borrow_field_err.move:19:19
+   ┌─ tests/checking-lang-v2.3/cross_module_borrow_field_err.move:19:19
    │
 18 │         let x_0 = &mut x.0;
    │                   -------- previously mutably borrowed here: field borrow for non-private struct/enum `0xc0ffee::m::Wrapper` is converted into a function call
@@ -457,7 +457,7 @@ error: cannot transfer mutable value since it is borrowed
    │             --- conflicting reference `x_0` used here
 
 error: cannot transfer mutable value since it is borrowed
-   ┌─ tests/checking-lang-v2.4/cross_module_borrow_field_err.move:30:19
+   ┌─ tests/checking-lang-v2.3/cross_module_borrow_field_err.move:30:19
    │
 29 │         let x_0 = &mut x.0;
    │                   -------- previously mutably borrowed here: field borrow for non-private struct/enum `0xc0ffee::m::Wrapper` is converted into a function call
