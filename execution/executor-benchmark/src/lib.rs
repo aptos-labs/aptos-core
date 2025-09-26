@@ -533,12 +533,14 @@ pub fn run_single_with_default_params(
     transaction_type: TransactionType,
     test_folder: impl AsRef<Path>,
     concurrency_level: usize,
+    use_blockstm_v2: bool,
     mode: SingleRunMode,
 ) -> SingleRunResults {
     aptos_logger::Logger::new().init();
 
     AptosVM::set_num_shards_once(1);
     AptosVM::set_concurrency_level_once(concurrency_level);
+    AptosVM::set_blockstm_v2_enabled_once(use_blockstm_v2);
     AptosVM::set_processed_transactions_detailed_counters();
 
     rayon::ThreadPoolBuilder::new()

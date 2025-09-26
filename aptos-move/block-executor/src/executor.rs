@@ -7,9 +7,9 @@ use crate::{
     code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     counters::{
-        self, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, PARALLEL_EXECUTION_SECONDS,
-        PARALLEL_FINALIZE_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
-        TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
+        self, BLOCKSTM_VERSION_NUMBER, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK,
+        PARALLEL_EXECUTION_SECONDS, PARALLEL_FINALIZE_SECONDS, RAYON_EXECUTION_SECONDS,
+        TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
     executor_utilities::*,
@@ -2494,6 +2494,7 @@ where
 
         if self.config.local.concurrency_level > 1 {
             let parallel_result = if self.config.local.blockstm_v2 {
+                BLOCKSTM_VERSION_NUMBER.set(2);
                 self.execute_transactions_parallel_v2(
                     signature_verified_block,
                     base_view,
@@ -2501,6 +2502,7 @@ where
                     module_cache_manager_guard,
                 )
             } else {
+                BLOCKSTM_VERSION_NUMBER.set(1);
                 self.execute_transactions_parallel(
                     signature_verified_block,
                     base_view,
