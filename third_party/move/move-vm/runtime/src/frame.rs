@@ -131,6 +131,7 @@ impl Frame {
         function_instantiation_handle_at
     );
 
+    #[inline(always)]
     pub(crate) fn make_new_frame<RTTCheck: RuntimeTypeCheck>(
         gas_meter: &mut impl GasMeter,
         call_type: CallType,
@@ -258,6 +259,7 @@ impl Frame {
         )
     }
 
+    #[inline(always)]
     pub(crate) fn get_field_ty(&self, idx: FieldHandleIndex) -> PartialVMResult<&Type> {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -269,6 +271,7 @@ impl Frame {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn get_generic_field_ty(
         &self,
         idx: FieldInstantiationIndex,
@@ -414,6 +417,7 @@ impl Frame {
         )
     }
 
+    #[inline(always)]
     pub(crate) fn field_offset(&self, idx: FieldHandleIndex) -> usize {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -422,6 +426,7 @@ impl Frame {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn field_instantiation_offset(&self, idx: FieldInstantiationIndex) -> usize {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -439,6 +444,7 @@ impl Frame {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn field_instantiation_count(&self, idx: StructDefInstantiationIndex) -> u16 {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -447,6 +453,7 @@ impl Frame {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> Type {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -458,6 +465,7 @@ impl Frame {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn field_instantiation_to_struct(
         &self,
         idx: FieldInstantiationIndex,
