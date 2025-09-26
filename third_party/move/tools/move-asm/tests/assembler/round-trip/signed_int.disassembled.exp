@@ -1,8 +1,8 @@
 processed 9 tasks
-task 0 lines 3-14:  publish --print-bytecode [// Bytecode version v7]
+task 0 lines 3-14:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_ok_i8
 // Function definition at index 0
 public fun f(l0: i8): i8
@@ -16,10 +16,10 @@ public fun f(l0: i8): i8
 
 
 == END Bytecode ==
-task 1 lines 18-29:  publish --print-bytecode [// Bytecode version v7]
+task 1 lines 18-29:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_ok_i16
 // Function definition at index 0
 public fun f(l0: i16): i16
@@ -33,10 +33,10 @@ public fun f(l0: i16): i16
 
 
 == END Bytecode ==
-task 2 lines 33-44:  publish --print-bytecode [// Bytecode version v7]
+task 2 lines 33-44:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_ok_i32
 // Function definition at index 0
 public fun f(l0: i32): i32
@@ -50,10 +50,10 @@ public fun f(l0: i32): i32
 
 
 == END Bytecode ==
-task 3 lines 48-59:  publish --print-bytecode [// Bytecode version v7]
+task 3 lines 48-59:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_ok_i64
 // Function definition at index 0
 public fun f(l0: i64): i64
@@ -67,10 +67,10 @@ public fun f(l0: i64): i64
 
 
 == END Bytecode ==
-task 4 lines 63-74:  publish --print-bytecode [// Bytecode version v7]
+task 4 lines 63-74:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_some_err_i64
 // Function definition at index 0
 public fun f(l0: i64): i64
@@ -84,10 +84,10 @@ public fun f(l0: i64): i64
 
 
 == END Bytecode ==
-task 5 lines 78-89:  publish --print-bytecode [// Bytecode version v7]
+task 5 lines 78-89:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_ok_i128
 // Function definition at index 0
 public fun f(l0: i128): i128
@@ -101,10 +101,10 @@ public fun f(l0: i128): i128
 
 
 == END Bytecode ==
-task 6 lines 93-104:  publish --print-bytecode [// Bytecode version v7]
+task 6 lines 93-104:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_some_err_i128
 // Function definition at index 0
 public fun f(l0: i128): i128
@@ -118,10 +118,10 @@ public fun f(l0: i128): i128
 
 
 == END Bytecode ==
-task 7 lines 108-119:  publish --print-bytecode [// Bytecode version v7]
+task 7 lines 108-119:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_ok_i256
 // Function definition at index 0
 public fun f(l0: i256): i256
@@ -135,10 +135,10 @@ public fun f(l0: i256): i256
 
 
 == END Bytecode ==
-task 8 lines 123-134:  publish --print-bytecode [// Bytecode version v7]
+task 8 lines 123-134:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_some_err_i256
 // Function definition at index 0
 public fun f(l0: i256): i256
