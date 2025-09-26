@@ -37,8 +37,6 @@ import {
   assertExecutingInRepoRoot,
   CargoBuildFeatures,
   CargoBuildProfiles,
-  Environment,
-  getEnvironment,
   installCrane,
   lazyImports,
   parseArgsFromFlagOrEnv,
@@ -67,13 +65,7 @@ const IMAGES_TO_RELEASE = {
   faucet: {
     [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
-  forge: {
-    [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
-  },
   tools: {
-    [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
-  },
-  "node-checker": {
     [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   "indexer-grpc": {
