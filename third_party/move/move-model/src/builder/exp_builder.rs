@@ -1190,7 +1190,7 @@ impl ExpTranslator<'_, '_, '_> {
                 self.check_language_version(
                     &loc,
                     "read/write access specifiers.",
-                    LanguageVersion::V2_3,
+                    LanguageVersion::V2_4,
                 )?;
             },
         }

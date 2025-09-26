@@ -1,0 +1,1820 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct S {
+        x: u64,
+    }
+    struct S2 {
+        x: u64,
+        s: S,
+    }
+    enum Wrapper {
+        V1 {
+            0: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        pack m::Wrapper::V1(x)
+    }
+    friend fun pack$0xc0ffee$m$S($x: u64): S {
+        pack m::S($x)
+    }
+    friend fun unpack$0xc0ffee$m$S($s: S): (u64) {
+        {
+          let m::S{ x } = $s;
+          Tuple(x)
+        }
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m$S($s: &mut S): (&mut u64) {
+        Tuple(Borrow(Mutable)(select_variants m::S.x($s)))
+    }
+    friend fun borrow_from$0xc0ffee$m$S$x$0($s: &S): &u64 {
+        Borrow(Immutable)(select m::S.x($s))
+    }
+    friend fun borrow_mut_from$0xc0ffee$m$S$x$0($s: &mut S): &mut u64 {
+        Borrow(Mutable)(select m::S.x($s))
+    }
+    friend fun pack$0xc0ffee$m$S2($x: u64,$s: S): S2 {
+        pack m::S2($x, $s)
+    }
+    friend fun unpack$0xc0ffee$m$S2($s: S2): (u64, S) {
+        {
+          let m::S2{ x, s } = $s;
+          Tuple(x, s)
+        }
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m$S2($s: &mut S2): (&mut u64, &mut S) {
+        Tuple(Borrow(Mutable)(select_variants m::S2.x($s)), Borrow(Mutable)(select_variants m::S2.s($s)))
+    }
+    friend fun borrow_from$0xc0ffee$m$S2$x$0($s: &S2): &u64 {
+        Borrow(Immutable)(select m::S2.x($s))
+    }
+    friend fun borrow_from$0xc0ffee$m$S2$s$1($s: &S2): &S {
+        Borrow(Immutable)(select m::S2.s($s))
+    }
+    friend fun borrow_mut_from$0xc0ffee$m$S2$x$0($s: &mut S2): &mut u64 {
+        Borrow(Mutable)(select m::S2.x($s))
+    }
+    friend fun borrow_mut_from$0xc0ffee$m$S2$s$1($s: &mut S2): &mut S {
+        Borrow(Mutable)(select m::S2.s($s))
+    }
+    friend fun pack$0xc0ffee$m$Wrapper$V1($0: u64): Wrapper {
+        pack m::Wrapper::V1($0)
+    }
+    friend fun pack$0xc0ffee$m$Wrapper$V2($0: u64): Wrapper {
+        pack m::Wrapper::V2($0)
+    }
+    friend fun unpack$0xc0ffee$m$Wrapper$V1($s: Wrapper): (u64) {
+        {
+          let m::Wrapper::V1{ 0 } = $s;
+          Tuple(0)
+        }
+    }
+    friend fun unpack$0xc0ffee$m$Wrapper$V2($s: Wrapper): (u64) {
+        {
+          let m::Wrapper::V2{ 0 } = $s;
+          Tuple(0)
+        }
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m$Wrapper$V1($s: &mut Wrapper): (&mut u64) {
+        Tuple(Borrow(Mutable)(select_variants m::Wrapper.V1.0($s)))
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m$Wrapper$V2($s: &mut Wrapper): (&mut u64) {
+        Tuple(Borrow(Mutable)(select_variants m::Wrapper.V2.0($s)))
+    }
+    friend fun borrow_from$0xc0ffee$m$Wrapper$0$0($s: &Wrapper): &u64 {
+        Borrow(Immutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0($s))
+    }
+    friend fun borrow_mut_from$0xc0ffee$m$Wrapper$0$0($s: &mut Wrapper): &mut u64 {
+        Borrow(Mutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0($s))
+    }
+    friend fun test_variant$0xc0ffee$m$Wrapper$V1($s: &Wrapper): bool {
+        test_variants m::Wrapper::V1($s)
+    }
+    friend fun test_variant$0xc0ffee$m$Wrapper$V2($s: &Wrapper): bool {
+        test_variants m::Wrapper::V2($s)
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::m_friend {
+    struct T {
+        x: u64,
+    }
+    friend fun pack$0xc0ffee$m_friend$T($x: u64): T {
+        pack m_friend::T($x)
+    }
+    friend fun unpack$0xc0ffee$m_friend$T($s: T): (u64) {
+        {
+          let m_friend::T{ x } = $s;
+          Tuple(x)
+        }
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m_friend$T($s: &mut T): (&mut u64) {
+        Tuple(Borrow(Mutable)(select_variants m_friend::T.x($s)))
+    }
+    friend fun borrow_from$0xc0ffee$m_friend$T$x$0($s: &T): &u64 {
+        Borrow(Immutable)(select m_friend::T.x($s))
+    }
+    friend fun borrow_mut_from$0xc0ffee$m_friend$T$x$0($s: &mut T): &mut u64 {
+        Borrow(Mutable)(select m_friend::T.x($s))
+    }
+} // end 0xc0ffee::m_friend
+module 0xc0ffee::n {
+    use 0xc0ffee::m; // resolved as: 0xc0ffee::m
+    private fun test() {
+        {
+          let x: m::Wrapper = m::make(22);
+          if Eq<u64>(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x), 22) {
+            Tuple()
+          } else {
+            Abort(1)
+          };
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::n2 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_pack() {
+        {
+          let _x: m::Wrapper = pack m::Wrapper::V1(22);
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n2
+module 0xc0ffee::n3 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_unpack(w: m::Wrapper) {
+        {
+          let m::Wrapper::V1{ 0: _x } = w;
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n3
+module 0xc0ffee::n4 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_select_variant(w: m::Wrapper): u64 {
+        select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(w)
+    }
+} // end 0xc0ffee::n4
+module 0xc0ffee::n5 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_test_variant(w: m::Wrapper): bool {
+        test_variants m::Wrapper::V1(w)
+    }
+} // end 0xc0ffee::n5
+module 0xc0ffee::n6 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_match(w: m::Wrapper): bool {
+        match (w) {
+          m::Wrapper::V1{ 0: _ } => {
+            true
+          }
+          m::Wrapper::V2{ 0: _ } => {
+            false
+          }
+        }
+
+    }
+} // end 0xc0ffee::n6
+module 0xc0ffee::n7 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    private fun test_pack_struct(): m::S {
+        pack m::S(22)
+    }
+} // end 0xc0ffee::n7
+module 0xc0ffee::n8 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    private fun test_pack_struct(): m::S {
+        {
+          let (): ();
+          pack m::S(22)
+        }
+    }
+    private inline fun test_pack_struct_inline(): m::S {
+        pack m::S(22)
+    }
+} // end 0xc0ffee::n8
+module 0xc0ffee::n9 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    use 0xc0ffee::m::{S2}; // resolved as: 0xc0ffee::m
+    private inline fun test_inline(x: ||) {
+        (x)()
+    }
+    private fun test_pack_unpack_struct_in_lambda() {
+        {
+          let (): ();
+          {
+            let (): ();
+            {
+              let x: m::S2 = pack m::S2(22, pack m::S(33));
+              {
+                let m::S2{ x: _x, s: m::S{ x: _y } } = x;
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0xc0ffee::n9
+module 0xc0ffee::n_friend {
+    use 0xc0ffee::m_friend::{T}; // resolved as: 0xc0ffee::m_friend
+    private fun test_pack_friend_struct(): m_friend::T {
+        pack m_friend::T(22)
+    }
+} // end 0xc0ffee::n_friend
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    friend 0xc0ffee::n;
+    friend 0xc0ffee::n2;
+    friend 0xc0ffee::n3;
+    friend 0xc0ffee::n4;
+    friend 0xc0ffee::n5;
+    friend 0xc0ffee::n6;
+    friend 0xc0ffee::n7;
+    friend 0xc0ffee::n8;
+    friend 0xc0ffee::n9;
+    struct S {
+        x: u64,
+    }
+    struct S2 {
+        x: u64,
+        s: S,
+    }
+    enum Wrapper has drop {
+        V1 {
+            0: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        Wrapper::V1(x)
+    }
+    friend fun pack_0xc0ffee_m_S(_x: u64): S {
+        S{x: _x}
+    }
+    friend fun unpack_0xc0ffee_m_S(_s: S): (u64) {
+        let S{x: x} = _s;
+        (x)
+    }
+    friend fun unpack_mut_ref_0xc0ffee_m_S(_s: &mut S): (&mut u64) {
+        (&mut _s.x)
+    }
+    friend fun borrow_from_0xc0ffee_m_S_x_0(_s: &S): &u64 {
+        &_s.x
+    }
+    friend fun borrow_mut_from_0xc0ffee_m_S_x_0(_s: &mut S): &mut u64 {
+        &mut _s.x
+    }
+    friend fun pack_0xc0ffee_m_S2(_x: u64, _s: S): S2 {
+        S2{x: _x, s: _s}
+    }
+    friend fun unpack_0xc0ffee_m_S2(_s: S2): (u64, S) {
+        let S2{x: x, s: s} = _s;
+        (x, s)
+    }
+    friend fun unpack_mut_ref_0xc0ffee_m_S2(_s: &mut S2): (&mut u64, &mut S) {
+        (&mut _s.x, &mut _s.s)
+    }
+    friend fun borrow_from_0xc0ffee_m_S2_x_0(_s: &S2): &u64 {
+        &_s.x
+    }
+    friend fun borrow_from_0xc0ffee_m_S2_s_1(_s: &S2): &S {
+        &_s.s
+    }
+    friend fun borrow_mut_from_0xc0ffee_m_S2_x_0(_s: &mut S2): &mut u64 {
+        &mut _s.x
+    }
+    friend fun borrow_mut_from_0xc0ffee_m_S2_s_1(_s: &mut S2): &mut S {
+        &mut _s.s
+    }
+    friend fun pack_0xc0ffee_m_Wrapper_V1(_0: u64): Wrapper {
+        Wrapper::V1(_0)
+    }
+    friend fun pack_0xc0ffee_m_Wrapper_V2(_0: u64): Wrapper {
+        Wrapper::V2(_0)
+    }
+    friend fun unpack_0xc0ffee_m_Wrapper_V1(_s: Wrapper): (u64) {
+        let Wrapper::V1(0) = _s;
+        (0)
+    }
+    friend fun unpack_0xc0ffee_m_Wrapper_V2(_s: Wrapper): (u64) {
+        let Wrapper::V2(0) = _s;
+        (0)
+    }
+    friend fun unpack_mut_ref_0xc0ffee_m_Wrapper_V1(_s: &mut Wrapper): (&mut u64) {
+        (&mut _s.0)
+    }
+    friend fun unpack_mut_ref_0xc0ffee_m_Wrapper_V2(_s: &mut Wrapper): (&mut u64) {
+        (&mut _s.0)
+    }
+    friend fun borrow_from_0xc0ffee_m_Wrapper_0_0(_s: &Wrapper): &u64 {
+        &_s.0
+    }
+    friend fun borrow_mut_from_0xc0ffee_m_Wrapper_0_0(_s: &mut Wrapper): &mut u64 {
+        &mut _s.0
+    }
+    friend fun test_variant_0xc0ffee_m_Wrapper_V1(_s: &Wrapper): bool {
+        _s is V1
+    }
+    friend fun test_variant_0xc0ffee_m_Wrapper_V2(_s: &Wrapper): bool {
+        _s is V2
+    }
+}
+module 0xc0ffee::m_friend {
+    friend 0xc0ffee::n_friend;
+    struct T {
+        x: u64,
+    }
+    friend fun pack_0xc0ffee_m_friend_T(_x: u64): T {
+        T{x: _x}
+    }
+    friend fun unpack_0xc0ffee_m_friend_T(_s: T): (u64) {
+        let T{x: x} = _s;
+        (x)
+    }
+    friend fun unpack_mut_ref_0xc0ffee_m_friend_T(_s: &mut T): (&mut u64) {
+        (&mut _s.x)
+    }
+    friend fun borrow_from_0xc0ffee_m_friend_T_x_0(_s: &T): &u64 {
+        &_s.x
+    }
+    friend fun borrow_mut_from_0xc0ffee_m_friend_T_x_0(_s: &mut T): &mut u64 {
+        &mut _s.x
+    }
+}
+module 0xc0ffee::n {
+    use 0xc0ffee::m;
+    fun test() {
+        let x = m::make(22);
+        if (x.0 == 22) () else abort 1;
+    }
+}
+module 0xc0ffee::n2 {
+    use 0xc0ffee::m;
+    fun test_pack() {
+        let _x = m::Wrapper::V1(22);
+    }
+}
+module 0xc0ffee::n3 {
+    use 0xc0ffee::m;
+    fun test_unpack(w: m::Wrapper) {
+        let m::Wrapper::V1(_x) = w;
+    }
+}
+module 0xc0ffee::n4 {
+    use 0xc0ffee::m;
+    fun test_select_variant(w: m::Wrapper): u64 {
+        w.0
+    }
+}
+module 0xc0ffee::n5 {
+    use 0xc0ffee::m;
+    fun test_test_variant(w: m::Wrapper): bool {
+        w is V1
+    }
+}
+module 0xc0ffee::n6 {
+    use 0xc0ffee::m;
+    fun test_match(w: m::Wrapper): bool {
+        match (w) {
+            m::Wrapper::V1(_) => true,
+            m::Wrapper::V2(_) => false,
+        }
+    }
+}
+module 0xc0ffee::n7 {
+    use 0xc0ffee::m;
+    fun test_pack_struct(): m::S {
+        m::S{x: 22}
+    }
+}
+module 0xc0ffee::n8 {
+    use 0xc0ffee::m;
+    fun test_pack_struct(): m::S {
+        let ();
+        m::S{x: 22}
+    }
+    inline fun test_pack_struct_inline(): m::S {
+        m::S{x: 22}
+    }
+}
+module 0xc0ffee::n9 {
+    use 0xc0ffee::m;
+    use 0xc0ffee::m;
+    inline fun test_inline(x: ||) {
+        x()
+    }
+    fun test_pack_unpack_struct_in_lambda() {
+        let ();
+        let ();
+        let x = m::S2{x: 22, s: m::S{x: 33}};
+        let m::S2{x: _x, s: m::S{x: _y}} = x;
+    }
+}
+module 0xc0ffee::n_friend {
+    use 0xc0ffee::m_friend;
+    fun test_pack_friend_struct(): m_friend::T {
+        m_friend::T{x: 22}
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::make($t0: u64): 0xc0ffee::m::Wrapper {
+     var $t1: 0xc0ffee::m::Wrapper
+  0: $t1 := pack_variant 0xc0ffee::m::Wrapper::V1($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::pack$0xc0ffee$m$S($t0: u64): 0xc0ffee::m::S {
+     var $t1: 0xc0ffee::m::S
+  0: $t1 := pack 0xc0ffee::m::S($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack$0xc0ffee$m$S($t0: 0xc0ffee::m::S): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := unpack 0xc0ffee::m::S($t0)
+  1: $t1 := infer($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack_mut_ref$0xc0ffee$m$S($t0: &mut 0xc0ffee::m::S): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_field<0xc0ffee::m::S>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_from$0xc0ffee$m$S$x$0($t0: &0xc0ffee::m::S): &u64 {
+     var $t1: &u64
+  0: $t1 := borrow_field<0xc0ffee::m::S>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_mut_from$0xc0ffee$m$S$x$0($t0: &mut 0xc0ffee::m::S): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_field<0xc0ffee::m::S>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::pack$0xc0ffee$m$S2($t0: u64, $t1: 0xc0ffee::m::S): 0xc0ffee::m::S2 {
+     var $t2: 0xc0ffee::m::S2
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := pack 0xc0ffee::m::S2($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack$0xc0ffee$m$S2($t0: 0xc0ffee::m::S2): (u64, 0xc0ffee::m::S) {
+     var $t1: u64
+     var $t2: 0xc0ffee::m::S
+     var $t3: u64
+     var $t4: 0xc0ffee::m::S
+  0: ($t3, $t4) := unpack 0xc0ffee::m::S2($t0)
+  1: $t1 := infer($t3)
+  2: $t2 := infer($t4)
+  3: return ($t1, $t2)
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack_mut_ref$0xc0ffee$m$S2($t0: &mut 0xc0ffee::m::S2): (&mut u64, &mut 0xc0ffee::m::S) {
+     var $t1: &mut u64
+     var $t2: &mut 0xc0ffee::m::S
+  0: $t1 := borrow_field<0xc0ffee::m::S2>.x($t0)
+  1: $t2 := borrow_field<0xc0ffee::m::S2>.s($t0)
+  2: return ($t1, $t2)
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_from$0xc0ffee$m$S2$x$0($t0: &0xc0ffee::m::S2): &u64 {
+     var $t1: &u64
+  0: $t1 := borrow_field<0xc0ffee::m::S2>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_from$0xc0ffee$m$S2$s$1($t0: &0xc0ffee::m::S2): &0xc0ffee::m::S {
+     var $t1: &0xc0ffee::m::S
+  0: $t1 := borrow_field<0xc0ffee::m::S2>.s($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_mut_from$0xc0ffee$m$S2$x$0($t0: &mut 0xc0ffee::m::S2): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_field<0xc0ffee::m::S2>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_mut_from$0xc0ffee$m$S2$s$1($t0: &mut 0xc0ffee::m::S2): &mut 0xc0ffee::m::S {
+     var $t1: &mut 0xc0ffee::m::S
+  0: $t1 := borrow_field<0xc0ffee::m::S2>.s($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::pack$0xc0ffee$m$Wrapper$V1($t0: u64): 0xc0ffee::m::Wrapper {
+     var $t1: 0xc0ffee::m::Wrapper
+  0: $t1 := pack_variant 0xc0ffee::m::Wrapper::V1($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::pack$0xc0ffee$m$Wrapper$V2($t0: u64): 0xc0ffee::m::Wrapper {
+     var $t1: 0xc0ffee::m::Wrapper
+  0: $t1 := pack_variant 0xc0ffee::m::Wrapper::V2($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack$0xc0ffee$m$Wrapper$V1($t0: 0xc0ffee::m::Wrapper): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := unpack_variant 0xc0ffee::m::Wrapper::V1($t0)
+  1: $t1 := infer($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack$0xc0ffee$m$Wrapper$V2($t0: 0xc0ffee::m::Wrapper): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := unpack_variant 0xc0ffee::m::Wrapper::V2($t0)
+  1: $t1 := infer($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack_mut_ref$0xc0ffee$m$Wrapper$V1($t0: &mut 0xc0ffee::m::Wrapper): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.0($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack_mut_ref$0xc0ffee$m$Wrapper$V2($t0: &mut 0xc0ffee::m::Wrapper): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_variant_field<0xc0ffee::m::Wrapper::V2>.0($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_from$0xc0ffee$m$Wrapper$0$0($t0: &0xc0ffee::m::Wrapper): &u64 {
+     var $t1: &u64
+  0: $t1 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_mut_from$0xc0ffee$m$Wrapper$0$0($t0: &mut 0xc0ffee::m::Wrapper): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::test_variant$0xc0ffee$m$Wrapper$V1($t0: &0xc0ffee::m::Wrapper): bool {
+     var $t1: bool
+  0: $t1 := test_variant 0xc0ffee::m::Wrapper::V1($t0)
+  1: if ($t1) goto 3 else goto 2
+  2: label L1
+  3: label L0
+  4: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::test_variant$0xc0ffee$m$Wrapper$V2($t0: &0xc0ffee::m::Wrapper): bool {
+     var $t1: bool
+  0: $t1 := test_variant 0xc0ffee::m::Wrapper::V2($t0)
+  1: if ($t1) goto 3 else goto 2
+  2: label L1
+  3: label L0
+  4: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m_friend::pack$0xc0ffee$m_friend$T($t0: u64): 0xc0ffee::m_friend::T {
+     var $t1: 0xc0ffee::m_friend::T
+  0: $t1 := pack 0xc0ffee::m_friend::T($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m_friend::unpack$0xc0ffee$m_friend$T($t0: 0xc0ffee::m_friend::T): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := unpack 0xc0ffee::m_friend::T($t0)
+  1: $t1 := infer($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m_friend::unpack_mut_ref$0xc0ffee$m_friend$T($t0: &mut 0xc0ffee::m_friend::T): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_field<0xc0ffee::m_friend::T>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m_friend::borrow_from$0xc0ffee$m_friend$T$x$0($t0: &0xc0ffee::m_friend::T): &u64 {
+     var $t1: &u64
+  0: $t1 := borrow_field<0xc0ffee::m_friend::T>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m_friend::borrow_mut_from$0xc0ffee$m_friend$T$x$0($t0: &mut 0xc0ffee::m_friend::T): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_field<0xc0ffee::m_friend::T>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun n::test() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: &0xc0ffee::m::Wrapper
+     var $t5: &u64
+     var $t6: u64
+     var $t7: u64
+  0: $t1 := 22
+  1: $t0 := m::make($t1)
+  2: $t4 := borrow_local($t0)
+  3: $t5 := m::borrow_from$0xc0ffee$m$Wrapper$0$0($t4)
+  4: $t3 := read_ref($t5)
+  5: $t6 := 22
+  6: $t2 := ==($t3, $t6)
+  7: if ($t2) goto 8 else goto 10
+  8: label L0
+  9: goto 13
+ 10: label L1
+ 11: $t7 := 1
+ 12: abort($t7)
+ 13: label L2
+ 14: return ()
+}
+
+
+[variant baseline]
+fun n2::test_pack() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := m::pack$0xc0ffee$m$Wrapper$V1($t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun n3::test_unpack($t0: 0xc0ffee::m::Wrapper) {
+     var $t1: u64
+  0: $t1 := m::unpack$0xc0ffee$m$Wrapper$V1($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun n4::test_select_variant($t0: 0xc0ffee::m::Wrapper): u64 {
+     var $t1: u64
+     var $t2: &0xc0ffee::m::Wrapper
+     var $t3: &u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := m::borrow_from$0xc0ffee$m$Wrapper$0$0($t2)
+  2: $t1 := read_ref($t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun n5::test_test_variant($t0: 0xc0ffee::m::Wrapper): bool {
+     var $t1: bool
+     var $t2: &0xc0ffee::m::Wrapper
+  0: $t2 := borrow_local($t0)
+  1: $t1 := m::test_variant$0xc0ffee$m$Wrapper$V1($t2)
+  2: if ($t1) goto 4 else goto 3
+  3: label L1
+  4: label L0
+  5: return $t1
+}
+
+
+[variant baseline]
+fun n6::test_match($t0: 0xc0ffee::m::Wrapper): bool {
+     var $t1: bool
+     var $t2: &0xc0ffee::m::Wrapper
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := m::test_variant$0xc0ffee$m$Wrapper$V1($t2)
+  2: if ($t3) goto 3 else goto 7
+  3: label L2
+  4: $t4 := m::unpack$0xc0ffee$m$Wrapper$V1($t0)
+  5: $t1 := true
+  6: goto 17
+  7: label L1
+  8: $t3 := m::test_variant$0xc0ffee$m$Wrapper$V2($t2)
+  9: if ($t3) goto 10 else goto 14
+ 10: label L4
+ 11: $t5 := m::unpack$0xc0ffee$m$Wrapper$V2($t0)
+ 12: $t1 := false
+ 13: goto 17
+ 14: label L3
+ 15: $t6 := 14566554180833181697
+ 16: abort($t6)
+ 17: label L0
+ 18: return $t1
+}
+
+
+[variant baseline]
+fun n7::test_pack_struct(): 0xc0ffee::m::S {
+     var $t0: 0xc0ffee::m::S
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := m::pack$0xc0ffee$m$S($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun n8::test_pack_struct(): 0xc0ffee::m::S {
+     var $t0: 0xc0ffee::m::S
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := m::pack$0xc0ffee$m$S($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun n9::test_pack_unpack_struct_in_lambda() {
+     var $t0: 0xc0ffee::m::S2
+     var $t1: u64
+     var $t2: 0xc0ffee::m::S
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: 0xc0ffee::m::S
+  0: $t1 := 22
+  1: $t3 := 33
+  2: $t2 := m::pack$0xc0ffee$m$S($t3)
+  3: $t0 := m::pack$0xc0ffee$m$S2($t1, $t2)
+  4: ($t4, $t6) := m::unpack$0xc0ffee$m$S2($t0)
+  5: $t5 := m::unpack$0xc0ffee$m$S($t6)
+  6: return ()
+}
+
+
+[variant baseline]
+fun n_friend::test_pack_friend_struct(): 0xc0ffee::m_friend::T {
+     var $t0: 0xc0ffee::m_friend::T
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := m_friend::pack$0xc0ffee$m_friend$T($t1)
+  2: return $t0
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    struct S {
+        x: u64,
+    }
+    struct S2 {
+        x: u64,
+        s: S,
+    }
+    enum Wrapper {
+        V1 {
+            0: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        pack m::Wrapper::V1(x)
+    }
+    friend fun pack$0xc0ffee$m$S($x: u64): S {
+        pack m::S($x)
+    }
+    friend fun unpack$0xc0ffee$m$S($s: S): (u64) {
+        {
+          let m::S{ x } = $s;
+          Tuple(x)
+        }
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m$S($s: &mut S): (&mut u64) {
+        Tuple(Borrow(Mutable)(select_variants m::S.x($s)))
+    }
+    friend fun borrow_from$0xc0ffee$m$S$x$0($s: &S): &u64 {
+        Borrow(Immutable)(select m::S.x($s))
+    }
+    friend fun borrow_mut_from$0xc0ffee$m$S$x$0($s: &mut S): &mut u64 {
+        Borrow(Mutable)(select m::S.x($s))
+    }
+    friend fun pack$0xc0ffee$m$S2($x: u64,$s: S): S2 {
+        pack m::S2($x, $s)
+    }
+    friend fun unpack$0xc0ffee$m$S2($s: S2): (u64, S) {
+        {
+          let m::S2{ x, s } = $s;
+          Tuple(x, s)
+        }
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m$S2($s: &mut S2): (&mut u64, &mut S) {
+        Tuple(Borrow(Mutable)(select_variants m::S2.x($s)), Borrow(Mutable)(select_variants m::S2.s($s)))
+    }
+    friend fun borrow_from$0xc0ffee$m$S2$x$0($s: &S2): &u64 {
+        Borrow(Immutable)(select m::S2.x($s))
+    }
+    friend fun borrow_from$0xc0ffee$m$S2$s$1($s: &S2): &S {
+        Borrow(Immutable)(select m::S2.s($s))
+    }
+    friend fun borrow_mut_from$0xc0ffee$m$S2$x$0($s: &mut S2): &mut u64 {
+        Borrow(Mutable)(select m::S2.x($s))
+    }
+    friend fun borrow_mut_from$0xc0ffee$m$S2$s$1($s: &mut S2): &mut S {
+        Borrow(Mutable)(select m::S2.s($s))
+    }
+    friend fun pack$0xc0ffee$m$Wrapper$V1($0: u64): Wrapper {
+        pack m::Wrapper::V1($0)
+    }
+    friend fun pack$0xc0ffee$m$Wrapper$V2($0: u64): Wrapper {
+        pack m::Wrapper::V2($0)
+    }
+    friend fun unpack$0xc0ffee$m$Wrapper$V1($s: Wrapper): (u64) {
+        {
+          let m::Wrapper::V1{ 0 } = $s;
+          Tuple(0)
+        }
+    }
+    friend fun unpack$0xc0ffee$m$Wrapper$V2($s: Wrapper): (u64) {
+        {
+          let m::Wrapper::V2{ 0 } = $s;
+          Tuple(0)
+        }
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m$Wrapper$V1($s: &mut Wrapper): (&mut u64) {
+        Tuple(Borrow(Mutable)(select_variants m::Wrapper.V1.0($s)))
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m$Wrapper$V2($s: &mut Wrapper): (&mut u64) {
+        Tuple(Borrow(Mutable)(select_variants m::Wrapper.V2.0($s)))
+    }
+    friend fun borrow_from$0xc0ffee$m$Wrapper$0$0($s: &Wrapper): &u64 {
+        Borrow(Immutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0($s))
+    }
+    friend fun borrow_mut_from$0xc0ffee$m$Wrapper$0$0($s: &mut Wrapper): &mut u64 {
+        Borrow(Mutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0($s))
+    }
+    friend fun test_variant$0xc0ffee$m$Wrapper$V1($s: &Wrapper): bool {
+        test_variants m::Wrapper::V1($s)
+    }
+    friend fun test_variant$0xc0ffee$m$Wrapper$V2($s: &Wrapper): bool {
+        test_variants m::Wrapper::V2($s)
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::m_friend {
+    struct T {
+        x: u64,
+    }
+    friend fun pack$0xc0ffee$m_friend$T($x: u64): T {
+        pack m_friend::T($x)
+    }
+    friend fun unpack$0xc0ffee$m_friend$T($s: T): (u64) {
+        {
+          let m_friend::T{ x } = $s;
+          Tuple(x)
+        }
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m_friend$T($s: &mut T): (&mut u64) {
+        Tuple(Borrow(Mutable)(select_variants m_friend::T.x($s)))
+    }
+    friend fun borrow_from$0xc0ffee$m_friend$T$x$0($s: &T): &u64 {
+        Borrow(Immutable)(select m_friend::T.x($s))
+    }
+    friend fun borrow_mut_from$0xc0ffee$m_friend$T$x$0($s: &mut T): &mut u64 {
+        Borrow(Mutable)(select m_friend::T.x($s))
+    }
+} // end 0xc0ffee::m_friend
+module 0xc0ffee::n {
+    use 0xc0ffee::m; // resolved as: 0xc0ffee::m
+    private fun test() {
+        {
+          let x: m::Wrapper = m::make(22);
+          if Eq<u64>(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x), 22) {
+            Tuple()
+          } else {
+            Abort(1)
+          };
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::n2 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_pack() {
+        {
+          let _x: m::Wrapper = pack m::Wrapper::V1(22);
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n2
+module 0xc0ffee::n3 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_unpack(w: m::Wrapper) {
+        {
+          let m::Wrapper::V1{ 0: _x } = w;
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n3
+module 0xc0ffee::n4 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_select_variant(w: m::Wrapper): u64 {
+        select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(w)
+    }
+} // end 0xc0ffee::n4
+module 0xc0ffee::n5 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_test_variant(w: m::Wrapper): bool {
+        test_variants m::Wrapper::V1(w)
+    }
+} // end 0xc0ffee::n5
+module 0xc0ffee::n6 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_match(w: m::Wrapper): bool {
+        match (w) {
+          m::Wrapper::V1{ 0: _ } => {
+            true
+          }
+          m::Wrapper::V2{ 0: _ } => {
+            false
+          }
+        }
+
+    }
+} // end 0xc0ffee::n6
+module 0xc0ffee::n7 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    private fun test_pack_struct(): m::S {
+        pack m::S(22)
+    }
+} // end 0xc0ffee::n7
+module 0xc0ffee::n8 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    private fun test_pack_struct(): m::S {
+        pack m::S(22)
+    }
+    private inline fun test_pack_struct_inline(): m::S {
+        pack m::S(22)
+    }
+} // end 0xc0ffee::n8
+module 0xc0ffee::n9 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    use 0xc0ffee::m::{S2}; // resolved as: 0xc0ffee::m
+    private inline fun test_inline(x: ||) {
+        (x)()
+    }
+    private fun test_pack_unpack_struct_in_lambda() {
+        {
+          let x: m::S2 = pack m::S2(22, pack m::S(33));
+          {
+            let m::S2{ x: _x, s: m::S{ x: _y } } = x;
+            Tuple()
+          }
+        }
+    }
+} // end 0xc0ffee::n9
+module 0xc0ffee::n_friend {
+    use 0xc0ffee::m_friend::{T}; // resolved as: 0xc0ffee::m_friend
+    private fun test_pack_friend_struct(): m_friend::T {
+        pack m_friend::T(22)
+    }
+} // end 0xc0ffee::n_friend
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::make($t0: u64): 0xc0ffee::m::Wrapper {
+     var $t1: 0xc0ffee::m::Wrapper
+  0: $t1 := pack_variant 0xc0ffee::m::Wrapper::V1($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::pack$0xc0ffee$m$S($t0: u64): 0xc0ffee::m::S {
+     var $t1: 0xc0ffee::m::S
+  0: $t1 := pack 0xc0ffee::m::S($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack$0xc0ffee$m$S($t0: 0xc0ffee::m::S): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := unpack 0xc0ffee::m::S($t0)
+  1: $t1 := infer($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack_mut_ref$0xc0ffee$m$S($t0: &mut 0xc0ffee::m::S): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_field<0xc0ffee::m::S>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_from$0xc0ffee$m$S$x$0($t0: &0xc0ffee::m::S): &u64 {
+     var $t1: &u64
+  0: $t1 := borrow_field<0xc0ffee::m::S>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_mut_from$0xc0ffee$m$S$x$0($t0: &mut 0xc0ffee::m::S): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_field<0xc0ffee::m::S>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::pack$0xc0ffee$m$S2($t0: u64, $t1: 0xc0ffee::m::S): 0xc0ffee::m::S2 {
+     var $t2: 0xc0ffee::m::S2
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := pack 0xc0ffee::m::S2($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack$0xc0ffee$m$S2($t0: 0xc0ffee::m::S2): (u64, 0xc0ffee::m::S) {
+     var $t1: u64
+     var $t2: 0xc0ffee::m::S
+     var $t3: u64
+     var $t4: 0xc0ffee::m::S
+  0: ($t3, $t4) := unpack 0xc0ffee::m::S2($t0)
+  1: $t1 := infer($t3)
+  2: $t2 := infer($t4)
+  3: return ($t1, $t2)
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack_mut_ref$0xc0ffee$m$S2($t0: &mut 0xc0ffee::m::S2): (&mut u64, &mut 0xc0ffee::m::S) {
+     var $t1: &mut u64
+     var $t2: &mut 0xc0ffee::m::S
+  0: $t1 := borrow_field<0xc0ffee::m::S2>.x($t0)
+  1: $t2 := borrow_field<0xc0ffee::m::S2>.s($t0)
+  2: return ($t1, $t2)
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_from$0xc0ffee$m$S2$x$0($t0: &0xc0ffee::m::S2): &u64 {
+     var $t1: &u64
+  0: $t1 := borrow_field<0xc0ffee::m::S2>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_from$0xc0ffee$m$S2$s$1($t0: &0xc0ffee::m::S2): &0xc0ffee::m::S {
+     var $t1: &0xc0ffee::m::S
+  0: $t1 := borrow_field<0xc0ffee::m::S2>.s($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_mut_from$0xc0ffee$m$S2$x$0($t0: &mut 0xc0ffee::m::S2): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_field<0xc0ffee::m::S2>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_mut_from$0xc0ffee$m$S2$s$1($t0: &mut 0xc0ffee::m::S2): &mut 0xc0ffee::m::S {
+     var $t1: &mut 0xc0ffee::m::S
+  0: $t1 := borrow_field<0xc0ffee::m::S2>.s($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::pack$0xc0ffee$m$Wrapper$V1($t0: u64): 0xc0ffee::m::Wrapper {
+     var $t1: 0xc0ffee::m::Wrapper
+  0: $t1 := pack_variant 0xc0ffee::m::Wrapper::V1($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::pack$0xc0ffee$m$Wrapper$V2($t0: u64): 0xc0ffee::m::Wrapper {
+     var $t1: 0xc0ffee::m::Wrapper
+  0: $t1 := pack_variant 0xc0ffee::m::Wrapper::V2($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack$0xc0ffee$m$Wrapper$V1($t0: 0xc0ffee::m::Wrapper): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := unpack_variant 0xc0ffee::m::Wrapper::V1($t0)
+  1: $t1 := infer($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack$0xc0ffee$m$Wrapper$V2($t0: 0xc0ffee::m::Wrapper): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := unpack_variant 0xc0ffee::m::Wrapper::V2($t0)
+  1: $t1 := infer($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack_mut_ref$0xc0ffee$m$Wrapper$V1($t0: &mut 0xc0ffee::m::Wrapper): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.0($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::unpack_mut_ref$0xc0ffee$m$Wrapper$V2($t0: &mut 0xc0ffee::m::Wrapper): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_variant_field<0xc0ffee::m::Wrapper::V2>.0($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_from$0xc0ffee$m$Wrapper$0$0($t0: &0xc0ffee::m::Wrapper): &u64 {
+     var $t1: &u64
+  0: $t1 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::borrow_mut_from$0xc0ffee$m$Wrapper$0$0($t0: &mut 0xc0ffee::m::Wrapper): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::test_variant$0xc0ffee$m$Wrapper$V1($t0: &0xc0ffee::m::Wrapper): bool {
+     var $t1: bool
+  0: $t1 := test_variant 0xc0ffee::m::Wrapper::V1($t0)
+  1: if ($t1) goto 3 else goto 2
+  2: label L1
+  3: label L0
+  4: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m::test_variant$0xc0ffee$m$Wrapper$V2($t0: &0xc0ffee::m::Wrapper): bool {
+     var $t1: bool
+  0: $t1 := test_variant 0xc0ffee::m::Wrapper::V2($t0)
+  1: if ($t1) goto 3 else goto 2
+  2: label L1
+  3: label L0
+  4: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m_friend::pack$0xc0ffee$m_friend$T($t0: u64): 0xc0ffee::m_friend::T {
+     var $t1: 0xc0ffee::m_friend::T
+  0: $t1 := pack 0xc0ffee::m_friend::T($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m_friend::unpack$0xc0ffee$m_friend$T($t0: 0xc0ffee::m_friend::T): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := unpack 0xc0ffee::m_friend::T($t0)
+  1: $t1 := infer($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m_friend::unpack_mut_ref$0xc0ffee$m_friend$T($t0: &mut 0xc0ffee::m_friend::T): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_field<0xc0ffee::m_friend::T>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m_friend::borrow_from$0xc0ffee$m_friend$T$x$0($t0: &0xc0ffee::m_friend::T): &u64 {
+     var $t1: &u64
+  0: $t1 := borrow_field<0xc0ffee::m_friend::T>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun m_friend::borrow_mut_from$0xc0ffee$m_friend$T$x$0($t0: &mut 0xc0ffee::m_friend::T): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := borrow_field<0xc0ffee::m_friend::T>.x($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun n::test() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: &0xc0ffee::m::Wrapper
+     var $t5: &u64
+     var $t6: u64
+     var $t7: u64
+  0: $t1 := 22
+  1: $t0 := m::make($t1)
+  2: $t4 := borrow_local($t0)
+  3: $t5 := m::borrow_from$0xc0ffee$m$Wrapper$0$0($t4)
+  4: $t3 := read_ref($t5)
+  5: $t6 := 22
+  6: $t2 := ==($t3, $t6)
+  7: if ($t2) goto 8 else goto 10
+  8: label L0
+  9: goto 13
+ 10: label L1
+ 11: $t7 := 1
+ 12: abort($t7)
+ 13: label L2
+ 14: return ()
+}
+
+
+[variant baseline]
+fun n2::test_pack() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := m::pack$0xc0ffee$m$Wrapper$V1($t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun n3::test_unpack($t0: 0xc0ffee::m::Wrapper) {
+     var $t1: u64
+  0: $t1 := m::unpack$0xc0ffee$m$Wrapper$V1($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun n4::test_select_variant($t0: 0xc0ffee::m::Wrapper): u64 {
+     var $t1: u64
+     var $t2: &0xc0ffee::m::Wrapper
+     var $t3: &u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := m::borrow_from$0xc0ffee$m$Wrapper$0$0($t2)
+  2: $t1 := read_ref($t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun n5::test_test_variant($t0: 0xc0ffee::m::Wrapper): bool {
+     var $t1: bool
+     var $t2: &0xc0ffee::m::Wrapper
+  0: $t2 := borrow_local($t0)
+  1: $t1 := m::test_variant$0xc0ffee$m$Wrapper$V1($t2)
+  2: if ($t1) goto 4 else goto 3
+  3: label L1
+  4: label L0
+  5: return $t1
+}
+
+
+[variant baseline]
+fun n6::test_match($t0: 0xc0ffee::m::Wrapper): bool {
+     var $t1: bool
+     var $t2: &0xc0ffee::m::Wrapper
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := m::test_variant$0xc0ffee$m$Wrapper$V1($t2)
+  2: if ($t3) goto 3 else goto 7
+  3: label L2
+  4: $t4 := m::unpack$0xc0ffee$m$Wrapper$V1($t0)
+  5: $t1 := true
+  6: goto 17
+  7: label L1
+  8: $t3 := m::test_variant$0xc0ffee$m$Wrapper$V2($t2)
+  9: if ($t3) goto 10 else goto 14
+ 10: label L4
+ 11: $t5 := m::unpack$0xc0ffee$m$Wrapper$V2($t0)
+ 12: $t1 := false
+ 13: goto 17
+ 14: label L3
+ 15: $t6 := 14566554180833181697
+ 16: abort($t6)
+ 17: label L0
+ 18: return $t1
+}
+
+
+[variant baseline]
+fun n7::test_pack_struct(): 0xc0ffee::m::S {
+     var $t0: 0xc0ffee::m::S
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := m::pack$0xc0ffee$m$S($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun n8::test_pack_struct(): 0xc0ffee::m::S {
+     var $t0: 0xc0ffee::m::S
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := m::pack$0xc0ffee$m$S($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun n9::test_pack_unpack_struct_in_lambda() {
+     var $t0: 0xc0ffee::m::S2
+     var $t1: u64
+     var $t2: 0xc0ffee::m::S
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: 0xc0ffee::m::S
+  0: $t1 := 22
+  1: $t3 := 33
+  2: $t2 := m::pack$0xc0ffee$m$S($t3)
+  3: $t0 := m::pack$0xc0ffee$m$S2($t1, $t2)
+  4: ($t4, $t6) := m::unpack$0xc0ffee$m$S2($t0)
+  5: $t5 := m::unpack$0xc0ffee$m$S($t6)
+  6: return ()
+}
+
+
+[variant baseline]
+fun n_friend::test_pack_friend_struct(): 0xc0ffee::m_friend::T {
+     var $t0: 0xc0ffee::m_friend::T
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := m_friend::pack$0xc0ffee$m_friend$T($t1)
+  2: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+struct S {
+	x: u64
+}
+struct S2 {
+	x: u64,
+	s: S
+}
+enum Wrapper has drop {
+ V1{
+	_0: u64
+ },
+ V2{
+	_0: u64
+ }
+}
+
+public make(x: u64): Wrapper /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](x: u64)
+	1: PackVariant[0](Wrapper/V1)
+	2: Ret
+}
+public(friend) pack$0xc0ffee$m$S($x: u64): S /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0]($x: u64)
+	1: Pack[0](S)
+	2: Ret
+}
+public(friend) unpack$0xc0ffee$m$S($s: S): u64 /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0]($s: S)
+	1: Unpack[0](S)
+	2: Ret
+}
+public(friend) unpack_mut_ref$0xc0ffee$m$S($s: &mut S): &mut u64 /* def_idx: 3 */ {
+B0:
+	0: MoveLoc[0]($s: &mut S)
+	1: MutBorrowField[0](S.x: u64)
+	2: Ret
+}
+public(friend) borrow_from$0xc0ffee$m$S$x$0($s: &S): &u64 /* def_idx: 4 */ {
+B0:
+	0: MoveLoc[0]($s: &S)
+	1: ImmBorrowField[0](S.x: u64)
+	2: Ret
+}
+public(friend) borrow_mut_from$0xc0ffee$m$S$x$0($s: &mut S): &mut u64 /* def_idx: 5 */ {
+B0:
+	0: MoveLoc[0]($s: &mut S)
+	1: MutBorrowField[0](S.x: u64)
+	2: Ret
+}
+public(friend) pack$0xc0ffee$m$S2($x: u64, $s: S): S2 /* def_idx: 6 */ {
+B0:
+	0: MoveLoc[0]($x: u64)
+	1: MoveLoc[1]($s: S)
+	2: Pack[1](S2)
+	3: Ret
+}
+public(friend) unpack$0xc0ffee$m$S2($s: S2): u64 * S /* def_idx: 7 */ {
+L1:	s: S
+L2:	x: u64
+B0:
+	0: MoveLoc[0]($s: S2)
+	1: Unpack[1](S2)
+	2: Ret
+}
+public(friend) unpack_mut_ref$0xc0ffee$m$S2($s: &mut S2): &mut u64 * &mut S /* def_idx: 8 */ {
+B0:
+	0: CopyLoc[0]($s: &mut S2)
+	1: MutBorrowField[1](S2.x: u64)
+	2: MoveLoc[0]($s: &mut S2)
+	3: MutBorrowField[2](S2.s: S)
+	4: Ret
+}
+public(friend) borrow_from$0xc0ffee$m$S2$x$0($s: &S2): &u64 /* def_idx: 9 */ {
+B0:
+	0: MoveLoc[0]($s: &S2)
+	1: ImmBorrowField[1](S2.x: u64)
+	2: Ret
+}
+public(friend) borrow_from$0xc0ffee$m$S2$s$1($s: &S2): &S /* def_idx: 10 */ {
+B0:
+	0: MoveLoc[0]($s: &S2)
+	1: ImmBorrowField[2](S2.s: S)
+	2: Ret
+}
+public(friend) borrow_mut_from$0xc0ffee$m$S2$x$0($s: &mut S2): &mut u64 /* def_idx: 11 */ {
+B0:
+	0: MoveLoc[0]($s: &mut S2)
+	1: MutBorrowField[1](S2.x: u64)
+	2: Ret
+}
+public(friend) borrow_mut_from$0xc0ffee$m$S2$s$1($s: &mut S2): &mut S /* def_idx: 12 */ {
+B0:
+	0: MoveLoc[0]($s: &mut S2)
+	1: MutBorrowField[2](S2.s: S)
+	2: Ret
+}
+public(friend) pack$0xc0ffee$m$Wrapper$V1($0: u64): Wrapper /* def_idx: 13 */ {
+B0:
+	0: MoveLoc[0]($0: u64)
+	1: PackVariant[0](Wrapper/V1)
+	2: Ret
+}
+public(friend) pack$0xc0ffee$m$Wrapper$V2($0: u64): Wrapper /* def_idx: 14 */ {
+B0:
+	0: MoveLoc[0]($0: u64)
+	1: PackVariant[1](Wrapper/V2)
+	2: Ret
+}
+public(friend) unpack$0xc0ffee$m$Wrapper$V1($s: Wrapper): u64 /* def_idx: 15 */ {
+B0:
+	0: MoveLoc[0]($s: Wrapper)
+	1: UnpackVariant[0](Wrapper/V1)
+	2: Ret
+}
+public(friend) unpack$0xc0ffee$m$Wrapper$V2($s: Wrapper): u64 /* def_idx: 16 */ {
+B0:
+	0: MoveLoc[0]($s: Wrapper)
+	1: UnpackVariant[1](Wrapper/V2)
+	2: Ret
+}
+public(friend) unpack_mut_ref$0xc0ffee$m$Wrapper$V1($s: &mut Wrapper): &mut u64 /* def_idx: 17 */ {
+B0:
+	0: MoveLoc[0]($s: &mut Wrapper)
+	1: MutBorrowVariantField[0](V1._0: u64)
+	2: Ret
+}
+public(friend) unpack_mut_ref$0xc0ffee$m$Wrapper$V2($s: &mut Wrapper): &mut u64 /* def_idx: 18 */ {
+B0:
+	0: MoveLoc[0]($s: &mut Wrapper)
+	1: MutBorrowVariantField[1](V2._0: u64)
+	2: Ret
+}
+public(friend) borrow_from$0xc0ffee$m$Wrapper$0$0($s: &Wrapper): &u64 /* def_idx: 19 */ {
+B0:
+	0: MoveLoc[0]($s: &Wrapper)
+	1: ImmBorrowVariantField[2](V1._0|V2._0: u64)
+	2: Ret
+}
+public(friend) borrow_mut_from$0xc0ffee$m$Wrapper$0$0($s: &mut Wrapper): &mut u64 /* def_idx: 20 */ {
+B0:
+	0: MoveLoc[0]($s: &mut Wrapper)
+	1: MutBorrowVariantField[2](V1._0|V2._0: u64)
+	2: Ret
+}
+public(friend) test_variant$0xc0ffee$m$Wrapper$V1($s: &Wrapper): bool /* def_idx: 21 */ {
+B0:
+	0: MoveLoc[0]($s: &Wrapper)
+	1: TestVariant[0](Wrapper/V1)
+	2: Ret
+}
+public(friend) test_variant$0xc0ffee$m$Wrapper$V2($s: &Wrapper): bool /* def_idx: 22 */ {
+B0:
+	0: MoveLoc[0]($s: &Wrapper)
+	1: TestVariant[1](Wrapper/V2)
+	2: Ret
+}
+}// Move bytecode v8
+module c0ffee.m_friend {
+struct T {
+	x: u64
+}
+
+public(friend) pack$0xc0ffee$m_friend$T($x: u64): T /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0]($x: u64)
+	1: Pack[0](T)
+	2: Ret
+}
+public(friend) unpack$0xc0ffee$m_friend$T($s: T): u64 /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0]($s: T)
+	1: Unpack[0](T)
+	2: Ret
+}
+public(friend) unpack_mut_ref$0xc0ffee$m_friend$T($s: &mut T): &mut u64 /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0]($s: &mut T)
+	1: MutBorrowField[0](T.x: u64)
+	2: Ret
+}
+public(friend) borrow_from$0xc0ffee$m_friend$T$x$0($s: &T): &u64 /* def_idx: 3 */ {
+B0:
+	0: MoveLoc[0]($s: &T)
+	1: ImmBorrowField[0](T.x: u64)
+	2: Ret
+}
+public(friend) borrow_mut_from$0xc0ffee$m_friend$T$x$0($s: &mut T): &mut u64 /* def_idx: 4 */ {
+B0:
+	0: MoveLoc[0]($s: &mut T)
+	1: MutBorrowField[0](T.x: u64)
+	2: Ret
+}
+}// Move bytecode v8
+module c0ffee.n {
+use 0000000000000000000000000000000000000000000000000000000000c0ffee::m;
+
+
+
+
+test() /* def_idx: 0 */ {
+L0:	x: Wrapper
+B0:
+	0: LdU64(22)
+	1: Call m::make(u64): Wrapper
+	2: StLoc[0](x: Wrapper)
+	3: ImmBorrowLoc[0](x: Wrapper)
+	4: Call m::borrow_from$0xc0ffee$m$Wrapper$0$0(&Wrapper): &u64
+	5: ReadRef
+	6: LdU64(22)
+	7: Eq
+	8: BrFalse(10)
+B1:
+	9: Ret
+B2:
+	10: LdU64(1)
+	11: Abort
+}
+}// Move bytecode v8
+module c0ffee.n2 {
+use 0000000000000000000000000000000000000000000000000000000000c0ffee::m;
+
+
+
+
+test_pack() /* def_idx: 0 */ {
+B0:
+	0: LdU64(22)
+	1: Call m::pack$0xc0ffee$m$Wrapper$V1(u64): Wrapper
+	2: Pop
+	3: Ret
+}
+}// Move bytecode v8
+module c0ffee.n3 {
+use 0000000000000000000000000000000000000000000000000000000000c0ffee::m;
+
+
+
+
+test_unpack(w: Wrapper) /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](w: Wrapper)
+	1: Call m::unpack$0xc0ffee$m$Wrapper$V1(Wrapper): u64
+	2: Pop
+	3: Ret
+}
+}// Move bytecode v8
+module c0ffee.n4 {
+use 0000000000000000000000000000000000000000000000000000000000c0ffee::m;
+
+
+
+
+test_select_variant(w: Wrapper): u64 /* def_idx: 0 */ {
+B0:
+	0: ImmBorrowLoc[0](w: Wrapper)
+	1: Call m::borrow_from$0xc0ffee$m$Wrapper$0$0(&Wrapper): &u64
+	2: ReadRef
+	3: Ret
+}
+}// Move bytecode v8
+module c0ffee.n5 {
+use 0000000000000000000000000000000000000000000000000000000000c0ffee::m;
+
+
+
+
+test_test_variant(w: Wrapper): bool /* def_idx: 0 */ {
+B0:
+	0: ImmBorrowLoc[0](w: Wrapper)
+	1: Call m::test_variant$0xc0ffee$m$Wrapper$V1(&Wrapper): bool
+	2: Ret
+}
+}// Move bytecode v8
+module c0ffee.n6 {
+use 0000000000000000000000000000000000000000000000000000000000c0ffee::m;
+
+
+
+
+test_match(w: Wrapper): bool /* def_idx: 0 */ {
+L1:	$t2: &Wrapper
+L2:	return: bool
+B0:
+	0: ImmBorrowLoc[0](w: Wrapper)
+	1: StLoc[1]($t2: &Wrapper)
+	2: CopyLoc[1]($t2: &Wrapper)
+	3: Call m::test_variant$0xc0ffee$m$Wrapper$V1(&Wrapper): bool
+	4: BrFalse(14)
+B1:
+	5: MoveLoc[1]($t2: &Wrapper)
+	6: Pop
+	7: MoveLoc[0](w: Wrapper)
+	8: Call m::unpack$0xc0ffee$m$Wrapper$V1(Wrapper): u64
+	9: Pop
+	10: LdTrue
+	11: StLoc[2](return: bool)
+B2:
+	12: MoveLoc[2](return: bool)
+	13: Ret
+B3:
+	14: MoveLoc[1]($t2: &Wrapper)
+	15: Call m::test_variant$0xc0ffee$m$Wrapper$V2(&Wrapper): bool
+	16: BrFalse(23)
+B4:
+	17: MoveLoc[0](w: Wrapper)
+	18: Call m::unpack$0xc0ffee$m$Wrapper$V2(Wrapper): u64
+	19: Pop
+	20: LdFalse
+	21: StLoc[2](return: bool)
+	22: Branch(12)
+B5:
+	23: LdU64(14566554180833181697)
+	24: Abort
+}
+}// Move bytecode v8
+module c0ffee.n7 {
+use 0000000000000000000000000000000000000000000000000000000000c0ffee::m;
+
+
+
+
+test_pack_struct(): S /* def_idx: 0 */ {
+B0:
+	0: LdU64(22)
+	1: Call m::pack$0xc0ffee$m$S(u64): S
+	2: Ret
+}
+}// Move bytecode v8
+module c0ffee.n8 {
+use 0000000000000000000000000000000000000000000000000000000000c0ffee::m;
+
+
+
+
+test_pack_struct(): S /* def_idx: 0 */ {
+B0:
+	0: LdU64(22)
+	1: Call m::pack$0xc0ffee$m$S(u64): S
+	2: Ret
+}
+}// Move bytecode v8
+module c0ffee.n9 {
+use 0000000000000000000000000000000000000000000000000000000000c0ffee::m;
+
+
+
+
+test_pack_unpack_struct_in_lambda() /* def_idx: 0 */ {
+B0:
+	0: LdU64(22)
+	1: LdU64(33)
+	2: Call m::pack$0xc0ffee$m$S(u64): S
+	3: Call m::pack$0xc0ffee$m$S2(u64, S): S2
+	4: Call m::unpack$0xc0ffee$m$S2(S2): u64 * S
+	5: Call m::unpack$0xc0ffee$m$S(S): u64
+	6: Pop
+	7: Pop
+	8: Ret
+}
+}// Move bytecode v8
+module c0ffee.n_friend {
+use 0000000000000000000000000000000000000000000000000000000000c0ffee::m_friend;
+
+
+
+
+test_pack_friend_struct(): T /* def_idx: 0 */ {
+B0:
+	0: LdU64(22)
+	1: Call m_friend::pack$0xc0ffee$m_friend$T(u64): T
+	2: Ret
+}
+}
+============ bytecode verification succeeded ========
