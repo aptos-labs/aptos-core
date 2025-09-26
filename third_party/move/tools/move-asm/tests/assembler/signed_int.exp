@@ -2,7 +2,7 @@ processed 12 tasks
 task 0 lines 3-12:  publish --print-bytecode [module 0x66::test_ok_i8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_ok_i8
 // Function definition at index 0
 public fun f(l0: i8): i8
@@ -33,7 +33,7 @@ error: number -2781274937452 out of range (min -128)
 task 2 lines 28-37:  publish --print-bytecode [module 0x66::test_ok_i16]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_ok_i16
 // Function definition at index 0
 public fun f(l0: i16): i16
@@ -64,7 +64,7 @@ error: number -2781274937452 out of range (min -32768)
 task 4 lines 53-62:  publish --print-bytecode [module 0x66::test_ok_i32]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_ok_i32
 // Function definition at index 0
 public fun f(l0: i32): i32
@@ -95,7 +95,7 @@ error: number -2781274937452 out of range (min -2147483648)
 task 6 lines 78-87:  publish --print-bytecode [module 0x66::test_ok_i64]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_ok_i64
 // Function definition at index 0
 public fun f(l0: i64): i64
@@ -112,7 +112,7 @@ public fun f(l0: i64): i64
 task 7 lines 90-99:  publish --print-bytecode [module 0x66::test_some_err_i64]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_some_err_i64
 // Function definition at index 0
 public fun f(l0: i64): i64
@@ -129,7 +129,7 @@ public fun f(l0: i64): i64
 task 8 lines 103-112:  publish --print-bytecode [module 0x66::test_ok_i128]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_ok_i128
 // Function definition at index 0
 public fun f(l0: i128): i128
@@ -146,7 +146,7 @@ public fun f(l0: i128): i128
 task 9 lines 115-124:  publish --print-bytecode [module 0x66::test_some_err_i128]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_some_err_i128
 // Function definition at index 0
 public fun f(l0: i128): i128
@@ -163,7 +163,7 @@ public fun f(l0: i128): i128
 task 10 lines 128-137:  publish --print-bytecode [module 0x66::test_ok_i256]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_ok_i256
 // Function definition at index 0
 public fun f(l0: i256): i256
@@ -180,7 +180,7 @@ public fun f(l0: i256): i256
 task 11 lines 140-149:  publish --print-bytecode [module 0x66::test_some_err_i256]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test_some_err_i256
 // Function definition at index 0
 public fun f(l0: i256): i256

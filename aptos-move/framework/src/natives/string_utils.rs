@@ -14,8 +14,8 @@ use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     account_address::AccountAddress,
     function::ClosureMask,
-    language_storage::{TypeTag, OPTION_NONE_TAG},
     int256,
+    language_storage::{TypeTag, OPTION_NONE_TAG},
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET},
     vm_status::StatusCode,
 };
