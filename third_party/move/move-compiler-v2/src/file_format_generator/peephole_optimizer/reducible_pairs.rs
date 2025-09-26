@@ -35,6 +35,10 @@
 //!    - stack is left unaffected (first instruction negates the top, second takes it
 //!      off, vs. just take off the top).
 //!    - locals are unaffected.
+//! 8. [`FreezeRef`, `VecLen`]: Replace with `VecLen`.
+//!    - stack is left unaffected
+//!    - locals are unaffected
+//!    - this is valid because `VecLen` can take either an immut or a mut ref as operand.
 //!
 //! Finally, note that fixed window optimizations are performed on windows within a basic
 //! block, not spanning across multiple basic blocks.
@@ -72,6 +76,7 @@ impl WindowOptimizer for ReduciblePairs {
             },
             (Not, BrFalse(target)) => TransformedCodeChunk::new(vec![BrTrue(*target)], vec![0]),
             (Not, BrTrue(target)) => TransformedCodeChunk::new(vec![BrFalse(*target)], vec![0]),
+            (FreezeRef, VecLen(inst)) => TransformedCodeChunk::new(vec![VecLen(*inst)], vec![1]),
             _ => return None,
         };
         Some((optimized, Self::WINDOW_SIZE))

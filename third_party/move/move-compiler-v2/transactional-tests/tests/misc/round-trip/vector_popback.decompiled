@@ -4,13 +4,13 @@
 module 0x42::vector {
     use 0x1::vector;
     public fun remove<T0>(p0: &mut vector<T0>, p1: u64): T0 {
-        let _t2 = vector::length<T0>(freeze(p0));
+        let _t2 = vector::length<T0>(p0);
         if (p1 >= _t2) abort 1;
         _t2 = _t2 - 1;
         while (p1 < _t2) {
-            let _t18 = p1;
+            let _t17 = p1;
             p1 = p1 + 1;
-            vector::swap<T0>(p0, _t18, p1);
+            vector::swap<T0>(p0, _t17, p1);
             continue
         };
         vector::pop_back<T0>(p0)

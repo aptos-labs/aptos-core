@@ -1668,80 +1668,79 @@ B0:
 	6: LdU64(0)
 	7: StLoc[3](i: u64)
 	8: CopyLoc[2](v: &mut vector<u64>)
-	9: FreezeRef
-	10: VecLen(1)
-	11: StLoc[4](len: u64)
+	9: VecLen(1)
+	10: StLoc[4](len: u64)
 B1:
-	12: CopyLoc[3](i: u64)
-	13: CopyLoc[4](len: u64)
-	14: Lt
-	15: BrTrue(17)
+	11: CopyLoc[3](i: u64)
+	12: CopyLoc[4](len: u64)
+	13: Lt
+	14: BrTrue(16)
 B2:
-	16: Branch(26)
+	15: Branch(25)
 B3:
-	17: CopyLoc[2](v: &mut vector<u64>)
-	18: FreezeRef
-	19: CopyLoc[3](i: u64)
-	20: VecImmBorrow(1)
-	21: ReadRef
-	22: LdU64(1)
-	23: Gt
-	24: BrTrue(66)
+	16: CopyLoc[2](v: &mut vector<u64>)
+	17: FreezeRef
+	18: CopyLoc[3](i: u64)
+	19: VecImmBorrow(1)
+	20: ReadRef
+	21: LdU64(1)
+	22: Gt
+	23: BrTrue(65)
 B4:
-	25: Branch(26)
+	24: Branch(25)
 B5:
-	26: CopyLoc[3](i: u64)
-	27: StLoc[5]($t9: u64)
-	28: MoveLoc[3](i: u64)
-	29: LdU64(1)
-	30: Add
-	31: StLoc[3](i: u64)
+	25: CopyLoc[3](i: u64)
+	26: StLoc[5]($t9: u64)
+	27: MoveLoc[3](i: u64)
+	28: LdU64(1)
+	29: Add
+	30: StLoc[3](i: u64)
 B6:
-	32: CopyLoc[3](i: u64)
-	33: CopyLoc[4](len: u64)
-	34: Lt
-	35: BrFalse(58)
+	31: CopyLoc[3](i: u64)
+	32: CopyLoc[4](len: u64)
+	33: Lt
+	34: BrFalse(57)
 B7:
-	36: CopyLoc[2](v: &mut vector<u64>)
-	37: FreezeRef
-	38: CopyLoc[3](i: u64)
-	39: VecImmBorrow(1)
-	40: ReadRef
-	41: LdU64(1)
-	42: Gt
-	43: BrTrue(45)
+	35: CopyLoc[2](v: &mut vector<u64>)
+	36: FreezeRef
+	37: CopyLoc[3](i: u64)
+	38: VecImmBorrow(1)
+	39: ReadRef
+	40: LdU64(1)
+	41: Gt
+	42: BrTrue(44)
 B8:
-	44: Branch(53)
+	43: Branch(52)
 B9:
-	45: CopyLoc[2](v: &mut vector<u64>)
-	46: CopyLoc[5]($t9: u64)
-	47: CopyLoc[3](i: u64)
-	48: VecSwap(1)
-	49: MoveLoc[5]($t9: u64)
-	50: LdU64(1)
-	51: Add
-	52: StLoc[5]($t9: u64)
+	44: CopyLoc[2](v: &mut vector<u64>)
+	45: CopyLoc[5]($t9: u64)
+	46: CopyLoc[3](i: u64)
+	47: VecSwap(1)
+	48: MoveLoc[5]($t9: u64)
+	49: LdU64(1)
+	50: Add
+	51: StLoc[5]($t9: u64)
 B10:
-	53: MoveLoc[3](i: u64)
-	54: LdU64(1)
-	55: Add
-	56: StLoc[3](i: u64)
-	57: Branch(32)
+	52: MoveLoc[3](i: u64)
+	53: LdU64(1)
+	54: Add
+	55: StLoc[3](i: u64)
+	56: Branch(31)
 B11:
-	58: MoveLoc[2](v: &mut vector<u64>)
-	59: Pop
-	60: MoveLoc[1](r: &mut vector<u64>)
-	61: FreezeRef
-	62: LdU64(0)
-	63: VecImmBorrow(1)
-	64: ReadRef
-	65: Ret
+	57: MoveLoc[2](v: &mut vector<u64>)
+	58: Pop
+	59: MoveLoc[1](r: &mut vector<u64>)
+	60: FreezeRef
+	61: LdU64(0)
+	62: VecImmBorrow(1)
+	63: ReadRef
+	64: Ret
 B12:
-	66: MoveLoc[3](i: u64)
-	67: LdU64(1)
-	68: Add
-	69: StLoc[3](i: u64)
-	70: Branch(12)
+	65: MoveLoc[3](i: u64)
+	66: LdU64(1)
+	67: Add
+	68: StLoc[3](i: u64)
+	69: Branch(11)
 }
 }
 ============ bytecode verification succeeded ========
