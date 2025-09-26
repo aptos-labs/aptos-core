@@ -17,6 +17,7 @@ use move_vm_test_utils::InMemoryStorage;
 fn initialize_storage_with_binary_format_version(binary_format_version: u32) -> InMemoryStorage {
     let vm_config = VMConfig {
         deserializer_config: DeserializerConfig::new(binary_format_version, IDENTIFIER_SIZE_MAX),
+        enable_enum_option: false,
         ..Default::default()
     };
     let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);

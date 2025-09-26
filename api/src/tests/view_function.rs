@@ -519,7 +519,7 @@ async fn test_view_option(use_txn_payload_v2_format: bool, use_orderless_transac
 #[rstest(
     use_txn_payload_v2_format,
     use_orderless_transactions,
-    new_option_module,
+    enable_enum_option,
     case(false, false, false),
     case(false, false, true),
     case(true, false, false),
@@ -528,19 +528,21 @@ async fn test_view_option(use_txn_payload_v2_format: bool, use_orderless_transac
 async fn test_view_option_some(
     use_txn_payload_v2_format: bool,
     use_orderless_transactions: bool,
-    new_option_module: bool,
+    enable_enum_option: bool,
 ) {
-    const FEATURE_FLAG_NEW_OPTION_MODULE: u64 = 102;
+    const FEATURE_FLAG_ENABLE_ENUM_OPTION: u64 = 101;
     let mut context = new_test_context_with_orderless_flags(
         current_function_name!(),
         use_txn_payload_v2_format,
         use_orderless_transactions,
     );
-    if new_option_module {
-        context.enable_feature(FEATURE_FLAG_NEW_OPTION_MODULE).await;
+    if enable_enum_option {
+        context
+            .enable_feature(FEATURE_FLAG_ENABLE_ENUM_OPTION)
+            .await;
     } else {
         context
-            .disable_feature(FEATURE_FLAG_NEW_OPTION_MODULE)
+            .disable_feature(FEATURE_FLAG_ENABLE_ENUM_OPTION)
             .await;
     }
     let mut account = context.create_account().await;

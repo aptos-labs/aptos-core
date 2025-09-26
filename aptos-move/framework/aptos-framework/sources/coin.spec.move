@@ -70,7 +70,7 @@ spec aptos_framework::coin {
     }
 
     spec fun spec_fun_supply_tracked<CoinType>(val: u64, supply: Option<OptionalAggregator>): bool {
-        option::is_some(supply) ==>
+        option::spec_is_some(supply) ==>
             val
                 == optional_aggregator::optional_aggregator_value(
                     option::spec_borrow(supply)
@@ -95,7 +95,7 @@ spec aptos_framework::coin {
     spec fun spec_fun_supply_no_change<CoinType>(
         old_supply: Option<OptionalAggregator>, supply: Option<OptionalAggregator>
     ): bool {
-        option::is_some(old_supply) ==>
+        option::spec_is_some(old_supply) ==>
             optional_aggregator::optional_aggregator_value(
                 option::spec_borrow(old_supply)
             ) == optional_aggregator::optional_aggregator_value(
@@ -193,9 +193,11 @@ spec aptos_framework::coin {
         amount: u64;
         let addr = type_info::type_of<CoinType>().account_address;
         let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        include (option::is_some(
-            maybe_supply
-        )) ==> optional_aggregator::SubAbortsIf { optional_aggregator: option::spec_borrow(maybe_supply), value: amount };
+        include (option::is_some(maybe_supply)) ==>
+            optional_aggregator::SubAbortsIf {
+                optional_aggregator: option::borrow(maybe_supply),
+                value: amount
+            };
     }
 
     spec schema CoinAddAbortsIf<CoinType> {
@@ -203,9 +205,11 @@ spec aptos_framework::coin {
         amount: u64;
         let addr = type_info::type_of<CoinType>().account_address;
         let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        include (option::is_some(
-            maybe_supply
-        )) ==> optional_aggregator::AddAbortsIf { optional_aggregator: option::spec_borrow(maybe_supply), value: amount };
+        include (option::is_some(maybe_supply)) ==>
+            optional_aggregator::AddAbortsIf {
+                optional_aggregator: option::borrow(maybe_supply),
+                value: amount
+            };
     }
 
     spec schema AbortsIfNotExistCoinInfo<CoinType> {
@@ -240,10 +244,10 @@ spec aptos_framework::coin {
         let supply = option::spec_borrow(maybe_supply);
         let value = optional_aggregator::optional_aggregator_value(supply);
 
-        ensures if (option::is_some(maybe_supply)) {
+        ensures if (option::spec_is_some(maybe_supply)) {
             result == option::spec_some(value)
         } else {
-            option::is_none(result)
+            option::spec_is_none(result)
         };
     }
 
@@ -290,14 +294,14 @@ spec aptos_framework::coin {
         let post post_supply = option::spec_borrow(post_maybe_supply);
         let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
 
-        aborts_if option::is_some(maybe_supply) && value < amount;
+        aborts_if option::spec_is_some(maybe_supply) && value < amount;
 
         ensures post_coin_store.coin.value == coin_store.coin.value - amount;
         /// [managed_coin::high-level-req-5]
-        ensures if (option::is_some(maybe_supply)) {
+        ensures if (option::spec_is_some(maybe_supply)) {
             post_value == value - amount
         } else {
-            option::is_none(post_maybe_supply)
+            option::spec_is_none(post_maybe_supply)
         };
         ensures supply<CoinType> == old(supply<CoinType>) - amount;
     }
@@ -470,7 +474,7 @@ spec aptos_framework::coin {
                 && limit == MAX_U128
                 && (parallelizable == optional_aggregator::is_parallelizable(supply))
         } else {
-            option::is_none(coin_info.supply)
+            option::spec_is_none(coin_info.supply)
         };
         ensures result_1 == BurnCapability<CoinType> {};
         ensures result_2 == FreezeCapability<CoinType> {};

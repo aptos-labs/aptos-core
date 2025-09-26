@@ -135,7 +135,7 @@ spec aptos_framework::stake {
             consensus_pubkey,
             proof_of_possession_from_bytes(proof_of_possession)
         );
-        aborts_if !option::is_some(pubkey_from_pop);
+        aborts_if !option::spec_is_some(pubkey_from_pop);
         let addr = signer::address_of(account);
         let post_addr = signer::address_of(account);
         let allowed = global<AllowedValidators>(@aptos_framework);
@@ -190,9 +190,9 @@ spec aptos_framework::stake {
         let validator_set = global<ValidatorSet>(@aptos_framework);
         let post p_validator_set = global<ValidatorSet>(@aptos_framework);
         aborts_if signer::address_of(operator) != stake_pool.operator_address;
-        aborts_if option::is_some(spec_find_validator(validator_set.active_validators, pool_address)) ||
-                    option::is_some(spec_find_validator(validator_set.pending_inactive, pool_address)) ||
-                        option::is_some(spec_find_validator(validator_set.pending_active, pool_address));
+        aborts_if option::spec_is_some(spec_find_validator(validator_set.active_validators, pool_address)) ||
+                    option::spec_is_some(spec_find_validator(validator_set.pending_inactive, pool_address)) ||
+                        option::spec_is_some(spec_find_validator(validator_set.pending_active, pool_address));
 
         let config = staking_config::get();
         let voting_power = get_next_epoch_voting_power(stake_pool);
@@ -245,9 +245,9 @@ spec aptos_framework::stake {
         aborts_if !exists<ValidatorSet>(@aptos_framework);
 
         let validator_set = global<ValidatorSet>(@aptos_framework);
-        let bool_find_validator = !option::is_some(spec_find_validator(validator_set.active_validators, pool_address)) &&
-                    !option::is_some(spec_find_validator(validator_set.pending_inactive, pool_address)) &&
-                        !option::is_some(spec_find_validator(validator_set.pending_active, pool_address));
+        let bool_find_validator = !option::spec_is_some(spec_find_validator(validator_set.active_validators, pool_address)) &&
+                    !option::spec_is_some(spec_find_validator(validator_set.pending_inactive, pool_address)) &&
+                        !option::spec_is_some(spec_find_validator(validator_set.pending_active, pool_address));
         aborts_if bool_find_validator && !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         let new_withdraw_amount_1 = min(withdraw_amount, stake_pool.inactive.value + stake_pool.pending_inactive.value);
         let new_withdraw_amount_2 = min(withdraw_amount, stake_pool.inactive.value);
@@ -287,7 +287,7 @@ spec aptos_framework::stake {
         aborts_if signer::address_of(operator) != stake_pool.operator_address;
 
         let validator_set = global<ValidatorSet>(@aptos_framework);
-        let validator_find_bool = option::is_some(spec_find_validator(validator_set.pending_active, pool_address));
+        let validator_find_bool = option::spec_is_some(spec_find_validator(validator_set.pending_active, pool_address));
         let active_validators = validator_set.active_validators;
         let pending_active = validator_set.pending_active;
 
@@ -298,7 +298,7 @@ spec aptos_framework::stake {
         ensures len(active_validators) + len(pending_inactive_validators) == len(post_active_validators)
             + len(post_pending_inactive_validators);
 
-        aborts_if !validator_find_bool && !option::is_some(spec_find_validator(active_validators, pool_address));
+        aborts_if !validator_find_bool && !option::spec_is_some(spec_find_validator(active_validators, pool_address));
         aborts_if !validator_find_bool && vector::length(validator_set.active_validators) <= option::spec_borrow(spec_find_validator(active_validators, pool_address));
         aborts_if !validator_find_bool && vector::length(validator_set.active_validators) < 2;
         aborts_if validator_find_bool && vector::length(validator_set.pending_active) <= option::spec_borrow(spec_find_validator(pending_active, pool_address));
@@ -306,7 +306,7 @@ spec aptos_framework::stake {
         let validator_stake = (get_next_epoch_voting_power(stake_pool) as u128);
         ensures validator_find_bool && validator_set.total_joining_power > validator_stake ==>
                     p_validator_set.total_joining_power == validator_set.total_joining_power - validator_stake;
-        ensures !validator_find_bool ==> !option::is_some(spec_find_validator(p_validator_set.pending_active, pool_address));
+        ensures !validator_find_bool ==> !option::spec_is_some(spec_find_validator(p_validator_set.pending_active, pool_address));
     }
 
     spec extract_owner_cap(owner: &signer): OwnerCapability {
@@ -434,7 +434,7 @@ spec aptos_framework::stake {
             new_consensus_pubkey,
             proof_of_possession_from_bytes(proof_of_possession)
         );
-        aborts_if !option::is_some(pubkey_from_pop);
+        aborts_if !option::spec_is_some(pubkey_from_pop);
         modifies global<ValidatorConfig>(pool_address);
         include StakedValueNochange;
 
@@ -473,7 +473,7 @@ spec aptos_framework::stake {
         let validator_perf = global<ValidatorPerformance>(@aptos_framework);
         let post post_validator_perf = global<ValidatorPerformance>(@aptos_framework);
         let validator_len = len(validator_perf.validators);
-        ensures (option::is_some(ghost_proposer_idx) && option::spec_borrow(ghost_proposer_idx) < validator_len) ==>
+        ensures (option::spec_is_some(ghost_proposer_idx) && option::spec_borrow(ghost_proposer_idx) < validator_len) ==>
             (post_validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals ==
                 validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals + 1);
     }
@@ -655,7 +655,7 @@ spec aptos_framework::stake {
         pragma opaque;
         aborts_if false;
         ensures option::is_none(result) ==> (forall i in 0..len(v): v[i].addr != addr);
-        ensures option::is_some(result) ==> v[option::spec_borrow(result)].addr == addr;
+        ensures option::is_some(result) ==> v[option::borrow(result)].addr == addr;
         // Additional postcondition to help the quantifier instantiation.
         ensures option::is_some(result) ==> spec_contains(v, addr);
         ensures [abstract] result == spec_find_validator(v,addr);

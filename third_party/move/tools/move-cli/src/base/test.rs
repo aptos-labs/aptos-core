@@ -124,6 +124,7 @@ impl Test {
             cost_table,
             compute_coverage,
             &mut std::io::stdout(),
+            false,
         )?;
 
         // Return a non-zero exit code if any test failed
@@ -151,6 +152,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     cost_table: Option<CostTable>,
     compute_coverage: bool,
     writer: &mut W,
+    enable_enum_option: bool,
 ) -> Result<UnitTestResult> {
     run_move_unit_tests_with_factory(
         pkg_path,
@@ -161,6 +163,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
         compute_coverage,
         writer,
         UnitTestFactoryWithCostTable::new(cost_table, gas_limit),
+        enable_enum_option,
     )
 }
 
@@ -173,6 +176,7 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     compute_coverage: bool,
     writer: &mut W,
     factory: F,
+    enable_enum_option: bool,
 ) -> Result<UnitTestResult> {
     build_config.test_mode = true;
     build_config.dev_mode = true;
@@ -284,7 +288,14 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     // Run the tests. If any of the tests fail, then we don't produce a coverage report, so cleanup
     // the trace files.
     if !unit_test_config
-        .run_and_report_unit_tests(test_plan, Some(natives), Some(genesis), writer, factory)
+        .run_and_report_unit_tests(
+            test_plan,
+            Some(natives),
+            Some(genesis),
+            writer,
+            factory,
+            enable_enum_option,
+        )
         .unwrap()
         .1
     {

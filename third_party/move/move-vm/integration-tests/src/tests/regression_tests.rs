@@ -110,6 +110,7 @@ fn script_large_ty() {
     let vm_config = VMConfig {
         verifier_config,
         paranoid_type_checks: true,
+        enable_enum_option: false,
         ..Default::default()
     };
     let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);

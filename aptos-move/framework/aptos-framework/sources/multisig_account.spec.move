@@ -203,7 +203,7 @@ spec aptos_framework::multisig_account {
         aborts_if !exists<MultisigAccount>(multisig_account);
         aborts_if multisig_account_resource.last_executed_sequence_number + 1 > MAX_U64;
         aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
-        ensures option::is_none(transaction.payload) ==> result == provided_payload;
+        ensures option::spec_is_none(transaction.payload) ==> result == provided_payload;
     }
 
     spec get_next_multisig_account_address(creator: address): address {

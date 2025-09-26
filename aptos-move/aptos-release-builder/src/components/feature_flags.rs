@@ -153,7 +153,6 @@ pub enum FeatureFlag {
     EnableCaptureOption,
     EnableTrustedCode,
     EnableEnumOption,
-    NewOptionModule,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -406,7 +405,6 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::EnableCaptureOption => AptosFeatureFlag::ENABLE_CAPTURE_OPTION,
             FeatureFlag::EnableTrustedCode => AptosFeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::EnableEnumOption => AptosFeatureFlag::ENABLE_ENUM_OPTION,
-            FeatureFlag::NewOptionModule => AptosFeatureFlag::NEW_OPTION_MODULE,
         }
     }
 }
@@ -586,7 +584,6 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ENABLE_CAPTURE_OPTION => FeatureFlag::EnableCaptureOption,
             AptosFeatureFlag::ENABLE_TRUSTED_CODE => FeatureFlag::EnableTrustedCode,
             AptosFeatureFlag::ENABLE_ENUM_OPTION => FeatureFlag::EnableEnumOption,
-            AptosFeatureFlag::NEW_OPTION_MODULE => FeatureFlag::NewOptionModule,
         }
     }
 }

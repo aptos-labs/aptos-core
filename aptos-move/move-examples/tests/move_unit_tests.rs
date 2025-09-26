@@ -50,6 +50,7 @@ pub fn run_tests_for_pkg(
         /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
+        true,
     );
     if ok.is_err() || ok.is_ok_and(|r| r == UnitTestResult::Failure) {
         panic!("move unit tests failed")
