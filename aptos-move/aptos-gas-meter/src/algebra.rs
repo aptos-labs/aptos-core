@@ -187,6 +187,7 @@ where
         Ok(())
     }
 
+    #[inline(always)]
     fn charge_execution(
         &mut self,
         abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + Debug,

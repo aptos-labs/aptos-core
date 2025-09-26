@@ -700,6 +700,9 @@ impl Type {
         }
     }
 
+    // Note(inline): Recursive function, but `#[inline(always)]` seems to improve perf slightly
+    //               and doesn't add much compile time.
+    #[inline(always)]
     pub fn abilities(&self) -> PartialVMResult<AbilitySet> {
         match self {
             Type::Bool

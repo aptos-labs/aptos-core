@@ -347,6 +347,7 @@ impl ContainerRef {
         }
     }
 
+    #[inline(always)]
     fn mark_dirty(&self) {
         if let Self::Global { status, .. } = self {
             *status.borrow_mut() = GlobalDataStatus::Dirty
@@ -1104,6 +1105,7 @@ impl IndexedRef {
 }
 
 impl ReferenceImpl {
+    #[inline(always)]
     fn read_ref(self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Value> {
         match self {
             Self::ContainerRef(r) => r.read_ref(depth, max_depth),
@@ -1253,6 +1255,7 @@ impl IndexedRef {
 }
 
 impl ReferenceImpl {
+    #[inline(always)]
     fn write_ref(self, x: Value) -> PartialVMResult<()> {
         match self {
             Self::ContainerRef(r) => r.write_ref(x),
@@ -1262,6 +1265,7 @@ impl ReferenceImpl {
 }
 
 impl Reference {
+    #[inline(always)]
     pub fn write_ref(self, x: Value) -> PartialVMResult<()> {
         self.0.write_ref(x)
     }
@@ -2925,6 +2929,7 @@ impl VectorRef {
         Ok(res)
     }
 
+    #[inline(always)]
     pub fn swap(&self, idx1: usize, idx2: usize, type_param: &Type) -> PartialVMResult<()> {
         let c = self.0.container();
         check_elem_layout(type_param, c)?;
@@ -5155,6 +5160,7 @@ fn try_get_variant_field_layouts<'a>(
     None
 }
 
+#[inline(always)]
 fn check_depth(depth: u64, max_depth: Option<u64>) -> PartialVMResult<()> {
     if max_depth.map_or(false, |max_depth| depth > max_depth) {
         return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
