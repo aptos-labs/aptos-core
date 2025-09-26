@@ -5096,6 +5096,7 @@ dependencies = [
  "aptos-indexer-processor-sdk",
  "aptos-localnet",
  "aptos-node",
+ "aptos-temppath",
  "aptos-types",
  "bollard",
  "clap 4.5.21",

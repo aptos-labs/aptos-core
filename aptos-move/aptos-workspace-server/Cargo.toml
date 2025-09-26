@@ -38,3 +38,6 @@ uuid = { workspace = true }
 # indexer deps
 aptos-indexer-processor-sdk = { workspace = true }
 processor = { workspace = true }
+
+[dev-dependencies]
+aptos-temppath = { workspace = true }

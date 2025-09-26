@@ -4,6 +4,7 @@
 use crate::{common::IP_LOCAL_HOST, no_panic_println};
 use anyhow::{bail, Result};
 use aptos_config::config::{NodeConfig, TableInfoServiceMode};
+use aptos_indexer_processor_sdk::server_framework::setup_panic_handler;
 use aptos_localnet::health_checker::HealthChecker;
 use aptos_node::{load_node_config, start_and_report_ports};
 use aptos_types::network_address::{NetworkAddress, Protocol};
@@ -149,4 +150,31 @@ pub fn start_node(
     };
 
     Ok((fut_api, fut_indexer_grpc, fut_node_finish))
+}
+
+#[test]
+fn test_node_startup() {
+    setup_panic_handler();
+
+    let test_dir = aptos_temppath::TempPath::new().as_ref().to_path_buf();
+
+    // Create the directories for the node
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .create(&test_dir)
+        .unwrap();
+    let test_dir = test_dir.canonicalize().unwrap();
+    println!("Starting with test folder {:?}", test_dir);
+
+    let (fut_node_api, fut_indexer_grpc, _fut_node_quits) = start_node(&test_dir).unwrap();
+
+    let main_thread_pool = tokio::runtime::Builder::new_multi_thread()
+        .disable_lifo_slot()
+        .enable_all()
+        .worker_threads(3)
+        .build()
+        .unwrap();
+
+    let _node_api_port = main_thread_pool.block_on(fut_node_api).unwrap();
+    let _indexer_grpc_port = main_thread_pool.block_on(fut_indexer_grpc).unwrap();
 }
