@@ -951,7 +951,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Cancel all scheduled transactions for a sender using lazy cancel approach.
-    /// This increments the sender's authorization sequence number, which will cause
+    /// This increments the sender's authorization number, which will cause
     /// all existing scheduled transactions with auth tokens to fail validation when executed.
     ScheduledTxnsCancelAll {},
 
@@ -972,11 +972,6 @@ pub enum EntryFunctionCall {
     ///      (a) the stakeholders decide the feature is no longer needed
     ///      (b) there is an invariant violation detected, and the only way out is to shutdown and cancel all txns
     ScheduledTxnsStartShutdown {},
-
-    /// Unpause the scheduled transactions module.
-    /// This can be called by a governace proposal. It is advised that this be called only after ensuring that the
-    /// system invariants won't be violated again.
-    ScheduledTxnsUnpauseScheduledTxns {},
 
     /// Add `amount` of coins from the `account` owning the StakePool.
     StakeAddStake {
@@ -1837,7 +1832,6 @@ impl EntryFunctionCall {
             ScheduledTxnsInitialize {} => scheduled_txns_initialize(),
             ScheduledTxnsReInitialize {} => scheduled_txns_re_initialize(),
             ScheduledTxnsStartShutdown {} => scheduled_txns_start_shutdown(),
-            ScheduledTxnsUnpauseScheduledTxns {} => scheduled_txns_unpause_scheduled_txns(),
             StakeAddStake { amount } => stake_add_stake(amount),
             StakeIncreaseLockup {} => stake_increase_lockup(),
             StakeInitializeStakeOwner {
@@ -4524,7 +4518,7 @@ pub fn scheduled_txns_cancel(time: u64, gas_priority: u64, txn_id: U256) -> Tran
 }
 
 /// Cancel all scheduled transactions for a sender using lazy cancel approach.
-/// This increments the sender's authorization sequence number, which will cause
+/// This increments the sender's authorization number, which will cause
 /// all existing scheduled transactions with auth tokens to fail validation when executed.
 pub fn scheduled_txns_cancel_all() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -4604,24 +4598,6 @@ pub fn scheduled_txns_start_shutdown() -> TransactionPayload {
             ident_str!("scheduled_txns").to_owned(),
         ),
         ident_str!("start_shutdown").to_owned(),
-        vec![],
-        vec![],
-    ))
-}
-
-/// Unpause the scheduled transactions module.
-/// This can be called by a governace proposal. It is advised that this be called only after ensuring that the
-/// system invariants won't be violated again.
-pub fn scheduled_txns_unpause_scheduled_txns() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("scheduled_txns").to_owned(),
-        ),
-        ident_str!("unpause_scheduled_txns").to_owned(),
         vec![],
         vec![],
     ))
@@ -7123,16 +7099,6 @@ mod decoder {
         }
     }
 
-    pub fn scheduled_txns_unpause_scheduled_txns(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
-            Some(EntryFunctionCall::ScheduledTxnsUnpauseScheduledTxns {})
-        } else {
-            None
-        }
-    }
-
     pub fn stake_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeAddStake {
@@ -8224,10 +8190,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "scheduled_txns_start_shutdown".to_string(),
             Box::new(decoder::scheduled_txns_start_shutdown),
-        );
-        map.insert(
-            "scheduled_txns_unpause_scheduled_txns".to_string(),
-            Box::new(decoder::scheduled_txns_unpause_scheduled_txns),
         );
         map.insert(
             "stake_add_stake".to_string(),

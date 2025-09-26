@@ -213,11 +213,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 })
             },
             ScheduledTransaction(_) => {
-                // todo: to be addressed in the future commit regarding APIs
-                Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
-                    info,
-                    timestamp: timestamp.into(),
-                })
+                todo!("ScheduledTransaction is not supported yet");
             },
             BlockEpilogue(block_epilogue_payload) => {
                 let block_end_info = block_epilogue_payload

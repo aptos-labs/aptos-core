@@ -743,7 +743,7 @@ pub struct ScheduledTxnConfig {
     pub authorization_seqno: u64,
 }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum PermissionsType {
     ScheduledTxnsPermissions,
@@ -752,13 +752,13 @@ pub enum PermissionsType {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct PermissionsTbl {
-    permissions: std::collections::HashMap<PermissionsType, Vec<u8>>,
+    permissions: std::collections::BTreeMap<PermissionsType, Vec<u8>>,
 }
 
 impl PermissionsTbl {
     pub fn new() -> Self {
         Self {
-            permissions: std::collections::HashMap::new(),
+            permissions: std::collections::BTreeMap::new(),
         }
     }
 
@@ -814,9 +814,9 @@ pub enum TransactionExtraConfig {
         // None for regular transactions
         // Some(nonce) for orderless transactions
         replay_protection_nonce: Option<u64>,
-        // None for regular transactions
-        // Some(permissions) for transactions with permissions
-        permissions_table: Option<PermissionsTbl>,
+        // Empty table for regular transactions
+        // Populated table for transactions with permissions
+        permissions_table: PermissionsTbl,
     },
 }
 
@@ -999,9 +999,7 @@ impl TransactionExtraConfig {
             Self::V1 { .. } => None,
             Self::V2 {
                 permissions_table, ..
-            } => permissions_table
-                .as_ref()
-                .and_then(|table| table.get_scheduled_txn_config().ok()?),
+            } => permissions_table.get_scheduled_txn_config().ok()?,
         }
     }
 }

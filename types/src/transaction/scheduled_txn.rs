@@ -37,7 +37,7 @@ impl AsMoveValue for ScheduleMapKey {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ScheduledTransactionInfoWithKey {
-    pub sender_handle: AccountAddress,
+    pub sender_address: AccountAddress,
     /// Maximum gas to spend for this transaction
     pub max_gas_amount: u64,
     /// Unit price of gas for this transaction
@@ -46,6 +46,14 @@ pub struct ScheduledTransactionInfoWithKey {
     pub block_timestamp_ms: u64,
     /// Key to the scheduled txn in the Schedule queue
     pub key: ScheduleMapKey,
+    pub check: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+pub enum PreExecutionValidationStatus {
+    Skip,
+    Expired,
+    ExecuteUserFunction,
 }
 
 pub static SCHEDULED_TRANSACTIONS_MODULE_INFO: Lazy<ScheduledTxnsModuleInfo> =
@@ -61,9 +69,10 @@ pub static SCHEDULED_TRANSACTIONS_MODULE_INFO: Lazy<ScheduledTxnsModuleInfo> =
             "get_ready_transactions_with_limit",
         )
         .unwrap(),
-        mark_txn_to_remove_name: Identifier::new("mark_txn_to_remove").unwrap(),
+        prologue_func_name: Identifier::new("execute_txn_prologue").unwrap(),
         execute_user_function_name: Identifier::new("execute_user_function").unwrap(),
         pause_scheduled_txns_name: Identifier::new("pause_scheduled_txns").unwrap(),
+        validate_txn_name: Identifier::new("validate_txn").unwrap(),
     });
 
 pub struct ScheduledTxnsModuleInfo {
@@ -75,9 +84,10 @@ pub struct ScheduledTxnsModuleInfo {
     pub user_func_wrapper_module_name: Identifier,
     pub get_ready_transactions_name: Identifier,
     pub get_ready_transactions_with_limit_name: Identifier,
-    pub mark_txn_to_remove_name: Identifier,
+    pub prologue_func_name: Identifier,
     pub execute_user_function_name: Identifier,
     pub pause_scheduled_txns_name: Identifier,
+    pub validate_txn_name: Identifier,
 }
 
 impl ScheduledTxnsModuleInfo {

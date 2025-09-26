@@ -126,7 +126,7 @@ module aptos_framework::scheduled_txns {
 
     enum ScheduledFunction has copy, store, drop {
         V1(|| has copy + store + drop),
-        V1WithAuthToken(|&signer, ScheduledTxnAuthToken| has copy + store + drop, ScheduledTxnAuthToken),
+        V1WithAuthToken(|&signer, Option<ScheduledTxnAuthToken>| has copy + store + drop, ScheduledTxnAuthToken),
     }
 
     struct ScheduledTxnAuthToken has copy, drop, store {
@@ -157,7 +157,8 @@ module aptos_framework::scheduled_txns {
         max_gas_amount: u64,
         gas_unit_price: u64,
         block_timestamp_ms: u64,
-        key: ScheduleMapKey
+        key: ScheduleMapKey,
+        auth_token: Option<ScheduledTxnAuthToken>
     }
 
     /// First sorted in ascending order of time, then on gas priority, and finally on txn_id
@@ -194,6 +195,16 @@ module aptos_framework::scheduled_txns {
         /// Shutdown is complete
         ShutdownComplete
     }
+
+    enum PreExecutionValidationStatus has copy, store, drop {
+        /// Txn cancelled in same block. Ideally shouldn't happen (due to CANCEL_DELTA_DEFAULT), but harmless if happens
+        Skip,
+        /// Either (a) auth token expired or (b) we are too late to execute this txn (txn expired)
+        Expired,
+        /// Execute the user function (normal case)
+        ExecuteUserFunction,
+    }
+
 
     /// Stores module level auxiliary data
     struct AuxiliaryData has key {
@@ -531,7 +542,7 @@ module aptos_framework::scheduled_txns {
         max_gas_amount: u64,
         gas_unit_price: u64,
         expiry_delta: u64,
-        f: |&signer, ScheduledTxnAuthToken| has copy + store + drop
+        f: |&signer, Option<ScheduledTxnAuthToken>| has copy + store + drop
     ): ScheduledTransaction {
         let sender_addr = signer::address_of(sender);
         // Extract the payload config from the current transaction context
@@ -566,7 +577,7 @@ module aptos_framework::scheduled_txns {
             )
         };
 
-        get_auth_num(sender_addr); // Lazy initialization if needed
+        get_or_init_auth_num(sender_addr); // Lazy initialization if needed
 
         // Validate the auth token
         validate_auth_token(sender_addr, scheduled_time_ms, &auth_token);
@@ -588,7 +599,7 @@ module aptos_framework::scheduled_txns {
         max_gas_amount: u64,
         gas_unit_price: u64,
         expiry_delta: u64,
-        f: |&signer, ScheduledTxnAuthToken| has copy + store + drop,
+        f: |&signer, Option<ScheduledTxnAuthToken>| has copy + store + drop,
     ): ScheduledTransaction {
         let sender_addr = signer::address_of(sender);
 
@@ -850,13 +861,19 @@ module aptos_framework::scheduled_txns {
             let txn = queue.txn_table.borrow(key.txn_id);
 
             // Include transaction without checking expiry - expiry will be checked during execution
+            let auth_token = if (is_scheduled_function_v1(txn)) {
+                none<ScheduledTxnAuthToken>()
+            } else {
+                some(get_auth_token_from_txn(txn))
+            };
             let scheduled_txn_info_with_key =
                 ScheduledTransactionInfoWithKey {
                     sender_addr: txn.sender_addr,
                     max_gas_amount: txn.max_gas_amount,
                     gas_unit_price: txn.gas_unit_price,
                     block_timestamp_ms,
-                    key: *key
+                    key: *key,
+                    auth_token
                 };
 
             scheduled_txns.push_back(scheduled_txn_info_with_key);
@@ -875,6 +892,30 @@ module aptos_framework::scheduled_txns {
         let to_remove = borrow_global_mut<ToRemoveTbl>(@aptos_framework);
         let keys = to_remove.remove_tbl.borrow_mut(tbl_idx);
         keys.push_back(key);
+    }
+
+    fun execute_txn_prologue(txn_key: ScheduleMapKey, block_timestamp_ms: u64): PreExecutionValidationStatus acquires ToRemoveTbl, ScheduleQueue {
+        mark_txn_to_remove(txn_key);
+
+        // validate the state
+        let txn_opt = get_txn_by_key(txn_key);
+        if (txn_opt.is_none()) {
+            return PreExecutionValidationStatus::Skip; // do nothing
+        };
+
+        let txn = txn_opt.borrow();
+        if (fail_txn_on_expired(txn, txn_key, block_timestamp_ms)) {
+            remove_txn_from_table(txn_key.txn_id);
+            return PreExecutionValidationStatus::Expired;
+        };
+
+        if (!is_scheduled_function_v1(txn)) {
+            if (fail_txn_on_invalid_auth_token(txn, txn_key, block_timestamp_ms)) {
+                remove_txn_from_table(txn_key.txn_id);
+                return PreExecutionValidationStatus::Expired;
+            };
+        };
+        PreExecutionValidationStatus::ExecuteUserFunction
     }
 
     /// Remove the txns that are run
@@ -927,7 +968,7 @@ module aptos_framework::scheduled_txns {
     /// Helper to get V1WithAuthToken function
     public(friend) fun get_scheduled_function_v1_with_auth_token(
         txn: &ScheduledTransaction
-    ): |&signer, ScheduledTxnAuthToken| {
+    ): |&signer, Option<ScheduledTxnAuthToken>| {
         match(txn.f) {
             ScheduledFunction::V1(_f) => {
                 abort(error::invalid_state(EAUTH_TOKEN_NOT_FOUND))
@@ -947,7 +988,7 @@ module aptos_framework::scheduled_txns {
     }
 
     /// Helper to get auth token from transaction
-    public(friend) fun get_auth_token_from_txn(
+    public fun get_auth_token_from_txn(
         txn: &ScheduledTransaction
     ): ScheduledTxnAuthToken {
         match (txn.f) {
@@ -958,9 +999,9 @@ module aptos_framework::scheduled_txns {
         }
     }
 
-    /// Validate auth token and cancel transaction if invalid
-    /// Returns true if token was invalid and transaction was cancelled, false if token is valid
-    public(friend) fun fail_txn_on_invalid_auth_token(
+    /// Check if auth token is invalid
+    /// Emits event and returns true if invalid; just return false if token is valid
+    fun fail_txn_on_invalid_auth_token(
         txn: &ScheduledTransaction, txn_key: ScheduleMapKey, block_timestamp_ms: u64
     ): bool {
         let auth_token = get_auth_token_from_txn(txn);
@@ -982,9 +1023,9 @@ module aptos_framework::scheduled_txns {
         false
     }
 
-    /// Check if transaction has expired and emit failure event if so
-    /// Returns true if transaction was expired and should be cancelled, false if not expired
-    public(friend) fun fail_txn_on_expired(
+    /// Check if transaction has expired
+    /// Emit failure event if expired and returns true; just return false if not
+    fun fail_txn_on_expired(
         txn: &ScheduledTransaction, txn_key: ScheduleMapKey, block_timestamp_ms: u64
     ): bool {
         let sender_addr = txn.sender_addr;
@@ -1010,6 +1051,10 @@ module aptos_framework::scheduled_txns {
             return true
         };
         false
+    }
+
+    public(friend) fun allows_rescheduling(auth_token: &ScheduledTxnAuthToken): bool {
+        auth_token.allow_rescheduling
     }
 
     /// Create updated auth token for execution (invalidates auth num if rescheduling not allowed)
@@ -1133,6 +1178,18 @@ module aptos_framework::scheduled_txns {
         ScheduledTxnAuthToken { allow_rescheduling, expiration_time, authorization_num }
     }
 
+    #[test_only]
+    public fun execute_txn_prologue_test(
+        txn_key: ScheduleMapKey, block_timestamp_ms: u64
+    ): PreExecutionValidationStatus acquires ToRemoveTbl, ScheduleQueue {
+        execute_txn_prologue(txn_key, block_timestamp_ms)
+    }
+
+    #[test_only]
+    public fun is_pre_exec_status_expired(status: PreExecutionValidationStatus): bool {
+        status == PreExecutionValidationStatus::Expired
+    }
+
     struct State has copy, drop, store {
         count: u64
     }
@@ -1146,7 +1203,7 @@ module aptos_framework::scheduled_txns {
 
     #[persistent]
     fun step_with_auth_token(
-        state: State, _signer: &signer, _auth_token: ScheduledTxnAuthToken
+        state: State, _signer: &signer, _auth_token: Option<ScheduledTxnAuthToken>
     ) {
         if (state.count < 10) {
             state.count = state.count + 1;
@@ -1155,20 +1212,20 @@ module aptos_framework::scheduled_txns {
 
     #[persistent]
     fun rescheduling_test_func(
-        sender: &signer, auth_token: ScheduledTxnAuthToken
+        sender: &signer, auth_token: Option<ScheduledTxnAuthToken>
     ) {
         let current_time = timestamp::now_microseconds() / 1000;
         let next_schedule_time = current_time + 1000; // Would schedule 1 second later
 
         let foo =
-            |signer: &signer, auth_token: ScheduledTxnAuthToken| rescheduling_test_func(
+            |signer: &signer, auth_token: Option<ScheduledTxnAuthToken>| rescheduling_test_func(
                 signer, auth_token
             );
 
         let txn =
             new_scheduled_transaction_reuse_auth_token(
                 sender,
-                auth_token,
+                auth_token.extract(),
                 next_schedule_time,
                 1000,
                 200,
@@ -1632,7 +1689,7 @@ module aptos_framework::scheduled_txns {
 
         let state = State { count: 8 };
         let foo =
-            |signer: &signer, auth_token: ScheduledTxnAuthToken| step_with_auth_token(
+            |signer: &signer, auth_token: Option<ScheduledTxnAuthToken>| step_with_auth_token(
                 state, signer, auth_token
             );
 
@@ -1670,7 +1727,7 @@ module aptos_framework::scheduled_txns {
 
         let state = State { count: 8 };
         let foo =
-            |signer: &signer, auth_token: ScheduledTxnAuthToken| step_with_auth_token(
+            |signer: &signer, auth_token: Option<ScheduledTxnAuthToken>| step_with_auth_token(
                 state, signer, auth_token
             );
 
@@ -1706,7 +1763,7 @@ module aptos_framework::scheduled_txns {
 
         let state = State { count: 8 };
         let foo =
-            |signer: &signer, auth_token: ScheduledTxnAuthToken| step_with_auth_token(
+            |signer: &signer, auth_token: Option<ScheduledTxnAuthToken>| step_with_auth_token(
                 state, signer, auth_token
             );
 
@@ -1750,7 +1807,7 @@ module aptos_framework::scheduled_txns {
 
         let state = State { count: 8 };
         let foo =
-            |signer: &signer, auth_token: ScheduledTxnAuthToken| step_with_auth_token(
+            |signer: &signer, auth_token: Option<ScheduledTxnAuthToken>| step_with_auth_token(
                 state, signer, auth_token
             );
 
@@ -1780,7 +1837,7 @@ module aptos_framework::scheduled_txns {
 
         let state = State { count: 8 };
         let foo =
-            |signer: &signer, auth_token: ScheduledTxnAuthToken| step_with_auth_token(
+            |signer: &signer, auth_token: Option<ScheduledTxnAuthToken>| step_with_auth_token(
                 state, signer, auth_token
             );
 
@@ -1812,7 +1869,7 @@ module aptos_framework::scheduled_txns {
 
         let state = State { count: 8 };
         let foo =
-            |signer: &signer, auth_token: ScheduledTxnAuthToken| step_with_auth_token(
+            |signer: &signer, auth_token: Option<ScheduledTxnAuthToken>| step_with_auth_token(
                 state, signer, auth_token
             );
 

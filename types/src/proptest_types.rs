@@ -537,9 +537,9 @@ impl Arbitrary for TransactionExtraConfig {
             .prop_map(
                 |(use_v2, multisig_address, replay_protection_nonce, scheduled_txn_auth_token)| {
                     if use_v2 || scheduled_txn_auth_token.is_some() {
-                        let permissions_table = scheduled_txn_auth_token.and_then(|config| {
-                            PermissionsTbl::with_scheduled_txn_config(config).ok()
-                        });
+                        let permissions_table = scheduled_txn_auth_token
+                            .and_then(|config| PermissionsTbl::with_scheduled_txn_config(config).ok())
+                            .unwrap_or_else(PermissionsTbl::new);
                         TransactionExtraConfig::V2 {
                             multisig_address,
                             replay_protection_nonce,

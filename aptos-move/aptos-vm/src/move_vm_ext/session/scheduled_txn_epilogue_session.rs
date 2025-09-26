@@ -45,9 +45,9 @@ impl<'r> ScheduledTxnEpilogueSession<'r> {
         txn_status: TransactionStatus,
     ) -> Self {
         let user_txn_ctx = UserTransactionContext::new(
-            txn.sender_handle,
+            txn.sender_address,
             [].to_vec(),
-            txn.sender_handle,
+            txn.sender_address,
             txn.max_gas_amount,
             txn.gas_unit_price,
             chain_id,

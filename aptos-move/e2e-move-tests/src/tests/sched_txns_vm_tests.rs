@@ -418,9 +418,7 @@ fn test_mod_publish_error() {
         extra_config: TransactionExtraConfig::V2 {
             multisig_address: None,
             replay_protection_nonce: None,
-            permissions_table: Some(
-                PermissionsTbl::with_scheduled_txn_config(scheduled_txn_config).unwrap(),
-            ),
+            permissions_table: PermissionsTbl::with_scheduled_txn_config(scheduled_txn_config).unwrap(),
         },
     });
 
@@ -508,9 +506,7 @@ fn test_resched() {
         extra_config: TransactionExtraConfig::V2 {
             multisig_address: None,
             replay_protection_nonce: None,
-            permissions_table: Some(
-                PermissionsTbl::with_scheduled_txn_config(scheduled_txn_config).unwrap(),
-            ),
+            permissions_table: PermissionsTbl::with_scheduled_txn_config(scheduled_txn_config).unwrap(),
         },
     });
 

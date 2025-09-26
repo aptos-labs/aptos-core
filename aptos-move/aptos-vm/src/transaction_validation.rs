@@ -699,7 +699,7 @@ pub(crate) fn run_scheduled_txn_epilogue(
 ) -> VMResult<()> {
     let args = vec![
         MoveValue::Signer(SCHEDULED_TRANSACTIONS_MODULE_INFO.deposit_owner_addr),
-        MoveValue::Address(txn.sender_handle),
+        MoveValue::Address(txn.sender_address),
         txn.key.as_move_value(),
         MoveValue::U64(fee_statement.storage_fee_refund()),
         MoveValue::U64(txn.gas_unit_price),

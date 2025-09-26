@@ -28,9 +28,9 @@ impl<'r> ScheduledTxnSession<'r> {
         prologue_change_set: VMChangeSet,
     ) -> Self {
         let user_txn_ctx = UserTransactionContext::new(
-            txn.sender_handle,
+            txn.sender_address,
             vec![], // empty secondary signers
-            txn.sender_handle,
+            txn.sender_address,
             txn.max_gas_amount,
             txn.gas_unit_price,
             chain_id,

@@ -1,10 +1,13 @@
 module 0xCAFE::scheduled_txns_usage {
+    use std::option::{Option, some, none};
     use std::signer;
     use aptos_std::debug;
     use std::string;
     use std::vector;
-    use aptos_framework::scheduled_txns::{ScheduledTxnAuthToken, ScheduleMapKey, new_scheduled_transaction_no_signer,
-        cancel_with_key, insert, new_scheduled_transaction_gen_auth_token, new_scheduled_transaction_reuse_auth_token};
+    use aptos_framework::scheduled_txns::{ScheduleMapKey, new_scheduled_transaction_no_signer,
+        cancel_with_key, insert, new_scheduled_transaction_gen_auth_token, new_scheduled_transaction_reuse_auth_token,
+        ScheduledTxnAuthToken, get_auth_token_from_txn
+    };
     use aptos_std::big_ordered_map::{Self, BigOrderedMap};
     use aptos_framework::timestamp;
 
@@ -22,7 +25,7 @@ module 0xCAFE::scheduled_txns_usage {
     struct ScheduledTransactionInfo has copy, drop, store {
         sender_addr: address,
         max_gas_amount: u64,
-        gas_unit_price: u64
+        gas_unit_price: u64,
     }
 
     struct ScheduledTransactionInfoWithKey has copy, drop, store {
@@ -30,7 +33,8 @@ module 0xCAFE::scheduled_txns_usage {
         max_gas_amount: u64,
         gas_unit_price: u64,
         block_timestamp_ms: u64,
-        key: ScheduleMapKey
+        key: ScheduleMapKey,
+        auth_token: Option<ScheduledTxnAuthToken>
     }
 
     #[persistent]
@@ -49,7 +53,7 @@ module 0xCAFE::scheduled_txns_usage {
     }
 
     #[persistent]
-    fun user_func_mod_publish(s: &signer, _auth_token: ScheduledTxnAuthToken) {
+    fun user_func_mod_publish(s: &signer, _auth_token: Option<ScheduledTxnAuthToken>) {
         use aptos_framework::code;
 
         debug::print(&string::utf8(b"Move: in the user_func_mod_publish"));
@@ -89,15 +93,15 @@ module 0xCAFE::scheduled_txns_usage {
     #[persistent]
     fun user_func_to_reschedule(
         sender: &signer,
-        auth_token: ScheduledTxnAuthToken
+        auth_token: Option<ScheduledTxnAuthToken>
     ) {
         let next_schedule_time = timestamp::now_microseconds() / 1000 + 1000; // schedule 1 second later
 
-        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| user_func_to_reschedule(signer, auth_token);
+        let foo = |signer: &signer, auth_token: Option<ScheduledTxnAuthToken>| user_func_to_reschedule(signer, auth_token);
 
         let txn = new_scheduled_transaction_reuse_auth_token(
             sender,
-            auth_token,
+            auth_token.extract(),
             next_schedule_time,
             1000,
             200,
@@ -204,11 +208,8 @@ module 0xCAFE::scheduled_txns_usage {
     /// Generic function to create and add scheduled transactions with custom scheduling functions
     /// Uses idx to select from predefined array of functions
     ///
-    /// Function index mapping:
-    /// - 0: user_func_mod_publish (module publish)
-    /// - 1: user_func_xyz (placeholder - define this later)
-    /// - 2: custom_function_2 (placeholder - define this later)
-    /// - 3: custom_function_3 (placeholder - define this later)
+    /// Function idx mapping:
+    /// - 1: user_func_to_reschedule
     /// - default: user_func_mod_publish
     public entry fun create_and_add_custom_txn_template(
         user: &signer,
@@ -224,7 +225,8 @@ module 0xCAFE::scheduled_txns_usage {
         // Create the appropriate lambda based on index
         let txn = if (idx == 1) {
             // Placeholder for user_func_xyz - you can define this later
-            let user_function = |s: &signer, auth_token: ScheduledTxnAuthToken| user_func_to_reschedule(s, auth_token);
+            let user_function = |s: &signer, auth_token: Option<ScheduledTxnAuthToken>| user_func_to_reschedule(s, auth_token);
+            debug::print(&string::utf8(b"Move: Trying to new_scheduled_transaction_gen_auth_token"));
             new_scheduled_transaction_gen_auth_token(
                 user,
                 schedule_time,
@@ -235,7 +237,7 @@ module 0xCAFE::scheduled_txns_usage {
             )
         } else {
             // Placeholder for another custom function
-            let user_function = |s: &signer, auth_token: ScheduledTxnAuthToken| user_func_mod_publish(s, auth_token);
+            let user_function = |s: &signer, auth_token: Option<ScheduledTxnAuthToken>| user_func_mod_publish(s, auth_token);
             new_scheduled_transaction_gen_auth_token(
                 user,
                 schedule_time,
@@ -246,12 +248,14 @@ module 0xCAFE::scheduled_txns_usage {
             )
         };
 
+        debug::print(&string::utf8(b"Move: Trying to insert the custom txn"));
         let key = insert(user, txn);
+        debug::print(&string::utf8(b"Move: Failed to insert the custom txn"));
 
         let txn_info = ScheduledTransactionInfo {
             sender_addr: user_addr,
             max_gas_amount: gas_amount,
-            gas_unit_price
+            gas_unit_price,
         };
         let txn_map =
             big_ordered_map::new<ScheduleMapKey, ScheduledTransactionInfo>();
@@ -275,7 +279,8 @@ module 0xCAFE::scheduled_txns_usage {
                         max_gas_amount: value.max_gas_amount,
                         gas_unit_price: value.gas_unit_price,
                         block_timestamp_ms,
-                        key: *key
+                        key: *key,
+                        auth_token: none()
                     };
                 result.push_back(txn_info_with_key);
             }

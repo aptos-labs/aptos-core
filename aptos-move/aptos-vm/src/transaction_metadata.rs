@@ -128,9 +128,7 @@ impl TransactionMetadata {
                     } => Some(PayloadConfig {
                         multisig_address: *multisig_address,
                         replay_protection_nonce: *replay_protection_nonce,
-                        scheduled_txn_auth_token: permissions_table
-                            .as_ref()
-                            .and_then(|table| table.get_scheduled_txn_config().ok()?),
+                        scheduled_txn_auth_token: permissions_table.get_scheduled_txn_config().ok().flatten(),
                     }),
                 },
                 _ => None,
