@@ -64,12 +64,14 @@ impl BlockStore {
     /// Check if we're far away from this ledger info and need to sync.
     /// This ensures that the block referred by the ledger info is not in buffer manager.
     pub fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
+        const MAX_PRECOMMIT_GAP: u64 = 200;
         let block_not_exist = self.ordered_root().round() < li.commit_info().round()
             && !self.block_exists(li.commit_info().id());
         // TODO move min gap to fallback (30) to config, and if configurable make sure the value is
         // larger than buffer manager MAX_BACKLOG (20)
         let max_commit_gap = 30.max(2 * self.vote_back_pressure_limit);
         let min_commit_round = li.commit_info().round().saturating_sub(max_commit_gap);
+        let current_commit_round = self.commit_root().round();
 
         if let Some(pre_commit_status) = self.pre_commit_status() {
             let mut status_guard = pre_commit_status.lock();
@@ -81,10 +83,13 @@ impl BlockStore {
                 status_guard.pause();
                 true
             } else {
+                if current_commit_round + MAX_PRECOMMIT_GAP < status_guard.round() {
+                    status_guard.pause();
+                }
                 false
             }
         } else {
-            block_not_exist || self.commit_root().round() < min_commit_round
+            block_not_exist || current_commit_round < min_commit_round
         }
     }
 
