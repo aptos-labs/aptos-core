@@ -3032,7 +3032,9 @@ impl IntegerValue {
 
 macro_rules! cast_int {
     ($source:ty, $target:ty, $value:expr) => {{
-        if $value > (<$target>::MAX as $source) || $value < (<$target>::MIN as $source) {
+        let max = <$source>::MAX.min(<$target>::MAX as $source);
+        let min = <$source>::MIN.max(<$target>::MIN as $source);
+        if $value > max || $value < min {
             Err(
                 PartialVMError::new(StatusCode::ARITHMETIC_ERROR).with_message(format!(
                     "Cannot cast {}({}) to {}",
