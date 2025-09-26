@@ -33,6 +33,10 @@ COPY --link --from=tools-builder /aptos/dist/aptos-openapi-spec-generator /usr/l
 COPY --link --from=tools-builder /aptos/dist/aptos-transaction-emitter /usr/local/bin/aptos-transaction-emitter
 COPY --link --from=tools-builder /aptos/dist/aptos-release-builder /usr/local/bin/aptos-release-builder
 
+# For the release builder
+COPY --link --from=tools-builder /aptos/aptos-move/framework/ /aptos/aptos-move/framework/
+COPY --link --from=tools-builder /aptos/aptos-move/aptos-release-builder/ /aptos/aptos-move/aptos-release-builder/
+
 # Copy the example module to publish for api-tester
 COPY --link --from=tools-builder /aptos/aptos-move/framework/aptos-framework /aptos-move/framework/aptos-framework
 COPY --link --from=tools-builder /aptos/aptos-move/framework/aptos-stdlib /aptos-move/framework/aptos-stdlib
