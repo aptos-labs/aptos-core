@@ -20,6 +20,7 @@ pub struct AccessControlState {
 
 impl AccessControlState {
     /// Enters a function, applying its access specifier to the state.
+    #[inline(always)]
     pub(crate) fn enter_function(
         &mut self,
         env: &impl AccessSpecifierEnv,
@@ -46,6 +47,7 @@ impl AccessControlState {
     }
 
     /// Exit function, restoring access state before entering.
+    #[inline(always)]
     pub(crate) fn exit_function(&mut self, fun: &LoadedFunction) -> PartialVMResult<()> {
         if !matches!(fun.access_specifier(), AccessSpecifier::Any) {
             if self.specifier_stack.is_empty() {

@@ -771,6 +771,7 @@ where
     }
 
     // Check whether the values on the operand stack have the expected return types.
+    #[inline(always)]
     fn check_return_tys<RTTCheck: RuntimeTypeCheck>(
         &self,
         current_frame: &mut Frame,
@@ -807,6 +808,7 @@ where
         Ok(())
     }
 
+    #[inline(always)]
     fn set_new_call_frame<
         RTTCheck: RuntimeTypeCheck,
         RTRCheck: RuntimeRefCheck,
@@ -862,6 +864,7 @@ where
     ///
     /// Native functions do not push a frame at the moment and as such errors from a native
     /// function are incorrectly attributed to the caller.
+    #[inline(always)]
     fn make_call_frame<
         RTTCheck: RuntimeTypeCheck,
         RTRCheck: RuntimeRefCheck,

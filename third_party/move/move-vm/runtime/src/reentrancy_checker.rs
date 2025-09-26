@@ -108,6 +108,7 @@ impl ReentrancyChecker {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn exit_function(
         &mut self,
         caller_module: &ModuleId,
