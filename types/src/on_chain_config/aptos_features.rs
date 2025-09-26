@@ -150,7 +150,6 @@ pub enum FeatureFlag {
     ENABLE_ENUM_OPTION = 101,
     /// Enables bytecode version v9
     VM_BINARY_FORMAT_V9 = 102,
-
 }
 
 impl FeatureFlag {
