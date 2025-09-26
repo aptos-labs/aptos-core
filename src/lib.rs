@@ -11,7 +11,6 @@ pub use aptos_consensus_notifications;
 pub use aptos_crash_handler;
 pub use aptos_crypto;
 pub use aptos_crypto_derive;
-pub use aptos_dkg;
 pub use aptos_enum_conversion_derive;
 pub use aptos_event_notifications;
 pub use aptos_executor;
