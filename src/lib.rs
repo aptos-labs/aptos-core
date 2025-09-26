@@ -58,3 +58,5 @@ pub use aptos_memsocket;
 pub use aptos_safety_rules;
 pub use aptos_mempool;
 pub use aptos_jwk_consensus;
+pub use aptos_dkg;
+pub use aptos_dkg_runtime;
