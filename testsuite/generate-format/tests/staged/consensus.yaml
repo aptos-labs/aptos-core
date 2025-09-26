@@ -1324,6 +1324,18 @@ TypeTag:
       Function:
         NEWTYPE:
           TYPENAME: FunctionTag
+    12:
+      i8: UNIT
+    13:
+      i16: UNIT
+    14:
+      i32: UNIT
+    15:
+      i64: UNIT
+    16:
+      i128: UNIT
+    17:
+      i256: UNIT
 ValidatorConsensusInfo:
   STRUCT:
     - address:

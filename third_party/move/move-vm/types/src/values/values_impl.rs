@@ -3030,9 +3030,87 @@ impl IntegerValue {
     }
 }
 
-macro_rules! cast_int {
+//* ==== a list of macros to help integer type casting ====
+//*  Please do not merge them, as that will introduce extra runtime checks
+
+/// Cast unsigned to unsigned or signed to signed where the target type is larger than the source type.
+/// No checks are needed.
+macro_rules! cast_int_widening {
+    ($source:ty, $target:ty, $value:expr) => {{
+        Ok($value as $target)
+    }};
+}
+
+/// Cast unsigned to unsigned or signed to signed where the target type is smaller than the source type.
+/// Value must fit into the target type.
+macro_rules! cast_int_narrowing {
     ($source:ty, $target:ty, $value:expr) => {{
         if $value > (<$target>::MAX as $source) || $value < (<$target>::MIN as $source) {
+            Err(
+                PartialVMError::new(StatusCode::ARITHMETIC_ERROR).with_message(format!(
+                    "Cannot cast {}({}) to {}",
+                    stringify!($source),
+                    $value,
+                    stringify!($target)
+                )),
+            )
+        } else {
+            Ok($value as $target)
+        }
+    }};
+}
+
+/// Cast signed to unsigned, where the target type is smaller than the source type.
+/// Value must be non-negative and fit into the target type.
+macro_rules! cast_int_i2u_narrowing {
+    ($source:ty, $target:ty, $value:expr) => {{
+        if $value < 0 || $value > (<$target>::MAX as $source) {
+            Err(
+                PartialVMError::new(StatusCode::ARITHMETIC_ERROR).with_message(format!(
+                    "Cannot cast {}({}) to {}",
+                    stringify!($source),
+                    $value,
+                    stringify!($target)
+                )),
+            )
+        } else {
+            Ok($value as $target)
+        }
+    }};
+}
+
+/// Cast signed to unsigned, where the target type is larger than the source type.
+/// Value must be non-negative.
+macro_rules! cast_int_i2u_widening {
+    ($source:ty, $target:ty, $value:expr) => {{
+        if $value < 0 {
+            Err(
+                PartialVMError::new(StatusCode::ARITHMETIC_ERROR).with_message(format!(
+                    "Cannot cast {}({}) to {}",
+                    stringify!($source),
+                    $value,
+                    stringify!($target)
+                )),
+            )
+        } else {
+            Ok($value as $target)
+        }
+    }};
+}
+
+/// Cast unsigned to signed, where the target type is larger than the source type.
+/// No checks needed
+macro_rules! cast_int_u2i_widening {
+    ($source:ty, $target:ty, $value:expr) => {{
+        Ok($value as $target)
+    }};
+}
+
+/// Cast unsigned to signed, where the target type is smaller than the source type.
+/// No checks needed
+macro_rules! cast_int_u2i_narrowing {
+    ($source:ty, $target:ty, $value:expr) => {{
+        if $value > (<$target>::MAX as $source) {
             Err(
                 PartialVMError::new(StatusCode::ARITHMETIC_ERROR).with_message(format!(
                     "Cannot cast {}({}) to {}",
@@ -3068,16 +3146,16 @@ impl IntegerValue {
 
         match self {
             U8(x) => Ok(x),
-            U16(x) => cast_int!(u16, u8, x),
-            U32(x) => cast_int!(u32, u8, x),
-            U64(x) => cast_int!(u64, u8, x),
-            U128(x) => cast_int!(u128, u8, x),
+            U16(x) => cast_int_narrowing!(u16, u8, x),
+            U32(x) => cast_int_narrowing!(u32, u8, x),
+            U64(x) => cast_int_narrowing!(u64, u8, x),
+            U128(x) => cast_int_narrowing!(u128, u8, x),
             U256(x) => cast_int_with_try_from!(U256, u8, x),
-            I8(x) => cast_int!(i8, u8, x),
-            I16(x) => cast_int!(i16, u8, x),
-            I32(x) => cast_int!(i32, u8, x),
-            I64(x) => cast_int!(i64, u8, x),
-            I128(x) => cast_int!(i128, u8, x),
+            I8(x) => cast_int_i2u_widening!(i8, u8, x),
+            I16(x) => cast_int_i2u_narrowing!(i16, u8, x),
+            I32(x) => cast_int_i2u_narrowing!(i32, u8, x),
+            I64(x) => cast_int_i2u_narrowing!(i64, u8, x),
+            I128(x) => cast_int_i2u_narrowing!(i128, u8, x),
             I256(x) => cast_int_with_try_from!(I256, u8, x),
         }
     }
@@ -3086,17 +3164,17 @@ impl IntegerValue {
         use IntegerValue::*;
 
         match self {
-            U8(x) => Ok(x as u16),
+            U8(x) => cast_int_widening!(u8, u16, x),
             U16(x) => Ok(x),
-            U32(x) => cast_int!(u32, u16, x),
-            U64(x) => cast_int!(u64, u16, x),
-            U128(x) => cast_int!(u128, u16, x),
+            U32(x) => cast_int_narrowing!(u32, u16, x),
+            U64(x) => cast_int_narrowing!(u64, u16, x),
+            U128(x) => cast_int_narrowing!(u128, u16, x),
             U256(x) => cast_int_with_try_from!(U256, u16, x),
-            I8(x) => cast_int!(i8, u16, x),
-            I16(x) => cast_int!(i16, u16, x),
-            I32(x) => cast_int!(i32, u16, x),
-            I64(x) => cast_int!(i64, u16, x),
-            I128(x) => cast_int!(i128, u16, x),
+            I8(x) => cast_int_i2u_widening!(i8, u16, x),
+            I16(x) => cast_int_i2u_widening!(i16, u16, x),
+            I32(x) => cast_int_i2u_narrowing!(i32, u16, x),
+            I64(x) => cast_int_i2u_narrowing!(i64, u16, x),
+            I128(x) => cast_int_i2u_narrowing!(i128, u16, x),
             I256(x) => cast_int_with_try_from!(I256, u16, x),
         }
     }
@@ -3105,17 +3183,17 @@ impl IntegerValue {
         use IntegerValue::*;
 
         match self {
-            U8(x) => Ok(x as u32),
-            U16(x) => Ok(x as u32),
+            U8(x) => cast_int_widening!(u8, u32, x),
+            U16(x) => cast_int_widening!(u16, u32, x),
             U32(x) => Ok(x),
-            U64(x) => cast_int!(u64, u32, x),
-            U128(x) => cast_int!(u128, u32, x),
+            U64(x) => cast_int_narrowing!(u64, u32, x),
+            U128(x) => cast_int_narrowing!(u128, u32, x),
             U256(x) => cast_int_with_try_from!(U256, u32, x),
-            I8(x) => cast_int!(i8, u32, x),
-            I16(x) => cast_int!(i16, u32, x),
-            I32(x) => cast_int!(i32, u32, x),
-            I64(x) => cast_int!(i64, u32, x),
-            I128(x) => cast_int!(i128, u32, x),
+            I8(x) => cast_int_i2u_widening!(i8, u32, x),
+            I16(x) => cast_int_i2u_widening!(i16, u32, x),
+            I32(x) => cast_int_i2u_widening!(i32, u32, x),
+            I64(x) => cast_int_i2u_narrowing!(i64, u32, x),
+            I128(x) => cast_int_i2u_narrowing!(i128, u32, x),
             I256(x) => cast_int_with_try_from!(I256, u32, x),
         }
     }
@@ -3124,17 +3202,17 @@ impl IntegerValue {
         use IntegerValue::*;
 
         match self {
-            U8(x) => Ok(x as u64),
-            U16(x) => Ok(x as u64),
-            U32(x) => Ok(x as u64),
+            U8(x) => cast_int_widening!(u8, u64, x),
+            U16(x) => cast_int_widening!(u16, u64, x),
+            U32(x) => cast_int_widening!(u32, u64, x),
             U64(x) => Ok(x),
-            U128(x) => cast_int!(u128, u64, x),
+            U128(x) => cast_int_narrowing!(u128, u64, x),
             U256(x) => cast_int_with_try_from!(U256, u64, x),
-            I8(x) => cast_int!(i8, u64, x),
-            I16(x) => cast_int!(i16, u64, x),
-            I32(x) => cast_int!(i32, u64, x),
-            I64(x) => cast_int!(i64, u64, x),
-            I128(x) => cast_int!(i128, u64, x),
+            I8(x) => cast_int_i2u_widening!(i8, u64, x),
+            I16(x) => cast_int_i2u_widening!(i16, u64, x),
+            I32(x) => cast_int_i2u_widening!(i32, u64, x),
+            I64(x) => cast_int_i2u_widening!(i64, u64, x),
+            I128(x) => cast_int_i2u_narrowing!(i128, u64, x),
             I256(x) => cast_int_with_try_from!(I256, u64, x),
         }
     }
@@ -3143,17 +3221,17 @@ impl IntegerValue {
         use IntegerValue::*;
 
         match self {
-            U8(x) => Ok(x as u128),
-            U16(x) => Ok(x as u128),
-            U32(x) => Ok(x as u128),
-            U64(x) => Ok(x as u128),
+            U8(x) => cast_int_widening!(u8, u128, x),
+            U16(x) => cast_int_widening!(u16, u128, x),
+            U32(x) => cast_int_widening!(u32, u128, x),
+            U64(x) => cast_int_widening!(u64, u128, x),
             U128(x) => Ok(x),
             U256(x) => cast_int_with_try_from!(U256, u128, x),
-            I8(x) => cast_int!(i8, u128, x),
-            I16(x) => cast_int!(i16, u128, x),
-            I32(x) => cast_int!(i32, u128, x),
-            I64(x) => cast_int!(i64, u128, x),
-            I128(x) => cast_int!(i128, u128, x),
+            I8(x) => cast_int_i2u_widening!(i8, u128, x),
+            I16(x) => cast_int_i2u_widening!(i16, u128, x),
+            I32(x) => cast_int_i2u_widening!(i32, u128, x),
+            I64(x) => cast_int_i2u_widening!(i64, u128, x),
+            I128(x) => cast_int_i2u_widening!(i128, u128, x),
             I256(x) => cast_int_with_try_from!(I256, u128, x),
         }
     }
@@ -3181,17 +3259,17 @@ impl IntegerValue {
         use IntegerValue::*;
 
         match self {
-            U8(x) => cast_int!(u8, i8, x),
-            U16(x) => cast_int!(u16, i8, x),
-            U32(x) => cast_int!(u32, i8, x),
-            U64(x) => cast_int!(u64, i8, x),
-            U128(x) => cast_int!(u128, i8, x),
+            U8(x) => cast_int_u2i_narrowing!(u8, i8, x),
+            U16(x) => cast_int_u2i_narrowing!(u16, i8, x),
+            U32(x) => cast_int_u2i_narrowing!(u32, i8, x),
+            U64(x) => cast_int_u2i_narrowing!(u64, i8, x),
+            U128(x) => cast_int_u2i_narrowing!(u128, i8, x),
             U256(x) => cast_int_with_try_from!(U256, i8, x),
             I8(x) => Ok(x),
-            I16(x) => cast_int!(i16, i8, x),
-            I32(x) => cast_int!(i32, i8, x),
-            I64(x) => cast_int!(i64, i8, x),
-            I128(x) => cast_int!(i128, i8, x),
+            I16(x) => cast_int_narrowing!(i16, i8, x),
+            I32(x) => cast_int_narrowing!(i32, i8, x),
+            I64(x) => cast_int_narrowing!(i64, i8, x),
+            I128(x) => cast_int_narrowing!(i128, i8, x),
             I256(x) => cast_int_with_try_from!(I256, i8, x),
         }
     }
@@ -3200,17 +3278,17 @@ impl IntegerValue {
         use IntegerValue::*;
 
         match self {
-            U8(x) => cast_int!(u8, i16, x),
-            U16(x) => cast_int!(u16, i16, x),
-            U32(x) => cast_int!(u32, i16, x),
-            U64(x) => cast_int!(u64, i16, x),
-            U128(x) => cast_int!(u128, i16, x),
+            U8(x) => cast_int_u2i_widening!(u8, i16, x),
+            U16(x) => cast_int_u2i_narrowing!(u16, i16, x),
+            U32(x) => cast_int_u2i_narrowing!(u32, i16, x),
+            U64(x) => cast_int_u2i_narrowing!(u64, i16, x),
+            U128(x) => cast_int_u2i_narrowing!(u128, i16, x),
             U256(x) => cast_int_with_try_from!(U256, i16, x),
-            I8(x) => Ok(x as i16),
+            I8(x) => cast_int_widening!(i8, i16, x),
             I16(x) => Ok(x),
-            I32(x) => cast_int!(i32, i16, x),
-            I64(x) => cast_int!(i64, i16, x),
-            I128(x) => cast_int!(i128, i16, x),
+            I32(x) => cast_int_narrowing!(i32, i16, x),
+            I64(x) => cast_int_narrowing!(i64, i16, x),
+            I128(x) => cast_int_narrowing!(i128, i16, x),
             I256(x) => cast_int_with_try_from!(I256, i16, x),
         }
     }
@@ -3219,17 +3297,17 @@ impl IntegerValue {
         use IntegerValue::*;
 
         match self {
-            U8(x) => cast_int!(u8, i32, x),
-            U16(x) => cast_int!(u16, i32, x),
-            U32(x) => cast_int!(u32, i32, x),
-            U64(x) => cast_int!(u64, i32, x),
-            U128(x) => cast_int!(u128, i32, x),
+            U8(x) => cast_int_u2i_widening!(u8, i32, x),
+            U16(x) => cast_int_u2i_widening!(u16, i32, x),
+            U32(x) => cast_int_u2i_narrowing!(u32, i32, x),
+            U64(x) => cast_int_u2i_narrowing!(u64, i32, x),
+            U128(x) => cast_int_u2i_narrowing!(u128, i32, x),
             U256(x) => cast_int_with_try_from!(U256, i32, x),
-            I8(x) => Ok(x as i32),
-            I16(x) => Ok(x as i32),
+            I8(x) => cast_int_widening!(i8, i32, x),
+            I16(x) => cast_int_widening!(i16, i32, x),
             I32(x) => Ok(x),
-            I64(x) => cast_int!(i64, i32, x),
-            I128(x) => cast_int!(i128, i32, x),
+            I64(x) => cast_int_narrowing!(i64, i32, x),
+            I128(x) => cast_int_narrowing!(i128, i32, x),
             I256(x) => cast_int_with_try_from!(I256, i32, x),
         }
     }
@@ -3238,17 +3316,17 @@ impl IntegerValue {
         use IntegerValue::*;
 
         match self {
-            U8(x) => cast_int!(u8, i64, x),
-            U16(x) => cast_int!(u16, i64, x),
-            U32(x) => cast_int!(u32, i64, x),
-            U64(x) => cast_int!(u64, i64, x),
-            U128(x) => cast_int!(u128, i64, x),
+            U8(x) => cast_int_u2i_widening!(u8, i64, x),
+            U16(x) => cast_int_u2i_widening!(u16, i64, x),
+            U32(x) => cast_int_u2i_widening!(u32, i64, x),
+            U64(x) => cast_int_u2i_narrowing!(u64, i64, x),
+            U128(x) => cast_int_u2i_narrowing!(u128, i64, x),
             U256(x) => cast_int_with_try_from!(U256, i64, x),
-            I8(x) => Ok(x as i64),
-            I16(x) => Ok(x as i64),
-            I32(x) => Ok(x as i64),
+            I8(x) => cast_int_widening!(i8, i64, x),
+            I16(x) => cast_int_widening!(i16, i64, x),
+            I32(x) => cast_int_widening!(i32, i64, x),
             I64(x) => Ok(x),
-            I128(x) => cast_int!(i128, i64, x),
+            I128(x) => cast_int_narrowing!(i128, i64, x),
             I256(x) => cast_int_with_try_from!(I256, i64, x),
         }
     }
@@ -3257,16 +3335,16 @@ impl IntegerValue {
         use IntegerValue::*;
 
         match self {
-            U8(x) => cast_int!(u8, i128, x),
-            U16(x) => cast_int!(u16, i128, x),
-            U32(x) => cast_int!(u32, i128, x),
-            U64(x) => cast_int!(u64, i128, x),
-            U128(x) => cast_int!(u128, i128, x),
+            U8(x) => cast_int_u2i_widening!(u8, i128, x),
+            U16(x) => cast_int_u2i_widening!(u16, i128, x),
+            U32(x) => cast_int_u2i_widening!(u32, i128, x),
+            U64(x) => cast_int_u2i_widening!(u64, i128, x),
+            U128(x) => cast_int_u2i_narrowing!(u128, i128, x),
             U256(x) => cast_int_with_try_from!(U256, i128, x),
-            I8(x) => Ok(x as i128),
-            I16(x) => Ok(x as i128),
-            I32(x) => Ok(x as i128),
-            I64(x) => Ok(x as i128),
+            I8(x) => cast_int_widening!(i8, i128, x),
+            I16(x) => cast_int_widening!(i16, i128, x),
+            I32(x) => cast_int_widening!(i32, i128, x),
+            I64(x) => cast_int_widening!(i64, i128, x),
             I128(x) => Ok(x),
             I256(x) => cast_int_with_try_from!(I256, i128, x),
         }
