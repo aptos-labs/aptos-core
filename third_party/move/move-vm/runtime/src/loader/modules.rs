@@ -487,18 +487,22 @@ impl Module {
         &self.id
     }
 
+    #[inline(always)]
     pub(crate) fn struct_at(&self, idx: StructDefinitionIndex) -> &Arc<StructType> {
         &self.structs[idx.0 as usize].definition_struct_type
     }
 
+    #[inline(always)]
     pub(crate) fn struct_instantiation_at(&self, idx: u16) -> &StructInstantiation {
         &self.struct_instantiations[idx as usize]
     }
 
+    #[inline(always)]
     pub(crate) fn struct_variant_at(&self, idx: StructVariantHandleIndex) -> &StructVariantInfo {
         &self.struct_variant_infos[idx.0 as usize]
     }
 
+    #[inline(always)]
     pub(crate) fn struct_variant_instantiation_at(
         &self,
         idx: StructVariantInstantiationIndex,
@@ -506,38 +510,47 @@ impl Module {
         &self.struct_variant_instantiation_infos[idx.0 as usize]
     }
 
+    #[inline(always)]
     pub(crate) fn function_at(&self, idx: u16) -> &FunctionHandle {
         &self.function_refs[idx as usize]
     }
 
+    #[inline(always)]
     pub(crate) fn function_instantiation_at(&self, idx: u16) -> &[Type] {
         &self.function_instantiations[idx as usize].instantiation
     }
 
+    #[inline(always)]
     pub(crate) fn function_instantiation_handle_at(&self, idx: u16) -> &FunctionHandle {
         &self.function_instantiations[idx as usize].handle
     }
 
+    #[inline(always)]
     pub(crate) fn field_count(&self, idx: u16) -> u16 {
         self.structs[idx as usize].field_count
     }
 
+    #[inline(always)]
     pub(crate) fn field_instantiation_count(&self, idx: u16) -> u16 {
         self.struct_instantiations[idx as usize].field_count
     }
 
+    #[inline(always)]
     pub(crate) fn field_offset(&self, idx: FieldHandleIndex) -> usize {
         self.field_handles[idx.0 as usize].offset
     }
 
+    #[inline(always)]
     pub(crate) fn field_instantiation_offset(&self, idx: FieldInstantiationIndex) -> usize {
         self.field_instantiations[idx.0 as usize].offset
     }
 
+    #[inline(always)]
     pub(crate) fn variant_field_info_at(&self, idx: VariantFieldHandleIndex) -> &VariantFieldInfo {
         &self.variant_field_infos[idx.0 as usize]
     }
 
+    #[inline(always)]
     pub(crate) fn variant_field_instantiation_info_at(
         &self,
         idx: VariantFieldInstantiationIndex,
@@ -545,6 +558,7 @@ impl Module {
         &self.variant_field_instantiation_infos[idx.0 as usize]
     }
 
+    #[inline(always)]
     pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
         self.single_signature_token_map.get(&idx).unwrap()
     }

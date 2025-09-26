@@ -679,6 +679,7 @@ where
     }
 
     // Check whether the values on the operand stack have the expected return types.
+    #[inline(always)]
     fn check_return_tys(&self, current_frame: &mut Frame) -> PartialVMResult<()> {
         let expected_ret_tys = current_frame.function.return_tys();
         if self.call_stack.0.is_empty() && self.operand_stack.types.len() != expected_ret_tys.len()
@@ -710,6 +711,7 @@ where
         Ok(())
     }
 
+    #[inline(always)]
     fn set_new_call_frame<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         current_frame: &mut Frame,
@@ -760,6 +762,7 @@ where
     ///
     /// Native functions do not push a frame at the moment and as such errors from a native
     /// function are incorrectly attributed to the caller.
+    #[inline(always)]
     fn make_call_frame<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         gas_meter: &mut impl GasMeter,

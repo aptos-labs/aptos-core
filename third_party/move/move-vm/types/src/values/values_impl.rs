@@ -555,6 +555,7 @@ impl Value {
  **************************************************************************************/
 
 impl ValueImpl {
+    #[inline(always)]
     fn equals(&self, other: &Self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<bool> {
         use ValueImpl::*;
 
@@ -807,6 +808,7 @@ impl Container {
 }
 
 impl ContainerRef {
+    #[inline(always)]
     fn equals(&self, other: &Self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<bool> {
         // Note: the depth passed in accounts for the container.
         check_depth(depth, max_depth)?;
@@ -827,6 +829,7 @@ impl ContainerRef {
 }
 
 impl IndexedRef {
+    #[inline(always)]
     fn equals(&self, other: &Self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<bool> {
         use Container::*;
 
@@ -1041,6 +1044,7 @@ impl IndexedRef {
 }
 
 impl Value {
+    #[inline(always)]
     pub fn equals(&self, other: &Self) -> PartialVMResult<bool> {
         self.0
             .equals(&other.0, 1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
@@ -1710,6 +1714,7 @@ impl SignerRef {
  *
  **************************************************************************************/
 impl Locals {
+    #[inline(always)]
     pub fn new(n: usize) -> Self {
         Self(Rc::new(RefCell::new(
             iter::repeat_with(|| ValueImpl::Invalid).take(n).collect(),
@@ -1789,6 +1794,7 @@ impl Locals {
 
     /// Drop all Move values onto a different Vec to avoid leaking memory.
     /// References are excluded since they may point to invalid data.
+    #[inline(always)]
     pub fn drop_all_values(&mut self) -> impl Iterator<Item = (usize, Value)> {
         let mut locals = self.0.borrow_mut();
         let mut res = vec![];
