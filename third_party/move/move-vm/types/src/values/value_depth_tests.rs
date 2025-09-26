@@ -61,12 +61,12 @@ impl AbstractFunction for MockFunction {
 
 #[test]
 fn test_equals() {
-    test_binop_with_max_depth(|l, r, max_depth| l.equals_with_depth(r, max_depth));
+    test_binop_with_max_depth(|l, r, max_depth| l.equals_with_depth_for_test(r, max_depth));
 }
 
 #[test]
 fn test_compare() {
-    test_binop_with_max_depth(|l, r, max_depth| l.compare_with_depth(r, max_depth));
+    test_binop_with_max_depth(|l, r, max_depth| l.compare_with_depth_for_test(r, max_depth));
 }
 
 #[test]
