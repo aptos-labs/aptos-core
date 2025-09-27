@@ -179,16 +179,14 @@ where
             is_success: bool,
         ) -> PartialVMResult<()>;
 
-        fn charge_vec_len(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
+        fn charge_vec_len(&mut self) -> PartialVMResult<()>;
 
         fn charge_vec_borrow(
             &mut self,
             is_mut: bool,
-            ty: impl TypeView,
-            is_success: bool,
         ) -> PartialVMResult<()>;
 
-        fn charge_vec_swap(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
+        fn charge_vec_swap(&mut self) -> PartialVMResult<()>;
 
         fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
     }
@@ -455,9 +453,8 @@ where
     }
 
     #[inline]
-    fn charge_vec_pack<'a>(
+    fn charge_vec_pack(
         &mut self,
-        ty: impl TypeView + 'a,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
         self.use_heap_memory(
@@ -473,13 +470,12 @@ where
                 })?,
         )?;
 
-        self.base.charge_vec_pack(ty, args)
+        self.base.charge_vec_pack(args)
     }
 
     #[inline]
     fn charge_vec_unpack(
         &mut self,
-        ty: impl TypeView,
         expect_num_elements: NumArgs,
         elems: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
@@ -496,15 +492,11 @@ where
             },
         )?);
 
-        self.base.charge_vec_unpack(ty, expect_num_elements, elems)
+        self.base.charge_vec_unpack(expect_num_elements, elems)
     }
 
     #[inline]
-    fn charge_vec_push_back(
-        &mut self,
-        ty: impl TypeView,
-        val: impl ValueView,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_push_back(&mut self, val: impl ValueView) -> PartialVMResult<()> {
         self.use_heap_memory(
             self.vm_gas_params()
                 .misc
@@ -512,15 +504,11 @@ where
                 .abstract_packed_size(&val)?,
         )?;
 
-        self.base.charge_vec_push_back(ty, val)
+        self.base.charge_vec_push_back(val)
     }
 
     #[inline]
-    fn charge_vec_pop_back(
-        &mut self,
-        ty: impl TypeView,
-        val: Option<impl ValueView>,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_pop_back(&mut self, val: Option<impl ValueView>) -> PartialVMResult<()> {
         if let Some(val) = &val {
             self.release_heap_memory(
                 self.vm_gas_params()
@@ -530,7 +518,7 @@ where
             );
         }
 
-        self.base.charge_vec_pop_back(ty, val)
+        self.base.charge_vec_pop_back(val)
     }
 
     #[inline]
