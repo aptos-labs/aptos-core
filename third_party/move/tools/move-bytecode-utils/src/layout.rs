@@ -15,7 +15,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag, LEGACY_OPTION_VEC},
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
 };
 use serde_reflection::{ContainerFormat, Format, Named, Registry};
@@ -535,7 +535,50 @@ impl StructLayoutBuilder {
                     },
                 })
             },
-            StructFieldInformation::DeclaredVariants(..) => {
+            StructFieldInformation::DeclaredVariants(variant_definitions) => {
+                if m.self_id().is_option() {
+                    match layout_type {
+                        LayoutType::WithTypes => {
+                            let mid = m.self_id();
+                            let type_args = type_arguments
+                                .iter()
+                                .map(|t| t.try_into())
+                                .collect::<anyhow::Result<Vec<TypeTag>>>()?;
+                            let type_ = StructTag {
+                                address: *mid.address(),
+                                module: mid.name().to_owned(),
+                                name: m.identifier_at(s_handle.name).to_owned(),
+                                type_args,
+                            };
+                            if variant_definitions.len() != 2 {
+                                bail!("Option must have exactly two variants");
+                            }
+                            let variant = &variant_definitions[1];
+                            let name = m.identifier_at(variant.name).to_owned();
+                            if name.as_str() == "Some" {
+                                if variant.fields.len() != 1 {
+                                    bail!("Variant `Some` must have exactly one field");
+                                }
+                                let layout = TypeLayoutBuilder::build_from_signature_token(
+                                    m,
+                                    &variant.fields[0].signature.0,
+                                    &type_arguments,
+                                    compiled_module_view,
+                                    layout_type,
+                                )?;
+                                let vector_layout = MoveTypeLayout::Vector(Box::new(layout));
+                                let identifier = Identifier::new(LEGACY_OPTION_VEC)?;
+                                let fields = vec![MoveFieldLayout::new(identifier, vector_layout)];
+                                return Ok(MoveStructLayout::WithTypes { type_, fields });
+                            } else {
+                                bail!("Variant name must be `Some`");
+                            }
+                        },
+                        _ => {
+                            bail!("enum variants not yet supported by layouts");
+                        },
+                    }
+                }
                 bail!("enum variants not yet supported by layouts")
             },
         }

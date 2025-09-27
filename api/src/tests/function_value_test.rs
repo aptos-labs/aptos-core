@@ -180,4 +180,43 @@ async fn test_function_values_with_captured_struct(
             }
         })
     );
+
+    let resource = format!("{}::test::R2<0x1::option::Option<u64>>", addr);
+    let response = &context.gen_resource(&addr, &resource).await.unwrap();
+
+    assert_eq!(
+        response["data"],
+        json!({
+            "_0": {"vec": []},
+        })
+    );
+
+    let resource = format!("{}::test::R2<0x1::option::Option<u32>>", addr);
+    let response = &context.gen_resource(&addr, &resource).await.unwrap();
+
+    assert_eq!(
+        response["data"],
+        json!({
+            "_0": {"vec": [1]},
+        })
+    );
+
+    context
+        .api_execute_entry_function(
+            &mut account,
+            &format!("0x{}::test::entry_function", addr.to_hex()),
+            json!([]),
+            json!([{"vec": ["1"]}]),
+        )
+        .await;
+
+    let resource = format!("{}::test::R2<0x1::option::Option<u128>>", addr);
+    let response = &context.gen_resource(&addr, &resource).await.unwrap();
+
+    assert_eq!(
+        response["data"],
+        json!({
+            "_0": {"vec":["1"]},
+        })
+    );
 }
