@@ -29,13 +29,14 @@ use move_vm_types::{
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::{BTreeMap, Entry};
+use triomphe::Arc as TriompheArc;
 
 /// An entry in the data cache, containing resource's [GlobalValue] as well as additional cached
 /// information such as tag, layout, and a flag whether there are any delayed fields inside the
 /// resource.
 pub(crate) struct DataCacheEntry {
     struct_tag: StructTag,
-    layout: MoveTypeLayout,
+    layout: TriompheArc<MoveTypeLayout>,
     contains_delayed_fields: bool,
     value: GlobalValue,
 }
@@ -77,19 +78,21 @@ impl TransactionDataCache {
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
     pub fn into_effects(self, module_storage: &dyn ModuleStorage) -> PartialVMResult<ChangeSet> {
-        let resource_converter =
-            |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
-                let function_value_extension = FunctionValueExtensionAdapter { module_storage };
-                let max_value_nest_depth = function_value_extension.max_value_nest_depth();
-                ValueSerDeContext::new(max_value_nest_depth)
-                    .with_func_args_deserialization(&function_value_extension)
-                    .serialize(&value, &layout)?
-                    .map(Into::into)
-                    .ok_or_else(|| {
-                        PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                            .with_message(format!("Error when serializing resource {}.", value))
-                    })
-            };
+        let resource_converter = |value: Value,
+                                  layout: TriompheArc<MoveTypeLayout>,
+                                  _: bool|
+         -> PartialVMResult<Bytes> {
+            let function_value_extension = FunctionValueExtensionAdapter { module_storage };
+            let max_value_nest_depth = function_value_extension.max_value_nest_depth();
+            ValueSerDeContext::new(max_value_nest_depth)
+                .with_func_args_deserialization(&function_value_extension)
+                .serialize(&value, &layout)?
+                .map(Into::into)
+                .ok_or_else(|| {
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                        .with_message(format!("Error when serializing resource {}.", value))
+                })
+        };
         self.into_custom_effects(&resource_converter)
     }
 
@@ -97,7 +100,11 @@ impl TransactionDataCache {
     /// produced effects for resources.
     pub fn into_custom_effects<Resource>(
         self,
-        resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
+        resource_converter: &dyn Fn(
+            Value,
+            TriompheArc<MoveTypeLayout>,
+            bool,
+        ) -> PartialVMResult<Resource>,
     ) -> PartialVMResult<Changes<Resource>> {
         let mut change_set = Changes::<Resource>::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {

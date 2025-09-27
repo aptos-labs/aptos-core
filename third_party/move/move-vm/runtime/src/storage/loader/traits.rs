@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    module_traversal::TraversalContext, Function, LoadedFunction, LoadedFunctionOwner, Module,
-    ModuleStorage, Script, WithRuntimeEnvironment,
+    module_traversal::TraversalContext, Function, LayoutCacheEntry, LayoutWithDelayedFields,
+    LoadedFunction, LoadedFunctionOwner, Module, ModuleStorage, Script, WithRuntimeEnvironment,
 };
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::{
@@ -35,6 +35,28 @@ pub trait StructDefinitionLoader: WithRuntimeEnvironment {
         traversal_context: &mut TraversalContext,
         idx: &StructNameIndex,
     ) -> PartialVMResult<Arc<StructType>>;
+
+    /// Returns struct layout from cache if it exists, otherwise [None]. Of layout exists, a result
+    /// is returned because loader may charge gas after loading the layout from cache and run out
+    /// of gas.
+    fn load_non_generic_struct_layout_from_cache(
+        &self,
+        _gas_meter: &mut impl DependencyGasMeter,
+        _traversal_context: &mut TraversalContext,
+        _idx: &StructNameIndex,
+    ) -> Option<PartialVMResult<LayoutWithDelayedFields>> {
+        None
+    }
+
+    /// Stores computed layout to the layout cache.
+    fn store_non_generic_struct_layout_to_cache(
+        &self,
+        _idx: &StructNameIndex,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        // Default as no-op.
+        Ok(())
+    }
 }
 
 /// Provides access to function definitions.
