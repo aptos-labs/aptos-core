@@ -22,7 +22,7 @@ use move_bytecode_verifier::dependencies;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, TypeTag, MEM_MODULE_ID, OPTION_MODULE_ID},
+    language_storage::{ModuleId, TypeTag, OPTION_MODULE_ID},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use move_vm_metrics::{Timer, VERIFIED_MODULE_CACHE_SIZE, VM_TIMER};
@@ -367,9 +367,10 @@ impl RuntimeEnvironment {
         if enable_enum_option {
             if addr == OPTION_MODULE_ID.address() && *name == *OPTION_MODULE_ID.name() {
                 return Some(self.get_option_module_bytes());
-            } else if addr == MEM_MODULE_ID.address() && *name == *MEM_MODULE_ID.name() {
-                return Some(self.get_mem_module_bytes());
             }
+            // else if addr == MEM_MODULE_ID.address() && *name == *MEM_MODULE_ID.name() {
+            //     return Some(self.get_mem_module_bytes());
+            // }
         }
         None
     }

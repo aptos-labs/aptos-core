@@ -48,7 +48,7 @@ async fn run_option(use_txn_payload_v2_format: bool, use_orderless_transactions:
         .await;
     context.check_golden_output_no_prune(resp);
 
-    // Publish packages after enabling new option module
+    // Publish packages
     let named_addresses = vec![("account".to_string(), account_addr)];
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
@@ -57,6 +57,7 @@ async fn run_option(use_txn_payload_v2_format: bool, use_orderless_transactions:
     });
     context.publish_package(&mut account, txn).await;
 
+    // Run entry function with option as argument
     context
         .api_execute_entry_function(
             &mut account,

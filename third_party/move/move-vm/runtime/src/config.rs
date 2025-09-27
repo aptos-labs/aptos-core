@@ -67,7 +67,7 @@ impl Default for VMConfig {
             optimize_trusted_code: false,
             paranoid_ref_checks: false,
             enable_capture_option: false,
-            enable_enum_option: false,
+            enable_enum_option: true,
         }
     }
 }
