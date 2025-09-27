@@ -1979,6 +1979,7 @@ pub enum Operation {
     // Unary operators
     Not,
     Cast,
+    Negate,
 
     // Builtin functions (impl and spec)
     Exists(Option<MemoryLabel>),
@@ -2799,7 +2800,8 @@ impl Operation {
 
             // Unary operators
             Not => true,
-            Cast => false, // can overflow
+            Cast => false,   // can overflow
+            Negate => false, // can overflow
 
             // Builtin functions (impl and spec)
             Exists(..) => false, // Spec

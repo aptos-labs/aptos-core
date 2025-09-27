@@ -1,0 +1,3936 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::constants {
+    public fun test_i128(): i128 {
+        {
+          let a_ann: i128 = 0;
+          {
+            let b_ann: i128 = 1;
+            {
+              let c_ann: i128 = -1;
+              {
+                let d_ann: i128 = 170141183460469231731687303715884105727;
+                {
+                  let e_ann: i128 = -170141183460469231731687303715884105728;
+                  {
+                    let a: i128 = 0;
+                    {
+                      let b: i128 = 1;
+                      {
+                        let c: i128 = -1;
+                        {
+                          let d: i128 = 170141183460469231731687303715884105727;
+                          {
+                            let e: i128 = -170141183460469231731687303715884105728;
+                            {
+                              let (x: i128, y: i128, z: i128): (i128, i128, i128) = Tuple(-1, -2, -3);
+                              Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(0, 1), 1), -1), -1), 170141183460469231731687303715884105727), 170141183460469231731687303715884105727), -170141183460469231731687303715884105728), -170141183460469231731687303715884105728), a_ann), b_ann), c_ann), d_ann), e_ann), a), b), c), d), e), x), y), z)
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    public fun test_i16(): i16 {
+        {
+          let a_ann: i16 = 0;
+          {
+            let b_ann: i16 = 1;
+            {
+              let c_ann: i16 = -1;
+              {
+                let d_ann: i16 = 32767;
+                {
+                  let e_ann: i16 = -32768;
+                  {
+                    let a: i16 = 0;
+                    {
+                      let b: i16 = 1;
+                      {
+                        let c: i16 = -1;
+                        {
+                          let d: i16 = 32767;
+                          {
+                            let e: i16 = -32768;
+                            {
+                              let (x: i16, y: i16, z: i16): (i16, i16, i16) = Tuple(-1, -2, -3);
+                              Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(0, 1), 1), -1), -1), 32767), 32767), -32768), -32768), a_ann), b_ann), c_ann), d_ann), e_ann), a), b), c), d), e), x), y), z)
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    public fun test_i256(): i256 {
+        {
+          let a_ann: i256 = 0;
+          {
+            let b_ann: i256 = 1;
+            {
+              let c_ann: i256 = -1;
+              {
+                let d_ann: i256 = 57896044618658097711785492504343953926634992332820282019728792003956564819967;
+                {
+                  let e_ann: i256 = -57896044618658097711785492504343953926634992332820282019728792003956564819968;
+                  {
+                    let a: i256 = 0;
+                    {
+                      let b: i256 = 1;
+                      {
+                        let c: i256 = -1;
+                        {
+                          let d: i256 = 57896044618658097711785492504343953926634992332820282019728792003956564819967;
+                          {
+                            let e: i256 = -57896044618658097711785492504343953926634992332820282019728792003956564819968;
+                            {
+                              let (x: i256, y: i256, z: i256): (i256, i256, i256) = Tuple(-1, -2, -3);
+                              Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(0, 1), 1), -1), -1), 57896044618658097711785492504343953926634992332820282019728792003956564819967), 57896044618658097711785492504343953926634992332820282019728792003956564819967), -57896044618658097711785492504343953926634992332820282019728792003956564819968), -57896044618658097711785492504343953926634992332820282019728792003956564819968), a_ann), b_ann), c_ann), d_ann), e_ann), a), b), c), d), e), x), y), z)
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    public fun test_i32(): i32 {
+        {
+          let a_ann: i32 = 0;
+          {
+            let b_ann: i32 = 1;
+            {
+              let c_ann: i32 = -1;
+              {
+                let d_ann: i32 = 2147483647;
+                {
+                  let e_ann: i32 = -2147483648;
+                  {
+                    let a: i32 = 0;
+                    {
+                      let b: i32 = 1;
+                      {
+                        let c: i32 = -1;
+                        {
+                          let d: i32 = 2147483647;
+                          {
+                            let e: i32 = -2147483648;
+                            {
+                              let (x: i32, y: i32, z: i32): (i32, i32, i32) = Tuple(-1, -2, -3);
+                              Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(0, 1), 1), -1), -1), 2147483647), 2147483647), -2147483648), -2147483648), a_ann), b_ann), c_ann), d_ann), e_ann), a), b), c), d), e), x), y), z)
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    public fun test_i64(): i64 {
+        {
+          let a_ann: i64 = 0;
+          {
+            let b_ann: i64 = 1;
+            {
+              let c_ann: i64 = -1;
+              {
+                let d_ann: i64 = 9223372036854775807;
+                {
+                  let e_ann: i64 = -9223372036854775808;
+                  {
+                    let a: i64 = 0;
+                    {
+                      let b: i64 = 1;
+                      {
+                        let c: i64 = -1;
+                        {
+                          let d: i64 = 9223372036854775807;
+                          {
+                            let e: i64 = -9223372036854775808;
+                            {
+                              let (x: i64, y: i64, z: i64): (i64, i64, i64) = Tuple(-1, -2, -3);
+                              Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(0, 1), 1), -1), -1), 9223372036854775807), 9223372036854775807), -9223372036854775808), -9223372036854775808), a_ann), b_ann), c_ann), d_ann), e_ann), a), b), c), d), e), x), y), z)
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    public fun test_i8(): i8 {
+        {
+          let a_ann: i8 = 0;
+          {
+            let b_ann: i8 = 1;
+            {
+              let c_ann: i8 = -1;
+              {
+                let d_ann: i8 = 127;
+                {
+                  let e_ann: i8 = -128;
+                  {
+                    let a: i8 = 0;
+                    {
+                      let b: i8 = 1;
+                      {
+                        let c: i8 = -1;
+                        {
+                          let d: i8 = 127;
+                          {
+                            let e: i8 = -128;
+                            {
+                              let (x: i8, y: i8, z: i8): (i8, i8, i8) = Tuple(-1, -2, -3);
+                              Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(0, 1), 1), -1), -1), 127), 127), -128), -128), a_ann), b_ann), c_ann), d_ann), e_ann), a), b), c), d), e), x), y), z)
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::constants
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::constants {
+    public fun test_i128(): i128 {
+        let a_ann = 0i128;
+        let b_ann = 1i128;
+        let c_ann = -1i128;
+        let d_ann = 170141183460469231731687303715884105727i128;
+        let e_ann = -170141183460469231731687303715884105728i128;
+        let a = 0i128;
+        let b = 1i128;
+        let c = -1i128;
+        let d = 170141183460469231731687303715884105727i128;
+        let e = -170141183460469231731687303715884105728i128;
+        let (x,y,z) = (-1i128, -2i128, -3i128);
+        0i128 + 1i128 + 1i128 + -1i128 + -1i128 + 170141183460469231731687303715884105727i128 + 170141183460469231731687303715884105727i128 + -170141183460469231731687303715884105728i128 + -170141183460469231731687303715884105728i128 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
+    }
+    public fun test_i16(): i16 {
+        let a_ann = 0i16;
+        let b_ann = 1i16;
+        let c_ann = -1i16;
+        let d_ann = 32767i16;
+        let e_ann = -32768i16;
+        let a = 0i16;
+        let b = 1i16;
+        let c = -1i16;
+        let d = 32767i16;
+        let e = -32768i16;
+        let (x,y,z) = (-1i16, -2i16, -3i16);
+        0i16 + 1i16 + 1i16 + -1i16 + -1i16 + 32767i16 + 32767i16 + -32768i16 + -32768i16 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
+    }
+    public fun test_i256(): i256 {
+        let a_ann = 0i256;
+        let b_ann = 1i256;
+        let c_ann = -1i256;
+        let d_ann = 57896044618658097711785492504343953926634992332820282019728792003956564819967i256;
+        let e_ann = -57896044618658097711785492504343953926634992332820282019728792003956564819968i256;
+        let a = 0i256;
+        let b = 1i256;
+        let c = -1i256;
+        let d = 57896044618658097711785492504343953926634992332820282019728792003956564819967i256;
+        let e = -57896044618658097711785492504343953926634992332820282019728792003956564819968i256;
+        let (x,y,z) = (-1i256, -2i256, -3i256);
+        0i256 + 1i256 + 1i256 + -1i256 + -1i256 + 57896044618658097711785492504343953926634992332820282019728792003956564819967i256 + 57896044618658097711785492504343953926634992332820282019728792003956564819967i256 + -57896044618658097711785492504343953926634992332820282019728792003956564819968i256 + -57896044618658097711785492504343953926634992332820282019728792003956564819968i256 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
+    }
+    public fun test_i32(): i32 {
+        let a_ann = 0i32;
+        let b_ann = 1i32;
+        let c_ann = -1i32;
+        let d_ann = 2147483647i32;
+        let e_ann = -2147483648i32;
+        let a = 0i32;
+        let b = 1i32;
+        let c = -1i32;
+        let d = 2147483647i32;
+        let e = -2147483648i32;
+        let (x,y,z) = (-1i32, -2i32, -3i32);
+        0i32 + 1i32 + 1i32 + -1i32 + -1i32 + 2147483647i32 + 2147483647i32 + -2147483648i32 + -2147483648i32 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
+    }
+    public fun test_i64(): i64 {
+        let a_ann = 0i64;
+        let b_ann = 1i64;
+        let c_ann = -1i64;
+        let d_ann = 9223372036854775807i64;
+        let e_ann = -9223372036854775808i64;
+        let a = 0i64;
+        let b = 1i64;
+        let c = -1i64;
+        let d = 9223372036854775807i64;
+        let e = -9223372036854775808i64;
+        let (x,y,z) = (-1i64, -2i64, -3i64);
+        0i64 + 1i64 + 1i64 + -1i64 + -1i64 + 9223372036854775807i64 + 9223372036854775807i64 + -9223372036854775808i64 + -9223372036854775808i64 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
+    }
+    public fun test_i8(): i8 {
+        let a_ann = 0i8;
+        let b_ann = 1i8;
+        let c_ann = -1i8;
+        let d_ann = 127i8;
+        let e_ann = -128i8;
+        let a = 0i8;
+        let b = 1i8;
+        let c = -1i8;
+        let d = 127i8;
+        let e = -128i8;
+        let (x,y,z) = (-1i8, -2i8, -3i8);
+        0i8 + 1i8 + 1i8 + -1i8 + -1i8 + 127i8 + 127i8 + -128i8 + -128i8 + a_ann + b_ann + c_ann + d_ann + e_ann + a + b + c + d + e + x + y + z
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun constants::test_i128(): i128 {
+     var $t0: i128
+     var $t1: i128
+     var $t2: i128
+     var $t3: i128
+     var $t4: i128
+     var $t5: i128
+     var $t6: i128
+     var $t7: i128
+     var $t8: i128
+     var $t9: i128
+     var $t10: i128
+     var $t11: i128
+     var $t12: i128
+     var $t13: i128
+     var $t14: i128
+     var $t15: i128
+     var $t16: i128
+     var $t17: i128
+     var $t18: i128
+     var $t19: i128
+     var $t20: i128
+     var $t21: i128
+     var $t22: i128
+     var $t23: i128
+     var $t24: i128
+     var $t25: i128
+     var $t26: i128
+     var $t27: i128
+     var $t28: i128
+     var $t29: i128
+     var $t30: i128
+     var $t31: i128
+     var $t32: i128
+     var $t33: i128
+     var $t34: i128
+     var $t35: i128
+     var $t36: i128
+     var $t37: i128
+     var $t38: i128
+     var $t39: i128
+     var $t40: i128
+     var $t41: i128
+     var $t42: i128
+     var $t43: i128
+     var $t44: i128
+     var $t45: i128
+  0: $t1 := 0
+  1: $t2 := 1
+  2: $t3 := -1
+  3: $t4 := 170141183460469231731687303715884105727
+  4: $t5 := -170141183460469231731687303715884105728
+  5: $t6 := 0
+  6: $t7 := 1
+  7: $t8 := -1
+  8: $t9 := 170141183460469231731687303715884105727
+  9: $t10 := -170141183460469231731687303715884105728
+ 10: $t14 := -1
+ 11: $t11 := infer($t14)
+ 12: $t15 := -2
+ 13: $t12 := infer($t15)
+ 14: $t16 := -3
+ 15: $t13 := infer($t16)
+ 16: $t37 := 0
+ 17: $t38 := 1
+ 18: $t36 := +($t37, $t38)
+ 19: $t39 := 1
+ 20: $t35 := +($t36, $t39)
+ 21: $t40 := -1
+ 22: $t34 := +($t35, $t40)
+ 23: $t41 := -1
+ 24: $t33 := +($t34, $t41)
+ 25: $t42 := 170141183460469231731687303715884105727
+ 26: $t32 := +($t33, $t42)
+ 27: $t43 := 170141183460469231731687303715884105727
+ 28: $t31 := +($t32, $t43)
+ 29: $t44 := -170141183460469231731687303715884105728
+ 30: $t30 := +($t31, $t44)
+ 31: $t45 := -170141183460469231731687303715884105728
+ 32: $t29 := +($t30, $t45)
+ 33: $t28 := +($t29, $t1)
+ 34: $t27 := +($t28, $t2)
+ 35: $t26 := +($t27, $t3)
+ 36: $t25 := +($t26, $t4)
+ 37: $t24 := +($t25, $t5)
+ 38: $t23 := +($t24, $t6)
+ 39: $t22 := +($t23, $t7)
+ 40: $t21 := +($t22, $t8)
+ 41: $t20 := +($t21, $t9)
+ 42: $t19 := +($t20, $t10)
+ 43: $t18 := +($t19, $t11)
+ 44: $t17 := +($t18, $t12)
+ 45: $t0 := +($t17, $t13)
+ 46: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i16(): i16 {
+     var $t0: i16
+     var $t1: i16
+     var $t2: i16
+     var $t3: i16
+     var $t4: i16
+     var $t5: i16
+     var $t6: i16
+     var $t7: i16
+     var $t8: i16
+     var $t9: i16
+     var $t10: i16
+     var $t11: i16
+     var $t12: i16
+     var $t13: i16
+     var $t14: i16
+     var $t15: i16
+     var $t16: i16
+     var $t17: i16
+     var $t18: i16
+     var $t19: i16
+     var $t20: i16
+     var $t21: i16
+     var $t22: i16
+     var $t23: i16
+     var $t24: i16
+     var $t25: i16
+     var $t26: i16
+     var $t27: i16
+     var $t28: i16
+     var $t29: i16
+     var $t30: i16
+     var $t31: i16
+     var $t32: i16
+     var $t33: i16
+     var $t34: i16
+     var $t35: i16
+     var $t36: i16
+     var $t37: i16
+     var $t38: i16
+     var $t39: i16
+     var $t40: i16
+     var $t41: i16
+     var $t42: i16
+     var $t43: i16
+     var $t44: i16
+     var $t45: i16
+  0: $t1 := 0
+  1: $t2 := 1
+  2: $t3 := -1
+  3: $t4 := 32767
+  4: $t5 := -32768
+  5: $t6 := 0
+  6: $t7 := 1
+  7: $t8 := -1
+  8: $t9 := 32767
+  9: $t10 := -32768
+ 10: $t14 := -1
+ 11: $t11 := infer($t14)
+ 12: $t15 := -2
+ 13: $t12 := infer($t15)
+ 14: $t16 := -3
+ 15: $t13 := infer($t16)
+ 16: $t37 := 0
+ 17: $t38 := 1
+ 18: $t36 := +($t37, $t38)
+ 19: $t39 := 1
+ 20: $t35 := +($t36, $t39)
+ 21: $t40 := -1
+ 22: $t34 := +($t35, $t40)
+ 23: $t41 := -1
+ 24: $t33 := +($t34, $t41)
+ 25: $t42 := 32767
+ 26: $t32 := +($t33, $t42)
+ 27: $t43 := 32767
+ 28: $t31 := +($t32, $t43)
+ 29: $t44 := -32768
+ 30: $t30 := +($t31, $t44)
+ 31: $t45 := -32768
+ 32: $t29 := +($t30, $t45)
+ 33: $t28 := +($t29, $t1)
+ 34: $t27 := +($t28, $t2)
+ 35: $t26 := +($t27, $t3)
+ 36: $t25 := +($t26, $t4)
+ 37: $t24 := +($t25, $t5)
+ 38: $t23 := +($t24, $t6)
+ 39: $t22 := +($t23, $t7)
+ 40: $t21 := +($t22, $t8)
+ 41: $t20 := +($t21, $t9)
+ 42: $t19 := +($t20, $t10)
+ 43: $t18 := +($t19, $t11)
+ 44: $t17 := +($t18, $t12)
+ 45: $t0 := +($t17, $t13)
+ 46: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i256(): i256 {
+     var $t0: i256
+     var $t1: i256
+     var $t2: i256
+     var $t3: i256
+     var $t4: i256
+     var $t5: i256
+     var $t6: i256
+     var $t7: i256
+     var $t8: i256
+     var $t9: i256
+     var $t10: i256
+     var $t11: i256
+     var $t12: i256
+     var $t13: i256
+     var $t14: i256
+     var $t15: i256
+     var $t16: i256
+     var $t17: i256
+     var $t18: i256
+     var $t19: i256
+     var $t20: i256
+     var $t21: i256
+     var $t22: i256
+     var $t23: i256
+     var $t24: i256
+     var $t25: i256
+     var $t26: i256
+     var $t27: i256
+     var $t28: i256
+     var $t29: i256
+     var $t30: i256
+     var $t31: i256
+     var $t32: i256
+     var $t33: i256
+     var $t34: i256
+     var $t35: i256
+     var $t36: i256
+     var $t37: i256
+     var $t38: i256
+     var $t39: i256
+     var $t40: i256
+     var $t41: i256
+     var $t42: i256
+     var $t43: i256
+     var $t44: i256
+     var $t45: i256
+  0: $t1 := 0
+  1: $t2 := 1
+  2: $t3 := -1
+  3: $t4 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+  4: $t5 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+  5: $t6 := 0
+  6: $t7 := 1
+  7: $t8 := -1
+  8: $t9 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+  9: $t10 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+ 10: $t14 := -1
+ 11: $t11 := infer($t14)
+ 12: $t15 := -2
+ 13: $t12 := infer($t15)
+ 14: $t16 := -3
+ 15: $t13 := infer($t16)
+ 16: $t37 := 0
+ 17: $t38 := 1
+ 18: $t36 := +($t37, $t38)
+ 19: $t39 := 1
+ 20: $t35 := +($t36, $t39)
+ 21: $t40 := -1
+ 22: $t34 := +($t35, $t40)
+ 23: $t41 := -1
+ 24: $t33 := +($t34, $t41)
+ 25: $t42 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+ 26: $t32 := +($t33, $t42)
+ 27: $t43 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+ 28: $t31 := +($t32, $t43)
+ 29: $t44 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+ 30: $t30 := +($t31, $t44)
+ 31: $t45 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+ 32: $t29 := +($t30, $t45)
+ 33: $t28 := +($t29, $t1)
+ 34: $t27 := +($t28, $t2)
+ 35: $t26 := +($t27, $t3)
+ 36: $t25 := +($t26, $t4)
+ 37: $t24 := +($t25, $t5)
+ 38: $t23 := +($t24, $t6)
+ 39: $t22 := +($t23, $t7)
+ 40: $t21 := +($t22, $t8)
+ 41: $t20 := +($t21, $t9)
+ 42: $t19 := +($t20, $t10)
+ 43: $t18 := +($t19, $t11)
+ 44: $t17 := +($t18, $t12)
+ 45: $t0 := +($t17, $t13)
+ 46: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i32(): i32 {
+     var $t0: i32
+     var $t1: i32
+     var $t2: i32
+     var $t3: i32
+     var $t4: i32
+     var $t5: i32
+     var $t6: i32
+     var $t7: i32
+     var $t8: i32
+     var $t9: i32
+     var $t10: i32
+     var $t11: i32
+     var $t12: i32
+     var $t13: i32
+     var $t14: i32
+     var $t15: i32
+     var $t16: i32
+     var $t17: i32
+     var $t18: i32
+     var $t19: i32
+     var $t20: i32
+     var $t21: i32
+     var $t22: i32
+     var $t23: i32
+     var $t24: i32
+     var $t25: i32
+     var $t26: i32
+     var $t27: i32
+     var $t28: i32
+     var $t29: i32
+     var $t30: i32
+     var $t31: i32
+     var $t32: i32
+     var $t33: i32
+     var $t34: i32
+     var $t35: i32
+     var $t36: i32
+     var $t37: i32
+     var $t38: i32
+     var $t39: i32
+     var $t40: i32
+     var $t41: i32
+     var $t42: i32
+     var $t43: i32
+     var $t44: i32
+     var $t45: i32
+  0: $t1 := 0
+  1: $t2 := 1
+  2: $t3 := -1
+  3: $t4 := 2147483647
+  4: $t5 := -2147483648
+  5: $t6 := 0
+  6: $t7 := 1
+  7: $t8 := -1
+  8: $t9 := 2147483647
+  9: $t10 := -2147483648
+ 10: $t14 := -1
+ 11: $t11 := infer($t14)
+ 12: $t15 := -2
+ 13: $t12 := infer($t15)
+ 14: $t16 := -3
+ 15: $t13 := infer($t16)
+ 16: $t37 := 0
+ 17: $t38 := 1
+ 18: $t36 := +($t37, $t38)
+ 19: $t39 := 1
+ 20: $t35 := +($t36, $t39)
+ 21: $t40 := -1
+ 22: $t34 := +($t35, $t40)
+ 23: $t41 := -1
+ 24: $t33 := +($t34, $t41)
+ 25: $t42 := 2147483647
+ 26: $t32 := +($t33, $t42)
+ 27: $t43 := 2147483647
+ 28: $t31 := +($t32, $t43)
+ 29: $t44 := -2147483648
+ 30: $t30 := +($t31, $t44)
+ 31: $t45 := -2147483648
+ 32: $t29 := +($t30, $t45)
+ 33: $t28 := +($t29, $t1)
+ 34: $t27 := +($t28, $t2)
+ 35: $t26 := +($t27, $t3)
+ 36: $t25 := +($t26, $t4)
+ 37: $t24 := +($t25, $t5)
+ 38: $t23 := +($t24, $t6)
+ 39: $t22 := +($t23, $t7)
+ 40: $t21 := +($t22, $t8)
+ 41: $t20 := +($t21, $t9)
+ 42: $t19 := +($t20, $t10)
+ 43: $t18 := +($t19, $t11)
+ 44: $t17 := +($t18, $t12)
+ 45: $t0 := +($t17, $t13)
+ 46: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i64(): i64 {
+     var $t0: i64
+     var $t1: i64
+     var $t2: i64
+     var $t3: i64
+     var $t4: i64
+     var $t5: i64
+     var $t6: i64
+     var $t7: i64
+     var $t8: i64
+     var $t9: i64
+     var $t10: i64
+     var $t11: i64
+     var $t12: i64
+     var $t13: i64
+     var $t14: i64
+     var $t15: i64
+     var $t16: i64
+     var $t17: i64
+     var $t18: i64
+     var $t19: i64
+     var $t20: i64
+     var $t21: i64
+     var $t22: i64
+     var $t23: i64
+     var $t24: i64
+     var $t25: i64
+     var $t26: i64
+     var $t27: i64
+     var $t28: i64
+     var $t29: i64
+     var $t30: i64
+     var $t31: i64
+     var $t32: i64
+     var $t33: i64
+     var $t34: i64
+     var $t35: i64
+     var $t36: i64
+     var $t37: i64
+     var $t38: i64
+     var $t39: i64
+     var $t40: i64
+     var $t41: i64
+     var $t42: i64
+     var $t43: i64
+     var $t44: i64
+     var $t45: i64
+  0: $t1 := 0
+  1: $t2 := 1
+  2: $t3 := -1
+  3: $t4 := 9223372036854775807
+  4: $t5 := -9223372036854775808
+  5: $t6 := 0
+  6: $t7 := 1
+  7: $t8 := -1
+  8: $t9 := 9223372036854775807
+  9: $t10 := -9223372036854775808
+ 10: $t14 := -1
+ 11: $t11 := infer($t14)
+ 12: $t15 := -2
+ 13: $t12 := infer($t15)
+ 14: $t16 := -3
+ 15: $t13 := infer($t16)
+ 16: $t37 := 0
+ 17: $t38 := 1
+ 18: $t36 := +($t37, $t38)
+ 19: $t39 := 1
+ 20: $t35 := +($t36, $t39)
+ 21: $t40 := -1
+ 22: $t34 := +($t35, $t40)
+ 23: $t41 := -1
+ 24: $t33 := +($t34, $t41)
+ 25: $t42 := 9223372036854775807
+ 26: $t32 := +($t33, $t42)
+ 27: $t43 := 9223372036854775807
+ 28: $t31 := +($t32, $t43)
+ 29: $t44 := -9223372036854775808
+ 30: $t30 := +($t31, $t44)
+ 31: $t45 := -9223372036854775808
+ 32: $t29 := +($t30, $t45)
+ 33: $t28 := +($t29, $t1)
+ 34: $t27 := +($t28, $t2)
+ 35: $t26 := +($t27, $t3)
+ 36: $t25 := +($t26, $t4)
+ 37: $t24 := +($t25, $t5)
+ 38: $t23 := +($t24, $t6)
+ 39: $t22 := +($t23, $t7)
+ 40: $t21 := +($t22, $t8)
+ 41: $t20 := +($t21, $t9)
+ 42: $t19 := +($t20, $t10)
+ 43: $t18 := +($t19, $t11)
+ 44: $t17 := +($t18, $t12)
+ 45: $t0 := +($t17, $t13)
+ 46: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i8(): i8 {
+     var $t0: i8
+     var $t1: i8
+     var $t2: i8
+     var $t3: i8
+     var $t4: i8
+     var $t5: i8
+     var $t6: i8
+     var $t7: i8
+     var $t8: i8
+     var $t9: i8
+     var $t10: i8
+     var $t11: i8
+     var $t12: i8
+     var $t13: i8
+     var $t14: i8
+     var $t15: i8
+     var $t16: i8
+     var $t17: i8
+     var $t18: i8
+     var $t19: i8
+     var $t20: i8
+     var $t21: i8
+     var $t22: i8
+     var $t23: i8
+     var $t24: i8
+     var $t25: i8
+     var $t26: i8
+     var $t27: i8
+     var $t28: i8
+     var $t29: i8
+     var $t30: i8
+     var $t31: i8
+     var $t32: i8
+     var $t33: i8
+     var $t34: i8
+     var $t35: i8
+     var $t36: i8
+     var $t37: i8
+     var $t38: i8
+     var $t39: i8
+     var $t40: i8
+     var $t41: i8
+     var $t42: i8
+     var $t43: i8
+     var $t44: i8
+     var $t45: i8
+  0: $t1 := 0
+  1: $t2 := 1
+  2: $t3 := -1
+  3: $t4 := 127
+  4: $t5 := -128
+  5: $t6 := 0
+  6: $t7 := 1
+  7: $t8 := -1
+  8: $t9 := 127
+  9: $t10 := -128
+ 10: $t14 := -1
+ 11: $t11 := infer($t14)
+ 12: $t15 := -2
+ 13: $t12 := infer($t15)
+ 14: $t16 := -3
+ 15: $t13 := infer($t16)
+ 16: $t37 := 0
+ 17: $t38 := 1
+ 18: $t36 := +($t37, $t38)
+ 19: $t39 := 1
+ 20: $t35 := +($t36, $t39)
+ 21: $t40 := -1
+ 22: $t34 := +($t35, $t40)
+ 23: $t41 := -1
+ 24: $t33 := +($t34, $t41)
+ 25: $t42 := 127
+ 26: $t32 := +($t33, $t42)
+ 27: $t43 := 127
+ 28: $t31 := +($t32, $t43)
+ 29: $t44 := -128
+ 30: $t30 := +($t31, $t44)
+ 31: $t45 := -128
+ 32: $t29 := +($t30, $t45)
+ 33: $t28 := +($t29, $t1)
+ 34: $t27 := +($t28, $t2)
+ 35: $t26 := +($t27, $t3)
+ 36: $t25 := +($t26, $t4)
+ 37: $t24 := +($t25, $t5)
+ 38: $t23 := +($t24, $t6)
+ 39: $t22 := +($t23, $t7)
+ 40: $t21 := +($t22, $t8)
+ 41: $t20 := +($t21, $t9)
+ 42: $t19 := +($t20, $t10)
+ 43: $t18 := +($t19, $t11)
+ 44: $t17 := +($t18, $t12)
+ 45: $t0 := +($t17, $t13)
+ 46: return $t0
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun constants::test_i128(): i128 {
+     var $t0: i128
+     var $t1: i128
+     var $t2: i128
+     var $t3: i128
+     var $t4: i128
+     var $t5: i128
+     var $t6: i128
+     var $t7: i128
+     var $t8: i128
+     var $t9: i128
+     var $t10: i128
+     var $t11: i128
+     var $t12: i128
+     var $t13: i128
+     var $t14: i128
+     var $t15: i128
+     var $t16: i128
+     var $t17: i128
+     var $t18: i128
+     var $t19: i128
+     var $t20: i128
+     var $t21: i128
+     var $t22: i128
+     var $t23: i128
+     var $t24: i128
+     var $t25: i128
+     var $t26: i128
+     var $t27: i128
+     var $t28: i128
+     var $t29: i128
+     var $t30: i128
+     var $t31: i128
+     var $t32: i128
+     var $t33: i128
+     var $t34: i128
+     var $t35: i128
+     var $t36: i128
+     var $t37: i128
+     var $t38: i128
+     var $t39: i128
+     var $t40: i128
+     var $t41: i128
+     var $t42: i128
+     var $t43: i128
+     var $t44: i128
+     var $t45: i128
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t2 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  2: $t3 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3
+     # refs: []
+     #
+  3: $t4 := 170141183460469231731687303715884105727
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4
+     # refs: []
+     #
+  4: $t5 := -170141183460469231731687303715884105728
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5
+     # refs: []
+     #
+  5: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6
+     # refs: []
+     #
+  6: $t7 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7
+     # refs: []
+     #
+  7: $t8 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8
+     # refs: []
+     #
+  8: $t9 := 170141183460469231731687303715884105727
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9
+     # refs: []
+     #
+  9: $t10 := -170141183460469231731687303715884105728
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10
+     # refs: []
+     #
+ 10: $t14 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t14
+     # refs: []
+     #
+ 11: $t11 := infer($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11
+     # refs: []
+     #
+ 12: $t15 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t15
+     # refs: []
+     #
+ 13: $t12 := infer($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12
+     # refs: []
+     #
+ 14: $t16 := -3
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t16
+     # refs: []
+     #
+ 15: $t13 := infer($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13
+     # refs: []
+     #
+ 16: $t37 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t37
+     # refs: []
+     #
+ 17: $t38 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t37, $t38
+     # refs: []
+     #
+ 18: $t36 := +($t37, $t38)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t36
+     # refs: []
+     #
+ 19: $t39 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t36, $t39
+     # refs: []
+     #
+ 20: $t35 := +($t36, $t39)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t35
+     # refs: []
+     #
+ 21: $t40 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t35, $t40
+     # refs: []
+     #
+ 22: $t34 := +($t35, $t40)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t34
+     # refs: []
+     #
+ 23: $t41 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t34, $t41
+     # refs: []
+     #
+ 24: $t33 := +($t34, $t41)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t33
+     # refs: []
+     #
+ 25: $t42 := 170141183460469231731687303715884105727
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t33, $t42
+     # refs: []
+     #
+ 26: $t32 := +($t33, $t42)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t32
+     # refs: []
+     #
+ 27: $t43 := 170141183460469231731687303715884105727
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t32, $t43
+     # refs: []
+     #
+ 28: $t31 := +($t32, $t43)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t31
+     # refs: []
+     #
+ 29: $t44 := -170141183460469231731687303715884105728
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t31, $t44
+     # refs: []
+     #
+ 30: $t30 := +($t31, $t44)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t30
+     # refs: []
+     #
+ 31: $t45 := -170141183460469231731687303715884105728
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t30, $t45
+     # refs: []
+     #
+ 32: $t29 := +($t30, $t45)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t29
+     # refs: []
+     #
+ 33: $t28 := +($t29, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t28
+     # refs: []
+     #
+ 34: $t27 := +($t28, $t2)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t27
+     # refs: []
+     #
+ 35: $t26 := +($t27, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t26
+     # refs: []
+     #
+ 36: $t25 := +($t26, $t4)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t25
+     # refs: []
+     #
+ 37: $t24 := +($t25, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t24
+     # refs: []
+     #
+ 38: $t23 := +($t24, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t23
+     # refs: []
+     #
+ 39: $t22 := +($t23, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t8, $t9, $t10, $t11, $t12, $t13, $t22
+     # refs: []
+     #
+ 40: $t21 := +($t22, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t10, $t11, $t12, $t13, $t21
+     # refs: []
+     #
+ 41: $t20 := +($t21, $t9)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t11, $t12, $t13, $t20
+     # refs: []
+     #
+ 42: $t19 := +($t20, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t11, $t12, $t13, $t19
+     # refs: []
+     #
+ 43: $t18 := +($t19, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t13, $t18
+     # refs: []
+     #
+ 44: $t17 := +($t18, $t12)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t17
+     # refs: []
+     #
+ 45: $t0 := +($t17, $t13)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 46: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i16(): i16 {
+     var $t0: i16
+     var $t1: i16
+     var $t2: i16
+     var $t3: i16
+     var $t4: i16
+     var $t5: i16
+     var $t6: i16
+     var $t7: i16
+     var $t8: i16
+     var $t9: i16
+     var $t10: i16
+     var $t11: i16
+     var $t12: i16
+     var $t13: i16
+     var $t14: i16
+     var $t15: i16
+     var $t16: i16
+     var $t17: i16
+     var $t18: i16
+     var $t19: i16
+     var $t20: i16
+     var $t21: i16
+     var $t22: i16
+     var $t23: i16
+     var $t24: i16
+     var $t25: i16
+     var $t26: i16
+     var $t27: i16
+     var $t28: i16
+     var $t29: i16
+     var $t30: i16
+     var $t31: i16
+     var $t32: i16
+     var $t33: i16
+     var $t34: i16
+     var $t35: i16
+     var $t36: i16
+     var $t37: i16
+     var $t38: i16
+     var $t39: i16
+     var $t40: i16
+     var $t41: i16
+     var $t42: i16
+     var $t43: i16
+     var $t44: i16
+     var $t45: i16
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t2 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  2: $t3 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3
+     # refs: []
+     #
+  3: $t4 := 32767
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4
+     # refs: []
+     #
+  4: $t5 := -32768
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5
+     # refs: []
+     #
+  5: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6
+     # refs: []
+     #
+  6: $t7 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7
+     # refs: []
+     #
+  7: $t8 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8
+     # refs: []
+     #
+  8: $t9 := 32767
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9
+     # refs: []
+     #
+  9: $t10 := -32768
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10
+     # refs: []
+     #
+ 10: $t14 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t14
+     # refs: []
+     #
+ 11: $t11 := infer($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11
+     # refs: []
+     #
+ 12: $t15 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t15
+     # refs: []
+     #
+ 13: $t12 := infer($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12
+     # refs: []
+     #
+ 14: $t16 := -3
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t16
+     # refs: []
+     #
+ 15: $t13 := infer($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13
+     # refs: []
+     #
+ 16: $t37 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t37
+     # refs: []
+     #
+ 17: $t38 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t37, $t38
+     # refs: []
+     #
+ 18: $t36 := +($t37, $t38)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t36
+     # refs: []
+     #
+ 19: $t39 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t36, $t39
+     # refs: []
+     #
+ 20: $t35 := +($t36, $t39)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t35
+     # refs: []
+     #
+ 21: $t40 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t35, $t40
+     # refs: []
+     #
+ 22: $t34 := +($t35, $t40)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t34
+     # refs: []
+     #
+ 23: $t41 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t34, $t41
+     # refs: []
+     #
+ 24: $t33 := +($t34, $t41)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t33
+     # refs: []
+     #
+ 25: $t42 := 32767
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t33, $t42
+     # refs: []
+     #
+ 26: $t32 := +($t33, $t42)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t32
+     # refs: []
+     #
+ 27: $t43 := 32767
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t32, $t43
+     # refs: []
+     #
+ 28: $t31 := +($t32, $t43)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t31
+     # refs: []
+     #
+ 29: $t44 := -32768
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t31, $t44
+     # refs: []
+     #
+ 30: $t30 := +($t31, $t44)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t30
+     # refs: []
+     #
+ 31: $t45 := -32768
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t30, $t45
+     # refs: []
+     #
+ 32: $t29 := +($t30, $t45)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t29
+     # refs: []
+     #
+ 33: $t28 := +($t29, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t28
+     # refs: []
+     #
+ 34: $t27 := +($t28, $t2)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t27
+     # refs: []
+     #
+ 35: $t26 := +($t27, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t26
+     # refs: []
+     #
+ 36: $t25 := +($t26, $t4)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t25
+     # refs: []
+     #
+ 37: $t24 := +($t25, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t24
+     # refs: []
+     #
+ 38: $t23 := +($t24, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t23
+     # refs: []
+     #
+ 39: $t22 := +($t23, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t8, $t9, $t10, $t11, $t12, $t13, $t22
+     # refs: []
+     #
+ 40: $t21 := +($t22, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t10, $t11, $t12, $t13, $t21
+     # refs: []
+     #
+ 41: $t20 := +($t21, $t9)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t11, $t12, $t13, $t20
+     # refs: []
+     #
+ 42: $t19 := +($t20, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t11, $t12, $t13, $t19
+     # refs: []
+     #
+ 43: $t18 := +($t19, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t13, $t18
+     # refs: []
+     #
+ 44: $t17 := +($t18, $t12)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t17
+     # refs: []
+     #
+ 45: $t0 := +($t17, $t13)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 46: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i256(): i256 {
+     var $t0: i256
+     var $t1: i256
+     var $t2: i256
+     var $t3: i256
+     var $t4: i256
+     var $t5: i256
+     var $t6: i256
+     var $t7: i256
+     var $t8: i256
+     var $t9: i256
+     var $t10: i256
+     var $t11: i256
+     var $t12: i256
+     var $t13: i256
+     var $t14: i256
+     var $t15: i256
+     var $t16: i256
+     var $t17: i256
+     var $t18: i256
+     var $t19: i256
+     var $t20: i256
+     var $t21: i256
+     var $t22: i256
+     var $t23: i256
+     var $t24: i256
+     var $t25: i256
+     var $t26: i256
+     var $t27: i256
+     var $t28: i256
+     var $t29: i256
+     var $t30: i256
+     var $t31: i256
+     var $t32: i256
+     var $t33: i256
+     var $t34: i256
+     var $t35: i256
+     var $t36: i256
+     var $t37: i256
+     var $t38: i256
+     var $t39: i256
+     var $t40: i256
+     var $t41: i256
+     var $t42: i256
+     var $t43: i256
+     var $t44: i256
+     var $t45: i256
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t2 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  2: $t3 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3
+     # refs: []
+     #
+  3: $t4 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4
+     # refs: []
+     #
+  4: $t5 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5
+     # refs: []
+     #
+  5: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6
+     # refs: []
+     #
+  6: $t7 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7
+     # refs: []
+     #
+  7: $t8 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8
+     # refs: []
+     #
+  8: $t9 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9
+     # refs: []
+     #
+  9: $t10 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10
+     # refs: []
+     #
+ 10: $t14 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t14
+     # refs: []
+     #
+ 11: $t11 := infer($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11
+     # refs: []
+     #
+ 12: $t15 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t15
+     # refs: []
+     #
+ 13: $t12 := infer($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12
+     # refs: []
+     #
+ 14: $t16 := -3
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t16
+     # refs: []
+     #
+ 15: $t13 := infer($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13
+     # refs: []
+     #
+ 16: $t37 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t37
+     # refs: []
+     #
+ 17: $t38 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t37, $t38
+     # refs: []
+     #
+ 18: $t36 := +($t37, $t38)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t36
+     # refs: []
+     #
+ 19: $t39 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t36, $t39
+     # refs: []
+     #
+ 20: $t35 := +($t36, $t39)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t35
+     # refs: []
+     #
+ 21: $t40 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t35, $t40
+     # refs: []
+     #
+ 22: $t34 := +($t35, $t40)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t34
+     # refs: []
+     #
+ 23: $t41 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t34, $t41
+     # refs: []
+     #
+ 24: $t33 := +($t34, $t41)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t33
+     # refs: []
+     #
+ 25: $t42 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t33, $t42
+     # refs: []
+     #
+ 26: $t32 := +($t33, $t42)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t32
+     # refs: []
+     #
+ 27: $t43 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t32, $t43
+     # refs: []
+     #
+ 28: $t31 := +($t32, $t43)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t31
+     # refs: []
+     #
+ 29: $t44 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t31, $t44
+     # refs: []
+     #
+ 30: $t30 := +($t31, $t44)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t30
+     # refs: []
+     #
+ 31: $t45 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t30, $t45
+     # refs: []
+     #
+ 32: $t29 := +($t30, $t45)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t29
+     # refs: []
+     #
+ 33: $t28 := +($t29, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t28
+     # refs: []
+     #
+ 34: $t27 := +($t28, $t2)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t27
+     # refs: []
+     #
+ 35: $t26 := +($t27, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t26
+     # refs: []
+     #
+ 36: $t25 := +($t26, $t4)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t25
+     # refs: []
+     #
+ 37: $t24 := +($t25, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t24
+     # refs: []
+     #
+ 38: $t23 := +($t24, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t23
+     # refs: []
+     #
+ 39: $t22 := +($t23, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t8, $t9, $t10, $t11, $t12, $t13, $t22
+     # refs: []
+     #
+ 40: $t21 := +($t22, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t10, $t11, $t12, $t13, $t21
+     # refs: []
+     #
+ 41: $t20 := +($t21, $t9)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t11, $t12, $t13, $t20
+     # refs: []
+     #
+ 42: $t19 := +($t20, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t11, $t12, $t13, $t19
+     # refs: []
+     #
+ 43: $t18 := +($t19, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t13, $t18
+     # refs: []
+     #
+ 44: $t17 := +($t18, $t12)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t17
+     # refs: []
+     #
+ 45: $t0 := +($t17, $t13)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 46: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i32(): i32 {
+     var $t0: i32
+     var $t1: i32
+     var $t2: i32
+     var $t3: i32
+     var $t4: i32
+     var $t5: i32
+     var $t6: i32
+     var $t7: i32
+     var $t8: i32
+     var $t9: i32
+     var $t10: i32
+     var $t11: i32
+     var $t12: i32
+     var $t13: i32
+     var $t14: i32
+     var $t15: i32
+     var $t16: i32
+     var $t17: i32
+     var $t18: i32
+     var $t19: i32
+     var $t20: i32
+     var $t21: i32
+     var $t22: i32
+     var $t23: i32
+     var $t24: i32
+     var $t25: i32
+     var $t26: i32
+     var $t27: i32
+     var $t28: i32
+     var $t29: i32
+     var $t30: i32
+     var $t31: i32
+     var $t32: i32
+     var $t33: i32
+     var $t34: i32
+     var $t35: i32
+     var $t36: i32
+     var $t37: i32
+     var $t38: i32
+     var $t39: i32
+     var $t40: i32
+     var $t41: i32
+     var $t42: i32
+     var $t43: i32
+     var $t44: i32
+     var $t45: i32
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t2 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  2: $t3 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3
+     # refs: []
+     #
+  3: $t4 := 2147483647
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4
+     # refs: []
+     #
+  4: $t5 := -2147483648
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5
+     # refs: []
+     #
+  5: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6
+     # refs: []
+     #
+  6: $t7 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7
+     # refs: []
+     #
+  7: $t8 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8
+     # refs: []
+     #
+  8: $t9 := 2147483647
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9
+     # refs: []
+     #
+  9: $t10 := -2147483648
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10
+     # refs: []
+     #
+ 10: $t14 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t14
+     # refs: []
+     #
+ 11: $t11 := infer($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11
+     # refs: []
+     #
+ 12: $t15 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t15
+     # refs: []
+     #
+ 13: $t12 := infer($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12
+     # refs: []
+     #
+ 14: $t16 := -3
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t16
+     # refs: []
+     #
+ 15: $t13 := infer($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13
+     # refs: []
+     #
+ 16: $t37 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t37
+     # refs: []
+     #
+ 17: $t38 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t37, $t38
+     # refs: []
+     #
+ 18: $t36 := +($t37, $t38)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t36
+     # refs: []
+     #
+ 19: $t39 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t36, $t39
+     # refs: []
+     #
+ 20: $t35 := +($t36, $t39)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t35
+     # refs: []
+     #
+ 21: $t40 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t35, $t40
+     # refs: []
+     #
+ 22: $t34 := +($t35, $t40)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t34
+     # refs: []
+     #
+ 23: $t41 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t34, $t41
+     # refs: []
+     #
+ 24: $t33 := +($t34, $t41)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t33
+     # refs: []
+     #
+ 25: $t42 := 2147483647
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t33, $t42
+     # refs: []
+     #
+ 26: $t32 := +($t33, $t42)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t32
+     # refs: []
+     #
+ 27: $t43 := 2147483647
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t32, $t43
+     # refs: []
+     #
+ 28: $t31 := +($t32, $t43)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t31
+     # refs: []
+     #
+ 29: $t44 := -2147483648
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t31, $t44
+     # refs: []
+     #
+ 30: $t30 := +($t31, $t44)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t30
+     # refs: []
+     #
+ 31: $t45 := -2147483648
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t30, $t45
+     # refs: []
+     #
+ 32: $t29 := +($t30, $t45)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t29
+     # refs: []
+     #
+ 33: $t28 := +($t29, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t28
+     # refs: []
+     #
+ 34: $t27 := +($t28, $t2)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t27
+     # refs: []
+     #
+ 35: $t26 := +($t27, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t26
+     # refs: []
+     #
+ 36: $t25 := +($t26, $t4)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t25
+     # refs: []
+     #
+ 37: $t24 := +($t25, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t24
+     # refs: []
+     #
+ 38: $t23 := +($t24, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t23
+     # refs: []
+     #
+ 39: $t22 := +($t23, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t8, $t9, $t10, $t11, $t12, $t13, $t22
+     # refs: []
+     #
+ 40: $t21 := +($t22, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t10, $t11, $t12, $t13, $t21
+     # refs: []
+     #
+ 41: $t20 := +($t21, $t9)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t11, $t12, $t13, $t20
+     # refs: []
+     #
+ 42: $t19 := +($t20, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t11, $t12, $t13, $t19
+     # refs: []
+     #
+ 43: $t18 := +($t19, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t13, $t18
+     # refs: []
+     #
+ 44: $t17 := +($t18, $t12)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t17
+     # refs: []
+     #
+ 45: $t0 := +($t17, $t13)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 46: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i64(): i64 {
+     var $t0: i64
+     var $t1: i64
+     var $t2: i64
+     var $t3: i64
+     var $t4: i64
+     var $t5: i64
+     var $t6: i64
+     var $t7: i64
+     var $t8: i64
+     var $t9: i64
+     var $t10: i64
+     var $t11: i64
+     var $t12: i64
+     var $t13: i64
+     var $t14: i64
+     var $t15: i64
+     var $t16: i64
+     var $t17: i64
+     var $t18: i64
+     var $t19: i64
+     var $t20: i64
+     var $t21: i64
+     var $t22: i64
+     var $t23: i64
+     var $t24: i64
+     var $t25: i64
+     var $t26: i64
+     var $t27: i64
+     var $t28: i64
+     var $t29: i64
+     var $t30: i64
+     var $t31: i64
+     var $t32: i64
+     var $t33: i64
+     var $t34: i64
+     var $t35: i64
+     var $t36: i64
+     var $t37: i64
+     var $t38: i64
+     var $t39: i64
+     var $t40: i64
+     var $t41: i64
+     var $t42: i64
+     var $t43: i64
+     var $t44: i64
+     var $t45: i64
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t2 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  2: $t3 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3
+     # refs: []
+     #
+  3: $t4 := 9223372036854775807
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4
+     # refs: []
+     #
+  4: $t5 := -9223372036854775808
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5
+     # refs: []
+     #
+  5: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6
+     # refs: []
+     #
+  6: $t7 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7
+     # refs: []
+     #
+  7: $t8 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8
+     # refs: []
+     #
+  8: $t9 := 9223372036854775807
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9
+     # refs: []
+     #
+  9: $t10 := -9223372036854775808
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10
+     # refs: []
+     #
+ 10: $t14 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t14
+     # refs: []
+     #
+ 11: $t11 := infer($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11
+     # refs: []
+     #
+ 12: $t15 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t15
+     # refs: []
+     #
+ 13: $t12 := infer($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12
+     # refs: []
+     #
+ 14: $t16 := -3
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t16
+     # refs: []
+     #
+ 15: $t13 := infer($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13
+     # refs: []
+     #
+ 16: $t37 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t37
+     # refs: []
+     #
+ 17: $t38 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t37, $t38
+     # refs: []
+     #
+ 18: $t36 := +($t37, $t38)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t36
+     # refs: []
+     #
+ 19: $t39 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t36, $t39
+     # refs: []
+     #
+ 20: $t35 := +($t36, $t39)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t35
+     # refs: []
+     #
+ 21: $t40 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t35, $t40
+     # refs: []
+     #
+ 22: $t34 := +($t35, $t40)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t34
+     # refs: []
+     #
+ 23: $t41 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t34, $t41
+     # refs: []
+     #
+ 24: $t33 := +($t34, $t41)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t33
+     # refs: []
+     #
+ 25: $t42 := 9223372036854775807
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t33, $t42
+     # refs: []
+     #
+ 26: $t32 := +($t33, $t42)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t32
+     # refs: []
+     #
+ 27: $t43 := 9223372036854775807
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t32, $t43
+     # refs: []
+     #
+ 28: $t31 := +($t32, $t43)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t31
+     # refs: []
+     #
+ 29: $t44 := -9223372036854775808
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t31, $t44
+     # refs: []
+     #
+ 30: $t30 := +($t31, $t44)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t30
+     # refs: []
+     #
+ 31: $t45 := -9223372036854775808
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t30, $t45
+     # refs: []
+     #
+ 32: $t29 := +($t30, $t45)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t29
+     # refs: []
+     #
+ 33: $t28 := +($t29, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t28
+     # refs: []
+     #
+ 34: $t27 := +($t28, $t2)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t27
+     # refs: []
+     #
+ 35: $t26 := +($t27, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t26
+     # refs: []
+     #
+ 36: $t25 := +($t26, $t4)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t25
+     # refs: []
+     #
+ 37: $t24 := +($t25, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t24
+     # refs: []
+     #
+ 38: $t23 := +($t24, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t23
+     # refs: []
+     #
+ 39: $t22 := +($t23, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t8, $t9, $t10, $t11, $t12, $t13, $t22
+     # refs: []
+     #
+ 40: $t21 := +($t22, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t10, $t11, $t12, $t13, $t21
+     # refs: []
+     #
+ 41: $t20 := +($t21, $t9)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t11, $t12, $t13, $t20
+     # refs: []
+     #
+ 42: $t19 := +($t20, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t11, $t12, $t13, $t19
+     # refs: []
+     #
+ 43: $t18 := +($t19, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t13, $t18
+     # refs: []
+     #
+ 44: $t17 := +($t18, $t12)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t17
+     # refs: []
+     #
+ 45: $t0 := +($t17, $t13)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 46: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i8(): i8 {
+     var $t0: i8
+     var $t1: i8
+     var $t2: i8
+     var $t3: i8
+     var $t4: i8
+     var $t5: i8
+     var $t6: i8
+     var $t7: i8
+     var $t8: i8
+     var $t9: i8
+     var $t10: i8
+     var $t11: i8
+     var $t12: i8
+     var $t13: i8
+     var $t14: i8
+     var $t15: i8
+     var $t16: i8
+     var $t17: i8
+     var $t18: i8
+     var $t19: i8
+     var $t20: i8
+     var $t21: i8
+     var $t22: i8
+     var $t23: i8
+     var $t24: i8
+     var $t25: i8
+     var $t26: i8
+     var $t27: i8
+     var $t28: i8
+     var $t29: i8
+     var $t30: i8
+     var $t31: i8
+     var $t32: i8
+     var $t33: i8
+     var $t34: i8
+     var $t35: i8
+     var $t36: i8
+     var $t37: i8
+     var $t38: i8
+     var $t39: i8
+     var $t40: i8
+     var $t41: i8
+     var $t42: i8
+     var $t43: i8
+     var $t44: i8
+     var $t45: i8
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t2 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  2: $t3 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3
+     # refs: []
+     #
+  3: $t4 := 127
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4
+     # refs: []
+     #
+  4: $t5 := -128
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5
+     # refs: []
+     #
+  5: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6
+     # refs: []
+     #
+  6: $t7 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7
+     # refs: []
+     #
+  7: $t8 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8
+     # refs: []
+     #
+  8: $t9 := 127
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9
+     # refs: []
+     #
+  9: $t10 := -128
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10
+     # refs: []
+     #
+ 10: $t14 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t14
+     # refs: []
+     #
+ 11: $t11 := infer($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11
+     # refs: []
+     #
+ 12: $t15 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t15
+     # refs: []
+     #
+ 13: $t12 := infer($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12
+     # refs: []
+     #
+ 14: $t16 := -3
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t16
+     # refs: []
+     #
+ 15: $t13 := infer($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13
+     # refs: []
+     #
+ 16: $t37 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t37
+     # refs: []
+     #
+ 17: $t38 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t37, $t38
+     # refs: []
+     #
+ 18: $t36 := +($t37, $t38)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t36
+     # refs: []
+     #
+ 19: $t39 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t36, $t39
+     # refs: []
+     #
+ 20: $t35 := +($t36, $t39)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t35
+     # refs: []
+     #
+ 21: $t40 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t35, $t40
+     # refs: []
+     #
+ 22: $t34 := +($t35, $t40)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t34
+     # refs: []
+     #
+ 23: $t41 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t34, $t41
+     # refs: []
+     #
+ 24: $t33 := +($t34, $t41)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t33
+     # refs: []
+     #
+ 25: $t42 := 127
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t33, $t42
+     # refs: []
+     #
+ 26: $t32 := +($t33, $t42)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t32
+     # refs: []
+     #
+ 27: $t43 := 127
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t32, $t43
+     # refs: []
+     #
+ 28: $t31 := +($t32, $t43)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t31
+     # refs: []
+     #
+ 29: $t44 := -128
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t31, $t44
+     # refs: []
+     #
+ 30: $t30 := +($t31, $t44)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t30
+     # refs: []
+     #
+ 31: $t45 := -128
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t30, $t45
+     # refs: []
+     #
+ 32: $t29 := +($t30, $t45)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t29
+     # refs: []
+     #
+ 33: $t28 := +($t29, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t28
+     # refs: []
+     #
+ 34: $t27 := +($t28, $t2)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t27
+     # refs: []
+     #
+ 35: $t26 := +($t27, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t26
+     # refs: []
+     #
+ 36: $t25 := +($t26, $t4)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t25
+     # refs: []
+     #
+ 37: $t24 := +($t25, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t24
+     # refs: []
+     #
+ 38: $t23 := +($t24, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t23
+     # refs: []
+     #
+ 39: $t22 := +($t23, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t8, $t9, $t10, $t11, $t12, $t13, $t22
+     # refs: []
+     #
+ 40: $t21 := +($t22, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t10, $t11, $t12, $t13, $t21
+     # refs: []
+     #
+ 41: $t20 := +($t21, $t9)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t11, $t12, $t13, $t20
+     # refs: []
+     #
+ 42: $t19 := +($t20, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t11, $t12, $t13, $t19
+     # refs: []
+     #
+ 43: $t18 := +($t19, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t13, $t18
+     # refs: []
+     #
+ 44: $t17 := +($t18, $t12)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t17
+     # refs: []
+     #
+ 45: $t0 := +($t17, $t13)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 46: return $t0
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::constants {
+    public fun test_i128(): i128 {
+        Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(Add<i128>(170141183460469231731687303715884105727, 170141183460469231731687303715884105727), -170141183460469231731687303715884105728), -170141183460469231731687303715884105728), 0), 1), -1), 170141183460469231731687303715884105727), -170141183460469231731687303715884105728), 0), 1), -1), 170141183460469231731687303715884105727), -170141183460469231731687303715884105728), -1), -2), -3)
+    }
+    public fun test_i16(): i16 {
+        Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(Add<i16>(32767, 32767), -32768), -32768), 0), 1), -1), 32767), -32768), 0), 1), -1), 32767), -32768), -1), -2), -3)
+    }
+    public fun test_i256(): i256 {
+        Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(Add<i256>(57896044618658097711785492504343953926634992332820282019728792003956564819967, 57896044618658097711785492504343953926634992332820282019728792003956564819967), -57896044618658097711785492504343953926634992332820282019728792003956564819968), -57896044618658097711785492504343953926634992332820282019728792003956564819968), 0), 1), -1), 57896044618658097711785492504343953926634992332820282019728792003956564819967), -57896044618658097711785492504343953926634992332820282019728792003956564819968), 0), 1), -1), 57896044618658097711785492504343953926634992332820282019728792003956564819967), -57896044618658097711785492504343953926634992332820282019728792003956564819968), -1), -2), -3)
+    }
+    public fun test_i32(): i32 {
+        Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(Add<i32>(2147483647, 2147483647), -2147483648), -2147483648), 0), 1), -1), 2147483647), -2147483648), 0), 1), -1), 2147483647), -2147483648), -1), -2), -3)
+    }
+    public fun test_i64(): i64 {
+        Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(Add<i64>(9223372036854775807, 9223372036854775807), -9223372036854775808), -9223372036854775808), 0), 1), -1), 9223372036854775807), -9223372036854775808), 0), 1), -1), 9223372036854775807), -9223372036854775808), -1), -2), -3)
+    }
+    public fun test_i8(): i8 {
+        Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(Add<i8>(127, 127), -128), -128), 0), 1), -1), 127), -128), 0), 1), -1), 127), -128), -1), -2), -3)
+    }
+} // end 0x42::constants
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun constants::test_i128(): i128 {
+     var $t0: i128
+     var $t1: i128
+     var $t2: i128
+     var $t3: i128
+     var $t4: i128
+     var $t5: i128
+     var $t6: i128
+     var $t7: i128
+     var $t8: i128
+     var $t9: i128
+     var $t10: i128
+     var $t11: i128
+     var $t12: i128
+     var $t13: i128
+     var $t14: i128
+     var $t15: i128
+     var $t16: i128
+     var $t17: i128
+     var $t18: i128
+     var $t19: i128
+     var $t20: i128
+     var $t21: i128
+     var $t22: i128
+     var $t23: i128
+     var $t24: i128
+     var $t25: i128
+     var $t26: i128
+     var $t27: i128
+     var $t28: i128
+     var $t29: i128
+     var $t30: i128
+     var $t31: i128
+     var $t32: i128
+  0: $t16 := 170141183460469231731687303715884105727
+  1: $t17 := 170141183460469231731687303715884105727
+  2: $t15 := +($t16, $t17)
+  3: $t18 := -170141183460469231731687303715884105728
+  4: $t14 := +($t15, $t18)
+  5: $t19 := -170141183460469231731687303715884105728
+  6: $t13 := +($t14, $t19)
+  7: $t20 := 0
+  8: $t12 := +($t13, $t20)
+  9: $t21 := 1
+ 10: $t11 := +($t12, $t21)
+ 11: $t22 := -1
+ 12: $t10 := +($t11, $t22)
+ 13: $t23 := 170141183460469231731687303715884105727
+ 14: $t9 := +($t10, $t23)
+ 15: $t24 := -170141183460469231731687303715884105728
+ 16: $t8 := +($t9, $t24)
+ 17: $t25 := 0
+ 18: $t7 := +($t8, $t25)
+ 19: $t26 := 1
+ 20: $t6 := +($t7, $t26)
+ 21: $t27 := -1
+ 22: $t5 := +($t6, $t27)
+ 23: $t28 := 170141183460469231731687303715884105727
+ 24: $t4 := +($t5, $t28)
+ 25: $t29 := -170141183460469231731687303715884105728
+ 26: $t3 := +($t4, $t29)
+ 27: $t30 := -1
+ 28: $t2 := +($t3, $t30)
+ 29: $t31 := -2
+ 30: $t1 := +($t2, $t31)
+ 31: $t32 := -3
+ 32: $t0 := +($t1, $t32)
+ 33: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i16(): i16 {
+     var $t0: i16
+     var $t1: i16
+     var $t2: i16
+     var $t3: i16
+     var $t4: i16
+     var $t5: i16
+     var $t6: i16
+     var $t7: i16
+     var $t8: i16
+     var $t9: i16
+     var $t10: i16
+     var $t11: i16
+     var $t12: i16
+     var $t13: i16
+     var $t14: i16
+     var $t15: i16
+     var $t16: i16
+     var $t17: i16
+     var $t18: i16
+     var $t19: i16
+     var $t20: i16
+     var $t21: i16
+     var $t22: i16
+     var $t23: i16
+     var $t24: i16
+     var $t25: i16
+     var $t26: i16
+     var $t27: i16
+     var $t28: i16
+     var $t29: i16
+     var $t30: i16
+     var $t31: i16
+     var $t32: i16
+  0: $t16 := 32767
+  1: $t17 := 32767
+  2: $t15 := +($t16, $t17)
+  3: $t18 := -32768
+  4: $t14 := +($t15, $t18)
+  5: $t19 := -32768
+  6: $t13 := +($t14, $t19)
+  7: $t20 := 0
+  8: $t12 := +($t13, $t20)
+  9: $t21 := 1
+ 10: $t11 := +($t12, $t21)
+ 11: $t22 := -1
+ 12: $t10 := +($t11, $t22)
+ 13: $t23 := 32767
+ 14: $t9 := +($t10, $t23)
+ 15: $t24 := -32768
+ 16: $t8 := +($t9, $t24)
+ 17: $t25 := 0
+ 18: $t7 := +($t8, $t25)
+ 19: $t26 := 1
+ 20: $t6 := +($t7, $t26)
+ 21: $t27 := -1
+ 22: $t5 := +($t6, $t27)
+ 23: $t28 := 32767
+ 24: $t4 := +($t5, $t28)
+ 25: $t29 := -32768
+ 26: $t3 := +($t4, $t29)
+ 27: $t30 := -1
+ 28: $t2 := +($t3, $t30)
+ 29: $t31 := -2
+ 30: $t1 := +($t2, $t31)
+ 31: $t32 := -3
+ 32: $t0 := +($t1, $t32)
+ 33: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i256(): i256 {
+     var $t0: i256
+     var $t1: i256
+     var $t2: i256
+     var $t3: i256
+     var $t4: i256
+     var $t5: i256
+     var $t6: i256
+     var $t7: i256
+     var $t8: i256
+     var $t9: i256
+     var $t10: i256
+     var $t11: i256
+     var $t12: i256
+     var $t13: i256
+     var $t14: i256
+     var $t15: i256
+     var $t16: i256
+     var $t17: i256
+     var $t18: i256
+     var $t19: i256
+     var $t20: i256
+     var $t21: i256
+     var $t22: i256
+     var $t23: i256
+     var $t24: i256
+     var $t25: i256
+     var $t26: i256
+     var $t27: i256
+     var $t28: i256
+     var $t29: i256
+     var $t30: i256
+     var $t31: i256
+     var $t32: i256
+  0: $t16 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+  1: $t17 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+  2: $t15 := +($t16, $t17)
+  3: $t18 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+  4: $t14 := +($t15, $t18)
+  5: $t19 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+  6: $t13 := +($t14, $t19)
+  7: $t20 := 0
+  8: $t12 := +($t13, $t20)
+  9: $t21 := 1
+ 10: $t11 := +($t12, $t21)
+ 11: $t22 := -1
+ 12: $t10 := +($t11, $t22)
+ 13: $t23 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+ 14: $t9 := +($t10, $t23)
+ 15: $t24 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+ 16: $t8 := +($t9, $t24)
+ 17: $t25 := 0
+ 18: $t7 := +($t8, $t25)
+ 19: $t26 := 1
+ 20: $t6 := +($t7, $t26)
+ 21: $t27 := -1
+ 22: $t5 := +($t6, $t27)
+ 23: $t28 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+ 24: $t4 := +($t5, $t28)
+ 25: $t29 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+ 26: $t3 := +($t4, $t29)
+ 27: $t30 := -1
+ 28: $t2 := +($t3, $t30)
+ 29: $t31 := -2
+ 30: $t1 := +($t2, $t31)
+ 31: $t32 := -3
+ 32: $t0 := +($t1, $t32)
+ 33: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i32(): i32 {
+     var $t0: i32
+     var $t1: i32
+     var $t2: i32
+     var $t3: i32
+     var $t4: i32
+     var $t5: i32
+     var $t6: i32
+     var $t7: i32
+     var $t8: i32
+     var $t9: i32
+     var $t10: i32
+     var $t11: i32
+     var $t12: i32
+     var $t13: i32
+     var $t14: i32
+     var $t15: i32
+     var $t16: i32
+     var $t17: i32
+     var $t18: i32
+     var $t19: i32
+     var $t20: i32
+     var $t21: i32
+     var $t22: i32
+     var $t23: i32
+     var $t24: i32
+     var $t25: i32
+     var $t26: i32
+     var $t27: i32
+     var $t28: i32
+     var $t29: i32
+     var $t30: i32
+     var $t31: i32
+     var $t32: i32
+  0: $t16 := 2147483647
+  1: $t17 := 2147483647
+  2: $t15 := +($t16, $t17)
+  3: $t18 := -2147483648
+  4: $t14 := +($t15, $t18)
+  5: $t19 := -2147483648
+  6: $t13 := +($t14, $t19)
+  7: $t20 := 0
+  8: $t12 := +($t13, $t20)
+  9: $t21 := 1
+ 10: $t11 := +($t12, $t21)
+ 11: $t22 := -1
+ 12: $t10 := +($t11, $t22)
+ 13: $t23 := 2147483647
+ 14: $t9 := +($t10, $t23)
+ 15: $t24 := -2147483648
+ 16: $t8 := +($t9, $t24)
+ 17: $t25 := 0
+ 18: $t7 := +($t8, $t25)
+ 19: $t26 := 1
+ 20: $t6 := +($t7, $t26)
+ 21: $t27 := -1
+ 22: $t5 := +($t6, $t27)
+ 23: $t28 := 2147483647
+ 24: $t4 := +($t5, $t28)
+ 25: $t29 := -2147483648
+ 26: $t3 := +($t4, $t29)
+ 27: $t30 := -1
+ 28: $t2 := +($t3, $t30)
+ 29: $t31 := -2
+ 30: $t1 := +($t2, $t31)
+ 31: $t32 := -3
+ 32: $t0 := +($t1, $t32)
+ 33: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i64(): i64 {
+     var $t0: i64
+     var $t1: i64
+     var $t2: i64
+     var $t3: i64
+     var $t4: i64
+     var $t5: i64
+     var $t6: i64
+     var $t7: i64
+     var $t8: i64
+     var $t9: i64
+     var $t10: i64
+     var $t11: i64
+     var $t12: i64
+     var $t13: i64
+     var $t14: i64
+     var $t15: i64
+     var $t16: i64
+     var $t17: i64
+     var $t18: i64
+     var $t19: i64
+     var $t20: i64
+     var $t21: i64
+     var $t22: i64
+     var $t23: i64
+     var $t24: i64
+     var $t25: i64
+     var $t26: i64
+     var $t27: i64
+     var $t28: i64
+     var $t29: i64
+     var $t30: i64
+     var $t31: i64
+     var $t32: i64
+  0: $t16 := 9223372036854775807
+  1: $t17 := 9223372036854775807
+  2: $t15 := +($t16, $t17)
+  3: $t18 := -9223372036854775808
+  4: $t14 := +($t15, $t18)
+  5: $t19 := -9223372036854775808
+  6: $t13 := +($t14, $t19)
+  7: $t20 := 0
+  8: $t12 := +($t13, $t20)
+  9: $t21 := 1
+ 10: $t11 := +($t12, $t21)
+ 11: $t22 := -1
+ 12: $t10 := +($t11, $t22)
+ 13: $t23 := 9223372036854775807
+ 14: $t9 := +($t10, $t23)
+ 15: $t24 := -9223372036854775808
+ 16: $t8 := +($t9, $t24)
+ 17: $t25 := 0
+ 18: $t7 := +($t8, $t25)
+ 19: $t26 := 1
+ 20: $t6 := +($t7, $t26)
+ 21: $t27 := -1
+ 22: $t5 := +($t6, $t27)
+ 23: $t28 := 9223372036854775807
+ 24: $t4 := +($t5, $t28)
+ 25: $t29 := -9223372036854775808
+ 26: $t3 := +($t4, $t29)
+ 27: $t30 := -1
+ 28: $t2 := +($t3, $t30)
+ 29: $t31 := -2
+ 30: $t1 := +($t2, $t31)
+ 31: $t32 := -3
+ 32: $t0 := +($t1, $t32)
+ 33: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i8(): i8 {
+     var $t0: i8
+     var $t1: i8
+     var $t2: i8
+     var $t3: i8
+     var $t4: i8
+     var $t5: i8
+     var $t6: i8
+     var $t7: i8
+     var $t8: i8
+     var $t9: i8
+     var $t10: i8
+     var $t11: i8
+     var $t12: i8
+     var $t13: i8
+     var $t14: i8
+     var $t15: i8
+     var $t16: i8
+     var $t17: i8
+     var $t18: i8
+     var $t19: i8
+     var $t20: i8
+     var $t21: i8
+     var $t22: i8
+     var $t23: i8
+     var $t24: i8
+     var $t25: i8
+     var $t26: i8
+     var $t27: i8
+     var $t28: i8
+     var $t29: i8
+     var $t30: i8
+     var $t31: i8
+     var $t32: i8
+  0: $t16 := 127
+  1: $t17 := 127
+  2: $t15 := +($t16, $t17)
+  3: $t18 := -128
+  4: $t14 := +($t15, $t18)
+  5: $t19 := -128
+  6: $t13 := +($t14, $t19)
+  7: $t20 := 0
+  8: $t12 := +($t13, $t20)
+  9: $t21 := 1
+ 10: $t11 := +($t12, $t21)
+ 11: $t22 := -1
+ 12: $t10 := +($t11, $t22)
+ 13: $t23 := 127
+ 14: $t9 := +($t10, $t23)
+ 15: $t24 := -128
+ 16: $t8 := +($t9, $t24)
+ 17: $t25 := 0
+ 18: $t7 := +($t8, $t25)
+ 19: $t26 := 1
+ 20: $t6 := +($t7, $t26)
+ 21: $t27 := -1
+ 22: $t5 := +($t6, $t27)
+ 23: $t28 := 127
+ 24: $t4 := +($t5, $t28)
+ 25: $t29 := -128
+ 26: $t3 := +($t4, $t29)
+ 27: $t30 := -1
+ 28: $t2 := +($t3, $t30)
+ 29: $t31 := -2
+ 30: $t1 := +($t2, $t31)
+ 31: $t32 := -3
+ 32: $t0 := +($t1, $t32)
+ 33: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun constants::test_i128(): i128 {
+     var $t0: i128 [unused]
+     var $t1: i128 [unused]
+     var $t2: i128 [unused]
+     var $t3: i128 [unused]
+     var $t4: i128 [unused]
+     var $t5: i128 [unused]
+     var $t6: i128 [unused]
+     var $t7: i128 [unused]
+     var $t8: i128 [unused]
+     var $t9: i128 [unused]
+     var $t10: i128 [unused]
+     var $t11: i128 [unused]
+     var $t12: i128 [unused]
+     var $t13: i128 [unused]
+     var $t14: i128 [unused]
+     var $t15: i128 [unused]
+     var $t16: i128
+     var $t17: i128
+     var $t18: i128 [unused]
+     var $t19: i128 [unused]
+     var $t20: i128 [unused]
+     var $t21: i128 [unused]
+     var $t22: i128 [unused]
+     var $t23: i128 [unused]
+     var $t24: i128 [unused]
+     var $t25: i128 [unused]
+     var $t26: i128 [unused]
+     var $t27: i128 [unused]
+     var $t28: i128 [unused]
+     var $t29: i128 [unused]
+     var $t30: i128 [unused]
+     var $t31: i128 [unused]
+     var $t32: i128 [unused]
+     # live vars:
+  0: $t16 := 170141183460469231731687303715884105727
+     # live vars: $t16
+  1: $t17 := 170141183460469231731687303715884105727
+     # live vars: $t16, $t17
+  2: $t16 := +($t16, $t17)
+     # live vars: $t16
+  3: $t17 := -170141183460469231731687303715884105728
+     # live vars: $t16, $t17
+  4: $t16 := +($t16, $t17)
+     # live vars: $t16
+  5: $t17 := -170141183460469231731687303715884105728
+     # live vars: $t16, $t17
+  6: $t16 := +($t16, $t17)
+     # live vars: $t16
+  7: $t17 := 0
+     # live vars: $t16, $t17
+  8: $t16 := +($t16, $t17)
+     # live vars: $t16
+  9: $t17 := 1
+     # live vars: $t16, $t17
+ 10: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 11: $t17 := -1
+     # live vars: $t16, $t17
+ 12: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 13: $t17 := 170141183460469231731687303715884105727
+     # live vars: $t16, $t17
+ 14: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 15: $t17 := -170141183460469231731687303715884105728
+     # live vars: $t16, $t17
+ 16: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 17: $t17 := 0
+     # live vars: $t16, $t17
+ 18: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 19: $t17 := 1
+     # live vars: $t16, $t17
+ 20: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 21: $t17 := -1
+     # live vars: $t16, $t17
+ 22: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 23: $t17 := 170141183460469231731687303715884105727
+     # live vars: $t16, $t17
+ 24: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 25: $t17 := -170141183460469231731687303715884105728
+     # live vars: $t16, $t17
+ 26: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 27: $t17 := -1
+     # live vars: $t16, $t17
+ 28: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 29: $t17 := -2
+     # live vars: $t16, $t17
+ 30: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 31: $t17 := -3
+     # live vars: $t16, $t17
+ 32: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 33: return $t16
+}
+
+
+[variant baseline]
+public fun constants::test_i16(): i16 {
+     var $t0: i16 [unused]
+     var $t1: i16 [unused]
+     var $t2: i16 [unused]
+     var $t3: i16 [unused]
+     var $t4: i16 [unused]
+     var $t5: i16 [unused]
+     var $t6: i16 [unused]
+     var $t7: i16 [unused]
+     var $t8: i16 [unused]
+     var $t9: i16 [unused]
+     var $t10: i16 [unused]
+     var $t11: i16 [unused]
+     var $t12: i16 [unused]
+     var $t13: i16 [unused]
+     var $t14: i16 [unused]
+     var $t15: i16 [unused]
+     var $t16: i16
+     var $t17: i16
+     var $t18: i16 [unused]
+     var $t19: i16 [unused]
+     var $t20: i16 [unused]
+     var $t21: i16 [unused]
+     var $t22: i16 [unused]
+     var $t23: i16 [unused]
+     var $t24: i16 [unused]
+     var $t25: i16 [unused]
+     var $t26: i16 [unused]
+     var $t27: i16 [unused]
+     var $t28: i16 [unused]
+     var $t29: i16 [unused]
+     var $t30: i16 [unused]
+     var $t31: i16 [unused]
+     var $t32: i16 [unused]
+     # live vars:
+  0: $t16 := 32767
+     # live vars: $t16
+  1: $t17 := 32767
+     # live vars: $t16, $t17
+  2: $t16 := +($t16, $t17)
+     # live vars: $t16
+  3: $t17 := -32768
+     # live vars: $t16, $t17
+  4: $t16 := +($t16, $t17)
+     # live vars: $t16
+  5: $t17 := -32768
+     # live vars: $t16, $t17
+  6: $t16 := +($t16, $t17)
+     # live vars: $t16
+  7: $t17 := 0
+     # live vars: $t16, $t17
+  8: $t16 := +($t16, $t17)
+     # live vars: $t16
+  9: $t17 := 1
+     # live vars: $t16, $t17
+ 10: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 11: $t17 := -1
+     # live vars: $t16, $t17
+ 12: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 13: $t17 := 32767
+     # live vars: $t16, $t17
+ 14: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 15: $t17 := -32768
+     # live vars: $t16, $t17
+ 16: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 17: $t17 := 0
+     # live vars: $t16, $t17
+ 18: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 19: $t17 := 1
+     # live vars: $t16, $t17
+ 20: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 21: $t17 := -1
+     # live vars: $t16, $t17
+ 22: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 23: $t17 := 32767
+     # live vars: $t16, $t17
+ 24: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 25: $t17 := -32768
+     # live vars: $t16, $t17
+ 26: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 27: $t17 := -1
+     # live vars: $t16, $t17
+ 28: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 29: $t17 := -2
+     # live vars: $t16, $t17
+ 30: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 31: $t17 := -3
+     # live vars: $t16, $t17
+ 32: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 33: return $t16
+}
+
+
+[variant baseline]
+public fun constants::test_i256(): i256 {
+     var $t0: i256 [unused]
+     var $t1: i256 [unused]
+     var $t2: i256 [unused]
+     var $t3: i256 [unused]
+     var $t4: i256 [unused]
+     var $t5: i256 [unused]
+     var $t6: i256 [unused]
+     var $t7: i256 [unused]
+     var $t8: i256 [unused]
+     var $t9: i256 [unused]
+     var $t10: i256 [unused]
+     var $t11: i256 [unused]
+     var $t12: i256 [unused]
+     var $t13: i256 [unused]
+     var $t14: i256 [unused]
+     var $t15: i256 [unused]
+     var $t16: i256
+     var $t17: i256
+     var $t18: i256 [unused]
+     var $t19: i256 [unused]
+     var $t20: i256 [unused]
+     var $t21: i256 [unused]
+     var $t22: i256 [unused]
+     var $t23: i256 [unused]
+     var $t24: i256 [unused]
+     var $t25: i256 [unused]
+     var $t26: i256 [unused]
+     var $t27: i256 [unused]
+     var $t28: i256 [unused]
+     var $t29: i256 [unused]
+     var $t30: i256 [unused]
+     var $t31: i256 [unused]
+     var $t32: i256 [unused]
+     # live vars:
+  0: $t16 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+     # live vars: $t16
+  1: $t17 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+     # live vars: $t16, $t17
+  2: $t16 := +($t16, $t17)
+     # live vars: $t16
+  3: $t17 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+     # live vars: $t16, $t17
+  4: $t16 := +($t16, $t17)
+     # live vars: $t16
+  5: $t17 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+     # live vars: $t16, $t17
+  6: $t16 := +($t16, $t17)
+     # live vars: $t16
+  7: $t17 := 0
+     # live vars: $t16, $t17
+  8: $t16 := +($t16, $t17)
+     # live vars: $t16
+  9: $t17 := 1
+     # live vars: $t16, $t17
+ 10: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 11: $t17 := -1
+     # live vars: $t16, $t17
+ 12: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 13: $t17 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+     # live vars: $t16, $t17
+ 14: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 15: $t17 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+     # live vars: $t16, $t17
+ 16: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 17: $t17 := 0
+     # live vars: $t16, $t17
+ 18: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 19: $t17 := 1
+     # live vars: $t16, $t17
+ 20: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 21: $t17 := -1
+     # live vars: $t16, $t17
+ 22: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 23: $t17 := 57896044618658097711785492504343953926634992332820282019728792003956564819967
+     # live vars: $t16, $t17
+ 24: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 25: $t17 := -57896044618658097711785492504343953926634992332820282019728792003956564819968
+     # live vars: $t16, $t17
+ 26: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 27: $t17 := -1
+     # live vars: $t16, $t17
+ 28: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 29: $t17 := -2
+     # live vars: $t16, $t17
+ 30: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 31: $t17 := -3
+     # live vars: $t16, $t17
+ 32: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 33: return $t16
+}
+
+
+[variant baseline]
+public fun constants::test_i32(): i32 {
+     var $t0: i32 [unused]
+     var $t1: i32 [unused]
+     var $t2: i32 [unused]
+     var $t3: i32 [unused]
+     var $t4: i32 [unused]
+     var $t5: i32 [unused]
+     var $t6: i32 [unused]
+     var $t7: i32 [unused]
+     var $t8: i32 [unused]
+     var $t9: i32 [unused]
+     var $t10: i32 [unused]
+     var $t11: i32 [unused]
+     var $t12: i32 [unused]
+     var $t13: i32 [unused]
+     var $t14: i32 [unused]
+     var $t15: i32 [unused]
+     var $t16: i32
+     var $t17: i32
+     var $t18: i32 [unused]
+     var $t19: i32 [unused]
+     var $t20: i32 [unused]
+     var $t21: i32 [unused]
+     var $t22: i32 [unused]
+     var $t23: i32 [unused]
+     var $t24: i32 [unused]
+     var $t25: i32 [unused]
+     var $t26: i32 [unused]
+     var $t27: i32 [unused]
+     var $t28: i32 [unused]
+     var $t29: i32 [unused]
+     var $t30: i32 [unused]
+     var $t31: i32 [unused]
+     var $t32: i32 [unused]
+     # live vars:
+  0: $t16 := 2147483647
+     # live vars: $t16
+  1: $t17 := 2147483647
+     # live vars: $t16, $t17
+  2: $t16 := +($t16, $t17)
+     # live vars: $t16
+  3: $t17 := -2147483648
+     # live vars: $t16, $t17
+  4: $t16 := +($t16, $t17)
+     # live vars: $t16
+  5: $t17 := -2147483648
+     # live vars: $t16, $t17
+  6: $t16 := +($t16, $t17)
+     # live vars: $t16
+  7: $t17 := 0
+     # live vars: $t16, $t17
+  8: $t16 := +($t16, $t17)
+     # live vars: $t16
+  9: $t17 := 1
+     # live vars: $t16, $t17
+ 10: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 11: $t17 := -1
+     # live vars: $t16, $t17
+ 12: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 13: $t17 := 2147483647
+     # live vars: $t16, $t17
+ 14: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 15: $t17 := -2147483648
+     # live vars: $t16, $t17
+ 16: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 17: $t17 := 0
+     # live vars: $t16, $t17
+ 18: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 19: $t17 := 1
+     # live vars: $t16, $t17
+ 20: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 21: $t17 := -1
+     # live vars: $t16, $t17
+ 22: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 23: $t17 := 2147483647
+     # live vars: $t16, $t17
+ 24: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 25: $t17 := -2147483648
+     # live vars: $t16, $t17
+ 26: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 27: $t17 := -1
+     # live vars: $t16, $t17
+ 28: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 29: $t17 := -2
+     # live vars: $t16, $t17
+ 30: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 31: $t17 := -3
+     # live vars: $t16, $t17
+ 32: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 33: return $t16
+}
+
+
+[variant baseline]
+public fun constants::test_i64(): i64 {
+     var $t0: i64 [unused]
+     var $t1: i64 [unused]
+     var $t2: i64 [unused]
+     var $t3: i64 [unused]
+     var $t4: i64 [unused]
+     var $t5: i64 [unused]
+     var $t6: i64 [unused]
+     var $t7: i64 [unused]
+     var $t8: i64 [unused]
+     var $t9: i64 [unused]
+     var $t10: i64 [unused]
+     var $t11: i64 [unused]
+     var $t12: i64 [unused]
+     var $t13: i64 [unused]
+     var $t14: i64 [unused]
+     var $t15: i64 [unused]
+     var $t16: i64
+     var $t17: i64
+     var $t18: i64 [unused]
+     var $t19: i64 [unused]
+     var $t20: i64 [unused]
+     var $t21: i64 [unused]
+     var $t22: i64 [unused]
+     var $t23: i64 [unused]
+     var $t24: i64 [unused]
+     var $t25: i64 [unused]
+     var $t26: i64 [unused]
+     var $t27: i64 [unused]
+     var $t28: i64 [unused]
+     var $t29: i64 [unused]
+     var $t30: i64 [unused]
+     var $t31: i64 [unused]
+     var $t32: i64 [unused]
+     # live vars:
+  0: $t16 := 9223372036854775807
+     # live vars: $t16
+  1: $t17 := 9223372036854775807
+     # live vars: $t16, $t17
+  2: $t16 := +($t16, $t17)
+     # live vars: $t16
+  3: $t17 := -9223372036854775808
+     # live vars: $t16, $t17
+  4: $t16 := +($t16, $t17)
+     # live vars: $t16
+  5: $t17 := -9223372036854775808
+     # live vars: $t16, $t17
+  6: $t16 := +($t16, $t17)
+     # live vars: $t16
+  7: $t17 := 0
+     # live vars: $t16, $t17
+  8: $t16 := +($t16, $t17)
+     # live vars: $t16
+  9: $t17 := 1
+     # live vars: $t16, $t17
+ 10: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 11: $t17 := -1
+     # live vars: $t16, $t17
+ 12: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 13: $t17 := 9223372036854775807
+     # live vars: $t16, $t17
+ 14: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 15: $t17 := -9223372036854775808
+     # live vars: $t16, $t17
+ 16: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 17: $t17 := 0
+     # live vars: $t16, $t17
+ 18: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 19: $t17 := 1
+     # live vars: $t16, $t17
+ 20: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 21: $t17 := -1
+     # live vars: $t16, $t17
+ 22: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 23: $t17 := 9223372036854775807
+     # live vars: $t16, $t17
+ 24: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 25: $t17 := -9223372036854775808
+     # live vars: $t16, $t17
+ 26: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 27: $t17 := -1
+     # live vars: $t16, $t17
+ 28: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 29: $t17 := -2
+     # live vars: $t16, $t17
+ 30: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 31: $t17 := -3
+     # live vars: $t16, $t17
+ 32: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 33: return $t16
+}
+
+
+[variant baseline]
+public fun constants::test_i8(): i8 {
+     var $t0: i8 [unused]
+     var $t1: i8 [unused]
+     var $t2: i8 [unused]
+     var $t3: i8 [unused]
+     var $t4: i8 [unused]
+     var $t5: i8 [unused]
+     var $t6: i8 [unused]
+     var $t7: i8 [unused]
+     var $t8: i8 [unused]
+     var $t9: i8 [unused]
+     var $t10: i8 [unused]
+     var $t11: i8 [unused]
+     var $t12: i8 [unused]
+     var $t13: i8 [unused]
+     var $t14: i8 [unused]
+     var $t15: i8 [unused]
+     var $t16: i8
+     var $t17: i8
+     var $t18: i8 [unused]
+     var $t19: i8 [unused]
+     var $t20: i8 [unused]
+     var $t21: i8 [unused]
+     var $t22: i8 [unused]
+     var $t23: i8 [unused]
+     var $t24: i8 [unused]
+     var $t25: i8 [unused]
+     var $t26: i8 [unused]
+     var $t27: i8 [unused]
+     var $t28: i8 [unused]
+     var $t29: i8 [unused]
+     var $t30: i8 [unused]
+     var $t31: i8 [unused]
+     var $t32: i8 [unused]
+     # live vars:
+  0: $t16 := 127
+     # live vars: $t16
+  1: $t17 := 127
+     # live vars: $t16, $t17
+  2: $t16 := +($t16, $t17)
+     # live vars: $t16
+  3: $t17 := -128
+     # live vars: $t16, $t17
+  4: $t16 := +($t16, $t17)
+     # live vars: $t16
+  5: $t17 := -128
+     # live vars: $t16, $t17
+  6: $t16 := +($t16, $t17)
+     # live vars: $t16
+  7: $t17 := 0
+     # live vars: $t16, $t17
+  8: $t16 := +($t16, $t17)
+     # live vars: $t16
+  9: $t17 := 1
+     # live vars: $t16, $t17
+ 10: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 11: $t17 := -1
+     # live vars: $t16, $t17
+ 12: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 13: $t17 := 127
+     # live vars: $t16, $t17
+ 14: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 15: $t17 := -128
+     # live vars: $t16, $t17
+ 16: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 17: $t17 := 0
+     # live vars: $t16, $t17
+ 18: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 19: $t17 := 1
+     # live vars: $t16, $t17
+ 20: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 21: $t17 := -1
+     # live vars: $t16, $t17
+ 22: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 23: $t17 := 127
+     # live vars: $t16, $t17
+ 24: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 25: $t17 := -128
+     # live vars: $t16, $t17
+ 26: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 27: $t17 := -1
+     # live vars: $t16, $t17
+ 28: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 29: $t17 := -2
+     # live vars: $t16, $t17
+ 30: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 31: $t17 := -3
+     # live vars: $t16, $t17
+ 32: $t16 := +($t16, $t17)
+     # live vars: $t16
+ 33: return $t16
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v9
+module 42.constants {
+
+
+public test_i128(): i128 /* def_idx: 0 */ {
+B0:
+	0: LdI128(170141183460469231731687303715884105727)
+	1: LdI128(170141183460469231731687303715884105727)
+	2: Add
+	3: LdI128(-170141183460469231731687303715884105728)
+	4: Add
+	5: LdI128(-170141183460469231731687303715884105728)
+	6: Add
+	7: LdI128(0)
+	8: Add
+	9: LdI128(1)
+	10: Add
+	11: LdI128(-1)
+	12: Add
+	13: LdI128(170141183460469231731687303715884105727)
+	14: Add
+	15: LdI128(-170141183460469231731687303715884105728)
+	16: Add
+	17: LdI128(0)
+	18: Add
+	19: LdI128(1)
+	20: Add
+	21: LdI128(-1)
+	22: Add
+	23: LdI128(170141183460469231731687303715884105727)
+	24: Add
+	25: LdI128(-170141183460469231731687303715884105728)
+	26: Add
+	27: LdI128(-1)
+	28: Add
+	29: LdI128(-2)
+	30: Add
+	31: LdI128(-3)
+	32: Add
+	33: Ret
+}
+public test_i16(): i16 /* def_idx: 1 */ {
+B0:
+	0: LdI16(32767)
+	1: LdI16(32767)
+	2: Add
+	3: LdI16(-32768)
+	4: Add
+	5: LdI16(-32768)
+	6: Add
+	7: LdI16(0)
+	8: Add
+	9: LdI16(1)
+	10: Add
+	11: LdI16(-1)
+	12: Add
+	13: LdI16(32767)
+	14: Add
+	15: LdI16(-32768)
+	16: Add
+	17: LdI16(0)
+	18: Add
+	19: LdI16(1)
+	20: Add
+	21: LdI16(-1)
+	22: Add
+	23: LdI16(32767)
+	24: Add
+	25: LdI16(-32768)
+	26: Add
+	27: LdI16(-1)
+	28: Add
+	29: LdI16(-2)
+	30: Add
+	31: LdI16(-3)
+	32: Add
+	33: Ret
+}
+public test_i256(): i256 /* def_idx: 2 */ {
+B0:
+	0: LdI256(57896044618658097711785492504343953926634992332820282019728792003956564819967)
+	1: LdI256(57896044618658097711785492504343953926634992332820282019728792003956564819967)
+	2: Add
+	3: LdI256(-57896044618658097711785492504343953926634992332820282019728792003956564819968)
+	4: Add
+	5: LdI256(-57896044618658097711785492504343953926634992332820282019728792003956564819968)
+	6: Add
+	7: LdI256(0)
+	8: Add
+	9: LdI256(1)
+	10: Add
+	11: LdI256(-1)
+	12: Add
+	13: LdI256(57896044618658097711785492504343953926634992332820282019728792003956564819967)
+	14: Add
+	15: LdI256(-57896044618658097711785492504343953926634992332820282019728792003956564819968)
+	16: Add
+	17: LdI256(0)
+	18: Add
+	19: LdI256(1)
+	20: Add
+	21: LdI256(-1)
+	22: Add
+	23: LdI256(57896044618658097711785492504343953926634992332820282019728792003956564819967)
+	24: Add
+	25: LdI256(-57896044618658097711785492504343953926634992332820282019728792003956564819968)
+	26: Add
+	27: LdI256(-1)
+	28: Add
+	29: LdI256(-2)
+	30: Add
+	31: LdI256(-3)
+	32: Add
+	33: Ret
+}
+public test_i32(): i32 /* def_idx: 3 */ {
+B0:
+	0: LdI32(2147483647)
+	1: LdI32(2147483647)
+	2: Add
+	3: LdI32(-2147483648)
+	4: Add
+	5: LdI32(-2147483648)
+	6: Add
+	7: LdI32(0)
+	8: Add
+	9: LdI32(1)
+	10: Add
+	11: LdI32(-1)
+	12: Add
+	13: LdI32(2147483647)
+	14: Add
+	15: LdI32(-2147483648)
+	16: Add
+	17: LdI32(0)
+	18: Add
+	19: LdI32(1)
+	20: Add
+	21: LdI32(-1)
+	22: Add
+	23: LdI32(2147483647)
+	24: Add
+	25: LdI32(-2147483648)
+	26: Add
+	27: LdI32(-1)
+	28: Add
+	29: LdI32(-2)
+	30: Add
+	31: LdI32(-3)
+	32: Add
+	33: Ret
+}
+public test_i64(): i64 /* def_idx: 4 */ {
+B0:
+	0: LdI64(9223372036854775807)
+	1: LdI64(9223372036854775807)
+	2: Add
+	3: LdI64(-9223372036854775808)
+	4: Add
+	5: LdI64(-9223372036854775808)
+	6: Add
+	7: LdI64(0)
+	8: Add
+	9: LdI64(1)
+	10: Add
+	11: LdI64(-1)
+	12: Add
+	13: LdI64(9223372036854775807)
+	14: Add
+	15: LdI64(-9223372036854775808)
+	16: Add
+	17: LdI64(0)
+	18: Add
+	19: LdI64(1)
+	20: Add
+	21: LdI64(-1)
+	22: Add
+	23: LdI64(9223372036854775807)
+	24: Add
+	25: LdI64(-9223372036854775808)
+	26: Add
+	27: LdI64(-1)
+	28: Add
+	29: LdI64(-2)
+	30: Add
+	31: LdI64(-3)
+	32: Add
+	33: Ret
+}
+public test_i8(): i8 /* def_idx: 5 */ {
+B0:
+	0: LdI8(127)
+	1: LdI8(127)
+	2: Add
+	3: LdI8(-128)
+	4: Add
+	5: LdI8(-128)
+	6: Add
+	7: LdI8(0)
+	8: Add
+	9: LdI8(1)
+	10: Add
+	11: LdI8(-1)
+	12: Add
+	13: LdI8(127)
+	14: Add
+	15: LdI8(-128)
+	16: Add
+	17: LdI8(0)
+	18: Add
+	19: LdI8(1)
+	20: Add
+	21: LdI8(-1)
+	22: Add
+	23: LdI8(127)
+	24: Add
+	25: LdI8(-128)
+	26: Add
+	27: LdI8(-1)
+	28: Add
+	29: LdI8(-2)
+	30: Add
+	31: LdI8(-3)
+	32: Add
+	33: Ret
+}
+}
+============ bytecode verification succeeded ========
