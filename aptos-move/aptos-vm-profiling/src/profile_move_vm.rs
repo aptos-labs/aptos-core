@@ -93,6 +93,8 @@ fn build_binaries() -> Result<()> {
         .arg("build")
         .arg("--profile")
         .arg(BUILD_PROFILE)
+        .arg("--features")
+        .arg("move-vm-types/force-inline move-vm-runtime/force-inline")
         .arg("-p")
         .arg("aptos-vm-profiling")
         .arg("--bin")
