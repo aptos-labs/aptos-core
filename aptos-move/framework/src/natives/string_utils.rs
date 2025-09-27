@@ -9,13 +9,15 @@ use aptos_native_interface::{
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_std::iterable::Iterable;
+use itertools::Itertools;
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     account_address::AccountAddress,
     function::ClosureMask,
-    language_storage::TypeTag,
+    language_storage::{TypeTag, OPTION_NONE_TAG},
     u256,
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET},
+    vm_status::StatusCode,
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -180,6 +182,46 @@ fn format_closure_captured_arguments(
     Ok(())
 }
 
+/// Formats enum representation of option as a string
+fn format_enum_option(
+    context: &mut FormatContext,
+    fields: &[MoveFieldLayout],
+    strct: Struct,
+    depth: usize,
+    out: &mut String,
+) -> SafeNativeResult<()> {
+    let mut vv = strct.unpack()?.collect_vec();
+    if vv
+        .first()
+        .ok_or_else(|| {
+            SafeNativeError::InvariantViolation(PartialVMError::new(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            ))
+        })?
+        .equals(&Value::u16(OPTION_NONE_TAG))?
+    {
+        out.push_str("None");
+    } else {
+        debug_assert!(vv.len() == 2);
+        out.push_str("Some(");
+        let inner_ty = if let MoveTypeLayout::Vector(inner_ty) = &fields[0].layout {
+            inner_ty.deref()
+        } else {
+            return Err(SafeNativeError::InvariantViolation(PartialVMError::new(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            )));
+        };
+        let v2 = vv.pop().ok_or_else(|| {
+            SafeNativeError::InvariantViolation(PartialVMError::new(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            ))
+        })?;
+        native_format_impl(context, inner_ty, v2, depth, out)?;
+        out.push(')');
+    }
+    Ok(())
+}
+
 fn native_format_impl(
     context: &mut FormatContext,
     layout: &MoveTypeLayout,
@@ -308,27 +350,30 @@ fn native_format_impl(
                 )
                 .unwrap();
                 return Ok(());
-            } else if type_.name.as_str() == "Option"
-                && type_.module.as_str() == "option"
-                && type_.address == AccountAddress::ONE
-            {
-                let mut v = strct
-                    .unpack()?
-                    .next()
-                    .unwrap()
-                    .value_as::<Vector>()?
-                    .unpack_unchecked()?;
-                if v.is_empty() {
-                    out.push_str("None");
+            } else if type_.is_option() {
+                if context.context.get_feature_flags().is_enum_option_enabled() {
+                    // This outputs the legacy layout of option for backward compatibility.
+                    // when using enum representation of option, we need different logic to format it
+                    format_enum_option(context, fields, strct, depth, out)?;
                 } else {
-                    out.push_str("Some(");
-                    let inner_ty = if let MoveTypeLayout::Vector(inner_ty) = &fields[0].layout {
-                        inner_ty.deref()
+                    let mut v = strct
+                        .unpack()?
+                        .next()
+                        .unwrap()
+                        .value_as::<Vector>()?
+                        .unpack_unchecked()?;
+                    if v.is_empty() {
+                        out.push_str("None");
                     } else {
-                        unreachable!()
-                    };
-                    native_format_impl(context, inner_ty, v.pop().unwrap(), depth, out)?;
-                    out.push(')');
+                        out.push_str("Some(");
+                        let inner_ty = if let MoveTypeLayout::Vector(inner_ty) = &fields[0].layout {
+                            inner_ty.deref()
+                        } else {
+                            unreachable!()
+                        };
+                        native_format_impl(context, inner_ty, v.pop().unwrap(), depth, out)?;
+                        out.push(')');
+                    }
                 }
                 return Ok(());
             }

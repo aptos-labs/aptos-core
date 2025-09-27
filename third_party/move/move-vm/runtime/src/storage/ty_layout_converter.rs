@@ -9,10 +9,9 @@ use crate::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    account_address::AccountAddress,
     ident_str,
     identifier::Identifier,
-    language_storage::ModuleId,
+    language_storage::{LEGACY_OPTION_VEC, OPTION_STRUCT_NAME},
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -24,12 +23,7 @@ use move_vm_types::{
         struct_name_indexing::StructNameIndex,
     },
 };
-use once_cell::sync::Lazy;
 use std::sync::Arc;
-
-static OPTION_MODULE_ID: Lazy<ModuleId> =
-    Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("option"))));
-static OPTION_STRUCT_NAME: Lazy<Identifier> = Lazy::new(|| Identifier::from(ident_str!("Option")));
 
 /// Stores type layout as well as a flag if it contains any delayed fields.
 #[derive(Debug)]
@@ -327,8 +321,7 @@ where
                 .runtime_environment()
                 .struct_name_index_map()
                 .idx_to_struct_name(*idx)?;
-            if struct_identifier.module == *OPTION_MODULE_ID
-                && struct_identifier.name == *OPTION_STRUCT_NAME
+            if struct_identifier.module.is_option() && struct_identifier.name == *OPTION_STRUCT_NAME
             {
                 return Err(
                     PartialVMError::new(StatusCode::UNABLE_TO_CAPTURE_OPTION_TYPE)
@@ -342,6 +335,50 @@ where
             // delayed fields is needed because enums cannot be delayed fields!
             StructLayout::Variants(variants) => {
                 let mut variant_contains_delayed_fields = false;
+                let enum_option_enabled = self.runtime_environment().vm_config().enable_enum_option;
+                // convert enum representation of option for backward compatibility
+                if enum_option_enabled && ANNOTATED {
+                    let ty_tag_converter =
+                        TypeTagConverter::new(self.struct_definition_loader.runtime_environment());
+                    let struct_tag =
+                        ty_tag_converter.struct_name_idx_to_struct_tag(idx, ty_args)?;
+                    if struct_tag.is_option() {
+                        let field_name = ident_str!(LEGACY_OPTION_VEC).to_owned();
+                        let ty_builder = &self.vm_config().ty_builder;
+                        if variants.len() < 2 || variants[1].1.is_empty() {
+                            return Err(PartialVMError::new(
+                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            ));
+                        }
+                        let field_type =
+                            ty_builder.create_ty_with_subst(&variants[1].1[0].1, ty_args)?;
+                        let (mut field_layout, delayed_fields) = self
+                            .types_to_type_layouts::<ANNOTATED>(
+                                gas_meter,
+                                traversal_context,
+                                &[field_type],
+                                count,
+                                depth + 1,
+                                check_option_type,
+                            )?;
+                        variant_contains_delayed_fields |= delayed_fields;
+                        if field_layout.is_empty() {
+                            return Err(PartialVMError::new(
+                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            ));
+                        }
+                        let field_layout = MoveFieldLayout::new(
+                            field_name,
+                            MoveTypeLayout::Vector(Box::new(field_layout.pop().unwrap())),
+                        );
+                        let struct_layout =
+                            MoveStructLayout::with_types(struct_tag, vec![field_layout]);
+                        return Ok((
+                            MoveTypeLayout::Struct(struct_layout),
+                            variant_contains_delayed_fields,
+                        ));
+                    }
+                }
                 let variant_layouts = variants
                     .iter()
                     .map(|variant| {
