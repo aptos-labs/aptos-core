@@ -2649,10 +2649,6 @@ mod test {
         Value::struct_(Struct::pack(vec![inner]))
     }
 
-    fn create_vector_value(inner: Vec<Value>) -> Value {
-        Value::vector_for_testing_only(inner)
-    }
-
     fn create_state_value(value: &Value, layout: &MoveTypeLayout) -> StateValue {
         StateValue::new_legacy(
             ValueSerDeContext::new(None)
@@ -2750,11 +2746,14 @@ mod test {
         let storage_layout = create_struct_layout(create_vector_layout(
             create_aggregator_storage_layout(MoveTypeLayout::U64),
         ));
-        let value = create_struct_value(create_vector_value(vec![
-            create_aggregator_value_u64(20, 50),
-            create_aggregator_value_u64(35, 65),
-            create_aggregator_value_u64(0, 20),
-        ]));
+        let value = create_struct_value(
+            Value::vector_unchecked(vec![
+                create_aggregator_value_u64(20, 50),
+                create_aggregator_value_u64(35, 65),
+                create_aggregator_value_u64(0, 20),
+            ])
+            .unwrap(),
+        );
         let state_value = create_state_value(&value, &storage_layout);
 
         let layout = create_struct_layout(create_vector_layout(create_aggregator_layout_u64()));
@@ -2771,21 +2770,21 @@ mod test {
             RefCell::new(9),
             "The counter should have been updated to 9"
         );
-        let patched_value =
-            Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-                Value::struct_(Struct::pack(vec![
-                    Value::u64(DelayedFieldID::new_with_width(6, 8).as_u64()),
-                    Value::u64(50),
-                ])),
-                Value::struct_(Struct::pack(vec![
-                    Value::u64(DelayedFieldID::new_with_width(7, 8).as_u64()),
-                    Value::u64(65),
-                ])),
-                Value::struct_(Struct::pack(vec![
-                    Value::u64(DelayedFieldID::new_with_width(8, 8).as_u64()),
-                    Value::u64(20),
-                ])),
-            ])]));
+        let patched_value = Value::struct_(Struct::pack(vec![Value::vector_unchecked(vec![
+            Value::struct_(Struct::pack(vec![
+                Value::u64(DelayedFieldID::new_with_width(6, 8).as_u64()),
+                Value::u64(50),
+            ])),
+            Value::struct_(Struct::pack(vec![
+                Value::u64(DelayedFieldID::new_with_width(7, 8).as_u64()),
+                Value::u64(65),
+            ])),
+            Value::struct_(Struct::pack(vec![
+                Value::u64(DelayedFieldID::new_with_width(8, 8).as_u64()),
+                Value::u64(20),
+            ])),
+        ])
+        .unwrap()]));
         assert_eq!(
             patched_state_value,
             create_state_value(&patched_value, &storage_layout),
@@ -2808,11 +2807,14 @@ mod test {
         let storage_layout = create_struct_layout(create_vector_layout(
             create_snapshot_storage_layout(MoveTypeLayout::U128),
         ));
-        let value = create_struct_value(create_vector_value(vec![
-            create_snapshot_value(Value::u128(20)),
-            create_snapshot_value(Value::u128(35)),
-            create_snapshot_value(Value::u128(0)),
-        ]));
+        let value = create_struct_value(
+            Value::vector_unchecked(vec![
+                create_snapshot_value(Value::u128(20)),
+                create_snapshot_value(Value::u128(35)),
+                create_snapshot_value(Value::u128(0)),
+            ])
+            .unwrap(),
+        );
         let state_value = create_state_value(&value, &storage_layout);
 
         let layout = create_struct_layout(create_vector_layout(create_snapshot_layout(
@@ -2831,18 +2833,18 @@ mod test {
             RefCell::new(12),
             "The counter should have been updated to 12"
         );
-        let patched_value =
-            Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-                create_snapshot_value(Value::u128(
-                    DelayedFieldID::new_with_width(9, 16).as_u64() as u128
-                )),
-                create_snapshot_value(Value::u128(
-                    DelayedFieldID::new_with_width(10, 16).as_u64() as u128
-                )),
-                create_snapshot_value(Value::u128(
-                    DelayedFieldID::new_with_width(11, 16).as_u64() as u128
-                )),
-            ])]));
+        let patched_value = Value::struct_(Struct::pack(vec![Value::vector_unchecked(vec![
+            create_snapshot_value(Value::u128(
+                DelayedFieldID::new_with_width(9, 16).as_u64() as u128
+            )),
+            create_snapshot_value(Value::u128(
+                DelayedFieldID::new_with_width(10, 16).as_u64() as u128
+            )),
+            create_snapshot_value(Value::u128(
+                DelayedFieldID::new_with_width(11, 16).as_u64() as u128
+            )),
+        ])
+        .unwrap()]));
         assert_eq!(
             patched_state_value,
             create_state_value(&patched_value, &storage_layout),
@@ -2865,11 +2867,14 @@ mod test {
         */
         let storage_layout =
             create_struct_layout(create_vector_layout(create_derived_string_storage_layout()));
-        let value = create_struct_value(create_vector_value(vec![
-            create_derived_value("hello", 60),
-            create_derived_value("ab", 55),
-            create_derived_value("c", 50),
-        ]));
+        let value = create_struct_value(
+            Value::vector_unchecked(vec![
+                create_derived_value("hello", 60),
+                create_derived_value("ab", 55),
+                create_derived_value("c", 50),
+            ])
+            .unwrap(),
+        );
         let state_value = create_state_value(&value, &storage_layout);
 
         let layout = create_struct_layout(create_vector_layout(create_derived_string_layout()));
@@ -2887,18 +2892,18 @@ mod test {
             "The counter should have been updated to 15"
         );
 
-        let patched_value =
-            Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-                DelayedFieldID::new_with_width(12, 60)
-                    .into_derived_string_struct()
-                    .unwrap(),
-                DelayedFieldID::new_with_width(13, 55)
-                    .into_derived_string_struct()
-                    .unwrap(),
-                DelayedFieldID::new_with_width(14, 50)
-                    .into_derived_string_struct()
-                    .unwrap(),
-            ])]));
+        let patched_value = Value::struct_(Struct::pack(vec![Value::vector_unchecked(vec![
+            DelayedFieldID::new_with_width(12, 60)
+                .into_derived_string_struct()
+                .unwrap(),
+            DelayedFieldID::new_with_width(13, 55)
+                .into_derived_string_struct()
+                .unwrap(),
+            DelayedFieldID::new_with_width(14, 50)
+                .into_derived_string_struct()
+                .unwrap(),
+        ])
+        .unwrap()]));
         assert_eq!(
             patched_state_value,
             create_state_value(&patched_value, &storage_layout),
