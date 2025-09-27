@@ -413,7 +413,7 @@ where
         let mut locals = Locals::new(num_locals);
         for (i, value) in args.into_iter().enumerate() {
             locals
-                .store_loc(i, value, self.vm_config.check_invariant_in_swap_loc)
+                .store_loc(i, value)
                 .map_err(|e| self.set_location(e))?;
         }
 
@@ -929,7 +929,7 @@ where
             } else {
                 self.operand_stack.pop()?
             };
-            locals.store_loc(i, value, self.vm_config.check_invariant_in_swap_loc)?;
+            locals.store_loc(i, value)?;
 
             if should_check && !is_captured {
                 // Only perform paranoid type check for actual operands on the stack.
@@ -2117,10 +2117,7 @@ impl Frame {
                         interpreter.operand_stack.push(local)?;
                     },
                     Bytecode::MoveLoc(idx) => {
-                        let local = self.locals.move_loc(
-                            *idx as usize,
-                            interpreter.vm_config.check_invariant_in_swap_loc,
-                        )?;
+                        let local = self.locals.move_loc(*idx as usize)?;
                         gas_meter.charge_move_loc(&local)?;
 
                         interpreter.operand_stack.push(local)?;
@@ -2128,11 +2125,7 @@ impl Frame {
                     Bytecode::StLoc(idx) => {
                         let value_to_store = interpreter.operand_stack.pop()?;
                         gas_meter.charge_store_loc(&value_to_store)?;
-                        self.locals.store_loc(
-                            *idx as usize,
-                            value_to_store,
-                            interpreter.vm_config.check_invariant_in_swap_loc,
-                        )?;
+                        self.locals.store_loc(*idx as usize, value_to_store)?;
                     },
                     Bytecode::Call(idx) => {
                         return Ok(ExitCode::Call(*idx));
