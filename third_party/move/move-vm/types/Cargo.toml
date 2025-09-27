@@ -40,3 +40,4 @@ rand = { workspace = true }
 default = []
 testing = []
 fuzzing = ["proptest", "move-binary-format/fuzzing"]
+force-inline = []

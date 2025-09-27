@@ -238,7 +238,7 @@ impl RuntimeEnvironment {
     }
 
     /// Returns an error is module's address and name do not match the expected values.
-    #[inline]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_module_address_and_name(
         &self,
         module: &CompiledModule,

@@ -60,7 +60,7 @@ impl CallType {
 }
 
 impl ReentrancyChecker {
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn enter_function(
         &mut self,
         caller_module: Option<&ModuleId>,
@@ -108,7 +108,7 @@ impl ReentrancyChecker {
         Ok(())
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn exit_function(
         &mut self,
         caller_module: &ModuleId,
