@@ -37,6 +37,8 @@ module aptos_framework::aptos_governance {
     use aptos_framework::timestamp;
     use aptos_framework::voting;
 
+    friend aptos_framework::delegation_pool;
+
     /// The specified stake pool does not have sufficient stake to create a proposal
     const EINSUFFICIENT_PROPOSER_STAKE: u64 = 1;
     /// This account is not the designated voter of the specified stake pool
@@ -302,6 +304,15 @@ module aptos_framework::aptos_governance {
     }
 
     #[view]
+    public fun used_voting_power(stake_pool: address, proposal_id: u64): u64 acquires VotingRecordsV2 {
+        let record_key = RecordKey {
+            stake_pool,
+            proposal_id,
+        };
+        *VotingRecordsV2[@aptos_framework].votes.borrow_with_default(record_key, &0)
+    }
+
+    #[view]
     /// Return true if a stake pool has already voted on a proposal before partial governance voting is enabled.
     public fun has_entirely_voted(stake_pool: address, proposal_id: u64): bool acquires VotingRecords {
         let record_key = RecordKey {
@@ -321,18 +332,28 @@ module aptos_framework::aptos_governance {
         stake_pool: address,
         proposal_id: u64
     ): u64 acquires VotingRecords, VotingRecordsV2 {
-        assert_voting_initialization();
-
-        let proposal_expiration = voting::get_proposal_expiration_secs<GovernanceProposal>(
-            @aptos_framework,
-            proposal_id
-        );
+        let proposal_expiration = get_proposal_expiration(proposal_id);
         let lockup_until = stake::get_lockup_secs(stake_pool);
         // The voter's stake needs to be locked up at least as long as the proposal's expiration.
         // Also no one can vote on a expired proposal.
         if (proposal_expiration > lockup_until || timestamp::now_seconds() > proposal_expiration) {
             return 0
         };
+
+        get_remaining_voting_power_skipping_expiration(
+            stake_pool,
+            proposal_id
+        )
+    }
+
+    #[view]
+    /// Return remaining voting power of a stake pool on a proposal without checking that the pool's remaining lockup is
+    /// at least as long as the proposal's expiration.
+    public fun get_remaining_voting_power_skipping_expiration(
+        stake_pool: address,
+        proposal_id: u64
+    ): u64 acquires VotingRecords, VotingRecordsV2 {
+        assert_voting_initialization();
 
         // If a stake pool has already voted on a proposal before partial governance voting is enabled, the stake pool
         // cannot vote on the proposal even after partial governance voting is enabled.
@@ -347,12 +368,14 @@ module aptos_framework::aptos_governance {
         get_voting_power(stake_pool) - used_voting_power
     }
 
+    #[view]
+    public fun get_proposal_expiration(proposal_id: u64): u64 {
+        voting::get_proposal_expiration_secs<GovernanceProposal>(@aptos_framework, proposal_id)
+    }
+
     public fun assert_proposal_expiration(stake_pool: address, proposal_id: u64) {
         assert_voting_initialization();
-        let proposal_expiration = voting::get_proposal_expiration_secs<GovernanceProposal>(
-            @aptos_framework,
-            proposal_id
-        );
+        let proposal_expiration = get_proposal_expiration(proposal_id);
         // The voter's stake needs to be locked up at least as long as the proposal's expiration.
         assert!(
             proposal_expiration <= stake::get_lockup_secs(stake_pool),
@@ -412,6 +435,8 @@ module aptos_framework::aptos_governance {
     ): u64 acquires GovernanceConfig, GovernanceEvents {
         check_governance_permission(proposer);
         let proposer_address = signer::address_of(proposer);
+        // This effectively disallows delegation pool delegators to create proposals
+        // TODO: Support delegators creating proposals
         assert!(
             stake::get_delegated_voter(stake_pool) == proposer_address,
             error::invalid_argument(ENOT_DELEGATED_VOTER)
@@ -494,7 +519,7 @@ module aptos_framework::aptos_governance {
         should_pass: bool,
     ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
         vector::for_each(stake_pools, |stake_pool| {
-            vote_internal(voter, stake_pool, proposal_id, MAX_U64, should_pass);
+            vote_internal(voter, stake_pool, proposal_id, MAX_U64, should_pass, true);
         });
     }
 
@@ -507,7 +532,7 @@ module aptos_framework::aptos_governance {
         should_pass: bool,
     ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
         vector::for_each(stake_pools, |stake_pool| {
-            vote_internal(voter, stake_pool, proposal_id, voting_power, should_pass);
+            vote_internal(voter, stake_pool, proposal_id, voting_power, should_pass, true);
         });
     }
 
@@ -518,7 +543,7 @@ module aptos_framework::aptos_governance {
         proposal_id: u64,
         should_pass: bool,
     ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        vote_internal(voter, stake_pool, proposal_id, MAX_U64, should_pass);
+        vote_internal(voter, stake_pool, proposal_id, MAX_U64, should_pass, true);
     }
 
     /// Vote on proposal with `proposal_id` and specified voting power from `stake_pool`.
@@ -529,7 +554,22 @@ module aptos_framework::aptos_governance {
         voting_power: u64,
         should_pass: bool,
     ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        vote_internal(voter, stake_pool, proposal_id, voting_power, should_pass);
+        vote_internal(voter, stake_pool, proposal_id, voting_power, should_pass, true);
+    }
+
+    /// Vote on proposal with `proposal_id` and specified voting power from `stake_pool` WITHOUT CHECKING PROPOSAL
+    /// EXPIRATION.
+    ///
+    /// This is only callable by the delegation module for cases where delegators have separate extra lockups from the
+    /// delegation pool.
+    friend fun partial_vote_without_expiration_check(
+        voter: &signer,
+        stake_pool: address,
+        proposal_id: u64,
+        voting_power: u64,
+        should_pass: bool,
+    ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        vote_internal(voter, stake_pool, proposal_id, voting_power, should_pass, false);
     }
 
     /// Vote on proposal with `proposal_id` and specified voting_power from `stake_pool`.
@@ -542,16 +582,23 @@ module aptos_framework::aptos_governance {
         proposal_id: u64,
         voting_power: u64,
         should_pass: bool,
+        check_expiration: bool,
     ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
         permissioned_signer::assert_master_signer(voter);
         let voter_address = signer::address_of(voter);
         assert!(stake::get_delegated_voter(stake_pool) == voter_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
 
-        assert_proposal_expiration(stake_pool, proposal_id);
+        if (check_expiration) {
+            assert_proposal_expiration(stake_pool, proposal_id);
+        };
 
         // If a stake pool has already voted on a proposal before partial governance voting is enabled,
         // `get_remaining_voting_power` returns 0.
-        let staking_pool_voting_power = get_remaining_voting_power(stake_pool, proposal_id);
+        let staking_pool_voting_power = if (check_expiration) {
+            get_remaining_voting_power(stake_pool, proposal_id)
+        } else {
+            get_remaining_voting_power_skipping_expiration(stake_pool, proposal_id)
+        };
         voting_power = min(voting_power, staking_pool_voting_power);
 
         // Short-circuit if the voter has no voting power.
@@ -810,6 +857,11 @@ module aptos_framework::aptos_governance {
         } else {
             resolve(proposal_id, signer_address)
         }
+    }
+
+    #[test_only]
+    public fun extend_voting_duration_for_test(proposal_id: u64, new_voting_duration_secs: u64) {
+        voting::extend_voting<GovernanceProposal>(@aptos_framework, proposal_id, new_voting_duration_secs);
     }
 
     #[test_only]
