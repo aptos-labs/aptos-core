@@ -360,11 +360,10 @@ module aptos_experimental::bulk_order_book_types {
         is_bid: bool,
         matched_size: u64
     ): OrderMatch<M> {
-        // print( &order.total_remaining_bid_size);
-        let (price, orig_size, remaining_size) = if (is_bid) {
-            (order.bid_prices[0], order.orig_bid_size, order.total_remaining_bid_size - matched_size)
+        let price = if (is_bid) {
+            order.bid_prices[0]
         } else {
-            (order.ask_prices[0], order.orig_ask_size, order.total_remaining_ask_size - matched_size)
+            order.ask_prices[0]
         };
         new_order_match<M>(
             new_order_match_details<M>(
@@ -373,8 +372,8 @@ module aptos_experimental::bulk_order_book_types {
                 option::none(),
                 order.get_unique_priority_idx(),
                 price,
-                orig_size,
-                remaining_size,
+                order.orig_bid_size + order.orig_ask_size,
+                order.total_remaining_bid_size + order.total_remaining_ask_size - matched_size,
                 is_bid,
                 good_till_cancelled(),
                 order.metadata,
@@ -591,5 +590,54 @@ module aptos_experimental::bulk_order_book_types {
         self.ask_sizes = vector::empty();
         self.bid_prices = vector::empty();
         self.ask_prices = vector::empty();
+    }
+
+    public fun destroy_bulk_order<M: store + copy + drop>(
+        self: BulkOrder<M>
+    ): (
+        OrderIdType,
+        address,
+        UniqueIdxType,
+        u64,
+        u64,
+        u64,
+        u64,
+        u64,
+        vector<u64>,
+        vector<u64>,
+        vector<u64>,
+        vector<u64>,
+        M
+    ) {
+        let BulkOrder::V1 {
+            order_id,
+            account,
+            unique_priority_idx,
+            order_sequence_number,
+            orig_bid_size,
+            orig_ask_size,
+            total_remaining_bid_size,
+            total_remaining_ask_size,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            metadata
+        } = self;
+        (
+            order_id,
+            account,
+            unique_priority_idx,
+            order_sequence_number,
+            orig_bid_size,
+            orig_ask_size,
+            total_remaining_bid_size,
+            total_remaining_ask_size,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            metadata
+        )
     }
 }

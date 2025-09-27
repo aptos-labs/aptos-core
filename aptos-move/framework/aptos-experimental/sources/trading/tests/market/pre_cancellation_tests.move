@@ -131,7 +131,8 @@ module aptos_experimental::pre_cancellation_tests {
             0,
             2000000,
             true, // Order is cancelled
-            &mut event_store
+            &mut event_store,
+            false,
         );
         assert!(market.get_remaining_size(order_id) == 0);
         market.destroy_market();

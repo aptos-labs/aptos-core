@@ -77,6 +77,7 @@ ask_sizes
     -  [Validation:](#@Validation:_7)
 -  [Enum `BulkOrder`](#0x7_bulk_order_book_types_BulkOrder)
     -  [Fields:](#@Fields:_8)
+-  [Struct `BulkOrderPlacementResult`](#0x7_bulk_order_book_types_BulkOrderPlacementResult)
 -  [Constants](#@Constants_9)
 -  [Function `new_bulk_order`](#0x7_bulk_order_book_types_new_bulk_order)
     -  [Arguments:](#@Arguments:_10)
@@ -130,6 +131,7 @@ ask_sizes
     -  [Aborts:](#@Aborts:_38)
 -  [Function `set_empty`](#0x7_bulk_order_book_types_set_empty)
     -  [Arguments:](#@Arguments:_39)
+-  [Function `destroy_bulk_order`](#0x7_bulk_order_book_types_destroy_bulk_order)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -369,6 +371,57 @@ both original and remaining sizes for tracking purposes.
 </details>
 
 </details>
+
+</details>
+
+<a id="0x7_bulk_order_book_types_BulkOrderPlacementResult"></a>
+
+## Struct `BulkOrderPlacementResult`
+
+
+
+<pre><code><b>struct</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlacementResult">BulkOrderPlacementResult</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
 
 </details>
 
@@ -934,11 +987,10 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
     is_bid: bool,
     matched_size: u64
 ): OrderMatch&lt;M&gt; {
-    // print( &order.total_remaining_bid_size);
-    <b>let</b> (price, orig_size, remaining_size) = <b>if</b> (is_bid) {
-        (order.bid_prices[0], order.orig_bid_size, order.total_remaining_bid_size - matched_size)
+    <b>let</b> price = <b>if</b> (is_bid) {
+        order.bid_prices[0]
     } <b>else</b> {
-        (order.ask_prices[0], order.orig_ask_size, order.total_remaining_ask_size - matched_size)
+        order.ask_prices[0]
     };
     new_order_match&lt;M&gt;(
         new_order_match_details&lt;M&gt;(
@@ -947,8 +999,8 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
             <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
             order.<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_unique_priority_idx">get_unique_priority_idx</a>(),
             price,
-            orig_size,
-            remaining_size,
+            order.orig_bid_size + order.orig_ask_size,
+            order.total_remaining_bid_size + order.total_remaining_ask_size - matched_size,
             is_bid,
             good_till_cancelled(),
             order.metadata,
@@ -1441,6 +1493,75 @@ Sets the bulk order to empty state by clearing all sizes.
     self.ask_sizes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     self.bid_prices = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     self.ask_prices = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_bulk_order_book_types_destroy_bulk_order"></a>
+
+## Function `destroy_bulk_order`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order">destroy_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, u64, u64, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, M)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order">destroy_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;
+): (
+    OrderIdType,
+    <b>address</b>,
+    UniqueIdxType,
+    u64,
+    u64,
+    u64,
+    u64,
+    u64,
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    M
+) {
+    <b>let</b> BulkOrder::V1 {
+        order_id,
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        unique_priority_idx,
+        order_sequence_number,
+        orig_bid_size,
+        orig_ask_size,
+        total_remaining_bid_size,
+        total_remaining_ask_size,
+        bid_prices,
+        bid_sizes,
+        ask_prices,
+        ask_sizes,
+        metadata
+    } = self;
+    (
+        order_id,
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        unique_priority_idx,
+        order_sequence_number,
+        orig_bid_size,
+        orig_ask_size,
+        total_remaining_bid_size,
+        total_remaining_ask_size,
+        bid_prices,
+        bid_sizes,
+        ask_prices,
+        ask_sizes,
+        metadata
+    )
 }
 </code></pre>
 
