@@ -64,8 +64,8 @@ type Blinder = [u8; 31];
 /// Runs the example client that interacts with the pepper service
 pub async fn run_client_example(
     pepper_service_url: String,
-    firestore_google_project_id: String,
-    firestore_database_id: String,
+    firestore_google_project_id: Option<String>,
+    firestore_database_id: Option<String>,
 ) {
     utils::print(
         "Starting the example client that interacts with the Aptos OIDB Pepper Service.",
@@ -410,13 +410,26 @@ fn verify_pepper_signature(
 /// (Optional) Step 8: Verify that a firestore entry exists for the given pepper input
 async fn verify_firestore_pepper_entry(
     pepper_input: PepperInput,
-    google_project_id: String,
-    database_id: String,
+    google_project_id: Option<String>,
+    database_id: Option<String>,
 ) {
-    utils::print(
-        &format!("(Optional) Step 8: Verifying that a firestore entry exists for the given pepper input. Project ID: {}, Database: {}", google_project_id, database_id),
-        true,
-    );
+    // Check if the Google project ID and database ID are provided
+    let (google_project_id, database_id) = match (google_project_id, database_id) {
+        (Some(google_project_id), Some(database_id)) => {
+            utils::print(
+                &format!("(Optional) Step 8: Verifying that a firestore entry exists for the given pepper input. Project ID: {}, Database: {}", google_project_id, database_id),
+                true,
+            );
+            (google_project_id, database_id)
+        },
+        _ => {
+            utils::print(
+                "Skipping the verification of the firestore entry since the Google project ID and database ID are not provided!",
+                true,
+            );
+            return;
+        },
+    };
 
     // Create the firestore DB client
     let firestore_db_options = FirestoreDbOptions {

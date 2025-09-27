@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    accounts::{account_db::update_account_recovery_db, account_managers::ACCOUNT_MANAGERS},
+    accounts::{
+        account_managers::ACCOUNT_MANAGERS, account_recovery_db::AccountRecoveryDBInterface,
+    },
     error::PepperServiceError,
     external_resources::{jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
 };
@@ -24,7 +26,10 @@ use aptos_types::{
     transaction::authenticator::{AnyPublicKey, AuthenticationKey, EphemeralPublicKey},
 };
 use jsonwebtoken::{Algorithm::RS256, DecodingKey, TokenData, Validation};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 // The default derivation path (if none is provided)
 const DEFAULT_DERIVATION_PATH: &str = "m/44'/637'/0'/0'/0'";
@@ -50,7 +55,7 @@ pub async fn handle_pepper_request(
     uid_key: Option<String>,
     derivation_path: Option<String>,
     aud: Option<String>,
-    should_update_account_recovery_db: bool,
+    account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
 ) -> Result<(Vec<u8>, Vec<u8>, AccountAddress), PepperServiceError> {
     // Get the on-chain keyless configuration
     let keyless_configuration = get_on_chain_keyless_configuration(cached_resources)?;
@@ -78,14 +83,8 @@ pub async fn handle_pepper_request(
     let (uid_key, uid_val) = get_uid_key_and_value(uid_key, &claims)?;
 
     // Create the pepper input
-    let pepper_input = create_pepper_input(
-        aud,
-        should_update_account_recovery_db,
-        &claims,
-        uid_key,
-        uid_val,
-    )
-    .await?;
+    let pepper_input =
+        create_pepper_input(aud, &claims, uid_key, uid_val, account_recovery_db).await?;
 
     // Create the pepper base using the vuf private key and the pepper input
     let pepper_base = create_pepper_base(vuf_private_key, &pepper_input)?;
@@ -159,13 +158,13 @@ fn create_pepper_base(
     Ok(pepper_base)
 }
 
-/// Creates the pepper input, and updates the account recovery DB if needed
+/// Creates the pepper input, and updates the account recovery DB
 async fn create_pepper_input(
     aud: Option<String>,
-    should_update_account_recovery_db: bool,
     claims: &TokenData<Claims>,
     uid_key: String,
     uid_val: String,
+    account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
 ) -> Result<PepperInput, PepperServiceError> {
     // Get the aud from the claims. Note: if the request is from an account manager,
     // and a target aud is specified, we will override the aud and  generate the
@@ -186,13 +185,17 @@ async fn create_pepper_input(
         iss: claims.claims.iss.clone(),
         uid_key,
         uid_val,
-        aud,
+        aud: aud.clone(),
     };
     info!("Successfully created PepperInput: {:?}", &pepper_input);
 
-    // Update the account recovery DB (if needed)
-    if !aud_overridden && should_update_account_recovery_db {
-        update_account_recovery_db(&pepper_input).await?;
+    // Update the account recovery DB (unless the aud was overridden)
+    if aud_overridden {
+        info!("The aud was overridden ({}) for the pepper input. Skipping account recovery DB update!", aud);
+    } else {
+        account_recovery_db
+            .update_db_with_pepper_input(&pepper_input)
+            .await?;
     }
 
     Ok(pepper_input)

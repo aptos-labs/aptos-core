@@ -59,9 +59,7 @@ type HmacSha512 = Hmac<Sha512>;
 
 pub fn get_aptos_derivation_path(s: &str) -> Result<DerivationPath> {
     let re = Regex::new(r"^m\/44'\/637'\/[0-9]+'\/[0-9]+'\/[0-9]+'?$").unwrap();
-    if re.is_match(s) {
-        println!("Valid path");
-    } else {
+    if !re.is_match(s) {
         bail!(format!("Invalid derivation path: {}", s))
     }
     Ok(DerivationPath::from_str(s)?)

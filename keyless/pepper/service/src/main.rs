@@ -3,8 +3,10 @@
 
 use aptos_keyless_pepper_service::{
     accounts::{
-        account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
         account_managers::ACCOUNT_MANAGERS,
+        account_recovery_db::{
+            AccountRecoveryDBInterface, FirestoreAccountRecoveryDB, TestAccountRecoveryDB,
+        },
     },
     external_resources::{
         jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher, resource_fetcher::CachedResources,
@@ -15,15 +17,31 @@ use aptos_keyless_pepper_service::{
     request_handler::DEFAULT_PEPPER_SERVICE_PORT,
     vuf_pub_key,
 };
-use aptos_logger::info;
+use aptos_logger::{info, warn};
+use clap::Parser;
 use hyper::{
     service::{make_service_fn, service_fn},
     Server,
 };
 use std::{convert::Infallible, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
 
+#[derive(Parser, Debug)]
+#[command(author, version, about)]
+struct Args {
+    /// Run the service in local development mode (uses a test account recovery database)
+    #[arg(long)]
+    local_development_mode: bool, // Defaults to false if not provided
+
+    /// The port for the Pepper service to listen on
+    #[arg(long, default_value_t = DEFAULT_PEPPER_SERVICE_PORT)]
+    pepper_service_port: u16,
+}
+
 #[tokio::main]
 async fn main() {
+    // Fetch the command line arguments
+    let args = Args::parse();
+
     // Start the logger
     aptos_logger::Logger::new().init();
     info!("Starting the Pepper service...");
@@ -39,18 +57,30 @@ async fn main() {
     // Start the cached resource fetcher
     let cached_resources = resource_fetcher::start_cached_resource_fetcher();
 
-    // Initialize the account recovery database
     let _ = ACCOUNT_MANAGERS.deref();
-    {
-        let _db = ACCOUNT_RECOVERY_DB.get_or_init(init_account_db).await;
-    }
+
+    // Create the account recovery database
+    let account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync> =
+        if args.local_development_mode {
+            warn!("Running in local development mode! Using a test account recovery database!");
+            Arc::new(TestAccountRecoveryDB::new())
+        } else {
+            Arc::new(FirestoreAccountRecoveryDB::new().await)
+        };
 
     // Start the JWK fetchers
     let jwk_cache = jwk_fetcher::start_jwk_fetchers();
 
     // Start the pepper service
     let vuf_keypair = Arc::new((vuf_public_key, vuf_private_key));
-    start_pepper_service(vuf_keypair, jwk_cache, cached_resources).await;
+    start_pepper_service(
+        args.pepper_service_port,
+        vuf_keypair,
+        jwk_cache,
+        cached_resources,
+        account_recovery_db,
+    )
+    .await;
 }
 
 // Starts a simple metrics server
@@ -67,20 +97,22 @@ fn start_metrics_server() {
         let socket_addr = SocketAddr::from(([0, 0, 0, 0], DEFAULT_METRICS_SERVER_PORT));
         let server = Server::bind(&socket_addr).serve(make_service);
         if let Err(error) = server.await {
-            eprintln!("Metrics server error! Error: {}", error);
+            panic!("Metrics server error! Error: {}", error);
         }
     });
 }
 
 // Starts the pepper service
 async fn start_pepper_service(
+    pepper_service_port: u16,
     vuf_keypair: Arc<(String, ark_bls12_381::Fr)>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
+    account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
 ) {
     info!(
         "Starting the Pepper service request handler on port {}...",
-        DEFAULT_PEPPER_SERVICE_PORT
+        pepper_service_port
     );
 
     // Create the service function that handles the endpoint requests
@@ -89,6 +121,7 @@ async fn start_pepper_service(
         let vuf_keypair = vuf_keypair.clone();
         let jwk_cache = jwk_cache.clone();
         let cached_resources = cached_resources.clone();
+        let account_recovery_db = account_recovery_db.clone();
 
         async move {
             Ok::<_, Infallible>(service_fn(move |request| {
@@ -101,6 +134,7 @@ async fn start_pepper_service(
                 let vuf_keypair = vuf_keypair.clone();
                 let jwk_cache = jwk_cache.clone();
                 let cached_resources = cached_resources.clone();
+                let account_recovery_db = account_recovery_db.clone();
 
                 // Handle the request
                 async move {
@@ -110,6 +144,7 @@ async fn start_pepper_service(
                         vuf_keypair.clone(),
                         jwk_cache.clone(),
                         cached_resources.clone(),
+                        account_recovery_db.clone(),
                     )
                     .await;
 
@@ -130,9 +165,9 @@ async fn start_pepper_service(
     });
 
     // Bind the socket address, and start the server
-    let socket_addr = SocketAddr::from(([0, 0, 0, 0], DEFAULT_PEPPER_SERVICE_PORT));
+    let socket_addr = SocketAddr::from(([0, 0, 0, 0], pepper_service_port));
     let server = Server::bind(&socket_addr).serve(make_service);
     if let Err(error) = server.await {
-        eprintln!("Pepper service error! Error: {}", error);
+        panic!("Pepper service error! Error: {}", error);
     }
 }

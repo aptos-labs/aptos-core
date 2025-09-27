@@ -11,13 +11,15 @@ struct Args {
     #[arg(long, default_value = "http://localhost:8000")]
     pepper_service_url: String,
 
-    /// The Google project ID used by Firestore
-    #[arg(long)]
-    firestore_google_project_id: String,
+    /// The Google project ID used by Firestore. If not provided, the client example
+    /// will not verify that the account recovery DB was updated.
+    #[arg(long, requires = "firestore_database_id")]
+    firestore_google_project_id: Option<String>,
 
-    /// The database ID used by Firestore
-    #[arg(long, default_value = "(default)")]
-    firestore_database_id: String,
+    /// The database ID used by Firestore. If not provided, the client example
+    /// will not verify that the account recovery DB was updated.
+    #[arg(long, requires = "firestore_google_project_id")]
+    firestore_database_id: Option<String>,
 }
 
 #[tokio::main]
