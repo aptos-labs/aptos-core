@@ -72,6 +72,20 @@ pub enum SimpleInstruction {
     CastU16,
     CastU32,
     CastU256,
+
+    LdI8,
+    LdI16,
+    LdI32,
+    LdI64,
+    LdI128,
+    LdI256,
+    CastI8,
+    CastI16,
+    CastI32,
+    CastI64,
+    CastI128,
+    CastI256,
+    Negate,
 }
 
 impl SimpleInstruction {
@@ -112,6 +126,7 @@ impl SimpleInstruction {
             Mul => MUL,
             Mod => MOD,
             Div => DIV,
+            Negate => NEGATE,
 
             BitOr => BIT_OR,
             BitAnd => BIT_AND,
@@ -135,6 +150,19 @@ impl SimpleInstruction {
             CastU16 => CAST_U16,
             CastU32 => CAST_U32,
             CastU256 => CAST_U256,
+
+            LdI8 => LD_I8,
+            LdI16 => LD_I16,
+            LdI32 => LD_I32,
+            LdI64 => LD_I64,
+            LdI128 => LD_I128,
+            LdI256 => LD_I256,
+            CastI8 => CAST_I8,
+            CastI16 => CAST_I16,
+            CastI32 => CAST_I32,
+            CastI64 => CAST_I64,
+            CastI128 => CAST_I128,
+            CastI256 => CAST_I256,
         }
     }
 }

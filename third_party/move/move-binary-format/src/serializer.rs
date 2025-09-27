@@ -782,6 +782,12 @@ fn serialize_signature_token_single_node_impl(
         SignatureToken::U64 => binary.push(SerializedType::U64 as u8)?,
         SignatureToken::U128 => binary.push(SerializedType::U128 as u8)?,
         SignatureToken::U256 => binary.push(SerializedType::U256 as u8)?,
+        SignatureToken::I8 => binary.push(SerializedType::I8 as u8)?,
+        SignatureToken::I16 => binary.push(SerializedType::I16 as u8)?,
+        SignatureToken::I32 => binary.push(SerializedType::I32 as u8)?,
+        SignatureToken::I64 => binary.push(SerializedType::I64 as u8)?,
+        SignatureToken::I128 => binary.push(SerializedType::I128 as u8)?,
+        SignatureToken::I256 => binary.push(SerializedType::I256 as u8)?,
         SignatureToken::Address => binary.push(SerializedType::ADDRESS as u8)?,
         SignatureToken::Signer => binary.push(SerializedType::SIGNER as u8)?,
         SignatureToken::Vector(_) => {
@@ -1146,6 +1152,7 @@ fn serialize_instruction_inner(
         Bytecode::Mul => binary.push(Opcodes::MUL as u8),
         Bytecode::Mod => binary.push(Opcodes::MOD as u8),
         Bytecode::Div => binary.push(Opcodes::DIV as u8),
+        Bytecode::Negate => binary.push(Opcodes::NEGATE as u8),
         Bytecode::BitOr => binary.push(Opcodes::BIT_OR as u8),
         Bytecode::BitAnd => binary.push(Opcodes::BIT_AND as u8),
         Bytecode::Xor => binary.push(Opcodes::XOR as u8),
@@ -1251,6 +1258,37 @@ fn serialize_instruction_inner(
         Bytecode::CastU16 => binary.push(Opcodes::CAST_U16 as u8),
         Bytecode::CastU32 => binary.push(Opcodes::CAST_U32 as u8),
         Bytecode::CastU256 => binary.push(Opcodes::CAST_U256 as u8),
+
+        Bytecode::LdI8(value) => {
+            binary.push(Opcodes::LD_I8 as u8)?;
+            binary.push(*value as u8)
+        },
+        Bytecode::LdI16(value) => {
+            binary.push(Opcodes::LD_I16 as u8)?;
+            binary.extend(&value.to_le_bytes())
+        },
+        Bytecode::LdI32(value) => {
+            binary.push(Opcodes::LD_I32 as u8)?;
+            binary.extend(&value.to_le_bytes())
+        },
+        Bytecode::LdI64(value) => {
+            binary.push(Opcodes::LD_I64 as u8)?;
+            binary.extend(&value.to_le_bytes())
+        },
+        Bytecode::LdI128(value) => {
+            binary.push(Opcodes::LD_I128 as u8)?;
+            binary.extend(&value.to_le_bytes())
+        },
+        Bytecode::LdI256(value) => {
+            binary.push(Opcodes::LD_I256 as u8)?;
+            binary.extend(&(*value).to_le_bytes())
+        },
+        Bytecode::CastI8 => binary.push(Opcodes::CAST_I8 as u8),
+        Bytecode::CastI16 => binary.push(Opcodes::CAST_I16 as u8),
+        Bytecode::CastI32 => binary.push(Opcodes::CAST_I32 as u8),
+        Bytecode::CastI64 => binary.push(Opcodes::CAST_I64 as u8),
+        Bytecode::CastI128 => binary.push(Opcodes::CAST_I128 as u8),
+        Bytecode::CastI256 => binary.push(Opcodes::CAST_I256 as u8),
     };
     res?;
     Ok(())

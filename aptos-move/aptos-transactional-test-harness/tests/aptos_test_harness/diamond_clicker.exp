@@ -1,6 +1,6 @@
 processed 4 tasks
 task 1 lines 4-35:  print-bytecode --input=module [module Alice::game {]
-// Bytecode version v8
+// Bytecode version v9
 module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::game
 use 0x1::signer
 use 0x1::debug

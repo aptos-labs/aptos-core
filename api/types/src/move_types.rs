@@ -127,7 +127,11 @@ macro_rules! define_integer_type {
 
 define_integer_type!(U64, u64, "A string encoded U64.");
 define_integer_type!(U128, u128, "A string encoded U128.");
-define_integer_type!(U256, move_core_types::u256::U256, "A string encoded U256.");
+define_integer_type!(
+    U256,
+    move_core_types::int256::U256,
+    "A string encoded U256."
+);
 
 /// Hex encoded bytes to allow for having bytes represented in JSON
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -797,6 +801,15 @@ impl From<&TypeTag> for MoveType {
             },
             TypeTag::Struct(v) => MoveType::Struct(v.as_ref().into()),
             TypeTag::Function(f) => from_function_tag(f),
+            TypeTag::I8
+            | TypeTag::I16
+            | TypeTag::I32
+            | TypeTag::I64
+            | TypeTag::I128
+            | TypeTag::I256 => {
+                // TODO(#17645): signed integers
+                MoveType::Unparsable("unimplemented signed integer".to_string())
+            },
         }
     }
 }

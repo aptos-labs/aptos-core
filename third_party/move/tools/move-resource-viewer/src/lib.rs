@@ -24,9 +24,9 @@ use move_core_types::{
     account_address::AccountAddress,
     function::{ClosureMask, MoveClosure},
     identifier::{IdentStr, Identifier},
+    int256,
     language_storage::{FunctionParamOrReturnTag, ModuleId, StructTag, TypeTag},
     transaction_argument::{convert_txn_args, TransactionArgument},
-    u256,
     value::{MoveStruct, MoveTypeLayout, MoveValue},
     vm_status::VMStatus,
 };
@@ -84,10 +84,11 @@ pub enum AnnotatedMoveValue {
     // NOTE: Added in bytecode version v6, do not reorder!
     U16(u16),
     U32(u32),
-    U256(u256::U256),
+    U256(int256::U256),
     // NOTE: Added in v8
     Closure(AnnotatedMoveClosure),
     RawStruct(RawMoveStruct),
+    // TODO(#17645): signed integers
 }
 
 pub struct MoveValueAnnotator<V> {
@@ -444,7 +445,13 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                                 | SignatureToken::TypeParameter(_)
                                 | SignatureToken::U16
                                 | SignatureToken::U32
-                                | SignatureToken::U256 => {
+                                | SignatureToken::U256
+                                | SignatureToken::I8
+                                | SignatureToken::I16
+                                | SignatureToken::I32
+                                | SignatureToken::I64
+                                | SignatureToken::I128
+                                | SignatureToken::I256 => {
                                     self.resolve_signature(module, tok, limit)?
                                 },
                             })
@@ -478,6 +485,15 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             SignatureToken::Reference(inner) => match **inner {
                 SignatureToken::Signer => FatType::Reference(Box::new(FatType::Signer)),
                 _ => return Err(anyhow!("Unexpected Reference")),
+            },
+            SignatureToken::I8
+            | SignatureToken::I16
+            | SignatureToken::I32
+            | SignatureToken::I64
+            | SignatureToken::I128
+            | SignatureToken::I256 => {
+                // TODO(#17645): implement for fat types to support REST api
+                return Err(anyhow!("signed integers not yet supported"));
             },
         })
     }
@@ -542,6 +558,15 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     results: convert_tags(&function_tag.results)?,
                     abilities: function_tag.abilities,
                 }))
+            },
+            TypeTag::I8
+            | TypeTag::I16
+            | TypeTag::I32
+            | TypeTag::I64
+            | TypeTag::I128
+            | TypeTag::I256 => {
+                // TODO(#17645): add support
+                panic!("signed integers not yet supported")
             },
         })
     }
@@ -763,7 +788,14 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             | (MoveValue::Signer(_), _)
             | (MoveValue::U16(_), _)
             | (MoveValue::U32(_), _)
-            | (MoveValue::U256(_), _) => {
+            | (MoveValue::U256(_), _)
+            | (MoveValue::I8(_), _)
+            | (MoveValue::I16(_), _)
+            | (MoveValue::I32(_), _)
+            | (MoveValue::I64(_), _)
+            | (MoveValue::I128(_), _)
+            | (MoveValue::I256(_), _) => {
+                // TODO(#17645): support signed integers
                 return Err(anyhow!(
                     "Cannot annotate value {:?} with type {:?}",
                     value,
