@@ -10,7 +10,6 @@ use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 
 #[derive(Debug, EnumCountMacro, EnumIter, Clone, Copy, Eq, PartialEq)]
 pub enum TimedFeatureFlag {
-    DisableInvariantViolationCheckInSwapLoc,
     // Was always enabled.
     _LimitTypeTagSize,
     // Enabled on mainnet, cannot be disabled.
@@ -72,10 +71,6 @@ impl TimedFeatureFlag {
         use TimedFeatureFlag::*;
 
         match (self, chain_id) {
-            // Enabled from the beginning of time.
-            (DisableInvariantViolationCheckInSwapLoc, TESTNET) => BEGINNING_OF_TIME,
-            (DisableInvariantViolationCheckInSwapLoc, MAINNET) => BEGINNING_OF_TIME,
-
             // Note: These have been enabled since the start due to a bug.
             (_LimitTypeTagSize, TESTNET) => BEGINNING_OF_TIME,
             (_LimitTypeTagSize, MAINNET) => BEGINNING_OF_TIME,
@@ -281,10 +276,6 @@ mod test {
         // Check testnet on Jan 1, 2024.
         let testnet_jan_1_2024 = TimedFeaturesBuilder::new(ChainId::testnet(), jan_1_2024_micros);
         assert!(
-            testnet_jan_1_2024.is_enabled(DisableInvariantViolationCheckInSwapLoc),
-            "DisableInvariantViolationCheckInSwapLoc should always be enabled"
-        );
-        assert!(
             testnet_jan_1_2024.is_enabled(_LimitTypeTagSize),
             "LimitTypeTagSize should always be enabled"
         );
@@ -298,10 +289,6 @@ mod test {
         );
         // Check testnet on Nov 15, 2024.
         let testnet_nov_15_2024 = TimedFeaturesBuilder::new(ChainId::testnet(), nov_15_2024_micros);
-        assert!(
-            testnet_nov_15_2024.is_enabled(DisableInvariantViolationCheckInSwapLoc),
-            "DisableInvariantViolationCheckInSwapLoc should always be enabled"
-        );
         assert!(
             testnet_nov_15_2024.is_enabled(_LimitTypeTagSize),
             "LimitTypeTagSize should always be enabled"
@@ -317,10 +304,6 @@ mod test {
         // Check mainnet on Jan 1, 2024.
         let mainnet_jan_1_2024 = TimedFeaturesBuilder::new(ChainId::mainnet(), jan_1_2024_micros);
         assert!(
-            mainnet_jan_1_2024.is_enabled(DisableInvariantViolationCheckInSwapLoc),
-            "DisableInvariantViolationCheckInSwapLoc should always be enabled"
-        );
-        assert!(
             mainnet_jan_1_2024.is_enabled(_LimitTypeTagSize),
             "LimitTypeTagSize should always be enabled"
         );
@@ -334,10 +317,6 @@ mod test {
         );
         // Check mainnet on Nov 15, 2024.
         let mainnet_nov_15_2024 = TimedFeaturesBuilder::new(ChainId::mainnet(), nov_15_2024_micros);
-        assert!(
-            mainnet_nov_15_2024.is_enabled(DisableInvariantViolationCheckInSwapLoc),
-            "DisableInvariantViolationCheckInSwapLoc should always be enabled"
-        );
         assert!(
             mainnet_nov_15_2024.is_enabled(_LimitTypeTagSize),
             "LimitTypeTagSize should always be enabled"
