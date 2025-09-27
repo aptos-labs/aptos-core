@@ -32,6 +32,7 @@ use move_vm_types::{
         runtime_access_specifier::{AccessSpecifierEnv, AddressSpecifierFunction},
         runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
     },
+    ty_interner::{TypeContext, TypeVecId},
     values::Locals,
 };
 use std::{cell::RefCell, rc::Rc, sync::Arc};
@@ -130,6 +131,22 @@ impl Frame {
         FunctionInstantiationIndex,
         function_instantiation_handle_at
     );
+
+    pub(crate) fn get_or_compute_ty_args_id(
+        &self,
+        ctx: &TypeContext,
+        idx: FunctionInstantiationIndex,
+        ty_args: &[Type],
+    ) -> TypeVecId {
+        let id = match self.function.owner() {
+            LoadedFunctionOwner::Script(script) => script.function_instantiation_fingerprint(idx.0),
+            LoadedFunctionOwner::Module(module) => module.function_instantiation_fingerprint(idx.0),
+        };
+        match id {
+            None => ctx.intern_ty_args(ty_args),
+            Some(id) => id,
+        }
+    }
 
     pub(crate) fn make_new_frame<RTTCheck: RuntimeTypeCheck>(
         gas_meter: &mut impl GasMeter,

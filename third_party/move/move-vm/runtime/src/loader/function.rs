@@ -32,6 +32,7 @@ use move_vm_types::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
     },
+    ty_interner::TypeVecId,
     values::{AbstractFunction, SerializedFunctionData},
 };
 use std::{
@@ -668,9 +669,11 @@ impl Function {
 // A function instantiation.
 #[derive(Clone, Debug)]
 pub(crate) struct FunctionInstantiation {
-    // index to `ModuleCache::functions` global table
     pub(crate) handle: FunctionHandle,
     pub(crate) instantiation: Vec<Type>,
+    // Unique ID for type arg instantiation. If type arguments are non-generic, is set. For generic
+    // type arguments kept not set.
+    pub(crate) ty_args_id: Option<TypeVecId>,
 }
 
 #[derive(Clone, Debug)]

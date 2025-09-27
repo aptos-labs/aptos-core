@@ -51,6 +51,7 @@ use move_vm_types::{
     loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
     natives::function::NativeResult,
     resolver::ResourceResolver,
+    ty_interner::TypeContext,
     values::{
         self, AbstractFunction, Closure, GlobalValue, IntegerValue, Locals, Reference, SignerRef,
         Struct, StructRef, VMValueCast, Value, Vector, VectorRef,
@@ -60,7 +61,7 @@ use move_vm_types::{
 use std::{
     cell::RefCell,
     cmp::min,
-    collections::{btree_map, VecDeque},
+    collections::VecDeque,
     fmt::{Debug, Write},
     rc::Rc,
 };
@@ -98,6 +99,8 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     call_stack: CallStack,
     /// VM configuration used by the interpreter.
     vm_config: &'ctx VMConfig,
+    /// Context for type interning.
+    ty_ctx: &'ctx TypeContext,
     /// The access control state.
     access_control: AccessControlState,
     /// Reentrancy checker.
@@ -182,6 +185,7 @@ where
             operand_stack: Stack::new(),
             call_stack: CallStack::new(),
             vm_config: loader.runtime_environment().vm_config(),
+            ty_ctx: loader.runtime_environment().ty_context(),
             access_control: AccessControlState::default(),
             reentrancy_checker: ReentrancyChecker::default(),
             loader,
@@ -571,39 +575,26 @@ where
                         {
                             (Rc::clone(function), Rc::clone(frame_cache))
                         } else {
-                            match current_frame_cache.generic_sub_frame_cache.entry(idx) {
-                                btree_map::Entry::Occupied(entry) => {
-                                    let entry = entry.get();
-                                    current_frame_cache.per_instruction_cache
-                                        [current_frame.pc as usize] =
-                                        PerInstructionCache::CallGeneric(
-                                            Rc::clone(&entry.0),
-                                            Rc::clone(&entry.1),
-                                        );
-
-                                    (Rc::clone(&entry.0), Rc::clone(&entry.1))
-                                },
-                                btree_map::Entry::Vacant(entry) => {
-                                    let function =
-                                        Rc::new(self.load_generic_function_no_visibility_checks(
-                                            gas_meter,
-                                            traversal_context,
-                                            &current_frame,
-                                            idx,
-                                        )?);
-                                    // TODO(caches): remove the generic sub frame cache.
-                                    let frame_cache = function_caches
-                                        .get_or_create_frame_cache_generic(&function);
-                                    entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
-                                    current_frame_cache.per_instruction_cache
-                                        [current_frame.pc as usize] =
-                                        PerInstructionCache::CallGeneric(
-                                            Rc::clone(&function),
-                                            Rc::clone(&frame_cache),
-                                        );
-                                    (function, frame_cache)
-                                },
-                            }
+                            let function =
+                                Rc::new(self.load_generic_function_no_visibility_checks(
+                                    gas_meter,
+                                    traversal_context,
+                                    &current_frame,
+                                    idx,
+                                )?);
+                            let fingerprint = current_frame.get_or_compute_ty_args_id(
+                                self.ty_ctx,
+                                idx,
+                                function.ty_args(),
+                            );
+                            let frame_cache = function_caches
+                                .get_or_create_frame_cache_generic(&function, fingerprint);
+                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
+                                PerInstructionCache::CallGeneric(
+                                    Rc::clone(&function),
+                                    Rc::clone(&frame_cache),
+                                );
+                            (function, frame_cache)
                         }
                     } else {
                         let function = Rc::new(self.load_generic_function_no_visibility_checks(
