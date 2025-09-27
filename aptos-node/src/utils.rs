@@ -22,9 +22,9 @@ aptos-node was compiled with feature flags that shouldn't be enabled.
 This is caused by cargo's feature unification.
 When you compile two crates with a shared dependency, if one enables a feature flag for the dependency, then it is also enabled for the other crate.
 
-PLEASE RECOMPILE APTOS-NODE SEPARATELY using the following command:
-    cargo build --package aptos-node
-
+To resolve this issue, try the following methods:
+- Recompile `aptos-node` SEPARATELY
+- Check if a disallowed feature flag is enabled by a dependency in the build tree
 "#;
 
 /// Initializes a global rayon thread pool iff `create_global_rayon_pool` is true

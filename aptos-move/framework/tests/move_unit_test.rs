@@ -8,11 +8,23 @@ use aptos_types::on_chain_config::{
     aptos_test_feature_flags_genesis, Features, TimedFeaturesBuilder,
 };
 use aptos_vm::natives;
-use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
+use move_cli::base::{
+    test::{run_move_unit_tests, UnitTestResult},
+    test_validation,
+};
+use move_model::model::GlobalEnv;
 use move_package::CompilerConfig;
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use tempfile::tempdir;
+
+/// Configures the move-cli unit test validation hook to run the extended checker.
+fn configure_extended_checks_for_unit_test() {
+    fn validate(env: &GlobalEnv) {
+        extended_checks::run_extended_checks(env);
+    }
+    test_validation::set_validation_hook(Box::new(validate));
+}
 
 fn run_tests_for_pkg(path_to_pkg: impl Into<String>, use_latest_language: bool) {
     let pkg_path = path_in_crate(path_to_pkg);
@@ -64,7 +76,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, use_latest_language: bool) 
 pub fn aptos_test_natives() -> NativeFunctionTable {
     // By side effect, configure for unit tests
     natives::configure_for_unit_test();
-    extended_checks::configure_extended_checks_for_unit_test();
+    configure_extended_checks_for_unit_test();
     // move_stdlib has the testing feature enabled to include debug native functions
     natives::aptos_natives(
         LATEST_GAS_FEATURE_VERSION,
