@@ -21,6 +21,7 @@ module aptos_framework::genesis {
     use aptos_framework::gas_schedule;
     use aptos_framework::nonce_validation;
     use aptos_framework::reconfiguration;
+    use aptos_framework::sched_txns_auth_num;
     use aptos_framework::scheduled_txns;
     use aptos_framework::stake;
     use aptos_framework::staking_contract;
@@ -150,6 +151,7 @@ module aptos_framework::genesis {
         // Give transaction_fee module MintCapability<AptosCoin> so it can mint refunds.
         transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
 
+        sched_txns_auth_num::initialize(aptos_framework);
         scheduled_txns::initialize(aptos_framework);
     }
 
@@ -169,6 +171,8 @@ module aptos_framework::genesis {
         transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
         // Give transaction_fee module MintCapability<AptosCoin> so it can mint refunds.
         transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+
+        sched_txns_auth_num::initialize(aptos_framework);
 
         let core_resources = account::create_account(@core_resources);
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);

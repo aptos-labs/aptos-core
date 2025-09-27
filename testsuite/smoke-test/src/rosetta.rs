@@ -1117,6 +1117,13 @@ async fn parse_block_transactions(
                 ));
                 assert!(transaction.operations.is_empty());
             },
+            TransactionType::ScheduledTransaction => {
+                assert!(matches!(
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::ScheduledTransaction(_)
+                ));
+                assert!(transaction.operations.is_empty());
+            },
         }
 
         parse_operations(

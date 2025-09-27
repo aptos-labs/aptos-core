@@ -1,6 +1,7 @@
 #[test_only]
 module aptos_framework::test_scheduled_txns {
 
+    use std::option::Option;
     use std::signer;
     use std::string;
     use aptos_std::debug;
@@ -29,7 +30,8 @@ module aptos_framework::test_scheduled_txns {
     #[test_only]
     public fun mock_execute(key: ScheduleMapKey, signer: signer) {
         let block_timestamp_ms = timestamp::now_microseconds() / 1000;
-        user_func_wrapper::execute_user_function_test(signer, key, block_timestamp_ms);
+        scheduled_txns::execute_txn_prologue_test(key, block_timestamp_ms);
+        user_func_wrapper::execute_user_function_test(signer, key);
         // Finish execution
         mark_txn_to_remove_test(key);
     }
@@ -44,20 +46,20 @@ module aptos_framework::test_scheduled_txns {
 
     #[persistent]
     fun rescheduling_test_func(
-        sender: &signer, auth_token: ScheduledTxnAuthToken
+        sender: &signer, auth_token: Option<ScheduledTxnAuthToken>
     ) {
         let current_time = timestamp::now_microseconds() / 1000;
         let next_schedule_time = current_time + 10000; // Would schedule 1 second later
 
         let foo =
-            |signer: &signer, auth_token: ScheduledTxnAuthToken| rescheduling_test_func(
+            |signer: &signer, auth_token: Option<ScheduledTxnAuthToken>| rescheduling_test_func(
                 signer, auth_token
             );
 
         let txn =
             scheduled_txns::new_scheduled_transaction_reuse_auth_token(
                 sender,
-                auth_token,
+                auth_token.extract(),
                 next_schedule_time,
                 1000,
                 200,
@@ -70,7 +72,7 @@ module aptos_framework::test_scheduled_txns {
 
     #[persistent]
     fun user_func_with_auth_token(
-        _signer: &signer, _auth_token: ScheduledTxnAuthToken
+        _signer: &signer, _auth_token: Option<ScheduledTxnAuthToken>
     ) {
         debug::print(&string::utf8(b"Running user func..."));
     }
@@ -88,7 +90,7 @@ module aptos_framework::test_scheduled_txns {
         let expiration_time = schedule_time + 10000; // Token valid for 10 seconds
 
         let foo =
-            |signer: &signer, auth_token: ScheduledTxnAuthToken| rescheduling_test_func(
+            |signer: &signer, auth_token: Option<ScheduledTxnAuthToken>| rescheduling_test_func(
                 signer, auth_token
             );
 
@@ -109,13 +111,13 @@ module aptos_framework::test_scheduled_txns {
         assert!(scheduled_txns::get_num_txns() == 1, scheduled_txns::get_num_txns());
 
         // Execute the transaction - it should work since allow_rescheduling = true
-        user_func_wrapper::execute_user_function_test(user, txn_key, schedule_time
-            + 100);
+        scheduled_txns::execute_txn_prologue_test(txn_key, schedule_time + 100);
+        user_func_wrapper::execute_user_function_test(user, txn_key);
         assert!(scheduled_txns::get_num_txns() == 2, scheduled_txns::get_num_txns());
     }
 
     #[test(fx = @0x1, user = @0x1234)]
-    #[expected_failure(abort_code = 65552)]
+    #[expected_failure(abort_code = 262145)]
     fun test_disallow_reschedule_token(fx: &signer, user: signer) {
         let user_addr = signer::address_of(&user);
         let curr_mock_time_micro_s = 1000000;
@@ -127,7 +129,7 @@ module aptos_framework::test_scheduled_txns {
 
         // Test: Create auth token with allow_rescheduling = false
         let foo =
-            |signer: &signer, auth_token: ScheduledTxnAuthToken| rescheduling_test_func(
+            |signer: &signer, auth_token: Option<ScheduledTxnAuthToken>| rescheduling_test_func(
                 signer, auth_token
             );
 
@@ -150,8 +152,8 @@ module aptos_framework::test_scheduled_txns {
         assert!(scheduled_txns::get_num_txns() == 1, scheduled_txns::get_num_txns());
 
         // Execute the transaction - it should work but with rescheduling disabled
-        user_func_wrapper::execute_user_function_test(user, txn_key, schedule_time
-            + 100);
+        scheduled_txns::execute_txn_prologue_test(txn_key, schedule_time + 100);
+        user_func_wrapper::execute_user_function_test(user, txn_key);
     }
 
     // Purpose of this test is to test 'scheduled_txn_epilogue'
@@ -294,7 +296,7 @@ module aptos_framework::test_scheduled_txns {
 
         // Create multiple transactions with auth tokens
         let foo =
-            |signer: &signer, auth_token: ScheduledTxnAuthToken| user_func_with_auth_token(
+        |signer: &signer, auth_token: Option<ScheduledTxnAuthToken>| user_func_with_auth_token(
                 signer, auth_token
             );
 
@@ -334,8 +336,8 @@ module aptos_framework::test_scheduled_txns {
 
         // Store transaction keys for later testing
         let txn1_key = scheduled_txns::insert(&user, txn1);
-        let _txn2_key = scheduled_txns::insert(&user, txn2);
-        let _txn3_key = scheduled_txns::insert(&user, txn3);
+        let txn2_key = scheduled_txns::insert(&user, txn2);
+        let txn3_key = scheduled_txns::insert(&user, txn3);
         assert!(scheduled_txns::get_num_txns() == 3, scheduled_txns::get_num_txns());
 
         // Cancel all - this increments the sender's auth num
@@ -351,6 +353,13 @@ module aptos_framework::test_scheduled_txns {
         // Test lazy delete: try to execute one of the transactions; should not execute; verify by checking the logging
         // in user_func_with_auth_token
         let current_time = schedule_time;
-        user_func_wrapper::execute_user_function_test(user, txn1_key, current_time);
+        let pre_exec_validate_status = scheduled_txns::execute_txn_prologue_test(txn1_key, current_time);
+        assert!(scheduled_txns::is_pre_exec_status_expired(pre_exec_validate_status));
+
+        pre_exec_validate_status = scheduled_txns::execute_txn_prologue_test(txn2_key, current_time);
+        assert!(scheduled_txns::is_pre_exec_status_expired(pre_exec_validate_status));
+
+        pre_exec_validate_status = scheduled_txns::execute_txn_prologue_test(txn3_key, current_time);
+        assert!(scheduled_txns::is_pre_exec_status_expired(pre_exec_validate_status));
     }
 }

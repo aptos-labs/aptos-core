@@ -83,7 +83,7 @@ Invalid signer - only framework can call this
 Initialize the authorization number map - called from scheduled_txns::initialize
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sched_txns_auth_num.md#0x1_sched_txns_auth_num_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="sched_txns_auth_num.md#0x1_sched_txns_auth_num_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -92,7 +92,7 @@ Initialize the authorization number map - called from scheduled_txns::initialize
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sched_txns_auth_num.md#0x1_sched_txns_auth_num_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code><b>public</b> <b>fun</b> <a href="sched_txns_auth_num.md#0x1_sched_txns_auth_num_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
 
     <b>move_to</b>(

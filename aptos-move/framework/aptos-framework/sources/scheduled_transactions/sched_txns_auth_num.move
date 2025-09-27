@@ -22,7 +22,7 @@ module aptos_framework::sched_txns_auth_num {
     }
 
     /// Initialize the authorization number map - called from scheduled_txns::initialize
-    public(friend) fun initialize(framework: &signer) {
+    public fun initialize(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
 
         move_to(
