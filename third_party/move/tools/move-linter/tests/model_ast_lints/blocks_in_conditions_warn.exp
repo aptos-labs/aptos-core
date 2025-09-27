@@ -9,6 +9,27 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
 
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:21:13
+   │
+21 │             bar();
+   │             ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:20:34
+   │
+20 │           if ({let x = foo(); !x}) {
+   │ ╭──────────────────────────────────^
+21 │ │             bar();
+22 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:26:13
    │
@@ -17,6 +38,27 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:27:13
+   │
+27 │             bar();
+   │             ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:26:34
+   │
+26 │           if ({x = x && foo(); x}) {
+   │ ╭──────────────────────────────────^
+27 │ │             bar();
+28 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
 
 warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:32:16
@@ -45,6 +87,27 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
 
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:41:17
+   │
+41 │                 bar();
+   │                 ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:40:37
+   │
+40 │               if ({let x = foo(); x}) {
+   │ ╭─────────────────────────────────────^
+41 │ │                 bar();
+42 │ │             }
+   │ ╰─────────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:44:17
    │
@@ -53,6 +116,54 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:45:17
+   │
+45 │                 bar();
+   │                 ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:44:37
+   │
+44 │               if ({let x = foo(); x}) {
+   │ ╭─────────────────────────────────────^
+45 │ │                 bar();
+46 │ │             }
+   │ ╰─────────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:52:39
+   │
+52 │         if ({if ({let x = foo(); x}) {bar();}; let x = foo(); x}) {
+   │                                       ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:52:38
+   │
+52 │         if ({if ({let x = foo(); x}) {bar();}; let x = foo(); x}) {
+   │                                      ^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:52:14
+   │
+52 │         if ({if ({let x = foo(); x}) {bar();}; let x = foo(); x}) {
+   │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
 
 warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:52:13
@@ -63,6 +174,27 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
 
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:53:13
+   │
+53 │             bar();
+   │             ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:52:67
+   │
+52 │           if ({if ({let x = foo(); x}) {bar();}; let x = foo(); x}) {
+   │ ╭───────────────────────────────────────────────────────────────────^
+53 │ │             bar();
+54 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:58:16
    │
@@ -72,6 +204,27 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
 
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:59:13
+   │
+59 │             bar();
+   │             ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:58:37
+   │
+58 │           while ({x = x + 1; x < 10}) {
+   │ ╭─────────────────────────────────────^
+59 │ │             bar();
+60 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:64:13
    │
@@ -80,3 +233,150 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:65:13
+   │
+65 │             bar();
+   │             ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:64:57
+   │
+64 │           if ({x = x + 1; x < 10} && {x = x + 1; x < 11}) {
+   │ ╭─────────────────────────────────────────────────────────^
+65 │ │             bar();
+66 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:73:13
+   │
+73 │             bar();
+   │             ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:72:67
+   │
+72 │           while ({x = x + 1; spec { invariant x <= 100; }; x < 10}) {
+   │ ╭───────────────────────────────────────────────────────────────────^
+73 │ │             bar();
+74 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:79:13
+   │
+79 │             bar();
+   │             ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:78:36
+   │
+78 │           if ((x + 1) * (x + 4) > 5) {
+   │ ╭────────────────────────────────────^
+79 │ │             bar();
+80 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:85:13
+   │
+85 │             bar();
+   │             ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:84:76
+   │
+84 │           if ({x = x + 1; x < 10} && {spec { invariant x <= 100; }; x < 10}) {
+   │ ╭────────────────────────────────────────────────────────────────────────────^
+85 │ │             bar();
+86 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:111:13
+    │
+111 │             bar();
+    │             ^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:110:34
+    │
+110 │           if ({let x = foo(); !x}) {
+    │ ╭──────────────────────────────────^
+111 │ │             bar();
+112 │ │         }
+    │ ╰─────────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:118:13
+    │
+118 │             bar();
+    │             ^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:117:34
+    │
+117 │           if ({x = x && foo(); x}) {
+    │ ╭──────────────────────────────────^
+118 │ │             bar();
+119 │ │         }
+    │ ╰─────────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:142:13
+    │
+142 │             bar();
+    │             ^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:141:34
+    │
+141 │           if ({let x = foo(); !x}) {
+    │ ╭──────────────────────────────────^
+142 │ │             bar();
+143 │ │         }
+    │ ╰─────────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
