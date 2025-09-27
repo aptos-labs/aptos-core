@@ -33,7 +33,7 @@ fn find_identifiers_in_value_impl(
         | ValueImpl::Bool(_)
         | ValueImpl::Address(_) => {},
 
-        ValueImpl::Container(c) => match c {
+        ValueImpl::Container(c) => match &**c {
             Container::Locals(_) => {
                 return Err(PartialVMError::new(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -56,7 +56,8 @@ fn find_identifiers_in_value_impl(
             },
         },
 
-        ValueImpl::ClosureValue(Closure(_, captured)) => {
+        ValueImpl::ClosureValue(c) => {
+            let Closure(_, captured) = &**c;
             for val in captured.iter() {
                 find_identifiers_in_value_impl(val, identifiers)?;
             }
