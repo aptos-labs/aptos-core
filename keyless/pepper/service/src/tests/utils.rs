@@ -6,10 +6,11 @@ use aptos_keyless_pepper_common::{
     vuf::{bls12381_g1_bls::Bls12381G1Bls, slip_10::ed25519_dalek::Digest, VUF},
     PepperInput, PepperV0VufPubKey,
 };
+use aptos_time_service::TimeService;
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_serialize::CanonicalSerialize;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 /// A mock implementation of the account recovery DB that does nothing
 struct MockAccountRecoveryDB;
@@ -22,6 +23,14 @@ impl AccountRecoveryDBInterface for MockAccountRecoveryDB {
     ) -> Result<(), PepperServiceError> {
         Ok(()) // Do nothing
     }
+}
+
+/// Advances the mock time service by the given number of seconds
+pub async fn advance_time_secs(time_service: TimeService, seconds: u64) {
+    let mock_time_service = time_service.into_mock();
+    mock_time_service
+        .advance_async(Duration::from_secs(seconds))
+        .await;
 }
 
 /// Generates a random VUF public and private keypair for testing purposes
