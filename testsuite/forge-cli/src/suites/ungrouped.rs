@@ -36,6 +36,7 @@ use aptos_testcases::{
     self,
     consensus_reliability_tests::ChangingWorkingQuorumTest,
     forge_setup_test::ForgeSetupTest,
+    four_node_partition_scenario::FourNodePartitionScenario,
     framework_upgrade::FrameworkUpgrade,
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
@@ -91,6 +92,8 @@ pub fn get_ungrouped_test(test_name: &str, duration: Duration) -> Option<ForgeCo
         // so using small constant traffic, small blocks and fast rounds, and short epochs.
         // reusing changing_working_quorum_test just for invariants/asserts, but with max_down_nodes = 0.
         "consensus_stress_test" => Some(consensus_stress_test()),
+        // 4-node partition scenario: Round 1 normal, Round 2 network split into 2 partitions
+        "four_node_partition_scenario" => Some(four_node_partition_scenario()),
         // not scheduled on continuous
         "large_test_only_few_nodes_down" => Some(large_test_only_few_nodes_down()),
         // single cluster test
@@ -408,6 +411,41 @@ fn consensus_stress_test() -> ForgeConfig {
             check_period_s: 27,
         },
     )
+}
+
+fn four_node_partition_scenario() -> ForgeConfig {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
+        .with_initial_fullnode_count(0)
+        .add_network_test(FourNodePartitionScenario::default())
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // Enable failpoints for network manipulation
+            config.api.failpoints_enabled = true;
+            
+            // Configure consensus for clear round boundaries
+            config.consensus.round_initial_timeout_ms = 2000;
+            config.consensus.round_timeout_backoff_exponent_base = 1.0;
+            config.consensus.quorum_store_poll_time_ms = 1000;
+            
+            // Ensure state sync can handle partitions
+            config
+                .state_sync
+                .state_sync_driver
+                .enable_auto_bootstrapping = true;
+            config
+                .state_sync
+                .state_sync_driver
+                .max_connection_deadline_secs = 5;
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(5) // Low TPS expectation due to partitions
+                .add_no_restarts()
+                .add_wait_for_catchup_s(60)
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 20.0,
+                    max_round_gap: 15,
+                })
+        )
 }
 
 fn background_emit_request(high_gas_price: bool) -> EmitJobRequest {

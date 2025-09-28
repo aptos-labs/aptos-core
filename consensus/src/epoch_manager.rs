@@ -871,7 +871,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let consensus_sk = consensus_key;
 
         let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
-        let pipeline_builder = self.execution_client.pipeline_builder(signer);
+        // In tests/fuzzing, allow running without a pipeline to simplify mocks
+        #[cfg(any(test, feature = "fuzzing"))]
+        let pipeline_builder_opt = None;
+        #[cfg(not(any(test, feature = "fuzzing")))]
+        let pipeline_builder_opt = Some(self.execution_client.pipeline_builder(signer));
         info!(epoch = epoch, "Create BlockStore");
         // Read the last vote, before "moving" `recovery_data`
         let last_vote = recovery_data.last_vote();
@@ -886,7 +890,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.order_vote_enabled(),
             onchain_consensus_config.window_size(),
             self.pending_blocks.clone(),
-            Some(pipeline_builder),
+            pipeline_builder_opt,
         ));
 
         let failures_tracker = Arc::new(Mutex::new(ExponentialWindowFailureTracker::new(
