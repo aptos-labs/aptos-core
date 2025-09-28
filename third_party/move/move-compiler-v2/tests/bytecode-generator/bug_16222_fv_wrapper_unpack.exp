@@ -6,23 +6,23 @@ module 0xc0ffee::m {
     public fun make_lazy(): Lazy {
         pack m::Lazy(closure#0m::__lambda__1__make_lazy())
     }
-    friend fun pack$0xc0ffee$m$Lazy($0: || has drop): Lazy {
-        pack m::Lazy($0)
+    friend fun _pack_0xc0ffee_1_m_4_Lazy(_0: || has drop): Lazy {
+        pack m::Lazy(_0)
     }
-    friend fun unpack$0xc0ffee$m$Lazy($s: Lazy): (|| has drop) {
+    friend fun _unpack_0xc0ffee_1_m_4_Lazy(_s: Lazy): (|| has drop) {
         {
-          let m::Lazy{ 0 } = $s;
+          let m::Lazy{ 0 } = _s;
           Tuple(0)
         }
     }
-    friend fun unpack_mut_ref$0xc0ffee$m$Lazy($s: &mut Lazy): (&mut || has drop) {
-        Tuple(Borrow(Mutable)(select_variants m::Lazy.0($s)))
+    friend fun _unpackmutref_0xc0ffee_1_m_4_Lazy(_s: &mut Lazy): (&mut || has drop) {
+        Tuple(Borrow(Mutable)(select_variants m::Lazy.0(_s)))
     }
-    friend fun borrow_from$0xc0ffee$m$Lazy$0$0($s: &Lazy): &|| has drop {
-        Borrow(Immutable)(select m::Lazy.0($s))
+    friend fun _borrow_0xc0ffee_1_m_4_Lazy_0_0(_s: &Lazy): &|| has drop {
+        Borrow(Immutable)(select m::Lazy.0(_s))
     }
-    friend fun borrow_mut_from$0xc0ffee$m$Lazy$0$0($s: &mut Lazy): &mut || has drop {
-        Borrow(Mutable)(select m::Lazy.0($s))
+    friend fun _borrowmut_0xc0ffee_1_m_4_Lazy_0_0(_s: &mut Lazy): &mut || has drop {
+        Borrow(Mutable)(select m::Lazy.0(_s))
     }
     private fun __lambda__1__make_lazy() {
         Tuple()
@@ -35,23 +35,23 @@ module 0xc0ffee::m_friend {
     public fun make_lazy(): Lazy {
         pack m_friend::Lazy(closure#0m_friend::__lambda__1__make_lazy())
     }
-    friend fun pack$0xc0ffee$m_friend$Lazy($0: || has drop): Lazy {
-        pack m_friend::Lazy($0)
+    friend fun _pack_0xc0ffee_8_m_friend_4_Lazy(_0: || has drop): Lazy {
+        pack m_friend::Lazy(_0)
     }
-    friend fun unpack$0xc0ffee$m_friend$Lazy($s: Lazy): (|| has drop) {
+    friend fun _unpack_0xc0ffee_8_m_friend_4_Lazy(_s: Lazy): (|| has drop) {
         {
-          let m_friend::Lazy{ 0 } = $s;
+          let m_friend::Lazy{ 0 } = _s;
           Tuple(0)
         }
     }
-    friend fun unpack_mut_ref$0xc0ffee$m_friend$Lazy($s: &mut Lazy): (&mut || has drop) {
-        Tuple(Borrow(Mutable)(select_variants m_friend::Lazy.0($s)))
+    friend fun _unpackmutref_0xc0ffee_8_m_friend_4_Lazy(_s: &mut Lazy): (&mut || has drop) {
+        Tuple(Borrow(Mutable)(select_variants m_friend::Lazy.0(_s)))
     }
-    friend fun borrow_from$0xc0ffee$m_friend$Lazy$0$0($s: &Lazy): &|| has drop {
-        Borrow(Immutable)(select m_friend::Lazy.0($s))
+    friend fun _borrow_0xc0ffee_8_m_friend_4_Lazy_0_0(_s: &Lazy): &|| has drop {
+        Borrow(Immutable)(select m_friend::Lazy.0(_s))
     }
-    friend fun borrow_mut_from$0xc0ffee$m_friend$Lazy$0$0($s: &mut Lazy): &mut || has drop {
-        Borrow(Mutable)(select m_friend::Lazy.0($s))
+    friend fun _borrowmut_0xc0ffee_8_m_friend_4_Lazy_0_0(_s: &mut Lazy): &mut || has drop {
+        Borrow(Mutable)(select m_friend::Lazy.0(_s))
     }
     private fun __lambda__1__make_lazy() {
         Tuple()
@@ -83,20 +83,20 @@ module 0xc0ffee::m {
     public fun make_lazy(): Lazy {
         Lazy(|| lambda__1__make_lazy())
     }
-    friend fun pack_0xc0ffee_m_Lazy(_0: || has drop): Lazy {
+    friend fun _pack_0xc0ffee_1_m_4_Lazy(_0: || has drop): Lazy {
         Lazy(_0)
     }
-    friend fun unpack_0xc0ffee_m_Lazy(_s: Lazy): (|| has drop) {
+    friend fun _unpack_0xc0ffee_1_m_4_Lazy(_s: Lazy): (|| has drop) {
         let Lazy(0) = _s;
         (0)
     }
-    friend fun unpack_mut_ref_0xc0ffee_m_Lazy(_s: &mut Lazy): (&mut || has drop) {
+    friend fun _unpackmutref_0xc0ffee_1_m_4_Lazy(_s: &mut Lazy): (&mut || has drop) {
         (&mut _s.0)
     }
-    friend fun borrow_from_0xc0ffee_m_Lazy_0_0(_s: &Lazy): &|| has drop {
+    friend fun _borrow_0xc0ffee_1_m_4_Lazy_0_0(_s: &Lazy): &|| has drop {
         &_s.0
     }
-    friend fun borrow_mut_from_0xc0ffee_m_Lazy_0_0(_s: &mut Lazy): &mut || has drop {
+    friend fun _borrowmut_0xc0ffee_1_m_4_Lazy_0_0(_s: &mut Lazy): &mut || has drop {
         &mut _s.0
     }
     fun lambda__1__make_lazy() {
@@ -110,20 +110,20 @@ module 0xc0ffee::m_friend {
     public fun make_lazy(): Lazy {
         Lazy(|| lambda__1__make_lazy())
     }
-    friend fun pack_0xc0ffee_m_friend_Lazy(_0: || has drop): Lazy {
+    friend fun _pack_0xc0ffee_8_m_friend_4_Lazy(_0: || has drop): Lazy {
         Lazy(_0)
     }
-    friend fun unpack_0xc0ffee_m_friend_Lazy(_s: Lazy): (|| has drop) {
+    friend fun _unpack_0xc0ffee_8_m_friend_4_Lazy(_s: Lazy): (|| has drop) {
         let Lazy(0) = _s;
         (0)
     }
-    friend fun unpack_mut_ref_0xc0ffee_m_friend_Lazy(_s: &mut Lazy): (&mut || has drop) {
+    friend fun _unpackmutref_0xc0ffee_8_m_friend_4_Lazy(_s: &mut Lazy): (&mut || has drop) {
         (&mut _s.0)
     }
-    friend fun borrow_from_0xc0ffee_m_friend_Lazy_0_0(_s: &Lazy): &|| has drop {
+    friend fun _borrow_0xc0ffee_8_m_friend_4_Lazy_0_0(_s: &Lazy): &|| has drop {
         &_s.0
     }
-    friend fun borrow_mut_from_0xc0ffee_m_friend_Lazy_0_0(_s: &mut Lazy): &mut || has drop {
+    friend fun _borrowmut_0xc0ffee_8_m_friend_4_Lazy_0_0(_s: &mut Lazy): &mut || has drop {
         &mut _s.0
     }
     fun lambda__1__make_lazy() {
@@ -153,7 +153,7 @@ public fun m::make_lazy(): 0xc0ffee::m::Lazy {
 
 
 [variant baseline]
-public(friend) fun m::pack$0xc0ffee$m$Lazy($t0: || has drop): 0xc0ffee::m::Lazy {
+public(friend) fun m::_pack_0xc0ffee_1_m_4_Lazy($t0: || has drop): 0xc0ffee::m::Lazy {
      var $t1: 0xc0ffee::m::Lazy
   0: $t1 := pack 0xc0ffee::m::Lazy($t0)
   1: return $t1
@@ -161,7 +161,7 @@ public(friend) fun m::pack$0xc0ffee$m$Lazy($t0: || has drop): 0xc0ffee::m::Lazy 
 
 
 [variant baseline]
-public(friend) fun m::unpack$0xc0ffee$m$Lazy($t0: 0xc0ffee::m::Lazy): || has drop {
+public(friend) fun m::_unpack_0xc0ffee_1_m_4_Lazy($t0: 0xc0ffee::m::Lazy): || has drop {
      var $t1: || has drop
      var $t2: || has drop
   0: $t2 := unpack 0xc0ffee::m::Lazy($t0)
@@ -171,7 +171,7 @@ public(friend) fun m::unpack$0xc0ffee$m$Lazy($t0: 0xc0ffee::m::Lazy): || has dro
 
 
 [variant baseline]
-public(friend) fun m::unpack_mut_ref$0xc0ffee$m$Lazy($t0: &mut 0xc0ffee::m::Lazy): &mut || has drop {
+public(friend) fun m::_unpackmutref_0xc0ffee_1_m_4_Lazy($t0: &mut 0xc0ffee::m::Lazy): &mut || has drop {
      var $t1: &mut || has drop
   0: $t1 := borrow_field<0xc0ffee::m::Lazy>.0($t0)
   1: return $t1
@@ -179,7 +179,7 @@ public(friend) fun m::unpack_mut_ref$0xc0ffee$m$Lazy($t0: &mut 0xc0ffee::m::Lazy
 
 
 [variant baseline]
-public(friend) fun m::borrow_from$0xc0ffee$m$Lazy$0$0($t0: &0xc0ffee::m::Lazy): &|| has drop {
+public(friend) fun m::_borrow_0xc0ffee_1_m_4_Lazy_0_0($t0: &0xc0ffee::m::Lazy): &|| has drop {
      var $t1: &|| has drop
   0: $t1 := borrow_field<0xc0ffee::m::Lazy>.0($t0)
   1: return $t1
@@ -187,7 +187,7 @@ public(friend) fun m::borrow_from$0xc0ffee$m$Lazy$0$0($t0: &0xc0ffee::m::Lazy): 
 
 
 [variant baseline]
-public(friend) fun m::borrow_mut_from$0xc0ffee$m$Lazy$0$0($t0: &mut 0xc0ffee::m::Lazy): &mut || has drop {
+public(friend) fun m::_borrowmut_0xc0ffee_1_m_4_Lazy_0_0($t0: &mut 0xc0ffee::m::Lazy): &mut || has drop {
      var $t1: &mut || has drop
   0: $t1 := borrow_field<0xc0ffee::m::Lazy>.0($t0)
   1: return $t1
@@ -211,7 +211,7 @@ public fun m_friend::make_lazy(): 0xc0ffee::m_friend::Lazy {
 
 
 [variant baseline]
-public(friend) fun m_friend::pack$0xc0ffee$m_friend$Lazy($t0: || has drop): 0xc0ffee::m_friend::Lazy {
+public(friend) fun m_friend::_pack_0xc0ffee_8_m_friend_4_Lazy($t0: || has drop): 0xc0ffee::m_friend::Lazy {
      var $t1: 0xc0ffee::m_friend::Lazy
   0: $t1 := pack 0xc0ffee::m_friend::Lazy($t0)
   1: return $t1
@@ -219,7 +219,7 @@ public(friend) fun m_friend::pack$0xc0ffee$m_friend$Lazy($t0: || has drop): 0xc0
 
 
 [variant baseline]
-public(friend) fun m_friend::unpack$0xc0ffee$m_friend$Lazy($t0: 0xc0ffee::m_friend::Lazy): || has drop {
+public(friend) fun m_friend::_unpack_0xc0ffee_8_m_friend_4_Lazy($t0: 0xc0ffee::m_friend::Lazy): || has drop {
      var $t1: || has drop
      var $t2: || has drop
   0: $t2 := unpack 0xc0ffee::m_friend::Lazy($t0)
@@ -229,7 +229,7 @@ public(friend) fun m_friend::unpack$0xc0ffee$m_friend$Lazy($t0: 0xc0ffee::m_frie
 
 
 [variant baseline]
-public(friend) fun m_friend::unpack_mut_ref$0xc0ffee$m_friend$Lazy($t0: &mut 0xc0ffee::m_friend::Lazy): &mut || has drop {
+public(friend) fun m_friend::_unpackmutref_0xc0ffee_8_m_friend_4_Lazy($t0: &mut 0xc0ffee::m_friend::Lazy): &mut || has drop {
      var $t1: &mut || has drop
   0: $t1 := borrow_field<0xc0ffee::m_friend::Lazy>.0($t0)
   1: return $t1
@@ -237,7 +237,7 @@ public(friend) fun m_friend::unpack_mut_ref$0xc0ffee$m_friend$Lazy($t0: &mut 0xc
 
 
 [variant baseline]
-public(friend) fun m_friend::borrow_from$0xc0ffee$m_friend$Lazy$0$0($t0: &0xc0ffee::m_friend::Lazy): &|| has drop {
+public(friend) fun m_friend::_borrow_0xc0ffee_8_m_friend_4_Lazy_0_0($t0: &0xc0ffee::m_friend::Lazy): &|| has drop {
      var $t1: &|| has drop
   0: $t1 := borrow_field<0xc0ffee::m_friend::Lazy>.0($t0)
   1: return $t1
@@ -245,7 +245,7 @@ public(friend) fun m_friend::borrow_from$0xc0ffee$m_friend$Lazy$0$0($t0: &0xc0ff
 
 
 [variant baseline]
-public(friend) fun m_friend::borrow_mut_from$0xc0ffee$m_friend$Lazy$0$0($t0: &mut 0xc0ffee::m_friend::Lazy): &mut || has drop {
+public(friend) fun m_friend::_borrowmut_0xc0ffee_8_m_friend_4_Lazy_0_0($t0: &mut 0xc0ffee::m_friend::Lazy): &mut || has drop {
      var $t1: &mut || has drop
   0: $t1 := borrow_field<0xc0ffee::m_friend::Lazy>.0($t0)
   1: return $t1
@@ -263,7 +263,7 @@ public fun n::test() {
      var $t0: 0xc0ffee::m::Lazy
      var $t1: || has drop
   0: $t0 := m::make_lazy()
-  1: $t1 := m::unpack$0xc0ffee$m$Lazy($t0)
+  1: $t1 := m::_unpack_0xc0ffee_1_m_4_Lazy($t0)
   2: invoke($t1)
   3: return ()
 }
@@ -274,7 +274,7 @@ public fun n::test_friend() {
      var $t0: 0xc0ffee::m_friend::Lazy
      var $t1: || has drop
   0: $t0 := m_friend::make_lazy()
-  1: $t1 := m_friend::unpack$0xc0ffee$m_friend$Lazy($t0)
+  1: $t1 := m_friend::_unpack_0xc0ffee_8_m_friend_4_Lazy($t0)
   2: invoke($t1)
   3: return ()
 }
@@ -287,23 +287,23 @@ module 0xc0ffee::m {
     public fun make_lazy(): Lazy {
         pack m::Lazy(closure#0m::__lambda__1__make_lazy())
     }
-    friend fun pack$0xc0ffee$m$Lazy($0: || has drop): Lazy {
-        pack m::Lazy($0)
+    friend fun _pack_0xc0ffee_1_m_4_Lazy(_0: || has drop): Lazy {
+        pack m::Lazy(_0)
     }
-    friend fun unpack$0xc0ffee$m$Lazy($s: Lazy): (|| has drop) {
+    friend fun _unpack_0xc0ffee_1_m_4_Lazy(_s: Lazy): (|| has drop) {
         {
-          let m::Lazy{ 0 } = $s;
+          let m::Lazy{ 0 } = _s;
           Tuple(0)
         }
     }
-    friend fun unpack_mut_ref$0xc0ffee$m$Lazy($s: &mut Lazy): (&mut || has drop) {
-        Tuple(Borrow(Mutable)(select_variants m::Lazy.0($s)))
+    friend fun _unpackmutref_0xc0ffee_1_m_4_Lazy(_s: &mut Lazy): (&mut || has drop) {
+        Tuple(Borrow(Mutable)(select_variants m::Lazy.0(_s)))
     }
-    friend fun borrow_from$0xc0ffee$m$Lazy$0$0($s: &Lazy): &|| has drop {
-        Borrow(Immutable)(select m::Lazy.0($s))
+    friend fun _borrow_0xc0ffee_1_m_4_Lazy_0_0(_s: &Lazy): &|| has drop {
+        Borrow(Immutable)(select m::Lazy.0(_s))
     }
-    friend fun borrow_mut_from$0xc0ffee$m$Lazy$0$0($s: &mut Lazy): &mut || has drop {
-        Borrow(Mutable)(select m::Lazy.0($s))
+    friend fun _borrowmut_0xc0ffee_1_m_4_Lazy_0_0(_s: &mut Lazy): &mut || has drop {
+        Borrow(Mutable)(select m::Lazy.0(_s))
     }
     private fun __lambda__1__make_lazy() {
         Tuple()
@@ -316,23 +316,23 @@ module 0xc0ffee::m_friend {
     public fun make_lazy(): Lazy {
         pack m_friend::Lazy(closure#0m_friend::__lambda__1__make_lazy())
     }
-    friend fun pack$0xc0ffee$m_friend$Lazy($0: || has drop): Lazy {
-        pack m_friend::Lazy($0)
+    friend fun _pack_0xc0ffee_8_m_friend_4_Lazy(_0: || has drop): Lazy {
+        pack m_friend::Lazy(_0)
     }
-    friend fun unpack$0xc0ffee$m_friend$Lazy($s: Lazy): (|| has drop) {
+    friend fun _unpack_0xc0ffee_8_m_friend_4_Lazy(_s: Lazy): (|| has drop) {
         {
-          let m_friend::Lazy{ 0 } = $s;
+          let m_friend::Lazy{ 0 } = _s;
           Tuple(0)
         }
     }
-    friend fun unpack_mut_ref$0xc0ffee$m_friend$Lazy($s: &mut Lazy): (&mut || has drop) {
-        Tuple(Borrow(Mutable)(select_variants m_friend::Lazy.0($s)))
+    friend fun _unpackmutref_0xc0ffee_8_m_friend_4_Lazy(_s: &mut Lazy): (&mut || has drop) {
+        Tuple(Borrow(Mutable)(select_variants m_friend::Lazy.0(_s)))
     }
-    friend fun borrow_from$0xc0ffee$m_friend$Lazy$0$0($s: &Lazy): &|| has drop {
-        Borrow(Immutable)(select m_friend::Lazy.0($s))
+    friend fun _borrow_0xc0ffee_8_m_friend_4_Lazy_0_0(_s: &Lazy): &|| has drop {
+        Borrow(Immutable)(select m_friend::Lazy.0(_s))
     }
-    friend fun borrow_mut_from$0xc0ffee$m_friend$Lazy$0$0($s: &mut Lazy): &mut || has drop {
-        Borrow(Mutable)(select m_friend::Lazy.0($s))
+    friend fun _borrowmut_0xc0ffee_8_m_friend_4_Lazy_0_0(_s: &mut Lazy): &mut || has drop {
+        Borrow(Mutable)(select m_friend::Lazy.0(_s))
     }
     private fun __lambda__1__make_lazy() {
         Tuple()
@@ -368,7 +368,7 @@ public fun m::make_lazy(): 0xc0ffee::m::Lazy {
 
 
 [variant baseline]
-public(friend) fun m::pack$0xc0ffee$m$Lazy($t0: || has drop): 0xc0ffee::m::Lazy {
+public(friend) fun m::_pack_0xc0ffee_1_m_4_Lazy($t0: || has drop): 0xc0ffee::m::Lazy {
      var $t1: 0xc0ffee::m::Lazy
   0: $t1 := pack 0xc0ffee::m::Lazy($t0)
   1: return $t1
@@ -376,7 +376,7 @@ public(friend) fun m::pack$0xc0ffee$m$Lazy($t0: || has drop): 0xc0ffee::m::Lazy 
 
 
 [variant baseline]
-public(friend) fun m::unpack$0xc0ffee$m$Lazy($t0: 0xc0ffee::m::Lazy): || has drop {
+public(friend) fun m::_unpack_0xc0ffee_1_m_4_Lazy($t0: 0xc0ffee::m::Lazy): || has drop {
      var $t1: || has drop
      var $t2: || has drop
   0: $t2 := unpack 0xc0ffee::m::Lazy($t0)
@@ -386,7 +386,7 @@ public(friend) fun m::unpack$0xc0ffee$m$Lazy($t0: 0xc0ffee::m::Lazy): || has dro
 
 
 [variant baseline]
-public(friend) fun m::unpack_mut_ref$0xc0ffee$m$Lazy($t0: &mut 0xc0ffee::m::Lazy): &mut || has drop {
+public(friend) fun m::_unpackmutref_0xc0ffee_1_m_4_Lazy($t0: &mut 0xc0ffee::m::Lazy): &mut || has drop {
      var $t1: &mut || has drop
   0: $t1 := borrow_field<0xc0ffee::m::Lazy>.0($t0)
   1: return $t1
@@ -394,7 +394,7 @@ public(friend) fun m::unpack_mut_ref$0xc0ffee$m$Lazy($t0: &mut 0xc0ffee::m::Lazy
 
 
 [variant baseline]
-public(friend) fun m::borrow_from$0xc0ffee$m$Lazy$0$0($t0: &0xc0ffee::m::Lazy): &|| has drop {
+public(friend) fun m::_borrow_0xc0ffee_1_m_4_Lazy_0_0($t0: &0xc0ffee::m::Lazy): &|| has drop {
      var $t1: &|| has drop
   0: $t1 := borrow_field<0xc0ffee::m::Lazy>.0($t0)
   1: return $t1
@@ -402,7 +402,7 @@ public(friend) fun m::borrow_from$0xc0ffee$m$Lazy$0$0($t0: &0xc0ffee::m::Lazy): 
 
 
 [variant baseline]
-public(friend) fun m::borrow_mut_from$0xc0ffee$m$Lazy$0$0($t0: &mut 0xc0ffee::m::Lazy): &mut || has drop {
+public(friend) fun m::_borrowmut_0xc0ffee_1_m_4_Lazy_0_0($t0: &mut 0xc0ffee::m::Lazy): &mut || has drop {
      var $t1: &mut || has drop
   0: $t1 := borrow_field<0xc0ffee::m::Lazy>.0($t0)
   1: return $t1
@@ -426,7 +426,7 @@ public fun m_friend::make_lazy(): 0xc0ffee::m_friend::Lazy {
 
 
 [variant baseline]
-public(friend) fun m_friend::pack$0xc0ffee$m_friend$Lazy($t0: || has drop): 0xc0ffee::m_friend::Lazy {
+public(friend) fun m_friend::_pack_0xc0ffee_8_m_friend_4_Lazy($t0: || has drop): 0xc0ffee::m_friend::Lazy {
      var $t1: 0xc0ffee::m_friend::Lazy
   0: $t1 := pack 0xc0ffee::m_friend::Lazy($t0)
   1: return $t1
@@ -434,7 +434,7 @@ public(friend) fun m_friend::pack$0xc0ffee$m_friend$Lazy($t0: || has drop): 0xc0
 
 
 [variant baseline]
-public(friend) fun m_friend::unpack$0xc0ffee$m_friend$Lazy($t0: 0xc0ffee::m_friend::Lazy): || has drop {
+public(friend) fun m_friend::_unpack_0xc0ffee_8_m_friend_4_Lazy($t0: 0xc0ffee::m_friend::Lazy): || has drop {
      var $t1: || has drop
      var $t2: || has drop
   0: $t2 := unpack 0xc0ffee::m_friend::Lazy($t0)
@@ -444,7 +444,7 @@ public(friend) fun m_friend::unpack$0xc0ffee$m_friend$Lazy($t0: 0xc0ffee::m_frie
 
 
 [variant baseline]
-public(friend) fun m_friend::unpack_mut_ref$0xc0ffee$m_friend$Lazy($t0: &mut 0xc0ffee::m_friend::Lazy): &mut || has drop {
+public(friend) fun m_friend::_unpackmutref_0xc0ffee_8_m_friend_4_Lazy($t0: &mut 0xc0ffee::m_friend::Lazy): &mut || has drop {
      var $t1: &mut || has drop
   0: $t1 := borrow_field<0xc0ffee::m_friend::Lazy>.0($t0)
   1: return $t1
@@ -452,7 +452,7 @@ public(friend) fun m_friend::unpack_mut_ref$0xc0ffee$m_friend$Lazy($t0: &mut 0xc
 
 
 [variant baseline]
-public(friend) fun m_friend::borrow_from$0xc0ffee$m_friend$Lazy$0$0($t0: &0xc0ffee::m_friend::Lazy): &|| has drop {
+public(friend) fun m_friend::_borrow_0xc0ffee_8_m_friend_4_Lazy_0_0($t0: &0xc0ffee::m_friend::Lazy): &|| has drop {
      var $t1: &|| has drop
   0: $t1 := borrow_field<0xc0ffee::m_friend::Lazy>.0($t0)
   1: return $t1
@@ -460,7 +460,7 @@ public(friend) fun m_friend::borrow_from$0xc0ffee$m_friend$Lazy$0$0($t0: &0xc0ff
 
 
 [variant baseline]
-public(friend) fun m_friend::borrow_mut_from$0xc0ffee$m_friend$Lazy$0$0($t0: &mut 0xc0ffee::m_friend::Lazy): &mut || has drop {
+public(friend) fun m_friend::_borrowmut_0xc0ffee_8_m_friend_4_Lazy_0_0($t0: &mut 0xc0ffee::m_friend::Lazy): &mut || has drop {
      var $t1: &mut || has drop
   0: $t1 := borrow_field<0xc0ffee::m_friend::Lazy>.0($t0)
   1: return $t1
@@ -478,7 +478,7 @@ public fun n::test() {
      var $t0: 0xc0ffee::m::Lazy
      var $t1: || has drop
   0: $t0 := m::make_lazy()
-  1: $t1 := m::unpack$0xc0ffee$m$Lazy($t0)
+  1: $t1 := m::_unpack_0xc0ffee_1_m_4_Lazy($t0)
   2: invoke($t1)
   3: return ()
 }
@@ -489,7 +489,7 @@ public fun n::test_friend() {
      var $t0: 0xc0ffee::m_friend::Lazy
      var $t1: || has drop
   0: $t0 := m_friend::make_lazy()
-  1: $t1 := m_friend::unpack$0xc0ffee$m_friend$Lazy($t0)
+  1: $t1 := m_friend::_unpack_0xc0ffee_8_m_friend_4_Lazy($t0)
   2: invoke($t1)
   3: return ()
 }
@@ -508,33 +508,33 @@ B0:
 	1: Pack[0](Lazy)
 	2: Ret
 }
-public(friend) pack$0xc0ffee$m$Lazy($0: || has drop): Lazy /* def_idx: 1 */ {
+public(friend) _pack_0xc0ffee_1_m_4_Lazy(_0: || has drop): Lazy /* def_idx: 1 */ {
 B0:
-	0: MoveLoc[0]($0: || has drop)
+	0: MoveLoc[0](_0: || has drop)
 	1: Pack[0](Lazy)
 	2: Ret
 }
-public(friend) unpack$0xc0ffee$m$Lazy($s: Lazy): || has drop /* def_idx: 2 */ {
+public(friend) _unpack_0xc0ffee_1_m_4_Lazy(_s: Lazy): || has drop /* def_idx: 2 */ {
 B0:
-	0: MoveLoc[0]($s: Lazy)
+	0: MoveLoc[0](_s: Lazy)
 	1: Unpack[0](Lazy)
 	2: Ret
 }
-public(friend) unpack_mut_ref$0xc0ffee$m$Lazy($s: &mut Lazy): &mut || has drop /* def_idx: 3 */ {
+public(friend) _unpackmutref_0xc0ffee_1_m_4_Lazy(_s: &mut Lazy): &mut || has drop /* def_idx: 3 */ {
 B0:
-	0: MoveLoc[0]($s: &mut Lazy)
+	0: MoveLoc[0](_s: &mut Lazy)
 	1: MutBorrowField[0](Lazy._0: || has drop)
 	2: Ret
 }
-public(friend) borrow_from$0xc0ffee$m$Lazy$0$0($s: &Lazy): &|| has drop /* def_idx: 4 */ {
+public(friend) _borrow_0xc0ffee_1_m_4_Lazy_0_0(_s: &Lazy): &|| has drop /* def_idx: 4 */ {
 B0:
-	0: MoveLoc[0]($s: &Lazy)
+	0: MoveLoc[0](_s: &Lazy)
 	1: ImmBorrowField[0](Lazy._0: || has drop)
 	2: Ret
 }
-public(friend) borrow_mut_from$0xc0ffee$m$Lazy$0$0($s: &mut Lazy): &mut || has drop /* def_idx: 5 */ {
+public(friend) _borrowmut_0xc0ffee_1_m_4_Lazy_0_0(_s: &mut Lazy): &mut || has drop /* def_idx: 5 */ {
 B0:
-	0: MoveLoc[0]($s: &mut Lazy)
+	0: MoveLoc[0](_s: &mut Lazy)
 	1: MutBorrowField[0](Lazy._0: || has drop)
 	2: Ret
 }
@@ -554,33 +554,33 @@ B0:
 	1: Pack[0](Lazy)
 	2: Ret
 }
-public(friend) pack$0xc0ffee$m_friend$Lazy($0: || has drop): Lazy /* def_idx: 1 */ {
+public(friend) _pack_0xc0ffee_8_m_friend_4_Lazy(_0: || has drop): Lazy /* def_idx: 1 */ {
 B0:
-	0: MoveLoc[0]($0: || has drop)
+	0: MoveLoc[0](_0: || has drop)
 	1: Pack[0](Lazy)
 	2: Ret
 }
-public(friend) unpack$0xc0ffee$m_friend$Lazy($s: Lazy): || has drop /* def_idx: 2 */ {
+public(friend) _unpack_0xc0ffee_8_m_friend_4_Lazy(_s: Lazy): || has drop /* def_idx: 2 */ {
 B0:
-	0: MoveLoc[0]($s: Lazy)
+	0: MoveLoc[0](_s: Lazy)
 	1: Unpack[0](Lazy)
 	2: Ret
 }
-public(friend) unpack_mut_ref$0xc0ffee$m_friend$Lazy($s: &mut Lazy): &mut || has drop /* def_idx: 3 */ {
+public(friend) _unpackmutref_0xc0ffee_8_m_friend_4_Lazy(_s: &mut Lazy): &mut || has drop /* def_idx: 3 */ {
 B0:
-	0: MoveLoc[0]($s: &mut Lazy)
+	0: MoveLoc[0](_s: &mut Lazy)
 	1: MutBorrowField[0](Lazy._0: || has drop)
 	2: Ret
 }
-public(friend) borrow_from$0xc0ffee$m_friend$Lazy$0$0($s: &Lazy): &|| has drop /* def_idx: 4 */ {
+public(friend) _borrow_0xc0ffee_8_m_friend_4_Lazy_0_0(_s: &Lazy): &|| has drop /* def_idx: 4 */ {
 B0:
-	0: MoveLoc[0]($s: &Lazy)
+	0: MoveLoc[0](_s: &Lazy)
 	1: ImmBorrowField[0](Lazy._0: || has drop)
 	2: Ret
 }
-public(friend) borrow_mut_from$0xc0ffee$m_friend$Lazy$0$0($s: &mut Lazy): &mut || has drop /* def_idx: 5 */ {
+public(friend) _borrowmut_0xc0ffee_8_m_friend_4_Lazy_0_0(_s: &mut Lazy): &mut || has drop /* def_idx: 5 */ {
 B0:
-	0: MoveLoc[0]($s: &mut Lazy)
+	0: MoveLoc[0](_s: &mut Lazy)
 	1: MutBorrowField[0](Lazy._0: || has drop)
 	2: Ret
 }
@@ -599,14 +599,14 @@ use 0000000000000000000000000000000000000000000000000000000000c0ffee::m_friend;
 public test() /* def_idx: 0 */ {
 B0:
 	0: Call m::make_lazy(): Lazy
-	1: Call m::unpack$0xc0ffee$m$Lazy(Lazy): || has drop
+	1: Call m::_unpack_0xc0ffee_1_m_4_Lazy(Lazy): || has drop
 	2: CallClosure(|| has drop)
 	3: Ret
 }
 public test_friend() /* def_idx: 1 */ {
 B0:
 	0: Call m_friend::make_lazy(): Lazy
-	1: Call m_friend::unpack$0xc0ffee$m_friend$Lazy(Lazy): || has drop
+	1: Call m_friend::_unpack_0xc0ffee_8_m_friend_4_Lazy(Lazy): || has drop
 	2: CallClosure(|| has drop)
 	3: Ret
 }
