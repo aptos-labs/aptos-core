@@ -1379,7 +1379,7 @@ impl AstDebug for StructDefinition {
             w.write("native ");
         }
 
-        w.write(&format!("{} struct {}", visibility, name));
+        w.write(format!("{} struct {}", visibility, name));
         type_parameters.ast_debug(w);
         match layout {
             StructLayout::Singleton(fields, _) => w.block(|w| {
