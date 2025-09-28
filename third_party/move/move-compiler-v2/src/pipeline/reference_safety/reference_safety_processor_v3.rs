@@ -918,7 +918,7 @@ impl LifetimeAnalysisStep<'_, '_> {
         if let Operation::Function(mid, fid, inst) = oper.clone() {
             let fun_env = self.global_env().get_function(mid.qualified(fid));
             // If this is a borrow field api, store the corresponding struct name, which is then used for printing out proper error message.
-            if let Some(splited_names) = fun_env.get_and_split_fun_name('$') {
+            if let Some(splited_names) = fun_env.retrieve_struct_full_name_for_public_api() {
                 if splited_names.len() >= 4 {
                     let oper = splited_names[0].clone();
                     let addr = splited_names[1].clone();

@@ -19,6 +19,7 @@ use move_model::{
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
     well_known,
+    well_known::{BORROW, PACK, PUBLIC_STRUCT_DELIMITER, TEST_VARIANT, UNPACK, UNPACK_MUT_REF},
 };
 use move_stackless_bytecode::{
     function_target::FunctionData,
@@ -374,14 +375,15 @@ impl<'env> Generator<'env> {
         struct_name: String,
         variant: Option<Symbol>,
     ) -> Symbol {
-        let mut fun_name = self
-            .env()
-            .symbol_pool()
-            .make(&format!("{}${}", oper, struct_name));
+        let mut fun_name = self.env().symbol_pool().make(&format!(
+            "{}{}{}",
+            oper, PUBLIC_STRUCT_DELIMITER, struct_name
+        ));
         if let Some(variant) = variant {
             fun_name = self.env().symbol_pool().make(&format!(
-                "{}${}",
+                "{}{}{}",
                 fun_name.display(self.env().symbol_pool()),
+                PUBLIC_STRUCT_DELIMITER,
                 variant.display(self.env().symbol_pool())
             ));
         }
@@ -398,21 +400,26 @@ impl<'env> Generator<'env> {
         offset: usize,
     ) -> Symbol {
         let mut fun_name = self.env().symbol_pool().make(&format!(
-            "borrow{}from${}${}",
-            if mutable { "_mut_" } else { "_" },
+            "{}{}{}{}{}{}",
+            BORROW,
+            if mutable { "mut" } else { "" },
+            PUBLIC_STRUCT_DELIMITER,
             struct_name,
+            PUBLIC_STRUCT_DELIMITER,
             field_name.display(self.env().symbol_pool())
         ));
         if let Some(variant) = variant {
             fun_name = self.env().symbol_pool().make(&format!(
-                "{}${}",
+                "{}{}{}",
                 fun_name.display(self.env().symbol_pool()),
+                PUBLIC_STRUCT_DELIMITER,
                 variant.display(self.env().symbol_pool())
             ));
         }
         fun_name = self.env().symbol_pool().make(&format!(
-            "{}${}",
+            "{}{}{}",
             fun_name.display(self.env().symbol_pool()),
+            PUBLIC_STRUCT_DELIMITER,
             offset
         ));
         fun_name
@@ -795,9 +802,9 @@ impl Generator<'_> {
             let inst = inst.to_vec();
             let oper = if self.check_cross_module_access(&struct_id.module_id) {
                 let struct_env = self.func_env.env().get_struct(struct_id);
-                let struct_full_name = struct_env.get_full_name_with_address().replace("::", "$");
+                let struct_full_name = struct_env.get_full_name_for_public_api();
                 let fun_name =
-                    self.build_cross_module_access_api_name("unpack", struct_full_name, None);
+                    self.build_cross_module_access_api_name(UNPACK, struct_full_name, None);
                 if !has_err_msg {
                     self.check_and_generate_internal_struct_api_error(
                         id,
@@ -850,9 +857,9 @@ impl Generator<'_> {
                 let inst = self.env().get_node_instantiation(id);
                 let is_cross_module = self.check_cross_module_access(mid);
                 let struct_env = self.func_env.env().get_struct(mid.qualified(*sid));
-                let struct_full_name = struct_env.get_full_name_with_address().replace("::", "$");
+                let struct_full_name = struct_env.get_full_name_for_public_api();
                 let fun_name =
-                    self.build_cross_module_access_api_name("pack", struct_full_name, *variant);
+                    self.build_cross_module_access_api_name(PACK, struct_full_name, *variant);
                 if is_cross_module {
                     self.check_and_generate_internal_struct_api_error(
                         id,
@@ -1076,11 +1083,10 @@ impl Generator<'_> {
                         .func_env
                         .env()
                         .get_struct(wrapper_mid.qualified(wrapper_sid));
-                    let struct_full_name =
-                        struct_env.get_full_name_with_address().replace("::", "$");
+                    let struct_full_name = struct_env.get_full_name_for_public_api();
                     let oper = if self.check_cross_module_access(&wrapper_mid) {
                         let fun_name =
-                            self.build_cross_module_access_api_name("pack", struct_full_name, None);
+                            self.build_cross_module_access_api_name(PACK, struct_full_name, None);
                         if !has_err_msg {
                             self.check_and_generate_internal_struct_api_error(
                                 id,
@@ -1702,7 +1708,7 @@ impl Generator<'_> {
         let struct_env = self.env().get_struct(str.to_qualified_id());
         let struct_name_symbol = struct_env.get_name();
         let mid = str.module_id;
-        let struct_env_full_name = struct_env.get_full_name_with_address().replace("::", "$");
+        let struct_env_full_name = struct_env.get_full_name_for_public_api();
         let field_name = struct_env.get_field(fields[0]).get_name();
         let fun_name = self.build_cross_module_access_borrow_field_api_name(
             dest_type.is_mutable_reference(),
@@ -1925,14 +1931,14 @@ impl Generator<'_> {
         let bool_temp =
             *bool_temp.get_or_insert_with(|| self.new_temp(Type::new_prim(PrimitiveType::Bool)));
         let struct_env = self.env().get_struct(str.to_qualified_id());
-        let struct_full_name = struct_env.get_full_name_with_address().replace("::", "$");
+        let struct_full_name = struct_env.get_full_name_for_public_api();
         let mut variant_operations = Vec::new();
         let src_ty = self.temp_type(src).clone();
         let cross_module = self.check_cross_module_access(&str.module_id);
         for variant in variants {
             let oper = if cross_module {
                 let fun_name = self.build_cross_module_access_api_name(
-                    "test_variant",
+                    TEST_VARIANT,
                     struct_full_name.clone(),
                     Some(variant),
                 );
@@ -2356,13 +2362,12 @@ impl Generator<'_> {
                 ) = (variant, match_mode)
                 {
                     let struct_env = self.env().get_struct(str.to_qualified_id());
-                    let struct_full_name =
-                        struct_env.get_full_name_with_address().replace("::", "$");
+                    let struct_full_name = struct_env.get_full_name_for_public_api();
                     let src_ty = self.temp_type(value).clone();
                     let conversion_flag = src_ty.is_mutable_reference();
                     let oper = if cross_module {
                         let fun_name = self.build_cross_module_access_api_name(
-                            "test_variant",
+                            TEST_VARIANT,
                             struct_full_name,
                             Some(*variant),
                         );
@@ -2439,11 +2444,10 @@ impl Generator<'_> {
                     let inst = str.inst.to_owned();
                     let oper = {
                         let struct_env = self.func_env.env().get_struct(mid.qualified(sid));
-                        let struct_full_name =
-                            struct_env.get_full_name_with_address().replace("::", "$");
+                        let struct_full_name = struct_env.get_full_name_for_public_api();
                         let get_function = |variant: Option<Symbol>| {
                             let fun_name = self.build_cross_module_access_api_name(
-                                "unpack",
+                                UNPACK,
                                 struct_full_name,
                                 variant,
                             );
@@ -2532,7 +2536,7 @@ impl Generator<'_> {
             .collect();
         let mid = str.module_id;
         let struct_name_symbol = struct_env.get_name();
-        let struct_name_full = struct_env.get_full_name_with_address().replace("::", "$");
+        let struct_name_full = struct_env.get_full_name_for_public_api();
         // If unpack is mutable, use `unpack_mut_ref` to return reference of all fields for `variant`
         if ref_kind == ReferenceKind::Mutable
             && self.temp_type(arg).is_mutable_reference()
@@ -2541,7 +2545,7 @@ impl Generator<'_> {
             let mut res_temp = vec![];
             if sub_matches.len() == fields.len() {
                 let fun_name = self.build_cross_module_access_api_name(
-                    "unpack_mut_ref",
+                    UNPACK_MUT_REF,
                     struct_name_full.clone(),
                     variant,
                 );

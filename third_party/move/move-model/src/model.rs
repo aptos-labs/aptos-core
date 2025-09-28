@@ -36,6 +36,7 @@ use crate::{
     },
     ty_invariant_analysis::TypeUnificationAdapter,
     well_known,
+    well_known::PUBLIC_STRUCT_DELIMITER,
 };
 use anyhow::bail;
 use codespan::{ByteIndex, ByteOffset, ColumnOffset, FileId, Files, LineOffset, Location, Span};
@@ -3889,6 +3890,30 @@ impl<'env> StructEnv<'env> {
         )
     }
 
+    /// Get full name for constructing public api.
+    pub fn get_full_name_for_public_api(&self) -> String {
+        let address = self.module_env.get_name().addr();
+        let module_name = self
+            .module_env
+            .get_name()
+            .name()
+            .display(self.symbol_pool())
+            .to_string();
+        let struct_name = self.get_name().display(self.symbol_pool()).to_string();
+        format!(
+            "{}{}{}{}{}{}{}{}{}",
+            self.module_env.env.display(address),
+            PUBLIC_STRUCT_DELIMITER,
+            module_name.len(),
+            PUBLIC_STRUCT_DELIMITER,
+            module_name,
+            PUBLIC_STRUCT_DELIMITER,
+            struct_name.len(),
+            PUBLIC_STRUCT_DELIMITER,
+            struct_name
+        )
+    }
+
     /// Returns the VM identifier for this struct
     pub fn get_identifier(&self) -> Option<Identifier> {
         Identifier::new(self.symbol_pool().string(self.get_name()).as_str()).ok()
@@ -4664,6 +4689,82 @@ impl<'env> FunctionEnv<'env> {
         } else {
             None
         }
+    }
+
+    /// Safely split `s` into (prefix of exactly `n` chars, remainder).
+    fn take_chars<'a>(&self, s: &'a str, n: usize) -> Option<(&'a str, &'a str)> {
+        if n == 0 {
+            return Some(("", s));
+        }
+        let mut it = s.char_indices();
+        // advance to the start index of the (n)th character
+        let split_idx = (0..n).try_fold(0usize, |_, _| it.next().map(|(i, _)| i))?;
+        // Now move one more to get the end byte index
+        let end = it.next().map(|(i, _)| i).unwrap_or_else(|| s.len());
+        Some((&s[split_idx..end], &s[end..]))
+    }
+
+    /// Parse `_[oper]_[address]_[m]_[module]_[n]_[structname]_...`
+    pub fn retrieve_struct_full_name_for_public_api(&self) -> Option<[String; 4]> {
+        let s = self.get_name_str();
+        if !s.starts_with('_') {
+            return None;
+        }
+        let mut cur = &s[1..]; // drop leading '_'
+
+        // 1) oper
+        let i = cur.find('_')?;
+        let oper = &cur[..i];
+        if oper.is_empty() {
+            return None;
+        }
+        cur = &cur[i + 1..];
+
+        // 2) address
+        let i = cur.find('_')?;
+        let address = &cur[..i];
+        if address.is_empty() {
+            return None;
+        }
+        cur = &cur[i + 1..];
+
+        // 3) m (len of module, in chars)
+        let i = cur.find('_')?;
+        let m_str = &cur[..i];
+        let m: usize = m_str.parse().ok()?;
+        cur = &cur[i + 1..];
+
+        // 4) module: exactly m chars (can contain underscores)
+        let (module, rest) = self.take_chars(cur, m)?;
+        if module.is_empty() {
+            return None;
+        }
+        cur = rest;
+
+        // next must be '_' before n
+        if !cur.starts_with('_') {
+            return None;
+        }
+        cur = &cur[1..];
+
+        // 5) n
+        let i = cur.find('_')?;
+        let n_str = &cur[..i];
+        let n: usize = n_str.parse().ok()?;
+        cur = &cur[i + 1..];
+
+        // 6) structname: exactly n chars (can contain underscores)
+        let (structname, _tail) = self.take_chars(cur, n)?;
+        if structname.is_empty() {
+            return None;
+        }
+
+        Some([
+            oper.to_string(),
+            address.to_string(),
+            module.to_string(),
+            structname.to_string(),
+        ])
     }
 
     /// Gets full name with module address as string.

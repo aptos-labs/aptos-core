@@ -35,7 +35,11 @@ use crate::{
         Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, ReferenceKind, Type,
         Variance, BOOL_TYPE,
     },
-    well_known, LanguageVersion,
+    well_known::{
+        self, BORROW, PACK, PARAM_NAME, PUBLIC_STRUCT_DELIMITER, TEST_VARIANT, UNPACK,
+        UNPACK_MUT_REF,
+    },
+    LanguageVersion,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -3699,8 +3703,12 @@ impl ModuleBuilder<'_, '_> {
 
         match &struct_entry.layout {
             StructLayout::Singleton(fields, _) => {
-                let fun_name =
-                    symbol_pool.make(&format!("{}${}", prefix, struct_name.display(symbol_pool)));
+                let fun_name = symbol_pool.make(&format!(
+                    "{}{}{}",
+                    prefix,
+                    PUBLIC_STRUCT_DELIMITER,
+                    struct_name.display(symbol_pool)
+                ));
                 if let Some(data) = build_fn(fun_name, None, fields) {
                     result_map.insert(None, data);
                 }
@@ -3708,9 +3716,11 @@ impl ModuleBuilder<'_, '_> {
             StructLayout::Variants(variants) => {
                 for variant in variants {
                     let fun_name = symbol_pool.make(&format!(
-                        "{}${}${}",
+                        "{}{}{}{}{}",
                         prefix,
+                        PUBLIC_STRUCT_DELIMITER,
                         struct_name.display(symbol_pool),
+                        PUBLIC_STRUCT_DELIMITER,
                         variant.name.display(symbol_pool)
                     ));
                     if let Some(data) = build_fn(fun_name, Some(variant.name), &variant.fields) {
@@ -3732,7 +3742,7 @@ impl ModuleBuilder<'_, '_> {
         self.create_pack_unpack_struct_api(
             struct_name,
             struct_entry,
-            "pack",
+            PACK,
             |fun_name, variant: Option<Symbol>, fields| {
                 Some(self.build_pack_function(fun_name, struct_entry, variant, fields))
             },
@@ -3746,7 +3756,7 @@ impl ModuleBuilder<'_, '_> {
         is_mut_ref: bool,
     ) -> BTreeMap<Option<Symbol>, FunctionData> {
         let symbol_pool = self.parent.env.symbol_pool();
-        let input_para_name = symbol_pool.make("$s");
+        let input_para_name = symbol_pool.make(PARAM_NAME);
         let struct_ty = self
             .module_id
             .qualified_inst(
@@ -3773,11 +3783,7 @@ impl ModuleBuilder<'_, '_> {
         );
         let local_para_var = ExpData::LocalVar(struct_node, input_para_name).into_exp();
         let params = vec![param];
-        let prefix = if is_mut_ref {
-            "unpack_mut_ref"
-        } else {
-            "unpack"
-        };
+        let prefix = if is_mut_ref { UNPACK_MUT_REF } else { UNPACK };
 
         self.create_pack_unpack_struct_api(
             struct_name,
@@ -3810,7 +3816,7 @@ impl ModuleBuilder<'_, '_> {
         )
     }
 
-    /// Build the pack api `pack$struct_name[$variant_name]<generic type params>($field_name: $field_type, ...): struct_type` for structs/enums
+    /// Build the pack api `_pack_struct[_variant]<generic type params>(_field_name: field_type, ...): struct_type` for structs/enums
     fn build_pack_function(
         &self,
         fun_name: Symbol,
@@ -3823,7 +3829,7 @@ impl ModuleBuilder<'_, '_> {
         let mut var_list = vec![];
 
         for (field_name, field) in Self::sorted_fields(fields) {
-            let field_symbol = symbol_pool.make(&format!("${}", field_name.display(symbol_pool)));
+            let field_symbol = symbol_pool.make(&format!("_{}", field_name.display(symbol_pool)));
             params.push(Parameter(field_symbol, field.ty.clone(), field.loc.clone()));
 
             let par_node = self
@@ -3856,7 +3862,7 @@ impl ModuleBuilder<'_, '_> {
         self.build_function_data(fun_name, struct_entry, params, result_type, def)
     }
 
-    /// Build the unpack api `unpack$struct_name[$variant_name]<generic type params>($s: struct_type): (field_type, ...)` for structs/enums
+    /// Build the unpack api `_unpack_struct[_variant]<generic type params>(_s: struct_type): (field_type, ...)` for structs/enums
     fn build_unpack_function(
         &self,
         fun_name: Symbol,
@@ -3935,7 +3941,7 @@ impl ModuleBuilder<'_, '_> {
         self.build_function_data(fun_name, struct_entry, params, result_type, def)
     }
 
-    /// Build the unpack mut ref api `unpack_mut_ref$struct_name[$variant_name]<generic type params>($s: &mut struct_type): (&mut field_type, ...)` for structs/enums
+    /// Build the unpack mut ref api `_unpackmutref_structname[_variantname]<generic type params>(_s: &mut struct_type): (&mut field_type, ...)` for structs/enums
     fn build_unpack_mut_ref_function(
         &self,
         fun_name: Symbol,
@@ -4030,7 +4036,7 @@ impl ModuleBuilder<'_, '_> {
         )
     }
 
-    /// Create the test variant api `test_variant$enum_name$variant_name<generic type params>($s: &enum_type): bool` for enums
+    /// Create the test variant api `testvariant_enum_variant<generic type params>(_s: &enum_type): bool` for enums
     fn create_struct_test_variant_api(
         &self,
         struct_name: Symbol,
@@ -4038,7 +4044,7 @@ impl ModuleBuilder<'_, '_> {
     ) -> BTreeMap<Symbol, FunctionData> {
         let mut test_variant_map = BTreeMap::new();
         if let StructLayout::Variants(variants) = &struct_entry.layout {
-            let input_para_name = self.parent.env.symbol_pool().make("$s");
+            let input_para_name = self.parent.env.symbol_pool().make(PARAM_NAME);
             let struct_ty = self
                 .module_id
                 .qualified_inst(
@@ -4059,8 +4065,11 @@ impl ModuleBuilder<'_, '_> {
             let local_para_var = ExpData::LocalVar(struct_node, input_para_name).into_exp();
             for variant in variants {
                 let fun_name = self.parent.env.symbol_pool().make(&format!(
-                    "test_variant${}${}",
+                    "{}{}{}{}{}",
+                    TEST_VARIANT,
+                    PUBLIC_STRUCT_DELIMITER,
                     struct_name.display(self.parent.env.symbol_pool()),
+                    PUBLIC_STRUCT_DELIMITER,
                     variant.name.display(self.parent.env.symbol_pool())
                 ));
                 let result_type = Type::Primitive(PrimitiveType::Bool);
@@ -4179,8 +4188,8 @@ impl ModuleBuilder<'_, '_> {
     ) {
         let symbol_pool = self.parent.env.symbol_pool();
 
-        // Setup shared parameter for &$s
-        let input_para_name = symbol_pool.make("$s");
+        // Setup shared parameter for &_s
+        let input_para_name = symbol_pool.make(PARAM_NAME);
         let struct_ty = self
             .module_id
             .qualified_inst(
@@ -4260,7 +4269,7 @@ impl ModuleBuilder<'_, '_> {
         }
     }
 
-    /// Create the borrow field api `borrow[_mut_]$struct_name$field_name[$variant_name]$offset($s: &[mut] struct_type): &[mut] field_type` for structs/enums
+    /// Create the borrow field api `borrow[mut]_struct_field[_variant]_offset(_s: &[mut] struct_type): &[mut] field_type` for structs/enums
     fn build_borrow_function(
         &self,
         struct_name: Symbol,
@@ -4283,15 +4292,23 @@ impl ModuleBuilder<'_, '_> {
         );
 
         let fun_name_str = format!(
-            "borrow{}from${}${}{}${}",
-            if dst_mutable { "_mut_" } else { "_" },
+            "{}{}{}{}{}{}{}{}{}",
+            BORROW,
+            if dst_mutable { "mut" } else { "" },
+            PUBLIC_STRUCT_DELIMITER,
             struct_name.display(symbol_pool),
+            PUBLIC_STRUCT_DELIMITER,
             field_name.display(symbol_pool),
             if let Some(variant_name) = variant_name_opt {
-                format!("${}", variant_name.display(symbol_pool))
+                format!(
+                    "{}{}",
+                    PUBLIC_STRUCT_DELIMITER,
+                    variant_name.display(symbol_pool)
+                )
             } else {
                 "".to_string()
             },
+            PUBLIC_STRUCT_DELIMITER,
             offset,
         );
         let fun_name = symbol_pool.make(&fun_name_str);
@@ -4406,9 +4423,25 @@ impl ModuleBuilder<'_, '_> {
                         .symbol
                         .display(self.parent.env.symbol_pool())
                         .to_string();
-                    let module_name = self.module_name.display_full(self.parent.env).to_string();
-                    let replaced_module_name = module_name.replace("::", "$");
-                    let full_name = format!("{}${}", replaced_module_name, struct_name);
+                    let module_name = name
+                        .module_name
+                        .name()
+                        .display(self.parent.env.symbol_pool())
+                        .to_string();
+                    let address = name.module_name.addr();
+                    //let replaced_module_name = module_name.replace("::", PUBLIC_STRUCT_DELIMITER);
+                    let full_name = format!(
+                        "{}{}{}{}{}{}{}{}{}",
+                        self.parent.env.display(address),
+                        PUBLIC_STRUCT_DELIMITER,
+                        module_name.len(),
+                        PUBLIC_STRUCT_DELIMITER,
+                        module_name,
+                        PUBLIC_STRUCT_DELIMITER,
+                        struct_name.len(),
+                        PUBLIC_STRUCT_DELIMITER,
+                        struct_name
+                    );
                     let full_symbol = self.parent.env.symbol_pool().make(&full_name);
                     self.create_struct_api(full_symbol, entry, &mut function_data);
                 } else {
