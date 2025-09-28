@@ -407,38 +407,57 @@ fn verify_public_key_expiry_date_secs(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::utils;
+    use aptos_keyless_pepper_common::vuf::slip_10::ed25519_dalek::Digest;
+    use ark_ff::PrimeField;
+
+    // Test token data constants
+    const TEST_TOKEN_ISSUER: &str = "token_issuer";
+    const TEST_TOKEN_SUB: &str = "token_sub";
+    const TEST_TOKEN_AUD: &str = "token_aud";
+    const TEST_TOKEN_EMAIL: &str = "token_email";
+    const TEST_TOKEN_NONCE: &str = "token_nonce";
+
+    // Hard-coded test pepper constants. These are used to sanity check the
+    // generation logic for the pepper base, derived pepper and account address.
+    // Note:
+    // - These were generated using the tests in this file, and verified across
+    //   several releases (to ensure backward compatibility).
+    // - The "sub" variants are for when the "sub" uid key is used, and the
+    //   "email" variants are for when the "email" uid key is used.
+    const TEST_EMAIL_ACCOUNT_ADDRESS: &str =
+        "0x526bcbdbdb4641f1b2f7bbc865c8eb41e976285a9849844b4f543ea17cff3dd3";
+    const TEST_EMAIL_DERIVED_PEPPER_HEX: &str =
+        "9c76d2f26e8717ffbd499caad7ef5d85fdf24ce493ed111c8313f34429d10d";
+    const TEST_EMAIL_PEPPER_BASE_HEX: &str = "96ef6f0fa8534a24b917dd773f14fa75a934e3bd21480391b49699c6b14735915de0adbdacc2670be61f06cb7215a57c";
+    const TEST_EMAIL_VUF_PRIVATE_KEY_SEED: [u8; 32] = [1; 32];
+    const TEST_SUB_ACCOUNT_ADDRESS: &str =
+        "0xafdfc88e30c9858d34b2b5f63854cb4c2740c03a16cbc4df3f4adbe7b2e6c63f";
+    const TEST_SUB_DERIVED_PEPPER_HEX: &str =
+        "42803a2ec0739390232b81a20a78651210e6e185d70edc4fa5bddbc2416b24";
+    const TEST_SUB_PEPPER_BASE_HEX: &str = "b6d25395110bad7fda25f36bd44ee8220f37e952718bbb0e92cfae1061b6bb982bf34779d936f1b3cc412b832cf76d83";
+    const TEST_SUB_VUF_PRIVATE_KEY_SEED: [u8; 32] = [2; 32];
 
     #[test]
     fn test_get_uid_key_and_value() {
         // Create test token data
-        let claims = TokenData {
-            claims: Claims {
-                iss: "test_issuer".into(),
-                sub: "test_sub".into(),
-                aud: "test_aud".into(),
-                exp: 0,
-                iat: 0,
-                nonce: "test_nonce".into(),
-                email: Some("test_email".into()),
-                azp: None,
-            },
-            header: Default::default(),
-        };
+        let claims = create_test_token_data();
 
         // Test with no uid_key (should use the default)
         let (uid_key, uid_val) = get_uid_key_and_value(None, &claims).unwrap();
-        assert_eq!(uid_key, "sub");
-        assert_eq!(uid_val, "test_sub");
+        assert_eq!(uid_key, SUB_UID_KEY);
+        assert_eq!(uid_val, TEST_TOKEN_SUB);
 
-        // Test with "sub" uid_key
-        let (uid_key, uid_val) = get_uid_key_and_value(Some("sub".into()), &claims).unwrap();
-        assert_eq!(uid_key, "sub");
-        assert_eq!(uid_val, "test_sub");
+        // Test with sub uid_key
+        let (uid_key, uid_val) = get_uid_key_and_value(Some(SUB_UID_KEY.into()), &claims).unwrap();
+        assert_eq!(uid_key, SUB_UID_KEY);
+        assert_eq!(uid_val, TEST_TOKEN_SUB);
 
-        // Test with "email" uid_key
-        let (uid_key, uid_val) = get_uid_key_and_value(Some("email".into()), &claims).unwrap();
-        assert_eq!(uid_key, "email");
-        assert_eq!(uid_val, "test_email");
+        // Test with email uid_key
+        let (uid_key, uid_val) =
+            get_uid_key_and_value(Some(EMAIL_UID_KEY.into()), &claims).unwrap();
+        assert_eq!(uid_key, EMAIL_UID_KEY);
+        assert_eq!(uid_val, TEST_TOKEN_EMAIL);
 
         // Test with an unsupported uid_key
         let result = get_uid_key_and_value(Some("unsupported".to_string()), &claims);
@@ -450,5 +469,143 @@ mod tests {
         let invalid_path = Some("m/44'/637'/0'/0/0'".to_string()); // Invalid because one index is not hardened
         let result = get_verified_derivation_path(invalid_path);
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_pepper_and_address_derivation_default() {
+        // Create test token data
+        let claims = create_test_token_data();
+
+        // Get the default uid key and value (which should be "sub")
+        let (uid_key, uid_val) = get_uid_key_and_value(None, &claims).unwrap();
+
+        // Create the pepper input
+        let account_recovery_db = utils::get_mock_account_recovery_db();
+        let pepper_input =
+            create_pepper_input(None, &claims, uid_key, uid_val, account_recovery_db)
+                .await
+                .unwrap();
+
+        // Get the VUF private key
+        let vuf_private_key = get_test_vuf_private_key(TEST_SUB_VUF_PRIVATE_KEY_SEED);
+
+        // Verify the pepper base, derived pepper and account address
+        verify_base_pepper_and_address_generation(
+            &vuf_private_key,
+            &pepper_input,
+            TEST_SUB_PEPPER_BASE_HEX,
+            TEST_SUB_DERIVED_PEPPER_HEX,
+            TEST_SUB_ACCOUNT_ADDRESS,
+        );
+    }
+
+    #[tokio::test]
+    async fn test_pepper_and_address_derivation_email() {
+        // Create test token data
+        let claims = create_test_token_data();
+
+        // Get the email uid key and value
+        let (uid_key, uid_val) =
+            get_uid_key_and_value(Some(EMAIL_UID_KEY.into()), &claims).unwrap();
+
+        // Create the pepper input
+        let account_recovery_db = utils::get_mock_account_recovery_db();
+        let pepper_input =
+            create_pepper_input(None, &claims, uid_key, uid_val, account_recovery_db)
+                .await
+                .unwrap();
+
+        // Get the VUF private key
+        let vuf_private_key = get_test_vuf_private_key(TEST_EMAIL_VUF_PRIVATE_KEY_SEED);
+
+        // Verify the pepper base, derived pepper and account address
+        verify_base_pepper_and_address_generation(
+            &vuf_private_key,
+            &pepper_input,
+            TEST_EMAIL_PEPPER_BASE_HEX,
+            TEST_EMAIL_DERIVED_PEPPER_HEX,
+            TEST_EMAIL_ACCOUNT_ADDRESS,
+        );
+    }
+
+    #[tokio::test]
+    async fn test_pepper_and_address_derivation_sub() {
+        // Create test token data
+        let claims = create_test_token_data();
+
+        // Get the sub uid key and value
+        let (uid_key, uid_val) = get_uid_key_and_value(Some(SUB_UID_KEY.into()), &claims).unwrap();
+
+        // Create the pepper input
+        let account_recovery_db = utils::get_mock_account_recovery_db();
+        let pepper_input =
+            create_pepper_input(None, &claims, uid_key, uid_val, account_recovery_db)
+                .await
+                .unwrap();
+
+        // Get the VUF private key
+        let vuf_private_key = get_test_vuf_private_key(TEST_SUB_VUF_PRIVATE_KEY_SEED);
+
+        // Verify the pepper base, derived pepper and account address
+        verify_base_pepper_and_address_generation(
+            &vuf_private_key,
+            &pepper_input,
+            TEST_SUB_PEPPER_BASE_HEX,
+            TEST_SUB_DERIVED_PEPPER_HEX,
+            TEST_SUB_ACCOUNT_ADDRESS,
+        );
+    }
+
+    /// Creates test token data with predefined claims
+    fn create_test_token_data() -> TokenData<Claims> {
+        TokenData {
+            claims: Claims {
+                iss: TEST_TOKEN_ISSUER.into(),
+                sub: TEST_TOKEN_SUB.into(),
+                aud: TEST_TOKEN_AUD.into(),
+                exp: 0,
+                iat: 0,
+                nonce: TEST_TOKEN_NONCE.into(),
+                email: Some(TEST_TOKEN_EMAIL.into()),
+                azp: None,
+            },
+            header: Default::default(),
+        }
+    }
+
+    /// Returns the test VUF private key from the given seed
+    fn get_test_vuf_private_key(seed: [u8; 32]) -> ark_bls12_381::Fr {
+        // Derive the VUF private key from the seed
+        let mut sha3_hasher = sha3::Sha3_512::new();
+        sha3_hasher.update(seed);
+        ark_bls12_381::Fr::from_be_bytes_mod_order(sha3_hasher.finalize().as_slice())
+    }
+
+    /// Verifies the generated pepper base, derived pepper and account address against the expected values
+    fn verify_base_pepper_and_address_generation(
+        vuf_private_key: &ark_bls12_381::Fr,
+        pepper_input: &PepperInput,
+        expected_pepper_base_hex: &str,
+        expected_derived_pepper_hex: &str,
+        expected_account_address: &str,
+    ) {
+        // Create the pepper base
+        let pepper_base = create_pepper_base(vuf_private_key, pepper_input).unwrap();
+
+        // Derive the pepper using the verified derivation path and the pepper base
+        let verified_derivation_path = get_verified_derivation_path(None).unwrap();
+        let derived_pepper = derive_pepper(&verified_derivation_path, &pepper_base).unwrap();
+        let derived_pepper_bytes = derived_pepper.to_bytes().to_vec();
+
+        // Create the account address
+        let address = create_account_address(pepper_input, &derived_pepper).unwrap();
+
+        // Verify the pepper base, derived pepper and account address
+        assert_eq!(hex::encode(pepper_base), expected_pepper_base_hex);
+        assert_eq!(
+            hex::encode(derived_pepper_bytes),
+            expected_derived_pepper_hex
+        );
+        assert_eq!(address.to_standard_string(), expected_account_address);
     }
 }
