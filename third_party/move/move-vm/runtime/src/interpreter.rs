@@ -2709,7 +2709,13 @@ impl Frame {
                     },
                     Bytecode::Abort => {
                         gas_meter.charge_simple_instr(S::Abort)?;
+                        let mut str = String::new();
                         let error_code = interpreter.operand_stack.pop_as::<u64>()?;
+                        interpreter.debug_print_stack_trace(
+                            &mut str,
+                            interpreter.loader.runtime_environment(),
+                        )?;
+                        eprintln!("ABORTED({}): {}", error_code, str);
                         let error = PartialVMError::new(StatusCode::ABORTED)
                             .with_sub_status(error_code)
                             .with_message(format!(
