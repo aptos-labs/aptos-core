@@ -902,31 +902,39 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
     <b>let</b> maker_cancel_size = unsettled_size + maker_order.get_remaining_size_from_match_details();
-    market.emit_event_for_order(
-        order_id,
-        client_order_id,
-        maker_address,
-        maker_order.get_orig_size_from_match_details(),
-        0,
-        maker_cancel_size,
-        maker_order.get_price_from_match_details(),
-        maker_order.is_bid_from_match_details(),
-        <b>false</b>,
-        <a href="market_types.md#0x7_market_types_order_status_cancelled">market_types::order_status_cancelled</a>(),
-        maker_cancellation_reason,
-        metadata,
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
-        time_in_force,
-        callbacks
-    );
+    <b>let</b> is_bulk_order = maker_order.get_book_type_from_match_details() != single_order_book_type();
+    <b>if</b> (is_bulk_order) {
+        market.emit_event_for_bulk_order_cancelled(
+            order_id,
+            maker_address,
+        );
+    } <b>else</b> {
+        market.emit_event_for_order(
+            order_id,
+            client_order_id,
+            maker_address,
+            maker_order.get_orig_size_from_match_details(),
+            0,
+            maker_cancel_size,
+            maker_order.get_price_from_match_details(),
+            maker_order.is_bid_from_match_details(),
+            <b>false</b>,
+            <a href="market_types.md#0x7_market_types_order_status_cancelled">market_types::order_status_cancelled</a>(),
+            maker_cancellation_reason,
+            metadata,
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
+            time_in_force,
+            callbacks
+        );
+    };
     // If the maker is invalid cancel the maker order and <b>continue</b> <b>to</b> the next maker order
     <b>if</b> (maker_order.get_remaining_size_from_match_details() != 0) {
-        <b>let</b> order_book_type = maker_order.get_book_type_from_match_details();
-        <b>if</b> (order_book_type == single_order_book_type()) {
-            market.get_order_book_mut().cancel_order(maker_address, order_id);
-        } <b>else</b> {
+        <b>if</b> (is_bulk_order) {
+            // For bulk orders, we cancel all orders for the user
             market.get_order_book_mut().cancel_bulk_order(maker_address);
-        }
+        } <b>else</b> {
+            market.get_order_book_mut().cancel_order(maker_address, order_id);
+        };
     };
     <a href="order_placement.md#0x7_order_placement_cleanup_order_internal">cleanup_order_internal</a>(
         maker_address,
@@ -1043,7 +1051,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         );
     } <b>else</b> {
         callbacks.cleanup_bulk_orders(
-            user_addr, is_bid, remaining_size
+            user_addr, order_id
         );
     }
 }
@@ -1086,6 +1094,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         market.get_order_book_mut()
             .get_single_match_for_taker(price, *remaining_size, is_bid);
     <b>let</b> (maker_order, maker_matched_size) = result.destroy_order_match();
+    <b>let</b> is_bulk_order = maker_order.get_book_type_from_match_details() != single_order_book_type();
     <b>if</b> (!market.is_allowed_self_trade() && maker_order.get_account_from_match_details() == user_addr) {
         <a href="order_placement.md#0x7_order_placement_cancel_maker_order_internal">cancel_maker_order_internal</a>(
             market,
@@ -1141,27 +1150,36 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             callbacks
         );
         // Event for maker fill
-        market.emit_event_for_order(
-            maker_order.get_order_id_from_match_details(),
-            maker_order.get_client_order_id_from_match_details(),
-            maker_order.get_account_from_match_details(),
-            maker_order.get_orig_size_from_match_details(),
-            maker_order.get_remaining_size_from_match_details() + unsettled_maker_size,
-            settled_size,
-            maker_order.get_price_from_match_details(),
-            !is_bid,
-            <b>false</b>,
-            <a href="market_types.md#0x7_market_types_order_status_filled">market_types::order_status_filled</a>(),
-            std::string::utf8(b""),
-            maker_order.get_metadata_from_match_details(),
-            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
-            maker_order.get_time_in_force_from_match_details(),
-            callbacks
-        );
+        <b>if</b> (is_bulk_order) {
+            market.emit_event_for_bulk_order_filled(
+                maker_order.get_order_id_from_match_details(),
+                maker_order.get_account_from_match_details(),
+                settled_size,
+                maker_order.get_price_from_match_details(),
+                !is_bid,
+            );
+        } <b>else</b> {
+            market.emit_event_for_order(
+                maker_order.get_order_id_from_match_details(),
+                maker_order.get_client_order_id_from_match_details(),
+                maker_order.get_account_from_match_details(),
+                maker_order.get_orig_size_from_match_details(),
+                maker_order.get_remaining_size_from_match_details() + unsettled_maker_size,
+                settled_size,
+                maker_order.get_price_from_match_details(),
+                !is_bid,
+                <b>false</b>,
+                <a href="market_types.md#0x7_market_types_order_status_filled">market_types::order_status_filled</a>(),
+                std::string::utf8(b""),
+                maker_order.get_metadata_from_match_details(),
+                <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+                maker_order.get_time_in_force_from_match_details(),
+                callbacks
+            );
+        };
     };
 
     <b>let</b> maker_cancellation_reason = settle_result.get_maker_cancellation_reason();
-
     <b>let</b> taker_cancellation_reason = settle_result.get_taker_cancellation_reason();
     <b>if</b> (taker_cancellation_reason.is_some()) {
         <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
