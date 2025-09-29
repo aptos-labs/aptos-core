@@ -3085,6 +3085,7 @@ Applications can use this to create multiple stores for isolating fungible asset
         store_obj,
         <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> { metadata: <a href="object.md#0x1_object_convert">object::convert</a>(metadata), balance: 0, frozen: <b>false</b> }
     );
+    <a href="object.md#0x1_object_add_deletion_guarded_resource">object::add_deletion_guarded_resource</a>(store_obj);
 
     <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_is_untransferable">is_untransferable</a>(metadata)) {
         <a href="object.md#0x1_object_set_untransferable">object::set_untransferable</a>(constructor_ref);
@@ -3128,6 +3129,8 @@ Used to delete a store.  Requires the store to be completely empty prior to remo
 ) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a> {
     <b>let</b> store = <a href="object.md#0x1_object_object_from_delete_ref">object::object_from_delete_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(delete_ref);
     <b>let</b> addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
+    <a href="object.md#0x1_object_remove_deletion_guarded_resource">object::remove_deletion_guarded_resource</a>(addr);
+
     <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> { metadata, balance, frozen: _ } =
         <b>move_from</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(addr);
     <b>assert</b>!(balance == 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_EBALANCE_IS_NOT_ZERO">EBALANCE_IS_NOT_ZERO</a>));
