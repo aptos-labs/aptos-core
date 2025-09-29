@@ -11,6 +11,7 @@ mod cyclomatic_complexity;
 mod equal_operands_in_bin_op;
 mod find_unnecessary_casts;
 mod known_to_abort;
+mod empty_if;
 mod needless_bool;
 mod needless_deref_ref;
 mod needless_ref_deref;
@@ -37,6 +38,7 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         Box::<equal_operands_in_bin_op::EqualOperandsInBinOp>::default(),
         Box::<find_unnecessary_casts::FindUnnecessaryCasts>::default(),
         Box::<known_to_abort::KnownToAbort>::default(),
+        Box::<empty_if::EmptyIf>::default(),
         Box::<needless_bool::NeedlessBool>::default(),
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),
         Box::<needless_ref_deref::NeedlessRefDeref>::default(),
