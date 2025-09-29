@@ -1,0 +1,96 @@
+Move prover returns: exiting with verification errors
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/signed_int/negate.move:11:5
+   │
+ 9 │           -x
+   │           -- abort happened here with execution failure
+10 │       }
+11 │ ╭     spec negate_i8_incorrect {
+12 │ │         aborts_if false;
+13 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/signed_int/negate.move:8: negate_i8_incorrect
+   =         x = <redacted>
+   =     at tests/sources/functional/signed_int/negate.move:9: negate_i8_incorrect
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/signed_int/negate.move:26:5
+   │
+24 │           -x
+   │           -- abort happened here with execution failure
+25 │       }
+26 │ ╭     spec negate_i16_incorrect {
+27 │ │         aborts_if false;
+28 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/signed_int/negate.move:23: negate_i16_incorrect
+   =         x = <redacted>
+   =     at tests/sources/functional/signed_int/negate.move:24: negate_i16_incorrect
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/signed_int/negate.move:42:5
+   │
+40 │           -x
+   │           -- abort happened here with execution failure
+41 │       }
+42 │ ╭     spec negate_i32_incorrect {
+43 │ │         aborts_if false;
+44 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/signed_int/negate.move:39: negate_i32_incorrect
+   =         x = <redacted>
+   =     at tests/sources/functional/signed_int/negate.move:40: negate_i32_incorrect
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/signed_int/negate.move:58:5
+   │
+56 │           -x
+   │           -- abort happened here with execution failure
+57 │       }
+58 │ ╭     spec negate_i64_incorrect {
+59 │ │         aborts_if false;
+60 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/signed_int/negate.move:55: negate_i64_incorrect
+   =         x = <redacted>
+   =     at tests/sources/functional/signed_int/negate.move:56: negate_i64_incorrect
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/signed_int/negate.move:74:5
+   │
+72 │           -x
+   │           -- abort happened here with execution failure
+73 │       }
+74 │ ╭     spec negate_i128_incorrect {
+75 │ │         aborts_if false;
+76 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/signed_int/negate.move:71: negate_i128_incorrect
+   =         x = <redacted>
+   =     at tests/sources/functional/signed_int/negate.move:72: negate_i128_incorrect
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/signed_int/negate.move:90:5
+   │
+88 │           -x
+   │           -- abort happened here with execution failure
+89 │       }
+90 │ ╭     spec negate_i256_incorrect {
+91 │ │         aborts_if false;
+92 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/signed_int/negate.move:87: negate_i256_incorrect
+   =         x = <redacted>
+   =     at tests/sources/functional/signed_int/negate.move:88: negate_i256_incorrect
+   =         ABORTED

@@ -44,7 +44,7 @@ use move_ir_types::{
     location::{sp, Spanned},
     sp,
 };
-use num::{BigInt, FromPrimitive};
+use num::{BigInt, FromPrimitive, Zero};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, LinkedList},
@@ -3193,8 +3193,12 @@ impl ExpTranslator<'_, '_, '_> {
                 _ => unreachable!("not primitive"),
             }
         } else if self.is_spec_mode() {
-            // In specification mode, use U256.
-            vec![PrimitiveType::U256]
+            // In specification mode, use I256 or U256.
+            if value < BigInt::zero() {
+                vec![PrimitiveType::I256]
+            } else {
+                vec![PrimitiveType::U256]
+            }
         } else {
             // Infer the possible types from the value
             PrimitiveType::possible_int_types(value.clone())
