@@ -64,6 +64,7 @@ Order book type definitions
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 </code></pre>
 
 
@@ -118,7 +119,7 @@ Order book type definitions
 
 </dd>
 <dt>
-<code>client_order_id: u64</code>
+<code>client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
 
@@ -446,7 +447,7 @@ identifier, account, priority index, price, sizes, and side.
 
 </dd>
 <dt>
-<code>client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;</code>
+<code>client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;</code>
 </dt>
 <dd>
 
@@ -757,7 +758,7 @@ particular match operation.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_account_client_order_id">new_account_client_order_id</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: u64): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">order_book_types::AccountClientOrderId</a>
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_account_client_order_id">new_account_client_order_id</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">order_book_types::AccountClientOrderId</a>
 </code></pre>
 
 
@@ -767,7 +768,7 @@ particular match operation.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_account_client_order_id">new_account_client_order_id</a>(
-    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: u64
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: String
 ): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> {
     <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id }
 }
@@ -1142,7 +1143,7 @@ particular match operation.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_order_match_details">destroy_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M, <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_order_match_details">destroy_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M, <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>)
 </code></pre>
 
 
@@ -1153,7 +1154,7 @@ particular match operation.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_order_match_details">destroy_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
-): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, Option&lt;u64&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a>, M, <a href="order_book_types.md#0x7_order_book_types_OrderBookType">OrderBookType</a>) {
+): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, Option&lt;String&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a>, M, <a href="order_book_types.md#0x7_order_book_types_OrderBookType">OrderBookType</a>) {
     <b>let</b> OrderMatchDetails::V1 {
         order_id,
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -1416,7 +1417,7 @@ Validates that a reinsertion request is valid for the given original order.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_client_order_id_from_match_details">get_client_order_id_from_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_client_order_id_from_match_details">get_client_order_id_from_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;
 </code></pre>
 
 
@@ -1427,7 +1428,7 @@ Validates that a reinsertion request is valid for the given original order.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_client_order_id_from_match_details">get_client_order_id_from_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
-): Option&lt;u64&gt; {
+): Option&lt;String&gt; {
     self.client_order_id
 }
 </code></pre>
@@ -1494,7 +1495,7 @@ Validates that a reinsertion request is valid for the given original order.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_match_details">new_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, metadata: M, order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_match_details">new_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, metadata: M, order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
 </code></pre>
 
 
@@ -1506,7 +1507,7 @@ Validates that a reinsertion request is valid for the given original order.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_match_details">new_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
-    client_order_id: Option&lt;u64&gt;,
+    client_order_id: Option&lt;String&gt;,
     unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>,
     price: u64,
     orig_size: u64,

@@ -15,6 +15,7 @@ module aptos_experimental::single_order_book {
     use std::vector;
     use std::error;
     use std::option::{Self, Option};
+    use std::string::String;
     use aptos_framework::big_ordered_map::BigOrderedMap;
 
     use aptos_experimental::order_book_types::{
@@ -61,7 +62,7 @@ module aptos_experimental::single_order_book {
         V1 {
             account: address,
             order_id: OrderIdType,
-            client_order_id: Option<u64>,
+            client_order_id: Option<String>,
             price: u64,
             orig_size: u64,
             remaining_size: u64,
@@ -89,7 +90,7 @@ module aptos_experimental::single_order_book {
     public(friend) fun new_single_order_request<M: store + copy + drop>(
         account: address,
         order_id: OrderIdType,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         price: u64,
         orig_size: u64,
         remaining_size: u64,
@@ -215,7 +216,7 @@ module aptos_experimental::single_order_book {
     }
 
     public(friend) fun try_cancel_order_with_client_order_id<M: store + copy + drop>(
-        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_creator: address, client_order_id: u64
+        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_creator: address, client_order_id: String
     ): Option<SingleOrder<M>> {
         let account_client_order_id =
             new_account_client_order_id(order_creator, client_order_id);
@@ -240,7 +241,7 @@ module aptos_experimental::single_order_book {
     }
 
     public(friend) fun client_order_id_exists<M: store + copy + drop>(
-        self: &SingleOrderBook<M>, order_creator: address, client_order_id: u64
+        self: &SingleOrderBook<M>, order_creator: address, client_order_id: String
     ): bool {
         let account_client_order_id =
             new_account_client_order_id(order_creator, client_order_id);
@@ -471,7 +472,7 @@ module aptos_experimental::single_order_book {
     }
 
     public(friend) fun get_order_id_by_client_id<M: store + copy + drop>(
-        self: &SingleOrderBook<M>, order_creator: address, client_order_id: u64
+        self: &SingleOrderBook<M>, order_creator: address, client_order_id: String
     ): Option<OrderIdType> {
         let account_client_order_id =
             new_account_client_order_id(order_creator, client_order_id);
@@ -739,7 +740,7 @@ module aptos_experimental::single_order_book {
     public fun create_test_order_request<M: store + copy + drop>(
         account: address,
         order_id: OrderIdType,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         price: u64,
         orig_size: u64,
         remaining_size: u64,
@@ -787,7 +788,7 @@ module aptos_experimental::single_order_book {
     public fun create_test_order_request_with_client_id<M: store + copy + drop>(
         account: address,
         order_id: OrderIdType,
-        client_order_id: u64,
+        client_order_id: String,
         price: u64,
         size: u64,
         is_bid: bool,
@@ -815,7 +816,7 @@ module aptos_experimental::single_order_book {
         expected_orig_size: u64,
         expected_remaining_size: u64,
         expected_is_bid: bool,
-        expected_client_order_id: Option<u64>
+        expected_client_order_id: Option<String>
     ) {
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
@@ -870,7 +871,7 @@ module aptos_experimental::single_order_book {
         let order_req = create_test_order_request_with_client_id(
             @0xAA,
             new_order_id_type(1),
-            1,
+            std::string::utf8(b"1"),
             100,
             1000,
             false,
@@ -888,7 +889,7 @@ module aptos_experimental::single_order_book {
             1000,
             1000,
             false,
-            option::some(1)
+            option::some(std::string::utf8(b"1"))
         );
 
         // Place a matching buy order for partial fill
@@ -898,7 +899,7 @@ module aptos_experimental::single_order_book {
             create_test_order_request_with_client_id(
                 @0xBB,
                 new_order_id_type(1),
-                2,
+                std::string::utf8(b"2"),
                 100,
                 400,
                 true,
@@ -930,7 +931,7 @@ module aptos_experimental::single_order_book {
             1000,
             600,
             false,
-            option::some(1)
+            option::some(std::string::utf8(b"1"))
         );
 
         // Cancel the remaining order
@@ -1014,7 +1015,7 @@ module aptos_experimental::single_order_book {
         let order_req = create_test_order_request_with_client_id(
             @0xAA,
             new_order_id_type(1),
-            1,
+            std::string::utf8(b"1"),
             100,
             1000,
             false,
@@ -1030,7 +1031,7 @@ module aptos_experimental::single_order_book {
             create_test_order_request_with_client_id(
                 @0xBB,
                 new_order_id_type(2),
-                2,
+                std::string::utf8(b"2"),
                 99,
                 500,
                 true,
@@ -1046,7 +1047,7 @@ module aptos_experimental::single_order_book {
             create_test_order_request_with_client_id(
                 @0xAA,
                 new_order_id_type(1),
-                3,
+                std::string::utf8(b"3"),
                 99,
                 1000,
                 false,
@@ -1470,7 +1471,7 @@ module aptos_experimental::single_order_book {
         let order_req = create_test_order_request_with_client_id(
             @0xAA,
             new_order_id_type(1),
-            1,
+            std::string::utf8(b"1"),
             100,
             1000,
             false,
@@ -1479,7 +1480,7 @@ module aptos_experimental::single_order_book {
         order_book.place_maker_order(&mut price_time_idx, &mut ascending_id_generator, order_req);
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 1000);
 
-        assert!(order_book.client_order_id_exists(@0xAA, 1));
+        assert!(order_book.client_order_id_exists(@0xAA, std::string::utf8(b"1")));
 
         // Taker order
         let order_req = create_simple_test_order_request(
@@ -1494,13 +1495,13 @@ module aptos_experimental::single_order_book {
         let match_results = order_book.place_order_and_get_matches(&mut price_time_idx, &mut ascending_id_generator, order_req);
         assert!(total_matched_size(&match_results) == 100);
 
-        assert!(order_book.client_order_id_exists(@0xAA, 1));
+        assert!(order_book.client_order_id_exists(@0xAA, std::string::utf8(b"1")));
 
         let (matched_order, _) = match_results[0].destroy_order_match();
         let reinsert_request = matched_order.new_order_match_details_with_modified_size(50);
         // Assume half of the order was matched and remaining 50 size is reinserted back to the order book
         order_book.reinsert_order(&mut price_time_idx, reinsert_request,  &matched_order);
-        assert!(order_book.client_order_id_exists(@0xAA, 1));
+        assert!(order_book.client_order_id_exists(@0xAA, std::string::utf8(b"1")));
         // Verify order was reinserted with updated size
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 950);
         cleanup_test(order_book, price_time_idx);
@@ -1514,7 +1515,7 @@ module aptos_experimental::single_order_book {
         let order_req = create_test_order_request_with_client_id(
             @0xAA,
             new_order_id_type(1),
-            1,
+            std::string::utf8(b"1"),
             100,
             1000,
             false,
@@ -1527,25 +1528,25 @@ module aptos_experimental::single_order_book {
         let order_req = create_test_order_request_with_client_id(
             @0xBB,
             new_order_id_type(2),
-            1,
+            std::string::utf8(b"1"),
             100,
             1000,
             true,
             TestMetadata {}
         );
 
-        assert!(order_book.client_order_id_exists(@0xAA, 1));
+        assert!(order_book.client_order_id_exists(@0xAA, std::string::utf8(b"1")));
 
         let match_results = order_book.place_order_and_get_matches(&mut price_time_idx, &mut ascending_id_generator, order_req);
         assert!(total_matched_size(&match_results) == 1000);
 
-        assert!(!order_book.client_order_id_exists(@0xAA, 1));
+        assert!(!order_book.client_order_id_exists(@0xAA, std::string::utf8(b"1")));
 
         let (matched_order, _) = match_results[0].destroy_order_match();
         let reinsert_request = matched_order.new_order_match_details_with_modified_size(500);
 
         order_book.reinsert_order(&mut price_time_idx,  reinsert_request, &matched_order);
-        assert!(order_book.client_order_id_exists(@0xAA, 1));
+        assert!(order_book.client_order_id_exists(@0xAA, std::string::utf8(b"1")));
         // Verify order was reinserted with updated size
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 500);
         cleanup_test(order_book, price_time_idx);

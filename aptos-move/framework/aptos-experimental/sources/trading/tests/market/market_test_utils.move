@@ -3,6 +3,7 @@ module aptos_experimental::market_test_utils {
     use std::option;
     use std::option::Option;
     use std::signer;
+    use std::string::String;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::event_utils::{latest_emitted_events, EventStore, new_event_store};
     use aptos_experimental::market_types::{
@@ -31,7 +32,7 @@ module aptos_experimental::market_test_utils {
         is_taker: bool,
         is_cancelled: bool,
         metadata: M,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): OrderIdType {
         let user_addr = signer::address_of(user);
@@ -120,7 +121,7 @@ module aptos_experimental::market_test_utils {
     public fun place_taker_order<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         taker: &signer,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         taker_price: Option<u64>,
         size: u64,
         is_bid: bool,
@@ -203,7 +204,7 @@ module aptos_experimental::market_test_utils {
         fill_prices: vector<u64>,
         maker_addr: address,
         maker_order_ids: vector<OrderIdType>,
-        maker_client_order_ids: vector<Option<u64>>,
+        maker_client_order_ids: vector<Option<String>>,
         maker_orig_sizes: vector<u64>,
         maker_remaining_sizes: vector<u64>,
         event_store: &mut EventStore,
@@ -273,7 +274,7 @@ module aptos_experimental::market_test_utils {
         user: &signer,
         is_taker: bool,
         order_id: OrderIdType,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         price: u64,
         orig_size: u64,
         remaining_size: u64,
@@ -313,7 +314,7 @@ module aptos_experimental::market_test_utils {
         market: &mut Market<M>,
         taker: &signer,
         taker_order_id: OrderIdType,
-        taker_client_order_id: Option<u64>,
+        taker_client_order_id: Option<String>,
         taker_price: u64,
         size: u64,
         is_bid: bool,
@@ -321,7 +322,7 @@ module aptos_experimental::market_test_utils {
         fill_prices: vector<u64>,
         maker_addr: address,
         maker_order_ids: vector<OrderIdType>,
-        maker_client_order_ids: vector<Option<u64>>,
+        maker_client_order_ids: vector<Option<String>>,
         maker_orig_sizes: vector<u64>,
         maker_remaining_sizes: vector<u64>,
         event_store: &mut EventStore,
@@ -424,7 +425,7 @@ module aptos_experimental::market_test_utils {
         market: &mut Market<M>,
         taker: &signer,
         taker_order_id: OrderIdType,
-        taker_client_order_id: Option<u64>,
+        taker_client_order_id: Option<String>,
         taker_price: u64,
         size: u64,
         is_bid: bool,

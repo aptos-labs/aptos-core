@@ -574,7 +574,7 @@
 
 </dd>
 <dt>
-<code>client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;</code>
+<code>client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;</code>
 </dt>
 <dd>
 
@@ -2050,7 +2050,7 @@ It is up to the caller to perform necessary permissions checks
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_order_metadata_by_client_id">get_order_metadata_by_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_order_metadata_by_client_id">get_order_metadata_by_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;M&gt;
 </code></pre>
 
 
@@ -2060,7 +2060,7 @@ It is up to the caller to perform necessary permissions checks
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_order_metadata_by_client_id">get_order_metadata_by_client_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: u64
+    self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: String
 ): Option&lt;M&gt; {
     <b>let</b> order_id = self.<a href="order_book.md#0x7_order_book">order_book</a>.get_order_id_by_client_id(user, client_order_id);
     <b>if</b> (order_id.is_none()) {
@@ -2082,7 +2082,7 @@ Sets the order metadata for an order by client id. It is up to the caller to per
 around ownership of the order.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_set_order_metadata_by_client_id">set_order_metadata_by_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: u64, metadata: M)
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_set_order_metadata_by_client_id">set_order_metadata_by_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, metadata: M)
 </code></pre>
 
 
@@ -2092,7 +2092,7 @@ around ownership of the order.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_set_order_metadata_by_client_id">set_order_metadata_by_client_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: u64, metadata: M
+    self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: String, metadata: M
 ) {
     <b>let</b> order_id = self.<a href="order_book.md#0x7_order_book">order_book</a>.get_order_id_by_client_id(user, client_order_id);
     <b>assert</b>!(order_id.is_some(), <a href="market_types.md#0x7_market_types_EORDER_DOES_NOT_EXIST">EORDER_DOES_NOT_EXIST</a>);
@@ -2166,7 +2166,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_order">emit_event_for_order</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, user: <b>address</b>, orig_size: u64, remaining_size: u64, size_delta: u64, price: u64, is_bid: bool, is_taker: bool, status: <a href="market_types.md#0x7_market_types_OrderStatus">market_types::OrderStatus</a>, details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, metadata: M, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_order">emit_event_for_order</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, user: <b>address</b>, orig_size: u64, remaining_size: u64, size_delta: u64, price: u64, is_bid: bool, is_taker: bool, status: <a href="market_types.md#0x7_market_types_OrderStatus">market_types::OrderStatus</a>, details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, metadata: M, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
 </code></pre>
 
 
@@ -2178,7 +2178,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_order">emit_event_for_order</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
     self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;,
     order_id: OrderIdType,
-    client_order_id: Option&lt;u64&gt;,
+    client_order_id: Option&lt;String&gt;,
     user: <b>address</b>,
     orig_size: u64,
     remaining_size: u64,

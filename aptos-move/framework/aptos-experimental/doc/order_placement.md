@@ -664,7 +664,7 @@ interface. This is used to validate the order and settle the trade.
 Returns the order id, remaining size, cancel reason and number of fills for the order.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_place_limit_order">place_limit_order</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, limit_price: u64, orig_size: u64, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, max_match_limit: u32, cancel_on_match_limit: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_place_limit_order">place_limit_order</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, limit_price: u64, orig_size: u64, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, max_match_limit: u32, cancel_on_match_limit: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
 </code></pre>
 
 
@@ -682,7 +682,7 @@ Returns the order id, remaining size, cancel reason and number of fills for the 
     time_in_force: TimeInForce,
     trigger_condition: Option&lt;TriggerCondition&gt;,
     metadata: M,
-    client_order_id: Option&lt;u64&gt;,
+    client_order_id: Option&lt;String&gt;,
     max_match_limit: u32,
     cancel_on_match_limit: bool,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
@@ -718,7 +718,7 @@ Returns the order id, remaining size, cancel reason and number of fills for the 
 Places a market order - The order is guaranteed to be a taker order and will be matched immediately.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_place_market_order">place_market_order</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, orig_size: u64, is_bid: bool, metadata: M, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, max_match_limit: u32, cancel_on_match_limit: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_place_market_order">place_market_order</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, orig_size: u64, is_bid: bool, metadata: M, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, max_match_limit: u32, cancel_on_match_limit: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
 </code></pre>
 
 
@@ -733,7 +733,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     orig_size: u64,
     is_bid: bool,
     metadata: M,
-    client_order_id: Option&lt;u64&gt;,
+    client_order_id: Option&lt;String&gt;,
     max_match_limit: u32,
     cancel_on_match_limit: bool,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
@@ -768,7 +768,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
 
 
-<pre><code><b>fun</b> <a href="order_placement.md#0x7_order_placement_place_maker_order_internal">place_maker_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user_addr: <b>address</b>, limit_price: u64, orig_size: u64, remaining_size: u64, fill_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, match_count: u32, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, emit_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, callback_results: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
+<pre><code><b>fun</b> <a href="order_placement.md#0x7_order_placement_place_maker_order_internal">place_maker_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user_addr: <b>address</b>, limit_price: u64, orig_size: u64, remaining_size: u64, fill_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, match_count: u32, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, emit_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, callback_results: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
 </code></pre>
 
 
@@ -790,7 +790,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     trigger_condition: Option&lt;TriggerCondition&gt;,
     metadata: M,
     order_id: OrderIdType,
-    client_order_id: Option&lt;u64&gt;,
+    client_order_id: Option&lt;String&gt;,
     emit_order_open: bool,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;,
     callback_results: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;,
@@ -880,7 +880,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
 
 
-<pre><code><b>fun</b> <a href="order_placement.md#0x7_order_placement_cancel_maker_order_internal">cancel_maker_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, maker_order: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, maker_address: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, maker_cancellation_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, unsettled_size: u64, metadata: M, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
+<pre><code><b>fun</b> <a href="order_placement.md#0x7_order_placement_cancel_maker_order_internal">cancel_maker_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, maker_order: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, maker_address: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, maker_cancellation_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, unsettled_size: u64, metadata: M, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
 </code></pre>
 
 
@@ -892,7 +892,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 <pre><code><b>fun</b> <a href="order_placement.md#0x7_order_placement_cancel_maker_order_internal">cancel_maker_order_internal</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
     market: &<b>mut</b> Market&lt;M&gt;,
     maker_order: &OrderMatchDetails&lt;M&gt;,
-    client_order_id: Option&lt;u64&gt;,
+    client_order_id: Option&lt;String&gt;,
     maker_address: <b>address</b>,
     order_id: OrderIdType,
     maker_cancellation_reason: String,
@@ -958,7 +958,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
 
 
-<pre><code><b>fun</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user_addr: <b>address</b>, limit_price: u64, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, orig_size: u64, size_delta: u64, fill_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, match_count: u32, is_bid: bool, is_taker: bool, cancel_reason: <a href="order_placement.md#0x7_order_placement_OrderCancellationReason">order_placement::OrderCancellationReason</a>, cancel_details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, metadata: M, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, callback_results: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
+<pre><code><b>fun</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user_addr: <b>address</b>, limit_price: u64, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, orig_size: u64, size_delta: u64, fill_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, match_count: u32, is_bid: bool, is_taker: bool, cancel_reason: <a href="order_placement.md#0x7_order_placement_OrderCancellationReason">order_placement::OrderCancellationReason</a>, cancel_details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, metadata: M, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, callback_results: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
 </code></pre>
 
 
@@ -972,7 +972,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     user_addr: <b>address</b>,
     limit_price: u64,
     order_id: OrderIdType,
-    client_order_id: Option&lt;u64&gt;,
+    client_order_id: Option&lt;String&gt;,
     orig_size: u64,
     size_delta: u64,
     fill_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
@@ -1067,7 +1067,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
 
 
-<pre><code><b>fun</b> <a href="order_placement.md#0x7_order_placement_settle_single_trade">settle_single_trade</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user_addr: <b>address</b>, price: u64, orig_size: u64, remaining_size: &<b>mut</b> u64, is_bid: bool, metadata: M, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, fill_sizes: &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_placement.md#0x7_order_placement_OrderCancellationReason">order_placement::OrderCancellationReason</a>&gt;, <a href="market_types.md#0x7_market_types_CallbackResult">market_types::CallbackResult</a>&lt;R&gt;)
+<pre><code><b>fun</b> <a href="order_placement.md#0x7_order_placement_settle_single_trade">settle_single_trade</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user_addr: <b>address</b>, price: u64, orig_size: u64, remaining_size: &<b>mut</b> u64, is_bid: bool, metadata: M, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, fill_sizes: &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_placement.md#0x7_order_placement_OrderCancellationReason">order_placement::OrderCancellationReason</a>&gt;, <a href="market_types.md#0x7_market_types_CallbackResult">market_types::CallbackResult</a>&lt;R&gt;)
 </code></pre>
 
 
@@ -1085,7 +1085,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     is_bid: bool,
     metadata: M,
     order_id: OrderIdType,
-    client_order_id: Option&lt;u64&gt;,
+    client_order_id: Option&lt;String&gt;,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;,
     time_in_force: TimeInForce,
     fill_sizes: &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
@@ -1256,7 +1256,7 @@ the caller do not wants to emit an open order event for a taker in case the take
 of fill limit violation  in the previous transaction and the order is just a continuation of the previous order.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_place_order_with_order_id">place_order_with_order_id</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user_addr: <b>address</b>, limit_price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, max_match_limit: u32, cancel_on_match_limit: bool, emit_taker_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_place_order_with_order_id">place_order_with_order_id</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user_addr: <b>address</b>, limit_price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, max_match_limit: u32, cancel_on_match_limit: bool, emit_taker_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
 </code></pre>
 
 
@@ -1276,7 +1276,7 @@ of fill limit violation  in the previous transaction and the order is just a con
     trigger_condition: Option&lt;TriggerCondition&gt;,
     metadata: M,
     order_id: Option&lt;OrderIdType&gt;,
-    client_order_id: Option&lt;u64&gt;,
+    client_order_id: Option&lt;String&gt;,
     max_match_limit: u32,
     cancel_on_match_limit: bool,
     emit_taker_order_open: bool,

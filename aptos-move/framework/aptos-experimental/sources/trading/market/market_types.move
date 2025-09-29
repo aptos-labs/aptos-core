@@ -331,7 +331,7 @@ module aptos_experimental::market_types {
         parent: address,
         market: address,
         order_id: u128,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         user: address,
         /// Original size of the order
         orig_size: u64,
@@ -499,7 +499,7 @@ module aptos_experimental::market_types {
     }
 
     public fun get_order_metadata_by_client_id<M: store + copy + drop>(
-        self: &Market<M>, user: address, client_order_id: u64
+        self: &Market<M>, user: address, client_order_id: String
     ): Option<M> {
         let order_id = self.order_book.get_order_id_by_client_id(user, client_order_id);
         if (order_id.is_none()) {
@@ -511,7 +511,7 @@ module aptos_experimental::market_types {
     /// Sets the order metadata for an order by client id. It is up to the caller to perform necessary permissions checks
     /// around ownership of the order.
     public fun set_order_metadata_by_client_id<M: store + copy + drop>(
-        self: &mut Market<M>, user: address, client_order_id: u64, metadata: M
+        self: &mut Market<M>, user: address, client_order_id: String, metadata: M
     ) {
         let order_id = self.order_book.get_order_id_by_client_id(user, client_order_id);
         assert!(order_id.is_some(), EORDER_DOES_NOT_EXIST);
@@ -537,7 +537,7 @@ module aptos_experimental::market_types {
     public fun emit_event_for_order<M: store + copy + drop, R: store + copy + drop>(
         self: &Market<M>,
         order_id: OrderIdType,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         user: address,
         orig_size: u64,
         remaining_size: u64,
@@ -671,7 +671,7 @@ module aptos_experimental::market_types {
     }
 
     #[test_only]
-    public fun get_client_order_id_from_event(self: OrderEvent): Option<u64> {
+    public fun get_client_order_id_from_event(self: OrderEvent): Option<String> {
         self.client_order_id
     }
 
@@ -679,7 +679,7 @@ module aptos_experimental::market_types {
     public fun verify_order_event(
         self: OrderEvent,
         order_id: OrderIdType,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         market: address,
         user: address,
         orig_size: u64,
