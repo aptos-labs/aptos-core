@@ -70,6 +70,7 @@ either = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+move-vm-runtime = { workspace = true }
 num_cpus = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
