@@ -276,7 +276,7 @@ impl ConsensusObserver {
         for block in ordered_block.blocks() {
             let commit_callback =
                 block_data::create_commit_callback(self.observer_block_data.clone());
-            self.pipeline_builder().build(
+            self.pipeline_builder().build_for_observer(
                 block,
                 parent_fut.take().expect("future should be set"),
                 commit_callback,
