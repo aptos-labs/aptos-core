@@ -58,11 +58,7 @@ use move_vm_types::{
     views::TypeView,
 };
 use std::{
-    cell::RefCell,
-    cmp::min,
-    collections::{btree_map, VecDeque},
-    fmt::{Debug, Write},
-    rc::Rc,
+    cell::RefCell, cmp::min, collections::{btree_map, VecDeque}, env, fmt::{Debug, Write}, rc::Rc
 };
 
 macro_rules! set_err_info {
@@ -1940,6 +1936,7 @@ impl Frame {
         let frame_cache = &mut *self.frame_cache.borrow_mut();
 
         let code = self.function.code();
+        let print_abort_stack_trace = !env::var("PRINT_ABORT_STACK_TRACE").unwrap_or_default().is_empty();
         loop {
             for instruction in &code[self.pc as usize..] {
                 trace!(
@@ -2636,13 +2633,25 @@ impl Frame {
                     Bytecode::Abort => {
                         gas_meter.charge_simple_instr(S::Abort)?;
                         let error_code = interpreter.operand_stack.pop_as::<u64>()?;
-                        let error = PartialVMError::new(StatusCode::ABORTED)
-                            .with_sub_status(error_code)
-                            .with_message(format!(
+                        let message = if print_abort_stack_trace {
+                            let stack = &interpreter.call_stack.0.iter().map(|frame| frame.function.name_as_pretty_string()).join(", ");
+                            format!(
+                                "{} at offset {}, with stack: {}",
+                                self.function.name_as_pretty_string(),
+                                self.pc,
+                                stack,
+                            )
+                        } else {
+                            format!(
                                 "{} at offset {}",
                                 self.function.name_as_pretty_string(),
                                 self.pc,
-                            ));
+                            )
+                        };
+                        println!("Abort info: {}", message);
+                        let error = PartialVMError::new(StatusCode::ABORTED)
+                            .with_sub_status(error_code)
+                            .with_message(message);
                         return Err(error);
                     },
                     Bytecode::Eq => {
