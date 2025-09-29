@@ -17,6 +17,7 @@ module aptos_experimental::order_operations {
         pre_cancel_order_for_tracker
     };
     use aptos_experimental::order_placement::cleanup_order_internal;
+    use aptos_experimental::market_clearinghouse_order_info::new_clearinghouse_order_info;
 
     // Error codes
     const ENOT_ORDER_CREATOR: u64 = 12;
@@ -132,7 +133,16 @@ module aptos_experimental::order_operations {
             metadata
         ) = order.destroy_single_order();
         callbacks.decrease_order_size(
-            user, order_id, is_bid, price, remaining_size
+            new_clearinghouse_order_info(
+                user,
+                order_id,
+                client_order_id,
+                is_bid,
+                time_in_force,
+                metadata
+            ),
+            price,
+            remaining_size
         );
 
         market.emit_event_for_order(
@@ -181,7 +191,7 @@ module aptos_experimental::order_operations {
             metadata
         ) = order.destroy_single_order();
         cleanup_order_internal(
-            account, order_id, single_order_book_type(), is_bid, remaining_size, metadata, callbacks
+            account, order_id, client_order_id, single_order_book_type(), is_bid, time_in_force, remaining_size, metadata, callbacks
         );
         if (emit_event) {
             market.emit_event_for_order(

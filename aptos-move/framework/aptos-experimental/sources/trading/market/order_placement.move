@@ -388,8 +388,10 @@ module aptos_experimental::order_placement {
         cleanup_order_internal(
             maker_address,
             order_id,
+            client_order_id,
             maker_order.get_book_type_from_match_details(),
             maker_order.is_bid_from_match_details(),
+            time_in_force,
             maker_cancel_size,
             metadata,
             callbacks
@@ -894,7 +896,7 @@ module aptos_experimental::order_placement {
             };
             if (remaining_size == 0) {
                 cleanup_order_internal(
-                    user_addr, order_id, single_order_book_type(), is_bid, 0, metadata, callbacks
+                    user_addr, order_id, client_order_id, single_order_book_type(), is_bid, time_in_force, 0, metadata, callbacks
                 );
                 break;
             };

@@ -19,7 +19,7 @@ module aptos_experimental::market_clearinghouse_order_info {
         }
     }
 
-    public(friend) fun new_clearinghouse_order_info<M: copy + drop>(
+    public fun new_clearinghouse_order_info<M: copy + drop>(
         account: address,
         order_id: OrderIdType,
         client_order_id: Option<String>,
