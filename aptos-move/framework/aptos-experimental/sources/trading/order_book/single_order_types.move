@@ -1,6 +1,7 @@
 /// (work in progress)
 module aptos_experimental::single_order_types {
     use std::option::Option;
+    use std::string::String;
     use aptos_experimental::order_book_types::{
         OrderIdType, UniqueIdxType,
         TimeInForce, TriggerCondition
@@ -23,7 +24,7 @@ module aptos_experimental::single_order_types {
         V1 {
             order_id: OrderIdType,
             account: address,
-            client_order_id: Option<u64>, // for client to track orders
+            client_order_id: Option<String>, // for client to track orders
             unique_priority_idx: UniqueIdxType,
             price: u64,
             orig_size: u64,
@@ -50,7 +51,7 @@ module aptos_experimental::single_order_types {
         order_id: OrderIdType,
         account: address,
         unique_priority_idx: UniqueIdxType,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         price: u64,
         orig_size: u64,
         size: u64,
@@ -167,7 +168,7 @@ module aptos_experimental::single_order_types {
         self.orig_size
     }
 
-    public fun get_client_order_id<M: store + copy + drop>(self: &SingleOrder<M>): Option<u64> {
+    public fun get_client_order_id<M: store + copy + drop>(self: &SingleOrder<M>): Option<String> {
         self.client_order_id
     }
 
@@ -180,7 +181,7 @@ module aptos_experimental::single_order_types {
     public fun destroy_single_order<M: store + copy + drop>(
         self: SingleOrder<M>
     ): (
-        address, OrderIdType, Option<u64>, UniqueIdxType, u64, u64, u64, bool, Option<TriggerCondition>, TimeInForce, M
+        address, OrderIdType, Option<String>, UniqueIdxType, u64, u64, u64, bool, Option<TriggerCondition>, TimeInForce, M
     ) {
         let SingleOrder::V1 {
             order_id,

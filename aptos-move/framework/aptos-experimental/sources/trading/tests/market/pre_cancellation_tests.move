@@ -34,12 +34,12 @@ module aptos_experimental::pre_cancellation_tests {
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
-        cancel_order_with_client_id(&mut market, signer::address_of(maker1), 1000, &test_market_callbacks());
+        cancel_order_with_client_id(&mut market, signer::address_of(maker1), std::string::utf8(b"1001"), &test_market_callbacks());
         let _ =
             place_order_and_verify(
                 &mut market,
                 maker1,
-                option::some(1001),
+                option::none(),
                 2000000,
                 true,
                 good_till_cancelled(),
@@ -47,7 +47,7 @@ module aptos_experimental::pre_cancellation_tests {
                 false,
                 true, // Order should be cancelled as it was pre-cancelled
                 new_test_order_metadata(1),
-                option::some(1000),
+                option::some(std::string::utf8(b"1001")),
                 &test_market_callbacks()
             );
         // Place another order with same client order ID and verify that it is also cancelled
@@ -55,7 +55,7 @@ module aptos_experimental::pre_cancellation_tests {
             place_order_and_verify(
                 &mut market,
                 maker1,
-                option::some(1001),
+                option::none(),
                 2000000,
                 true,
                 good_till_cancelled(),
@@ -63,7 +63,7 @@ module aptos_experimental::pre_cancellation_tests {
                 false,
                 true, // Order should be cancelled as it was pre-cancelled
                 new_test_order_metadata(1),
-                option::some(1000),
+                option::some(std::string::utf8(b"1001")),
                 &test_market_callbacks()
             );
 
@@ -72,7 +72,7 @@ module aptos_experimental::pre_cancellation_tests {
             place_order_and_verify(
                 &mut market,
                 maker1,
-                option::some(1002),
+                option::none(),
                 2000000,
                 true,
                 good_till_cancelled(),
@@ -80,7 +80,7 @@ module aptos_experimental::pre_cancellation_tests {
                 false,
                 false, // Order should not be cancelled
                 new_test_order_metadata(1),
-                option::some(1002),
+                option::some(std::string::utf8(b"1002")),
                 &test_market_callbacks()
             );
         market.destroy_market()
@@ -114,18 +114,18 @@ module aptos_experimental::pre_cancellation_tests {
                 false,
                 false,
                 new_test_order_metadata(1),
-                option::some(1000),
+                option::some(std::string::utf8(b"1000")),
                 &test_market_callbacks()
             );
         assert!(market.get_remaining_size(order_id) == 2000000);
         // Pre-cancel the order after it has been placed
-        cancel_order_with_client_id(&mut market, signer::address_of(maker1), 1000, &test_market_callbacks());
+        cancel_order_with_client_id(&mut market, signer::address_of(maker1), std::string::utf8(b"1000"), &test_market_callbacks());
         verify_cancel_event(
             &mut market,
             maker1,
             false, // Not a maker order
             order_id,
-            option::some(1000),
+            option::some(std::string::utf8(b"1000")),
             1001,
             2000000,
             0,
@@ -154,12 +154,12 @@ module aptos_experimental::pre_cancellation_tests {
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
-        cancel_order_with_client_id(&mut market, signer::address_of(maker1), 1000, &test_market_callbacks());
+        cancel_order_with_client_id(&mut market, signer::address_of(maker1), std::string::utf8(b"1000"), &test_market_callbacks());
         let _ =
             place_order_and_verify(
                 &mut market,
                 maker1,
-                option::some(1001),
+                option::none(),
                 2000000,
                 true,
                 good_till_cancelled(),
@@ -167,7 +167,7 @@ module aptos_experimental::pre_cancellation_tests {
                 false,
                 true, // Order should be cancelled as it was pre-cancelled
                 new_test_order_metadata(1),
-                option::some(1000),
+                option::some(std::string::utf8(b"1001")),
                 &test_market_callbacks()
             );
         let initial_time = timestamp::now_seconds();
@@ -186,7 +186,7 @@ module aptos_experimental::pre_cancellation_tests {
                 false,
                 false, // Order should not be cancelled as it was pre-cancelled after expiration
                 new_test_order_metadata(1),
-                option::some(1000),
+                option::some(std::string::utf8(b"1001")),
                 &test_market_callbacks()
             );
         market.destroy_market()

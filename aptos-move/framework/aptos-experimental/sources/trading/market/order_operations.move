@@ -3,6 +3,7 @@
 /// and reducing the size of existing orders.
 module aptos_experimental::order_operations {
     use std::option;
+    use std::string::String;
     use aptos_experimental::market_types::{
         MarketClearinghouseCallbacks,
         Market,
@@ -34,7 +35,7 @@ module aptos_experimental::order_operations {
     public fun cancel_order_with_client_id<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user: address,
-        client_order_id: u64,
+        client_order_id: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let order =
