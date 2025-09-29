@@ -103,13 +103,13 @@ spec aptos_framework::transaction_fee {
         let post post_supply = option::spec_borrow(post_maybe_supply);
         let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
 
-        aborts_if option::spec_is_some(maybe_supply) && value < amount;
+        aborts_if option::is_some(maybe_supply) && value < amount;
 
         ensures post_coin_store.coin.value == coin_store.coin.value - amount;
-        ensures if (option::spec_is_some(maybe_supply)) {
+        ensures if (option::is_some(maybe_supply)) {
             post_value == value - amount
         } else {
-            option::spec_is_none(post_maybe_supply)
+            option::is_none(post_maybe_supply)
         };
         ensures coin::supply<AptosCoin> == old(coin::supply<AptosCoin>) - amount;
     }
