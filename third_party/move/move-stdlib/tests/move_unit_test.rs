@@ -39,6 +39,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, include_nursery_natives: bo
         /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
+        false,
     );
     if result.is_err() || result.is_ok_and(|r| r == UnitTestResult::Failure) {
         panic!("aborting because of Move unit test failures")

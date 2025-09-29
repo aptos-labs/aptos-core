@@ -14,6 +14,7 @@ mod invalid_post_request_test;
 mod modules;
 mod multisig_transactions_test;
 mod objects;
+mod option_test;
 mod resource_groups;
 mod secp256k1_ecdsa;
 mod simulation_test;

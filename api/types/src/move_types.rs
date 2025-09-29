@@ -16,7 +16,9 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag},
+    language_storage::{
+        FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag, LEGACY_OPTION_VEC,
+    },
     parser::{parse_struct_tag, parse_type_tag},
     transaction_argument::TransactionArgument,
 };
@@ -226,6 +228,35 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
 
     fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
         let mut map = BTreeMap::new();
+        // This guarantees generated json is backwards compatible.
+        if s.ty_tag.is_option() {
+            if let Some((_, name)) = &s.variant_info {
+                if name.to_string() == "None" {
+                    if !s.value.is_empty() {
+                        return Err(anyhow::anyhow!("None must not have any value"));
+                    }
+                    map.insert(
+                        IdentifierWrapper::from_str(LEGACY_OPTION_VEC)?,
+                        MoveValue::Vector(vec![]).json()?,
+                    );
+                } else if name.to_string() == "Some" {
+                    if s.value.len() != 1 {
+                        return Err(anyhow::anyhow!("Some must have exactly one value"));
+                    }
+                    let v = s.value.into_iter().next().unwrap().1;
+                    map.insert(
+                        IdentifierWrapper::from_str(LEGACY_OPTION_VEC)?,
+                        MoveValue::Vector(vec![MoveValue::try_from(v)?]).json()?,
+                    );
+                } else {
+                    return Err(anyhow::anyhow!(
+                        "Invalid option variant: {}",
+                        name.to_string()
+                    ));
+                }
+                return Ok(Self(map));
+            }
+        }
         if let Some((_, name)) = s.variant_info {
             map.insert(
                 IdentifierWrapper::from_str("__variant__")?,
