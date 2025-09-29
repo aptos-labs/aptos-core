@@ -24,6 +24,7 @@ mod error_map;
 mod events;
 mod fee_payer;
 mod friends;
+mod function_value_capture_option;
 mod function_value_depth;
 mod function_values;
 mod fungible_asset;

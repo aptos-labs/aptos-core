@@ -1,6 +1,6 @@
 processed 4 tasks
 task 0 lines 1-22:  print-bytecode [// This is roughly equivalent to the following Move program:]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -22,7 +22,7 @@ l2: ret
 
 
 task 1 lines 24-41:  print-bytecode [// This is roughly equivalent to the following Move program:]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -41,7 +41,7 @@ l1: ret
 
 
 task 2 lines 43-59:  print-bytecode [// `jump_if` statements can be sequenced, akin to "nested" `if` statements in Move.]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -69,7 +69,7 @@ l1: ret
 
 
 task 3 lines 61-74:  print-bytecode [// `return` statements can appear anywhere, including within a jump destination's block.]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()

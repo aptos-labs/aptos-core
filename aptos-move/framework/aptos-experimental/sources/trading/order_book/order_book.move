@@ -1,6 +1,7 @@
 module aptos_experimental::order_book {
 
     use std::option::Option;
+    use aptos_experimental::bulk_order_book_types::BulkOrder;
     use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
     use aptos_experimental::single_order_book::{SingleOrderBook, new_single_order_book, SingleOrderRequest};
     use aptos_experimental::order_book_types::{AscendingIdGenerator, OrderIdType, new_ascending_id_generator,
@@ -63,6 +64,12 @@ module aptos_experimental::order_book {
         self: &mut OrderBook<M>, order_creator: address, order_id: OrderIdType
     ): SingleOrder<M> {
         self.single_order_book.cancel_order(&mut self.price_time_idx, order_creator, order_id)
+    }
+
+    public fun try_cancel_order<M: store + copy + drop>(
+        self: &mut OrderBook<M>, order_creator: address, order_id: OrderIdType
+    ): Option<SingleOrder<M>> {
+        self.single_order_book.try_cancel_order(&mut self.price_time_idx, order_creator, order_id)
     }
 
     public fun try_cancel_order_with_client_order_id<M: store + copy + drop>(
@@ -207,7 +214,7 @@ module aptos_experimental::order_book {
     // ============================= APIs relevant to bulk order only ====================================
     public fun place_bulk_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_req: aptos_experimental::bulk_order_book_types::BulkOrderRequest<M>
-    ) : OrderIdType {
+    ) : BulkOrder<M> {
         self.bulk_order_book.place_bulk_order(
             &mut self.price_time_idx,
             &mut self.ascending_id_generator,

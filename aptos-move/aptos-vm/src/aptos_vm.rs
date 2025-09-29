@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
+    block_executor::AptosVMBlockExecutorWrapper,
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::{discarded_output, expect_only_successful_execution},
@@ -159,6 +159,7 @@ use std::{
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
+static BLOCKSTM_V2_ENABLED: OnceCell<bool> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static DISCARD_FAILED_BLOCKS: OnceCell<bool> = OnceCell::new();
@@ -406,6 +407,20 @@ impl AptosVM {
         match EXECUTION_CONCURRENCY_LEVEL.get() {
             Some(concurrency_level) => *concurrency_level,
             None => 1,
+        }
+    }
+
+    /// Sets blockstm v2 enabled flag when invoked the first time.
+    pub fn set_blockstm_v2_enabled_once(blockstm_v2_enabled: bool) {
+        // Only the first call succeeds, due to OnceCell semantics.
+        BLOCKSTM_V2_ENABLED.set(blockstm_v2_enabled).ok();
+    }
+
+    /// Get the blockstm v2 enabled flag if already set, otherwise return default (false)
+    pub fn get_blockstm_v2_enabled() -> bool {
+        match BLOCKSTM_V2_ENABLED.get() {
+            Some(blockstm_v2_enabled) => *blockstm_v2_enabled,
+            None => false,
         }
     }
 
@@ -2956,7 +2971,7 @@ impl AptosVMBlockExecutor {
 
         let result = AptosVMBlockExecutorWrapper::execute_block::<
             _,
-            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            NoOpTransactionCommitHook<VMStatus>,
             DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         >(
             txn_provider,
@@ -2990,7 +3005,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
     ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
-                blockstm_v2: false,
+                blockstm_v2: AptosVM::get_blockstm_v2_enabled(),
                 concurrency_level: AptosVM::get_concurrency_level(),
                 allow_fallback: true,
                 discard_failed_blocks: AptosVM::get_discard_failed_blocks(),

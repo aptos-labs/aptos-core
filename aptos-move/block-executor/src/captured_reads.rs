@@ -46,6 +46,7 @@ use std::{
     ops::Deref,
     sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ReadKind {
@@ -70,8 +71,8 @@ pub(crate) enum DataRead<V> {
         // Currently, we are conservative and check the version for equality
         // (version implies value equality, but not vice versa). TODO: when
         // comparing the instances of V is cheaper, compare those instead.
-        #[derivative(PartialEq = "ignore", Debug = "ignore")] Arc<V>,
-        #[derivative(PartialEq = "ignore", Debug = "ignore")] Option<Arc<MoveTypeLayout>>,
+        #[derivative(PartialEq = "ignore", Debug = "ignore")] TriompheArc<V>,
+        #[derivative(PartialEq = "ignore", Debug = "ignore")] Option<TriompheArc<MoveTypeLayout>>,
     ),
     // Metadata and ResourceSize are insufficient to determine each other, but both
     // can be determined from Versioned. When both are available, the information
@@ -121,7 +122,7 @@ impl<V: TransactionWrite> DataRead<V> {
         false
     }
 
-    fn value_size(v: &Arc<V>) -> Option<u64> {
+    fn value_size(v: &TriompheArc<V>) -> Option<u64> {
         v.bytes().map(|bytes| bytes.len() as u64)
     }
 
@@ -149,8 +150,8 @@ impl<V: TransactionWrite> DataRead<V> {
 
     fn versioned_convert_to(
         version: &Version,
-        v: &Arc<V>,
-        layout: &Option<Arc<MoveTypeLayout>>,
+        v: &TriompheArc<V>,
+        layout: &Option<TriompheArc<MoveTypeLayout>>,
         kind: &ReadKind,
     ) -> Option<DataRead<V>> {
         match kind {
@@ -614,7 +615,8 @@ where
         view: &LatestView<T, SV>,
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
         skip: &HashSet<T::Key>,
-    ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>, PanicError> {
+    ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>, PanicError>
+    {
         self.data_reads
             .iter()
             .filter_map(|(key, data_read)| {
@@ -1116,7 +1118,7 @@ where
                     },
                     Err(TagNotFound) => {
                         let sentinel_deletion =
-                            Arc::<T::Value>::new(TransactionWrite::from_state_value(None));
+                            TriompheArc::<T::Value>::new(TransactionWrite::from_state_value(None));
                         assert!(sentinel_deletion.is_deletion());
                         matches!(
                             self.data_read_comparator.compare_data_reads(
@@ -1365,7 +1367,7 @@ mod test {
         let mut exists_read = DataRead::Exists::<ValueType>(exists_value);
         let versioned_read = DataRead::Versioned::<ValueType>(
             Err(StorageVersion),
-            Arc::new(ValueType::with_len_and_metadata(
+            TriompheArc::new(ValueType::with_len_and_metadata(
                 1,
                 StateValueMetadata::none(),
             )),
@@ -1413,7 +1415,7 @@ mod test {
         assert_eq!(
             DataRead::Versioned(
                 Err(StorageVersion),
-                Arc::new(ValueType::with_len_and_metadata(
+                TriompheArc::new(ValueType::with_len_and_metadata(
                     1,
                     StateValueMetadata::none()
                 )),
@@ -1503,7 +1505,7 @@ mod test {
         // Legacy state values do not have metadata.
         let versioned_legacy = DataRead::Versioned(
             Err(StorageVersion),
-            Arc::new(ValueType::with_len_and_metadata(
+            TriompheArc::new(ValueType::with_len_and_metadata(
                 1,
                 StateValueMetadata::none(),
             )),
@@ -1511,7 +1513,7 @@ mod test {
         );
         let versioned_deletion = DataRead::Versioned(
             Ok((5, 1)),
-            Arc::new(ValueType::with_len_and_metadata(
+            TriompheArc::new(ValueType::with_len_and_metadata(
                 0,
                 StateValueMetadata::none(),
             )),
@@ -1519,7 +1521,7 @@ mod test {
         );
         let versioned_with_metadata = DataRead::Versioned(
             Ok((7, 0)),
-            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
+            TriompheArc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
             None,
         );
         let resolved = DataRead::Resolved::<ValueType>(200);
@@ -1585,7 +1587,7 @@ mod test {
             versioned_legacy,
             DataRead::Versioned(
                 Err(StorageVersion),
-                Arc::new(ValueType::with_len_and_metadata(
+                TriompheArc::new(ValueType::with_len_and_metadata(
                     10,
                     StateValueMetadata::none()
                 )),
@@ -1691,7 +1693,7 @@ mod test {
 
         let correct_versioned = DataRead::Versioned(
             Ok((7, 0)),
-            Arc::new(ValueType::with_len_and_metadata(42, raw_metadata(1))),
+            TriompheArc::new(ValueType::with_len_and_metadata(42, raw_metadata(1))),
             None,
         );
         assert_update!(map, 0, correct_versioned);
@@ -1709,7 +1711,7 @@ mod test {
 
         let incorrect_versioned = DataRead::Versioned(
             Ok((7, 0)),
-            Arc::new(ValueType::with_len_and_metadata(
+            TriompheArc::new(ValueType::with_len_and_metadata(
                 if incorrect_metadata_or_size { 42 } else { 2 },
                 if incorrect_metadata_or_size {
                     raw_metadata(2)
@@ -1727,7 +1729,7 @@ mod test {
         // Legacy state values do not have metadata.
         let versioned_legacy = DataRead::Versioned(
             Err(StorageVersion),
-            Arc::new(ValueType::with_len_and_metadata(
+            TriompheArc::new(ValueType::with_len_and_metadata(
                 1,
                 StateValueMetadata::none(),
             )),
@@ -1735,7 +1737,7 @@ mod test {
         );
         let versioned_deletion = DataRead::Versioned(
             Ok((5, 1)),
-            Arc::new(ValueType::with_len_and_metadata(
+            TriompheArc::new(ValueType::with_len_and_metadata(
                 0,
                 StateValueMetadata::none(),
             )),
@@ -1743,7 +1745,7 @@ mod test {
         );
         let versioned_with_metadata = DataRead::Versioned(
             Ok((7, 0)),
-            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
+            TriompheArc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
             None,
         );
         let resolved = DataRead::Resolved::<ValueType>(200);
@@ -1821,7 +1823,7 @@ mod test {
         let legacy_metadata = DataRead::Metadata(Some(StateValueMetadata::none()));
         let versioned_legacy = DataRead::Versioned(
             Err(StorageVersion),
-            Arc::new(ValueType::with_len_and_metadata(
+            TriompheArc::new(ValueType::with_len_and_metadata(
                 1,
                 StateValueMetadata::none(),
             )),
@@ -1833,7 +1835,7 @@ mod test {
     fn deletion_reads_by_kind() -> Vec<DataRead<ValueType>> {
         let versioned_deletion = DataRead::Versioned(
             Ok((5, 1)),
-            Arc::new(ValueType::with_len_and_metadata(
+            TriompheArc::new(ValueType::with_len_and_metadata(
                 0,
                 StateValueMetadata::none(),
             )),
@@ -1847,7 +1849,7 @@ mod test {
     fn with_metadata_reads_by_kind() -> Vec<DataRead<ValueType>> {
         let versioned_with_metadata = DataRead::Versioned(
             Ok((7, 0)),
-            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
+            TriompheArc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
             None,
         );
         let metadata = DataRead::Metadata(Some(raw_metadata(1)));
@@ -1993,7 +1995,7 @@ mod test {
         let mut captured_reads = test_captured_reads!(new);
         let versioned_legacy = DataRead::Versioned(
             Err(StorageVersion),
-            Arc::new(ValueType::with_len_and_metadata(
+            TriompheArc::new(ValueType::with_len_and_metadata(
                 1,
                 StateValueMetadata::none(),
             )),

@@ -3,10 +3,10 @@
 //# publish
 module 0xc0ffee::m {
     fun test() {
-        let _t0 = 5;
-        let _t4 = &_t0;
-        let _t2 = 5;
-        if (!(*&_t2 == 5)) abort 0;
+        let _v0 = 5;
+        let _v1 = &_v0;
+        let _v2 = 5;
+        assert!(*&_v2 == 5, 0);
     }
 }
 

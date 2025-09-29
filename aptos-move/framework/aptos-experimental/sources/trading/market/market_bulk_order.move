@@ -4,7 +4,7 @@
 module aptos_experimental::market_bulk_order {
     use std::option;
     use std::signer;
-    use aptos_experimental::bulk_order_book_types::new_bulk_order_request;
+    use aptos_experimental::bulk_order_book_types::{new_bulk_order_request};
     use aptos_experimental::market_types::{
         MarketClearinghouseCallbacks,
         Market,
@@ -26,15 +26,16 @@ module aptos_experimental::market_bulk_order {
     ///
     /// Returns:
     /// - Option<OrderIdType>: The bulk order ID if successfully placed, None if validation failed
-    public fun place_bulk_order<M: store + copy + drop>(
+    public fun place_bulk_order<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         account: address,
+        sequence_number: u64,
         bid_prices: vector<u64>,
         bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>,
         metadata: M,
-        callbacks: &MarketClearinghouseCallbacks<M>
+        callbacks: &MarketClearinghouseCallbacks<M, R>
     ): option::Option<OrderIdType> {
         // TODO(skedia) Add support for events for bulk orders
         if (!callbacks.validate_bulk_order_placement(
@@ -43,19 +44,24 @@ module aptos_experimental::market_bulk_order {
             bid_sizes,
             ask_prices,
             ask_sizes,
-            metadata
+            metadata,
         )) {
             // If the bulk order is not valid, we simply return without placing the order.
             return option::none();
         };
-        option::some(market.get_order_book_mut().place_bulk_order(new_bulk_order_request(
+        let bulk_order = market.get_order_book_mut().place_bulk_order(new_bulk_order_request(
             account,
+            sequence_number,
             bid_prices,
             bid_sizes,
             ask_prices,
             ask_sizes,
             metadata,
-        )))
+        ));
+        let (order_id, _, _, _, _, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = bulk_order.destroy_bulk_order(); // We don't need to keep the bulk order struct after placement
+        // Emit an event for the placed bulk order
+        market.emit_event_for_bulk_order_placed(order_id, account, bid_sizes, bid_prices, ask_sizes, ask_prices);
+        option::some(order_id)
     }
 
     /// Cancels all bulk orders for a given user.
@@ -66,18 +72,24 @@ module aptos_experimental::market_bulk_order {
     /// - market: The market instance
     /// - user: The signer of the user whose bulk orders should be cancelled
     /// - callbacks: The market clearinghouse callbacks for cleanup operations
-    public fun cancel_bulk_order<M: store + copy + drop>(
+    public fun cancel_bulk_order<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user: &signer,
-        callbacks: &MarketClearinghouseCallbacks<M>
+        callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let account = signer::address_of(user);
-        let (_order_id, remaining_bid_size, remaining_ask_size) = market.get_order_book_mut().cancel_bulk_order(account);
-        if (remaining_ask_size > 0) {
-            callbacks.cleanup_bulk_orders(account, false, remaining_ask_size);
+        cancel_bulk_order_internal(market, account, callbacks);
+    }
+
+    public(package) fun cancel_bulk_order_internal<M: store + copy + drop, R: store + copy + drop>(
+        market: &mut Market<M>,
+        user: address,
+        callbacks: &MarketClearinghouseCallbacks<M, R>
+    ) {
+        let (order_id, remaining_bid_size, remaining_ask_size) = market.get_order_book_mut().cancel_bulk_order(user);
+        if (remaining_bid_size > 0 || remaining_ask_size > 0) {
+            callbacks.cleanup_bulk_orders(user, order_id);
         };
-        if (remaining_bid_size > 0) {
-            callbacks.cleanup_bulk_orders(account, true, remaining_bid_size);
-        }
+        market.emit_event_for_bulk_order_cancelled(order_id, user);
     }
 }

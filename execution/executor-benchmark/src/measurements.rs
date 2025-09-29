@@ -489,7 +489,7 @@ impl OverallMeasurement {
             "gas/txn": format!("{:.2}", self.get_gpt()),
             "io gas/txn": format!("{:.2}", self.get_io_gpt()),
             "exe gas/txn": format!("{:.2}", self.get_execution_gpt()),
-            "output/txn": format!("{: >12.2}", self.get_output_per_txn()),
+            "output/txn": format!("{:.2}", self.get_output_per_txn()),
         })
     }
 }

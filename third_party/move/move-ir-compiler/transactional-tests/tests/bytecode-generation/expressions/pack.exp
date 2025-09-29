@@ -1,6 +1,6 @@
 processed 3 tasks
 task 0 lines 1-9:  print-bytecode --input=module [module 0x2d20.M {]
-// Bytecode version v7
+// Bytecode version v8
 module 0x2d20::M
 struct T
   u: u64

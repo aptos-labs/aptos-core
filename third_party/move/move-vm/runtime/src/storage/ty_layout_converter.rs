@@ -9,7 +9,9 @@ use crate::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
+    ident_str,
     identifier::Identifier,
+    language_storage::{LEGACY_OPTION_VEC, OPTION_STRUCT_NAME},
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -77,8 +79,14 @@ where
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         ty: &Type,
+        check_option_type: bool,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
-        self.type_to_type_layout_with_delayed_fields_impl::<false>(gas_meter, traversal_context, ty)
+        self.type_to_type_layout_with_delayed_fields_impl::<false>(
+            gas_meter,
+            traversal_context,
+            ty,
+            check_option_type,
+        )
     }
 
     /// Returns the decorated layout of a type.
@@ -90,7 +98,12 @@ where
         traversal_context: &mut TraversalContext,
         ty: &Type,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
-        self.type_to_type_layout_with_delayed_fields_impl::<true>(gas_meter, traversal_context, ty)
+        self.type_to_type_layout_with_delayed_fields_impl::<true>(
+            gas_meter,
+            traversal_context,
+            ty,
+            false,
+        )
     }
 
     /// Returns the VM config used in the system.
@@ -163,6 +176,7 @@ where
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         ty: &Type,
+        check_option_type: bool,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
         let _timer = VM_TIMER.timer_with_label("type_to_type_layout_with_delayed_fields");
 
@@ -173,6 +187,7 @@ where
             ty,
             &mut count,
             1,
+            check_option_type,
         )?;
         Ok(LayoutWithDelayedFields {
             layout,
@@ -190,6 +205,7 @@ where
         ty: &Type,
         count: &mut u64,
         depth: u64,
+        check_option_type: bool,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         self.check_depth_and_increment_count(count, depth)?;
 
@@ -211,6 +227,7 @@ where
                     ty,
                     count,
                     depth + 1,
+                    check_option_type,
                 )
                 .map(|(elem_layout, contains_delayed_fields)| {
                     let vec_layout = MoveTypeLayout::Vector(Box::new(elem_layout));
@@ -223,6 +240,7 @@ where
                 &[],
                 count,
                 depth + 1,
+                check_option_type,
             )?,
             Type::StructInstantiation { idx, ty_args, .. } => self
                 .struct_to_type_layout::<ANNOTATED>(
@@ -232,6 +250,7 @@ where
                     ty_args,
                     count,
                     depth + 1,
+                    check_option_type,
                 )?,
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -251,6 +270,7 @@ where
         tys: &[Type],
         count: &mut u64,
         depth: u64,
+        check_option_type: bool,
     ) -> PartialVMResult<(Vec<MoveTypeLayout>, bool)> {
         let mut contains_delayed_fields = false;
         let layouts = tys
@@ -263,6 +283,7 @@ where
                         ty,
                         count,
                         depth,
+                        check_option_type,
                     )?;
                 contains_delayed_fields |= ty_contains_delayed_fields;
                 Ok(layout)
@@ -287,6 +308,7 @@ where
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
+        check_option_type: bool,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         let struct_definition = self.struct_definition_loader.load_struct_definition(
             gas_meter,
@@ -294,11 +316,69 @@ where
             idx,
         )?;
 
+        if check_option_type && !self.runtime_environment().vm_config().enable_capture_option {
+            let struct_identifier = self
+                .runtime_environment()
+                .struct_name_index_map()
+                .idx_to_struct_name(*idx)?;
+            if struct_identifier.module.is_option() && struct_identifier.name == *OPTION_STRUCT_NAME
+            {
+                return Err(
+                    PartialVMError::new(StatusCode::UNABLE_TO_CAPTURE_OPTION_TYPE)
+                        .with_message("Option type cannot be captured".to_string()),
+                );
+            }
+        }
+
         let result = match &struct_definition.layout {
             // For enums, construct layouts for all possible variants. No special handling for
             // delayed fields is needed because enums cannot be delayed fields!
             StructLayout::Variants(variants) => {
                 let mut variant_contains_delayed_fields = false;
+                let enum_option_enabled = self.runtime_environment().vm_config().enable_enum_option;
+                // convert enum representation of option for backward compatibility
+                if enum_option_enabled && ANNOTATED {
+                    let ty_tag_converter =
+                        TypeTagConverter::new(self.struct_definition_loader.runtime_environment());
+                    let struct_tag =
+                        ty_tag_converter.struct_name_idx_to_struct_tag(idx, ty_args)?;
+                    if struct_tag.is_option() {
+                        let field_name = ident_str!(LEGACY_OPTION_VEC).to_owned();
+                        let ty_builder = &self.vm_config().ty_builder;
+                        if variants.len() < 2 || variants[1].1.is_empty() {
+                            return Err(PartialVMError::new(
+                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            ));
+                        }
+                        let field_type =
+                            ty_builder.create_ty_with_subst(&variants[1].1[0].1, ty_args)?;
+                        let (mut field_layout, delayed_fields) = self
+                            .types_to_type_layouts::<ANNOTATED>(
+                                gas_meter,
+                                traversal_context,
+                                &[field_type],
+                                count,
+                                depth + 1,
+                                check_option_type,
+                            )?;
+                        variant_contains_delayed_fields |= delayed_fields;
+                        if field_layout.is_empty() {
+                            return Err(PartialVMError::new(
+                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            ));
+                        }
+                        let field_layout = MoveFieldLayout::new(
+                            field_name,
+                            MoveTypeLayout::Vector(Box::new(field_layout.pop().unwrap())),
+                        );
+                        let struct_layout =
+                            MoveStructLayout::with_types(struct_tag, vec![field_layout]);
+                        return Ok((
+                            MoveTypeLayout::Struct(struct_layout),
+                            variant_contains_delayed_fields,
+                        ));
+                    }
+                }
                 let variant_layouts = variants
                     .iter()
                     .map(|variant| {
@@ -312,6 +392,7 @@ where
                                 &self.apply_subst_for_field_tys(&variant.1, ty_args)?,
                                 count,
                                 depth,
+                                check_option_type,
                             )?;
                         variant_contains_delayed_fields |= variant_fields_contain_delayed_fields;
                         Ok(variant_field_layouts)
@@ -337,6 +418,7 @@ where
                         &self.apply_subst_for_field_tys(fields, ty_args)?,
                         count,
                         depth,
+                        check_option_type,
                     )?;
 
                 match (kind, fields_contain_delayed_fields) {
@@ -464,6 +546,7 @@ mod tests {
                 &mut gas_meter,
                 &mut traversal_context,
                 ty,
+                false,
             )
         }
     }

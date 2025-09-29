@@ -1,6 +1,6 @@
 processed 2 tasks
 task 0 lines 1-31:  print-bytecode --input=module [// This module defines several public functions with complex bodies.]
-// Bytecode version v7
+// Bytecode version v8
 module 0x3d10::Example
 struct Coin
   value: u64
@@ -53,7 +53,7 @@ public fun deposit(l0: &mut Coin, l1: Coin)
 
 
 task 1 lines 33-46:  print-bytecode --input=module [// Functions may be declared with entry modifier]
-// Bytecode version v7
+// Bytecode version v8
 module 0x4d10::M
 // Function definition at index 0
 entry public fun f()

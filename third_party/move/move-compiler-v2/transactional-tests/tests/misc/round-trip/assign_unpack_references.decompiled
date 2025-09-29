@@ -10,30 +10,30 @@ module 0x42::m {
         f: u64,
     }
     fun t1() {
-        let _t4 = S{f: 0};
-        let _t6 = S{f: 1};
-        let _t0 = R{s1: _t4, s2: _t6};
-        let _t1 = &_t0;
-        let _t10 = &_t1.s1;
-        let _t2 = &_t1.s2;
-        if (!(*&_t10.f == 0)) abort 0;
-        if (!(*&_t2.f == 1)) abort 1;
+        let _v0 = S{f: 0};
+        let _v1 = S{f: 1};
+        let _v2 = R{s1: _v0, s2: _v1};
+        let _v3 = &_v2;
+        let _v4 = &_v3.s1;
+        let _v5 = &_v3.s2;
+        assert!(*&_v4.f == 0, 0);
+        assert!(*&_v5.f == 1, 1);
     }
     fun t2() {
-        let _t9 = S{f: 0};
-        let _t11 = S{f: 1};
-        let _t0 = R{s1: _t9, s2: _t11};
-        let _t1 = &mut _t0;
-        let _t2 = &mut _t1.s1;
-        let _t3 = &mut _t1.s2;
-        if (!(*&mut _t2.f == 0)) abort 0;
-        if (!(*&_t3.f == 1)) abort 1;
-        let _t6 = 5;
-        let _t29 = &mut _t6;
-        let _t7 = S{f: 0};
-        _t3 = &mut _t7;
-        if (!(*_t29 == 5)) abort 0;
-        if (!(*&_t3.f == 0)) abort 1;
+        let _v0 = S{f: 0};
+        let _v1 = S{f: 1};
+        let _v2 = R{s1: _v0, s2: _v1};
+        let _v3 = &mut _v2;
+        let _v4 = &mut _v3.s1;
+        let _v5 = &mut _v3.s2;
+        assert!(*&mut _v4.f == 0, 0);
+        assert!(*&_v5.f == 1, 1);
+        let _v6 = 5;
+        let _v7 = &mut _v6;
+        let _v8 = S{f: 0};
+        _v5 = &mut _v8;
+        assert!(*_v7 == 5, 0);
+        assert!(*&_v5.f == 0, 1);
     }
 }
 

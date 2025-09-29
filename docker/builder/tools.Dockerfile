@@ -30,9 +30,12 @@ RUN cd /usr/local/bin && wget "https://storage.googleapis.com/kubernetes-release
 COPY --link --from=tools-builder /aptos/dist/aptos-debugger /usr/local/bin/aptos-debugger
 COPY --link --from=tools-builder /aptos/dist/aptos /usr/local/bin/aptos
 COPY --link --from=tools-builder /aptos/dist/aptos-openapi-spec-generator /usr/local/bin/aptos-openapi-spec-generator
-COPY --link --from=tools-builder /aptos/dist/aptos-fn-check-client /usr/local/bin/aptos-fn-check-client
 COPY --link --from=tools-builder /aptos/dist/aptos-transaction-emitter /usr/local/bin/aptos-transaction-emitter
-COPY --link --from=tools-builder /aptos/dist/aptos-api-tester /usr/local/bin/aptos-api-tester
+COPY --link --from=tools-builder /aptos/dist/aptos-release-builder /usr/local/bin/aptos-release-builder
+
+# For the release builder
+COPY --link --from=tools-builder /aptos/aptos-move/framework/ /aptos/aptos-move/framework/
+COPY --link --from=tools-builder /aptos/aptos-move/aptos-release-builder/ /aptos/aptos-move/aptos-release-builder/
 
 # Copy the example module to publish for api-tester
 COPY --link --from=tools-builder /aptos/aptos-move/framework/aptos-framework /aptos-move/framework/aptos-framework

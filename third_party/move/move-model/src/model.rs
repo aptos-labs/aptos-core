@@ -3734,6 +3734,10 @@ impl<'env> ModuleEnv<'env> {
     pub fn is_cmp(&self) -> bool {
         self.is_module_in_std("cmp")
     }
+
+    pub fn is_option(&self) -> bool {
+        self.is_module_in_std("option")
+    }
 }
 
 // =================================================================================================
@@ -4143,6 +4147,11 @@ impl<'env> StructEnv<'env> {
             }
         }
         None
+    }
+
+    /// Whether the current struct/enum is Option
+    pub fn is_option_type(&self) -> bool {
+        self.module_env.is_option() && self.get_full_name_str() == "option::Option"
     }
 }
 

@@ -1,6 +1,6 @@
 processed 3 tasks
 task 0 lines 1-18:  print-bytecode --input=module [module 0x1d12.M {]
-// Bytecode version v7
+// Bytecode version v8
 module 0x1d12::M
 struct T
   b: bool

@@ -9,11 +9,11 @@ module 0x42::Test {
         *&p0.f
     }
     public fun modify(p0: &mut Tester): u64 {
-        let _t5 = *&p0.f - 1;
-        let _t7 = &mut p0.f;
-        *_t7 = _t5;
-        let _t11 = *&p0.f;
-        9 - _t11
+        let _v0 = *&p0.f - 1;
+        let _v1 = &mut p0.f;
+        *_v1 = _v0;
+        let _v2 = *&p0.f;
+        9 - _v2
     }
     public fun new(): Tester {
         Tester{f: 10}
@@ -25,17 +25,17 @@ module 0x42::Test {
 script {
     use 0x42::Test;
     fun main() {
-        let _t0 = Test::new();
-        if (!(Test::len(&_t0) == 10)) abort 70002;
-        let _t1 = 0;
+        let _v0 = Test::new();
+        assert!(Test::len(&_v0) == 10, 70002);
+        let _v1 = 0;
         'l0: loop {
             loop {
-                let _t10 = Test::len(&_t0);
-                if (!(_t1 < _t10)) break 'l0;
-                let _t13 = Test::modify(&mut _t0);
-                let _t16 = _t1 + 1;
-                if (!(_t13 == _t16)) break;
-                _t1 = _t1 + 1;
+                let _v2 = Test::len(&_v0);
+                if (!(_v1 < _v2)) break 'l0;
+                let _v3 = Test::modify(&mut _v0);
+                let _v4 = _v1 + 1;
+                if (!(_v3 == _v4)) break;
+                _v1 = _v1 + 1;
                 continue
             };
             abort 14566554180833181696

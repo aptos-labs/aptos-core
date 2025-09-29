@@ -144,9 +144,10 @@ pub enum FeatureFlag {
     CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
     DISTRIBUTE_TRANSACTION_FEE = 97,
     MONOTONICALLY_INCREASING_COUNTER = 98,
-
+    ENABLE_CAPTURE_OPTION = 99,
     /// Whether to allow trusted code optimizations.
-    ENABLE_TRUSTED_CODE = 99,
+    ENABLE_TRUSTED_CODE = 100,
+    ENABLE_ENUM_OPTION = 101,
 }
 
 impl FeatureFlag {
@@ -247,7 +248,9 @@ impl FeatureFlag {
             FeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
             FeatureFlag::ENABLE_LAZY_LOADING,
             FeatureFlag::MONOTONICALLY_INCREASING_COUNTER,
+            FeatureFlag::ENABLE_CAPTURE_OPTION,
             FeatureFlag::ENABLE_TRUSTED_CODE,
+            FeatureFlag::ENABLE_ENUM_OPTION,
         ]
     }
 }
@@ -443,6 +446,10 @@ impl Features {
 
     pub fn is_distribute_transaction_fee_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::DISTRIBUTE_TRANSACTION_FEE)
+    }
+
+    pub fn is_enum_option_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

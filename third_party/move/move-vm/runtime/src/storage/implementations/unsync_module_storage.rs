@@ -134,10 +134,18 @@ where
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        let bytes = match self.ctx.fetch_module_bytes(key.address(), key.name())? {
+        let mut bytes = match self.ctx.fetch_module_bytes(key.address(), key.name())? {
             Some(bytes) => bytes,
             None => return Ok(None),
         };
+        // TODO: remove this once framework on mainnet is using the new option module
+        if let Some(replaced_bytes) = self
+            .ctx
+            .runtime_environment()
+            .get_module_bytes_override(key.address(), key.name())
+        {
+            bytes = replaced_bytes;
+        }
         let compiled_module = self
             .ctx
             .runtime_environment()

@@ -93,7 +93,7 @@ impl VMBlockExecutor for NativeVMBlockExecutor {
     ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         AptosBlockExecutorWrapper::<NativeVMExecutorTask>::execute_block_on_thread_pool::<
             _,
-            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            NoOpTransactionCommitHook<VMStatus>,
             _,
         >(
             Arc::clone(&NATIVE_EXECUTOR_POOL),

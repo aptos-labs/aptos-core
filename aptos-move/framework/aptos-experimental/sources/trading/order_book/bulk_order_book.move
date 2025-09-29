@@ -66,6 +66,7 @@ module aptos_experimental::bulk_order_book {
     const EINVLID_MM_ORDER_REQUEST: u64 = 10;
     const EPRICE_CROSSING: u64 = 11;
     const ENOT_BULK_ORDER: u64 = 12;
+    const E_INVALID_SEQUENCE_NUMBER: u64 = 13;
 
 
     /// Main bulk order book container that manages all orders and their matching.
@@ -335,11 +336,14 @@ module aptos_experimental::bulk_order_book {
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
         ascending_id_generator: &mut AscendingIdGenerator,
         order_req: BulkOrderRequest<M>
-    ) : OrderIdType {
+    ) : BulkOrder<M> {
         let account = get_account_from_order_request(&order_req);
+        let new_sequence_number = aptos_experimental::bulk_order_book_types::get_sequence_number_from_order_request(&order_req);
         let existing_order = self.orders.contains(&account);
         let order_id = if (existing_order) {
             let old_order = self.orders.remove(&account);
+            let existing_sequence_number = aptos_experimental::bulk_order_book_types::get_sequence_number_from_bulk_order(&old_order);
+            assert!(new_sequence_number > existing_sequence_number, E_INVALID_SEQUENCE_NUMBER);
             cancel_active_orders(price_time_idx, &old_order);
             old_order.get_order_id()
         } else {
@@ -347,17 +351,17 @@ module aptos_experimental::bulk_order_book {
             self.order_id_to_address.add(order_id, account);
             order_id
         };
-        let new_order = new_bulk_order(
+        let bulk_order = new_bulk_order(
             order_id,
             new_unique_idx_type(ascending_id_generator.next_ascending_id()),
             order_req,
             price_time_idx.best_bid_price(),
             price_time_idx.best_ask_price(),
         );
-        self.orders.add(account, new_order);
+        self.orders.add(account, bulk_order);
         // Activate the first price levels in the active order book
-        activate_first_price_levels(price_time_idx, &new_order, order_id);
-        order_id
+        activate_first_price_levels(price_time_idx, &bulk_order, order_id);
+        bulk_order
     }
 
     #[test_only]

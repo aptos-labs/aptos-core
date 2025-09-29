@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.8.1"
+version = "7.9.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -466,6 +466,7 @@ dependencies = [
  "move-vm-types",
  "once_cell",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -750,6 +751,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -1346,12 +1348,19 @@ dependencies = [
 
 [[package]]
 name = "aptos-dkg"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-runtimes",
+ "ark-bls12-381 0.5.0",
+ "ark-bn254",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-poly 0.5.0",
+ "ark-serialize 0.5.0",
+ "ark-std 0.5.0",
  "bcs 0.1.4",
  "blst",
  "blstrs",
@@ -2000,6 +2009,7 @@ dependencies = [
  "tempfile",
  "tiny-keccak",
  "toml 0.7.8",
+ "triomphe",
 ]
 
 [[package]]
@@ -2824,7 +2834,6 @@ dependencies = [
 name = "aptos-keyless-pepper-service"
 version = "0.1.0"
 dependencies = [
- "aes-gcm",
  "anyhow",
  "aptos-build-info",
  "aptos-crypto",
@@ -2833,6 +2842,7 @@ dependencies = [
  "aptos-keyless-pepper-common",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-time-service",
  "aptos-types",
  "ark-bls12-381 0.5.0",
  "ark-bn254",
@@ -2840,7 +2850,9 @@ dependencies = [
  "ark-ff 0.5.0",
  "ark-groth16",
  "ark-serialize 0.5.0",
+ "async-trait",
  "bcs 0.1.4",
+ "clap 4.5.21",
  "firestore",
  "hex",
  "hyper 0.14.28",
@@ -2853,9 +2865,9 @@ dependencies = [
  "serde",
  "serde_json",
  "sha3 0.9.1",
+ "tempfile",
  "thiserror",
  "tokio",
- "uuid 1.11.0",
 ]
 
 [[package]]
@@ -3187,6 +3199,7 @@ dependencies = [
  "rayon",
  "serde",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -4314,6 +4327,7 @@ dependencies = [
  "move-vm-types",
  "sha3 0.9.1",
  "smallvec",
+ "triomphe",
 ]
 
 [[package]]
@@ -4861,13 +4875,13 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "ouroboros",
- "parking_lot 0.12.1",
  "proptest",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "rayon",
  "serde",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -4997,6 +5011,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -11735,8 +11750,9 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.16.0"
-source = "git+https://github.com/aptos-labs/lru-rs?rev=d16747e8b119c48315a1c76669f962456d06dfe7#d16747e8b119c48315a1c76669f962456d06dfe7"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfe949189f46fabb938b3a9a0be30fdd93fd8a09260da863399a8cf3db756ec8"
 dependencies = [
  "hashbrown 0.15.3",
 ]
@@ -18673,9 +18689,9 @@ dependencies = [
 
 [[package]]
 name = "triomphe"
-version = "0.1.11"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "859eb650cfee7434994602c3a68b25d77ad9e68c8a6cd491616ef86661382eb3"
+checksum = "ef8f7726da4807b58ea5c96fdc122f80702030edc33b35aff9190a51148ccc85"
 dependencies = [
  "serde",
  "stable_deref_trait",

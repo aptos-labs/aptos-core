@@ -55,6 +55,10 @@ pub fn smallest_power_of_2_greater_than_or_eq(n: usize) -> (usize, usize) {
     }
 
     (N, log_N)
+    // TODO: Replace with:
+    // let N = n.next_power_of_two();
+    // let log_N = N.trailing_zeros() as usize;
+    // (N, log_N)
 }
 
 impl EvaluationDomain {
@@ -168,12 +172,13 @@ impl BatchEvaluationDomain {
             // i.e., omega = omega.square();
             idx *= 2;
         }
+        // TODO: idx == 2^(self.log_N - log_K)
 
         let N = self.omegas.len();
-        let omega = self.omegas[idx % N];
+        let omega = self.omegas[idx % N]; // TODO: %N seems unnecessary
         debug_assert!(Self::is_order(&omega, K));
 
-        let omega_inverse = self.omegas[(N - idx) % N];
+        let omega_inverse = self.omegas[(N - idx) % N]; // TODO: %N seems unnecessary
         debug_assert_eq!(omega_inverse.invert().unwrap(), omega);
 
         EvaluationDomain {

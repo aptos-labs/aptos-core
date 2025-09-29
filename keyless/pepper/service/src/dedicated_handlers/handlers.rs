@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dedicated_handlers::process_common::process_common,
+    accounts::account_recovery_db::AccountRecoveryDBInterface,
+    dedicated_handlers::pepper_request::handle_pepper_request,
     error::PepperServiceError,
     external_resources::{jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
 };
@@ -24,7 +25,6 @@ use std::{
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
-use uuid::Uuid;
 
 /// A generic handler trait for processing requests and producing responses
 #[async_trait]
@@ -41,6 +41,7 @@ pub trait HandlerTrait<TRequest, TResponse>: Send + Sync {
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: TRequest,
+        account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
     ) -> Result<TResponse, PepperServiceError>;
 }
 
@@ -53,8 +54,9 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
         &self,
         vuf_private_key: &ark_bls12_381::Fr,
         jwk_cache: JWKCache,
-        _cached_resources: CachedResources,
+        cached_resources: CachedResources,
         request: PepperRequest,
+        account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
     ) -> Result<PepperResponse, PepperServiceError> {
         // Parse the request
         let PepperRequest {
@@ -67,19 +69,18 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
         } = request;
 
         // Fetch the pepper
-        let (_pepper_base, pepper, address) = process_common(
+        let (_pepper_base, pepper, address) = handle_pepper_request(
             vuf_private_key,
             jwk_cache,
-            &Uuid::new_v4(),
+            cached_resources,
             jwt,
             epk,
             exp_date_secs,
             epk_blinder,
             uid_key,
             derivation_path,
-            false,
             None,
-            true,
+            account_recovery_db,
         )
         .await?;
 
@@ -100,8 +101,9 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
         &self,
         vuf_private_key: &ark_bls12_381::Fr,
         jwk_cache: JWKCache,
-        _cached_resources: CachedResources,
+        cached_resources: CachedResources,
         request: PepperRequest,
+        account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
     ) -> Result<SignatureResponse, PepperServiceError> {
         // Parse the request
         let PepperRequest {
@@ -114,19 +116,18 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
         } = request;
 
         // Fetch the pepper base (i.e., VUF signature)
-        let (pepper_base, _pepper, _address) = process_common(
+        let (pepper_base, _pepper, _address) = handle_pepper_request(
             vuf_private_key,
             jwk_cache,
-            &Uuid::new_v4(),
+            cached_resources,
             jwt,
             epk,
             exp_date_secs,
             epk_blinder,
             uid_key,
             derivation_path,
-            false,
             None,
-            false,
+            account_recovery_db,
         )
         .await?;
 
@@ -149,6 +150,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: VerifyRequest,
+        _account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
     ) -> Result<VerifyResponse, PepperServiceError> {
         // Parse the request
         let VerifyRequest {

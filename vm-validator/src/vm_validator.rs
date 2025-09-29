@@ -217,7 +217,7 @@ impl<S: StateView> ModuleCodeBuilder for ValidationState<S> {
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        let state_value = match self
+        let mut state_value = match self
             .state_view
             .get_state_value(&StateKey::module_id(key))
             .map_err(|err| module_storage_error!(key.address(), key.name(), err))?
@@ -225,6 +225,13 @@ impl<S: StateView> ModuleCodeBuilder for ValidationState<S> {
             Some(bytes) => bytes,
             None => return Ok(None),
         };
+        // TODO: remove this once framework on mainnet is using the new option module
+        if let Some(bytes) = self
+            .runtime_environment()
+            .get_module_bytes_override(key.address(), key.name())
+        {
+            state_value.set_bytes(bytes);
+        }
         let compiled_module = self
             .runtime_environment()
             .deserialize_into_compiled_module(state_value.bytes())?;

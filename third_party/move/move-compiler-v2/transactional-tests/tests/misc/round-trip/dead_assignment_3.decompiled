@@ -3,17 +3,17 @@
 //# publish
 module 0xc0ffee::m {
     fun foo(p0: u64): u64 {
-        let _t1 = 2;
-        let _t2 = 0;
-        while (_t2 < p0) {
-            _t2 = _t2 + 1;
-            _t1 = 3
+        let _v0 = 2;
+        let _v1 = 0;
+        while (_v1 < p0) {
+            _v1 = _v1 + 1;
+            _v0 = 3
         };
-        _t1
+        _v0
     }
     public fun test() {
-        if (!(foo(0) == 2)) abort 55;
-        if (!(foo(1) == 3)) abort 56;
+        assert!(foo(0) == 2, 55);
+        assert!(foo(1) == 3, 56);
     }
 }
 

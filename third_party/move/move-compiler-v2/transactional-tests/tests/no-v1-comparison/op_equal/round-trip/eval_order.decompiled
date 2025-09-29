@@ -6,40 +6,40 @@ module 0xc0ffee::m {
         *p0 = *p0 + 2;
     }
     fun mod2(p0: &mut u64): u64 {
-        let _t1 = p0;
-        *_t1 = *_t1 + 2;
+        let _v0 = p0;
+        *_v0 = *_v0 + 2;
         *p0
     }
     public fun test0() {
-        let _t0 = 1 + 2;
-        _t0 = _t0 + _t0;
-        if (!(_t0 + _t0 == 12)) abort 14566554180833181696;
+        let _v0 = 1 + 2;
+        _v0 = _v0 + _v0;
+        assert!(_v0 + _v0 == 12, 14566554180833181696);
     }
     public fun test1() {
-        let _t0 = 1 + 2;
-        if (!(_t0 + _t0 == 6)) abort 14566554180833181696;
+        let _v0 = 1 + 2;
+        assert!(_v0 + _v0 == 6, 14566554180833181696);
     }
     public fun test2() {
-        let _t0 = 1;
-        mod1(&mut _t0);
-        if (!(_t0 + _t0 == 6)) abort 14566554180833181696;
+        let _v0 = 1;
+        mod1(&mut _v0);
+        assert!(_v0 + _v0 == 6, 14566554180833181696);
     }
     public fun test3() {
-        let _t0 = 1;
-        let _t1 = mod2(&mut _t0);
-        if (!(_t0 + _t1 == 6)) abort 14566554180833181696;
+        let _v0 = 1;
+        let _v1 = mod2(&mut _v0);
+        assert!(_v0 + _v1 == 6, 14566554180833181696);
     }
     public fun test4() {
-        let _t0 = vector[1, 2, 3];
-        let _t1 = &_t0;
-        let _t2 = 0 + 1;
-        let _t3 = _t2;
-        _t3 = *0x1::vector::borrow<u64>(_t1, _t3);
-        let _t15 = &mut _t0;
-        let _t18 = _t2 + 1;
-        let _t4 = 0x1::vector::borrow_mut<u64>(_t15, _t18);
-        *_t4 = *_t4 + _t3;
-        if (!(_t0 == vector[1, 2, 5])) abort 14566554180833181696;
+        let _v0 = vector[1, 2, 3];
+        let _v1 = &_v0;
+        let _v2 = 0 + 1;
+        let _v3 = _v2;
+        _v3 = *0x1::vector::borrow<u64>(_v1, _v3);
+        let _v4 = &mut _v0;
+        let _v5 = _v2 + 1;
+        let _v6 = 0x1::vector::borrow_mut<u64>(_v4, _v5);
+        *_v6 = *_v6 + _v3;
+        assert!(_v0 == vector[1, 2, 5], 14566554180833181696);
     }
 }
 

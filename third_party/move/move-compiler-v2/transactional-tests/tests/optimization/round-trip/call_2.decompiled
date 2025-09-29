@@ -6,11 +6,11 @@ module 0xc0ffee::m {
         *p0 = 0;
     }
     public fun main() {
-        if (!(test(5) == 5)) abort 0;
+        assert!(test(5) == 5, 0);
     }
     fun test(p0: u64): u64 {
-        let _t1 = p0;
-        update(&mut _t1);
+        let _v0 = p0;
+        update(&mut _v0);
         p0
     }
 }

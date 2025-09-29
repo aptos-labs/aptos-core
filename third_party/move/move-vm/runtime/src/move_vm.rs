@@ -5,6 +5,7 @@
 use crate::{
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
+    interpreter_caches::InterpreterFunctionCaches,
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     storage::{
@@ -101,6 +102,8 @@ impl MoveVM {
                 function,
                 deserialized_args,
                 data_cache,
+                // TODO(caches): async drop
+                &mut InterpreterFunctionCaches::new(),
                 loader,
                 &ty_depth_checker,
                 &layout_converter,
@@ -170,7 +173,7 @@ fn deserialize_arg(
     // guaranteed by transaction argument validation but because it does not use layouts we better
     // double-check here.
     let layout = layout_converter
-        .type_to_type_layout_with_delayed_fields(gas_meter, traversal_context, ty)
+        .type_to_type_layout_with_delayed_fields(gas_meter, traversal_context, ty, false)
         .map_err(|err| {
             if layout_converter.is_lazy_loading_enabled() {
                 err
@@ -273,7 +276,7 @@ fn serialize_return_value(
 
     // Disallow delayed fields to escape through return values of a function.
     let layout = layout_converter
-        .type_to_type_layout_with_delayed_fields(gas_meter, traversal_context, ty)
+        .type_to_type_layout_with_delayed_fields(gas_meter, traversal_context, ty, false)
         .map_err(|err| {
             if layout_converter.is_lazy_loading_enabled() {
                 err

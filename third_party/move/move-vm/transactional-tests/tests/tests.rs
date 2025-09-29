@@ -76,6 +76,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
                 verifier_config: VerifierConfig::production(),
                 paranoid_type_checks: true,
                 enable_lazy_loading: false,
+                enable_enum_option: false,
                 ..VMConfig::default()
             },
             include: &[],
@@ -111,6 +112,7 @@ fn vm_config_for_tests(verifier_config: VerifierConfig) -> VMConfig {
         paranoid_type_checks: true,
         optimize_trusted_code: true,
         verifier_config,
+        enable_enum_option: false,
         ..VMConfig::default()
     }
 }

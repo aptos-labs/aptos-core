@@ -12,13 +12,13 @@ Error: compilation errors:
 error: type `||u64` is missing required abilities `copy + drop`
    ┌─ TEMPFILE:28:13
    │
-28 │             _t2 = get_func_recursive(Function::NoParam{_0: || lambda__1__get_func_recursive(_t14)})
+28 │             _v0 = get_func_recursive(Function::NoParam{_0: || lambda__1__get_func_recursive(_v3)})
    │             ^^^
 
 error: type `||u64` is missing required abilities `copy + drop`
    ┌─ TEMPFILE:31:13
    │
-31 │             _t2 = get_func_recursive(Function::OneParam{_0: |arg0| lambda__2__get_func_recursive(_t21, arg0)})
+31 │             _v0 = get_func_recursive(Function::OneParam{_0: |arg0| lambda__2__get_func_recursive(_v4, arg0)})
    │             ^^^
 
 

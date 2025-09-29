@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_preparer::BlockPreparer, error::StateSyncError, monitor,
+    block_preparer::BlockPreparer, error::StateSyncError, monitor, network::NetworkSender,
     payload_manager::TPayloadManager, pipeline::pipeline_builder::PipelineBuilder,
     state_replication::StateComputer, transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler, txn_notifier::TxnNotifier,
@@ -46,6 +46,7 @@ struct MutableState {
     is_randomness_enabled: bool,
     consensus_onchain_config: OnChainConsensusConfig,
     persisted_auxiliary_info_version: u8,
+    network_sender: Arc<NetworkSender>,
 }
 
 /// Basic communication with the Execution module;
@@ -89,6 +90,7 @@ impl ExecutionProxy {
             is_randomness_enabled,
             consensus_onchain_config,
             persisted_auxiliary_info_version,
+            network_sender,
         } = self
             .state
             .read()
@@ -115,6 +117,7 @@ impl ExecutionProxy {
             self.enable_pre_commit,
             &consensus_onchain_config,
             persisted_auxiliary_info_version,
+            network_sender,
         )
     }
 }
@@ -235,6 +238,7 @@ impl StateComputer for ExecutionProxy {
         randomness_enabled: bool,
         consensus_onchain_config: OnChainConsensusConfig,
         persisted_auxiliary_info_version: u8,
+        network_sender: Arc<NetworkSender>,
     ) {
         *self.state.write() = Some(MutableState {
             validators: epoch_state
@@ -249,6 +253,7 @@ impl StateComputer for ExecutionProxy {
             is_randomness_enabled: randomness_enabled,
             consensus_onchain_config,
             persisted_auxiliary_info_version,
+            network_sender,
         });
     }
 

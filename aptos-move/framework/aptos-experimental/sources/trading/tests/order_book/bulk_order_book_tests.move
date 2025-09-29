@@ -22,6 +22,7 @@ module aptos_experimental::bulk_order_book_tests {
     const SIZE_2: u64 = 20;
     const SIZE_3: u64 = 15;
     const SIZE_4: u64 = 25;
+    const TOTAL_SIZE_PER_SIDE: u64 = SIZE_1 + SIZE_2;
 
     // Test metadata type for testing
     struct TestMetadata has store, copy, drop {
@@ -43,8 +44,9 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let order_request = create_test_order_request(
+        let order_request = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1,
+            1, // sequence number 1 for initial setup
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -64,6 +66,26 @@ module aptos_experimental::bulk_order_book_tests {
     ): BulkOrderRequest<TestMetadata> {
         new_bulk_order_request(
             account,
+            1, // sequence number for tests
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            new_test_metadata(1)
+        )
+    }
+
+    fun create_test_order_request_with_sequence(
+        account: address,
+        sequence_number: u64,
+        bid_prices: vector<u64>,
+        bid_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+        ask_sizes: vector<u64>
+    ): BulkOrderRequest<TestMetadata> {
+        new_bulk_order_request(
+            account,
+            sequence_number,
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -106,18 +128,16 @@ module aptos_experimental::bulk_order_book_tests {
         match_result: OrderMatch<TestMetadata>,
         expected_account: address,
         expected_price: u64,
-        expected_orig_size: u64,
         expected_matched_size: u64,
         expected_is_bid: bool,
         expected_remaining_size: u64
     ) {
         let (matched_order, matched_size) = match_result.destroy_order_match();
-        let (_order_id, account, _client_order_id, _unique_priority_idx, price, orig_size, remaining_size, is_bid, _, _metadata, order_book_type) =
+        let (_order_id, account, _client_order_id, _unique_priority_idx, price, _orig_size, remaining_size, is_bid, _, _metadata, order_book_type) =
             matched_order.destroy_order_match_details();
 
         assert!(account == expected_account);
         assert!(price == expected_price);
-        assert!(orig_size == expected_orig_size);
         assert!(matched_size == expected_matched_size);
         assert!(is_bid == expected_is_bid);
         assert!(remaining_size == expected_remaining_size);
@@ -156,16 +176,6 @@ module aptos_experimental::bulk_order_book_tests {
             i += 1;
         };
         assert!(total_matched == expected_total_size);
-    }
-
-    /// Verifies that the last match has zero remaining size (fully consumed)
-    fun verify_fully_consumed(matches: vector<OrderMatch<TestMetadata>>) {
-        assert!(matches.length() > 0);
-        let last_match = matches[matches.length() - 1];
-        let (matched_order, _matched_size) = last_match.destroy_order_match();
-        let (_order_id, _account, _client_order_id, _unique_priority_idx, _price, _orig_size, remaining_size, _is_bid, _, _metadata, _) =
-            matched_order.destroy_order_match_details();
-        assert!(remaining_size == 0);
     }
 
     /// Helper to extract match data for custom verification
@@ -213,8 +223,36 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices = vector[ask_price];
         let ask_sizes = vector[ask_size];
 
-        let order_request = create_test_order_request(
+        let order_request = create_test_order_request_with_sequence(
             account,
+            5, // sequence number 5 for subsequent orders
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes
+        );
+        order_book.place_bulk_order(price_time_index, id_gen, order_request);
+    }
+
+    fun place_simple_order_with_sequence(
+        order_book: &mut BulkOrderBook<TestMetadata>,
+        price_time_index: &mut price_time_index::PriceTimeIndex,
+        id_gen: &mut AscendingIdGenerator,
+        account: address,
+        sequence_number: u64,
+        bid_price: u64,
+        bid_size: u64,
+        ask_price: u64,
+        ask_size: u64
+    ) {
+        let bid_prices = vector[bid_price];
+        let bid_sizes = vector[bid_size];
+        let ask_prices = vector[ask_price];
+        let ask_sizes = vector[ask_size];
+
+        let order_request = create_test_order_request_with_sequence(
+            account,
+            sequence_number,
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -234,8 +272,9 @@ module aptos_experimental::bulk_order_book_tests {
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>
     ) {
-        let order_request = create_test_order_request(
+        let order_request = create_test_order_request_with_sequence(
             account,
+            6, // sequence number 6 for multi-level orders
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -349,10 +388,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[0],
             TEST_ACCOUNT_1,
             ASK_PRICE_1,
-            SIZE_1 + SIZE_2,
             SIZE_1,
             false, // Should be an ask order
-            SIZE_2 // Remaining size after first level consumed
+            SIZE_2 + TOTAL_SIZE_PER_SIDE // Remaining size after first level consumed
         );
 
         // Second attempt - should be no matches since first level is consumed
@@ -378,10 +416,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[0],
             TEST_ACCOUNT_1,
             ASK_PRICE_2,
-            SIZE_1 + SIZE_2,
             SIZE_2,
             false, // Should be an ask order
-            0 // Fully consumed
+            0 + TOTAL_SIZE_PER_SIDE // Fully consumed
         );
 
         order_book.destroy_bulk_order_book();
@@ -406,10 +443,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[0],
             TEST_ACCOUNT_1,
             BID_PRICE_1,
-            SIZE_1 + SIZE_2,
             SIZE_1,
             true, // Should be a bid order
-            SIZE_2 // Remaining size after first level consumed
+            SIZE_2 + TOTAL_SIZE_PER_SIDE // Remaining size after first level consumed
         );
 
         // Second attempt - should be no matches since first level is consumed
@@ -435,10 +471,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[0],
             TEST_ACCOUNT_1,
             BID_PRICE_2,
-            SIZE_1 + SIZE_2,
             SIZE_2,
             true, // Should be a bid order
-            0 // Fully consumed
+            0 + TOTAL_SIZE_PER_SIDE // Fully consumed
         );
 
         order_book.destroy_bulk_order_book();
@@ -464,10 +499,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[0],
             TEST_ACCOUNT_1,
             ASK_PRICE_1,
-            SIZE_1 + SIZE_2,
             taker_size,
             false, // Should be an ask order
-            SIZE_1 + SIZE_2 - taker_size // Remaining size after partial consumption
+            2 * TOTAL_SIZE_PER_SIDE - taker_size // Remaining size after partial consumption
         );
 
         // Test taker ask with size smaller than the first bid level
@@ -484,10 +518,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[0],
             TEST_ACCOUNT_1,
             BID_PRICE_1,
-            SIZE_1 + SIZE_2,
             taker_ask_size,
             true, // Should be a bid order
-            SIZE_1 + SIZE_2 - taker_ask_size // Remaining size after partial consumption
+            2 * TOTAL_SIZE_PER_SIDE - taker_size - taker_ask_size // Remaining size after partial consumption
         );
 
         price_time_index.destroy_price_time_idx();
@@ -517,10 +550,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[0],
             TEST_ACCOUNT_1,
             ASK_PRICE_1,
-            total_bulk_order_size,
             SIZE_1,
             false, // Should be an ask order
-            SIZE_2 // Remaining size after first level
+            SIZE_2 + TOTAL_SIZE_PER_SIDE // Remaining size after first level
         );
 
         // Check second match (second ask level)
@@ -528,17 +560,13 @@ module aptos_experimental::bulk_order_book_tests {
             matches[1],
             TEST_ACCOUNT_1,
             ASK_PRICE_2,
-            total_bulk_order_size,
             SIZE_2,
             false, // Should be an ask order
-            0 // Fully consumed
+            0 + TOTAL_SIZE_PER_SIDE // Fully consumed
         );
 
         // Verify total matched size equals total bulk order size
         verify_total_matched_size(matches, total_bulk_order_size);
-
-        // Verify the bulk order is fully consumed
-        verify_fully_consumed(matches);
 
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
@@ -565,10 +593,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[0],
             TEST_ACCOUNT_1,
             ASK_PRICE_1,
-            total_bulk_order_size,
             SIZE_1,
             false, // Should be an ask order
-            SIZE_2 // Remaining size after first level
+            SIZE_2 + TOTAL_SIZE_PER_SIDE // Remaining size after first level
         );
 
         // Check second match
@@ -576,15 +603,13 @@ module aptos_experimental::bulk_order_book_tests {
             matches[1],
             TEST_ACCOUNT_1,
             ASK_PRICE_2,
-            total_bulk_order_size,
             SIZE_2,
             false, // Should be an ask order
-            0 // Fully consumed
+            0 + TOTAL_SIZE_PER_SIDE // Fully consumed
         );
 
         // Verify total matched size equals total bulk order size
         verify_total_matched_size(matches, total_bulk_order_size);
-        verify_fully_consumed(matches);
 
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
@@ -613,10 +638,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[0],
             TEST_ACCOUNT_1,
             ASK_PRICE_1,
-            SIZE_1 + SIZE_2,
             SIZE_1,
             false, // Should be an ask order
-            SIZE_2 // Remaining size after first level
+            SIZE_2  + TOTAL_SIZE_PER_SIDE// Remaining size after first level
         );
 
         // Check second match (partially consumed)
@@ -624,10 +648,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[1],
             TEST_ACCOUNT_1,
             ASK_PRICE_2,
-            SIZE_1 + SIZE_2,
             SIZE_2 / 2,
             false, // Should be an ask order
-            SIZE_2 / 2 // Remaining size in second level
+            SIZE_2 / 2 + TOTAL_SIZE_PER_SIDE // Remaining size in second level
         );
 
         // Verify total matched size equals partial size
@@ -696,10 +719,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[0],
             TEST_ACCOUNT_1,
             ASK_PRICE_1,
-            SIZE_1 + SIZE_2,
             partial_size,
             false, // Should be an ask order
-            SIZE_1 + SIZE_2 - partial_size // Remaining size after partial consumption
+            2 * TOTAL_SIZE_PER_SIDE - partial_size // Remaining size after partial consumption
         );
 
         // Verify order is still active (second level should still be available)
@@ -755,10 +777,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[0],
             TEST_ACCOUNT_1,
             ASK_PRICE_1,
-            SIZE_1 + SIZE_2,
             SIZE_1,
             false, // Should be an ask order
-            SIZE_2 // Remaining size after first level
+            TOTAL_SIZE_PER_SIDE + SIZE_2 // Remaining size after first level
         );
 
         // Verify second match
@@ -766,10 +787,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[1],
             TEST_ACCOUNT_1,
             ASK_PRICE_2,
-            SIZE_1 + SIZE_2,
             SIZE_2,
             false, // Should be an ask order
-            0 // Fully consumed
+            0 + TOTAL_SIZE_PER_SIDE // Fully consumed
         );
 
         // Verify order is no longer active after full consumption
@@ -842,8 +862,9 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let order_request = create_test_order_request(
+        let order_request = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1,
+            10, // sequence number 10 for recreation
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -869,10 +890,9 @@ module aptos_experimental::bulk_order_book_tests {
             matches[0],
             TEST_ACCOUNT_1,
             ASK_PRICE_1,
-            SIZE_1 + SIZE_2,
             SIZE_1,
             false, // Should be an ask order
-            SIZE_2 // Remaining size
+            SIZE_2 + TOTAL_SIZE_PER_SIDE // Remaining size
         );
 
         price_time_index.destroy_price_time_idx();
@@ -1080,8 +1100,9 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let order_request = create_test_order_request(
+        let order_request = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1,
+            15, // sequence number 15 for empty bid vectors test
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -1244,8 +1265,9 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices_1 = vector[105];
         let ask_sizes_1 = vector[SIZE_1];
 
-        let order_request_1 = create_test_order_request(
+        let order_request_1 = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1,
+            20, // sequence number 20 for first order
             bid_prices_1,
             bid_sizes_1,
             ask_prices_1,
@@ -1258,8 +1280,9 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices_2 = vector[107, 108]; //
         let ask_sizes_2 = vector[SIZE_1, SIZE_2];
 
-        let order_request_2 = create_test_order_request(
+        let order_request_2 = create_test_order_request_with_sequence(
             TEST_ACCOUNT_2,
+            25, // sequence number 25 for second order
             bid_prices_2,
             bid_sizes_2,
             ask_prices_2,
@@ -1521,7 +1544,7 @@ module aptos_experimental::bulk_order_book_tests {
         setup_multi_account_scenario(&mut order_book, &mut price_time_index, &mut id_gen, accounts_and_orders);
 
         // Account 1 replaces their order with different prices
-        place_simple_order(&mut order_book, &mut price_time_index, &mut id_gen, TEST_ACCOUNT_1, 98, SIZE_3, 103, SIZE_3);
+        place_simple_order_with_sequence(&mut order_book, &mut price_time_index, &mut id_gen, TEST_ACCOUNT_1, 30, 98, SIZE_3, 103, SIZE_3);
 
         // Old prices should no longer be active
         assert!(!price_time_index.is_taker_order(101, true)); // Old ask price
@@ -1554,6 +1577,46 @@ module aptos_experimental::bulk_order_book_tests {
         );
         assert!(matches_2.length() == 1);
 
+        price_time_index.destroy_price_time_idx();
+        order_book.destroy_bulk_order_book();
+    }
+
+    #[test]
+    fun test_sequence_number_validation() {
+        let (order_book, price_time_index, id_gen) = setup_test();
+        // Test that we can place an order with higher sequence number (replacing the one from setup_test)
+        let order_req1 = create_test_order_request_with_sequence(
+            TEST_ACCOUNT_1, 10, vector[100], vector[10], vector[200], vector[10]
+        );
+        let _order_id1 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req1);
+        // Test that we can place an order with even higher sequence number
+        let order_req2 = create_test_order_request_with_sequence(
+            TEST_ACCOUNT_1, 15, vector[100], vector[10], vector[200], vector[10]
+        );
+        let _order_id2 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req2);
+        price_time_index.destroy_price_time_idx();
+        order_book.destroy_bulk_order_book();
+    }
+
+    #[test]
+    #[expected_failure(abort_code = aptos_experimental::bulk_order_book::E_INVALID_SEQUENCE_NUMBER)]
+    fun test_sequence_number_validation_failure() {
+        let (order_book, price_time_index, id_gen) = setup_test();
+        // Test that we can place an order with higher sequence number (replacing the one from setup_test)
+        let order_req1 = create_test_order_request_with_sequence(
+            TEST_ACCOUNT_1, 10, vector[100], vector[10], vector[200], vector[10]
+        );
+        let _order_id1 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req1);
+        // Test that we can place an order with even higher sequence number
+        let order_req2 = create_test_order_request_with_sequence(
+            TEST_ACCOUNT_1, 15, vector[100], vector[10], vector[200], vector[10]
+        );
+        let _order_id2 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req2);
+        // Test that we cannot place an order with lower sequence number (should abort)
+        let order_req3 = create_test_order_request_with_sequence(
+            TEST_ACCOUNT_1, 12, vector[100], vector[10], vector[200], vector[10]
+        );
+        let _ = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req3);
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
     }

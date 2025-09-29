@@ -3,13 +3,13 @@
 //# publish
 module 0xc0ffee::m {
     fun foo(): (u64, u64) {
-        let _t0 = 1;
-        let _t5 = _t0 + 1;
-        (_t0, _t5)
+        let _v0 = 1;
+        let _v1 = _v0 + 1;
+        (_v0, _v1)
     }
     public fun test(): u64 {
-        let (_t2,_t3) = foo();
-        _t2 + _t3
+        let (_v0,_v1) = foo();
+        _v0 + _v1
     }
 }
 

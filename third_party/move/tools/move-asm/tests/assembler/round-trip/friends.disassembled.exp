@@ -1,15 +1,15 @@
 processed 3 tasks
-task 0 lines 3-5:  publish --print-bytecode [// Bytecode version v7]
+task 0 lines 3-5:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test1
 
 == END Bytecode ==
-task 1 lines 8-15:  publish --print-bytecode [// Bytecode version v7]
+task 1 lines 8-15:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test2
 friend 0x66::test1
 // Function definition at index 0
@@ -19,10 +19,10 @@ friend fun friend_fun(): u8
 
 
 == END Bytecode ==
-task 2 lines 19-26:  publish --print-bytecode [// Bytecode version v7]
+task 2 lines 19-26:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test1
 use 0x66::test2
 // Function definition at index 0

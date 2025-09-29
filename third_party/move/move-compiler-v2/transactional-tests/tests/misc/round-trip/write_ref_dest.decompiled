@@ -6,13 +6,13 @@ module 0x42::m {
         (*p0, 0)
     }
     fun test_assign() {
-        if (!(vector[1] == vector[1])) abort 0;
+        assert!(vector[1] == vector[1], 0);
     }
     fun test_call() {
-        let _t0 = 0x1::vector::empty<u64>();
-        let (_t3,_t4) = foo(&_t0);
-        let _t5 = 0x1::vector::empty<u64>();
-        if (!(_t3 == _t5)) abort 0;
+        let _v0 = 0x1::vector::empty<u64>();
+        let (_v1,_v2) = foo(&_v0);
+        let _v3 = 0x1::vector::empty<u64>();
+        assert!(_v1 == _v3, 0);
     }
 }
 

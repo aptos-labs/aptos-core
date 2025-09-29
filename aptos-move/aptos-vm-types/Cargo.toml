@@ -29,6 +29,7 @@ move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
+triomphe = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
