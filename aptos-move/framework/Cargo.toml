@@ -49,7 +49,6 @@ libsecp256k1 = { workspace = true }
 log = { workspace = true }
 merlin = { workspace = true }
 move-binary-format = { workspace = true }
-move-cli = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-core-types = { workspace = true }
