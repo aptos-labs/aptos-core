@@ -626,6 +626,7 @@ impl CliCommand<&'static str> for TestPackage {
             None,
             self.compute_coverage,
             &mut std::io::stdout(),
+            true,
         )
         .map_err(|err| CliError::UnexpectedError(format!("Failed to run tests: {:#}", err)))?;
 

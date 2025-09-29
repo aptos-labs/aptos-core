@@ -118,6 +118,7 @@ impl TestRunner {
         native_function_table: Option<NativeFunctionTable>,
         genesis_state: Option<ChangeSet>,
         record_writeset: bool,
+        enable_enum_option: bool,
     ) -> Result<Self> {
         let native_function_table = native_function_table.unwrap_or_else(|| {
             move_stdlib::natives::all_natives(
@@ -125,7 +126,10 @@ impl TestRunner {
                 move_stdlib::natives::GasParameters::zeros(),
             )
         });
-        let runtime_environment = RuntimeEnvironment::new(native_function_table);
+        let runtime_environment = RuntimeEnvironment::new_for_move_third_party_tests(
+            native_function_table,
+            enable_enum_option,
+        );
 
         let source_files = tests
             .files
