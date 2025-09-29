@@ -31,15 +31,6 @@ impl AptosModuleExtension {
         }
     }
 
-    pub fn new_from_bytes_and_metadata(bytes: Bytes, metadata: StateValueMetadata) -> Self {
-        let hash = sha3_256(&bytes);
-        Self {
-            bytes,
-            hash,
-            state_value_metadata: metadata,
-        }
-    }
-
     /// Returns the state value metadata stored in extension.
     pub fn state_value_metadata(&self) -> &StateValueMetadata {
         &self.state_value_metadata

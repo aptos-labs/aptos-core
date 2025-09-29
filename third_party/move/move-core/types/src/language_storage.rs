@@ -39,8 +39,6 @@ pub static OPTION_MODULE_ID: Lazy<ModuleId> =
     Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("option"))));
 pub static OPTION_STRUCT_NAME: Lazy<Identifier> =
     Lazy::new(|| Identifier::from(ident_str!("Option")));
-pub static MEM_MODULE_ID: Lazy<ModuleId> =
-    Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("mem"))));
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(

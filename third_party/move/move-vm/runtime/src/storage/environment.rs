@@ -68,10 +68,11 @@ impl RuntimeEnvironment {
     pub fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
     ) -> Self {
-        Self::new_with_enum_option(natives, true)
+        Self::new_for_move_third_party_tests(natives, true)
     }
 
-    pub fn new_with_enum_option(
+    /// API to control the enum option feature flag depending on whether the caller is from aptos or not
+    pub fn new_for_move_third_party_tests(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         enable_enum_option: bool,
     ) -> Self {

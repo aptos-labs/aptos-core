@@ -28,7 +28,6 @@ fn in_memory_storage(enable_lazy_loading: bool) -> InMemoryStorage {
         vec![],
         VMConfig {
             enable_lazy_loading,
-            enable_enum_option: false,
             ..VMConfig::default()
         },
     ))

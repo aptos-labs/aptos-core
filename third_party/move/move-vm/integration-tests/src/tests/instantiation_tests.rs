@@ -116,7 +116,6 @@ fn instantiation_err() {
 
     let vm_config = VMConfig {
         paranoid_type_checks: false,
-        enable_enum_option: false,
         ..VMConfig::default()
     };
     let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);

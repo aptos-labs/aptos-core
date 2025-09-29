@@ -126,8 +126,10 @@ impl TestRunner {
                 move_stdlib::natives::GasParameters::zeros(),
             )
         });
-        let runtime_environment =
-            RuntimeEnvironment::new_with_enum_option(native_function_table, enable_enum_option);
+        let runtime_environment = RuntimeEnvironment::new_for_move_third_party_tests(
+            native_function_table,
+            enable_enum_option,
+        );
 
         let source_files = tests
             .files
