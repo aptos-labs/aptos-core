@@ -14,7 +14,7 @@ use crate::{
 use legacy_move_compiler::parser::ast as PA;
 use move_core_types::{
     ability::{Ability, AbilitySet},
-    int256::U256,
+    int256::{I256, U256},
 };
 use num::BigInt;
 use std::collections::BTreeMap;
@@ -48,6 +48,8 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
     {
         // Builtin Constants (for specifications)
         use EntryVisibility::Spec;
+
+        // Unsigned integers
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U8"),
             mk_num_const(BigInt::from(u8::MAX), Spec),
@@ -72,6 +74,57 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             trans.builtin_qualified_symbol("MAX_U256"),
             mk_num_const(BigInt::from(U256::MAX), Spec),
         );
+
+        // Signed integers
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I8"),
+            mk_num_const(BigInt::from(i8::MAX), Spec),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I8"),
+            mk_num_const(BigInt::from(i8::MIN), Spec),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I16"),
+            mk_num_const(BigInt::from(i16::MAX), Spec),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I16"),
+            mk_num_const(BigInt::from(i16::MIN), Spec),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I32"),
+            mk_num_const(BigInt::from(i32::MAX), Spec),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I32"),
+            mk_num_const(BigInt::from(i32::MIN), Spec),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I64"),
+            mk_num_const(BigInt::from(i64::MAX), Spec),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I64"),
+            mk_num_const(BigInt::from(i64::MIN), Spec),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I128"),
+            mk_num_const(BigInt::from(i128::MAX), Spec),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I128"),
+            mk_num_const(BigInt::from(i128::MIN), Spec),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I256"),
+            mk_num_const(BigInt::from(I256::MAX), Spec),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I256"),
+            mk_num_const(BigInt::from(I256::MIN), Spec),
+        );
+
         trans.define_const(
             trans.builtin_qualified_symbol("EXECUTION_FAILURE"),
             mk_num_const(BigInt::from(-1), Spec),
