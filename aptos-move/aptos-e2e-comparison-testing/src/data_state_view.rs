@@ -66,7 +66,7 @@ impl DataStateView {
             debugger: db,
             debugger_view:debugger_view,
             code_data: Some(code_data),
-            data_read_state_keys: Some(Arc::new(Mutex::new(HashMap::new()))),
+            data_read_state_keys: Some(Arc::new(Mutex::new(features.clone()))),
             config: Some(features)
         }
     }
