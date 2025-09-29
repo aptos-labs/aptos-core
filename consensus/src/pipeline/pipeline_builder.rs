@@ -15,7 +15,7 @@ use anyhow::anyhow;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
     block::Block,
-    common::Round,
+    common::{Author, Round},
     pipeline::commit_vote::CommitVote,
     pipelined_block::{
         CommitLedgerResult, CommitVoteResult, ExecuteResult, LedgerUpdateResult,
@@ -361,7 +361,7 @@ impl PipelineBuilder {
         }
     }
 
-    pub fn build(
+    pub fn build_for_observer(
         &self,
         pipelined_block: &PipelinedBlock,
         parent_futs: PipelineFutures,
@@ -369,10 +369,46 @@ impl PipelineBuilder {
             dyn FnOnce(WrappedLedgerInfo, LedgerInfoWithSignatures) + Send + Sync,
         >,
     ) {
+        Self::build(
+            self,
+            pipelined_block,
+            parent_futs,
+            block_store_callback,
+            true,
+        );
+    }
+
+    pub fn build_for_consensus(
+        &self,
+        pipelined_block: &PipelinedBlock,
+        parent_futs: PipelineFutures,
+        block_store_callback: Box<
+            dyn FnOnce(WrappedLedgerInfo, LedgerInfoWithSignatures) + Send + Sync,
+        >,
+    ) {
+        Self::build(
+            self,
+            pipelined_block,
+            parent_futs,
+            block_store_callback,
+            false,
+        );
+    }
+
+    fn build(
+        &self,
+        pipelined_block: &PipelinedBlock,
+        parent_futs: PipelineFutures,
+        block_store_callback: Box<
+            dyn FnOnce(WrappedLedgerInfo, LedgerInfoWithSignatures) + Send + Sync,
+        >,
+        observer_enabled: bool,
+    ) {
         let (futs, tx, abort_handles) = self.build_internal(
             parent_futs,
             Arc::new(pipelined_block.block().clone()),
             block_store_callback,
+            observer_enabled,
         );
         pipelined_block.set_pipeline_futs(futs);
         pipelined_block.set_pipeline_tx(tx);
@@ -386,6 +422,7 @@ impl PipelineBuilder {
         block_store_callback: Box<
             dyn FnOnce(WrappedLedgerInfo, LedgerInfoWithSignatures) + Send + Sync,
         >,
+        observer_enabled: bool,
     ) -> (PipelineFutures, PipelineInputTx, Vec<AbortHandle>) {
         let mut abort_handles = vec![];
         let (tx, rx) = Self::channel(&mut abort_handles);
@@ -437,19 +474,29 @@ impl PipelineBuilder {
             ),
             None,
         );
-        let commit_vote_fut = spawn_shared_fut(
-            Self::sign_and_broadcast_commit_vote(
-                ledger_update_fut.clone(),
-                order_vote_rx,
-                order_proof_fut.clone(),
-                commit_proof_fut.clone(),
-                self.signer.clone(),
-                block.clone(),
-                self.order_vote_enabled,
-                self.network_sender.clone(),
-            ),
-            Some(&mut abort_handles),
-        );
+        let commit_vote_fut = if !observer_enabled {
+            spawn_shared_fut(
+                Self::sign_and_broadcast_commit_vote(
+                    ledger_update_fut.clone(),
+                    order_vote_rx,
+                    order_proof_fut.clone(),
+                    commit_proof_fut.clone(),
+                    self.signer.clone(),
+                    block.clone(),
+                    self.order_vote_enabled,
+                    self.network_sender.clone(),
+                ),
+                Some(&mut abort_handles),
+            )
+        } else {
+            spawn_ready_fut(CommitVote::new_with_signature(
+                Author::ONE,
+                LedgerInfo::dummy(),
+                self.signer
+                    .sign(&LedgerInfo::dummy())
+                    .expect("Signing should succeed"),
+            ))
+        };
         let pre_commit_fut = spawn_shared_fut(
             Self::pre_commit(
                 ledger_update_fut.clone(),
