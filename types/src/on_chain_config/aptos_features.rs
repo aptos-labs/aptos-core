@@ -249,7 +249,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_LAZY_LOADING,
             FeatureFlag::MONOTONICALLY_INCREASING_COUNTER,
             FeatureFlag::ENABLE_CAPTURE_OPTION,
-            FeatureFlag::ENABLE_TRUSTED_CODE,
+            // FeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::ENABLE_ENUM_OPTION,
         ]
     }
