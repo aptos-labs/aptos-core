@@ -29,7 +29,7 @@ use std::collections::BTreeSet;
 /// [TODO]: tune the heuristic limits below
 /// A conservative heuristic limit posed by the inlining optimization on how
 /// large a caller function can grow to due to inlining.
-const MAX_CALLER_CODE_SIZE: usize = 2048;
+const MAX_CALLER_CODE_SIZE: usize = 512;
 /// A conservative heuristic limit posed by the inlining optimization on how
 /// large a callee function can be for it to be considered for inlining.
 const MAX_CALLEE_CODE_SIZE: usize = 128;
