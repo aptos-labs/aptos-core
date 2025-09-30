@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_logger::info;
+use aptos_logger::{error, info};
 use aptos_storage_interface::{
     state_store::state_view::{
         cached_state_view::CachedDbStateView,
@@ -354,18 +354,24 @@ impl TransactionValidation for PooledVMValidator {
             ))
         });
 
-        let vm_validator_locked = vm_validator.lock().unwrap();
+        let result = std::panic::catch_unwind(move || {
+            let vm_validator_locked = vm_validator.lock().unwrap();
 
-        use aptos_vm::VMValidator;
-        let vm = AptosVM::new(
-            &vm_validator_locked.state.environment,
-            &vm_validator_locked.state.state_view,
-        );
-        Ok(vm.validate_transaction(
-            txn,
-            &vm_validator_locked.state.state_view,
-            &vm_validator_locked.state,
-        ))
+            use aptos_vm::VMValidator;
+            let vm = AptosVM::new(
+                &vm_validator_locked.state.environment,
+                &vm_validator_locked.state.state_view,
+            );
+            vm.validate_transaction(
+                txn,
+                &vm_validator_locked.state.state_view,
+                &vm_validator_locked.state,
+            )
+        });
+        if let Err(err) = &result {
+            error!("VMValidator panicked: {:?}", err);
+        }
+        result.map_err(|_| anyhow::anyhow!("panic validating transaction"))
     }
 
     fn restart(&mut self) -> Result<()> {
