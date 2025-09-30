@@ -190,26 +190,6 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         (pk, vk)
     }
 
-    // fn commit_with_randomness(
-    //     pk: &Self::ProverKey,
-    //     values: &[Self::Input],
-    //     r: &Self::CommitmentRandomness,
-    // ) -> Commitment<E> {
-    //     debug_assert!(
-    //         pk.lagr_g1.len() > values.len(),
-    //         "pp.lagr_g1 must have at least z.len() + 1 elements"
-    //     );
-
-    //     let mut scalars = Vec::with_capacity(values.len() + 1);
-    //     scalars.push(*r);
-    //     scalars.extend_from_slice(values);
-
-    //     Commitment(
-    //         E::G1::msm(&pk.lagr_g1[..scalars.len()], &scalars)
-    //             .expect("Failed to compute MSM in range proof commitment"),
-    //     )
-    // }
-
     fn commit_with_randomness(
         pk: &Self::ProverKey,
         values: &[Self::Input],

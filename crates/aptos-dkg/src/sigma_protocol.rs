@@ -265,7 +265,7 @@ where
         }
 
         // Add scalars for the prover's commitment and challenge
-        scalars.push(-E::ScalarField::ONE * beta_power); // for commitment
+        scalars.push(-E::ScalarField::ONE * beta_power); // for the prover's commitment
         scalars.push(-c * beta_power); // for challenge
     }
 
