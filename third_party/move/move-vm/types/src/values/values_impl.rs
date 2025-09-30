@@ -2154,6 +2154,10 @@ impl Value {
     {
         VMValueCast::cast(self)
     }
+
+    pub fn is_invalid(&self) -> bool {
+        matches!(self.0, ValueImpl::Invalid)
+    }
 }
 
 impl VMValueCast<u8> for IntegerValue {

@@ -57,13 +57,59 @@ use move_vm_types::{
     },
     views::TypeView,
 };
+use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
     cmp::min,
-    collections::{btree_map, VecDeque},
+    collections::{btree_map, BTreeSet, VecDeque},
     fmt::{Debug, Write},
     rc::Rc,
+    str::FromStr,
 };
+
+/// A category of information which can be traced by the interpreter.
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
+pub(crate) enum TraceCategory {
+    /// Unknown category name. An unknown category name can be used for local debugging.
+    Unknown(String),
+    /// Trace VM Error.
+    VMError,
+    /// Trace abort of given code.
+    Abort(u64),
+}
+
+/// A set of categories to be traced as defined by environment variable, for example
+/// `MOVE_TRACE_EXEC=abort(22),abort(33)`.
+static MOVE_TRACE_EXEC: Lazy<Option<BTreeSet<TraceCategory>>> = Lazy::new(|| {
+    std::env::var("MOVE_TRACE_EXEC").ok().map(|str| {
+        str.split(',')
+            .map(|part| {
+                if part == "vm_error" {
+                    return TraceCategory::VMError;
+                }
+                if let Some(mut s) = part.strip_prefix("abort(") {
+                    s = s.strip_suffix(")").unwrap_or(s);
+                    if let Ok(c) = u64::from_str(s) {
+                        return TraceCategory::Abort(c);
+                    }
+                }
+                TraceCategory::Unknown(part.to_string())
+            })
+            .collect()
+    })
+});
+
+/// Macro for checking whether a certain trace category is active.
+macro_rules! is_tracing_for {
+    ($category:expr) => {{
+        if let Some(categories) = &*MOVE_TRACE_EXEC {
+            // Only evaluate $category when tracing is on.
+            categories.contains(&$category)
+        } else {
+            false
+        }
+    }};
+}
 
 macro_rules! set_err_info {
     ($frame:ident, $e:expr) => {{
@@ -1659,6 +1705,9 @@ where
         }
         debug_writeln!(buf, "Operand Stack:")?;
         for (idx, val) in self.operand_stack.value.iter().enumerate() {
+            if val.is_invalid() {
+                continue;
+            }
             // TODO: Currently we do not know the types of the values on the operand stack.
             // Revisit.
             debug_write!(buf, "    [{}] ", idx)?;
@@ -1910,6 +1959,15 @@ impl Frame {
             } else {
                 e
             };
+            if is_tracing_for!(TraceCategory::VMError) {
+                let mut str = String::new();
+                if let Err(print_err) = interpreter
+                    .debug_print_stack_trace(&mut str, interpreter.loader.runtime_environment())
+                {
+                    str = format!("<while printing stack trace>: {}", print_err);
+                }
+                eprintln!("trace vm_error {}:\n{}", e, str)
+            }
             set_err_info!(self, e)
         })
     }
@@ -2636,6 +2694,14 @@ impl Frame {
                     Bytecode::Abort => {
                         gas_meter.charge_simple_instr(S::Abort)?;
                         let error_code = interpreter.operand_stack.pop_as::<u64>()?;
+                        if is_tracing_for!(TraceCategory::Abort(error_code)) {
+                            let mut str = String::new();
+                            interpreter.debug_print_stack_trace(
+                                &mut str,
+                                interpreter.loader.runtime_environment(),
+                            )?;
+                            eprintln!("trace abort({}): {}", error_code, str);
+                        }
                         let error = PartialVMError::new(StatusCode::ABORTED)
                             .with_sub_status(error_code)
                             .with_message(format!(
