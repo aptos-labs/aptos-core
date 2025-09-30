@@ -758,7 +758,7 @@ if __name__ == "__main__":
     run_id = f"{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}-{image[-5:]}"
     network = Network.from_string(args.network)
     config = ReplayConfig(network)
-    worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 7
+    worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 8
     range_size = args.range_size if args.range_size else config.range_size
 
     if args.start is not None:
