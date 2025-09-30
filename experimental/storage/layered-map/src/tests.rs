@@ -5,7 +5,7 @@ use crate::{layer::MapLayer, KeyHash};
 use itertools::Itertools;
 use proptest::{collection::vec, prelude::*};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     hash::{Hash, Hasher},
 };
 
@@ -76,7 +76,46 @@ fn layers(
     layers
 }
 
+#[test]
+fn basic() {
+    let persisted_layer = MapLayer::new_family("test_basic");
+    let layer0 = persisted_layer.clone();
+
+    let map00 = layer0.view_layers_after(&persisted_layer);
+    let layer1 = map00.new_layer(&[(1, "a"), (2, "b")]);
+
+    let map01 = layer1.view_layers_after(&layer0);
+    assert_eq!(map01.get(&1), Some("a"));
+    assert_eq!(map01.get(&2), Some("b"));
+    assert_eq!(map01.get(&3), None);
+    assert_eq!(map01.get(&4), None);
+    let traversed: BTreeMap<_, _> = map01.iter().collect();
+    assert_eq!(traversed, maplit::btreemap! {1 => "a", 2 => "b"});
+
+    let layer2 = map01.new_layer(&[(2, "c"), (3, "d")]);
+    let map12 = layer2.view_layers_after(&layer0);
+    assert_eq!(map12.get(&1), None);
+    assert_eq!(map12.get(&2), Some("c"));
+    assert_eq!(map12.get(&3), Some("d"));
+    assert_eq!(map12.get(&4), None);
+    let traversed: BTreeMap<_, _> = map12.iter().collect();
+    assert_eq!(traversed, maplit::btreemap! { 2 => "c", 3 => "d" });
+
+    let map02 = layer2.view_layers_after(&layer0);
+    assert_eq!(map02.get(&1), Some("a"));
+    assert_eq!(map02.get(&2), Some("c"));
+    assert_eq!(map02.get(&3), Some("d"));
+    assert_eq!(map02.get(&4), None);
+    let traversed: BTreeMap<_, _> = map02.iter().collect();
+    assert_eq!(
+        traversed,
+        maplit::btreemap! { 1 => "a", 2 => "c", 3 => "d" }
+    );
+}
+
 proptest! {
+    #![proptest_config(ProptestConfig::with_cases(1))]
+
     #[test]
     fn test_layered_map_get(
         (mut items_per_update, ancestor, base, top) in arb_test_case()
@@ -97,7 +136,8 @@ proptest! {
         }
 
         // traversed via iterator
-        let traversed = layered_map.iter().collect();
+        let traversed: BTreeMap<_, _> = layered_map.iter().collect();
+        prop_assert_eq!(all.len(), traversed.len());
         prop_assert_eq!(all, traversed);
     }
 

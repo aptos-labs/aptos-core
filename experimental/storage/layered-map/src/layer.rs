@@ -28,7 +28,7 @@ struct LayerInner<K: ArcAsyncDrop, V: ArcAsyncDrop> {
 impl<K: ArcAsyncDrop, V: ArcAsyncDrop> Drop for LayerInner<K, V> {
     fn drop(&mut self) {
         // Drop the tree nodes in a different thread, because that's the slowest part.
-        DROPPER.schedule_drop(self.peak.take_for_drop());
+        // DROPPER.schedule_drop(self.peak.take_for_drop());
 
         let mut stack = self.drain_children_for_drop();
         while let Some(descendant) = stack.pop() {
