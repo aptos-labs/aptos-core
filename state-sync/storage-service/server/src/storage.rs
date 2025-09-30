@@ -599,10 +599,6 @@ impl StorageReader {
         let transaction_events_iterator = self
             .storage
             .get_events_iterator(start_version, num_outputs_to_fetch)?;
-        let transaction_auxiliary_data_iterator = self
-            .storage
-            .get_auxiliary_data_iterator(start_version, num_outputs_to_fetch)?
-            .chain(std::iter::repeat(Ok(TransactionAuxiliaryData::default()))); // Use default auxiliary data if not present
         let persisted_auxiliary_info_iterator = self
             .storage
             .get_persisted_auxiliary_info_iterator(start_version, num_outputs_to_fetch as usize)?;
@@ -611,7 +607,6 @@ impl StorageReader {
             transaction_info_iterator,
             transaction_write_set_iterator,
             transaction_events_iterator,
-            transaction_auxiliary_data_iterator,
             persisted_auxiliary_info_iterator,
         ));
 
@@ -636,7 +631,6 @@ impl StorageReader {
                     Ok(info),
                     Ok(write_set),
                     Ok(events),
-                    Ok(auxiliary_data),
                     Ok(persisted_auxiliary_info),
                 )) => {
                     // Create the transaction output
@@ -645,7 +639,7 @@ impl StorageReader {
                         events,
                         info.gas_used(),
                         info.status().clone().into(),
-                        auxiliary_data,
+                        TransactionAuxiliaryData::None, // Auxiliary data is no longer supported
                     );
 
                     // Calculate the number of serialized bytes for the data items
@@ -678,12 +672,11 @@ impl StorageReader {
                         break; // Cannot add any more data items
                     }
                 },
-                Some((Err(error), _, _, _, _, _))
-                | Some((_, Err(error), _, _, _, _))
-                | Some((_, _, Err(error), _, _, _))
-                | Some((_, _, _, Err(error), _, _))
-                | Some((_, _, _, _, Err(error), _))
-                | Some((_, _, _, _, _, Err(error))) => {
+                Some((Err(error), _, _, _, _))
+                | Some((_, Err(error), _, _, _))
+                | Some((_, _, Err(error), _, _))
+                | Some((_, _, _, Err(error), _))
+                | Some((_, _, _, _, Err(error))) => {
                     return Err(Error::StorageErrorEncountered(error.to_string()));
                 },
                 None => {
@@ -1327,12 +1320,6 @@ impl DbReader for TimedStorageReader {
             start_version: Version,
             limit: u64,
         ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<WriteSet>> + '_>>;
-
-        fn get_auxiliary_data_iterator(
-            &self,
-            start_version: Version,
-            limit: u64,
-        ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<TransactionAuxiliaryData>> + '_>>;
 
         fn get_transaction_accumulator_range_proof(
             &self,
