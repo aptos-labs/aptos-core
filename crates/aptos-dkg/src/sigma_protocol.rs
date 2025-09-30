@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::morphism::{FixedBaseMSM, Morphism},
+    algebra::msm::{FixedBaseMSM, Map},
     fiat_shamir, utils,
 };
 use anyhow::ensure;
@@ -88,7 +88,7 @@ impl<T> Codomain for T where T: CanonicalSerialize + Clone + std::fmt::Debug + P
 /// - Commitment from the prover
 /// - Challenge from the verifier
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum FirstStoredMessage<E: Pairing, H: Morphism>
+pub enum FirstStoredMessage<E: Pairing, H: Map>
 where
     H::Domain: Domain<E>,
     H::Codomain: Codomain,
@@ -98,7 +98,7 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Proof<E: Pairing, H: Morphism>
+pub struct Proof<E: Pairing, H: Map>
 where
     H::Domain: Domain<E>,
     H::Codomain: Codomain,
@@ -118,7 +118,7 @@ where
 ///
 /// # Returns
 /// The Fiat-Shamir challenge scalar, after appending the DST and the first message to the Fiat-Shamir transcript.
-pub fn fiat_shamir_challenge_for_sigma_protocol<E: Pairing, H: Morphism>(
+pub fn fiat_shamir_challenge_for_sigma_protocol<E: Pairing, H: Map>(
     fs_transcript: &mut merlin::Transcript,
     prover_first_message: &H::Codomain,
     dst: &'static [u8],
@@ -146,7 +146,7 @@ where
 }
 
 #[allow(non_snake_case)]
-pub fn prove_homomorphism<E: Pairing, H: Morphism, R>(
+pub fn prove_homomorphism<E: Pairing, H: Map, R>(
     homomorphism: H,
     witness: &H::Domain,
     fiat_shamir_transcript: &mut merlin::Transcript,
@@ -184,7 +184,7 @@ where
     }
 }
 
-pub fn fiat_shamir_challenge_for_msm_verifier<E: Pairing, H: Morphism>(
+pub fn fiat_shamir_challenge_for_msm_verifier<E: Pairing, H: Map>(
     fs_transcript: &mut merlin::Transcript,
     public_statement: &H::Codomain,
     prover_last_message: &H::Domain,
@@ -261,7 +261,7 @@ where
         // Scale existing scalars by the appropriate power of the verifier challenge
         let beta_power = powers_of_beta[i];
         for scalar in scalars.iter_mut() {
-            *scalar = *scalar * beta_power;
+            *scalar *= beta_power;
         }
 
         // Add scalars for the prover's commitment and challenge

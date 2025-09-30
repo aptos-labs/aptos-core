@@ -4,5 +4,5 @@
 pub mod evaluation_domain;
 pub mod fft;
 pub mod lagrange;
-pub mod morphism;
+pub mod msm;
 pub mod polynomials;

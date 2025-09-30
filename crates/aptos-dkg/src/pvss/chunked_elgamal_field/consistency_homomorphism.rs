@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::morphism::{DiagonalProductMorphism, LiftMorphism},
+    algebra::msm::{DiagonalProductMap, LiftMap},
     pcs::univariate_kzg::UnivariateKZG,
     pvss::chunked_elgamal_field::chunked_elgamal::ChunkedElGamal,
     sigma_protocol,
@@ -53,13 +53,12 @@ impl<E: Pairing> sigma_protocol::Domain<E> for ConsistencyDomain<E> {
 }
 
 #[allow(type_alias_bounds)]
-type LiftedKZG<'a, E: Pairing> = LiftMorphism<UnivariateKZG<'a, E>, ConsistencyDomain<E>>;
+type LiftedKZG<'a, E: Pairing> = LiftMap<UnivariateKZG<'a, E>, ConsistencyDomain<E>>;
 #[allow(type_alias_bounds)]
-type LiftedChunkedElGamal<'a, E: Pairing> =
-    LiftMorphism<ChunkedElGamal<'a, E>, ConsistencyDomain<E>>;
+type LiftedChunkedElGamal<'a, E: Pairing> = LiftMap<ChunkedElGamal<'a, E>, ConsistencyDomain<E>>;
 
 pub type ConsistencyHomomorphism<'a, E> =
-    DiagonalProductMorphism<LiftedKZG<'a, E>, LiftedChunkedElGamal<'a, E>>;
+    DiagonalProductMap<LiftedKZG<'a, E>, LiftedChunkedElGamal<'a, E>>;
 
 impl<'a, E: Pairing> ConsistencyHomomorphism<'a, E> {
     pub fn new(
@@ -69,7 +68,7 @@ impl<'a, E: Pairing> ConsistencyHomomorphism<'a, E> {
         ek: &'a [E::G1Affine],
     ) -> Self {
         let lifted_kzg = LiftedKZG::<E> {
-            morphism: UnivariateKZG { lagr_g1 },
+            map: UnivariateKZG { lagr_g1 },
             projection_map: |dom: &ConsistencyDomain<E>| {
                 let ConsistencyDomain(first, nested, _ignored) = dom;
                 let flattened: Vec<E::ScalarField> = nested.iter().flatten().cloned().collect();
@@ -78,7 +77,7 @@ impl<'a, E: Pairing> ConsistencyHomomorphism<'a, E> {
         };
 
         let lifted_chunked_elgamal = LiftedChunkedElGamal::<E> {
-            morphism: ChunkedElGamal { g_1, h_1, ek },
+            map: ChunkedElGamal { g_1, h_1, ek },
             projection_map: |dom: &ConsistencyDomain<E>| {
                 let ConsistencyDomain(_ignored, first, second) = dom;
                 (first.clone(), second.clone())
@@ -86,8 +85,8 @@ impl<'a, E: Pairing> ConsistencyHomomorphism<'a, E> {
         };
 
         Self {
-            morphism1: lifted_kzg,
-            morphism2: lifted_chunked_elgamal,
+            map1: lifted_kzg,
+            map2: lifted_chunked_elgamal,
         }
     }
 }

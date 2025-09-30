@@ -215,7 +215,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         values: &[Self::Input],
         r: &Self::CommitmentRandomness,
     ) -> Commitment<E> {
-        use crate::{algebra::morphism::Morphism, pcs::univariate_kzg::UnivariateKZG};
+        use crate::{algebra::msm::Map, pcs::univariate_kzg::UnivariateKZG};
 
         debug_assert!(
             pk.lagr_g1.len() > values.len(),

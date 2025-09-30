@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::morphism::{self, FixedBaseMSM},
-    pvss::chunked_elgamal_field::chunked_elgamal::morphism::Morphism,
+    algebra::msm::{self, FixedBaseMSM},
+    pvss::chunked_elgamal_field::chunked_elgamal::msm::Map,
 };
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 
@@ -21,7 +21,7 @@ type MSMInputVec<'a, E> = MatrixVectorPair<(
 )>;
 
 impl<'a, E: Pairing> ChunkedElGamal<'a, E> {
-    pub fn prep_msms(&self, input: &<Self as Morphism>::Domain) -> MSMInputVec<'a, E> {
+    pub fn prep_msms(&self, input: &<Self as Map>::Domain) -> MSMInputVec<'a, E> {
         let first_elgamal_comp = input
             .0
             .iter()
@@ -51,7 +51,7 @@ impl<'a, E: Pairing> ChunkedElGamal<'a, E> {
     }
 }
 
-impl<'a, E: Pairing> morphism::Morphism for ChunkedElGamal<'a, E> {
+impl<'a, E: Pairing> msm::Map for ChunkedElGamal<'a, E> {
     type Codomain = MatrixVectorPair<E::G1>;
     type Domain = MatrixVectorPair<E::ScalarField>;
 

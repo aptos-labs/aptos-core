@@ -3,8 +3,8 @@
 
 use aptos_dkg::{
     algebra::{
-        morphism,
-        morphism::{DiagonalProductMorphism, Morphism},
+        msm,
+        msm::{DiagonalProductMap, Map},
     },
     sigma_protocol,
     sigma_protocol::SigmaProtocol,
@@ -83,7 +83,7 @@ mod schnorr {
         pub g: E::G1Affine,
     }
 
-    impl<E: Pairing> morphism::Morphism for ExponentiateBase<E> {
+    impl<E: Pairing> msm::Map for ExponentiateBase<E> {
         type Codomain = E::G1;
         type Domain = SchnorrDomain<E>;
 
@@ -92,7 +92,7 @@ mod schnorr {
         }
     }
 
-    impl<E: Pairing> morphism::FixedBaseMSM for ExponentiateBase<E> {
+    impl<E: Pairing> msm::FixedBaseMSM for ExponentiateBase<E> {
         type Base = E::G1Affine;
         type Scalar = E::ScalarField;
 
@@ -123,7 +123,7 @@ mod chaum_pedersen {
     }
 
     impl<E: Pairing> SigmaProtocol<E> for ChaumPedersen<E> {
-        type Hom = DiagonalProductMorphism<ExponentiateBase<E>, ExponentiateBase<E>>;
+        type Hom = DiagonalProductMap<ExponentiateBase<E>, ExponentiateBase<E>>;
         type Statement = (E::G1, E::G1);
         type Witness = SchnorrDomain<E>;
 
@@ -133,10 +133,7 @@ mod chaum_pedersen {
         fn homomorphism(&self) -> Self::Hom {
             let h1 = ExponentiateBase { g: self.g1 };
             let h2 = ExponentiateBase { g: self.g2 };
-            DiagonalProductMorphism {
-                morphism1: h1,
-                morphism2: h2,
-            }
+            DiagonalProductMap { map1: h1, map2: h2 }
         }
     }
 }
