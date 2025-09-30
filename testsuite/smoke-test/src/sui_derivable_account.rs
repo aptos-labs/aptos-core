@@ -70,7 +70,7 @@ fn derive_account_address_from_public_key(public_key_bytes: Vec<u8>, scheme_flag
 
     // Convert the address bytes to a hex string with "0x" prefix
     let mut sui_account_address = b"0x".to_vec();
-    sui_account_address.extend_from_slice(&hex::encode(sui_address).as_bytes());
+    sui_account_address.extend_from_slice(hex::encode(sui_address).as_bytes());
 
     sui_account_address
 }
