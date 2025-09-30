@@ -54,7 +54,6 @@ where
 pub trait FixedBaseMSM: Morphism {
     type Scalar;
     type Base;
-    // type MSMInput = (Vec<Self::Base>, Vec<Self::Scalar>);
 
     fn msm_rows(&self, input: &Self::Domain) -> Vec<(Vec<Self::Base>, Vec<Self::Scalar>)>;
 
@@ -66,7 +65,6 @@ where
     M: FixedBaseMSM,
 {
     type Base = M::Base;
-    //    type MSMInput = M::MSMInput;
     type Scalar = M::Scalar;
 
     fn msm_rows(&self, input: &Self::Domain) -> Vec<(Vec<Self::Base>, Vec<Self::Scalar>)> {
@@ -82,15 +80,9 @@ where
 impl<M1, M2> FixedBaseMSM for DiagonalProductMorphism<M1, M2>
 where
     M1: FixedBaseMSM,
-    M2: FixedBaseMSM<
-        Domain = M1::Domain,
-        Scalar = M1::Scalar,
-        Base = M1::Base,
-        //        MSMInput = M1::MSMInput,
-    >, // MSMOutput = M1::MSMOutput
+    M2: FixedBaseMSM<Domain = M1::Domain, Scalar = M1::Scalar, Base = M1::Base>,
 {
     type Base = M1::Base;
-    //    type MSMInput = M1::MSMInput;
     type Scalar = M1::Scalar;
 
     fn msm_rows(&self, input: &Self::Domain) -> Vec<(Vec<Self::Base>, Vec<Self::Scalar>)> {
