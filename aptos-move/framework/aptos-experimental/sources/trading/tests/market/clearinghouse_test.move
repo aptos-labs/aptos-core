@@ -215,7 +215,7 @@ module aptos_experimental::clearinghouse_test {
             |account, _order_id| {
                 cleanup_bulk_order(account);
             },
-            |order_info, _price, _size| {
+            |_order_info, _price, _size| {
                 // decrease order size is not used in this test
             },
             |order_metadata| {
@@ -236,7 +236,7 @@ module aptos_experimental::clearinghouse_test {
             |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices, _order_metadata| {
                 validate_bulk_order_placement(account)
             },
-            |order_info, _price, _size| {
+            |_order_info, _price, _size| {
                 // place_maker_order is not used in this test
             },
             |order_info, _remaining_size| {
@@ -245,7 +245,7 @@ module aptos_experimental::clearinghouse_test {
             |account, _order_id| {
                 cleanup_bulk_order(account);
             },
-            |order_info, _price, _size| {
+            |_order_info, _price, _size| {
                 // decrease order size is not used in this test
             },
             |order_metadata| {

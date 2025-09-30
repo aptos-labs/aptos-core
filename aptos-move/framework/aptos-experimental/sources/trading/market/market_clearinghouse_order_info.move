@@ -52,8 +52,8 @@ module aptos_experimental::market_clearinghouse_order_info {
         &self.metadata
     }
 
-    public fun into_inner<M: copy + drop>(self: MarketClearinghouseOrderInfo<M>): (address, OrderIdType, bool, Option<String>, M) {
-        (self.account, self.order_id, self.is_bid, self.client_order_id, self.metadata)
+    public fun into_inner<M: copy + drop>(self: MarketClearinghouseOrderInfo<M>): (address, OrderIdType, bool, Option<String>, TimeInForce, M) {
+        (self.account, self.order_id, self.is_bid, self.client_order_id, self.time_in_force, self.metadata)
     }
 
 }
