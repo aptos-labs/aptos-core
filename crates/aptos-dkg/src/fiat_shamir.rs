@@ -8,8 +8,10 @@
 //! define all the things that are appended to the transcript.
 
 use crate::{
+    algebra::msm::Map,
     pvss::{traits::Transcript, ThresholdConfig},
     range_proofs::traits::BatchedRangeProof,
+    sigma_protocol,
     utils::random::random_scalar_from_uniform_bytes,
     SCALAR_NUM_BYTES,
 };
@@ -127,26 +129,17 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 }
 
 #[allow(private_bounds)]
-pub trait SigmaProtocol<E: Pairing>: ScalarProtocolBlstrs {
+pub trait SigmaProtocol<E: Pairing, H: Map>: ScalarProtocol<E> {
     fn append_sigma_protocol_sep(&mut self, dst: &'static [u8]);
 
     /// Append the claim of a sigma protocol.
-    fn append_sigma_protocol_public_statement<A: CanonicalSerialize>(
-        &mut self,
-        public_statement: &A,
-    ); // TODO: Remove A here and make it generic over ...
+    fn append_sigma_protocol_public_statement(&mut self, public_statement: &H::Codomain);
 
     /// Append the first message (the commitment) in a sigma protocol.
-    fn append_sigma_protocol_first_prover_message<A: CanonicalSerialize>(
-        &mut self,
-        prover_first_message: &A,
-    ); // TODO: Remove A here and make it generic over sigma_proof::Homomorphism, etc?
+    fn append_sigma_protocol_first_prover_message(&mut self, prover_first_message: &H::Codomain);
 
     /// Append the last message (the masked witness) in a sigma protocol.
-    fn append_sigma_protocol_last_message<A: CanonicalSerialize>(
-        &mut self,
-        prover_last_message: &A,
-    ); // TODO: Remove A here and make it generic over ...
+    fn append_sigma_protocol_last_message(&mut self, prover_last_message: &H::Domain);
 
     // Returns a single scalar `r` for use in a Sigma protocol
     fn challenge_for_sigma_protocol(&mut self) -> E::ScalarField;
@@ -272,15 +265,16 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
     }
 }
 
-impl<E: Pairing> SigmaProtocol<E> for merlin::Transcript {
+impl<E: Pairing, H: Map> SigmaProtocol<E, H> for merlin::Transcript
+where
+    H::Domain: sigma_protocol::Domain<E>,
+    H::Codomain: sigma_protocol::Codomain,
+{
     fn append_sigma_protocol_sep(&mut self, dst: &'static [u8]) {
         self.append_message(b"dom-sep", dst);
     }
 
-    fn append_sigma_protocol_public_statement<A: CanonicalSerialize>(
-        &mut self,
-        public_statement: &A,
-    ) {
+    fn append_sigma_protocol_public_statement(&mut self, public_statement: &H::Codomain) {
         let mut public_statement_bytes = Vec::new();
         public_statement
             .serialize_compressed(&mut public_statement_bytes)
@@ -288,10 +282,7 @@ impl<E: Pairing> SigmaProtocol<E> for merlin::Transcript {
         self.append_message(b"sigma-protocol-claim", public_statement_bytes.as_slice());
     }
 
-    fn append_sigma_protocol_first_prover_message<A: CanonicalSerialize>(
-        &mut self,
-        prover_first_message: &A,
-    ) {
+    fn append_sigma_protocol_first_prover_message(&mut self, prover_first_message: &H::Codomain) {
         let mut prover_first_message_bytes = Vec::new();
         prover_first_message
             .serialize_compressed(&mut prover_first_message_bytes)
@@ -302,10 +293,7 @@ impl<E: Pairing> SigmaProtocol<E> for merlin::Transcript {
         );
     }
 
-    fn append_sigma_protocol_last_message<A: CanonicalSerialize>(
-        &mut self,
-        prover_last_message: &A,
-    ) {
+    fn append_sigma_protocol_last_message(&mut self, prover_last_message: &H::Domain) {
         let mut prover_last_message_bytes = Vec::new();
         prover_last_message
             .serialize_compressed(&mut prover_last_message_bytes)

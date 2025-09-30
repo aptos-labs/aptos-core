@@ -128,19 +128,19 @@ where
     H::Codomain: Codomain,
 {
     // Append the sigma protocol separator to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E>>::append_sigma_protocol_sep(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_sep(
         fs_transcript,
         dst,
     );
 
     // Add the first prover message (the commitment) to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E>>::append_sigma_protocol_first_prover_message(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_first_prover_message(
         fs_transcript,
         prover_first_message,
     );
 
     // Generate the Fiat-Shamir challenge from the updated transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E>>::challenge_for_sigma_protocol(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::challenge_for_sigma_protocol(
         fs_transcript,
     )
 }
@@ -195,24 +195,24 @@ where
     H::Codomain: Codomain,
 {
     // Append the sigma protocol separator to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E>>::append_sigma_protocol_sep(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_sep(
         fs_transcript,
         dst,
     );
 
     // Add the last prover message (the prover's response) to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E>>::append_sigma_protocol_last_message(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_last_message(
         fs_transcript,
         prover_last_message,
     );
 
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E>>::append_sigma_protocol_public_statement(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_public_statement(
         fs_transcript,
         public_statement,
     );
 
     // Generate the Fiat-Shamir challenge from the updated transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E>>::challenge_for_sigma_protocol(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::challenge_for_sigma_protocol(
         fs_transcript,
     )
 }
