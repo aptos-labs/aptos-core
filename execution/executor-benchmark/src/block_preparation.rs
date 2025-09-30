@@ -69,6 +69,7 @@ impl BlockPreparationStage {
             txns.len()
         );
         let block_id = HashValue::random();
+
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             self.sig_verify_pool.install(|| {
                 let _timer = TIMER.timer_with(&["sig_verify"]);
