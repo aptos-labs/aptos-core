@@ -18,7 +18,7 @@
 /// - OKX
 module aptos_framework::solana_derivable_account {
     use aptos_framework::auth_data::AbstractionAuthData;
-    use aptos_framework::common_account_abstractions_utils::{construct_message, entry_function_name};
+    use aptos_framework::common_account_abstractions_utils::{construct_message, daa_authenticate};
     use aptos_std::ed25519::{
         Self,
         new_signature_from_bytes,
@@ -27,14 +27,11 @@ module aptos_framework::solana_derivable_account {
     };
     use std::bcs_stream::{Self, deserialize_u8};
     use std::string_utils;
-    use std::transaction_context;
 
     /// Signature failed to verify.
     const EINVALID_SIGNATURE: u64 = 1;
     /// Non base58 character found in public key.
     const EINVALID_BASE_58_PUBLIC_KEY: u64 = 2;
-    /// Entry function payload is missing.
-    const EMISSING_ENTRY_FUNCTION_PAYLOAD: u64 = 3;
     /// Invalid signature type.
     const EINVALID_SIGNATURE_TYPE: u64 = 4;
     /// Invalid public key.
@@ -169,15 +166,7 @@ module aptos_framework::solana_derivable_account {
 
     /// Authorization function for domain account abstraction.
     public fun authenticate(account: signer, aa_auth_data: AbstractionAuthData): signer {
-        let maybe_entry_function_payload = transaction_context::entry_function_payload();
-        if (maybe_entry_function_payload.is_some()) {
-            let entry_function_payload = maybe_entry_function_payload.destroy_some();
-            let entry_function_name = entry_function_name(&entry_function_payload);
-            authenticate_auth_data(aa_auth_data, &entry_function_name);
-            account
-        } else {
-            abort(EMISSING_ENTRY_FUNCTION_PAYLOAD)
-        }
+        daa_authenticate(account, aa_auth_data, |auth_data, entry_name| authenticate_auth_data(auth_data, entry_name))
     }
 
     #[test_only]

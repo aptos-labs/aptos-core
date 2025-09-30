@@ -19,12 +19,11 @@
 module aptos_framework::sui_derivable_account {
 
     use aptos_framework::auth_data::AbstractionAuthData;
-    use aptos_framework::common_account_abstractions_utils::{construct_message, entry_function_name};
+    use aptos_framework::common_account_abstractions_utils::{construct_message, daa_authenticate};
     use aptos_std::ed25519::{ Self, new_signature_from_bytes, new_validated_public_key_from_bytes, public_key_into_unvalidated };
     use std::bcs_stream::{ Self, deserialize_u8 };
     use std::bcs;
     use std::string_utils;
-    use std::transaction_context;
     use std::vector;
     use aptos_std::aptos_hash;
 
@@ -185,7 +184,7 @@ module aptos_framework::sui_derivable_account {
         pragma verify = false;
     }
 
-    fun authenticate_auth_data(
+    public fun authenticate_auth_data(
         aa_auth_data: AbstractionAuthData,
         entry_function_name: &vector<u8>
     ) {
@@ -246,15 +245,7 @@ module aptos_framework::sui_derivable_account {
 
     /// Authorization function for domain account abstraction.
     public fun authenticate(account: signer, aa_auth_data: AbstractionAuthData): signer {
-        let maybe_entry_function_payload = transaction_context::entry_function_payload();
-        if (maybe_entry_function_payload.is_some()) {
-            let entry_function_payload = maybe_entry_function_payload.destroy_some();
-            let entry_function_name = entry_function_name(&entry_function_payload);
-            authenticate_auth_data(aa_auth_data, &entry_function_name);
-            account
-        } else {
-            abort(EMISSING_ENTRY_FUNCTION_PAYLOAD)
-        }
+        daa_authenticate(account, aa_auth_data, |auth_data, entry_name| authenticate_auth_data(auth_data, entry_name))
     }
 
     #[test_only]

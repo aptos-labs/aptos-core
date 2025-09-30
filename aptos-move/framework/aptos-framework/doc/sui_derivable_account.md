@@ -407,6 +407,16 @@ Invalid public key.
 
 
 
+<a id="0x1_sui_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD"></a>
+
+Entry function payload is missing.
+
+
+<pre><code><b>const</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>: u64 = 1;
+</code></pre>
+
+
+
 <a id="0x1_sui_derivable_account_EINVALID_SIGNATURE"></a>
 
 Invalid signature.
@@ -423,16 +433,6 @@ Invalid signature type.
 
 
 <pre><code><b>const</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>: u64 = 2;
-</code></pre>
-
-
-
-<a id="0x1_sui_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD"></a>
-
-Entry function payload is missing.
-
-
-<pre><code><b>const</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>: u64 = 1;
 </code></pre>
 
 
@@ -653,7 +653,7 @@ Derives the account address from the public key and returns it is a hex string w
 
 
 
-<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -662,7 +662,7 @@ Derives the account address from the public key and returns it is a hex string w
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(
+<pre><code><b>public</b> <b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(
     aa_auth_data: AbstractionAuthData,
     entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 ) {
@@ -738,15 +738,7 @@ Authorization function for domain account abstraction.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate">authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aa_auth_data: AbstractionAuthData): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
-    <b>let</b> maybe_entry_function_payload = <a href="transaction_context.md#0x1_transaction_context_entry_function_payload">transaction_context::entry_function_payload</a>();
-    <b>if</b> (maybe_entry_function_payload.is_some()) {
-        <b>let</b> entry_function_payload = maybe_entry_function_payload.destroy_some();
-        <b>let</b> entry_function_name = entry_function_name(&entry_function_payload);
-        <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data, &entry_function_name);
-        <a href="account.md#0x1_account">account</a>
-    } <b>else</b> {
-        <b>abort</b>(<a href="sui_derivable_account.md#0x1_sui_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>)
-    }
+    daa_authenticate(<a href="account.md#0x1_account">account</a>, aa_auth_data, |<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name| <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name))
 }
 </code></pre>
 
@@ -764,7 +756,7 @@ Authorization function for domain account abstraction.
 ### Function `authenticate_auth_data`
 
 
-<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 

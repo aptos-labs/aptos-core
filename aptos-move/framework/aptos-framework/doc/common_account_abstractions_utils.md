@@ -5,9 +5,11 @@
 
 
 
+-  [Constants](#@Constants_0)
 -  [Function `network_name`](#0x1_common_account_abstractions_utils_network_name)
 -  [Function `entry_function_name`](#0x1_common_account_abstractions_utils_entry_function_name)
 -  [Function `construct_message`](#0x1_common_account_abstractions_utils_construct_message)
+-  [Function `daa_authenticate`](#0x1_common_account_abstractions_utils_daa_authenticate)
 
 
 <pre><code><b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
@@ -15,6 +17,21 @@
 <b>use</b> <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils">0x1::string_utils</a>;
 <b>use</b> <a href="transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
+</code></pre>
+
+
+
+<a id="@Constants_0"></a>
+
+## Constants
+
+
+<a id="0x1_common_account_abstractions_utils_EMISSING_ENTRY_FUNCTION_PAYLOAD"></a>
+
+Entry function payload is missing.
+
+
+<pre><code><b>const</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>: u64 = 1;
 </code></pre>
 
 
@@ -135,6 +152,44 @@
     message.append(b"\n\nNonce: ");
     message.append(*digest_utf8);
     *message
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_common_account_abstractions_utils_daa_authenticate"></a>
+
+## Function `daa_authenticate`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_daa_authenticate">daa_authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aa_auth_data: <a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, auth_fn: |<a href="auth_data.md#0x1_auth_data_AbstractionAuthData">auth_data::AbstractionAuthData</a>, &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;|): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) inline <b>fun</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_daa_authenticate">daa_authenticate</a>(
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    aa_auth_data: AbstractionAuthData,
+    auth_fn: |AbstractionAuthData, &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;|,
+): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
+    <b>let</b> maybe_entry_function_payload = <a href="transaction_context.md#0x1_transaction_context_entry_function_payload">transaction_context::entry_function_payload</a>();
+    <b>if</b> (maybe_entry_function_payload.is_some()) {
+        <b>let</b> entry_function_payload = maybe_entry_function_payload.destroy_some();
+        <b>let</b> entry_function_name = <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_entry_function_name">entry_function_name</a>(&entry_function_payload);
+
+        // call the passed-in function value
+        auth_fn(aa_auth_data, &entry_function_name);
+        <a href="account.md#0x1_account">account</a>
+    } <b>else</b> {
+        <b>abort</b>(<a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>)
+    }
 }
 </code></pre>
 

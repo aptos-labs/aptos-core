@@ -173,6 +173,16 @@ Issued At: <issued_at>
 ## Constants
 
 
+<a id="0x1_ethereum_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD"></a>
+
+Entry function payload is missing.
+
+
+<pre><code><b>const</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>: u64 = 2;
+</code></pre>
+
+
+
 <a id="0x1_ethereum_derivable_account_EADDR_MISMATCH"></a>
 
 Address mismatch.
@@ -199,16 +209,6 @@ Invalid signature type.
 
 
 <pre><code><b>const</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>: u64 = 3;
-</code></pre>
-
-
-
-<a id="0x1_ethereum_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD"></a>
-
-Entry function payload is missing.
-
-
-<pre><code><b>const</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>: u64 = 2;
 </code></pre>
 
 
@@ -471,15 +471,7 @@ Authorization function for domain account abstraction.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_authenticate">authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aa_auth_data: AbstractionAuthData): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
-    <b>let</b> maybe_entry_function_payload = <a href="transaction_context.md#0x1_transaction_context_entry_function_payload">transaction_context::entry_function_payload</a>();
-    <b>if</b> (maybe_entry_function_payload.is_some()) {
-        <b>let</b> entry_function_payload = maybe_entry_function_payload.destroy_some();
-        <b>let</b> entry_function_name = entry_function_name(&entry_function_payload);
-        <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data, &entry_function_name);
-        <a href="account.md#0x1_account">account</a>
-    } <b>else</b> {
-        <b>abort</b>(<a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>)
-    }
+    daa_authenticate(<a href="account.md#0x1_account">account</a>, aa_auth_data, |<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name| <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name))
 }
 </code></pre>
 
