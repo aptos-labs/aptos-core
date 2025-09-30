@@ -100,6 +100,7 @@ module aptos_experimental::market_bulk_order_tests {
             false,
             option::none(),
             new_test_order_metadata(1),
+            true,
             &test_market_callbacks()
         );
 

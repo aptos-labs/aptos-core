@@ -51,7 +51,8 @@ use move_vm_types::{
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::Value,
 };
-use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
+use std::{borrow::Borrow, collections::BTreeMap};
+use triomphe::Arc as TriompheArc;
 
 pub mod respawned_session;
 pub mod session_id;
@@ -66,7 +67,7 @@ pub(crate) enum ResourceGroupChangeSet {
 }
 type AccountChangeSet = AccountChanges<BytesWithResourceLayout>;
 type ChangeSet = Changes<BytesWithResourceLayout>;
-pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
+pub type BytesWithResourceLayout = (Bytes, Option<TriompheArc<MoveTypeLayout>>);
 
 pub struct SessionExt<'r, R> {
     data_cache: TransactionDataCache,
@@ -197,7 +198,7 @@ where
                     .with_delayed_fields_serde()
                     .with_func_args_deserialization(&function_extension)
                     .serialize(&value, &layout)?
-                    .map(|bytes| (bytes.into(), Some(Arc::new(layout))))
+                    .map(|bytes| (bytes.into(), Some(TriompheArc::new(layout))))
             } else {
                 // Otherwise, there should be no native values so ensure
                 // serialization fails here if there are any.

@@ -3,17 +3,17 @@
 //# publish
 module 0xc0ffee::m {
     public fun test1(p0: u64, p1: u64, p2: u64): u64 {
-        let _t3 = 0;
-        while (_t3 < p0) {
+        let _v0 = 0;
+        while (_v0 < p0) {
             p1 = p2;
             p2 = p1;
-            _t3 = _t3 + 1
+            _v0 = _v0 + 1
         };
         p1
     }
     public fun test2(p0: u64, p1: u64): u64 {
-        let _t2 = 0;
-        while (_t2 < p0) _t2 = _t2 + 1;
+        let _v0 = 0;
+        while (_v0 < p0) _v0 = _v0 + 1;
         p1
     }
 }

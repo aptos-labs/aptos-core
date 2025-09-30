@@ -520,8 +520,11 @@ pub enum SingleRunMode {
     },
 }
 
-// Optional more detailed configuration.
+/// Optional more detailed configuration.
 pub struct SingleRunAdditionalConfigs {
+    /// If num_generator_workers=1 then order in which transactions are generated
+    /// is kept in the block, otherwise transactions from different workers are
+    /// stitched together in arbitrary order
     pub num_generator_workers: usize,
     pub split_stages: bool,
 }
@@ -530,12 +533,14 @@ pub fn run_single_with_default_params(
     transaction_type: TransactionType,
     test_folder: impl AsRef<Path>,
     concurrency_level: usize,
+    use_blockstm_v2: bool,
     mode: SingleRunMode,
 ) -> SingleRunResults {
     aptos_logger::Logger::new().init();
 
     AptosVM::set_num_shards_once(1);
     AptosVM::set_concurrency_level_once(concurrency_level);
+    AptosVM::set_blockstm_v2_enabled_once(use_blockstm_v2);
     AptosVM::set_processed_transactions_detailed_counters();
 
     rayon::ThreadPoolBuilder::new()
@@ -575,8 +580,8 @@ pub fn run_single_with_default_params(
         },
     };
     let num_generator_workers = match mode {
-        SingleRunMode::TEST
-        | SingleRunMode::BENCHMARK {
+        SingleRunMode::TEST => 1,
+        SingleRunMode::BENCHMARK {
             additional_configs: None,
             ..
         } => 4,

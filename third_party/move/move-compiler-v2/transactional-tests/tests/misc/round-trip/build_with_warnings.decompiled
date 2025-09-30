@@ -3,7 +3,7 @@
 //# publish --print-bytecode
 module 0x42::m {
     public fun bar() {
-        if (!(foo(3) == 2)) abort 1;
+        assert!(foo(3) == 2, 1);
     }
     public fun foo(p0: u64): u64 {
         2

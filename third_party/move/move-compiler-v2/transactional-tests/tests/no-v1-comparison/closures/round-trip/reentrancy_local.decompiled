@@ -6,24 +6,24 @@ module 0x42::tests {
         _0: u64,
     }
     public fun init(p0: &signer) {
-        let _t3 = R{_0: 0};
-        move_to<R>(p0, _t3);
+        let _v0 = R{_0: 0};
+        move_to<R>(p0, _v0);
     }
     public fun local_access_via_lambda_fails(): bool
         acquires R
     {
-        let _t2: || has copy + drop = || lambda__1__local_access_via_lambda_fails();
-        let _t0 = borrow_global_mut<R>(@0x42);
-        _t2();
-        let _t1 = &mut _t0._0;
-        *_t1 = *_t1 + 1;
+        let _v0: || has copy + drop = || lambda__1__local_access_via_lambda_fails();
+        let _v1 = borrow_global_mut<R>(@0x42);
+        _v0();
+        let _v2 = &mut _v1._0;
+        *_v2 = *_v2 + 1;
         false
     }
     fun lambda__1__local_access_via_lambda_fails()
         acquires R
     {
-        let _t0 = &mut borrow_global_mut<R>(@0x42)._0;
-        *_t0 = *_t0 + 1;
+        let _v0 = &mut borrow_global_mut<R>(@0x42)._0;
+        *_v0 = *_v0 + 1;
     }
 }
 

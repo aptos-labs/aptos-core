@@ -9,7 +9,7 @@ module 0xc0ffee::m {
         10
     }
     public fun test(): u64 {
-        let _t0 = four();
+        let _v0 = four();
         ten()
     }
 }

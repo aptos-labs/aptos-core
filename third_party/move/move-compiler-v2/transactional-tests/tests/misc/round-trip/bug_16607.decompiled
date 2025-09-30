@@ -11,13 +11,13 @@ module 0xcafe::Module0 {
         x: Enum0,
     }
     fun f(p0: S) {
-        let _t1: || has copy + drop = || lambda__1__f();
-        let _t2: || has copy + drop = || lambda__2__f();
-        let _t3 = *&(&p0).x;
-        if (!(&_t3 is E1)) abort 14566554180833181697;
-        let Enum0::E1{_0: _t13} = _t3;
-        let _t4 = &mut _t1;
-        *_t4 = _t2;
+        let _v0: || has copy + drop = || lambda__1__f();
+        let _v1: || has copy + drop = || lambda__2__f();
+        let _v2 = *&(&p0).x;
+        assert!(&_v2 is E1, 14566554180833181697);
+        let Enum0::E1{_0: _v3} = _v2;
+        let _v4 = &mut _v0;
+        *_v4 = _v1;
     }
     fun lambda__1__f() {
         ()

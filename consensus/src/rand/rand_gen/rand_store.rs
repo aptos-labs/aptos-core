@@ -250,6 +250,14 @@ impl<S: TShare> RandStore<S> {
         self.highest_known_round = std::cmp::max(self.highest_known_round, round);
     }
 
+    pub fn reset(&mut self, round: u64) {
+        self.update_highest_known_round(round);
+        // remove future rounds items in case they're already decided
+        // otherwise if the block re-enters the queue, it'll be stuck
+        let _ = self.rand_map.split_off(&round);
+        let _ = self.fast_rand_map.as_mut().map(|map| map.split_off(&round));
+    }
+
     pub fn add_rand_metadata(&mut self, rand_metadata: FullRandMetadata) {
         let rand_item = self
             .rand_map

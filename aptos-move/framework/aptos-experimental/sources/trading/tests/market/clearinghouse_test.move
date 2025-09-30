@@ -154,17 +154,20 @@ module aptos_experimental::clearinghouse_test {
         open_orders.remove(order_id);
     }
 
-    public(package) fun cleanup_bulk_order(account: address, is_bid: bool) acquires GlobalState {
-        let open_orders = if (is_bid) {
-             &mut borrow_global_mut<GlobalState>(@0x1).bulk_open_bids
-          } else {
-                &mut borrow_global_mut<GlobalState>(@0x1).bulk_open_asks
+    public(package) fun cleanup_bulk_order(account: address) acquires GlobalState {
+        let global_state = borrow_global_mut<GlobalState>(@0x1);
+        let bulk_open_bids = &mut global_state.bulk_open_bids;
+        let bulk_open_asks = &mut global_state.bulk_open_asks;
+        if (!bulk_open_bids.contains(account)
+            && !bulk_open_asks.contains(account)) {
+            abort error::invalid_argument(E_ORDER_NOT_FOUND);
         };
-        assert!(
-            open_orders.contains(account),
-            error::invalid_argument(E_ORDER_NOT_FOUND)
-        );
-        open_orders.remove(account);
+        if (bulk_open_asks.contains(account)) {
+            bulk_open_asks.remove(account);
+        };
+        if (bulk_open_bids.contains(account)) {
+            bulk_open_bids.remove(account);
+        }
     }
 
     public(package) fun order_exists(order_id: OrderIdType): bool acquires GlobalState {
@@ -208,8 +211,8 @@ module aptos_experimental::clearinghouse_test {
             |_account, _order_id, _is_bid, _remaining_size, _order_metadata| {
                 cleanup_order(_order_id);
             },
-            |account, is_bid, _remaining_size| {
-                cleanup_bulk_order(account, is_bid);
+            |account, _order_id| {
+                cleanup_bulk_order(account);
             },
             |_account, _order_id, _is_bid, _price, _size| {
                 // decrease order size is not used in this test
@@ -239,8 +242,8 @@ module aptos_experimental::clearinghouse_test {
             |_account, _order_id, _is_bid, _remaining_size, _order_metadata| {
                 cleanup_order(_order_id);
             },
-            |account, is_bid, _remaining_size| {
-                cleanup_bulk_order(account, is_bid);
+            |account, _order_id| {
+                cleanup_bulk_order(account);
             },
             |_account, _order_id, _is_bid, _price, _size| {
                 // decrease order size is not used in this test

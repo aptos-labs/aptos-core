@@ -2,42 +2,132 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    error::PepperServiceError,
     external_resources::{
         groth16_vk::OnChainGroth16VerificationKey, keyless_config::OnChainKeylessConfiguration,
     },
     metrics, utils,
 };
 use aptos_infallible::RwLock;
-use aptos_logger::{info, prelude::SampleRate, sample, warn};
+use aptos_logger::{info, warn};
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};
 use tokio::time::Instant;
 
-// Cached resource constants
+// TODO: at some point, we should try to merge the JWK and resource fetcher code
+
+// Environment variable names for the resource URLs
 const ENV_ONCHAIN_KEYLESS_CONFIG_URL: &str = "ONCHAIN_KEYLESS_CONFIG_URL";
 const ENV_ONCHAIN_GROTH16_VK_URL: &str = "ONCHAIN_GROTH16_VK_URL";
+
+// Resource names for metrics and logging
 const ONCHAIN_KEYLESS_CONFIG_RESOURCE_NAME: &str = "onchain_keyless_configuration";
 const ONCHAIN_GROTH16_VK_RESOURCE_NAME: &str = "onchain_groth16_verification_key";
-const RESOURCE_FETCH_INTERVAL_SECS: u64 = 10;
-const RESOURCE_FETCH_LOG_INTERVAL_SECS: u64 = 60;
+
+// The interval (in seconds) at which to refresh the resources
+pub const RESOURCE_FETCH_INTERVAL_SECS: u64 = 10;
+
+// The frequency at which to log the resource fetch status (per loop iteration)
+const RESOURCE_REFRESH_LOOP_LOG_FREQUENCY: u64 = 6; // e.g., 6 * 10s (per loop) = 60s per log
+
+/// A common interface for fetching external resources (this is especially useful for logging and testing)
+#[async_trait::async_trait]
+pub trait ExternalResourceInterface<T: DeserializeOwned + Send + Sync + 'static> {
+    /// Returns the name of the resource
+    fn resource_name(&self) -> String;
+
+    /// Returns the URL of the resource
+    fn resource_url(&self) -> String;
+
+    /// Fetches the resource from the URL and parses it into the expected type
+    async fn fetch_resource(&self) -> Result<T, PepperServiceError>;
+}
+
+/// An external resource (e.g., on-chain keyless config or Groth16 VK)
+struct ExternalResource {
+    name: String,
+    url: String,
+}
+
+impl ExternalResource {
+    pub fn new(name: String, url: String) -> ExternalResource {
+        ExternalResource { name, url }
+    }
+}
+
+#[async_trait::async_trait]
+impl<T: DeserializeOwned + Send + Sync + 'static> ExternalResourceInterface<T>
+    for ExternalResource
+{
+    fn resource_name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn resource_url(&self) -> String {
+        self.url.clone()
+    }
+
+    async fn fetch_resource(&self) -> Result<T, PepperServiceError> {
+        // Fetch the resource from the URL
+        let url = self.url.clone();
+        let client = utils::create_request_client();
+        let fetch_result = client.get(url.clone()).send().await;
+
+        // Parse the response into the expected resource type
+        let resource_name = self.name.clone();
+        match fetch_result {
+            Ok(response) => match response.json::<T>().await {
+                Ok(resource) => Ok(resource),
+                Err(error) => Err(PepperServiceError::InternalError(format!(
+                    "Failed to parse resource: {}, from {}! Error: {}",
+                    resource_name, url, error
+                ))),
+            },
+            Err(error) => Err(PepperServiceError::InternalError(format!(
+                "Failed to fetch resource: {}, from {}! Error: {}",
+                resource_name, url, error
+            ))),
+        }
+    }
+}
 
 /// A struct that holds the cached resources and their refresh logic
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct CachedResources {
     on_chain_keyless_configuration: Arc<RwLock<Option<OnChainKeylessConfiguration>>>,
     groth16_vk: Arc<RwLock<Option<OnChainGroth16VerificationKey>>>,
+    time_service: TimeService,
 }
 
 impl CachedResources {
+    pub fn new(time_service: TimeService) -> Self {
+        Self {
+            on_chain_keyless_configuration: Arc::new(RwLock::new(None)),
+            groth16_vk: Arc::new(RwLock::new(None)),
+            time_service,
+        }
+    }
+
+    /// Creates a new CachedResources instance with a mock time service (for testing)
+    #[cfg(test)]
+    pub fn new_for_testing() -> Self {
+        Self::new(TimeService::mock())
+    }
+
     /// Starts the refresh loops for the cached resources
     pub fn start_resource_fetcher(&self) {
         // Start the keyless config fetcher
         match utils::read_environment_variable(ENV_ONCHAIN_KEYLESS_CONFIG_URL) {
             Ok(url) => {
-                start_external_resource_refresh_loop(
+                let external_resource = Arc::new(ExternalResource::new(
                     ONCHAIN_KEYLESS_CONFIG_RESOURCE_NAME.into(),
-                    url,
+                    url.clone(),
+                ));
+                start_external_resource_refresh_loop(
+                    external_resource,
                     self.on_chain_keyless_configuration.clone(),
+                    self.time_service.clone(),
                 );
             },
             Err(error) => {
@@ -51,10 +141,14 @@ impl CachedResources {
         // Start the Groth16 VK fetcher
         match utils::read_environment_variable(ENV_ONCHAIN_GROTH16_VK_URL) {
             Ok(url) => {
-                start_external_resource_refresh_loop(
+                let external_resource = Arc::new(ExternalResource::new(
                     ONCHAIN_GROTH16_VK_RESOURCE_NAME.into(),
-                    url,
+                    url.clone(),
+                ));
+                start_external_resource_refresh_loop(
+                    external_resource,
                     self.groth16_vk.clone(),
+                    self.time_service.clone(),
                 );
             },
             Err(error) => {
@@ -64,6 +158,20 @@ impl CachedResources {
                 );
             },
         }
+    }
+
+    /// Returns the Groth16 verification key cache entry (for testing purposes)
+    #[cfg(test)]
+    pub fn get_groth16_vk_cache_entry(&self) -> Arc<RwLock<Option<OnChainGroth16VerificationKey>>> {
+        self.groth16_vk.clone()
+    }
+
+    /// Returns the keyless configuration cache entry (for testing purposes)
+    #[cfg(test)]
+    pub fn get_keyless_configuration_cache_entry(
+        &self,
+    ) -> Arc<RwLock<Option<OnChainKeylessConfiguration>>> {
+        self.on_chain_keyless_configuration.clone()
     }
 
     /// Reads the cached on-chain Groth16 verification key
@@ -95,29 +203,35 @@ impl CachedResources {
 }
 
 /// Starts a background task that periodically fetches and caches the resource from the given URL
-fn start_external_resource_refresh_loop<T: DeserializeOwned + Send + Sync + 'static>(
-    resource_name: String,
-    resource_url: String,
+pub fn start_external_resource_refresh_loop<T: DeserializeOwned + Send + Sync + 'static>(
+    external_resource: Arc<dyn ExternalResourceInterface<T> + Send + Sync>,
     local_cache: Arc<RwLock<Option<T>>>,
+    time_service: TimeService,
 ) {
+    // Log the start of the task for the resource fetcher
+    let resource_name = external_resource.resource_name();
+    let resource_url = external_resource.resource_url();
     info!(
-        "Starting the cached resource refresh loop for {}!",
-        resource_url
+        "Starting the cached resource refresh loop for {} at {}!",
+        resource_name, resource_url
     );
-
-    // Create the request client
-    let client = utils::create_request_client();
 
     // Start the resource fetcher loop
     tokio::spawn(async move {
+        let mut loop_iteration_counter: u64 = 0;
+
         loop {
             // Sleep until the next refresh
             let refresh_interval = Duration::from_secs(RESOURCE_FETCH_INTERVAL_SECS);
-            tokio::time::sleep(refresh_interval).await;
+            time_service.sleep(refresh_interval).await;
+
+            // Increment the loop iteration counter
+            loop_iteration_counter = loop_iteration_counter.wrapping_add(1);
 
             // Fetch the resource from the URL
             let time_now = Instant::now();
-            let fetch_result = client.get(resource_url.clone()).send().await;
+            let fetch_result: Result<T, PepperServiceError> =
+                external_resource.fetch_resource().await;
             let fetch_time = time_now.elapsed();
 
             // Update the fetch metrics
@@ -129,27 +243,14 @@ fn start_external_resource_refresh_loop<T: DeserializeOwned + Send + Sync + 'sta
 
             // Process the fetch result
             match fetch_result {
-                Ok(response) => {
+                Ok(resource) => {
                     // Log the successful fetch
-                    sample!(
-                        SampleRate::Duration(Duration::from_secs(RESOURCE_FETCH_LOG_INTERVAL_SECS)),
+                    if loop_iteration_counter % RESOURCE_REFRESH_LOOP_LOG_FREQUENCY == 0 {
                         info!(
                             "Successfully fetched resource {} from {} in {:?}",
                             resource_name, resource_url, fetch_time
                         )
-                    );
-
-                    // Parse the response into the expected resource
-                    let resource = match response.json::<T>().await {
-                        Ok(resource) => resource,
-                        Err(error) => {
-                            warn!(
-                                "Failed to parse resource from {}! Error: {}",
-                                resource_url, error
-                            );
-                            continue; // Retry in the next loop
-                        },
-                    };
+                    }
 
                     // Update the cache
                     let mut cache = local_cache.write();
@@ -162,7 +263,7 @@ fn start_external_resource_refresh_loop<T: DeserializeOwned + Send + Sync + 'sta
                     );
                     continue; // Retry in the next loop
                 },
-            }
+            };
         }
     });
 }
@@ -170,8 +271,7 @@ fn start_external_resource_refresh_loop<T: DeserializeOwned + Send + Sync + 'sta
 /// Creates and starts the cached resource fetcher, and
 /// returns a handle to the cached resources.
 pub fn start_cached_resource_fetcher() -> CachedResources {
-    // Create and start the fetcher
-    let cached_resources = CachedResources::default();
+    let cached_resources = CachedResources::new(TimeService::real());
     cached_resources.start_resource_fetcher();
     cached_resources
 }

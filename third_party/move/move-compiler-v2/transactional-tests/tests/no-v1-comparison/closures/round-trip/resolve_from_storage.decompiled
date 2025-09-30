@@ -6,8 +6,8 @@ module 0x66::test {
         f: ||(u64) has copy + store,
     }
     public fun init(p0: &signer) {
-        let _t6 = Func{f: || identity<u64>(23)};
-        move_to<Func>(p0, _t6);
+        let _v0 = Func{f: || identity<u64>(23)};
+        move_to<Func>(p0, _v0);
     }
     public fun identity<T0>(p0: T0): T0 {
         p0
@@ -15,8 +15,8 @@ module 0x66::test {
     public fun call(p0: address)
         acquires Func
     {
-        let _t4 = *&borrow_global<Func>(p0).f;
-        if (!(_t4() == 23)) abort 777;
+        let _v0 = *&borrow_global<Func>(p0).f;
+        assert!(_v0() == 23, 777);
     }
 }
 

@@ -3,7 +3,7 @@
 //# publish
 module 0xc0ffee::m {
     public fun main() {
-        if (!(sequential(50) == 50)) abort 0;
+        assert!(sequential(50) == 50, 0);
     }
     fun sequential(p0: u64): u64 {
         p0

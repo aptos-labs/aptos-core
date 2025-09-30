@@ -3,21 +3,21 @@
 //# publish
 module 0xc0ffee::m {
     public fun main() {
-        if (!(test2(5) == 5)) abort 0;
-        if (!(test3() == 1)) abort 1;
-        if (!(test4(55) == 55)) abort 2;
+        assert!(test2(5) == 5, 0);
+        assert!(test3() == 1, 1);
+        assert!(test4(55) == 55, 2);
     }
     public fun test2(p0: u64): u64 {
         p0
     }
     public fun test3(): u64 {
-        let _t0 = 0;
-        while (_t0 < 42) _t0 = _t0 + 1;
+        let _v0 = 0;
+        while (_v0 < 42) _v0 = _v0 + 1;
         1
     }
     public fun test4(p0: u64): u64 {
-        let _t1 = 0;
-        while (_t1 < 42) _t1 = _t1 + 1;
+        let _v0 = 0;
+        while (_v0 < 42) _v0 = _v0 + 1;
         p0
     }
     public fun test1(p0: u64) {

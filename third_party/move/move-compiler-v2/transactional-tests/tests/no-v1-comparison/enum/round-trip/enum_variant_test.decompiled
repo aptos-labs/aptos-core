@@ -13,22 +13,22 @@ module 0x42::m {
         V3,
     }
     fun test_v1(): bool {
-        let _t0 = Data::V1{x: 43};
-        &_t0 is V1
+        let _v0 = Data::V1{x: 43};
+        &_v0 is V1
     }
     fun test_v1v3(): bool {
-        let _t5;
-        let _t0 = Data::V1{x: 43};
-        let _t1 = &_t0;
-        let _t2 = _t1 is V1;
-        if (!_t2) _t2 = _t1 is V3;
-        let _t3 = Data::V3{};
-        if (_t2) {
-            let _t4 = &_t3;
-            _t5 = _t4 is V1;
-            if (_t5) () else _t5 = _t4 is V3
-        } else _t5 = false;
-        _t5
+        let _v0;
+        let _v1 = Data::V1{x: 43};
+        let _v2 = &_v1;
+        let _v3 = _v2 is V1;
+        if (!_v3) _v3 = _v2 is V3;
+        let _v4 = Data::V3{};
+        if (_v3) {
+            let _v5 = &_v4;
+            _v0 = _v5 is V1;
+            if (_v0) () else _v0 = _v5 is V3
+        } else _v0 = false;
+        _v0
     }
 }
 

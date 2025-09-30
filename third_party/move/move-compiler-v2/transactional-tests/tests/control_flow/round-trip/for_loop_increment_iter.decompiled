@@ -3,15 +3,15 @@
 //# run
 script {
     fun main() {
-        let _t0 = 0;
-        let _t1 = 0;
-        let _t2 = false;
+        let _v0 = 0;
+        let _v1 = 0;
+        let _v2 = false;
         loop {
-            if (_t2) _t1 = _t1 + 1 else _t2 = true;
-            if (!(_t1 < 10)) break;
-            _t0 = _t0 + 1;
-            _t1 = _t1 + 1
+            if (_v2) _v1 = _v1 + 1 else _v2 = true;
+            if (!(_v1 < 10)) break;
+            _v0 = _v0 + 1;
+            _v1 = _v1 + 1
         };
-        if (!(_t0 == 5)) abort 42;
+        assert!(_v0 == 5, 42);
     }
 }

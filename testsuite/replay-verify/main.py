@@ -512,7 +512,7 @@ class ReplayScheduler:
         # Because PVCs can be shared among multiple replay-verify runs, a more correct TTL
         # would be computed from the number of shards and the expected run time of the replay-verify
         # run. However, for simplicity, we set the TTL to 3 hours.
-        pvc_ttl = 5 * 60 * 60  # 3 hours
+        pvc_ttl = 8 * 60 * 60  # 8 hours
         pvcs = create_replay_verify_pvcs_from_snapshot(
             self.id,
             snapshot_name,
@@ -526,7 +526,7 @@ class ReplayScheduler:
 
     # Creates a pvc by cloning an existing pvc
     def create_pvc_from_existing(self, original_snapshot_name: str, existing_pvc: str):
-        pvc_ttl = 5 * 60 * 60
+        pvc_ttl = 8 * 60 * 60
         pvcs = create_replay_verify_pvcs_from_existing(
             self.id,
             original_snapshot_name,
@@ -758,7 +758,7 @@ if __name__ == "__main__":
     run_id = f"{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}-{image[-5:]}"
     network = Network.from_string(args.network)
     config = ReplayConfig(network)
-    worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 7
+    worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 8
     range_size = args.range_size if args.range_size else config.range_size
 
     if args.start is not None:

@@ -12,15 +12,15 @@ module 0xcafe::m0 {
         field2: Enum0,
     }
     public fun f0() {
-        let _t4;
-        let _t0 = S{field2: Enum0::Variant1{field1: false}};
-        let _t2 = *&(&_t0).field2;
-        if (&_t2 is Variant0) {
-            let Enum0::Variant0{} = _t2;
-            let _t3 = true;
-            _t4 = &mut _t3
-        } else _t4 = &mut (&mut (&mut _t0).field2).field1;
-        *_t4 = true;
+        let _v0;
+        let _v1 = S{field2: Enum0::Variant1{field1: false}};
+        let _v2 = *&(&_v1).field2;
+        if (&_v2 is Variant0) {
+            let Enum0::Variant0{} = _v2;
+            let _v3 = true;
+            _v0 = &mut _v3
+        } else _v0 = &mut (&mut (&mut _v1).field2).field1;
+        *_v0 = true;
     }
 }
 
@@ -37,40 +37,40 @@ module 0xcafe::m1 {
         field: Enum0,
     }
     public fun f0() {
-        let _t4;
-        let _t0 = S{field: Enum0::Variant1{}};
-        let _t2 = *&(&_t0).field;
-        if (&_t2 is Variant1) {
-            let Enum0::Variant1{} = _t2;
-            let _t3 = true;
-            _t4 = &mut _t3
+        let _v0;
+        let _v1 = S{field: Enum0::Variant1{}};
+        let _v2 = *&(&_v1).field;
+        if (&_v2 is Variant1) {
+            let Enum0::Variant1{} = _v2;
+            let _v3 = true;
+            _v0 = &mut _v3
         } else {
-            let _t5 = _t0;
-            let _t23 = *&(&_t5).field;
-            let _t6 = true;
-            _t4 = &mut _t6
+            let _v4 = _v1;
+            let _v5 = *&(&_v4).field;
+            let _v6 = true;
+            _v0 = &mut _v6
         };
-        *_t4 = true;
+        *_v0 = true;
     }
     public fun f1() {
-        let _t7;
-        let _t0 = S{field: Enum0::Variant1{}};
-        let _t2 = *&(&_t0).field;
-        let _t3 = *&(&_t0).field;
-        let _t18 = &_t2;
-        let _t4 = &_t3;
-        if ((_t18 is Variant1) && (_t4 is Variant1)) {
-            let Enum0::Variant1{} = _t2;
-            let Enum0::Variant1{} = _t3;
-            let _t8 = true;
-            _t7 = &mut _t8
+        let _v0;
+        let _v1 = S{field: Enum0::Variant1{}};
+        let _v2 = *&(&_v1).field;
+        let _v3 = *&(&_v1).field;
+        let _v4 = &_v2;
+        let _v5 = &_v3;
+        if ((_v4 is Variant1) && (_v5 is Variant1)) {
+            let Enum0::Variant1{} = _v2;
+            let Enum0::Variant1{} = _v3;
+            let _v6 = true;
+            _v0 = &mut _v6
         } else {
-            let _t5 = _t0;
-            let _t25 = *&(&_t5).field;
-            let _t6 = true;
-            _t7 = &mut _t6
+            let _v7 = _v1;
+            let _v8 = *&(&_v7).field;
+            let _v9 = true;
+            _v0 = &mut _v9
         };
-        *_t7 = true;
+        *_v0 = true;
     }
 }
 
@@ -96,23 +96,23 @@ module 0xcafe::m2 {
         _0: bool,
     }
     public fun f0() {
-        let _t3;
-        let _t0 = Enum1::Variant2{field2: Enum0::Variant1{field1: false}};
-        let _t2 = *&(&_t0).field2;
-        if (&_t2 is Variant1) {
-            let Enum0::Variant1{field1: _t19} = _t2;
-            _t3 = Struct1{_0: true}
+        let _v0;
+        let _v1 = Enum1::Variant2{field2: Enum0::Variant1{field1: false}};
+        let _v2 = *&(&_v1).field2;
+        if (&_v2 is Variant1) {
+            let Enum0::Variant1{field1: _v3} = _v2;
+            _v0 = Struct1{_0: true}
         } else {
-            let _t8 = _t0;
-            let _t37 = *&(&_t8).field2;
-            _t3 = Struct1{_0: true}
+            let _v4 = _v1;
+            let _v5 = *&(&_v4).field2;
+            _v0 = Struct1{_0: true}
         };
-        let _t4 = Struct1{_0: *&(&(&_t0).field2).field1};
-        let _t5 = &mut _t4;
-        *_t5 = _t3;
-        let _t6 = true;
-        let _t7 = &mut _t6;
-        *_t7 = true;
+        let _v6 = Struct1{_0: *&(&(&_v1).field2).field1};
+        let _v7 = &mut _v6;
+        *_v7 = _v0;
+        let _v8 = true;
+        let _v9 = &mut _v8;
+        *_v9 = true;
     }
 }
 
@@ -129,18 +129,18 @@ module 0xcafe::m3 {
         field: Enum0,
     }
     fun f0(p0: S) {
-        let _t4;
-        let _t2 = *&(&p0).field;
-        if (&_t2 is Variant0) {
-            let Enum0::Variant0{} = _t2;
-            let _t3 = 1u8;
-            _t4 = &mut _t3
+        let _v0;
+        let _v1 = *&(&p0).field;
+        if (&_v1 is Variant0) {
+            let Enum0::Variant0{} = _v1;
+            let _v2 = 1u8;
+            _v0 = &mut _v2
         } else {
-            let _t19 = *&(&p0).field;
-            let _t5 = 1u8;
-            _t4 = &mut _t5
+            let _v3 = *&(&p0).field;
+            let _v4 = 1u8;
+            _v0 = &mut _v4
         };
-        *_t4 = 1u8;
+        *_v0 = 1u8;
     }
     public fun test() {
         f0(S{field: Enum0::Variant1{}});

@@ -11,7 +11,7 @@ script {
 //# run
 script {
     fun main() {
-        let _t2 = 1u16 + 65535u16;
+        let _v0 = 1u16 + 65535u16;
     }
 }
 
@@ -19,31 +19,7 @@ script {
 //# run
 script {
     fun main() {
-        let _t2 = 65135u16 + 6555u16;
-    }
-}
-
-
-//# run
-script {
-    fun main() {
-        ()
-    }
-}
-
-
-//# run
-script {
-    fun main() {
-        let _t2 = 0u16 - 1u16;
-    }
-}
-
-
-//# run
-script {
-    fun main() {
-        let _t2 = 54u16 - 100u16;
+        let _v0 = 65135u16 + 6555u16;
     }
 }
 
@@ -59,7 +35,7 @@ script {
 //# run
 script {
     fun main() {
-        let _t2 = 32767u16 * 32767u16;
+        let _v0 = 0u16 - 1u16;
     }
 }
 
@@ -67,39 +43,7 @@ script {
 //# run
 script {
     fun main() {
-        let _t2 = 33767u16 * 2u16;
-    }
-}
-
-
-//# run
-script {
-    fun main() {
-        ()
-    }
-}
-
-
-//# run
-script {
-    fun main() {
-        let _t2 = 0u16 / 0u16;
-    }
-}
-
-
-//# run
-script {
-    fun main() {
-        let _t2 = 1u16 / 0u16;
-    }
-}
-
-
-//# run
-script {
-    fun main() {
-        let _t2 = 65535u16 / 0u16;
+        let _v0 = 54u16 - 100u16;
     }
 }
 
@@ -115,7 +59,7 @@ script {
 //# run
 script {
     fun main() {
-        let _t2 = 0u16 % 0u16;
+        let _v0 = 32767u16 * 32767u16;
     }
 }
 
@@ -123,7 +67,7 @@ script {
 //# run
 script {
     fun main() {
-        let _t2 = 1u16 % 0u16;
+        let _v0 = 33767u16 * 2u16;
     }
 }
 
@@ -131,6 +75,62 @@ script {
 //# run
 script {
     fun main() {
-        let _t2 = 65535u16 % 0u16;
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 0u16 / 0u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 1u16 / 0u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 65535u16 / 0u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 0u16 % 0u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 1u16 % 0u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 65535u16 % 0u16;
     }
 }

@@ -9,113 +9,113 @@ module 0xc0ffee::m {
         r: u64,
     }
     public fun main() {
-        let _t0 = test_01(new_p());
-        if (!(*&(&(&_t0).q).r == 1)) abort 0;
-        if (!(test_02(new_p()) == 10)) abort 0;
-        let _t1 = new_p();
-        test_03(&mut _t1);
-        if (!(*&(&(&_t1).q).r == 12)) abort 0;
-        let _t2 = test_04(new_p());
-        if (!(*&(&(&_t2).q).r == 14)) abort 0;
-        let _t3 = test_05(new_p());
-        if (!(*&(&(&_t3).q).r == 15)) abort 0;
-        let _t4 = test_06(new_p());
-        if (!(*&(&(&_t4).q).r == 16)) abort 0;
-        let _t5 = test_07(new_p());
-        if (!(*&(&(&_t5).q).r == 0)) abort 0;
-        if (!(test_08(1) == 1)) abort 0;
-        if (!test_09(3)) abort 0;
-        let _t6 = test_10(new_p());
-        if (!(*&(&(&_t6).q).r == 20)) abort 0;
-        let _t7 = test_11(new_p());
-        if (!(*&(&(&_t7).q).r == 0)) abort 0;
-        let _t8 = test_12(new_p());
-        if (!(*&(&(&_t8).q).r == 5)) abort 0;
-        let _t9 = test_13(new_p());
-        if (!(*&(&(&_t9).q).r == 0)) abort 0;
-        let _t10 = test_14(new_p());
-        if (!(*&(&(&_t10).q).r == 24)) abort 0;
+        let _v0 = test_01(new_p());
+        assert!(*&(&(&_v0).q).r == 1, 0);
+        assert!(test_02(new_p()) == 10, 0);
+        let _v1 = new_p();
+        test_03(&mut _v1);
+        assert!(*&(&(&_v1).q).r == 12, 0);
+        let _v2 = test_04(new_p());
+        assert!(*&(&(&_v2).q).r == 14, 0);
+        let _v3 = test_05(new_p());
+        assert!(*&(&(&_v3).q).r == 15, 0);
+        let _v4 = test_06(new_p());
+        assert!(*&(&(&_v4).q).r == 16, 0);
+        let _v5 = test_07(new_p());
+        assert!(*&(&(&_v5).q).r == 0, 0);
+        assert!(test_08(1) == 1, 0);
+        assert!(test_09(3), 0);
+        let _v6 = test_10(new_p());
+        assert!(*&(&(&_v6).q).r == 20, 0);
+        let _v7 = test_11(new_p());
+        assert!(*&(&(&_v7).q).r == 0, 0);
+        let _v8 = test_12(new_p());
+        assert!(*&(&(&_v8).q).r == 5, 0);
+        let _v9 = test_13(new_p());
+        assert!(*&(&(&_v9).q).r == 0, 0);
+        let _v10 = test_14(new_p());
+        assert!(*&(&(&_v10).q).r == 24, 0);
     }
     fun new_p(): P {
         P{q: Q{r: 0}}
     }
     fun test_01(p0: P): P {
-        let _t4 = &mut (&mut (&mut p0).q).r;
-        *_t4 = 1;
+        let _v0 = &mut (&mut (&mut p0).q).r;
+        *_v0 = 1;
         p0
     }
     fun test_02(p0: P): u64 {
         *&(&(&p0).q).r + 10
     }
     fun test_03(p0: &mut P) {
-        let _t4 = &mut (&mut p0.q).r;
-        *_t4 = 12;
+        let _v0 = &mut (&mut p0.q).r;
+        *_v0 = 12;
     }
     fun test_04(p0: P): P {
-        let _t4 = &mut (&mut (&mut p0).q).r;
-        *_t4 = 14;
+        let _v0 = &mut (&mut (&mut p0).q).r;
+        *_v0 = 14;
         p0
     }
     fun test_05(p0: P): P {
-        let _t4 = &mut (&mut (&mut p0).q).r;
-        *_t4 = 15;
+        let _v0 = &mut (&mut (&mut p0).q).r;
+        *_v0 = 15;
         p0
     }
     fun test_06(p0: P): P {
-        let _t6 = &mut (&mut (&mut p0).q).r;
-        *_t6 = 16;
+        let _v0 = &mut (&mut (&mut p0).q).r;
+        *_v0 = 16;
         p0
     }
     fun test_07(p0: P): P {
-        let _t1 = *&(&(&p0).q).r;
-        let _t7 = &mut _t1;
-        *_t7 = 17;
+        let _v0 = *&(&(&p0).q).r;
+        let _v1 = &mut _v0;
+        *_v1 = 17;
         p0
     }
     fun test_08(p0: u64): u64 {
-        let _t1 = p0;
-        let _t4 = &mut _t1;
-        *_t4 = 18;
+        let _v0 = p0;
+        let _v1 = &mut _v0;
+        *_v1 = 18;
         p0
     }
     fun test_09(p0: u64): bool {
-        let _t3 = freeze(&mut p0);
-        let _t1 = 3;
-        let _t6 = freeze(&mut _t1);
-        _t3 == _t6
+        let _v0 = freeze(&mut p0);
+        let _v1 = 3;
+        let _v2 = freeze(&mut _v1);
+        _v0 == _v2
     }
     fun test_10(p0: P): P {
-        let _t4 = &mut (&mut (&mut p0).q).r;
-        *_t4 = 20;
+        let _v0 = &mut (&mut (&mut p0).q).r;
+        *_v0 = 20;
         p0
     }
     fun test_11(p0: P): P {
-        let _t1 = p0;
-        let _t6 = &mut (&mut (&mut _t1).q).r;
-        *_t6 = 21;
+        let _v0 = p0;
+        let _v1 = &mut (&mut (&mut _v0).q).r;
+        *_v1 = 21;
         p0
     }
     fun test_12(p0: P): P {
-        let _t6 = &mut (&mut (&mut p0).q).r;
-        *_t6 = 5;
-        let _t1 = *&(&(&p0).q).r;
-        let _t11 = &mut _t1;
-        *_t11 = 22;
+        let _v0 = &mut (&mut (&mut p0).q).r;
+        *_v0 = 5;
+        let _v1 = *&(&(&p0).q).r;
+        let _v2 = &mut _v1;
+        *_v2 = 22;
         p0
     }
     fun test_13(p0: P): P {
-        let _t1 = *&(&(&p0).q).r;
-        let _t7 = &mut _t1;
-        *_t7 = 23;
+        let _v0 = *&(&(&p0).q).r;
+        let _v1 = &mut _v0;
+        *_v1 = 23;
         p0
     }
     fun test_14(p0: P): P {
-        let _t4 = Q{r: 24};
-        let _t6 = &mut (&mut p0).q;
-        *_t6 = _t4;
-        let _t1 = *&(&(&p0).q).r;
-        let _t11 = &mut _t1;
-        *_t11 = 12;
+        let _v0 = Q{r: 24};
+        let _v1 = &mut (&mut p0).q;
+        *_v1 = _v0;
+        let _v2 = *&(&(&p0).q).r;
+        let _v3 = &mut _v2;
+        *_v3 = 12;
         p0
     }
 }
@@ -129,9 +129,9 @@ module 0xcafe::m1 {
         x: bool,
     }
     fun f(p0: Struct0) {
-        let _t1 = *&(&p0).x;
-        let _t6 = &mut _t1;
-        *_t6 = true;
+        let _v0 = *&(&p0).x;
+        let _v1 = &mut _v0;
+        *_v1 = true;
     }
     public fun main() {
         f(Struct0{x: true});
@@ -147,13 +147,13 @@ module 0xcafe::m2 {
         x: bool,
     }
     fun f(p0: S) {
-        let _t6 = *&(&p0).x;
-        let _t1 = true;
-        let _t8 = &mut _t1;
-        *_t8 = _t6;
-        let _t2 = 0u8;
-        let _t10 = &mut _t2;
-        *_t10 = 123u8;
+        let _v0 = *&(&p0).x;
+        let _v1 = true;
+        let _v2 = &mut _v1;
+        *_v2 = _v0;
+        let _v3 = 0u8;
+        let _v4 = &mut _v3;
+        *_v4 = 123u8;
     }
     public fun main() {
         f(S{x: true});
@@ -175,10 +175,10 @@ module 0xc0ffee::m3 {
         42u8
     }
     fun test(p0: S) {
-        let _t5 = *&(&p0).f;
-        let _t1 = _t5();
-        let _t7 = &mut _t1;
-        *_t7 = 1u8;
+        let _v0 = *&(&p0).f;
+        let _v1 = _v0();
+        let _v2 = &mut _v1;
+        *_v2 = 1u8;
     }
 }
 

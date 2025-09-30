@@ -75,11 +75,9 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicU32, Ordering},
 };
+use triomphe::Arc as TriompheArc;
 
 /// [ReadResult] wraps the result of MVHashMap's data map, while [GroupReadResult]
 /// is for the groups' MVHashMap. The client can interpret these types to
@@ -87,7 +85,7 @@ use std::{
 
 #[derive(Debug)]
 pub(crate) enum ReadResult {
-    Value(Option<StateValue>, Option<Arc<MoveTypeLayout>>),
+    Value(Option<StateValue>, Option<TriompheArc<MoveTypeLayout>>),
     Metadata(Option<StateValueMetadata>),
     ResourceSize(Option<u64>),
     Exists(bool),
@@ -101,7 +99,7 @@ pub(crate) enum ReadResult {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum GroupReadResult {
-    Value(Option<Bytes>, Option<Arc<MoveTypeLayout>>),
+    Value(Option<Bytes>, Option<TriompheArc<MoveTypeLayout>>),
     ResourceSize(Option<u64>),
     Exists(bool),
     Uninitialized,
@@ -650,8 +648,8 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
                                     self.versioned_map.data().set_base_value(
                                         key.clone(),
                                         ValueWithLayout::Exchanged(
-                                            Arc::new(patched_value),
-                                            layout.cloned().map(Arc::new),
+                                            TriompheArc::new(patched_value),
+                                            layout.cloned().map(TriompheArc::new),
                                         ),
                                     );
                                     // Refetch in case a concurrent change went through.
@@ -790,7 +788,7 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
                                             group_key.clone(),
                                             resource_tag.clone(),
                                             patched_value,
-                                            layout.cloned().map(Arc::new),
+                                            layout.cloned().map(TriompheArc::new),
                                         );
                                     // Re-fetch in case a concurrent change went through.
                                     continue;
@@ -898,8 +896,8 @@ impl<T: Transaction> ResourceState<T> for SequentialState<'_, T> {
                         match patch_base_value(v.as_ref(), layout) {
                             Ok(patched_value) => {
                                 let exchanged_value = ValueWithLayout::Exchanged(
-                                    Arc::new(patched_value.clone()),
-                                    layout.cloned().map(Arc::new),
+                                    TriompheArc::new(patched_value.clone()),
+                                    layout.cloned().map(TriompheArc::new),
                                 );
                                 self.unsync_map
                                     .set_base_value(key.clone(), exchanged_value.clone());
@@ -981,7 +979,7 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
                     if let ValueWithLayout::RawFromStorage(v) = value {
                         match patch_base_value(v.as_ref(), layout) {
                             Ok(patched_value) => {
-                                let arced_layout = layout.cloned().map(Arc::new);
+                                let arced_layout = layout.cloned().map(TriompheArc::new);
                                 self.unsync_map.update_tagged_base_value_with_layout(
                                     group_key.clone(),
                                     resource_tag.clone(),
@@ -990,7 +988,7 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
                                 );
 
                                 value = ValueWithLayout::Exchanged(
-                                    Arc::new(patched_value),
+                                    TriompheArc::new(patched_value),
                                     arced_layout,
                                 );
                             },
@@ -1026,7 +1024,7 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
             Err(UnsyncGroupError::TagNotFound) => {
                 let empty_data_read = DataRead::Versioned(
                     Err(StorageVersion),
-                    Arc::<T::Value>::new(TransactionWrite::from_state_value(None)),
+                    TriompheArc::<T::Value>::new(TransactionWrite::from_state_value(None)),
                     None,
                 );
                 self.read_set
@@ -1342,7 +1340,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
         skip: &HashSet<T::Key>,
-    ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>, PanicError> {
+    ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>, PanicError>
+    {
         read_set
             .iter()
             .filter_map(|key| {
@@ -1548,7 +1547,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 TransactionWrite::from_state_value(self.get_raw_base_value(state_key)?);
             state.set_base_value(
                 state_key.clone(),
-                ValueWithLayout::RawFromStorage(Arc::new(from_storage)),
+                ValueWithLayout::RawFromStorage(TriompheArc::new(from_storage)),
             );
 
             // In case of concurrent storage fetches, we cannot use our value,
@@ -1614,7 +1613,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             .set_raw_group_base_values(group_key.clone(), base_group_sentinel_ops)?;
         self.latest_view.get_resource_state().set_base_value(
             group_key.clone(),
-            ValueWithLayout::RawFromStorage(Arc::new(metadata_op)),
+            ValueWithLayout::RawFromStorage(TriompheArc::new(metadata_op)),
         );
         Ok(())
     }
@@ -1935,7 +1934,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for LatestVi
         delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
     ) -> Result<
-        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
         PanicError,
     > {
         match &self.latest_view {
@@ -3079,7 +3078,7 @@ mod test {
             delayed_write_set_ids: &HashSet<DelayedFieldID>,
             skip: &HashSet<KeyType<u32>>,
         ) -> Result<
-            BTreeMap<KeyType<u32>, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+            BTreeMap<KeyType<u32>, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
             PanicError,
         > {
             let seq = self

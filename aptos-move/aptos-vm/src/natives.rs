@@ -37,10 +37,9 @@ use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 #[cfg(feature = "testing")]
-use std::{
-    collections::{BTreeMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashSet};
+#[cfg(feature = "testing")]
+use triomphe::Arc as TriompheArc;
 #[cfg(feature = "testing")]
 use {
     aptos_framework::natives::{
@@ -110,7 +109,7 @@ impl TDelayedFieldView for AptosBlankStorage {
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
     ) -> Result<
-        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
         PanicError,
     > {
         unreachable!()

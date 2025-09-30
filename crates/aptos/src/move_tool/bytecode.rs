@@ -38,7 +38,8 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
-const DISASSEMBLER_EXTENSION: &str = "mv.asm";
+const DISASSEMBLER_EXTENSION_V1: &str = "mv.asm";
+const DISASSEMBLER_EXTENSION_V2: &str = "mv.masm";
 const DECOMPILER_EXTENSION: &str = "mv.move";
 
 /// Disassemble the Move bytecode pointed to in the textual representation
@@ -52,7 +53,7 @@ pub struct Disassemble {
     #[clap(flatten)]
     pub command: BytecodeCommand,
     /// (Optional) Disassembler version to use
-    #[arg(long, value_enum, default_value = "v1")]
+    #[arg(long, value_enum, default_value = "v2")]
     pub disassembler_version: DisassemblerVersion,
 }
 
@@ -66,7 +67,7 @@ pub struct Decompile {
     #[clap(flatten)]
     pub command: BytecodeCommand,
     /// (Optional) Decompiler version to use
-    #[arg(long, value_enum, default_value = "v1")]
+    #[arg(long, value_enum, default_value = "v2")]
     pub decompiler_version: DecompilerVersion,
 }
 
@@ -223,8 +224,20 @@ impl BytecodeCommand {
             let (output, extension) = match (command_type, version) {
                 (
                     BytecodeCommandType::Disassemble,
-                    BinaryCommandVersion::DisassemblerVersion(v),
-                ) => (self.disassemble(bytecode_path, v)?, DISASSEMBLER_EXTENSION),
+                    BinaryCommandVersion::DisassemblerVersion(DisassemblerVersion::V1),
+                ) => (
+                    self.disassemble(bytecode_path, DisassemblerVersion::V1)?,
+                    DISASSEMBLER_EXTENSION_V1,
+                ),
+
+                (
+                    BytecodeCommandType::Disassemble,
+                    BinaryCommandVersion::DisassemblerVersion(DisassemblerVersion::V2),
+                ) => (
+                    self.disassemble(bytecode_path, DisassemblerVersion::V2)?,
+                    DISASSEMBLER_EXTENSION_V2,
+                ),
+
                 (BytecodeCommandType::Decompile, BinaryCommandVersion::DecompilerVersion(v)) => {
                     (self.decompile(bytecode_path, v)?, DECOMPILER_EXTENSION)
                 },

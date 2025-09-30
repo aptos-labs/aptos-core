@@ -153,6 +153,7 @@ pub fn aptos_prod_vm_config(
 
     let deserializer_config = aptos_prod_deserializer_config(features);
     let verifier_config = aptos_prod_verifier_config(gas_feature_version, features);
+    let enable_enum_option = features.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION);
 
     let layout_max_size = if gas_feature_version >= RELEASE_V1_30 {
         512
@@ -194,6 +195,7 @@ pub fn aptos_prod_vm_config(
         optimize_trusted_code: features.is_trusted_code_enabled(),
         paranoid_ref_checks,
         enable_capture_option,
+        enable_enum_option,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

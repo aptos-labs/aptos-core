@@ -1,14 +1,37 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{accounts::account_recovery_db::AccountRecoveryDBInterface, error::PepperServiceError};
 use aptos_keyless_pepper_common::{
     vuf::{bls12381_g1_bls::Bls12381G1Bls, slip_10::ed25519_dalek::Digest, VUF},
-    PepperV0VufPubKey,
+    PepperInput, PepperV0VufPubKey,
 };
+use aptos_time_service::TimeService;
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_serialize::CanonicalSerialize;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
+
+/// A mock implementation of the account recovery DB that does nothing
+struct MockAccountRecoveryDB;
+
+#[async_trait::async_trait]
+impl AccountRecoveryDBInterface for MockAccountRecoveryDB {
+    async fn update_db_with_pepper_input(
+        &self,
+        _pepper_input: &PepperInput,
+    ) -> Result<(), PepperServiceError> {
+        Ok(()) // Do nothing
+    }
+}
+
+/// Advances the mock time service by the given number of seconds
+pub async fn advance_time_secs(time_service: TimeService, seconds: u64) {
+    let mock_time_service = time_service.into_mock();
+    mock_time_service
+        .advance_async(Duration::from_secs(seconds))
+        .await;
+}
 
 /// Generates a random VUF public and private keypair for testing purposes
 pub fn create_vuf_public_private_keypair() -> Arc<(String, ark_bls12_381::Fr)> {
@@ -36,4 +59,9 @@ pub fn create_vuf_public_private_keypair() -> Arc<(String, ark_bls12_381::Fr)> {
     let vuf_public_key_string = serde_json::to_string_pretty(&pepper_vuf_public_key).unwrap();
 
     Arc::new((vuf_public_key_string, vuf_private_key))
+}
+
+/// Returns a mock account recovery DB instance
+pub fn get_mock_account_recovery_db() -> Arc<dyn AccountRecoveryDBInterface + Send + Sync> {
+    Arc::new(MockAccountRecoveryDB)
 }

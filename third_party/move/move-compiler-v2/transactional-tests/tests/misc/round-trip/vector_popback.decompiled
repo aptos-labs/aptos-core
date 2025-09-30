@@ -4,13 +4,13 @@
 module 0x42::vector {
     use 0x1::vector;
     public fun remove<T0>(p0: &mut vector<T0>, p1: u64): T0 {
-        let _t2 = vector::length<T0>(freeze(p0));
-        if (p1 >= _t2) abort 1;
-        _t2 = _t2 - 1;
-        while (p1 < _t2) {
-            let _t18 = p1;
+        let _v0 = vector::length<T0>(freeze(p0));
+        if (p1 >= _v0) abort 1;
+        _v0 = _v0 - 1;
+        while (p1 < _v0) {
+            let _v1 = p1;
             p1 = p1 + 1;
-            vector::swap<T0>(p0, _t18, p1);
+            vector::swap<T0>(p0, _v1, p1);
             continue
         };
         vector::pop_back<T0>(p0)
@@ -19,22 +19,22 @@ module 0x42::vector {
         vector[1, 2, 3]
     }
     public fun test_fold() {
-        let _t0 = 0;
-        let _t1 = vector[1];
-        vector::reverse<u64>(&mut _t1);
-        while (!vector::is_empty<u64>(&_t1)) {
-            let _t8 = vector::pop_back<u64>(&mut _t1);
-            _t0 = 0;
+        let _v0 = 0;
+        let _v1 = vector[1];
+        vector::reverse<u64>(&mut _v1);
+        while (!vector::is_empty<u64>(&_v1)) {
+            let _v2 = vector::pop_back<u64>(&mut _v1);
+            _v0 = 0;
             continue
         };
-        if (!(_t0 == 0)) abort 0;
+        assert!(_v0 == 0, 0);
     }
     public fun test_remove() {
-        let _t0 = create();
-        if (!(remove<u64>(&mut _t0, 1) == 2)) abort 0;
-        if (!(vector::length<u64>(&_t0) == 2)) abort 0;
-        if (!(*vector::borrow<u64>(&_t0, 0) == 1)) abort 0;
-        if (!(*vector::borrow<u64>(&_t0, 1) == 3)) abort 0;
+        let _v0 = create();
+        assert!(remove<u64>(&mut _v0, 1) == 2, 0);
+        assert!(vector::length<u64>(&_v0) == 2, 0);
+        assert!(*vector::borrow<u64>(&_v0, 0) == 1, 0);
+        assert!(*vector::borrow<u64>(&_v0, 1) == 3, 0);
     }
 }
 

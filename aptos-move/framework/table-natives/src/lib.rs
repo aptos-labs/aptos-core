@@ -37,8 +37,8 @@ use std::{
     cell::RefCell,
     collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
     mem::drop,
-    sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 /// The native table context extension. This needs to be attached to the NativeContextExtensions
 /// value which is passed into session functions, so its accessible from natives of this
@@ -74,7 +74,7 @@ struct TableData {
 /// A structure containing information about the layout of a value stored in a table. Needed in
 /// order to replace delayed fields.
 struct LayoutInfo {
-    layout: Arc<MoveTypeLayout>,
+    layout: TriompheArc<MoveTypeLayout>,
     contains_delayed_fields: bool,
 }
 
@@ -99,7 +99,7 @@ pub struct TableChangeSet {
 
 /// A change of a single table.
 pub struct TableChange {
-    pub entries: BTreeMap<Vec<u8>, Op<(Bytes, Option<Arc<MoveTypeLayout>>)>>,
+    pub entries: BTreeMap<Vec<u8>, Op<(Bytes, Option<TriompheArc<MoveTypeLayout>>)>>,
 }
 
 // =========================================================================================
@@ -215,7 +215,7 @@ impl LayoutInfo {
             .type_to_type_layout_with_delayed_fields(value_ty)?
             .unpack();
         Ok(Self {
-            layout: Arc::new(layout),
+            layout: TriompheArc::new(layout),
             contains_delayed_fields,
         })
     }
@@ -636,7 +636,7 @@ fn serialize_value(
     function_value_extension: &dyn FunctionValueExtension,
     layout_info: &LayoutInfo,
     val: &Value,
-) -> PartialVMResult<(Bytes, Option<Arc<MoveTypeLayout>>)> {
+) -> PartialVMResult<(Bytes, Option<TriompheArc<MoveTypeLayout>>)> {
     let max_value_nest_depth = function_value_extension.max_value_nest_depth();
     let serialization_result = if layout_info.contains_delayed_fields {
         // Value contains delayed fields, so we should be able to serialize it.
