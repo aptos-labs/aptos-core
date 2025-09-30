@@ -109,7 +109,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::INLINING_OPTIMIZATION.to_string(),
             description: "Turns on or off inlining optimizations".to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::ACROSS_PACKAGE_INLINING.to_string(),
