@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::node::{InternalNode, NodeRef, NodeStrongRef};
+use crate::node::{InternalNode, NodeRef};
 use aptos_drop_helper::ArcAsyncDrop;
 use std::sync::Arc;
 
@@ -26,56 +26,57 @@ where
         }
     }
 
-    fn find_next_leaf(
-        &mut self,
-        current_node: Option<NodeStrongRef<K, V>>,
-    ) -> Option<Box<dyn Iterator<Item = (K, V)>>> {
-        match current_node {
-            None => {
-                if let Some(internal) = self.ancestors.pop() {
-                    let right = internal.right.get_strong(self.base_layer);
-                    self.find_next_leaf(Some(right))
-                } else {
-                    None
-                }
-            },
-            Some(node) => match node {
-                NodeStrongRef::Empty => self.find_next_leaf(None),
-                NodeStrongRef::Leaf(leaf) => {
-                    Some(Box::new(leaf.content.clone().into_iter(self.base_layer)))
-                },
-                NodeStrongRef::Internal(internal) => {
-                    let left = internal.left.get_strong(self.base_layer);
-                    self.ancestors.push(internal);
-                    self.find_next_leaf(Some(left))
-                },
-            },
-        }
-    }
+    // fn find_next_leaf(
+    //     &mut self,
+    //     current_node: Option<NodeStrongRef<K, V>>,
+    // ) -> Option<Box<dyn Iterator<Item = (K, V)>>> {
+    //     match current_node {
+    //         None => {
+    //             if let Some(internal) = self.ancestors.pop() {
+    //                 let right = internal.right.get_strong(self.base_layer);
+    //                 self.find_next_leaf(Some(right))
+    //             } else {
+    //                 None
+    //             }
+    //         },
+    //         Some(node) => match node {
+    //             NodeStrongRef::Empty => self.find_next_leaf(None),
+    //             NodeStrongRef::Leaf(leaf) => {
+    //                 Some(Box::new(leaf.content.clone().into_iter(self.base_layer)))
+    //             },
+    //             NodeStrongRef::Internal(internal) => {
+    //                 let left = internal.left.get_strong(self.base_layer);
+    //                 self.ancestors.push(internal);
+    //                 self.find_next_leaf(Some(left))
+    //             },
+    //         },
+    //     }
+    // }
 
     fn next_impl(&mut self) -> Option<(K, V)> {
-        loop {
-            match &mut self.current_leaf {
-                None => {
-                    if let Some(root) = self.root.take() {
-                        // Iterater not started yet, consume root and go down.
-                        self.current_leaf =
-                            self.find_next_leaf(Some(root.get_strong(self.base_layer)));
-                    } else if self.ancestors.is_empty() {
-                        return None;
-                    } else {
-                        self.current_leaf = self.find_next_leaf(None);
-                    }
-                },
-                Some(kv_iter) => {
-                    if let Some((key, value)) = kv_iter.next() {
-                        return Some((key, value));
-                    } else {
-                        self.current_leaf = None;
-                    }
-                },
-            } // end match self.current_leaf
-        } // end loop
+        unimplemented!()
+        // loop {
+        //     match &mut self.current_leaf {
+        //         None => {
+        //             if let Some(root) = self.root.take() {
+        //                 // Iterater not started yet, consume root and go down.
+        //                 self.current_leaf =
+        //                     self.find_next_leaf(Some(root.get_strong(self.base_layer)));
+        //             } else if self.ancestors.is_empty() {
+        //                 return None;
+        //             } else {
+        //                 self.current_leaf = self.find_next_leaf(None);
+        //             }
+        //         },
+        //         Some(kv_iter) => {
+        //             if let Some((key, value)) = kv_iter.next() {
+        //                 return Some((key, value));
+        //             } else {
+        //                 self.current_leaf = None;
+        //             }
+        //         },
+        //     } // end match self.current_leaf
+        // } // end loop
     }
 }
 

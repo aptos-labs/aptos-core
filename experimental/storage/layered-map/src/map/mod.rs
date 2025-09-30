@@ -3,7 +3,7 @@
 
 mod new_layer_impl;
 
-use crate::{iterator::DescendantIterator, node::NodeStrongRef, Key, KeyHash, MapLayer, Value};
+use crate::{iterator::DescendantIterator, node::NodeRawPtr, Key, KeyHash, MapLayer, Value};
 use aptos_drop_helper::ArcAsyncDrop;
 use std::marker::PhantomData;
 
@@ -46,6 +46,10 @@ where
     pub(crate) fn base_layer(&self) -> u64 {
         self.base_layer.layer()
     }
+
+    pub(crate) fn top_layer(&self) -> u64 {
+        self.top_layer.layer()
+    }
 }
 
 impl<K, V, S> LayeredMap<K, V, S>
@@ -71,7 +75,7 @@ where
 
     fn get_under_node(
         &self,
-        node: NodeStrongRef<K, V>,
+        node: NodeRawPtr<K, V>,
         key: &K,
         remaining_key_bits: &mut impl Iterator<Item = bool>,
     ) -> Option<V> {
@@ -80,19 +84,28 @@ where
 
         loop {
             match cur_node {
-                NodeStrongRef::Empty => return None,
-                NodeStrongRef::Leaf(leaf) => {
-                    return leaf.get_value(key, self.base_layer()).cloned()
+                NodeRawPtr::Empty => return None,
+                NodeRawPtr::Leaf(leaf) => {
+                    return unsafe { leaf.as_ref().get_value(key, self.base_layer()).cloned() }
                 },
-                NodeStrongRef::Internal(internal) => match bits.next() {
+                NodeRawPtr::Internal(internal) => match bits.next() {
                     None => {
                         unreachable!("value on key-prefix not supported.");
                     },
                     Some(bit) => {
+                        let internal = unsafe { internal.as_ref() };
                         if bit {
-                            cur_node = internal.right.get_strong(self.base_layer());
+                            if internal.right_layer > self.base_layer() {
+                                cur_node = internal.right.get_raw(self.base_layer());
+                            } else {
+                                return None;
+                            }
                         } else {
-                            cur_node = internal.left.get_strong(self.base_layer());
+                            if internal.left_layer > self.base_layer() {
+                                cur_node = internal.left.get_raw(self.base_layer());
+                            } else {
+                                return None;
+                            }
                         }
                     },
                 },

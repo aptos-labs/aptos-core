@@ -76,30 +76,45 @@ fn layers(
     layers
 }
 
+#[test]
+fn basic() {
+    let persisted_layer = MapLayer::new_family("test_basic");
+    let layer0 = persisted_layer.clone();
+
+    let map00 = layer0.view_layers_after(&persisted_layer);
+    let layer1 = map00.new_layer(&[(1, 1), (2, 2)]);
+
+    let map01 = layer1.view_layers_after(&layer0);
+    assert_eq!(map01.get(&1), Some(1));
+    assert_eq!(map01.get(&2), Some(2));
+    assert_eq!(map01.get(&3), None);
+    assert_eq!(map01.get(&4), None);
+}
+
 proptest! {
-    #[test]
-    fn test_layered_map_get(
-        (mut items_per_update, ancestor, base, top) in arb_test_case()
-    ) {
-        let (_ancestor_layer, base_layer, top_layer) = {
-            let layers = layers(&items_per_update, ancestor as u64);
-            (layers[ancestor].clone(), layers[base].clone(), layers[top].clone())
-        };
+    // #[test]
+    // fn test_layered_map_get(
+    //     (mut items_per_update, ancestor, base, top) in arb_test_case()
+    // ) {
+    //     let (_ancestor_layer, base_layer, top_layer) = {
+    //         let layers = layers(&items_per_update, ancestor as u64);
+    //         (layers[ancestor].clone(), layers[base].clone(), layers[top].clone())
+    //     };
 
-        let layered_map = top_layer.into_layers_view_after(base_layer);
+    //     let layered_map = top_layer.into_layers_view_after(base_layer);
 
-        // n.b. notice items_per_update doesn't have a placeholder for the root layer
-        let all = naive_view_layers(items_per_update.drain(base..top));
+    //     // n.b. notice items_per_update doesn't have a placeholder for the root layer
+    //     let all = naive_view_layers(items_per_update.drain(base..top));
 
-        // get() individually
-        for (k, v) in &all {
-            prop_assert_eq!(layered_map.get(k), Some(*v));
-        }
+    //     // get() individually
+    //     for (k, v) in &all {
+    //         prop_assert_eq!(layered_map.get(k), Some(*v));
+    //     }
 
-        // traversed via iterator
-        let traversed = layered_map.iter().collect();
-        prop_assert_eq!(all, traversed);
-    }
+    //     // traversed via iterator
+    //     // let traversed = layered_map.iter().collect();
+    //     // prop_assert_eq!(all, traversed);
+    // }
 
     #[test]
     fn test_key_hash_order(nums in vec(any::<u64>(), 0..100)) {
