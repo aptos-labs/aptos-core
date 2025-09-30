@@ -57,6 +57,7 @@ module aptos_experimental::order_placement {
     use std::signer;
     use std::string::String;
     use std::vector;
+    use aptos_experimental::market_clearinghouse_order_info::new_clearinghouse_order_info;
     use aptos_experimental::order_book::{new_single_order_request};
     use aptos_experimental::pre_cancellation_tracker::{
         is_pre_cancelled
@@ -302,12 +303,16 @@ module aptos_experimental::order_placement {
         };
 
         callbacks.place_maker_order(
-            user_addr,
-            order_id,
-            is_bid,
+            new_clearinghouse_order_info(
+                user_addr,
+                order_id,
+                client_order_id,
+                is_bid,
+                time_in_force,
+                metadata
+            ),
             limit_price,
             remaining_size,
-            metadata
         );
         market.get_order_book_mut().place_maker_order(
             new_single_order_request(
@@ -383,8 +388,10 @@ module aptos_experimental::order_placement {
         cleanup_order_internal(
             maker_address,
             order_id,
+            client_order_id,
             maker_order.get_book_type_from_match_details(),
             maker_order.is_bid_from_match_details(),
+            time_in_force,
             maker_cancel_size,
             metadata,
             callbacks
@@ -428,7 +435,15 @@ module aptos_experimental::order_placement {
             callbacks
         );
         callbacks.cleanup_order(
-            user_addr, order_id, is_bid, size_delta, metadata
+            new_clearinghouse_order_info(
+                user_addr,
+                order_id,
+                client_order_id,
+                is_bid,
+                time_in_force,
+                metadata
+            ),
+            size_delta
         );
         return OrderMatchResult {
             order_id,
@@ -443,15 +458,25 @@ module aptos_experimental::order_placement {
     public fun cleanup_order_internal<M: store + copy + drop, R: store + copy + drop>(
         user_addr: address,
         order_id: OrderIdType,
+        client_order_id: Option<String>,
         book_type: OrderBookType,
         is_bid: bool,
+        time_in_force: TimeInForce,
         remaining_size: u64,
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         if (book_type == single_order_book_type()) {
             callbacks.cleanup_order(
-                user_addr, order_id, is_bid, remaining_size, metadata
+                new_clearinghouse_order_info(
+                    user_addr,
+                    order_id,
+                    client_order_id,
+                    is_bid,
+                    time_in_force,
+                    metadata
+                ),
+                remaining_size
             );
         } else {
             callbacks.cleanup_bulk_orders(
@@ -497,16 +522,25 @@ module aptos_experimental::order_placement {
         let fill_id = market.next_fill_id();
         let settle_result = callbacks.settle_trade(
             market,
-            user_addr,
-            order_id,
-            maker_order.get_account_from_match_details(),
-            maker_order.get_order_id_from_match_details(),
+            new_clearinghouse_order_info(
+                user_addr,
+                order_id,
+                client_order_id,
+                is_bid,
+                time_in_force,
+                metadata
+            ),
+            new_clearinghouse_order_info(
+                maker_order.get_account_from_match_details(),
+                maker_order.get_order_id_from_match_details(),
+                maker_order.get_client_order_id_from_match_details(),
+                maker_order.is_bid_from_match_details(),
+                maker_order.get_time_in_force_from_match_details(),
+                maker_order.get_metadata_from_match_details()
+            ),
             fill_id,
-            is_bid,
             maker_order.get_price_from_match_details(), // Order is always matched at the price of the maker
             maker_matched_size,
-            metadata,
-            maker_order.get_metadata_from_match_details()
         );
 
         let unsettled_maker_size = maker_matched_size;
@@ -613,8 +647,10 @@ module aptos_experimental::order_placement {
             cleanup_order_internal(
                 maker_order.get_account_from_match_details(),
                 maker_order.get_order_id_from_match_details(),
+                maker_order.get_client_order_id_from_match_details(),
                 maker_order.get_book_type_from_match_details(),
                 !is_bid, // is_bid is inverted for maker orders
+                maker_order.get_time_in_force_from_match_details(),
                 0, // 0 because the order is fully filled
                 maker_order.get_metadata_from_match_details(),
                 callbacks
@@ -685,14 +721,17 @@ module aptos_experimental::order_placement {
 
         if (
             !callbacks.validate_order_placement(
-                user_addr,
-                order_id,
+                new_clearinghouse_order_info(
+                    user_addr,
+                    order_id,
+                    client_order_id,
+                    is_bid,
+                    time_in_force,
+                    metadata
+                ),
                 is_taker_order, // is_taker
-                is_bid,
                 limit_price,
-                time_in_force,
                 remaining_size,
-                metadata
             )) {
             return cancel_single_order_internal(
                 market,
@@ -857,7 +896,7 @@ module aptos_experimental::order_placement {
             };
             if (remaining_size == 0) {
                 cleanup_order_internal(
-                    user_addr, order_id, single_order_book_type(), is_bid, 0, metadata, callbacks
+                    user_addr, order_id, client_order_id, single_order_book_type(), is_bid, time_in_force, 0, metadata, callbacks
                 );
                 break;
             };
