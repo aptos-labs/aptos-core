@@ -24,15 +24,6 @@ pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
     coeffs.truncate(degree);
 }
 
-pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
-    let degree = coeffs.len() - 1;
-    for i in 0..degree {
-        coeffs[i] = coeffs[i + 1].mul(F::from((i + 1) as u64));
-    }
-
-    coeffs.truncate(degree);
-}
-
 /// Returns $\[1, \tau, \tau^2, \tau^3, \ldots, \tau^{n-1}\]$.
 pub fn get_powers_of_tau(tau: &Scalar, n: usize) -> Vec<Scalar> {
     if n == 0 {
