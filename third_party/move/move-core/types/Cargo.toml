@@ -13,6 +13,7 @@ edition = { workspace = true }
 anyhow = { workspace = true }
 arbitrary = { workspace = true, features = ["derive_arbitrary"], optional = true }
 bcs = { workspace = true }
+blake3 = { workspace = true }
 bytes = { workspace = true }
 dearbitrary = { workspace = true, optional = true, features = ["derive"] }
 ethnum = { workspace = true, features = ["serde"] }

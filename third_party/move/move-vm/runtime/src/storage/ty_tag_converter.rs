@@ -520,14 +520,14 @@ mod tests {
         // Structs.
         let bar_idx = runtime_environment
             .struct_name_index_map()
-            .struct_name_to_idx(&StructIdentifier {
+            .struct_name_to_idx_for_test(&StructIdentifier {
                 module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
                 name: Identifier::new("Bar").unwrap(),
             })
             .unwrap();
         let foo_idx = runtime_environment
             .struct_name_index_map()
-            .struct_name_to_idx(&StructIdentifier {
+            .struct_name_to_idx_for_test(&StructIdentifier {
                 module: ModuleId::new(AccountAddress::TWO, Identifier::new("foo").unwrap()),
                 name: Identifier::new("Foo").unwrap(),
             })
@@ -608,7 +608,7 @@ mod tests {
         };
         let idx = runtime_environment
             .struct_name_index_map()
-            .struct_name_to_idx(&id)
+            .struct_name_to_idx_for_test(&id)
             .unwrap();
         let struct_tag = StructTag::from_str("0x1::foo::Foo").unwrap();
 

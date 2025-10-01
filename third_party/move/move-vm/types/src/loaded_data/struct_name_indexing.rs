@@ -37,16 +37,18 @@ impl std::fmt::Display for StructNameIndex {
     }
 }
 
+// TODO: more efficient interner impl
+//       https://matklad.github.io/2020/03/22/fast-simple-rust-interner.html
 #[derive(Clone)]
-struct IndexMap<T: Clone + Ord> {
+struct IndexMap<T: Clone + Ord, U> {
     forward_map: BTreeMap<T, u32>,
-    backward_map: Vec<Arc<T>>,
+    backward_map: Vec<(Arc<T>, U)>,
 }
 
 /// A data structure to cache struct identifiers (address, module name, struct name) and use
 /// indices instead, to save on the memory consumption and avoid unnecessary cloning. It
 /// guarantees that the same struct name identifier always corresponds to a unique index.
-pub struct StructNameIndexMap(RwLock<IndexMap<StructIdentifier>>);
+pub struct StructNameIndexMap(RwLock<IndexMap<StructIdentifier, [u8; 32]>>);
 
 impl StructNameIndexMap {
     /// Returns an empty map with no entries.
@@ -67,9 +69,13 @@ impl StructNameIndexMap {
     /// Maps the struct identifier into an index. If the identifier already exists returns the
     /// corresponding index. This function guarantees that for any struct identifiers A and B,
     /// if A == B, they have the same indices.
-    pub fn struct_name_to_idx(
+    ///
+    /// Additionally, this also stores the blake3 hash of the module in which the struct is
+    /// defined, which is for efficient lookup in reentrancy checks.
+    fn struct_name_to_idx_impl(
         &self,
         struct_name: &StructIdentifier,
+        module_hash: Option<[u8; 32]>,
     ) -> PartialVMResult<StructNameIndex> {
         {
             let index_map = self.0.read();
@@ -82,6 +88,8 @@ impl StructNameIndexMap {
         let forward_key = struct_name.clone();
         let backward_value = Arc::new(struct_name.clone());
 
+        let module_hash: [u8; 32] = module_hash.unwrap_or_else(|| struct_name.module.blake3_hash());
+
         let idx = {
             let mut index_map = self.0.write();
 
@@ -90,7 +98,7 @@ impl StructNameIndexMap {
             }
 
             let idx = index_map.backward_map.len() as u32;
-            index_map.backward_map.push(backward_value);
+            index_map.backward_map.push((backward_value, module_hash));
             index_map.forward_map.insert(forward_key, idx);
             idx
         };
@@ -98,19 +106,39 @@ impl StructNameIndexMap {
         Ok(StructNameIndex(idx))
     }
 
+    #[cfg(any(test, feature = "testing"))]
+    pub fn struct_name_to_idx_for_test(
+        &self,
+        struct_name: &StructIdentifier,
+    ) -> PartialVMResult<StructNameIndex> {
+        self.struct_name_to_idx_impl(struct_name, None)
+    }
+
+    pub fn struct_name_to_idx_with_module_hash(
+        &self,
+        struct_name: &StructIdentifier,
+        module_hash: [u8; 32],
+    ) -> PartialVMResult<StructNameIndex> {
+        self.struct_name_to_idx_impl(struct_name, Some(module_hash))
+    }
+
     fn idx_to_struct_name_helper<'a>(
-        index_map: &'a parking_lot::RwLockReadGuard<IndexMap<StructIdentifier>>,
+        index_map: &'a parking_lot::RwLockReadGuard<IndexMap<StructIdentifier, [u8; 32]>>,
         idx: StructNameIndex,
-    ) -> PartialVMResult<&'a Arc<StructIdentifier>> {
-        index_map.backward_map.get(idx.0 as usize).ok_or_else(|| {
-            let msg = format!(
-                "Index out of bounds when accessing struct name reference \
+    ) -> PartialVMResult<(&'a Arc<StructIdentifier>, &'a [u8; 32])> {
+        index_map
+            .backward_map
+            .get(idx.0 as usize)
+            .map(|(struct_name, module_hash)| (struct_name, module_hash))
+            .ok_or_else(|| {
+                let msg = format!(
+                    "Index out of bounds when accessing struct name reference \
                      at index {}, backward map length: {}",
-                idx.0,
-                index_map.backward_map.len()
-            );
-            panic_error!(msg)
-        })
+                    idx.0,
+                    index_map.backward_map.len()
+                );
+                panic_error!(msg)
+            })
     }
 
     /// Returns the reference of the struct name corresponding to the index. Here, we wrap the
@@ -120,7 +148,16 @@ impl StructNameIndexMap {
         idx: StructNameIndex,
     ) -> PartialVMResult<Arc<StructIdentifier>> {
         let index_map = self.0.read();
-        Ok(Self::idx_to_struct_name_helper(&index_map, idx)?.clone())
+        Ok(Self::idx_to_struct_name_helper(&index_map, idx)?.0.clone())
+    }
+
+    pub fn idx_to_struct_name_and_module_hash(
+        &self,
+        idx: StructNameIndex,
+    ) -> PartialVMResult<(StructIdentifier, [u8; 32])> {
+        let index_map = self.0.read();
+        let (struct_name, module_hash) = Self::idx_to_struct_name_helper(&index_map, idx)?;
+        Ok((struct_name.as_ref().clone(), *module_hash))
     }
 
     /// Returns the clone of the struct name corresponding to the index. The clone ensures that the
@@ -128,6 +165,7 @@ impl StructNameIndexMap {
     pub fn idx_to_struct_name(&self, idx: StructNameIndex) -> PartialVMResult<StructIdentifier> {
         let index_map = self.0.read();
         Ok(Self::idx_to_struct_name_helper(&index_map, idx)?
+            .0
             .as_ref()
             .clone())
     }
@@ -139,7 +177,7 @@ impl StructNameIndexMap {
         ty_args: Vec<TypeTag>,
     ) -> PartialVMResult<StructTag> {
         let index_map = self.0.read();
-        let struct_name = Self::idx_to_struct_name_helper(&index_map, idx)?.as_ref();
+        let struct_name = Self::idx_to_struct_name_helper(&index_map, idx)?.0.as_ref();
         Ok(StructTag {
             address: *struct_name.module.address(),
             module: struct_name.module.name().to_owned(),
@@ -198,11 +236,11 @@ mod test {
         // First-time access.
 
         let foo = make_struct_name("foo", "Foo");
-        let foo_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(&foo));
+        let foo_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx_for_test(&foo));
         assert_eq!(foo_idx.0, 0);
 
         let bar = make_struct_name("bar", "Bar");
-        let bar_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(&bar));
+        let bar_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx_for_test(&bar));
         assert_eq!(bar_idx.0, 1);
 
         // Check that struct names actually correspond to indices.
@@ -212,9 +250,9 @@ mod test {
         assert_eq!(returned_bar.as_ref(), &bar);
 
         // Re-check indices on second access.
-        let foo_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(&foo));
+        let foo_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx_for_test(&foo));
         assert_eq!(foo_idx.0, 0);
-        let bar_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(&bar));
+        let bar_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx_for_test(&bar));
         assert_eq!(bar_idx.0, 1);
 
         let len = assert_ok!(struct_name_idx_map.checked_len());
@@ -244,7 +282,7 @@ mod test {
                     s.spawn({
                         let struct_name_idx_map = struct_name_idx_map.clone();
                         move || {
-                            let idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(struct_name));
+                            let idx = assert_ok!(struct_name_idx_map.struct_name_to_idx_for_test(struct_name));
                             let actual_struct_name = assert_ok!(struct_name_idx_map.idx_to_struct_name_ref(idx));
                             assert_eq!(actual_struct_name.as_ref(), struct_name);
                         }
@@ -266,7 +304,7 @@ mod test {
                     let struct_name_idx_map = struct_name_idx_map.clone();
                     let struct_name = struct_name.clone();
                     move || {
-                        assert_ok!(struct_name_idx_map.struct_name_to_idx(&struct_name));
+                        assert_ok!(struct_name_idx_map.struct_name_to_idx_for_test(&struct_name));
                     }
                 });
             }

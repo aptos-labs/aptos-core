@@ -12,7 +12,10 @@ use move_binary_format::{
     errors::PartialVMResult,
     file_format::{CompiledScript, FunctionDefinitionIndex, SignatureIndex, Visibility},
 };
-use move_core_types::{ident_str, language_storage::ModuleId};
+use move_core_types::{
+    ident_str,
+    language_storage::{pseudo_script_module_id, ModuleId},
+};
 use move_vm_types::{
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
@@ -50,6 +53,8 @@ impl Script {
         struct_name_index_map: &StructNameIndexMap,
         ty_pool: &InternedTypePool,
     ) -> PartialVMResult<Self> {
+        let id_hash = pseudo_script_module_id().blake3_hash();
+
         let mut struct_names = vec![];
         for struct_handle in script.struct_handles() {
             let struct_name = script.identifier_at(struct_handle.name);
@@ -59,7 +64,9 @@ impl Script {
                 module: module_id,
                 name: struct_name.to_owned(),
             };
-            struct_names.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
+            struct_names.push(
+                struct_name_index_map.struct_name_to_idx_with_module_hash(&struct_name, id_hash)?,
+            );
         }
 
         let mut function_refs = vec![];

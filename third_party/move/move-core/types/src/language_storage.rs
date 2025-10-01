@@ -447,6 +447,13 @@ impl ModuleId {
         self.address == *OPTION_MODULE_ID.address()
             && self.name.as_ident_str() == OPTION_MODULE_ID.name()
     }
+
+    pub fn blake3_hash(&self) -> [u8; 32] {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(self.address.as_ref());
+        hasher.update(self.name.as_bytes());
+        hasher.finalize().into()
+    }
 }
 
 impl<'a> hashbrown::Equivalent<(&'a AccountAddress, &'a IdentStr)> for ModuleId {

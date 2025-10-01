@@ -1389,13 +1389,13 @@ where
                 )
             },
         };
-        let struct_name = runtime_environment
+        let (struct_name, module_hash) = runtime_environment
             .struct_name_index_map()
-            .idx_to_struct_name(struct_idx)?;
+            .idx_to_struct_name_and_module_hash(struct_idx)?;
 
         // Perform resource reentrancy check
         self.reentrancy_checker
-            .check_resource_access(&struct_name)?;
+            .check_resource_access(&struct_name, module_hash)?;
 
         // Perform resource access control
         if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
