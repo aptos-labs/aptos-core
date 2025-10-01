@@ -3,7 +3,7 @@
 
 mod new_layer_impl;
 
-use crate::{iterator::DescendantIterator, node::NodeStrongRef, Key, KeyHash, MapLayer, Value};
+use crate::{iterator::DescendantIterator, node::NodeRawPtr, Key, KeyHash, MapLayer, Value};
 use aptos_drop_helper::ArcAsyncDrop;
 use std::marker::PhantomData;
 
@@ -17,19 +17,32 @@ pub struct LayeredMap<K: ArcAsyncDrop, V: ArcAsyncDrop, S = DefaultHashBuilder> 
     top_layer: MapLayer<K, V>,
     /// Hasher is needed only for spawning a new layer, i.e. for a read only map there's no need to
     /// pay the overhead of constructing it.
-    _hash_builder: PhantomData<S>,
+    hash_builder: S,
 }
 
 impl<K, V, S> LayeredMap<K, V, S>
 where
     K: ArcAsyncDrop,
     V: ArcAsyncDrop,
+    S: Default,
 {
     pub fn new(base_layer: MapLayer<K, V>, top_layer: MapLayer<K, V>) -> Self {
         Self {
             base_layer,
             top_layer,
-            _hash_builder: PhantomData,
+            hash_builder: Default::default(),
+        }
+    }
+
+    pub fn new_with_hasher(
+        base_layer: MapLayer<K, V>,
+        top_layer: MapLayer<K, V>,
+        hash_builder: S,
+    ) -> Self {
+        Self {
+            base_layer,
+            top_layer,
+            hash_builder,
         }
     }
 
@@ -37,7 +50,7 @@ where
         let Self {
             base_layer,
             top_layer,
-            _hash_builder,
+            hash_builder,
         } = self;
 
         (base_layer, top_layer)
@@ -46,55 +59,91 @@ where
     pub(crate) fn base_layer(&self) -> u64 {
         self.base_layer.layer()
     }
+
+    pub(crate) fn top_layer(&self) -> u64 {
+        self.top_layer.layer()
+    }
 }
 
 impl<K, V, S> LayeredMap<K, V, S>
 where
-    K: ArcAsyncDrop + Key,
-    V: ArcAsyncDrop + Value,
+    K: ArcAsyncDrop + Key + std::fmt::Debug,
+    V: ArcAsyncDrop + Value + std::fmt::Debug,
+    S: Default,
 {
     pub fn get_with_hasher(&self, key: &K, hash_builder: &S) -> Option<V>
     where
         S: core::hash::BuildHasher,
     {
         let key_hash = KeyHash(hash_builder.hash_one(key));
+        println!("looking up key {:?}, key hash: {:?}", key, key_hash);
         let mut bits = key_hash.iter_bits();
 
         let peak = self.top_layer.peak();
+        println!("peak.height(): {}", peak.height());
         let mut foot = 0;
         for _ in 0..peak.height() - 1 {
             foot = (foot << 1) | bits.next().expect("bits exhausted") as usize;
         }
+        println!("foot: {}", foot);
 
         self.get_under_node(peak.expect_foot(foot, self.base_layer()), key, &mut bits)
     }
 
     fn get_under_node(
         &self,
-        node: NodeStrongRef<K, V>,
+        node: NodeRawPtr<K, V>,
         key: &K,
         remaining_key_bits: &mut impl Iterator<Item = bool>,
     ) -> Option<V> {
+        println!("looking up key {:?} under node", key);
         let mut cur_node = node;
         let bits = remaining_key_bits;
 
         loop {
             match cur_node {
-                NodeStrongRef::Empty => return None,
-                NodeStrongRef::Leaf(leaf) => {
-                    return leaf.get_value(key, self.base_layer()).cloned()
+                NodeRawPtr::Empty => {
+                    println!("see empty");
+                    return None;
                 },
-                NodeStrongRef::Internal(internal) => match bits.next() {
-                    None => {
-                        unreachable!("value on key-prefix not supported.");
-                    },
-                    Some(bit) => {
-                        if bit {
-                            cur_node = internal.right.get_strong(self.base_layer());
-                        } else {
-                            cur_node = internal.left.get_strong(self.base_layer());
-                        }
-                    },
+                NodeRawPtr::Leaf(leaf) => {
+                    let leaf = unsafe { leaf.as_ref() };
+                    println!("see leaf {:?}", leaf);
+                    return leaf.get_value(key, self.base_layer()).cloned();
+                },
+                NodeRawPtr::Internal(internal) => {
+                    println!("see internal");
+                    match bits.next() {
+                        None => {
+                            unreachable!("value on key-prefix not supported.");
+                        },
+                        Some(bit) => {
+                            let internal = unsafe { internal.as_ref() };
+                            if bit {
+                                println!("go right");
+                                let right_layer = match internal.right_layer {
+                                    Some(ly) => ly,
+                                    None => return None,
+                                };
+                                if right_layer > self.base_layer() {
+                                    cur_node = internal.right.get_raw(self.base_layer());
+                                } else {
+                                    return None;
+                                }
+                            } else {
+                                println!("go left");
+                                let left_layer = match internal.left_layer {
+                                    Some(ly) => ly,
+                                    None => return None,
+                                };
+                                if left_layer > self.base_layer() {
+                                    cur_node = internal.left.get_raw(self.base_layer());
+                                } else {
+                                    return None;
+                                }
+                            }
+                        },
+                    }
                 },
             } // end match cur_node
         } // end loop
@@ -108,10 +157,22 @@ where
     }
 
     // TODO(aldenhu): make `Item = (&K, &V)`
-    pub fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
-        self.top_layer
-            .peak()
-            .into_feet_iter()
-            .flat_map(|node| DescendantIterator::new(node, self.base_layer()))
+    pub fn iter(&self) -> Box<dyn Iterator<Item = (K, V)> + '_> {
+        println!(
+            "iter... base_layer: {}, top_layer: {}",
+            self.base_layer.layer(),
+            self.top_layer.layer()
+        );
+        println!("peak: {:?}", self.top_layer.peak());
+        if self.top_layer.layer() <= self.base_layer.layer() {
+            return Box::new(std::iter::empty());
+        }
+
+        Box::new(
+            self.top_layer
+                .peak()
+                .into_feet_iter(self.base_layer.layer())
+                .flat_map(|node| DescendantIterator::new(node, self.base_layer())),
+        )
     }
 }

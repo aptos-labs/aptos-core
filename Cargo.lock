@@ -1713,15 +1713,14 @@ dependencies = [
  "aptos-drop-helper",
  "aptos-infallible",
  "aptos-metrics-core",
- "aptos-schemadb",
  "aptos-temppath",
  "bitvec 1.0.1",
  "criterion",
  "itertools 0.13.0",
+ "maplit",
  "once_cell",
  "proptest",
  "rand 0.7.3",
- "rocksdb",
  "tikv-jemallocator",
 ]
 
