@@ -18,7 +18,7 @@ use aptos_keyless_pepper_service::{
     vuf_pub_key,
 };
 use aptos_logger::{info, warn};
-use clap::Parser;
+use clap::{ArgGroup, Parser};
 use hyper::{
     service::{make_service_fn, service_fn},
     Server,
@@ -27,6 +27,12 @@ use std::{convert::Infallible, net::SocketAddr, ops::Deref, sync::Arc, time::Ins
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
+#[command(group(
+    ArgGroup::new("vuf_private_key")
+        .required(true) // One of the two arguments must be provided
+        .multiple(false) // Only one of the two arguments should be provided at a time (i.e., not both)
+        .args(&["vuf_private_key_hex", "vuf_private_key_seed_hex"]),
+))]
 struct Args {
     /// Run the service in local development mode (uses a test account recovery database)
     #[arg(long)]
@@ -35,6 +41,14 @@ struct Args {
     /// The port for the Pepper service to listen on
     #[arg(long, default_value_t = DEFAULT_PEPPER_SERVICE_PORT)]
     pepper_service_port: u16,
+
+    /// The hex-encoded VUF private key (used directly if provided, otherwise derived from the seed)
+    #[arg(long)]
+    vuf_private_key_hex: Option<String>,
+
+    /// The hex-encoded VUF private key seed (used to derive the private key if the key is not provided directly)
+    #[arg(long)]
+    vuf_private_key_seed_hex: Option<String>,
 }
 
 #[tokio::main]
@@ -51,7 +65,10 @@ async fn main() {
 
     // Fetch the VUF public and private keypair (this will load the private key into memory)
     info!("Fetching the VUF public and private keypair for the pepper service...");
-    let (vuf_public_key, vuf_private_key) = vuf_pub_key::get_pepper_service_vuf_keypair();
+    let (vuf_public_key, vuf_private_key) = vuf_pub_key::get_pepper_service_vuf_keypair(
+        args.vuf_private_key_hex,
+        args.vuf_private_key_seed_hex,
+    );
     info!("Retrieved the VUF public key: {:?}", vuf_public_key);
 
     // Start the cached resource fetcher
