@@ -1624,7 +1624,7 @@ where
         debug_writeln!(buf)?;
         debug_writeln!(buf, "        Locals:")?;
         if !function.local_tys().is_empty() {
-            values::debug::print_locals(buf, &frame.locals)?;
+            values::debug::print_locals(buf, &frame.locals, true)?;
             debug_writeln!(buf)?;
         } else {
             debug_writeln!(buf, "            (none)")?;
@@ -1705,9 +1705,6 @@ where
         }
         debug_writeln!(buf, "Operand Stack:")?;
         for (idx, val) in self.operand_stack.value.iter().enumerate() {
-            if val.is_invalid() {
-                continue;
-            }
             // TODO: Currently we do not know the types of the values on the operand stack.
             // Revisit.
             debug_write!(buf, "    [{}] ", idx)?;
