@@ -1,11 +1,15 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::loaded_data::{
-    runtime_access_specifier::{
-        AccessInstance, AccessSpecifier, AccessSpecifierClause, AddressSpecifier, ResourceSpecifier,
+use crate::{
+    loaded_data::{
+        runtime_access_specifier::{
+            AccessInstance, AccessSpecifier, AccessSpecifierClause, AddressSpecifier,
+            ResourceSpecifier,
+        },
+        runtime_types::{StructIdentifier, Type, TypeBuilder},
     },
-    runtime_types::{StructIdentifier, Type, TypeBuilder},
+    module_id_interner::InternedModuleId,
 };
 use move_binary_format::file_format::AccessKind;
 use move_core_types::{
@@ -112,8 +116,11 @@ fn type_args_strategy() -> impl Strategy<Value = Vec<Type>> {
 }
 
 fn struct_id_strategy() -> impl Strategy<Value = StructIdentifier> {
-    (module_id_strategy(), identifier_strategy())
-        .prop_map(|(module, name)| StructIdentifier { module, name })
+    (module_id_strategy(), identifier_strategy()).prop_map(|(module, name)| StructIdentifier {
+        module: module.clone(),
+        name,
+        interned_module_id: InternedModuleId::from_module_id_for_test(module.clone()),
+    })
 }
 
 fn module_id_strategy() -> impl Strategy<Value = ModuleId> {

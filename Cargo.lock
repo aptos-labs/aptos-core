@@ -6271,7 +6271,7 @@ checksum = "23285ad32269793932e830392f2fe2f83e26488fd3ec778883a93c8323735780"
 dependencies = [
  "arrayref",
  "arrayvec 0.7.4",
- "constant_time_eq 0.3.0",
+ "constant_time_eq 0.3.1",
 ]
 
 [[package]]
@@ -6282,7 +6282,7 @@ checksum = "94230421e395b9920d23df13ea5d77a20e1725331f90fbbf6df6040b33f756ae"
 dependencies = [
  "arrayref",
  "arrayvec 0.7.4",
- "constant_time_eq 0.3.0",
+ "constant_time_eq 0.3.1",
 ]
 
 [[package]]
@@ -7273,9 +7273,9 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "constant_time_eq"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7144d30dcf0fafbce74250a3963025d8d52177934239851c917d29f1df280c2"
+checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
 
 [[package]]
 name = "convert_case"
@@ -13049,6 +13049,7 @@ dependencies = [
  "mockall 0.11.4",
  "move-binary-format",
  "move-core-types",
+ "once_cell",
  "parking_lot 0.12.1",
  "proptest",
  "rand 0.7.3",

@@ -518,17 +518,27 @@ mod tests {
         );
 
         // Structs.
+        let module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let interned_module_id = runtime_environment
+            .module_id_pool()
+            .intern_by_ref(&module_id);
         let bar_idx = runtime_environment
             .struct_name_index_map()
             .struct_name_to_idx(&StructIdentifier {
-                module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
+                module: module_id,
+                interned_module_id,
                 name: Identifier::new("Bar").unwrap(),
             })
             .unwrap();
+        let module_id = ModuleId::new(AccountAddress::TWO, Identifier::new("foo").unwrap());
+        let interned_module_id = runtime_environment
+            .module_id_pool()
+            .intern_by_ref(&module_id);
         let foo_idx = runtime_environment
             .struct_name_index_map()
             .struct_name_to_idx(&StructIdentifier {
-                module: ModuleId::new(AccountAddress::TWO, Identifier::new("foo").unwrap()),
+                module: module_id,
+                interned_module_id,
                 name: Identifier::new("Foo").unwrap(),
             })
             .unwrap();
@@ -602,8 +612,13 @@ mod tests {
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
 
+        let module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let interned_module_id = runtime_environment
+            .module_id_pool()
+            .intern_by_ref(&module_id);
         let id = StructIdentifier {
-            module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
+            module: module_id,
+            interned_module_id,
             name: Identifier::new("Foo").unwrap(),
         };
         let idx = runtime_environment
