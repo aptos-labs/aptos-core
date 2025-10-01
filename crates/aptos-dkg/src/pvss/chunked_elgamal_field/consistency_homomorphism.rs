@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::msm::{DiagonalProductMap, LiftMap},
+    algebra::homomorphism::{DiagonalProductMap, LiftMap},
     pcs::univariate_kzg,
     pvss::chunked_elgamal_field::chunked_elgamal,
     sigma_protocol,

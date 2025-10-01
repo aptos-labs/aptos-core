@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::msm::{FixedBaseMSM, Map},
+    algebra::homomorphism::{FixedBaseMSM, Map},
     fiat_shamir, utils,
 };
 use anyhow::ensure;
@@ -11,7 +11,7 @@ use ark_ff::{AdditiveGroup, Field};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{CryptoRng, RngCore};
 
-pub trait SigmaProtocol<E: Pairing> {
+pub trait Trait<E: Pairing> {
     type Statement: Codomain;
     type Witness: Domain<E>;
     type Hom: FixedBaseMSM<

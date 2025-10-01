@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::{msm::Map, polynomials},
+    algebra::{homomorphism::Map, polynomials},
     fiat_shamir,
     pcs::univariate_kzg,
     range_proofs::traits,

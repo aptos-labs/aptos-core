@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::algebra::msm::{self, FixedBaseMSM};
+use crate::algebra::homomorphism::{self, FixedBaseMSM};
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 
 #[allow(non_snake_case)]
@@ -18,7 +18,7 @@ type MSMInputVec<'a, E> = MatrixVectorPair<(
 )>;
 
 impl<'a, E: Pairing> Map<'a, E> {
-    pub fn prep_msms(&self, input: &<Self as msm::Map>::Domain) -> MSMInputVec<'a, E> {
+    pub fn prep_msms(&self, input: &<Self as homomorphism::Map>::Domain) -> MSMInputVec<'a, E> {
         let first_elgamal_comp = input
             .0
             .iter()
@@ -48,7 +48,7 @@ impl<'a, E: Pairing> Map<'a, E> {
     }
 }
 
-impl<'a, E: Pairing> msm::Map for Map<'a, E> {
+impl<'a, E: Pairing> homomorphism::Map for Map<'a, E> {
     type Codomain = MatrixVectorPair<E::G1>;
     type Domain = MatrixVectorPair<E::ScalarField>;
 

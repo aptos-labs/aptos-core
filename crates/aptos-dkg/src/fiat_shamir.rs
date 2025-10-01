@@ -8,7 +8,7 @@
 //! define all the things that are appended to the transcript.
 
 use crate::{
-    algebra::msm::Map,
+    algebra::homomorphism,
     pvss::{traits::Transcript, ThresholdConfig},
     range_proofs::traits::BatchedRangeProof,
     sigma_protocol,
@@ -123,7 +123,9 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 }
 
 #[allow(private_bounds)]
-pub trait SigmaProtocol<E: Pairing, H: Map>: ScalarProtocol<ArkworksScalar<E>> {
+pub trait SigmaProtocol<E: Pairing, H: homomorphism::Map>:
+    ScalarProtocol<ArkworksScalar<E>>
+{
     fn append_sigma_protocol_sep(&mut self, dst: &'static [u8]);
 
     /// Append the claim of a sigma protocol.
@@ -259,7 +261,7 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
     }
 }
 
-impl<E: Pairing, H: Map> SigmaProtocol<E, H> for merlin::Transcript
+impl<E: Pairing, H: homomorphism::Map> SigmaProtocol<E, H> for merlin::Transcript
 where
     H::Domain: sigma_protocol::Domain<E>,
     H::Codomain: sigma_protocol::Codomain,

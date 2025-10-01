@@ -3,11 +3,10 @@
 
 use aptos_dkg::{
     algebra::{
-        msm,
-        msm::{DiagonalProductMap, Map},
+        homomorphism,
+        homomorphism::{DiagonalProductMap, Map},
     },
     sigma_protocol,
-    sigma_protocol::SigmaProtocol,
 };
 use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
@@ -20,7 +19,7 @@ use ark_std::rand::{thread_rng, CryptoRng, RngCore};
 pub fn test_sigma_protocol<E, P>(instance: P, witness: P::Witness)
 where
     E: Pairing,
-    P: SigmaProtocol<E>,
+    P: sigma_protocol::Trait<E>,
 {
     let mut rng = thread_rng();
 
@@ -65,7 +64,7 @@ mod schnorr {
         }
     }
 
-    impl<E: Pairing> SigmaProtocol<E> for Schnorr<E> {
+    impl<E: Pairing> sigma_protocol::Trait<E> for Schnorr<E> {
         type Hom = ExponentiateBase<E>;
         type Statement = E::G1;
         type Witness = SchnorrDomain<E>;
@@ -83,7 +82,7 @@ mod schnorr {
         pub g: E::G1Affine,
     }
 
-    impl<E: Pairing> msm::Map for ExponentiateBase<E> {
+    impl<E: Pairing> homomorphism::Map for ExponentiateBase<E> {
         type Codomain = E::G1;
         type Domain = SchnorrDomain<E>;
 
@@ -92,7 +91,7 @@ mod schnorr {
         }
     }
 
-    impl<E: Pairing> msm::FixedBaseMSM for ExponentiateBase<E> {
+    impl<E: Pairing> homomorphism::FixedBaseMSM for ExponentiateBase<E> {
         type Base = E::G1Affine;
         type Scalar = E::ScalarField;
 
@@ -122,7 +121,7 @@ mod chaum_pedersen {
         }
     }
 
-    impl<E: Pairing> SigmaProtocol<E> for ChaumPedersen<E> {
+    impl<E: Pairing> sigma_protocol::Trait<E> for ChaumPedersen<E> {
         type Hom = DiagonalProductMap<ExponentiateBase<E>, ExponentiateBase<E>>;
         type Statement = (E::G1, E::G1);
         type Witness = SchnorrDomain<E>;
