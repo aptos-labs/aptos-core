@@ -39,6 +39,7 @@ Nonce: <digest>
 -  [Function `authenticate_auth_data`](#0x1_sui_derivable_account_authenticate_auth_data)
 -  [Function `authenticate`](#0x1_sui_derivable_account_authenticate)
 -  [Specification](#@Specification_1)
+    -  [Function `derive_account_address_from_public_key`](#@Specification_1_derive_account_address_from_public_key)
     -  [Function `authenticate_auth_data`](#@Specification_1_authenticate_auth_data)
     -  [Function `authenticate`](#@Specification_1_authenticate)
 
@@ -749,6 +750,22 @@ Authorization function for domain account abstraction.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Specification_1_derive_account_address_from_public_key"></a>
+
+### Function `derive_account_address_from_public_key`
+
+
+<pre><code><b>fun</b> <a href="sui_derivable_account.md#0x1_sui_derivable_account_derive_account_address_from_public_key">derive_account_address_from_public_key</a>(signing_scheme: u8, public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
 
 
 <a id="@Specification_1_authenticate_auth_data"></a>

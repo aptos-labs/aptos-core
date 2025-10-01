@@ -151,6 +151,11 @@ module aptos_framework::sui_derivable_account {
         (signing_scheme, abstract_signature_signature, abstract_signature_public_key)
     }
 
+    spec derive_account_address_from_public_key {
+        // TODO: Move Prover has issues with blake2b_256 type translation
+        pragma verify = false;
+    }
+
     /// Derives the account address from the public key and returns it is a hex string with "0x" prefix
     fun derive_account_address_from_public_key(signing_scheme: u8, public_key_bytes: vector<u8>): vector<u8> {
         // Create a vector with signing scheme and public key bytes
