@@ -5,8 +5,8 @@ use crate::{
     code_cache_global::GlobalModuleCache,
     counters::{
         GLOBAL_LAYOUT_CACHE_NUM_NON_ENTRIES, GLOBAL_MODULE_CACHE_NUM_MODULES,
-        GLOBAL_MODULE_CACHE_SIZE_IN_BYTES, NUM_INTERNED_TYPES, NUM_INTERNED_TYPE_VECS,
-        STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
+        GLOBAL_MODULE_CACHE_SIZE_IN_BYTES, NUM_INTERNED_MODULE_IDS, NUM_INTERNED_TYPES,
+        NUM_INTERNED_TYPE_VECS, STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
     },
 };
 use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_34;
@@ -142,11 +142,19 @@ where
         NUM_INTERNED_TYPES.set(num_interned_tys as i64);
         let num_interned_ty_vecs = runtime_environment.ty_pool().num_interned_ty_vecs();
         NUM_INTERNED_TYPE_VECS.set(num_interned_ty_vecs as i64);
+        let num_interned_module_ids = runtime_environment.module_id_pool().len();
+        NUM_INTERNED_MODULE_IDS.set(num_interned_module_ids as i64);
 
         if num_interned_tys > config.max_interned_tys
             || num_interned_ty_vecs > config.max_interned_ty_vecs
         {
             runtime_environment.ty_pool().flush();
+            self.module_cache.flush();
+        }
+
+        if num_interned_module_ids > config.max_interned_module_ids {
+            runtime_environment.module_id_pool().flush();
+            runtime_environment.struct_name_index_map().flush();
             self.module_cache.flush();
         }
 
@@ -399,15 +407,20 @@ mod test {
         V: Deref<Target = Arc<D>>,
         E: WithSize,
     {
-        assert_ok!(manager
-            .environment
-            .as_mut()
-            .unwrap()
-            .runtime_environment()
-            .struct_name_to_idx_for_test(StructIdentifier {
-                module: ModuleId::new(AccountAddress::ZERO, Identifier::new("m").unwrap()),
+        let runtime_environment = manager.environment.as_mut().unwrap().runtime_environment();
+
+        let module_id = ModuleId::new(AccountAddress::ZERO, Identifier::new("m").unwrap());
+        let interned_module_id = runtime_environment
+            .module_id_pool()
+            .intern_by_ref(&module_id);
+
+        assert_ok!(
+            runtime_environment.struct_name_to_idx_for_test(StructIdentifier {
+                module: module_id,
+                interned_module_id,
                 name: Identifier::new(name).unwrap()
-            }));
+            })
+        );
     }
 
     fn assert_struct_name_index_map_size_eq<K, D, V, E>(
@@ -460,6 +473,7 @@ mod test {
             max_interned_tys: 100,
             max_interned_ty_vecs: 100,
             max_layout_cache_size: 10,
+            max_interned_module_ids: 100,
         };
 
         // Populate the cache for testing.

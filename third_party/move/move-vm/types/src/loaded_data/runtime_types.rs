@@ -4,7 +4,9 @@
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
-use crate::loaded_data::struct_name_indexing::StructNameIndex;
+use crate::{
+    loaded_data::struct_name_indexing::StructNameIndex, module_id_interner::InternedModuleId,
+};
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
@@ -259,6 +261,7 @@ impl StructType {
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructIdentifier {
     pub module: ModuleId,
+    pub interned_module_id: InternedModuleId,
     pub name: Identifier,
 }
 
@@ -306,7 +309,7 @@ pub struct TypePreorderTraversalIter<'a> {
 impl<'a> Iterator for TypePreorderTraversalIter<'a> {
     type Item = &'a Type;
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn next(&mut self) -> Option<Self::Item> {
         use Type::*;
 

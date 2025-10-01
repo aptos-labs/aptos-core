@@ -2355,7 +2355,7 @@ impl Value {
         ))))
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn vector_u32(it: impl IntoIterator<Item = u32>) -> Self {
         Value::Container(Container::VecU32(Rc::new(RefCell::new(
             it.into_iter().collect(),

@@ -32,6 +32,7 @@ use move_vm_types::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
     },
+    module_id_interner::InternedModuleId,
     ty_interner::TypeVecId,
     values::{AbstractFunction, SerializedFunctionData},
 };
@@ -90,6 +91,24 @@ impl Debug for LoadedFunctionOwner {
                     m.module.name()
                 )
             },
+        }
+    }
+}
+
+impl LoadedFunctionOwner {
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    pub fn module_or_script_id(&self) -> &ModuleId {
+        match self {
+            LoadedFunctionOwner::Module(m) => Module::self_id(m),
+            LoadedFunctionOwner::Script(_) => language_storage::pseudo_script_module_id(),
+        }
+    }
+
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    pub fn interned_module_or_script_id(&self) -> InternedModuleId {
+        match self {
+            LoadedFunctionOwner::Module(m) => m.interned_id,
+            LoadedFunctionOwner::Script(s) => s.interned_id,
         }
     }
 }
@@ -451,10 +470,7 @@ impl LoadedFunction {
     /// Returns the module id or, if it is a script, the pseudo module id for scripts.
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn module_or_script_id(&self) -> &ModuleId {
-        match &self.owner {
-            LoadedFunctionOwner::Module(m) => Module::self_id(m),
-            LoadedFunctionOwner::Script(_) => language_storage::pseudo_script_module_id(),
-        }
+        self.owner.module_or_script_id()
     }
 
     /// Returns the name of this function.
