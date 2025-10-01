@@ -89,12 +89,6 @@
 <dd>
 
 </dd>
-<dt>
-<code>ascending_id_generator: <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a></code>
-</dt>
-<dd>
-
-</dd>
 </dl>
 
 
@@ -138,7 +132,6 @@
         <a href="single_order_book.md#0x7_single_order_book">single_order_book</a>: new_single_order_book(),
         <a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>: new_bulk_order_book(),
         price_time_idx: new_price_time_idx(),
-        ascending_id_generator: new_ascending_id_generator(),
     }
 }
 </code></pre>
@@ -317,7 +310,6 @@
 ) {
     self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_place_maker_order">place_maker_order</a>(
         &<b>mut</b> self.price_time_idx,
-        &<b>mut</b> self.ascending_id_generator,
         order_req
     );
 }
@@ -761,7 +753,6 @@ Checks if the order is a taker order i.e., matched immediatedly with the active 
 ) : BulkOrder&lt;M&gt; {
     self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_place_bulk_order">place_bulk_order</a>(
         &<b>mut</b> self.price_time_idx,
-        &<b>mut</b> self.ascending_id_generator,
         order_req
     )
 }

@@ -12,15 +12,15 @@
 ///
 module aptos_experimental::single_order_book {
     friend aptos_experimental::order_book;
+
     use std::vector;
     use std::error;
     use std::option::{Self, Option};
     use std::string::String;
     use aptos_framework::big_ordered_map::BigOrderedMap;
-
+    use aptos_framework::transaction_context;
     use aptos_experimental::order_book_types::{
         OrderIdType,
-        AscendingIdGenerator,
         AccountClientOrderId,
         new_unique_idx_type,
         new_account_client_order_id,
@@ -40,10 +40,10 @@ module aptos_experimental::single_order_book {
         PendingOrderBookIndex,
         new_pending_order_book_index
     };
+
     #[test_only]
     use aptos_experimental::order_book_types::{
         new_order_id_type,
-        new_ascending_id_generator
     };
     #[test_only]
     use aptos_experimental::order_book_types::{good_till_cancelled, price_move_up_condition, price_move_down_condition};
@@ -251,12 +251,12 @@ module aptos_experimental::single_order_book {
     /// Places a maker order to the order book. If the order is a pending order, it is added to the pending order book
     /// else it is added to the active order book. The API aborts if its not a maker order or if the order already exists
     public(friend) fun place_maker_order<M: store + copy + drop>(
-        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, order_req: SingleOrderRequest<M>
+        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_req: SingleOrderRequest<M>
     ) {
         let ascending_idx =
-            new_unique_idx_type(ascending_id_generator.next_ascending_id());
+            new_unique_idx_type(transaction_context::monotonically_increasing_counter());
         if (order_req.trigger_condition.is_some()) {
-            return self.place_pending_maker_order(ascending_id_generator, order_req);
+            return self.place_pending_maker_order(order_req);
         };
         self.place_ready_maker_order_with_unique_idx(price_time_idx, order_req, ascending_idx);
 
@@ -365,11 +365,11 @@ module aptos_experimental::single_order_book {
 
 
     fun place_pending_maker_order<M: store + copy + drop>(
-        self: &mut SingleOrderBook<M>, ascending_id_generator: &mut AscendingIdGenerator, order_req: SingleOrderRequest<M>
+        self: &mut SingleOrderBook<M>, order_req: SingleOrderRequest<M>
     ) {
         let order_id = order_req.order_id;
         let ascending_idx =
-            new_unique_idx_type(ascending_id_generator.next_ascending_id());
+            new_unique_idx_type(transaction_context::monotonically_increasing_counter());
         let order =
             new_single_order(
                 order_id,
@@ -599,7 +599,7 @@ module aptos_experimental::single_order_book {
 
     #[test_only]
     public(friend) fun place_order_and_get_matches<M: store + copy + drop>(
-        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, order_req: SingleOrderRequest<M>
+        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_req: SingleOrderRequest<M>
     ): vector<OrderMatch<M>> {
         let match_results = vector::empty();
         let remaining_size = order_req.remaining_size;
@@ -609,7 +609,6 @@ module aptos_experimental::single_order_book {
             )) {
                 self.place_maker_order(
                     price_time_idx,
-                    ascending_id_generator,
                     SingleOrderRequest::V1 {
                         account: order_req.account,
                         order_id: order_req.order_id,
@@ -637,7 +636,7 @@ module aptos_experimental::single_order_book {
 
     #[test_only]
     public(friend) fun update_order_and_get_matches<M: store + copy + drop>(
-        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, order_req: SingleOrderRequest<M>
+        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_req: SingleOrderRequest<M>
     ): vector<OrderMatch<M>> {
         let unique_priority_idx = self.get_unique_priority_idx(order_req.order_id);
         assert!(unique_priority_idx.is_some(), EORDER_NOT_FOUND);
@@ -654,12 +653,12 @@ module aptos_experimental::single_order_book {
             time_in_force: order_req.time_in_force,
             metadata: order_req.metadata
         };
-        self.place_order_and_get_matches(price_time_idx, ascending_id_generator, order_req)
+        self.place_order_and_get_matches(price_time_idx, order_req)
     }
 
     #[test_only]
     public(friend) fun trigger_pending_orders<M: store + copy + drop>(
-        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, oracle_price: u64
+        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, oracle_price: u64
     ): vector<OrderMatch<M>> {
         let ready_orders = self.take_ready_price_based_orders(oracle_price, 1000);
         let all_matches = vector::empty();
@@ -691,7 +690,7 @@ module aptos_experimental::single_order_book {
                 time_in_force,
                 metadata
             };
-            let match_results = self.place_order_and_get_matches(price_time_idx, ascending_id_generator, order_req);
+            let match_results = self.place_order_and_get_matches(price_time_idx, order_req);
             all_matches.append(match_results);
             i += 1;
         };
@@ -719,19 +718,17 @@ module aptos_experimental::single_order_book {
     }
 
     #[test_only]
-    public fun set_up_test(): (SingleOrderBook<TestMetadata>, PriceTimeIndex, AscendingIdGenerator) {
+    public fun set_up_test(): (SingleOrderBook<TestMetadata>, PriceTimeIndex) {
         let order_book = new_single_order_book<TestMetadata>();
         let price_time_idx = new_price_time_idx();
-        let ascending_id_generator = new_ascending_id_generator();
-        (order_book, price_time_idx, ascending_id_generator)
+        (order_book, price_time_idx)
     }
 
     #[test_only]
-    public fun set_up_test_with_id(): (SingleOrderBook<u64>, PriceTimeIndex, AscendingIdGenerator) {
+    public fun set_up_test_with_id(): (SingleOrderBook<u64>, PriceTimeIndex) {
         let order_book = new_single_order_book<u64>();
         let price_time_idx = new_price_time_idx();
-        let ascending_id_generator = new_ascending_id_generator();
-        (order_book, price_time_idx, ascending_id_generator)
+        (order_book, price_time_idx)
     }
 
     // ============================= Test Helper Functions ====================================
