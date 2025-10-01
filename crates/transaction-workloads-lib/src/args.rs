@@ -102,6 +102,7 @@ pub enum TransactionTypeArg {
     OrderBookBalancedSizeSkewed80Pct50Markets,
     // Monotonic counter throughput tests
     MonotonicCounterSingle,
+    MonotonicCounterInsert,
     MonotonicCounterMultiple10,
     MonotonicCounterMultiple100,
     MonotonicCounterMultiple1000,
@@ -453,6 +454,11 @@ impl TransactionTypeArg {
             TransactionTypeArg::MonotonicCounterSingle => {
                 call_custom_module(EntryPoints::MonotonicCounter {
                     counter_type: MonotonicCounterType::Single,
+                })
+            },
+            TransactionTypeArg::MonotonicCounterInsert => {
+                call_custom_module(EntryPoints::MonotonicCounter {
+                    counter_type: MonotonicCounterType::Insert,
                 })
             },
             TransactionTypeArg::MonotonicCounterMultiple10 => {

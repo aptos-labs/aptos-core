@@ -52,6 +52,7 @@ pub enum LoopType {
 pub enum MonotonicCounterType {
     Single,                  // Call counter once per transaction
     Multiple { count: u64 }, // Call counter multiple times per transaction
+    Insert,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -865,6 +866,10 @@ impl EntryPointTrait for EntryPoints {
                     module_id,
                     ident_str!("test_monotonic_counter_multiple").to_owned(),
                     vec![bcs::to_bytes(&count).unwrap()],
+                ),
+                MonotonicCounterType::Insert => get_payload_void(
+                    module_id,
+                    ident_str!("test_monotonic_counter_insert").to_owned(),
                 ),
             },
             EntryPoints::OrderBook {

@@ -1022,7 +1022,7 @@ mod tests {
         AptosVM::set_processed_transactions_detailed_counters();
         NativeConfig::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVMBlockExecutor>(
-            Some(TransactionTypeArg::ModifyGlobalMilestoneAggV2),
+            Some(TransactionTypeArg::MonotonicCounterInsert),
             true,
         );
     }
