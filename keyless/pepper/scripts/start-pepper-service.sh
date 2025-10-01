@@ -20,6 +20,6 @@ ON_CHAIN_KEYLESS_CONFIG_URL=https://fullnode.devnet.aptoslabs.com/v1/accounts/0x
 echo "Starting the pepper service in local development mode, connecting to Aptos devnet for on-chain data!"
 cargo run -p aptos-keyless-pepper-service -- \
 --local-development-mode \
---vuf-private-key-seed-hex=${VUF_KEY_SEED_HEX} \
 --on-chain-groth16-vk-url=${ON_CHAIN_GROTH16_VK_URL} \
---on-chain-keyless-config-url=${ON_CHAIN_KEYLESS_CONFIG_URL}
+--on-chain-keyless-config-url=${ON_CHAIN_KEYLESS_CONFIG_URL} \
+--vuf-private-key-seed-hex=${VUF_KEY_SEED_HEX}
