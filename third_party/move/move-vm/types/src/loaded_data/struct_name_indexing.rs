@@ -172,6 +172,7 @@ impl StructNameIndexMap {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::module_id_interner::InternedModuleId;
     use claims::{assert_err, assert_ok};
     use move_core_types::{
         account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
@@ -181,8 +182,13 @@ mod test {
 
     fn make_struct_name(module_name: &str, struct_name: &str) -> StructIdentifier {
         let module = ModuleId::new(AccountAddress::ONE, Identifier::new(module_name).unwrap());
+        let interned_module_id = InternedModuleId(0);
         let name = Identifier::new(struct_name).unwrap();
-        StructIdentifier { module, name }
+        StructIdentifier {
+            module,
+            interned_module_id,
+            name,
+        }
     }
 
     #[test]
@@ -225,9 +231,13 @@ mod test {
         let address = any::<AccountAddress>();
         let module_identifier = any::<Identifier>();
         let struct_identifier = any::<Identifier>();
-        (address, module_identifier, struct_identifier).prop_map(|(a, m, name)| StructIdentifier {
-            module: ModuleId::new(a, m),
-            name,
+        let idx = any::<usize>();
+        (address, module_identifier, idx, struct_identifier).prop_map(|(a, m, idx, name)| {
+            StructIdentifier {
+                module: ModuleId::new(a, m),
+                interned_module_id: InternedModuleId(idx),
+                name,
+            }
         })
     }
 

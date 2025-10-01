@@ -32,6 +32,7 @@ use move_vm_types::{
         runtime_types::{StructIdentifier, StructLayout, StructType, Type},
         struct_name_indexing::{StructNameIndex, StructNameIndexMap},
     },
+    module_id_interner::{InternedModuleId, InternedModuleIdPool},
     ty_interner::{InternedTypePool, TypeVecId},
 };
 use std::{
@@ -48,6 +49,8 @@ use std::{
 #[derive(Clone, Debug)]
 pub struct Module {
     id: ModuleId,
+
+    pub(crate) interned_id: InternedModuleId,
 
     // size in bytes
     #[allow(dead_code)]
@@ -157,10 +160,13 @@ impl Module {
         module: Arc<CompiledModule>,
         struct_name_index_map: &StructNameIndexMap,
         ty_pool: &InternedTypePool,
+        module_id_pool: &InternedModuleIdPool,
     ) -> PartialVMResult<Self> {
         let _timer = VM_TIMER.timer_with_label("Module::new");
 
         let id = module.self_id();
+        let interned_id = module_id_pool.intern(id.clone());
+
         let friends = module
             .immediate_friends_iter()
             .map(|(addr, name)| ModuleId::new(*addr, name.to_owned()))
@@ -190,9 +196,11 @@ impl Module {
             let struct_name = module.identifier_at(struct_handle.name);
             let module_handle = module.module_handle_at(struct_handle.module);
             let module_id = module.module_id_for_handle(module_handle);
+            let interned_module_id = module_id_pool.intern(module_id.clone());
 
             let struct_name = StructIdentifier {
                 module: module_id,
+                interned_module_id,
                 name: struct_name.to_owned(),
             };
             struct_idxs.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
@@ -378,6 +386,7 @@ impl Module {
 
         Ok(Self {
             id,
+            interned_id,
             size,
             module,
             structs,
@@ -416,6 +425,7 @@ impl Module {
 
         Self {
             id: module_id,
+            interned_id: InternedModuleId(0),
             size: 0,
             module: module_arc,
             structs: vec![],
