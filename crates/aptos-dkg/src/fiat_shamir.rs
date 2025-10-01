@@ -42,11 +42,11 @@ trait ScalarProtocol<E: Pairing> {
 
 impl<E: Pairing> ScalarProtocol<E> for merlin::Transcript {
     fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<E::ScalarField> {
-        let mut buf = vec![0u8; num_scalars * 2 * SCALAR_NUM_BYTES];
+        let mut buf = vec![0u8; num_scalars * (E::ScalarField::MODULUS_BIT_SIZE as usize) / 4];
         self.challenge_bytes(label, &mut buf);
 
         let mut result = Vec::with_capacity(num_scalars);
-        for chunk in buf.chunks(2 * SCALAR_NUM_BYTES) {
+        for chunk in buf.chunks((E::ScalarField::MODULUS_BIT_SIZE as usize) / 4) {
             match chunk.try_into() {
                 Ok(chunk) => {
                     result.push(E::ScalarField::from_le_bytes_mod_order(chunk));
