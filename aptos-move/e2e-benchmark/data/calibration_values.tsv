@@ -1,43 +1,43 @@
-Loop { loop_count: Some(100000), loop_type: NoOp }	6	0.990	1.040	34731.8
-Loop { loop_count: Some(10000), loop_type: Arithmetic }	6	0.988	1.018	21679.8
-CreateObjects { num_objects: 10, object_payload_size: 0 }	6	0.989	1.007	104.0
-CreateObjects { num_objects: 10, object_payload_size: 10240 }	6	0.998	1.037	7793.9
-CreateObjects { num_objects: 100, object_payload_size: 0 }	6	0.984	1.011	957.7
-CreateObjects { num_objects: 100, object_payload_size: 10240 }	6	0.992	1.038	9076.4
-InitializeVectorPicture { length: 128 }	6	0.989	1.022	138.6
-VectorPicture { length: 128 }	6	0.994	1.024	33.3
-VectorPictureRead { length: 128 }	6	0.997	1.016	32.3
-InitializeVectorPicture { length: 30720 }	6	0.992	1.025	23963.8
-VectorPicture { length: 30720 }	6	0.996	1.006	4529.6
-VectorPictureRead { length: 30720 }	6	0.996	1.029	4546.9
-SmartTablePicture { length: 30720, num_points_per_txn: 200 }	6	0.997	1.067	18712.4
-SmartTablePicture { length: 1048576, num_points_per_txn: 300 }	6	0.989	1.058	33129.7
-ResourceGroupsSenderWriteTag { string_length: 1024 }	6	0.990	1.008	16.0
-ResourceGroupsSenderMultiChange { string_length: 1024 }	6	0.982	1.004	29.9
-TokenV1MintAndTransferFT	6	0.994	1.021	304.1
-TokenV1MintAndTransferNFTSequential	6	1.000	1.016	441.4
-TokenV2AmbassadorMint { numbered: true }	6	0.982	1.005	318.5
-LiquidityPoolSwap { is_stable: true }	6	0.987	1.005	487.1
-LiquidityPoolSwap { is_stable: false }	6	0.988	1.018	453.7
-CoinInitAndMint	6	0.991	1.009	415.2
-FungibleAssetMint	6	0.987	1.014	158.4
-IncGlobalMilestoneAggV2 { milestone_every: 1 }	6	0.989	1.018	24.1
-IncGlobalMilestoneAggV2 { milestone_every: 2 }	6	0.996	1.016	14.3
-EmitEvents { count: 1000 }	6	0.998	1.013	5429.7
-APTTransferWithPermissionedSigner	6	0.989	1.005	541.6
-APTTransferWithMasterSigner	6	0.987	1.014	65.6
-VectorTrimAppend { vec_len: 3000, element_len: 1, index: 0, repeats: 0 }	6	0.994	1.029	4573.0
-VectorTrimAppend { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	6	0.982	1.038	18783.0
-VectorTrimAppend { vec_len: 3000, element_len: 1, index: 2990, repeats: 1000 }	6	0.994	1.017	9480.2
-VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	6	0.995	1.017	14981.6
-VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 2998, repeats: 1000 }	6	0.987	1.030	10492.5
-VectorRangeMove { vec_len: 3000, element_len: 1, index: 1000, move_len: 500, repeats: 1000 }	6	0.996	1.018	21485.1
-VectorTrimAppend { vec_len: 100, element_len: 100, index: 0, repeats: 0 }	6	0.998	1.046	236.3
-VectorTrimAppend { vec_len: 100, element_len: 100, index: 10, repeats: 1000 }	6	0.993	1.012	5638.4
-VectorRangeMove { vec_len: 100, element_len: 100, index: 50, move_len: 10, repeats: 1000 }	6	0.995	1.000	3882.1
-MapInsertRemove { len: 100, repeats: 100, map_type: OrderedMap }	6	0.993	1.031	5608.2
-MapInsertRemove { len: 100, repeats: 100, map_type: SimpleMap }	6	0.993	1.065	18222.3
-MapInsertRemove { len: 100, repeats: 100, map_type: BigOrderedMap { inner_max_degree: 4, leaf_max_degree: 4 } }	6	0.992	1.023	33261.7
-MapInsertRemove { len: 100, repeats: 100, map_type: BigOrderedMap { inner_max_degree: 1024, leaf_max_degree: 1024 } }	6	0.991	1.022	7719.9
-MapInsertRemove { len: 1000, repeats: 100, map_type: OrderedMap }	6	0.991	1.036	28612.4
-OrderBook { state: OrderBookState { order_idx: 0 }, num_markets: 1, overlap_ratio: 0.0, buy_frequency: 0.5, max_sell_size: 1, max_buy_size: 1 }	6	0.984	1.007	385.2
+Loop { loop_count: Some(100000), loop_type: NoOp }	10	0.988	1.044	32866.5
+Loop { loop_count: Some(10000), loop_type: Arithmetic }	10	0.996	1.038	20269.5
+CreateObjects { num_objects: 10, object_payload_size: 0 }	10	0.994	1.013	99.6
+CreateObjects { num_objects: 10, object_payload_size: 10240 }	10	0.993	1.037	7366.5
+CreateObjects { num_objects: 100, object_payload_size: 0 }	10	0.994	1.015	917.4
+CreateObjects { num_objects: 100, object_payload_size: 10240 }	10	0.993	1.033	8598.7
+InitializeVectorPicture { length: 128 }	10	0.993	1.051	129.4
+VectorPicture { length: 128 }	10	0.982	1.008	33.2
+VectorPictureRead { length: 128 }	10	0.985	1.009	31.3
+InitializeVectorPicture { length: 30720 }	10	0.985	1.038	22113.3
+VectorPicture { length: 30720 }	10	0.988	1.012	4520.9
+VectorPictureRead { length: 30720 }	10	0.990	1.010	4520.9
+SmartTablePicture { length: 30720, num_points_per_txn: 200 }	10	0.994	1.029	17063.2
+SmartTablePicture { length: 1048576, num_points_per_txn: 300 }	10	0.993	1.034	30131.6
+ResourceGroupsSenderWriteTag { string_length: 1024 }	10	0.986	1.024	15.3
+ResourceGroupsSenderMultiChange { string_length: 1024 }	10	0.994	1.021	27.7
+TokenV1MintAndTransferFT	10	0.994	1.015	295.7
+TokenV1MintAndTransferNFTSequential	10	0.984	1.512	428.8
+TokenV2AmbassadorMint { numbered: true }	10	0.983	1.016	289.1
+LiquidityPoolSwap { is_stable: true }	10	0.996	1.013	463.8
+LiquidityPoolSwap { is_stable: false }	10	0.992	1.024	435.0
+CoinInitAndMint	10	0.995	1.017	392.8
+FungibleAssetMint	10	0.988	1.038	153.5
+IncGlobalMilestoneAggV2 { milestone_every: 1 }	10	0.979	1.032	23.7
+IncGlobalMilestoneAggV2 { milestone_every: 2 }	10	0.984	1.031	14.1
+EmitEvents { count: 1000 }	10	0.997	1.023	5076.7
+APTTransferWithPermissionedSigner	10	0.995	1.015	490.9
+APTTransferWithMasterSigner	10	0.989	1.021	62.9
+VectorTrimAppend { vec_len: 3000, element_len: 1, index: 0, repeats: 0 }	10	0.991	1.051	4358.4
+VectorTrimAppend { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	10	0.963	1.098	17876.9
+VectorTrimAppend { vec_len: 3000, element_len: 1, index: 2990, repeats: 1000 }	10	0.992	1.032	8632.3
+VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	10	0.992	1.039	13796.3
+VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 2998, repeats: 1000 }	10	0.993	1.038	9320.9
+VectorRangeMove { vec_len: 3000, element_len: 1, index: 1000, move_len: 500, repeats: 1000 }	10	0.993	1.018	20344.0
+VectorTrimAppend { vec_len: 100, element_len: 100, index: 0, repeats: 0 }	10	0.994	1.035	223.9
+VectorTrimAppend { vec_len: 100, element_len: 100, index: 10, repeats: 1000 }	10	0.984	1.008	5151.5
+VectorRangeMove { vec_len: 100, element_len: 100, index: 50, move_len: 10, repeats: 1000 }	10	0.991	1.023	3703.8
+MapInsertRemove { len: 100, repeats: 100, map_type: OrderedMap }	10	0.991	1.035	4975.0
+MapInsertRemove { len: 100, repeats: 100, map_type: SimpleMap }	10	0.993	1.052	16697.0
+MapInsertRemove { len: 100, repeats: 100, map_type: BigOrderedMap { inner_max_degree: 4, leaf_max_degree: 4 } }	10	0.993	1.013	25008.6
+MapInsertRemove { len: 100, repeats: 100, map_type: BigOrderedMap { inner_max_degree: 1024, leaf_max_degree: 1024 } }	10	0.991	1.043	6285.6
+MapInsertRemove { len: 1000, repeats: 100, map_type: OrderedMap }	10	0.990	1.034	25457.5
+OrderBook { state: OrderBookState { order_idx: 0 }, num_markets: 1, overlap_ratio: 0.0, buy_frequency: 0.5, max_sell_size: 1, max_buy_size: 1 }	10	0.994	1.012	350.5

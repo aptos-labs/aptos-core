@@ -11,18 +11,7 @@ use aptos_transaction_generator_lib::{
 };
 use aptos_transaction_workloads_lib::{EntryPoints, MoveVmMicroBenchmark};
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
-use clap::Parser;
 use rand::{rngs::StdRng, SeedableRng};
-
-#[derive(Parser, Debug)]
-struct Args {
-    /// Run only with caches ON
-    #[clap(long, default_value = "false")]
-    pub only_on: bool,
-    /// Run only with caches OFF
-    #[clap(long, default_value = "false")]
-    pub only_off: bool,
-}
 
 fn execute_txn(
     executor: &mut FakeExecutor,
@@ -87,7 +76,7 @@ fn run() {
     let executor = FakeExecutor::from_head_genesis();
     let mut executor = executor.set_not_parallel();
 
-    let workloads = vec![
+    let workloads = [
         EntryPoints::MoveVmMicroBenchmark(MoveVmMicroBenchmark::Locals),
         EntryPoints::MoveVmMicroBenchmark(MoveVmMicroBenchmark::LocalsGeneric),
     ];
