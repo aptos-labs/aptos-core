@@ -53,6 +53,8 @@ pub struct Module {
     // primitive pools
     pub(crate) module: Arc<CompiledModule>,
 
+    pub(crate) id_hash: [u8; 32],
+
     //
     // types as indexes into the Loader type list
     //
@@ -363,8 +365,14 @@ impl Module {
             });
         }
 
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(id.address.as_ref());
+        hasher.update(id.name.as_bytes());
+        let id_hash = hasher.finalize().into();
+
         Ok(Self {
             id,
+            id_hash,
             size,
             module,
             structs,
@@ -401,8 +409,14 @@ impl Module {
         // Create necessary empty collections
         let module_arc = Arc::new(empty_module);
 
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(module_id.address.as_ref());
+        hasher.update(module_id.name.as_bytes());
+        let id_hash = hasher.finalize().into();
+
         Self {
             id: module_id,
+            id_hash,
             size: 0,
             module: module_arc,
             structs: vec![],

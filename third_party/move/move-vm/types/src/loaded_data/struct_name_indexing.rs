@@ -37,16 +37,18 @@ impl std::fmt::Display for StructNameIndex {
     }
 }
 
+// TODO: more efficient interner impl
+//       https://matklad.github.io/2020/03/22/fast-simple-rust-interner.html
 #[derive(Clone)]
-struct IndexMap<T: Clone + Ord> {
+struct IndexMap<T: Clone + Ord, U> {
     forward_map: BTreeMap<T, usize>,
-    backward_map: Vec<Arc<T>>,
+    backward_map: Vec<(Arc<T>, U)>,
 }
 
 /// A data structure to cache struct identifiers (address, module name, struct name) and use
 /// indices instead, to save on the memory consumption and avoid unnecessary cloning. It
 /// guarantees that the same struct name identifier always corresponds to a unique index.
-pub struct StructNameIndexMap(RwLock<IndexMap<StructIdentifier>>);
+pub struct StructNameIndexMap(RwLock<IndexMap<StructIdentifier, [u8; 32]>>);
 
 impl StructNameIndexMap {
     /// Returns an empty map with no entries.
@@ -82,6 +84,11 @@ impl StructNameIndexMap {
         let forward_key = struct_name.clone();
         let backward_value = Arc::new(struct_name.clone());
 
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(struct_name.module.address.as_ref());
+        hasher.update(struct_name.module.name.as_bytes());
+        let module_hash: [u8; 32] = hasher.finalize().into();
+
         let idx = {
             let mut index_map = self.0.write();
 
@@ -90,7 +97,7 @@ impl StructNameIndexMap {
             }
 
             let idx = index_map.backward_map.len();
-            index_map.backward_map.push(backward_value);
+            index_map.backward_map.push((backward_value, module_hash));
             index_map.forward_map.insert(forward_key, idx);
             idx
         };
@@ -99,18 +106,22 @@ impl StructNameIndexMap {
     }
 
     fn idx_to_struct_name_helper<'a>(
-        index_map: &'a parking_lot::RwLockReadGuard<IndexMap<StructIdentifier>>,
+        index_map: &'a parking_lot::RwLockReadGuard<IndexMap<StructIdentifier, [u8; 32]>>,
         idx: StructNameIndex,
-    ) -> PartialVMResult<&'a Arc<StructIdentifier>> {
-        index_map.backward_map.get(idx.0).ok_or_else(|| {
-            let msg = format!(
-                "Index out of bounds when accessing struct name reference \
+    ) -> PartialVMResult<(&'a Arc<StructIdentifier>, &'a [u8; 32])> {
+        index_map
+            .backward_map
+            .get(idx.0)
+            .map(|(struct_name, module_hash)| (struct_name, module_hash))
+            .ok_or_else(|| {
+                let msg = format!(
+                    "Index out of bounds when accessing struct name reference \
                      at index {}, backward map length: {}",
-                idx.0,
-                index_map.backward_map.len()
-            );
-            panic_error!(msg)
-        })
+                    idx.0,
+                    index_map.backward_map.len()
+                );
+                panic_error!(msg)
+            })
     }
 
     /// Returns the reference of the struct name corresponding to the index. Here, we wrap the
@@ -120,7 +131,16 @@ impl StructNameIndexMap {
         idx: StructNameIndex,
     ) -> PartialVMResult<Arc<StructIdentifier>> {
         let index_map = self.0.read();
-        Ok(Self::idx_to_struct_name_helper(&index_map, idx)?.clone())
+        Ok(Self::idx_to_struct_name_helper(&index_map, idx)?.0.clone())
+    }
+
+    pub fn idx_to_struct_name_and_module_hash(
+        &self,
+        idx: StructNameIndex,
+    ) -> PartialVMResult<(StructIdentifier, [u8; 32])> {
+        let index_map = self.0.read();
+        let (struct_name, module_hash) = Self::idx_to_struct_name_helper(&index_map, idx)?;
+        Ok((struct_name.as_ref().clone(), *module_hash))
     }
 
     /// Returns the clone of the struct name corresponding to the index. The clone ensures that the
@@ -128,6 +148,7 @@ impl StructNameIndexMap {
     pub fn idx_to_struct_name(&self, idx: StructNameIndex) -> PartialVMResult<StructIdentifier> {
         let index_map = self.0.read();
         Ok(Self::idx_to_struct_name_helper(&index_map, idx)?
+            .0
             .as_ref()
             .clone())
     }
@@ -139,7 +160,7 @@ impl StructNameIndexMap {
         ty_args: Vec<TypeTag>,
     ) -> PartialVMResult<StructTag> {
         let index_map = self.0.read();
-        let struct_name = Self::idx_to_struct_name_helper(&index_map, idx)?.as_ref();
+        let struct_name = Self::idx_to_struct_name_helper(&index_map, idx)?.0.as_ref();
         Ok(StructTag {
             address: *struct_name.module.address(),
             module: struct_name.module.name().to_owned(),
