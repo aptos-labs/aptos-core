@@ -13,7 +13,6 @@ use crate::{
     range_proofs::traits::BatchedRangeProof,
     sigma_protocol,
     utils::random::random_scalar_from_uniform_bytes,
-    SCALAR_NUM_BYTES,
 };
 use aptos_crypto::ValidCryptoMaterial;
 use ark_ec::pairing::Pairing;
@@ -32,53 +31,48 @@ pub const PVSS_DOM_SEP: &[u8; 21] = b"APTOS_SCRAPE_PVSS_DST"; // TODO: Name need
 /// ⚠️ This trait is intentionally private: `challenge_scalars`
 /// should **only** be used internally to ensure properly
 /// labelled scalar generation across protocols.
-trait ScalarProtocol<E: Pairing> {
-    /// **Auxiliary** function to return random scalars
-    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<E::ScalarField>;
-    fn challenge_scalar(&mut self, label: &[u8]) -> E::ScalarField {
+pub trait ScalarProtocol<S: FromUniformBytes> {
+    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S>;
+
+    fn challenge_scalar(&mut self, label: &[u8]) -> S {
         self.challenge_scalars(label, 1)[0]
     }
 }
 
-impl<E: Pairing> ScalarProtocol<E> for merlin::Transcript {
-    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<E::ScalarField> {
-        let mut buf = vec![0u8; num_scalars * (E::ScalarField::MODULUS_BIT_SIZE as usize) / 4];
-        self.challenge_bytes(label, &mut buf);
+pub trait FromUniformBytes: Copy {
+    const BYTE_SIZE: usize;
+    fn from_uniform_bytes(bytes: &[u8]) -> Self;
+}
 
-        let mut result = Vec::with_capacity(num_scalars);
-        for chunk in buf.chunks((E::ScalarField::MODULUS_BIT_SIZE as usize) / 4) {
-            match chunk.try_into() {
-                Ok(chunk) => {
-                    result.push(E::ScalarField::from_le_bytes_mod_order(chunk));
-                },
-                Err(_) => panic!("Expected a 64-byte slice, but got a different size"),
-            }
-        }
+/// This reason for this wrapper is to avoid "overlapping implementations" for blstrs::Scalar
+#[derive(Clone, Copy)]
+struct ArkworksScalar<E: Pairing>(E::ScalarField);
 
-        debug_assert_eq!(result.len(), num_scalars);
-        result
+impl<E: Pairing> FromUniformBytes for ArkworksScalar<E> {
+    const BYTE_SIZE: usize = (E::ScalarField::MODULUS_BIT_SIZE as usize) / 8;
+
+    fn from_uniform_bytes(bytes: &[u8]) -> Self {
+        Self(E::ScalarField::from_le_bytes_mod_order(bytes))
     }
 }
 
-trait ScalarProtocolBlstrs {
-    /// **Auxiliary** function to return random scalars
-    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<blstrs::Scalar>;
+impl FromUniformBytes for blstrs::Scalar {
+    const BYTE_SIZE: usize = crate::SCALAR_NUM_BYTES;
+
+    fn from_uniform_bytes(bytes: &[u8]) -> Self {
+        random_scalar_from_uniform_bytes(bytes.try_into().expect("Wrong byte length"))
+    }
 }
 
-impl ScalarProtocolBlstrs for merlin::Transcript {
-    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<blstrs::Scalar> {
-        let mut buf = vec![0u8; num_scalars * 2 * SCALAR_NUM_BYTES];
+impl<S: FromUniformBytes> ScalarProtocol<S> for merlin::Transcript {
+    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S> {
+        let mut buf = vec![0u8; 2 * num_scalars * S::BYTE_SIZE];
         self.challenge_bytes(label, &mut buf);
 
-        let mut result = Vec::with_capacity(num_scalars);
-        for chunk in buf.chunks(2 * SCALAR_NUM_BYTES) {
-            match chunk.try_into() {
-                Ok(chunk) => {
-                    result.push(random_scalar_from_uniform_bytes(chunk));
-                },
-                Err(_) => panic!("Expected a 64-byte slice, but got a different size"),
-            }
-        }
+        let result = buf
+            .chunks(2 * S::BYTE_SIZE)
+            .map(S::from_uniform_bytes)
+            .collect::<Vec<_>>();
 
         debug_assert_eq!(result.len(), num_scalars);
         result
@@ -87,7 +81,7 @@ impl ScalarProtocolBlstrs for merlin::Transcript {
 
 #[allow(non_snake_case)]
 #[allow(private_bounds)]
-pub trait PVSS<T: Transcript>: ScalarProtocolBlstrs {
+pub trait PVSS<T: Transcript>: ScalarProtocol<blstrs::Scalar> {
     /// Append a domain separator for the PVSS protocol (in addition to the transcript-level DST used to initialise the FS transcript),
     /// consisting of a sharing configuration `sc`, which locks in the $t$ out of $n$ threshold.
     fn pvss_domain_sep(&mut self, sc: &ThresholdConfig);
@@ -129,7 +123,7 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 }
 
 #[allow(private_bounds)]
-pub trait SigmaProtocol<E: Pairing, H: Map>: ScalarProtocol<E> {
+pub trait SigmaProtocol<E: Pairing, H: Map>: ScalarProtocol<ArkworksScalar<E>> {
     fn append_sigma_protocol_sep(&mut self, dst: &'static [u8]);
 
     /// Append the claim of a sigma protocol.
@@ -196,7 +190,7 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
         n_plus_1: usize,
     ) -> Vec<blstrs::Scalar> {
         let num_coeffs = n_plus_1 - t;
-        <merlin::Transcript as ScalarProtocolBlstrs>::challenge_scalars(
+        <merlin::Transcript as ScalarProtocol<blstrs::Scalar>>::challenge_scalars(
             self,
             b"challenge_dual_code_word_polynomial",
             num_coeffs,
@@ -204,7 +198,7 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
     }
 
     fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<blstrs::Scalar> {
-        <merlin::Transcript as ScalarProtocolBlstrs>::challenge_scalars(
+        <merlin::Transcript as ScalarProtocol<blstrs::Scalar>>::challenge_scalars(
             self,
             b"challenge_linear_combination",
             num_scalars,
@@ -305,10 +299,11 @@ where
     }
 
     fn challenge_for_sigma_protocol(&mut self) -> E::ScalarField {
-        <merlin::Transcript as ScalarProtocol<E>>::challenge_scalar(
+        <merlin::Transcript as ScalarProtocol<ArkworksScalar<E>>>::challenge_scalar(
             self,
             b"challenge_sigma_protocol",
         )
+        .0
     }
 }
 
