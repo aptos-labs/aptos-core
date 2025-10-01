@@ -4,11 +4,11 @@
 use crate::algebra::msm;
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 
-pub struct UnivariateKZG<'a, E: Pairing> {
+pub struct Map<'a, E: Pairing> {
     pub lagr_g1: &'a [E::G1Affine],
 }
 
-impl<'a, E: Pairing> msm::Map for UnivariateKZG<'a, E> {
+impl<'a, E: Pairing> msm::Map for Map<'a, E> {
     type Codomain = E::G1;
     type Domain = (E::ScalarField, Vec<E::ScalarField>);
 
@@ -18,7 +18,7 @@ impl<'a, E: Pairing> msm::Map for UnivariateKZG<'a, E> {
     }
 }
 
-impl<'a, E: Pairing> msm::FixedBaseMSM for UnivariateKZG<'a, E> {
+impl<'a, E: Pairing> msm::FixedBaseMSM for Map<'a, E> {
     type Base = E::G1Affine;
     type Scalar = E::ScalarField;
 

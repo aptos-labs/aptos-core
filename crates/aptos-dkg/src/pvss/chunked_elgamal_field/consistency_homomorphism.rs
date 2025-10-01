@@ -3,8 +3,8 @@
 
 use crate::{
     algebra::msm::{DiagonalProductMap, LiftMap},
-    pcs::univariate_kzg::UnivariateKZG,
-    pvss::chunked_elgamal_field::chunked_elgamal::ChunkedElGamal,
+    pcs::univariate_kzg,
+    pvss::chunked_elgamal_field::chunked_elgamal,
     sigma_protocol,
 };
 use ark_ec::pairing::Pairing;
@@ -53,9 +53,10 @@ impl<E: Pairing> sigma_protocol::Domain<E> for ConsistencyDomain<E> {
 }
 
 #[allow(type_alias_bounds)]
-type LiftedKZG<'a, E: Pairing> = LiftMap<UnivariateKZG<'a, E>, ConsistencyDomain<E>>;
+type LiftedKZG<'a, E: Pairing> = LiftMap<univariate_kzg::Map<'a, E>, ConsistencyDomain<E>>;
 #[allow(type_alias_bounds)]
-type LiftedChunkedElGamal<'a, E: Pairing> = LiftMap<ChunkedElGamal<'a, E>, ConsistencyDomain<E>>;
+type LiftedChunkedElGamal<'a, E: Pairing> =
+    LiftMap<chunked_elgamal::Map<'a, E>, ConsistencyDomain<E>>;
 
 pub type ConsistencyHomomorphism<'a, E> =
     DiagonalProductMap<LiftedKZG<'a, E>, LiftedChunkedElGamal<'a, E>>;
@@ -68,7 +69,7 @@ impl<'a, E: Pairing> ConsistencyHomomorphism<'a, E> {
         ek: &'a [E::G1Affine],
     ) -> Self {
         let lifted_kzg = LiftedKZG::<E> {
-            map: UnivariateKZG { lagr_g1 },
+            map: univariate_kzg::Map { lagr_g1 },
             projection_map: |dom: &ConsistencyDomain<E>| {
                 let ConsistencyDomain(first, nested, _ignored) = dom;
                 let flattened: Vec<E::ScalarField> = nested.iter().flatten().cloned().collect();
@@ -77,7 +78,7 @@ impl<'a, E: Pairing> ConsistencyHomomorphism<'a, E> {
         };
 
         let lifted_chunked_elgamal = LiftedChunkedElGamal::<E> {
-            map: ChunkedElGamal { g_1, h_1, ek },
+            map: chunked_elgamal::Map { g_1, h_1, ek },
             projection_map: |dom: &ConsistencyDomain<E>| {
                 let ConsistencyDomain(_ignored, first, second) = dom;
                 (first.clone(), second.clone())

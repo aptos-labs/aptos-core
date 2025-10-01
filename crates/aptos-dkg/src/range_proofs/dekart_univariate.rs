@@ -1,7 +1,13 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{algebra::polynomials, fiat_shamir, range_proofs::traits, utils};
+use crate::{
+    algebra::{msm::Map, polynomials},
+    fiat_shamir,
+    pcs::univariate_kzg,
+    range_proofs::traits,
+    utils,
+};
 use anyhow::ensure;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
@@ -195,14 +201,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         values: &[Self::Input],
         r: &Self::CommitmentRandomness,
     ) -> Commitment<E> {
-        use crate::{algebra::msm::Map, pcs::univariate_kzg::UnivariateKZG};
-
         debug_assert!(
             pk.lagr_g1.len() > values.len(),
             "pk.lagr_g1 must have at least values.len() + 1 elements"
         );
 
-        let kzg: UnivariateKZG<'_, E> = UnivariateKZG {
+        let kzg: univariate_kzg::Map<'_, E> = univariate_kzg::Map {
             lagr_g1: &pk.lagr_g1,
         };
 

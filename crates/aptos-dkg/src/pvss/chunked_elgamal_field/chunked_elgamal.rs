@@ -1,14 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    algebra::msm::{self, FixedBaseMSM},
-    pvss::chunked_elgamal_field::chunked_elgamal::msm::Map,
-};
+use crate::algebra::msm::{self, FixedBaseMSM};
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 
 #[allow(non_snake_case)]
-pub struct ChunkedElGamal<'a, E: Pairing> {
+pub struct Map<'a, E: Pairing> {
     pub g_1: &'a E::G1Affine,
     pub h_1: &'a E::G1Affine,
     pub ek: &'a [E::G1Affine],
@@ -16,12 +13,12 @@ pub struct ChunkedElGamal<'a, E: Pairing> {
 
 type MatrixVectorPair<T> = (Vec<Vec<T>>, Vec<T>);
 type MSMInputVec<'a, E> = MatrixVectorPair<(
-    Vec<<ChunkedElGamal<'a, E> as FixedBaseMSM>::Base>,
-    Vec<<ChunkedElGamal<'a, E> as FixedBaseMSM>::Scalar>,
+    Vec<<Map<'a, E> as FixedBaseMSM>::Base>,
+    Vec<<Map<'a, E> as FixedBaseMSM>::Scalar>,
 )>;
 
-impl<'a, E: Pairing> ChunkedElGamal<'a, E> {
-    pub fn prep_msms(&self, input: &<Self as Map>::Domain) -> MSMInputVec<'a, E> {
+impl<'a, E: Pairing> Map<'a, E> {
+    pub fn prep_msms(&self, input: &<Self as msm::Map>::Domain) -> MSMInputVec<'a, E> {
         let first_elgamal_comp = input
             .0
             .iter()
@@ -51,7 +48,7 @@ impl<'a, E: Pairing> ChunkedElGamal<'a, E> {
     }
 }
 
-impl<'a, E: Pairing> msm::Map for ChunkedElGamal<'a, E> {
+impl<'a, E: Pairing> msm::Map for Map<'a, E> {
     type Codomain = MatrixVectorPair<E::G1>;
     type Domain = MatrixVectorPair<E::ScalarField>;
 
@@ -80,12 +77,12 @@ fn flatten<T>(input: MatrixVectorPair<T>) -> Vec<T> {
     mat.into_iter().flatten().chain(vec).collect()
 }
 
-impl<'a, E: Pairing> FixedBaseMSM for ChunkedElGamal<'a, E> {
+impl<'a, E: Pairing> FixedBaseMSM for Map<'a, E> {
     type Base = E::G1Affine;
     type Scalar = E::ScalarField;
 
     fn msm_rows(&self, input: &Self::Domain) -> Vec<(Vec<Self::Base>, Vec<Self::Scalar>)> {
-        let res = ChunkedElGamal::<'a, E>::prep_msms(self, input);
+        let res = Map::<'a, E>::prep_msms(self, input);
         flatten(res)
     }
 
