@@ -17,8 +17,8 @@ export FIRESTORE_EMULATOR_HOST=$1
 export GOOGLE_APPLICATION_CREDENTIALS=$2
 
 # Specify the account recovery DB location (passed as the third argument to the script).
-export PROJECT_ID=$3
-export DATABASE_ID='(default)' # the default name of a local firestore emulator
+GOOGLE_PROJECT_ID=$3
+FIRESTORE_DATABASE_ID='(default)' # the default name of a local firestore emulator
 
 # Specify an account manager (e.g., Google, Facebook, Apple). The example below is for Google.
 export ACCOUNT_MANAGER_0_ISSUER=https://accounts.google.com
@@ -41,6 +41,8 @@ ON_CHAIN_KEYLESS_CONFIG_URL=https://fullnode.devnet.aptoslabs.com/v1/accounts/0x
 echo "Starting the pepper service with a Firestore emulator, connecting to Aptos devnet for on-chain data!"
 cargo run -p aptos-keyless-pepper-service -- --vuf-private-key-seed-hex=${VUF_KEY_SEED_HEX}
 cargo run -p aptos-keyless-pepper-service -- \
---vuf-private-key-seed-hex=${VUF_KEY_SEED_HEX} \
+--google-project-id=${GOOGLE_PROJECT_ID} \
+--firestore-database-id=${FIRESTORE_DATABASE_ID} \
 --on_chain-groth16-vk-url=${ON_CHAIN_GROTH16_VK_URL} \
---on_chain-keyless-config-url=${ON_CHAIN_KEYLESS_CONFIG_URL}
+--on-chain-keyless-config-url=${ON_CHAIN_KEYLESS_CONFIG_URL} \
+--vuf-private-key-seed-hex=${VUF_KEY_SEED_HEX}

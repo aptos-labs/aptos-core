@@ -18,7 +18,7 @@ use aptos_keyless_pepper_service::{
     vuf_pub_key,
 };
 use aptos_logger::{info, warn};
-use clap::{ArgGroup, Parser};
+use clap::Parser;
 use hyper::{
     service::{make_service_fn, service_fn},
     Server,
@@ -27,15 +27,33 @@ use std::{convert::Infallible, net::SocketAddr, ops::Deref, sync::Arc, time::Ins
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
-#[command(group(
-    ArgGroup::new("vuf_private_key")
-        .required(true) // One of the two arguments must be provided
-        .multiple(false) // Only one of the two arguments should be provided at a time (i.e., not both)
-        .args(&["vuf_private_key_hex", "vuf_private_key_seed_hex"]),
-))]
 struct Args {
-    /// Run the service in local development mode (uses a test account recovery database)
-    #[arg(long)]
+    /// The Firestore database ID (required to connect to Firestore).
+    /// Only required if not running in local development mode.
+    #[arg(
+        long,
+        requires = "google_project_id",
+        required_unless_present = "local_development_mode",
+        conflicts_with = "local_development_mode"
+    )]
+    firestore_database_id: Option<String>,
+
+    /// The Google Cloud Project ID (required to connect to Firestore).
+    /// Only required if not running in local development mode.
+    #[arg(
+        long,
+        requires = "firestore_database_id",
+        required_unless_present = "local_development_mode",
+        conflicts_with = "local_development_mode"
+    )]
+    google_project_id: Option<String>,
+
+    /// Run the service in local development mode (uses a test account recovery database).
+    /// If this flag is not provided, the service will use the Firestore account recovery database.
+    #[arg(
+        long,
+        conflicts_with_all = ["firestore_database_id", "google_project_id"]
+    )]
     local_development_mode: bool, // Defaults to false if not provided
 
     /// The URL to fetch the on-chain keyless account configuration resource (if not provided, no fetching will be done)
@@ -51,11 +69,19 @@ struct Args {
     pepper_service_port: u16,
 
     /// The hex-encoded VUF private key (used directly if provided, otherwise derived from the seed)
-    #[arg(long)]
+    #[arg(
+        long,
+        required_unless_present = "vuf_private_key_seed_hex",
+        conflicts_with = "vuf_private_key_seed_hex"
+    )]
     vuf_private_key_hex: Option<String>,
 
     /// The hex-encoded VUF private key seed (used to derive the private key if the key is not provided directly)
-    #[arg(long)]
+    #[arg(
+        long,
+        required_unless_present = "vuf_private_key_hex",
+        conflicts_with = "vuf_private_key_hex"
+    )]
     vuf_private_key_seed_hex: Option<String>,
 }
 
@@ -88,13 +114,20 @@ async fn main() {
     let _ = ACCOUNT_MANAGERS.deref();
 
     // Create the account recovery database
-    let account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync> =
-        if args.local_development_mode {
-            warn!("Running in local development mode! Using a test account recovery database!");
-            Arc::new(TestAccountRecoveryDB::new())
-        } else {
-            Arc::new(FirestoreAccountRecoveryDB::new().await)
-        };
+    let account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync> = if args
+        .local_development_mode
+    {
+        warn!("Running in local development mode! Using a test account recovery database!");
+        Arc::new(TestAccountRecoveryDB::new())
+    } else {
+        let google_project_id = args.google_project_id.expect(
+            "Google Project ID must be provided when not running in local development mode!",
+        );
+        let firestore_database_id = args.firestore_database_id.expect(
+            "Firestore Database ID must be provided when not running in local development mode!",
+        );
+        Arc::new(FirestoreAccountRecoveryDB::new(google_project_id, firestore_database_id).await)
+    };
 
     // Start the JWK fetchers
     let jwk_cache = jwk_fetcher::start_jwk_fetchers();
