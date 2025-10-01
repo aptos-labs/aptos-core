@@ -14,21 +14,21 @@ use aptos_metrics_core::IntGaugeVecHelper;
 use std::{marker::PhantomData, sync::Arc};
 
 #[derive(Debug)]
-struct LayerInner<K: ArcAsyncDrop, V: ArcAsyncDrop> {
-    peak: FlattenPerfectTree<K, V>,
+pub(crate) struct LayerInner<K: ArcAsyncDrop, V: ArcAsyncDrop> {
+    pub(crate) peak: FlattenPerfectTree<K, V>,
     children: Mutex<Vec<Arc<LayerInner<K, V>>>>,
     use_case: &'static str,
     family: HashValue,
-    layer: u64,
+    layer: u32,
     // Base layer when self is created -- `self` won't even weak-link to a node created in
     // the base or an older layer.
-    base_layer: u64,
+    base_layer: u32,
 }
 
 impl<K: ArcAsyncDrop, V: ArcAsyncDrop> Drop for LayerInner<K, V> {
     fn drop(&mut self) {
         // Drop the tree nodes in a different thread, because that's the slowest part.
-        DROPPER.schedule_drop(self.peak.take_for_drop());
+        // DROPPER.schedule_drop(self.peak.take_for_drop());
 
         let mut stack = self.drain_children_for_drop();
         while let Some(descendant) = stack.pop() {
@@ -58,7 +58,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
         })
     }
 
-    fn spawn(self: &Arc<Self>, child_peak: FlattenPerfectTree<K, V>, base_layer: u64) -> Arc<Self> {
+    fn spawn(self: &Arc<Self>, child_peak: FlattenPerfectTree<K, V>, base_layer: u32) -> Arc<Self> {
         let child = Arc::new(Self {
             peak: child_peak,
             children: Mutex::new(Vec::new()),
@@ -84,7 +84,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
 
 #[derive(Debug)]
 pub struct MapLayer<K: ArcAsyncDrop, V: ArcAsyncDrop, S = DefaultHashBuilder> {
-    inner: Arc<LayerInner<K, V>>,
+    pub(crate) inner: Arc<LayerInner<K, V>>,
     /// Carried only for type safety: a LayeredMap can only be with layers of the same hasher type.
     _hash_builder: PhantomData<S>,
 }
@@ -139,7 +139,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         self.is_family(other) && self.inner.layer >= other.inner.layer
     }
 
-    pub(crate) fn layer(&self) -> u64 {
+    pub(crate) fn layer(&self) -> u32 {
         self.inner.layer
     }
 
@@ -147,7 +147,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         self.inner.use_case
     }
 
-    pub(crate) fn spawn(&self, child_peak: FlattenPerfectTree<K, V>, base_layer: u64) -> Self {
+    pub(crate) fn spawn(&self, child_peak: FlattenPerfectTree<K, V>, base_layer: u32) -> Self {
         Self::new(self.inner.spawn(child_peak, base_layer))
     }
 
