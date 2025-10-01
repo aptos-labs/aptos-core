@@ -1,6 +1,6 @@
 #[test_only]
 module aptos_experimental::bulk_order_book_tests {
-    use aptos_experimental::order_book_types::{OrderMatch, new_ascending_id_generator, AscendingIdGenerator,
+    use aptos_experimental::order_book_types::{OrderMatch,
         bulk_order_book_type
     };
     use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
@@ -33,10 +33,9 @@ module aptos_experimental::bulk_order_book_tests {
         TestMetadata { test_field }
     }
 
-    fun setup_test(): (BulkOrderBook<TestMetadata>, price_time_index::PriceTimeIndex, AscendingIdGenerator) {
+    fun setup_test(): (BulkOrderBook<TestMetadata>, price_time_index::PriceTimeIndex) {
         let order_book = new_bulk_order_book<TestMetadata>();
         let price_time_idx = price_time_index::new_price_time_idx();
-        let ascending_id_generator = new_ascending_id_generator();
 
         // Place an order first
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
@@ -211,7 +210,6 @@ module aptos_experimental::bulk_order_book_tests {
     fun place_simple_order(
         order_book: &mut BulkOrderBook<TestMetadata>,
         price_time_index: &mut price_time_index::PriceTimeIndex,
-        id_gen: &mut AscendingIdGenerator,
         account: address,
         bid_price: u64,
         bid_size: u64,
@@ -231,13 +229,12 @@ module aptos_experimental::bulk_order_book_tests {
             ask_prices,
             ask_sizes
         );
-        order_book.place_bulk_order(price_time_index, id_gen, order_request);
+        order_book.place_bulk_order(price_time_index, order_request);
     }
 
     fun place_simple_order_with_sequence(
         order_book: &mut BulkOrderBook<TestMetadata>,
         price_time_index: &mut price_time_index::PriceTimeIndex,
-        id_gen: &mut AscendingIdGenerator,
         account: address,
         sequence_number: u64,
         bid_price: u64,
@@ -258,14 +255,13 @@ module aptos_experimental::bulk_order_book_tests {
             ask_prices,
             ask_sizes
         );
-        order_book.place_bulk_order(price_time_index, id_gen, order_request);
+        order_book.place_bulk_order(price_time_index, order_request);
     }
 
     /// Creates and places a multi-level order
     fun place_multi_level_order(
         order_book: &mut BulkOrderBook<TestMetadata>,
         price_time_index: &mut price_time_index::PriceTimeIndex,
-        id_gen: &mut AscendingIdGenerator,
         account: address,
         bid_prices: vector<u64>,
         bid_sizes: vector<u64>,
@@ -318,7 +314,6 @@ module aptos_experimental::bulk_order_book_tests {
     fun setup_multi_account_scenario(
         order_book: &mut BulkOrderBook<TestMetadata>,
         price_time_index: &mut price_time_index::PriceTimeIndex,
-        id_gen: &mut AscendingIdGenerator,
         accounts_and_orders: vector<OrderData>
     ) {
         let i = 0;
@@ -327,7 +322,6 @@ module aptos_experimental::bulk_order_book_tests {
             place_simple_order(
                 order_book,
                 price_time_index,
-                id_gen,
                 order_data.account,
                 order_data.bid_price,
                 order_data.bid_size,

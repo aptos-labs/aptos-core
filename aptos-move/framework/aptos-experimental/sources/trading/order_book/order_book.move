@@ -5,7 +5,7 @@ module aptos_experimental::order_book {
     use aptos_experimental::bulk_order_book_types::BulkOrder;
     use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
     use aptos_experimental::single_order_book::{SingleOrderBook, new_single_order_book, SingleOrderRequest};
-    use aptos_experimental::order_book_types::{AscendingIdGenerator, OrderIdType, new_ascending_id_generator,
+    use aptos_experimental::order_book_types::{OrderIdType,
         OrderMatch, OrderMatchDetails, single_order_book_type
     };
     use aptos_experimental::single_order_types::{SingleOrder};
@@ -20,7 +20,6 @@ module aptos_experimental::order_book {
             single_order_book: SingleOrderBook<M>,
             bulk_order_book: BulkOrderBook<M>,
             price_time_idx: PriceTimeIndex,
-            ascending_id_generator: AscendingIdGenerator
         }
     }
 
@@ -29,7 +28,6 @@ module aptos_experimental::order_book {
             single_order_book: new_single_order_book(),
             bulk_order_book: new_bulk_order_book(),
             price_time_idx: new_price_time_idx(),
-            ascending_id_generator: new_ascending_id_generator(),
         }
     }
 
@@ -90,7 +88,6 @@ module aptos_experimental::order_book {
     ) {
         self.single_order_book.place_maker_order(
             &mut self.price_time_idx,
-            &mut self.ascending_id_generator,
             order_req
         );
     }
@@ -218,7 +215,6 @@ module aptos_experimental::order_book {
     ) : BulkOrder<M> {
         self.bulk_order_book.place_bulk_order(
             &mut self.price_time_idx,
-            &mut self.ascending_id_generator,
             order_req
         )
     }
@@ -246,7 +242,6 @@ module aptos_experimental::order_book {
             single_order_book: retail_order_book,
             bulk_order_book,
             price_time_idx,
-            ascending_id_generator: _
         } = self;
         bulk_order_book.destroy_bulk_order_book();
         retail_order_book.destroy_single_order_book();
