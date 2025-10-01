@@ -81,6 +81,11 @@ pub(crate) struct FrameTypeCache {
     /// guaranteed that everything will be exactly the same as when we
     /// did the insertion.
     pub(crate) per_instruction_cache: Vec<PerInstructionCache>,
+
+    /// Cached instantiated local types for generic functions.
+    pub(crate) instantiated_local_tys: Option<Rc<[Type]>>,
+    /// Cached number of type nodes per instantiated local type for gas charging re-use.
+    pub(crate) instantiated_local_ty_counts: Option<Rc<[NumTypeNodes]>>,
 }
 
 impl FrameTypeCache {

@@ -114,7 +114,7 @@ module 0xABCD::locals {
         assert!(data8.abc.d == data6.def.d, 888);
     }
 
-    public entry fun benchmark() {
+    public entry fun benchmark_generic() {
         let i = 0;
         while (i < 100) {
             generic_work_with_many_locals<u32, u32, bool, vector<bool>, Data<u8, u8, vector<bool>>, bool>();
@@ -140,7 +140,7 @@ module 0xABCD::locals {
         }
     }
 
-    public entry fun benchmark_generic() {
+    public entry fun benchmark() {
         let i = 0;
         while (i < 100) {
             work_with_many_locals();
