@@ -275,7 +275,7 @@ impl DebugContext {
                                 println!("        Locals:");
                                 if !function.local_tys().is_empty() {
                                     let mut s = String::new();
-                                    values::debug::print_locals(&mut s, locals).unwrap();
+                                    values::debug::print_locals(&mut s, locals, false).unwrap();
                                     println!("{}", s);
                                 } else {
                                     println!("            (none)");
