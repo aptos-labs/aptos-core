@@ -38,6 +38,14 @@ struct Args {
     #[arg(long)]
     local_development_mode: bool, // Defaults to false if not provided
 
+    /// The URL to fetch the on-chain keyless account configuration resource (if not provided, no fetching will be done)
+    #[arg(long)]
+    on_chain_groth16_vk_url: Option<String>,
+
+    /// The URL to fetch the on-chain keyless account configuration resource (if not provided, no fetching will be done)
+    #[arg(long)]
+    on_chain_keyless_config_url: Option<String>,
+
     /// The port for the Pepper service to listen on
     #[arg(long, default_value_t = DEFAULT_PEPPER_SERVICE_PORT)]
     pepper_service_port: u16,
@@ -72,7 +80,10 @@ async fn main() {
     info!("Retrieved the VUF public key: {:?}", vuf_public_key);
 
     // Start the cached resource fetcher
-    let cached_resources = resource_fetcher::start_cached_resource_fetcher();
+    let cached_resources = resource_fetcher::start_cached_resource_fetcher(
+        args.on_chain_groth16_vk_url,
+        args.on_chain_keyless_config_url,
+    );
 
     let _ = ACCOUNT_MANAGERS.deref();
 
