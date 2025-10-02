@@ -1,0 +1,48 @@
+
+Diagnostics:
+warning: [lint] Unconditional infinite recursion detected: m::test1_warn -> m::test1_warn
+  ┌─ tests/stackless_bytecode_lints/infinite_recursion_01.move:2:5
+  │
+2 │ ╭     fun test1_warn() {
+3 │ │         test1_warn();
+4 │ │     }
+  │ ╰─────^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(infinite_recursion)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#infinite_recursion.
+
+warning: [lint] Unconditional infinite recursion detected: m::test2_a_warn -> m::test2_b_warn -> m::test2_a_warn
+   ┌─ tests/stackless_bytecode_lints/infinite_recursion_01.move:8:5
+   │
+ 8 │ ╭     fun test2_a_warn() {
+ 9 │ │         test2_b_warn();
+10 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(infinite_recursion)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#infinite_recursion.
+
+warning: [lint] Unconditional infinite recursion detected: m::test3_a_warn -> m::test3_b_warn -> m::test3_c_warn -> m::test3_d_warn -> m::test3_a_warn
+   ┌─ tests/stackless_bytecode_lints/infinite_recursion_01.move:18:5
+   │
+18 │ ╭     fun test3_a_warn() {
+19 │ │         test3_b_warn();
+20 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(infinite_recursion)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#infinite_recursion.
+
+warning: [lint] Unconditional infinite recursion detected: m::test4_a_warn -> m::test4_a_warn
+   ┌─ tests/stackless_bytecode_lints/infinite_recursion_01.move:36:5
+   │
+36 │ ╭     fun test4_a_warn(x: u64, limit: u64) {
+37 │ │         if (limit < 1 || limit < 2) {
+38 │ │             abort 0
+39 │ │         };
+40 │ │         test4_a_warn(collatz(x), limit - 1);
+41 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(infinite_recursion)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#infinite_recursion.
