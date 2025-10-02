@@ -39,10 +39,9 @@ ON_CHAIN_KEYLESS_CONFIG_URL=https://fullnode.devnet.aptoslabs.com/v1/accounts/0x
 
 # Start the pepper service
 echo "Starting the pepper service with a Firestore emulator, connecting to Aptos devnet for on-chain data!"
-cargo run -p aptos-keyless-pepper-service -- --vuf-private-key-seed-hex=${VUF_KEY_SEED_HEX}
 cargo run -p aptos-keyless-pepper-service -- \
 --google-project-id=${GOOGLE_PROJECT_ID} \
 --firestore-database-id=${FIRESTORE_DATABASE_ID} \
---on_chain-groth16-vk-url=${ON_CHAIN_GROTH16_VK_URL} \
+--on-chain-groth16-vk-url=${ON_CHAIN_GROTH16_VK_URL} \
 --on-chain-keyless-config-url=${ON_CHAIN_KEYLESS_CONFIG_URL} \
 --vuf-private-key-seed-hex=${VUF_KEY_SEED_HEX}
