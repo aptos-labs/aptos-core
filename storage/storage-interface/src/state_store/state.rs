@@ -19,6 +19,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
+use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
@@ -156,6 +157,7 @@ impl State {
         all_checkpoint_versions: &[Version],
         state_cache: &ShardedStateCache,
     ) -> Self {
+        let now = std::time::Instant::now();
         let _timer = TIMER.timer_with(&["state__update"]);
 
         // 1. The update batch must begin at self.next_version().
@@ -189,6 +191,7 @@ impl State {
                         NonZeroUsize::new(self.hot_state_config.max_items_per_shard).unwrap(),
                         Arc::clone(&persisted_hot_state),
                         overlay,
+                        cache,
                         hot_metadata.latest.clone(),
                         hot_metadata.oldest.clone(),
                         hot_metadata.num_items,
@@ -225,6 +228,11 @@ impl State {
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let new_metadata = new_metadata.try_into().expect("Known to be 16 shards.");
         let usage = self.update_usage(usage_delta_per_shard);
+
+        info!(
+            "state__update time: {} microseconds",
+            now.elapsed().as_micros()
+        );
 
         // TODO(HotState): extract and pass new hot state onchain config if needed.
         State::new_with_updates(
@@ -312,16 +320,12 @@ impl State {
         cache: &StateCacheShard,
         key: &StateKey,
     ) -> StateSlot {
-        if let Some(slot) = overlay.get(key) {
-            return slot;
-        }
+        // if let Some(slot) = overlay.get(key) {
+        //     return slot;
+        // }
 
         // TODO(aldenhu): avoid cloning the state value (by not using DashMap)
-        cache
-            .get(key)
-            .unwrap_or_else(|| panic!("Key {:?} must exist in the cache.", key))
-            .value()
-            .clone()
+        cache.get(key).unwrap().value().clone()
     }
 }
 

@@ -6,6 +6,7 @@ use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::state_store::{
     hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
 };
+use dashmap::DashMap;
 use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 
 pub(crate) struct HotStateLRU<'a> {
@@ -16,6 +17,7 @@ pub(crate) struct HotStateLRU<'a> {
     committed: Arc<dyn HotStateView>,
     /// Additional entries resulted from previous speculative execution.
     overlay: &'a LayeredMap<StateKey, StateSlot>,
+    read_cache: &'a DashMap<StateKey, StateSlot>,
     /// The new entries from current execution.
     pending: HashMap<StateKey, StateSlot>,
     /// Points to the latest entry. `None` if empty.
@@ -31,6 +33,7 @@ impl<'a> HotStateLRU<'a> {
         capacity: NonZeroUsize,
         committed: Arc<dyn HotStateView>,
         overlay: &'a LayeredMap<StateKey, StateSlot>,
+        read_cache: &'a DashMap<StateKey, StateSlot>,
         head: Option<StateKey>,
         tail: Option<StateKey>,
         num_items: usize,
@@ -39,6 +42,7 @@ impl<'a> HotStateLRU<'a> {
             capacity,
             committed,
             overlay,
+            read_cache,
             pending: HashMap::new(),
             head,
             tail,
@@ -144,6 +148,10 @@ impl<'a> HotStateLRU<'a> {
 
     pub(crate) fn get_slot(&self, key: &StateKey) -> Option<StateSlot> {
         if let Some(slot) = self.pending.get(key) {
+            return Some(slot.clone());
+        }
+
+        if let Some(slot) = self.read_cache.get(key) {
             return Some(slot.clone());
         }
 
