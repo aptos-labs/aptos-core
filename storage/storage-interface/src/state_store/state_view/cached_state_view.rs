@@ -37,7 +37,7 @@ use std::{
 
 pub type StateCacheShard = DashMap<StateKey, StateSlot>;
 
-static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+pub(crate) static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
         .num_threads(32)
         .thread_name(|index| format!("kv_reader_{}", index))
