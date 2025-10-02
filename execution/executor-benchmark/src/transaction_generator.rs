@@ -509,7 +509,10 @@ impl TransactionGenerator {
                 .collect();
             bar.inc(transactions.len() as u64 - 1);
             if let Some(sender) = &self.block_sender {
-                sender.send(transactions).unwrap();
+                // Add BlockMetadata transaction at the beginning of the block
+                let mut block_transactions = vec![create_block_metadata_transaction(1, &self.db)];
+                block_transactions.extend(transactions);
+                sender.send(block_transactions).unwrap();
             }
         }
         bar.finish();
