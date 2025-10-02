@@ -53,6 +53,9 @@ pub struct DisassemblerOptions {
     /// Print bytecode statistics for the module.
     #[clap(long = "print-bytecode-stats")]
     pub print_bytecode_stats: bool,
+
+    #[clap(long = "print-code-size")]
+    pub print_code_size: bool,
 }
 
 impl DisassemblerOptions {
@@ -63,6 +66,7 @@ impl DisassemblerOptions {
             print_basic_blocks: true,
             print_locals: true,
             print_bytecode_stats: false,
+            print_code_size: false,
         }
     }
 }
@@ -1185,6 +1189,13 @@ impl<'a> Disassembler<'a> {
         parameters: SignatureIndex,
         code: &CodeUnit,
     ) -> Result<Vec<String>> {
+        if self.options.print_code_size {
+            println!(
+                "function {} has {} instructions",
+                function_name.as_str(),
+                code.code.len()
+            );
+        }
         if !self.options.print_code {
             return Ok(vec!["".to_string()]);
         }

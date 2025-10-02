@@ -29,13 +29,17 @@ use std::{
     fmt,
 };
 
-pub fn disassemble_module<T: fmt::Write>(out: T, module: &CompiledModule) -> anyhow::Result<T> {
-    Disassembler::run(out, module)
+pub fn disassemble_module<T: fmt::Write>(
+    out: T,
+    module: &CompiledModule,
+    print_code_size: bool,
+) -> anyhow::Result<T> {
+    Disassembler::run(out, module, print_code_size)
 }
 
 pub fn disassemble_script<T: fmt::Write>(out: T, script: &CompiledScript) -> anyhow::Result<T> {
     let script_as_module = script_into_module(script.clone(), "main");
-    Disassembler::run(out, &script_as_module)
+    Disassembler::run(out, &script_as_module, false)
 }
 
 struct Disassembler<T>
@@ -48,7 +52,7 @@ where
 }
 
 impl<T: fmt::Write> Disassembler<T> {
-    fn run(out: T, module: &CompiledModule) -> anyhow::Result<T> {
+    fn run(out: T, module: &CompiledModule, print_code_size: bool) -> anyhow::Result<T> {
         let version = module.version;
         let module = ModuleView::new(module);
         let mut dis = Disassembler {
@@ -102,7 +106,7 @@ impl<T: fmt::Write> Disassembler<T> {
         }
         for (idx, fdef) in module.functions().enumerate() {
             writeln!(dis.out, "// Function definition at index {}", idx)?;
-            dis.fun(fdef)?;
+            dis.fun(fdef, print_code_size)?;
             writeln!(dis.out)?
         }
 
@@ -252,7 +256,18 @@ impl<T: fmt::Write> Disassembler<T> {
     // --------------------------------------------------------------------------------------
     // Functions
 
-    fn fun(&mut self, fdef: FunctionDefinitionView<CompiledModule>) -> anyhow::Result<()> {
+    fn fun(
+        &mut self,
+        fdef: FunctionDefinitionView<CompiledModule>,
+        print_code_size: bool,
+    ) -> anyhow::Result<()> {
+        if print_code_size && fdef.code().is_some() {
+            println!(
+                "function {} has {} instructions",
+                fdef.name(),
+                fdef.code().unwrap().code.len()
+            );
+        }
         if !fdef.attributes().is_empty() {
             self.list(
                 fdef.attributes(),
