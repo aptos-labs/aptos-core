@@ -39,7 +39,6 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use termcolor::{ColorChoice, StandardStream, WriteColor};
 
 #[derive(Debug, Clone)]
 pub enum CompilationCachingStatus {
@@ -1127,12 +1126,7 @@ pub fn unimplemented_v2_driver(_options: move_compiler_v2::Options) -> CompilerD
 
 /// Runs the v2 compiler, exiting the process if any errors occurred.
 pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> CompilerDriverResult {
-    let mut writer: Box<dyn WriteColor> = if options.print_errors {
-        Box::new(StandardStream::stderr(ColorChoice::Auto))
-    } else {
-        Box::new(std::io::sink())
-    };
-
+    let mut writer = options.error_writer();
     let mut emitter = options.error_emitter(&mut writer);
     match move_compiler_v2::run_move_compiler(emitter.as_mut(), options) {
         Ok((env, units)) => Ok((move_compiler_v2::make_files_source_text(&env), units, env)),
@@ -1147,12 +1141,7 @@ pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> Compile
 pub fn build_and_report_no_exit_v2_driver(
     options: move_compiler_v2::Options,
 ) -> CompilerDriverResult {
-    let mut writer: Box<dyn WriteColor> = if options.print_errors {
-        Box::new(StandardStream::stderr(ColorChoice::Auto))
-    } else {
-        Box::new(std::io::sink())
-    };
-
+    let mut writer = options.error_writer();
     let mut emitter = options.error_emitter(&mut writer);
     let (env, units) = move_compiler_v2::run_move_compiler(emitter.as_mut(), options)?;
     Ok((move_compiler_v2::make_files_source_text(&env), units, env))
