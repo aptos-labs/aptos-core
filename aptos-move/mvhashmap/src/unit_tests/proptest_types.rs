@@ -20,11 +20,9 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicUsize, Ordering},
 };
+use triomphe::Arc;
 
 const DEFAULT_TIMEOUT: u64 = 30;
 

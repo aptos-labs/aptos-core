@@ -4,10 +4,11 @@
 use crate::utils::{
     parallel_multi_pairing::parallel_multi_pairing_slice, random::random_scalar_from_uniform_bytes,
 };
-use ark_ec::{pairing::Pairing, AdditiveGroup};
+use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::PrimeField;
 use blstrs::{pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt};
 use group::{Curve, Group};
+use num_traits::Zero;
 use pairing::{MillerLoopResult, MultiMillerLoop};
 use rayon::ThreadPool;
 use sha3::Digest;
@@ -189,17 +190,14 @@ impl HasMultiExp for G1Projective {
     }
 }
 
-/// Pads the given vector with zeros so that `(len + 1)` becomes the next power of two.
-///
-/// For example:
-/// - If `scalars.len() == 3`, then `len + 1 = 4`, already a power of two,
-///   so the vector is padded to length 3 (no change).
-/// - If `scalars.len() == 5`, then `len + 1 = 6`, next power of two is 8,
-///   so the vector is padded to length 7.
-pub(crate) fn pad_to_pow2_len_minus_one<E: Pairing>(
-    mut scalars: Vec<E::ScalarField>,
-) -> Vec<E::ScalarField> {
-    let target_len = (scalars.len() + 1).next_power_of_two() - 1;
-    scalars.resize(target_len, E::ScalarField::ZERO);
-    scalars
+pub(crate) fn msm_bool<G: AffineRepr>(bases: &[G], scalars: &[bool]) -> G::Group {
+    assert_eq!(bases.len(), scalars.len());
+
+    let mut acc = G::Group::zero();
+    for (base, &bit) in bases.iter().zip(scalars) {
+        if bit {
+            acc += base;
+        }
+    }
+    acc
 }

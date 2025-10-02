@@ -7,8 +7,8 @@ module 0xc0ffee::m {
         value: T0,
     }
     public fun init(p0: &signer) {
-        let _t5 = Wrapper<|u64|(u64) has copy + drop + store>{value: |arg0| identity<u64>(arg0)};
-        move_to<Wrapper<|u64|(u64) has copy + drop + store>>(p0, _t5);
+        let _v0 = Wrapper<|u64|(u64) has copy + drop + store>{value: |arg0| identity<u64>(arg0)};
+        move_to<Wrapper<|u64|(u64) has copy + drop + store>>(p0, _v0);
     }
     public fun identity<T0>(p0: T0): T0 {
         p0
@@ -16,8 +16,8 @@ module 0xc0ffee::m {
     public fun compare(p0: |u64|(u64) has copy + drop + store, p1: &signer): bool
         acquires Wrapper
     {
-        let _t3 = signer::address_of(p1);
-        *&borrow_global<Wrapper<|u64|(u64) has copy + drop + store>>(_t3).value == p0
+        let _v0 = signer::address_of(p1);
+        *&borrow_global<Wrapper<|u64|(u64) has copy + drop + store>>(_v0).value == p0
     }
 }
 
@@ -28,6 +28,6 @@ module 0xc0ffee::m {
 script {
     use 0xc0ffee::m;
     fun main(p0: &signer) {
-        if (!m::compare(|arg0| m::identity<u64>(arg0), p0)) abort 14566554180833181696;
+        assert!(m::compare(|arg0| m::identity<u64>(arg0), p0), 14566554180833181696);
     }
 }

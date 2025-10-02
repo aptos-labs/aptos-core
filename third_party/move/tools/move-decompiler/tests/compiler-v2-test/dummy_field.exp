@@ -9,8 +9,8 @@ module 0x42::test {
         let R{} = move_from<R>(addr);
     }
     fun test2(): bool {
-        let _t0 = R{};
-        *&(&_t0).dummy_field
+        let _v0 = R{};
+        *&(&_v0).dummy_field
     }
     public entry fun test3(addr: address)
         acquires T
@@ -18,8 +18,8 @@ module 0x42::test {
         let T{} = move_from<T>(addr);
     }
     public entry fun test4(s: &signer) {
-        let _t1 = T{};
-        move_to<T>(s, _t1);
+        let _v0 = T{};
+        move_to<T>(s, _v0);
     }
 }
 
@@ -28,5 +28,5 @@ exiting with context checking errors
 error: empty struct `test::R` cannot access the field `dummy_field`
    ┌─ dummy_field.move:13:11
    │
-13 │         *&(&_t0).dummy_field
+13 │         *&(&_v0).dummy_field
    │           ^^^^^^^^^^^^^^^^^^

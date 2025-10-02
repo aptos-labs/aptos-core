@@ -488,7 +488,7 @@ impl BlockStore {
                     }
                 },
             );
-            pipeline_builder.build(
+            pipeline_builder.build_for_consensus(
                 &pipelined_block,
                 parent_block.pipeline_futs().ok_or_else(|| {
                     anyhow::anyhow!("Parent future doesn't exist, potentially epoch ended")

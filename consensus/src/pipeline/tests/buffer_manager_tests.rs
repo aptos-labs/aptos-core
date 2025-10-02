@@ -114,12 +114,12 @@ pub fn prepare_buffer_manager(
 
     let (self_loop_tx, self_loop_rx) = aptos_channels::new_unbounded_test();
     let validators = Arc::new(validators);
-    let network = NetworkSender::new(
+    let network = Arc::new(NetworkSender::new(
         author,
         consensus_network_client,
         self_loop_tx,
         validators.clone(),
-    );
+    ));
 
     let (msg_tx, msg_rx) = aptos_channel::new::<
         AccountAddress,

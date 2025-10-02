@@ -1,6 +1,6 @@
 processed 1 task
 task 0 lines 1-13:  print-bytecode --input=module [module 0xE.Expressions {]
-// Bytecode version v7
+// Bytecode version v8
 module 0xe::Expressions
 // Function definition at index 0
 fun binary_add()

@@ -18,22 +18,22 @@ module 0xc0ffee::m {
         _0: ||(u64) has copy + drop,
     }
     fun test1(): u64 {
-        let _t0 = Func1{bar: || lambda__1__test1()};
-        let _t5 = *&(&_t0).bar;
-        _t5()
+        let _v0 = Func1{bar: || lambda__1__test1()};
+        let _v1 = *&(&_v0).bar;
+        _v1()
     }
     fun lambda__1__test1(): u64 {
         42
     }
     fun test2(): u64 {
-        let _t0 = Func2::V1{bar: |arg0| lambda__1__test2(arg0)};
-        let _t1 = Func2::V2{bar: |arg0| lambda__2__test2(arg0), x: 44};
-        let _t10 = *&(&_t0).bar;
-        let _t11 = _t10(42);
-        let _t14 = *&(&_t1).x;
-        let _t17 = *&(&_t1).bar;
-        let _t18 = _t17(_t14);
-        _t11 + _t18
+        let _v0 = Func2::V1{bar: |arg0| lambda__1__test2(arg0)};
+        let _v1 = Func2::V2{bar: |arg0| lambda__2__test2(arg0), x: 44};
+        let _v2 = *&(&_v0).bar;
+        let _v3 = _v2(42);
+        let _v4 = *&(&_v1).x;
+        let _v5 = *&(&_v1).bar;
+        let _v6 = _v5(_v4);
+        _v3 + _v6
     }
     fun lambda__1__test2(p0: u64): u64 {
         p0
@@ -42,9 +42,9 @@ module 0xc0ffee::m {
         p0 + 1
     }
     fun test3(): u64 {
-        let _t0 = Func3{_0: || lambda__1__test3()};
-        let _t5 = *&(&_t0)._0;
-        _t5()
+        let _v0 = Func3{_0: || lambda__1__test3()};
+        let _v1 = *&(&_v0)._0;
+        _v1()
     }
     fun lambda__1__test3(): u64 {
         42

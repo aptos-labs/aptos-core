@@ -6,15 +6,15 @@ module 0x8675::M {
         test1(10)
     }
     fun test1(p0: u64): u64 {
-        let _t1 = p0;
-        let _t2 = 0;
+        let _v0 = p0;
+        let _v1 = 0;
         while (p0 > 0) {
-            let _t3 = p0;
+            let _v2 = p0;
             p0 = p0 - 1;
-            _t2 = _t2 + _t3;
+            _v1 = _v1 + _v2;
             continue
         };
-        p0 + _t1 + _t2
+        p0 + _v0 + _v1
     }
 }
 

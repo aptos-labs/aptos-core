@@ -1,6 +1,6 @@
 processed 4 tasks
 task 0 lines 1-18:  print-bytecode [// This is roughly equivalent to the following Move program:]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -22,7 +22,7 @@ l0: ret
 
 
 task 1 lines 20-32:  print-bytecode [// `return` statements can appear anywhere, even within a loop.]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -38,7 +38,7 @@ l0: ret
 
 
 task 2 lines 34-42:  print-bytecode [// This is roughly equivalent to the following Move code: `while (true) { break; }`.]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -49,7 +49,7 @@ l0: ret
 
 
 task 3 lines 44-55:  print-bytecode [// This is roughly equivalent to the following Move code: `loop { loop { break; } break; }`.]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()

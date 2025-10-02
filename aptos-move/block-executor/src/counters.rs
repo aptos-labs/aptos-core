@@ -349,6 +349,14 @@ pub(crate) fn update_state_counters(block_state_stats: BlockStateStats, is_paral
     );
 }
 
+pub static BLOCKSTM_VERSION_NUMBER: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "blockstm_version_number",
+        "Blockstm version number (1 or 2)"
+    )
+    .unwrap()
+});
+
 pub static GLOBAL_MODULE_CACHE_SIZE_IN_BYTES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "global_module_cache_size_in_bytes",

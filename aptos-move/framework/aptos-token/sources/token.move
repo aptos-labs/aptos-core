@@ -2021,9 +2021,9 @@ module aptos_token::token {
             mutate_setting
         );
 
-        let default_keys = if (property_keys.length::<String>() == 0) { vector<String>[string::utf8(b"attack"), string::utf8(b"num_of_use")] } else { property_keys };
-        let default_vals = if (property_values.length::<vector<u8>>() == 0) { vector<vector<u8>>[bcs::to_bytes<u64>(&10), bcs::to_bytes<u64>(&5)] } else { property_values };
-        let default_types = if (property_types.length::<String>() == 0) { vector<String>[string::utf8(b"u64"), string::utf8(b"u64")] } else { property_types };
+        let default_keys = if (property_keys.length<String>() == 0) { vector<String>[string::utf8(b"attack"), string::utf8(b"num_of_use")] } else { property_keys };
+        let default_vals = if (property_values.length<vector<u8>>() == 0) { vector<vector<u8>>[bcs::to_bytes<u64>(&10), bcs::to_bytes<u64>(&5)] } else { property_values };
+        let default_types = if (property_types.length<String>() == 0) { vector<String>[string::utf8(b"u64"), string::utf8(b"u64")] } else { property_types };
         let mutate_setting = token_mutate_setting;
         create_token_script(
             creator,
@@ -2240,7 +2240,7 @@ module aptos_token::token {
         let pre_amount = &mut get_token_supply(creator_addr, token_id.token_data_id);
         burn_by_creator(creator, creator_addr, get_collection_name(), get_token_name(), 0, 1);
         let aft_amount = &mut get_token_supply(creator_addr, token_id.token_data_id);
-        assert!((pre_amount.extract::<u64>() - aft_amount.extract::<u64>()) == 1, 1);
+        assert!((pre_amount.extract<u64>() - aft_amount.extract<u64>()) == 1, 1);
 
         // create unlimited token and collection
         let new_addr = signer::address_of(another_creator);
@@ -2799,7 +2799,7 @@ module aptos_token::token {
         );
 
         let (token, capability) = partial_withdraw_with_capability(cap, 1);
-        assert!(capability.borrow::<WithdrawCapability>().amount == 2, 1);
+        assert!(capability.borrow<WithdrawCapability>().amount == 2, 1);
         let (token_1, cap) = partial_withdraw_with_capability(capability.extract(), 2);
         assert!(cap.is_none(), 1);
         merge(&mut token, token_1);

@@ -15,101 +15,101 @@ module 0x99::enum_complex {
         }
     }
     fun admin_id(self: &Entity): u64 {
-        let _t3;
+        let _v0;
         'l0: loop {
-            let _t8;
-            let _t2;
+            let _v1;
+            let _v2;
             if (!((self is Institution) && (&self.admin is Superuser))) {
-                let _t6;
-                let _t1;
+                let _v3;
+                let _v4;
                 loop {
-                    let _t5;
+                    let _v5;
                     if (self is Institution) {
-                        _t5 = &self.admin;
-                        if (_t5 is User) {
-                            _t2 = &_t5._0;
-                            if (*_t2 > 10) break
+                        _v5 = &self.admin;
+                        if (_v5 is User) {
+                            _v2 = &_v5._0;
+                            if (*_v2 > 10) break
                         }
                     };
                     loop {
                         if (self is Institution) {
-                            _t5 = &self.admin;
-                            if (_t5 is User) {
-                                if (*&_t5._0 <= 10) break}
+                            _v5 = &self.admin;
+                            if (_v5 is User) {
+                                if (*&_v5._0 <= 10) break}
                         };
-                        _t1 = self;
-                        if (_t1 is Person) {
-                            _t2 = &_t1.id;
-                            if (*_t2 > 10) {
-                                _t3 = *_t2;
+                        _v4 = self;
+                        if (_v4 is Person) {
+                            _v2 = &_v4.id;
+                            if (*_v2 > 10) {
+                                _v0 = *_v2;
                                 break 'l0
                             }
                         };
-                        if (_t1 is Institution) {
-                            _t3 = *&_t1.id;
+                        if (_v4 is Institution) {
+                            _v0 = *&_v4.id;
                             break 'l0
                         };
-                        _t3 = 0;
+                        _v0 = 0;
                         break 'l0
                     };
-                    _t1 = self;
+                    _v4 = self;
                     loop {
-                        if (_t1 is Person) {
-                            _t2 = &_t1.id;
-                            if (*_t2 > 10) {
-                                _t6 = *_t2;
+                        if (_v4 is Person) {
+                            _v2 = &_v4.id;
+                            if (*_v2 > 10) {
+                                _v3 = *_v2;
                                 break
                             }
                         };
-                        if (_t1 is Institution) {
-                            _t6 = *&_t1.id;
+                        if (_v4 is Institution) {
+                            _v3 = *&_v4.id;
                             break
                         };
-                        _t6 = 0;
+                        _v3 = 0;
                         break
                     };
-                    _t3 = _t6 + 5;
+                    _v0 = _v3 + 5;
                     break 'l0
                 };
-                _t8 = *_t2;
-                _t1 = self;
+                _v1 = *_v2;
+                _v4 = self;
                 loop {
-                    if (_t1 is Person) {
-                        _t2 = &_t1.id;
-                        if (*_t2 > 10) {
-                            _t6 = *_t2;
+                    if (_v4 is Person) {
+                        _v2 = &_v4.id;
+                        if (*_v2 > 10) {
+                            _v3 = *_v2;
                             break
                         }
                     };
-                    if (_t1 is Institution) {
-                        _t6 = *&_t1.id;
+                    if (_v4 is Institution) {
+                        _v3 = *&_v4.id;
                         break
                     };
-                    _t6 = 0;
+                    _v3 = 0;
                     break
                 };
-                _t3 = _t8 + _t6;
+                _v0 = _v1 + _v3;
                 break
             };
             loop {
                 if (self is Person) {
-                    _t2 = &self.id;
-                    if (*_t2 > 10) {
-                        _t8 = *_t2;
+                    _v2 = &self.id;
+                    if (*_v2 > 10) {
+                        _v1 = *_v2;
                         break
                     }
                 };
                 if (self is Institution) {
-                    _t8 = *&self.id;
+                    _v1 = *&self.id;
                     break
                 };
-                _t8 = 0;
+                _v1 = 0;
                 break
             };
-            _t3 = 1 + _t8;
+            _v0 = 1 + _v1;
             break
         };
-        _t3
+        _v0
     }
 }
 module 0x99::enum_simple {
@@ -123,22 +123,22 @@ module 0x99::enum_simple {
         }
     }
     fun destroy_empty(self: Shape): bool {
-        let _t2;
-        let _t1 = &self;
-        if (_t1 is Circle) {
-            let Shape::Circle{radius: _t8} = self;
-            _t2 = true
-        } else if (_t1 is Rectangle) {
-            let Shape::Rectangle{width: _t14, height: _t15} = self;
-            _t2 = false
+        let _v0;
+        let _v1 = &self;
+        if (_v1 is Circle) {
+            let Shape::Circle{radius: _v2} = self;
+            _v0 = true
+        } else if (_v1 is Rectangle) {
+            let Shape::Rectangle{width: _v3, height: _v4} = self;
+            _v0 = false
         } else abort 14566554180833181697;
-        _t2
+        _v0
     }
     fun example_destroy_shapes() {
-        let _t2 = Shape::Circle{radius: 0};
-        let _t0 = Shape::Rectangle{width: 0, height: 0};
-        let _t6 = destroy_empty(_t2);
-        let _t8 = destroy_empty(_t0);
+        let _v0 = Shape::Circle{radius: 0};
+        let _v1 = Shape::Rectangle{width: 0, height: 0};
+        let _v2 = destroy_empty(_v0);
+        let _v3 = destroy_empty(_v1);
     }
 }
 

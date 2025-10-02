@@ -3,15 +3,15 @@
 //# run
 script {
     fun main() {
-        if (!(0 == 0)) abort 42;
-        if (!(vector[104u8, 101u8, 108u8, 108u8, 111u8] == vector[104u8, 101u8, 108u8, 108u8, 111u8])) abort 42;
-        let _t0 = 0;
-        let _t1 = &mut _t0;
-        *_t1 = 1;
-        let _t2 = vector[104u8, 101u8, 108u8, 108u8, 111u8];
-        let _t3 = &mut _t2;
-        *_t3 = vector[98u8, 121u8, 101u8];
-        if (!(*_t1 == 1)) abort 42;
-        if (!(*_t3 == vector[98u8, 121u8, 101u8])) abort 42;
+        assert!(0 == 0, 42);
+        assert!(vector[104u8, 101u8, 108u8, 108u8, 111u8] == vector[104u8, 101u8, 108u8, 108u8, 111u8], 42);
+        let _v0 = 0;
+        let _v1 = &mut _v0;
+        *_v1 = 1;
+        let _v2 = vector[104u8, 101u8, 108u8, 108u8, 111u8];
+        let _v3 = &mut _v2;
+        *_v3 = vector[98u8, 121u8, 101u8];
+        assert!(*_v1 == 1, 42);
+        assert!(*_v3 == vector[98u8, 121u8, 101u8], 42);
     }
 }

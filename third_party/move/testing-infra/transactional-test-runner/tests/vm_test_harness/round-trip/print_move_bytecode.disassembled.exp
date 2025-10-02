@@ -1,6 +1,6 @@
 processed 2 tasks
 task 0 lines 3-8:  print-bytecode [// Bytecode version v8]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -8,7 +8,7 @@ entry public fun main()
 
 
 task 1 lines 12-18:  print-bytecode --input=module [// Bytecode version v8]
-// Bytecode version v7
+// Bytecode version v8
 module 0x3::N
 // Function definition at index 0
 #[persistent] entry public fun ex(l0: signer, l1: u64)

@@ -151,6 +151,7 @@ module aptos_experimental::market_mixed_order_tests {
             false,
             option::none(),
             new_test_order_metadata(1),
+            false,
             &test_market_callbacks()
         );
 
@@ -234,6 +235,7 @@ module aptos_experimental::market_mixed_order_tests {
             false,
             option::none(),
             new_test_order_metadata(1),
+            true,
             &test_market_callbacks()
         );
 
@@ -327,6 +329,7 @@ module aptos_experimental::market_mixed_order_tests {
             false,
             option::none(),
             new_test_order_metadata(1),
+            false,
             &test_market_callbacks()
         );
 

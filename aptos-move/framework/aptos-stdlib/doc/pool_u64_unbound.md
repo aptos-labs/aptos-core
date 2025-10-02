@@ -309,7 +309,7 @@ Destroy an empty pool. This will fail if the pool has any balance of coins.
         shares,
         scaling_factor: _,
     } = self;
-    shares.destroy_empty::&lt;<b>address</b>, u128&gt;();
+    shares.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_destroy_empty">destroy_empty</a>&lt;<b>address</b>, u128&gt;();
 }
 </code></pre>
 

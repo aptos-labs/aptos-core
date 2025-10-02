@@ -2,7 +2,7 @@ processed 1 task
 task 0 lines 1-62:  publish --print-bytecode [module 0x66::test]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test
 // Function definition at index 0
 fun f_u8(): u8

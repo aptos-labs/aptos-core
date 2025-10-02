@@ -1,29 +1,30 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::range_proofs::dekart_univariate::{commit, setup, Commitment, PublicParameters};
+use crate::range_proofs::traits::BatchedRangeProof;
 use ark_ec::pairing::Pairing;
 use ark_std::rand::{CryptoRng, RngCore};
 
-pub fn range_proof_random_instance<E: Pairing, R: RngCore + CryptoRng>(
+pub fn range_proof_random_instance<E: Pairing, B: BatchedRangeProof<E>, R: RngCore + CryptoRng>(
     n: usize,
     ell: usize,
     rng: &mut R,
 ) -> (
-    PublicParameters<E>,
-    Vec<E::ScalarField>,
-    Commitment<E>,
-    E::ScalarField,
+    B::ProverKey,
+    B::VerificationKey,
+    Vec<B::Input>,
+    B::Commitment,
+    B::CommitmentRandomness,
 ) {
-    let pp = setup(ell, n);
+    let (pk, vk) = B::setup(n + 10, ell + 10, rng); // TODO: change these values?
 
-    let zz: Vec<E::ScalarField> = (0..n)
+    let zz: Vec<B::Input> = (0..n)
         .map(|_| {
             let val = rng.next_u64() >> (64 - ell);
-            E::ScalarField::from(val)
+            B::Input::from(val)
         })
         .collect();
 
-    let (cc, r) = commit(&pp, &zz, rng);
-    (pp, zz, cc, r)
+    let (cc, r) = B::commit(&pk, &zz, rng);
+    (pk, vk, zz, cc, r)
 }

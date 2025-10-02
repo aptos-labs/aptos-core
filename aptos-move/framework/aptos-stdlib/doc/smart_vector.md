@@ -1597,7 +1597,7 @@ values without modifying the original vectors.
 
 <pre><code><b>aborts_if</b> i &gt;= self.<a href="smart_vector.md#0x1_smart_vector_length">length</a>();
 <b>aborts_if</b> self.big_vec.is_some() && (
-    (len(self.inline_vec) + self.big_vec.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>().length::&lt;T&gt;()) &gt; MAX_U64
+    (len(self.inline_vec) + self.big_vec.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>().<a href="smart_vector.md#0x1_smart_vector_length">length</a>&lt;T&gt;()) &gt; MAX_U64
 );
 </code></pre>
 
@@ -1652,7 +1652,7 @@ values without modifying the original vectors.
     (<a href="table_with_length.md#0x1_table_with_length_spec_len">table_with_length::spec_len</a>(self.big_vec.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>().buckets) == 0);
 <b>aborts_if</b> self.<a href="smart_vector.md#0x1_smart_vector_is_empty">is_empty</a>();
 <b>aborts_if</b> self.big_vec.is_some() && (
-    (len(self.inline_vec) + self.big_vec.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>().length::&lt;T&gt;()) &gt; MAX_U64
+    (len(self.inline_vec) + self.big_vec.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>().<a href="smart_vector.md#0x1_smart_vector_length">length</a>&lt;T&gt;()) &gt; MAX_U64
 );
 <b>ensures</b> self.<a href="smart_vector.md#0x1_smart_vector_length">length</a>() == <b>old</b>(self).<a href="smart_vector.md#0x1_smart_vector_length">length</a>() - 1;
 </code></pre>
@@ -1689,7 +1689,7 @@ values without modifying the original vectors.
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>aborts_if</b> i &gt;= self.<a href="smart_vector.md#0x1_smart_vector_length">length</a>();
 <b>aborts_if</b> self.big_vec.is_some() && (
-    (len(self.inline_vec) + self.big_vec.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>().length::&lt;T&gt;()) &gt; MAX_U64
+    (len(self.inline_vec) + self.big_vec.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>().<a href="smart_vector.md#0x1_smart_vector_length">length</a>&lt;T&gt;()) &gt; MAX_U64
 );
 <b>ensures</b> self.<a href="smart_vector.md#0x1_smart_vector_length">length</a>() == <b>old</b>(self).<a href="smart_vector.md#0x1_smart_vector_length">length</a>() - 1;
 </code></pre>

@@ -7,14 +7,14 @@ module 0x99::test_struct {
         fv: |T0|(u64) has copy + drop + store,
     }
     public fun init(p0: &signer) {
-        let _t5 = Wrapper<||(u64) has drop + store>{fv: |arg0: ||(u64) has drop + store| test(arg0)};
-        move_to<Wrapper<||(u64) has drop + store>>(p0, _t5);
+        let _v0 = Wrapper<||(u64) has drop + store>{fv: |arg0: ||(u64) has drop + store| test(arg0)};
+        move_to<Wrapper<||(u64) has drop + store>>(p0, _v0);
     }
     #[persistent]
     fun test(p0: ||(u64) has drop + store): u64 {
-        let _t1;
-        if (p0() == 1) _t1 = 1 else _t1 = 2;
-        _t1
+        let _v0;
+        if (p0() == 1) _v0 = 1 else _v0 = 2;
+        _v0
     }
     #[persistent]
     fun test1(): u64 {
@@ -27,54 +27,54 @@ module 0x99::test_struct {
     public fun test_bad_borrow_from(p0: &signer)
         acquires Wrapper
     {
-        let _t3 = signer::address_of(p0);
-        let _t1 = borrow_global<Wrapper<||(u64) has copy + drop + store>>(_t3);
-        let _t5: ||u64 has copy + drop = || test1();
-        let _t8 = *&_t1.fv;
-        if (!(_t8(_t5) == 1)) abort 14566554180833181696;
-        let _t12: ||u64 has copy + drop = || test2();
-        let _t15 = *&_t1.fv;
-        if (!(_t15(_t12) == 2)) abort 14566554180833181696;
+        let _v0 = signer::address_of(p0);
+        let _v1 = borrow_global<Wrapper<||(u64) has copy + drop + store>>(_v0);
+        let _v2: ||u64 has copy + drop = || test1();
+        let _v3 = *&_v1.fv;
+        assert!(_v3(_v2) == 1, 14566554180833181696);
+        let _v4: ||u64 has copy + drop = || test2();
+        let _v5 = *&_v1.fv;
+        assert!(_v5(_v4) == 2, 14566554180833181696);
     }
     public fun test_bad_move_from(p0: &signer)
         acquires Wrapper
     {
-        let _t2 = signer::address_of(p0);
-        let _t3 = move_from<Wrapper<||(u64) has copy + drop + store>>(_t2);
+        let _v0 = signer::address_of(p0);
+        let _v1 = move_from<Wrapper<||(u64) has copy + drop + store>>(_v0);
     }
     public fun test_borrow_from(p0: &signer)
         acquires Wrapper
     {
-        let _t3 = signer::address_of(p0);
-        let _t1 = borrow_global<Wrapper<||(u64) has drop + store>>(_t3);
-        let _t5: ||u64 has copy + drop = || test1();
-        let _t8 = *&_t1.fv;
-        if (!(_t8(_t5) == 1)) abort 14566554180833181696;
-        let _t12: ||u64 has copy + drop = || test2();
-        let _t15 = *&_t1.fv;
-        if (!(_t15(_t12) == 2)) abort 14566554180833181696;
+        let _v0 = signer::address_of(p0);
+        let _v1 = borrow_global<Wrapper<||(u64) has drop + store>>(_v0);
+        let _v2: ||u64 has copy + drop = || test1();
+        let _v3 = *&_v1.fv;
+        assert!(_v3(_v2) == 1, 14566554180833181696);
+        let _v4: ||u64 has copy + drop = || test2();
+        let _v5 = *&_v1.fv;
+        assert!(_v5(_v4) == 2, 14566554180833181696);
     }
     public fun test_exist(p0: &signer) {
-        let _t2 = signer::address_of(p0);
-        if (!exists<Wrapper<||(u64) has drop + store>>(_t2)) abort 14566554180833181696;
+        let _v0 = signer::address_of(p0);
+        assert!(exists<Wrapper<||(u64) has drop + store>>(_v0), 14566554180833181696);
     }
     public fun test_move_from(p0: &signer)
         acquires Wrapper
     {
-        let _t2 = signer::address_of(p0);
-        let _t3 = move_from<Wrapper<||(u64) has drop + store>>(_t2);
+        let _v0 = signer::address_of(p0);
+        let _v1 = move_from<Wrapper<||(u64) has drop + store>>(_v0);
     }
     public fun test_not_exist_1(p0: &signer) {
-        let _t2 = signer::address_of(p0);
-        if (exists<Wrapper<u64>>(_t2)) abort 14566554180833181696;
+        let _v0 = signer::address_of(p0);
+        if (exists<Wrapper<u64>>(_v0)) abort 14566554180833181696;
     }
     public fun test_not_exist_2(p0: &signer) {
-        let _t2 = signer::address_of(p0);
-        if (exists<Wrapper<||(u64) has store>>(_t2)) abort 14566554180833181696;
+        let _v0 = signer::address_of(p0);
+        if (exists<Wrapper<||(u64) has store>>(_v0)) abort 14566554180833181696;
     }
     public fun test_not_exist_3(p0: &signer) {
-        let _t2 = signer::address_of(p0);
-        if (exists<Wrapper<||(u64) has copy + drop + store>>(_t2)) abort 14566554180833181696;
+        let _v0 = signer::address_of(p0);
+        if (exists<Wrapper<||(u64) has copy + drop + store>>(_v0)) abort 14566554180833181696;
     }
 }
 
@@ -111,18 +111,18 @@ module 0x99::test_enum {
         }
     }
     public fun init(p0: &signer) {
-        let _t1 = Wrapper::V1<||(u64) has drop + store>{fv1: |arg0: ||(u64) has drop + store| test(arg0)};
-        move_to<Wrapper<||(u64) has drop + store>>(p0, _t1);
+        let _v0 = Wrapper::V1<||(u64) has drop + store>{fv1: |arg0: ||(u64) has drop + store| test(arg0)};
+        move_to<Wrapper<||(u64) has drop + store>>(p0, _v0);
     }
     #[persistent]
     fun test(p0: ||(u64) has drop + store): u64 {
-        let _t1;
-        if (p0() == 1) _t1 = 1 else _t1 = 2;
-        _t1
+        let _v0;
+        if (p0() == 1) _v0 = 1 else _v0 = 2;
+        _v0
     }
     public fun bad_init(p0: &signer) {
-        let _t1 = Wrapper::V2<||(u64) has drop + store>{fv1: |arg0: ||(u64) has drop + store| test(arg0)};
-        move_to<Wrapper<||(u64) has drop + store>>(p0, _t1);
+        let _v0 = Wrapper::V2<||(u64) has drop + store>{fv1: |arg0: ||(u64) has drop + store| test(arg0)};
+        move_to<Wrapper<||(u64) has drop + store>>(p0, _v0);
     }
     #[persistent]
     fun test1(): u64 {
@@ -135,79 +135,79 @@ module 0x99::test_enum {
     public fun test_bad_borrow_from(p0: &signer)
         acquires Wrapper
     {
-        let _t3 = signer::address_of(p0);
-        let _t4 = borrow_global<Wrapper<||(u64) has copy + drop + store>>(_t3);
+        let _v0 = signer::address_of(p0);
+        let _v1 = borrow_global<Wrapper<||(u64) has copy + drop + store>>(_v0);
     }
     public fun test_bad_move_from(p0: &signer)
         acquires Wrapper
     {
-        let _t4;
-        let _t7 = signer::address_of(p0);
-        let _t1 = move_from<Wrapper<||(u64) has copy + drop + store>>(_t7);
-        let _t2 = &_t1;
-        if (_t2 is V1) {
-            let Wrapper::V1<||(u64) has copy + drop + store>{fv1: _t14} = _t1;
-            let _t15: ||u64 has copy + drop = || test1();
-            _t4 = _t14(_t15)
-        } else if (_t2 is V2) {
-            let Wrapper::V2<||(u64) has copy + drop + store>{fv1: _t25} = _t1;
-            let _t26: ||u64 has copy + drop = || test2();
-            _t4 = _t25(_t26)
+        let _v0;
+        let _v1 = signer::address_of(p0);
+        let _v2 = move_from<Wrapper<||(u64) has copy + drop + store>>(_v1);
+        let _v3 = &_v2;
+        if (_v3 is V1) {
+            let Wrapper::V1<||(u64) has copy + drop + store>{fv1: _v4} = _v2;
+            let _v5: ||u64 has copy + drop = || test1();
+            _v0 = _v4(_v5)
+        } else if (_v3 is V2) {
+            let Wrapper::V2<||(u64) has copy + drop + store>{fv1: _v6} = _v2;
+            let _v7: ||u64 has copy + drop = || test2();
+            _v0 = _v6(_v7)
         } else abort 14566554180833181697;
-        if (!(_t4 == 1)) abort 0;
+        assert!(_v0 == 1, 0);
     }
     public fun test_borrow_from(p0: &signer)
         acquires Wrapper
     {
-        let _t3;
-        let _t6 = signer::address_of(p0);
-        let _t1 = borrow_global<Wrapper<||(u64) has drop + store>>(_t6);
-        if (_t1 is V1) {
-            let _t2 = &_t1.fv1;
-            let _t12: ||u64 has copy + drop = || test1();
-            let _t14 = *_t2;
-            _t3 = _t14(_t12)
-        } else if (_t1 is V2) {
-            let _t4 = &_t1.fv1;
-            let _t24: ||u64 has copy + drop = || test2();
-            let _t26 = *_t4;
-            _t3 = _t26(_t24)
+        let _v0;
+        let _v1 = signer::address_of(p0);
+        let _v2 = borrow_global<Wrapper<||(u64) has drop + store>>(_v1);
+        if (_v2 is V1) {
+            let _v3 = &_v2.fv1;
+            let _v4: ||u64 has copy + drop = || test1();
+            let _v5 = *_v3;
+            _v0 = _v5(_v4)
+        } else if (_v2 is V2) {
+            let _v6 = &_v2.fv1;
+            let _v7: ||u64 has copy + drop = || test2();
+            let _v8 = *_v6;
+            _v0 = _v8(_v7)
         } else abort 14566554180833181697;
-        if (!(_t3 == 1)) abort 0;
+        assert!(_v0 == 1, 0);
     }
     public fun test_exist(p0: &signer) {
-        let _t2 = signer::address_of(p0);
-        if (!exists<Wrapper<||(u64) has drop + store>>(_t2)) abort 14566554180833181696;
+        let _v0 = signer::address_of(p0);
+        assert!(exists<Wrapper<||(u64) has drop + store>>(_v0), 14566554180833181696);
     }
     public fun test_move_from(p0: &signer)
         acquires Wrapper
     {
-        let _t4;
-        let _t7 = signer::address_of(p0);
-        let _t1 = move_from<Wrapper<||(u64) has drop + store>>(_t7);
-        let _t2 = &_t1;
-        if (_t2 is V1) {
-            let Wrapper::V1<||(u64) has drop + store>{fv1: _t14} = _t1;
-            let _t15: ||u64 has copy + drop = || test1();
-            _t4 = _t14(_t15)
-        } else if (_t2 is V2) {
-            let Wrapper::V2<||(u64) has drop + store>{fv1: _t25} = _t1;
-            let _t26: ||u64 has copy + drop = || test2();
-            _t4 = _t25(_t26)
+        let _v0;
+        let _v1 = signer::address_of(p0);
+        let _v2 = move_from<Wrapper<||(u64) has drop + store>>(_v1);
+        let _v3 = &_v2;
+        if (_v3 is V1) {
+            let Wrapper::V1<||(u64) has drop + store>{fv1: _v4} = _v2;
+            let _v5: ||u64 has copy + drop = || test1();
+            _v0 = _v4(_v5)
+        } else if (_v3 is V2) {
+            let Wrapper::V2<||(u64) has drop + store>{fv1: _v6} = _v2;
+            let _v7: ||u64 has copy + drop = || test2();
+            _v0 = _v6(_v7)
         } else abort 14566554180833181697;
-        if (!(_t4 == 1)) abort 0;
+        assert!(_v0 == 1, 0);
     }
     public fun test_not_exist_1(p0: &signer) {
-        let _t2 = signer::address_of(p0);
-        if (exists<Wrapper<u64>>(_t2)) abort 14566554180833181696;
+        let _v0 = signer::address_of(p0);
+        if (exists<Wrapper<u64>>(_v0)) abort 14566554180833181696;
     }
     public fun test_not_exist_2(p0: &signer) {
-        let _t2 = signer::address_of(p0);
-        if (exists<Wrapper<||(u64) has store>>(_t2)) abort 14566554180833181696;
+        let _v0 = signer::address_of(p0);
+        if (exists<Wrapper<||(u64) has store>>(_v0)) abort 14566554180833181696;
     }
     public fun test_not_exist_3(p0: &signer) {
-        let _t2 = signer::address_of(p0);
-        if (exists<Wrapper<||(u64) has copy + drop + store>>(_t2)) abort 14566554180833181696;
+        let _v0 = signer::address_of(p0);
+        if (exists<Wrapper<||(u64) has copy + drop + store>>(_v0)) abort 14566554180833181696;
     }
 }
 

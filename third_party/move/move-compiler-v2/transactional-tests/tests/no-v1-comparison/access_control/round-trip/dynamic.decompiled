@@ -7,33 +7,33 @@ module 0x42::test {
         value: bool,
     }
     fun init(p0: &signer) {
-        let _t3 = R{value: true};
-        move_to<R>(p0, _t3);
+        let _v0 = R{value: true};
+        move_to<R>(p0, _v0);
     }
     fun fail1(p0: address): bool
-        reads R(p0)
         acquires R
+        reads R(p0)
     {
         *&borrow_global<R>(@0x2).value
     }
     fun fail2(p0: &signer): bool
-        reads R(signer::address_of(p0))
         acquires R
+        reads R(signer::address_of(p0))
     {
         *&borrow_global<R>(@0x2).value
     }
     fun ok1(p0: address): bool
-        reads R(p0)
         acquires R
+        reads R(p0)
     {
         *&borrow_global<R>(p0).value
     }
     fun ok2(p0: &signer): bool
-        reads R(signer::address_of(p0))
         acquires R
+        reads R(signer::address_of(p0))
     {
-        let _t2 = signer::address_of(p0);
-        *&borrow_global<R>(_t2).value
+        let _v0 = signer::address_of(p0);
+        *&borrow_global<R>(_v0).value
     }
 }
 

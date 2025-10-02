@@ -4,13 +4,13 @@
 script {
     use 0x1::vector;
     fun main() {
-        let _t0 = vector[1u8, 2u8, 3u8, 4u8];
-        let _t1 = 0;
-        while (!vector::is_empty<u8>(&_t0)) {
-            let _t9 = vector::pop_back<u8>(&mut _t0) as u64;
-            _t1 = _t1 + _t9;
+        let _v0 = vector[1u8, 2u8, 3u8, 4u8];
+        let _v1 = 0;
+        while (!vector::is_empty<u8>(&_v0)) {
+            let _v2 = vector::pop_back<u8>(&mut _v0) as u64;
+            _v1 = _v1 + _v2;
             continue
         };
-        if (!(_t1 == 10)) abort _t1;
+        assert!(_v1 == 10, _v1);
     }
 }

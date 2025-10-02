@@ -10,6 +10,7 @@ use crate::{
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
     },
+    interpreter_caches::InterpreterFunctionCaches,
     loader::LazyLoadedFunction,
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
@@ -56,13 +57,59 @@ use move_vm_types::{
     },
     views::TypeView,
 };
+use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
     cmp::min,
-    collections::{btree_map, VecDeque},
+    collections::{btree_map, BTreeSet, VecDeque},
     fmt::{Debug, Write},
     rc::Rc,
+    str::FromStr,
 };
+
+/// A category of information which can be traced by the interpreter.
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
+pub(crate) enum TraceCategory {
+    /// Unknown category name. An unknown category name can be used for local debugging.
+    Unknown(String),
+    /// Trace VM Error.
+    VMError,
+    /// Trace abort of given code.
+    Abort(u64),
+}
+
+/// A set of categories to be traced as defined by environment variable, for example
+/// `MOVE_TRACE_EXEC=abort(22),abort(33)`.
+static MOVE_TRACE_EXEC: Lazy<Option<BTreeSet<TraceCategory>>> = Lazy::new(|| {
+    std::env::var("MOVE_TRACE_EXEC").ok().map(|str| {
+        str.split(',')
+            .map(|part| {
+                if part == "vm_error" {
+                    return TraceCategory::VMError;
+                }
+                if let Some(mut s) = part.strip_prefix("abort(") {
+                    s = s.strip_suffix(")").unwrap_or(s);
+                    if let Ok(c) = u64::from_str(s) {
+                        return TraceCategory::Abort(c);
+                    }
+                }
+                TraceCategory::Unknown(part.to_string())
+            })
+            .collect()
+    })
+});
+
+/// Macro for checking whether a certain trace category is active.
+macro_rules! is_tracing_for {
+    ($category:expr) => {{
+        if let Some(categories) = &*MOVE_TRACE_EXEC {
+            // Only evaluate $category when tracing is on.
+            categories.contains(&$category)
+        } else {
+            false
+        }
+    }};
+}
 
 macro_rules! set_err_info {
     ($frame:ident, $e:expr) => {{
@@ -130,6 +177,7 @@ impl Interpreter {
         function: LoadedFunction,
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
+        function_caches: &mut InterpreterFunctionCaches,
         loader: &LoaderImpl,
         ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
         layout_converter: &LayoutConverter<LoaderImpl>,
@@ -145,6 +193,7 @@ impl Interpreter {
             function,
             args,
             data_cache,
+            function_caches,
             loader,
             ty_depth_checker,
             layout_converter,
@@ -166,6 +215,7 @@ where
         function: LoadedFunction,
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
+        function_caches: &mut InterpreterFunctionCaches,
         loader: &LoaderImpl,
         ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
         layout_converter: &LayoutConverter<LoaderImpl>,
@@ -196,6 +246,7 @@ where
                 interpreter
                     .dispatch_execute_main::<UntrustedOnlyRuntimeTypeCheck, NoRuntimeRefCheck>(
                         data_cache,
+                        function_caches,
                         resource_resolver,
                         gas_meter,
                         traversal_context,
@@ -206,6 +257,7 @@ where
             } else {
                 interpreter.dispatch_execute_main::<FullRuntimeTypeCheck, NoRuntimeRefCheck>(
                     data_cache,
+                    function_caches,
                     resource_resolver,
                     gas_meter,
                     traversal_context,
@@ -219,6 +271,7 @@ where
         {
             interpreter.dispatch_execute_main::<FullRuntimeTypeCheck, FullRuntimeRefCheck>(
                 data_cache,
+                function_caches,
                 resource_resolver,
                 gas_meter,
                 traversal_context,
@@ -231,6 +284,7 @@ where
         {
             interpreter.dispatch_execute_main::<NoRuntimeTypeCheck, NoRuntimeRefCheck>(
                 data_cache,
+                function_caches,
                 resource_resolver,
                 gas_meter,
                 traversal_context,
@@ -241,6 +295,7 @@ where
         } else {
             interpreter.dispatch_execute_main::<NoRuntimeTypeCheck, FullRuntimeRefCheck>(
                 data_cache,
+                function_caches,
                 resource_resolver,
                 gas_meter,
                 traversal_context,
@@ -300,6 +355,7 @@ where
     fn dispatch_execute_main<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         self,
         data_cache: &mut TransactionDataCache,
+        function_caches: &mut InterpreterFunctionCaches,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -310,6 +366,7 @@ where
         if self.vm_config.use_call_tree_and_instruction_cache {
             self.execute_main::<RTTCheck, RTRCheck, AllRuntimeCaches>(
                 data_cache,
+                function_caches,
                 resource_resolver,
                 gas_meter,
                 traversal_context,
@@ -320,6 +377,7 @@ where
         } else {
             self.execute_main::<RTTCheck, RTRCheck, NoRuntimeCaches>(
                 data_cache,
+                function_caches,
                 resource_resolver,
                 gas_meter,
                 traversal_context,
@@ -343,6 +401,7 @@ where
     >(
         mut self,
         data_cache: &mut TransactionDataCache,
+        function_caches: &mut InterpreterFunctionCaches,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -362,15 +421,10 @@ where
             .enter_function(None, &function, CallType::Regular)
             .map_err(|e| self.set_location(e))?;
 
-        let frame_cache = if RTCaches::caches_enabled() {
-            FrameTypeCache::make_rc_for_function(&function)
-        } else {
-            FrameTypeCache::make_rc()
-        };
-
         RTRCheck::init_entry(&function, &mut self.ref_state)
             .map_err(|err| self.set_location(err))?;
 
+        let frame_cache = function_caches.get_or_create_frame_cache::<RTCaches>(&function);
         let mut current_frame = Frame::make_new_frame::<RTTCheck>(
             gas_meter,
             CallType::Regular,
@@ -481,38 +535,22 @@ where
                         {
                             (Rc::clone(function), Rc::clone(frame_cache))
                         } else {
-                            match current_frame_cache.sub_frame_cache.entry(fh_idx) {
-                                btree_map::Entry::Occupied(entry) => {
-                                    let entry = entry.get();
-                                    current_frame_cache.per_instruction_cache
-                                        [current_frame.pc as usize] = PerInstructionCache::Call(
-                                        Rc::clone(&entry.0),
-                                        Rc::clone(&entry.1),
-                                    );
+                            let function = Rc::new(self.load_function_no_visibility_checks(
+                                gas_meter,
+                                traversal_context,
+                                &current_frame,
+                                fh_idx,
+                            )?);
+                            let frame_cache =
+                                function_caches.get_or_create_frame_cache_non_generic(&function);
 
-                                    (Rc::clone(&entry.0), Rc::clone(&entry.1))
-                                },
-                                btree_map::Entry::Vacant(entry) => {
-                                    let function =
-                                        Rc::new(self.load_function_no_visibility_checks(
-                                            gas_meter,
-                                            traversal_context,
-                                            &current_frame,
-                                            fh_idx,
-                                        )?);
-                                    let frame_cache =
-                                        FrameTypeCache::make_rc_for_function(&function);
+                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
+                                PerInstructionCache::Call(
+                                    Rc::clone(&function),
+                                    Rc::clone(&frame_cache),
+                                );
 
-                                    entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
-                                    current_frame_cache.per_instruction_cache
-                                        [current_frame.pc as usize] = PerInstructionCache::Call(
-                                        Rc::clone(&function),
-                                        Rc::clone(&frame_cache),
-                                    );
-
-                                    (function, frame_cache)
-                                },
-                            }
+                            (function, frame_cache)
                         }
                     } else {
                         let function = Rc::new(self.load_function_no_visibility_checks(
@@ -548,6 +586,7 @@ where
                         self.call_native::<RTTCheck, RTRCheck, RTCaches>(
                             &mut current_frame,
                             data_cache,
+                            function_caches,
                             resource_resolver,
                             gas_meter,
                             traversal_context,
@@ -598,9 +637,9 @@ where
                                             &current_frame,
                                             idx,
                                         )?);
-                                    let frame_cache =
-                                        FrameTypeCache::make_rc_for_function(&function);
-
+                                    // TODO(caches): remove the generic sub frame cache.
+                                    let frame_cache = function_caches
+                                        .get_or_create_frame_cache_generic(&function);
                                     entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
                                     current_frame_cache.per_instruction_cache
                                         [current_frame.pc as usize] =
@@ -653,6 +692,7 @@ where
                         self.call_native::<RTTCheck, RTRCheck, RTCaches>(
                             &mut current_frame,
                             data_cache,
+                            function_caches,
                             resource_resolver,
                             gas_meter,
                             traversal_context,
@@ -740,6 +780,7 @@ where
                         self.call_native::<RTTCheck, RTRCheck, RTCaches>(
                             &mut current_frame,
                             data_cache,
+                            function_caches,
                             resource_resolver,
                             gas_meter,
                             traversal_context,
@@ -749,11 +790,8 @@ where
                             captured_vec,
                         )?
                     } else {
-                        let frame_cache = if RTCaches::caches_enabled() {
-                            FrameTypeCache::make_rc_for_function(&callee)
-                        } else {
-                            FrameTypeCache::make_rc()
-                        };
+                        let frame_cache =
+                            function_caches.get_or_create_frame_cache::<RTCaches>(&callee);
                         self.set_new_call_frame::<RTTCheck, RTRCheck, RTCaches>(
                             &mut current_frame,
                             gas_meter,
@@ -932,6 +970,7 @@ where
         &mut self,
         current_frame: &mut Frame,
         data_cache: &mut TransactionDataCache,
+        function_caches: &mut InterpreterFunctionCaches,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -944,6 +983,7 @@ where
         self.call_native_impl::<RTTCheck, RTRCheck, RTCaches>(
             current_frame,
             data_cache,
+            function_caches,
             resource_resolver,
             gas_meter,
             traversal_context,
@@ -978,6 +1018,7 @@ where
         &mut self,
         current_frame: &mut Frame,
         data_cache: &mut TransactionDataCache,
+        function_caches: &mut InterpreterFunctionCaches,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -1068,9 +1109,15 @@ where
                 // If the caller requires checks, push return types of native function to
                 // satisfy runtime check protocol.
                 if RTTCheck::should_perform_checks(&current_frame.function.function) {
-                    for ty in function.return_tys() {
-                        let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
-                        self.operand_stack.push_ty(ty)?;
+                    if function.ty_args().is_empty() {
+                        for ty in function.return_tys() {
+                            self.operand_stack.push_ty(ty.clone())?;
+                        }
+                    } else {
+                        for ty in function.return_tys() {
+                            let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
+                            self.operand_stack.push_ty(ty)?;
+                        }
                     }
                 }
 
@@ -1148,12 +1195,8 @@ where
                     }
                 }
 
-                let frame_cache = if RTCaches::caches_enabled() {
-                    FrameTypeCache::make_rc_for_function(&target_func)
-                } else {
-                    FrameTypeCache::make_rc()
-                };
-
+                let frame_cache =
+                    function_caches.get_or_create_frame_cache::<RTCaches>(&target_func);
                 self.set_new_call_frame::<RTTCheck, RTRCheck, RTCaches>(
                     current_frame,
                     gas_meter,
@@ -1581,7 +1624,7 @@ where
         debug_writeln!(buf)?;
         debug_writeln!(buf, "        Locals:")?;
         if !function.local_tys().is_empty() {
-            values::debug::print_locals(buf, &frame.locals)?;
+            values::debug::print_locals(buf, &frame.locals, true)?;
             debug_writeln!(buf)?;
         } else {
             debug_writeln!(buf, "            (none)")?;
@@ -1913,6 +1956,15 @@ impl Frame {
             } else {
                 e
             };
+            if is_tracing_for!(TraceCategory::VMError) {
+                let mut str = String::new();
+                if let Err(print_err) = interpreter
+                    .debug_print_stack_trace(&mut str, interpreter.loader.runtime_environment())
+                {
+                    str = format!("<while printing stack trace>: {}", print_err);
+                }
+                eprintln!("trace vm_error {}:\n{}", e, str)
+            }
             set_err_info!(self, e)
         })
     }
@@ -2639,6 +2691,14 @@ impl Frame {
                     Bytecode::Abort => {
                         gas_meter.charge_simple_instr(S::Abort)?;
                         let error_code = interpreter.operand_stack.pop_as::<u64>()?;
+                        if is_tracing_for!(TraceCategory::Abort(error_code)) {
+                            let mut str = String::new();
+                            interpreter.debug_print_stack_trace(
+                                &mut str,
+                                interpreter.loader.runtime_environment(),
+                            )?;
+                            eprintln!("trace abort({}): {}", error_code, str);
+                        }
                         let error = PartialVMError::new(StatusCode::ABORTED)
                             .with_sub_status(error_code)
                             .with_message(format!(

@@ -84,12 +84,14 @@ SKIP_PERF_IMPROVEMENT_NOTICE = IS_MAINNET
 CODE_PERF_VERSION = "v10"
 
 # default to using production number of execution threads for assertions
-NUMBER_OF_EXECUTION_THREADS = int(
-    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=32)
-)
+# but cap it at available CPU count to avoid concurrency validation errors
+import multiprocessing
+MAX_EXECUTION_THREADS = int(os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=32))
+NUMBER_OF_EXECUTION_THREADS = min(MAX_EXECUTION_THREADS, multiprocessing.cpu_count())
 
 if os.environ.get("DETAILED"):
-    EXECUTION_ONLY_NUMBER_OF_THREADS = [1, 2, 4, 8, 16, 32, 48, 60]
+    # Cap execution threads at available CPU count
+    EXECUTION_ONLY_NUMBER_OF_THREADS = [t for t in [1, 2, 4, 8, 16, 32, 48, 60] if t <= multiprocessing.cpu_count()]
 else:
     EXECUTION_ONLY_NUMBER_OF_THREADS = []
 
@@ -261,7 +263,7 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("vector-trim-append-len3000-size1"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("vector-remove-insert-len3000-size1"), included_in=Flow.CONTINUOUS),
 
-    # waived because of missing monothonic counter native.
+    # waived because of missing monotonic counter native.
     RunGroupConfig(key=RunGroupKey("order-book-no-matches1-market"), included_in=Flow.ORDER_BOOK, waived=True),
     RunGroupConfig(key=RunGroupKey("order-book-balanced-matches25-pct1-market"), included_in=Flow.ORDER_BOOK, waived=True),
     RunGroupConfig(key=RunGroupKey("order-book-balanced-matches80-pct1-market"), included_in=Flow.ORDER_BOOK, waived=True),
@@ -270,6 +272,7 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("order-book-balanced-matches25-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
     RunGroupConfig(key=RunGroupKey("order-book-balanced-matches80-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
     RunGroupConfig(key=RunGroupKey("order-book-balanced-size-skewed80-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(key=RunGroupKey("monotonic-counter-single"), included_in=Flow.CONTINUOUS, waived=True),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
@@ -281,8 +284,7 @@ TESTS = [
     RunGroupConfig(expected_tps=6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET_LARGE_DB),
     RunGroupConfig(expected_tps=17000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
     RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
-    RunGroupConfig(key=RunGroupKey("monotonic-counter-single"), included_in=Flow.CONTINUOUS),
-] + [ 
+] + [
     # no-commit throughput of different executor, used on continuous flow
     RunGroupConfig(
         key=RunGroupKey(
@@ -669,7 +671,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 part for part in line.strip().split(CALIBRATION_SEPARATOR) if part
             ]
         )
-        >= 1
+        >= 3
     }
     print(calibrated_expected_tps)
 

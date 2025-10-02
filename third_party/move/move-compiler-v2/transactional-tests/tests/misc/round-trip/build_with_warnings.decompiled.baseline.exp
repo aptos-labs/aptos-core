@@ -16,11 +16,11 @@ module 0x42::m
     call foo
     ld_u64 2
     eq
-    br_true l0
+    br_false l0
     // @5
-    ld_u64 1
+    ret
+l0: ld_u64 1
     abort
-l0: ret
 
 // Function definition at index 1
 #[persistent] public fun foo(l0: u64): u64

@@ -6,8 +6,8 @@ module 0x42::test {
         value: bool,
     }
     fun init(p0: &signer) {
-        let _t3 = R{value: true};
-        move_to<R>(p0, _t3);
+        let _v0 = R{value: true};
+        move_to<R>(p0, _v0);
     }
     fun fail1(): bool
         !reads 0x42::*::*
@@ -22,16 +22,16 @@ module 0x42::test {
         *&borrow_global<R>(@0x1).value
     }
     fun ok1(): bool
-        reads 0x42::*::*
         !reads 0x43::*::*
         acquires R
+        reads 0x42::*::*
     {
         *&borrow_global<R>(@0x1).value
     }
     fun ok2(): bool
-        writes *
         !reads 0x43::*::*
         acquires R
+        writes *
     {
         *&borrow_global<R>(@0x1).value
     }

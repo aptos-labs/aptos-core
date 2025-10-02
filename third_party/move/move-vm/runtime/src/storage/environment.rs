@@ -22,7 +22,7 @@ use move_bytecode_verifier::dependencies;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{ModuleId, TypeTag, OPTION_MODULE_ID},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use move_vm_metrics::{Timer, VERIFIED_MODULE_CACHE_SIZE, VM_TIMER};
@@ -32,6 +32,8 @@ use move_vm_types::loaded_data::{
 };
 use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap};
 use std::sync::Arc;
+
+const OPTION_MODULE_BYTES: &[u8] = include_bytes!("option.mv");
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
 /// the code cache, possibly across multiple threads.
@@ -66,9 +68,18 @@ impl RuntimeEnvironment {
     pub fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
     ) -> Self {
+        Self::new_for_move_third_party_tests(natives, true)
+    }
+
+    /// API to control the enum option feature flag depending on whether the caller is from aptos or not
+    pub fn new_for_move_third_party_tests(
+        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
+        enable_enum_option: bool,
+    ) -> Self {
         let vm_config = VMConfig {
             // Keep the paranoid mode on as we most likely want this for tests.
             paranoid_type_checks: true,
+            enable_enum_option,
             ..VMConfig::default()
         };
         Self::new_with_config(natives, vm_config)
@@ -345,6 +356,24 @@ impl RuntimeEnvironment {
         idx: StructNameIndex,
     ) -> PartialVMResult<StructIdentifier> {
         self.struct_name_index_map.idx_to_struct_name(idx)
+    }
+
+    pub fn get_option_module_bytes(&self) -> Bytes {
+        Bytes::from(OPTION_MODULE_BYTES.to_vec())
+    }
+
+    pub fn get_module_bytes_override(
+        &self,
+        addr: &AccountAddress,
+        name: &IdentStr,
+    ) -> Option<Bytes> {
+        let enable_enum_option = self.vm_config().enable_enum_option;
+        if enable_enum_option {
+            if addr == OPTION_MODULE_ID.address() && *name == *OPTION_MODULE_ID.name() {
+                return Some(self.get_option_module_bytes());
+            }
+        }
+        None
     }
 }
 

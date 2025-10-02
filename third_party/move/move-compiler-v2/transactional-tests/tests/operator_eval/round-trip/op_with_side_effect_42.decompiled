@@ -3,12 +3,12 @@
 //# publish
 module 0xc0ffee::m {
     public fun test(): u64 {
-        let _t0 = 1;
-        let _t6 = _t0 + 1;
-        _t0 = _t0 + 1;
-        let _t12 = _t0 + 7;
-        _t0 = _t0 + 1 - 3;
-        _t6 + _t12 + _t0
+        let _v0 = 1;
+        let _v1 = _v0 + 1;
+        _v0 = _v0 + 1;
+        let _v2 = _v0 + 7;
+        _v0 = _v0 + 1 - 3;
+        _v1 + _v2 + _v0
     }
 }
 

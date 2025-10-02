@@ -146,10 +146,10 @@ if (Not(Lt(length, 100))) Abort(2);
 === Sourcified Output ============================================
 module 0x815::m {
     public fun f(length: u64): u64 {
-        if (!(length > 0)) abort 1;
-        if (!(length < 100)) abort 2;
-        let _t1 = 0;
-        while (_t1 < length) _t1 = _t1 + 1;
-        _t1
+        assert!(length > 0, 1);
+        assert!(length < 100, 2);
+        let _v0 = 0;
+        while (_v0 < length) _v0 = _v0 + 1;
+        _v0
     }
 }
