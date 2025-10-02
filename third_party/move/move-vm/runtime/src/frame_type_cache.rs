@@ -13,25 +13,6 @@ use move_core_types::gas_algebra::NumTypeNodes;
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
-pub(crate) trait RuntimeCacheTraits {
-    fn caches_enabled() -> bool;
-}
-
-pub(crate) struct NoRuntimeCaches;
-pub(crate) struct AllRuntimeCaches;
-
-impl RuntimeCacheTraits for NoRuntimeCaches {
-    fn caches_enabled() -> bool {
-        false
-    }
-}
-
-impl RuntimeCacheTraits for AllRuntimeCaches {
-    fn caches_enabled() -> bool {
-        true
-    }
-}
-
 /// Variants for each individual instruction cache. Should make sure
 /// that the memory footprint of each variant is small. This is an
 /// enum that is expected to grow in the future.

@@ -103,7 +103,7 @@ impl MoveVM {
                 deserialized_args,
                 data_cache,
                 // TODO(caches): async drop
-                &mut InterpreterFunctionCaches::new(),
+                &mut InterpreterFunctionCaches::new(vm_config.use_call_tree_and_instruction_cache),
                 loader,
                 &ty_depth_checker,
                 &layout_converter,

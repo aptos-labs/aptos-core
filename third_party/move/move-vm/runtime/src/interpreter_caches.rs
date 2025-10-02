@@ -7,7 +7,7 @@
 //! on the first call.
 
 use crate::{
-    frame_type_cache::{FrameTypeCache, RuntimeCacheTraits},
+    frame_type_cache::FrameTypeCache,
     loader::{FunctionPtr, GenericFunctionPtr},
     LoadedFunction,
 };
@@ -15,23 +15,25 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 /// Interpreter-level caches for function data (single-threaded)
 pub struct InterpreterFunctionCaches {
+    enabled: bool,
     function_instruction_caches: HashMap<FunctionPtr, Rc<RefCell<FrameTypeCache>>>,
     generic_function_instruction_caches: HashMap<GenericFunctionPtr, Rc<RefCell<FrameTypeCache>>>,
 }
 
 impl InterpreterFunctionCaches {
-    pub fn new() -> Self {
+    pub fn new(enabled: bool) -> Self {
         Self {
+            enabled,
             function_instruction_caches: HashMap::new(),
             generic_function_instruction_caches: HashMap::new(),
         }
     }
 
-    pub(crate) fn get_or_create_frame_cache<RTCaches: RuntimeCacheTraits>(
+    pub(crate) fn get_or_create_frame_cache(
         &mut self,
         function: &LoadedFunction,
     ) -> Rc<RefCell<FrameTypeCache>> {
-        if RTCaches::caches_enabled() {
+        if self.enabled {
             if function.ty_args.is_empty() {
                 self.get_or_create_frame_cache_non_generic(function)
             } else {
@@ -47,6 +49,7 @@ impl InterpreterFunctionCaches {
         &mut self,
         function: &LoadedFunction,
     ) -> Rc<RefCell<FrameTypeCache>> {
+        debug_assert!(self.enabled);
         debug_assert!(function.ty_args().is_empty());
 
         let ptr = FunctionPtr::from_loaded_function(function);
@@ -61,6 +64,7 @@ impl InterpreterFunctionCaches {
         &mut self,
         function: &LoadedFunction,
     ) -> Rc<RefCell<FrameTypeCache>> {
+        debug_assert!(self.enabled);
         debug_assert!(!function.ty_args().is_empty());
 
         let ptr = GenericFunctionPtr::from_loaded_function(function);
