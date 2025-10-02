@@ -1,7 +1,12 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{accounts::account_recovery_db::AccountRecoveryDBInterface, error::PepperServiceError};
+use crate::{
+    accounts::{
+        account_managers::AccountRecoveryManagers, account_recovery_db::AccountRecoveryDBInterface,
+    },
+    error::PepperServiceError,
+};
 use aptos_keyless_pepper_common::{
     vuf::{bls12381_g1_bls::Bls12381G1Bls, slip_10::ed25519_dalek::Digest, VUF},
     PepperInput, PepperV0VufPubKey,
@@ -59,6 +64,11 @@ pub fn create_vuf_public_private_keypair() -> Arc<(String, ark_bls12_381::Fr)> {
     let vuf_public_key_string = serde_json::to_string_pretty(&pepper_vuf_public_key).unwrap();
 
     Arc::new((vuf_public_key_string, vuf_private_key))
+}
+
+/// Returns an empty account managers and overrides instance
+pub fn get_empty_account_recovery_managers() -> Arc<AccountRecoveryManagers> {
+    Arc::new(AccountRecoveryManagers::new_empty())
 }
 
 /// Returns a mock account recovery DB instance

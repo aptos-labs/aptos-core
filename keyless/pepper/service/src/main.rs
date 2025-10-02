@@ -3,7 +3,7 @@
 
 use aptos_keyless_pepper_service::{
     accounts::{
-        account_managers::ACCOUNT_MANAGERS,
+        account_managers::{AccountRecoveryManager, AccountRecoveryManagers},
         account_recovery_db::{
             AccountRecoveryDBInterface, FirestoreAccountRecoveryDB, TestAccountRecoveryDB,
         },
@@ -23,11 +23,20 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Server,
 };
-use std::{convert::Infallible, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc, time::Instant};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
 struct Args {
+    /// A list of account recovery managers that are allowed to override the
+    /// aud claim in the JWTs they issue when handling pepper requests.
+    ///
+    /// For example:
+    /// --account-recovery-managers="https://accounts.google.com 1234567890"
+    /// --account-recovery-managers="https://accounts.facebook.com 9876543210"
+    #[arg(long)]
+    account_recovery_managers: Vec<AccountRecoveryManager>,
+
     /// The Firestore database ID (required to connect to Firestore).
     /// Only required if not running in local development mode.
     #[arg(
@@ -105,13 +114,16 @@ async fn main() {
     );
     info!("Retrieved the VUF public key: {:?}", vuf_public_key);
 
+    // Collect the account recovery managers
+    info!("Collecting the account recovery managers...");
+    let account_recovery_managers =
+        Arc::new(AccountRecoveryManagers::new(args.account_recovery_managers));
+
     // Start the cached resource fetcher
     let cached_resources = resource_fetcher::start_cached_resource_fetcher(
         args.on_chain_groth16_vk_url,
         args.on_chain_keyless_config_url,
     );
-
-    let _ = ACCOUNT_MANAGERS.deref();
 
     // Create the account recovery database
     let account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync> = if args
@@ -139,6 +151,7 @@ async fn main() {
         vuf_keypair,
         jwk_cache,
         cached_resources,
+        account_recovery_managers,
         account_recovery_db,
     )
     .await;
@@ -169,6 +182,7 @@ async fn start_pepper_service(
     vuf_keypair: Arc<(String, ark_bls12_381::Fr)>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
+    account_recovery_managers: Arc<AccountRecoveryManagers>,
     account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
 ) {
     info!(
@@ -182,6 +196,7 @@ async fn start_pepper_service(
         let vuf_keypair = vuf_keypair.clone();
         let jwk_cache = jwk_cache.clone();
         let cached_resources = cached_resources.clone();
+        let account_recovery_managers = account_recovery_managers.clone();
         let account_recovery_db = account_recovery_db.clone();
 
         async move {
@@ -195,6 +210,7 @@ async fn start_pepper_service(
                 let vuf_keypair = vuf_keypair.clone();
                 let jwk_cache = jwk_cache.clone();
                 let cached_resources = cached_resources.clone();
+                let account_recovery_managers = account_recovery_managers.clone();
                 let account_recovery_db = account_recovery_db.clone();
 
                 // Handle the request
@@ -205,6 +221,7 @@ async fn start_pepper_service(
                         vuf_keypair.clone(),
                         jwk_cache.clone(),
                         cached_resources.clone(),
+                        account_recovery_managers.clone(),
                         account_recovery_db.clone(),
                     )
                     .await;
