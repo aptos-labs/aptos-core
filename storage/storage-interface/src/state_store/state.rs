@@ -311,14 +311,10 @@ impl State {
     }
 
     fn expect_old_slot(
-        overlay: &LayeredMap<StateKey, StateSlot>,
+        _overlay: &LayeredMap<StateKey, StateSlot>,
         cache: &StateCacheShard,
         key: &StateKey,
     ) -> StateSlot {
-        if let Some(slot) = overlay.get(key) {
-            return slot;
-        }
-
         // TODO(aldenhu): avoid cloning the state value (by not using DashMap)
         cache
             .get(key)
