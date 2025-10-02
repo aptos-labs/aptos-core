@@ -6,7 +6,12 @@ use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::state_store::{
     hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
 };
-use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
+use rayon::prelude::*;
+use std::{
+    collections::{HashMap, HashSet},
+    num::NonZeroUsize,
+    sync::Arc,
+};
 
 pub(crate) struct HotStateLRU<'a> {
     /// Max total number of items in the cache.
@@ -24,6 +29,7 @@ pub(crate) struct HotStateLRU<'a> {
     tail: Option<StateKey>,
     /// Total number of items.
     num_items: usize,
+    prefetched: HashMap<StateKey, Option<StateSlot>>,
 }
 
 impl<'a> HotStateLRU<'a> {
@@ -43,7 +49,50 @@ impl<'a> HotStateLRU<'a> {
             head,
             tail,
             num_items,
+            prefetched: HashMap::new(),
         }
+    }
+
+    pub fn prefetch(&mut self, keys: &[&StateKey]) {
+        assert!(self.prefetched.is_empty());
+
+        use crate::state_store::state_view::cached_state_view::IO_POOL;
+        use dashmap::DashMap;
+
+        let slots = DashMap::<StateKey, Option<StateSlot>>::new();
+        IO_POOL.install(|| {
+            keys.par_iter().for_each(|key| {
+                let ret = self.prefetch_slot(key);
+                slots.insert((*key).clone(), ret);
+            });
+        });
+
+        let mut neighbors = HashSet::new();
+        slots
+            .iter()
+            .filter(|entry| entry.value().is_some() && entry.value().as_ref().unwrap().is_hot())
+            .for_each(|entry| {
+                let slot = entry.value().as_ref().unwrap();
+                if let Some(prev_key) = slot.prev()
+                    && !slots.contains_key(prev_key)
+                {
+                    neighbors.insert(prev_key.clone());
+                }
+                if let Some(next_key) = slot.next()
+                    && !slots.contains_key(next_key)
+                {
+                    neighbors.insert(next_key.clone());
+                }
+            });
+
+        IO_POOL.install(|| {
+            neighbors.into_par_iter().for_each(|key| {
+                let ret = self.prefetch_slot(&key);
+                slots.insert(key, ret);
+            });
+        });
+
+        self.prefetched.extend(slots.into_iter());
     }
 
     pub fn insert(&mut self, key: StateKey, slot: StateSlot) {
@@ -142,9 +191,21 @@ impl<'a> HotStateLRU<'a> {
         Some(old_slot)
     }
 
+    fn prefetch_slot(&self, key: &StateKey) -> Option<StateSlot> {
+        if let Some(slot) = self.overlay.get(key) {
+            return Some(slot);
+        }
+
+        self.committed.get_state_slot(key)
+    }
+
     pub(crate) fn get_slot(&self, key: &StateKey) -> Option<StateSlot> {
         if let Some(slot) = self.pending.get(key) {
             return Some(slot.clone());
+        }
+
+        if let Some(x) = self.prefetched.get(key) {
+            return x.clone();
         }
 
         if let Some(slot) = self.overlay.get(key) {

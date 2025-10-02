@@ -2154,6 +2154,10 @@ impl Value {
     {
         VMValueCast::cast(self)
     }
+
+    pub fn is_invalid(&self) -> bool {
+        matches!(self.0, ValueImpl::Invalid)
+    }
 }
 
 impl VMValueCast<u8> for IntegerValue {
@@ -3806,9 +3810,16 @@ pub mod debug {
         }
     }
 
-    pub fn print_locals<B: Write>(buf: &mut B, locals: &Locals) -> PartialVMResult<()> {
+    pub fn print_locals<B: Write>(
+        buf: &mut B,
+        locals: &Locals,
+        compact: bool,
+    ) -> PartialVMResult<()> {
         // REVIEW: The number of spaces in the indent is currently hard coded.
         for (idx, val) in locals.0.borrow().iter().enumerate() {
+            if compact && matches!(val, ValueImpl::Invalid) {
+                continue;
+            }
             debug_write!(buf, "            [{}] ", idx)?;
             print_value_impl(buf, val)?;
             debug_writeln!(buf)?;

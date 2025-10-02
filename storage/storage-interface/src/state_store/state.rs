@@ -195,9 +195,12 @@ impl State {
                     );
                     let mut all_updates = per_version.iter();
                     for ckpt_version in all_checkpoint_versions {
-                        for (key, update) in
-                            all_updates.take_while_ref(|(_k, u)| u.version <= *ckpt_version)
-                        {
+                        let updates = all_updates
+                            .take_while_ref(|(_k, u)| u.version <= *ckpt_version)
+                            .collect_vec();
+                        let keys = updates.iter().map(|(k, _u)| *k).collect_vec();
+                        lru.prefetch(&keys);
+                        for (key, update) in updates {
                             Self::apply_one_update(&mut lru, overlay, cache, key, update);
                         }
                         // Only evict at the checkpoints.
