@@ -1,0 +1,109 @@
+
+Diagnostics:
+warning: [lint] Using % to generate random numbers may introduce bias. Consider using u8_range(0, N) instead
+   ┌─ tests/model_ast_lints/random_modulo.move:18:19
+   │
+18 │         let ret = (u8_integer() % 251) as u256;
+   │                   ^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(random_modulo)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#random_modulo.
+
+warning: [lint] Using % to generate random numbers may introduce bias. Consider using u16_range(0, N) instead
+   ┌─ tests/model_ast_lints/random_modulo.move:19:16
+   │
+19 │         ret += (u16_integer() % 65521) as u256;
+   │                ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(random_modulo)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#random_modulo.
+
+warning: [lint] Using % to generate random numbers may introduce bias. Consider using u32_range(0, N) instead
+   ┌─ tests/model_ast_lints/random_modulo.move:20:16
+   │
+20 │         ret += (u32_integer() % 2147483647) as u256;
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(random_modulo)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#random_modulo.
+
+warning: [lint] Using % to generate random numbers may introduce bias. Consider using u64_range(0, N) instead
+   ┌─ tests/model_ast_lints/random_modulo.move:21:16
+   │
+21 │         ret += (u64_integer() % 2305843009213693951) as u256;
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(random_modulo)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#random_modulo.
+
+warning: [lint] Using % to generate random numbers may introduce bias. Consider using u128_range(0, N) instead
+   ┌─ tests/model_ast_lints/random_modulo.move:22:16
+   │
+22 │         ret += (u128_integer() % 170141183460469231731687303715884105727) as u256;
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(random_modulo)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#random_modulo.
+
+warning: [lint] Using % to generate random numbers may introduce bias. Consider using u256_range(0, N) instead
+   ┌─ tests/model_ast_lints/random_modulo.move:23:16
+   │
+23 │         ret += u256_integer() % 77194726158210796949047323339125271902179989777093709359638389338608753093290;
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(random_modulo)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#random_modulo.
+
+warning: [lint] Using % to generate random numbers may introduce bias. Consider using u8_range(0, N) instead
+   ┌─ tests/model_ast_lints/random_modulo.move:28:19
+   │
+28 │         let ret = (u8_integer() % (u8_range(0, 251) ^ 0xAA)) as u256;
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(random_modulo)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#random_modulo.
+
+warning: [lint] Using % to generate random numbers may introduce bias. Consider using u16_range(0, N) instead
+   ┌─ tests/model_ast_lints/random_modulo.move:29:16
+   │
+29 │         ret += (u16_integer() % (u16_range(0, 65521) ^ 0xAAAA)) as u256;
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(random_modulo)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#random_modulo.
+
+warning: [lint] Using % to generate random numbers may introduce bias. Consider using u32_range(0, N) instead
+   ┌─ tests/model_ast_lints/random_modulo.move:30:16
+   │
+30 │         ret += (u32_integer() % (u32_range(0, 2147483647) ^ 0xAAAAAAAA)) as u256;
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(random_modulo)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#random_modulo.
+
+warning: [lint] Using % to generate random numbers may introduce bias. Consider using u64_range(0, N) instead
+   ┌─ tests/model_ast_lints/random_modulo.move:31:16
+   │
+31 │         ret += (u64_integer() % (u64_range(0, 2305843009213693951) ^ 0xAAAAAAAA)) as u256;
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(random_modulo)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#random_modulo.
+
+warning: [lint] Using % to generate random numbers may introduce bias. Consider using u128_range(0, N) instead
+   ┌─ tests/model_ast_lints/random_modulo.move:32:16
+   │
+32 │         ret += (u128_integer() % (u128_range(0, 170141183460469231731687303715884105727) ^ 0xAAAAAAAAAAAAAAAA)) as u256;
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(random_modulo)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#random_modulo.
+
+warning: [lint] Using % to generate random numbers may introduce bias. Consider using u256_range(0, N) instead
+   ┌─ tests/model_ast_lints/random_modulo.move:33:16
+   │
+33 │         ret += u256_integer() % (u256_range(0, 77194726158210796949047323339125271902179989777093709359638389338608753093290) ^ 0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA);
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(random_modulo)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#random_modulo.
