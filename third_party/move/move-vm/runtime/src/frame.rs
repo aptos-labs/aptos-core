@@ -65,6 +65,7 @@ impl AccessSpecifierEnv for Frame {
 
 macro_rules! build_loaded_function {
     ($function_name:ident, $idx_ty:ty, $get_function_handle:ident) => {
+        #[inline(always)]
         pub(crate) fn $function_name(
             &self,
             loader: &impl FunctionDefinitionLoader,
@@ -478,6 +479,7 @@ impl Frame {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn instantiate_generic_function(
         &self,
         gas_meter: Option<&mut impl GasMeter>,

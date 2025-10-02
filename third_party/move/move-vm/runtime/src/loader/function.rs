@@ -512,8 +512,6 @@ fn is_fast_callable(module: &CompiledModule, code: &[Bytecode]) -> bool {
         match instruction {
             // Disallowed instructions
             CallClosure(_)
-            | PackVariant(_)
-            | PackVariantGeneric(_)
             | PackClosure(_, _)
             | PackClosureGeneric(_, _)
             | MutBorrowGlobal(_)
@@ -666,6 +664,101 @@ fn is_fast_callable(module: &CompiledModule, code: &[Bytecode]) -> bool {
                     }
                 }
             },
+            PackVariant(idx) => {
+                use SignatureToken::*;
+
+                let handle = module.struct_variant_handle_at(*idx);
+                let struct_def = module.struct_def_at(handle.struct_index);
+                let variants = match &struct_def.field_information {
+                    StructFieldInformation::DeclaredVariants(variants) => variants,
+                    _ => unreachable!(),
+                };
+                let variant = &variants[handle.variant as usize];
+
+                for field in &variant.fields {
+                    match &field.signature.0 {
+                        Bool | Address | Signer => continue,
+                        U8 | U16 | U32 | U64 | U128 | U256 => continue,
+
+                        Vector(inner) => match &**inner {
+                            Bool | Address | Signer => continue,
+                            U8 | U16 | U32 | U64 | U128 | U256 => continue,
+                            _ => return false,
+                        },
+
+                        Function(_, _, _)
+                        | Struct(_)
+                        | StructInstantiation(_, _)
+                        | TypeParameter(_) => return false,
+
+                        Reference(_) | MutableReference(_) => unreachable!(),
+                    }
+                }
+            },
+            PackVariantGeneric(idx) => {
+                use SignatureToken::*;
+
+                let inst = module.struct_variant_instantiation_at(*idx);
+                let handle = module.struct_variant_handle_at(inst.handle);
+                let struct_def = module.struct_def_at(handle.struct_index);
+                let variants = match &struct_def.field_information {
+                    StructFieldInformation::DeclaredVariants(variants) => variants,
+                    _ => unreachable!(),
+                };
+                let variant = &variants[handle.variant as usize];
+
+                for field in &variant.fields {
+                    match &field.signature.0 {
+                        Bool | Address | Signer => continue,
+                        U8 | U16 | U32 | U64 | U128 | U256 => continue,
+
+                        Vector(inner) => match &**inner {
+                            Bool | Address | Signer => continue,
+                            U8 | U16 | U32 | U64 | U128 | U256 => continue,
+                            _ => return false,
+                        },
+
+                        Function(_, _, _)
+                        | Struct(_)
+                        | StructInstantiation(_, _)
+                        | TypeParameter(_) => return false,
+
+                        Reference(_) | MutableReference(_) => unreachable!(),
+                    }
+                }
+            },
+            PackVariantGeneric(idx) => {
+                use SignatureToken::*;
+
+                let inst = module.struct_variant_instantiation_at(*idx);
+                let handle = module.struct_variant_handle_at(inst.handle);
+                let struct_def = module.struct_def_at(handle.struct_index);
+                let variants = match &struct_def.field_information {
+                    StructFieldInformation::DeclaredVariants(variants) => variants,
+                    _ => unreachable!(),
+                };
+                let variant = &variants[handle.variant as usize];
+
+                for field in &variant.fields {
+                    match &field.signature.0 {
+                        Bool | Address | Signer => continue,
+                        U8 | U16 | U32 | U64 | U128 | U256 => continue,
+
+                        Vector(inner) => match &**inner {
+                            Bool | Address | Signer => continue,
+                            U8 | U16 | U32 | U64 | U128 | U256 => continue,
+                            _ => return false,
+                        },
+
+                        Function(_, _, _)
+                        | Struct(_)
+                        | StructInstantiation(_, _)
+                        | TypeParameter(_) => return false,
+
+                        Reference(_) | MutableReference(_) => unreachable!(),
+                    }
+                }
+            },
             VecPack(idx, _) => {
                 use SignatureToken::*;
 
@@ -676,6 +769,13 @@ fn is_fast_callable(module: &CompiledModule, code: &[Bytecode]) -> bool {
                 match &sig.0[0] {
                     Bool | Address | Signer => continue,
                     U8 | U16 | U32 | U64 | U128 | U256 => continue,
+
+                    Vector(inner) => match &**inner {
+                        Bool | Address | Signer => continue,
+                        U8 | U16 | U32 | U64 | U128 | U256 => continue,
+                        _ => return false,
+                    },
+
                     _ => return false,
                 }
             },

@@ -214,6 +214,7 @@ where
     /// Loads a generic function with instantiated type arguments. Does not perform any checks if
     /// the function is callable (i.e., visible to the caller). The visibility check should be done
     /// at the call-site.
+    #[inline(always)]
     fn load_generic_function_no_visibility_checks(
         &mut self,
         gas_meter: &mut impl GasMeter,
@@ -221,19 +222,61 @@ where
         current_frame: &Frame,
         idx: FunctionInstantiationIndex,
     ) -> VMResult<LoadedFunction> {
-        let ty_args = current_frame
-            .instantiate_generic_function(Some(gas_meter), idx)
-            .map_err(|e| set_err_info!(current_frame, e))?;
-        let function = current_frame
-            .build_loaded_function_from_instantiation_and_ty_args(
-                self.loader,
-                gas_meter,
-                traversal_context,
-                idx,
-                ty_args,
-            )
-            .map_err(|e| self.set_location(e))?;
-        Ok(function)
+        let (owner, function) = match current_frame.function.owner() {
+            LoadedFunctionOwner::Module(module) => {
+                let handle = module.function_instantiation_handle_at(idx.0);
+                match handle {
+                    FunctionHandle::Local(function) => (
+                        LoadedFunctionOwner::Module(module.clone()),
+                        function.clone(),
+                    ),
+                    FunctionHandle::Remote { module, name } => {
+                        let (module, function) = self.loader.load_function_definition(
+                            gas_meter,
+                            traversal_context,
+                            module,
+                            name,
+                        )?;
+                        (LoadedFunctionOwner::Module(module), function)
+                    },
+                }
+            },
+            LoadedFunctionOwner::Script(script) => {
+                let handle = script.function_instantiation_handle_at(idx.0);
+                match handle {
+                    FunctionHandle::Local(function) => {
+                        let err =
+                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                                .with_message("Scripts never have local functions".to_string());
+
+                        return Err(self.set_location(err));
+                    },
+                    FunctionHandle::Remote { module, name } => {
+                        let (module, function) = self.loader.load_function_definition(
+                            gas_meter,
+                            traversal_context,
+                            module,
+                            name,
+                        )?;
+                        (LoadedFunctionOwner::Module(module), function)
+                    },
+                }
+            },
+        };
+
+        let ty_args = if function.is_fast_callable {
+            vec![]
+        } else {
+            current_frame
+                .instantiate_generic_function(Some(gas_meter), idx)
+                .map_err(|e| set_err_info!(current_frame, e))?
+        };
+
+        Ok(LoadedFunction {
+            owner,
+            ty_args,
+            function,
+        })
     }
 
     /// Loads a non-generic function. Does not perform any checks if the function is callable
@@ -2823,15 +2866,22 @@ fn execute_code_ex<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits, F: 
                         .push(Value::struct_(Struct::pack(args)))?;
                 },
                 Bytecode::PackVariant(idx) => {
-                    let frame = frame.as_regular_frame();
+                    let info = if F::is_regular_frame() {
+                        let frame = frame.as_regular_frame();
 
-                    let info = frame.get_struct_variant_at(*idx);
-                    let struct_type = frame.create_struct_ty(&info.definition_struct_type);
-                    interpreter.ty_depth_checker.check_depth_of_type(
-                        gas_meter,
-                        traversal_context,
-                        &struct_type,
-                    )?;
+                        let info = frame.get_struct_variant_at(*idx);
+                        let struct_type = frame.create_struct_ty(&info.definition_struct_type);
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            &struct_type,
+                        )?;
+
+                        info
+                    } else {
+                        frame.get_struct_variant_at(*idx)
+                    };
+
                     gas_meter.charge_pack_variant(
                         false,
                         interpreter
@@ -2901,8 +2951,6 @@ fn execute_code_ex<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits, F: 
                     //     traversal_context,
                     //     ty,
                     // )?;
-
-                    let frame = frame.as_regular_frame();
 
                     let info = frame.get_struct_variant_instantiation_at(*si_idx);
                     gas_meter.charge_pack_variant(

@@ -22,8 +22,8 @@ struct Args {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    profile_move_vm::run(args.regenerate_all)?;
-    //profile_aptos_vm::run()?;
+    //profile_move_vm::run(args.regenerate_all)?;
+    profile_aptos_vm::run()?;
 
     Ok(())
 }
