@@ -64,6 +64,7 @@ async fn request_ephemeral_public_key_expired() {
         get_sample_epk_blinder(),
         None,
         None,
+        utils::get_empty_account_recovery_managers(),
         None,
         utils::get_mock_account_recovery_db(),
     )
@@ -110,6 +111,7 @@ async fn request_ephemeral_public_key_expiry_too_large() {
         get_sample_epk_blinder(),
         None,
         None,
+        utils::get_empty_account_recovery_managers(),
         None,
         utils::get_mock_account_recovery_db(),
     )
@@ -156,6 +158,7 @@ async fn request_invalid_oath_nonce() {
         get_sample_epk_blinder(),
         None,
         None,
+        utils::get_empty_account_recovery_managers(),
         None,
         utils::get_mock_account_recovery_db(),
     )
@@ -192,6 +195,7 @@ async fn request_invalid_jwt() {
         get_sample_epk_blinder(),
         None,
         None,
+        utils::get_empty_account_recovery_managers(),
         None,
         utils::get_mock_account_recovery_db(),
     )
@@ -253,6 +257,7 @@ async fn request_invalid_jwt_signature() {
         epk_blinder,
         None,
         None,
+        utils::get_empty_account_recovery_managers(),
         None,
         utils::get_mock_account_recovery_db(),
     )
@@ -296,6 +301,7 @@ async fn request_max_exp_data_secs_overflowed() {
         get_sample_epk_blinder(),
         None,
         None,
+        utils::get_empty_account_recovery_managers(),
         None,
         utils::get_mock_account_recovery_db(),
     )

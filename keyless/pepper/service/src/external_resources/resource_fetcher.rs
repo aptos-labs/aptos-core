@@ -18,8 +18,8 @@ use tokio::time::Instant;
 // TODO: at some point, we should try to merge the JWK and resource fetcher code
 
 // Resource names for metrics and logging
-const ONCHAIN_KEYLESS_CONFIG_RESOURCE_NAME: &str = "onchain_keyless_configuration";
-const ONCHAIN_GROTH16_VK_RESOURCE_NAME: &str = "onchain_groth16_verification_key";
+const ON_CHAIN_KEYLESS_CONFIG_RESOURCE_NAME: &str = "on_chain_keyless_configuration";
+const ON_CHAIN_GROTH16_VK_RESOURCE_NAME: &str = "on_chain_groth16_verification_key";
 
 // The interval (in seconds) at which to refresh the resources
 pub const RESOURCE_FETCH_INTERVAL_SECS: u64 = 10;
@@ -122,7 +122,7 @@ impl CachedResources {
         match on_chain_groth16_vk_url {
             Some(url) => {
                 let external_resource = Arc::new(ExternalResource::new(
-                    ONCHAIN_GROTH16_VK_RESOURCE_NAME.into(),
+                    ON_CHAIN_GROTH16_VK_RESOURCE_NAME.into(),
                     url.clone(),
                 ));
                 start_external_resource_refresh_loop(
@@ -140,7 +140,7 @@ impl CachedResources {
         match on_chain_keyless_config_url {
             Some(url) => {
                 let external_resource = Arc::new(ExternalResource::new(
-                    ONCHAIN_KEYLESS_CONFIG_RESOURCE_NAME.into(),
+                    ON_CHAIN_KEYLESS_CONFIG_RESOURCE_NAME.into(),
                     url.clone(),
                 ));
                 start_external_resource_refresh_loop(
