@@ -3152,7 +3152,7 @@ macro_rules! cast_int_u2i_widening {
 }
 
 /// Cast unsigned to signed, where the target type is smaller than the source type.
-/// No checks needed
+/// Value must fit into the target type.
 macro_rules! cast_int_u2i_narrowing {
     ($source:ty, $target:ty, $value:expr) => {{
         if $value > (<$target>::MAX as $source) {
