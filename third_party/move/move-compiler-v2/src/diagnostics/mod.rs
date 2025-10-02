@@ -9,7 +9,7 @@ use anyhow::bail;
 use codespan::{FileId, Files};
 use codespan_reporting::{
     diagnostic::{Diagnostic, Severity},
-    term::termcolor::WriteColor,
+    term::termcolor::{ColorChoice, StandardStream, WriteColor},
 };
 use move_model::model::GlobalEnv;
 
@@ -17,6 +17,14 @@ pub mod human;
 pub mod json;
 
 impl options::Options {
+    pub fn error_writer(&self) -> Box<dyn WriteColor> {
+        if self.print_errors {
+            Box::new(StandardStream::stderr(ColorChoice::Auto))
+        } else {
+            Box::new(std::io::sink())
+        }
+    }
+
     pub fn error_emitter<'w, W>(&self, dest: &'w mut W) -> Box<dyn Emitter + 'w>
     where
         W: WriteColor,
