@@ -418,7 +418,11 @@ pub trait MoveTestAdapter<'a>: Sized {
                         self.cross_compile_module(&module)
                             .unwrap_or_else(|e| panic!("cross-compilation failed: {}", e));
                         if self.run_config().using_masm() {
-                            move_asm::disassembler::disassemble_module(String::new(), &module)?
+                            move_asm::disassembler::disassemble_module(
+                                String::new(),
+                                &module,
+                                false,
+                            )?
                         } else {
                             disassembler_for_view(BinaryIndexedView::Module(&module))
                                 .disassemble()?
@@ -442,7 +446,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 // If bytecode printing is enabled, call the disassembler.
                 let printed = if print_bytecode {
                     let out = if self.run_config().using_masm() {
-                        move_asm::disassembler::disassemble_module(String::new(), &module)?
+                        move_asm::disassembler::disassemble_module(String::new(), &module, false)?
                     } else {
                         disassembler_for_view(BinaryIndexedView::Module(&module)).disassemble()?
                     };
@@ -630,7 +634,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 },
                 SyntaxChoice::ASM => {
                     let mut out = String::new();
-                    move_asm::disassembler::disassemble_module(&mut out, module)?;
+                    move_asm::disassembler::disassemble_module(&mut out, module, false)?;
                     out
                 },
                 SyntaxChoice::IR => {

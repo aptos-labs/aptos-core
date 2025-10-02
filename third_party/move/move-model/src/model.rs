@@ -3670,7 +3670,7 @@ impl<'env> ModuleEnv<'env> {
     pub fn disassemble(&self) -> Option<String> {
         let module = self.get_verified_module()?;
         Some(
-            move_asm::disassembler::disassemble_module(String::new(), module)
+            move_asm::disassembler::disassemble_module(String::new(), module, false)
                 .expect("disassemble succeeds"),
         )
     }
