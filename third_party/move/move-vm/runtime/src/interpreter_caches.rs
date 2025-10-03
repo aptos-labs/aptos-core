@@ -7,7 +7,7 @@
 //! on the first call.
 
 use crate::{
-    frame_type_cache::{FrameTypeCache, RuntimeCacheTraits},
+    frame_type_cache::FrameTypeCache,
     loader::{FunctionPtr, GenericFunctionPtr},
     LoadedFunction,
 };
@@ -15,23 +15,25 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 /// Interpreter-level caches for function data (single-threaded)
 pub struct InterpreterFunctionCaches {
+    enabled: bool,
     function_instruction_caches: HashMap<FunctionPtr, Rc<RefCell<FrameTypeCache>>>,
     generic_function_instruction_caches: HashMap<GenericFunctionPtr, Rc<RefCell<FrameTypeCache>>>,
 }
 
 impl InterpreterFunctionCaches {
-    pub fn new() -> Self {
+    pub fn new(enabled: bool) -> Self {
         Self {
+            enabled,
             function_instruction_caches: HashMap::new(),
             generic_function_instruction_caches: HashMap::new(),
         }
     }
 
-    pub(crate) fn get_or_create_frame_cache<RTCaches: RuntimeCacheTraits>(
+    pub(crate) fn get_or_create_frame_cache(
         &mut self,
         function: &LoadedFunction,
     ) -> Rc<RefCell<FrameTypeCache>> {
-        if RTCaches::caches_enabled() {
+        if self.enabled {
             if function.ty_args.is_empty() {
                 self.get_or_create_frame_cache_non_generic(function)
             } else {
@@ -52,7 +54,7 @@ impl InterpreterFunctionCaches {
         let ptr = FunctionPtr::from_loaded_function(function);
         self.function_instruction_caches
             .entry(ptr)
-            .or_insert_with(|| FrameTypeCache::make_rc_for_function(function))
+            .or_insert_with(FrameTypeCache::make_rc)
             .clone()
     }
 
@@ -66,7 +68,7 @@ impl InterpreterFunctionCaches {
         let ptr = GenericFunctionPtr::from_loaded_function(function);
         self.generic_function_instruction_caches
             .entry(ptr)
-            .or_insert_with(|| FrameTypeCache::make_rc_for_function(function))
+            .or_insert_with(FrameTypeCache::make_rc)
             .clone()
     }
 }
