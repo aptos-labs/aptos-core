@@ -74,7 +74,6 @@ impl CalibrationRunner {
         to_skip: usize,
         block_size: usize,
         to_evaluate: usize,
-        tps: f64,
     ) {
         let cur_phase = Arc::new(AtomicUsize::new(0));
         let mut creator = workload
@@ -117,9 +116,12 @@ impl CalibrationRunner {
             .as_micros() as u64;
         self.harness.executor.new_block_with_timestamp(current_time_usecs);
 
+        let to_profile_txns = (0..to_evaluate).map(|_| generate_next()).collect::<Vec<_>>();
+
+        print_gas_with_statement_and_summary_header();
+
         let mut aggregate_gas_log: Option<TransactionGasLog> = None;
-        for i in 0..to_evaluate {
-            let txn = generate_next();
+        for (i, txn) in to_profile_txns.into_iter().enumerate() {
             let cur_name = if to_evaluate > 1 {
                 if let TransactionExecutableRef::EntryFunction(entry_fun) =
                     txn.payload().executable_ref().unwrap()
@@ -131,7 +133,7 @@ impl CalibrationRunner {
             } else {
                 name.clone()
             };
-            let log = self.run_with_tps_estimate_signed(&cur_name, txn, tps);
+            let log = self.run_signed(&cur_name, txn);
             if let Some(mut log) = log {
                 log.exec_io.call_graph = log.exec_io.call_graph.fold_unique_stack();
                 aggregate_gas_log = Some(
@@ -193,11 +195,10 @@ impl CalibrationRunner {
         }
     }
 
-    pub fn run_with_tps_estimate_signed(
+    pub fn run_signed(
         &mut self,
         function: &str,
         txn: SignedTransaction,
-        tps: f64,
     ) -> Option<TransactionGasLog> {
         if !self.profile_gas {
             print_gas_cost(function, self.harness.evaluate_gas_signed(txn));
@@ -206,12 +207,11 @@ impl CalibrationRunner {
             let (log, gas_used, fee_statement) =
                 self.harness.evaluate_gas_with_profiler_signed(txn);
             save_profiling_results(function, &log);
-            print_gas_cost_with_statement_and_tps(
+            print_gas_with_statement_and_summary(
                 function,
                 gas_used,
                 fee_statement,
-                summarize_exe_and_io(&log),
-                tps,
+                summarize_exe_and_io(&log)
             );
             Some(log)
         }
@@ -241,7 +241,7 @@ fn into_local_account(account: Account) -> LocalAccount {
 
 fn create_transaction_factory() -> TransactionFactory {
     TransactionFactory::new(ChainId::test())
-        .with_absolute_transaction_expiration_timestamp(30)
+        .with_transaction_expiration_time(30)
         .with_gas_unit_price(100)
         .with_max_gas_amount(2_000_000)
 }
@@ -502,6 +502,40 @@ fn print_gas_cost_with_statement_and_tps(
         summary.read_cost,
         summary.write_cost,
         (exe_and_io_gas) as f64 * tps,
+        function,
+    );
+}
+
+
+pub fn print_gas_with_statement_and_summary_header() {
+    println!(
+        "{:8} | {:8} | {:8.2} | {:8.2} | {:8.2} | {:8.2} | {}",
+        "gas units",
+        "exe+io g",
+        "intrins",
+        "execut",
+        "read",
+        "write",
+        "function",
+    );
+}
+
+fn print_gas_with_statement_and_summary(
+    function: &str,
+    gas_units: u64,
+    fee_statement: Option<FeeStatement>,
+    summary: SummaryExeAndIO,
+) {
+    let exe_gas = fee_statement.as_ref().map_or(0, FeeStatement::execution_gas_used);
+    let io_gas = fee_statement.as_ref().map_or(0, FeeStatement::io_gas_used);
+    println!(
+        "{:8} | {:8} | {:8.2} | {:8.2} | {:8.2} | {:8.2} | {}",
+        gas_units,
+        exe_gas + io_gas,
+        summary.intrinsic_cost,
+        summary.execution_cost,
+        summary.read_cost,
+        summary.write_cost,
         function,
     );
 }
