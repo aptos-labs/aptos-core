@@ -113,13 +113,13 @@ impl NeedlessReturn {
         }
     }
 
-    fn sequence_has_explicit_return(&mut self, env: &GlobalEnv, seq: &Vec<Exp>) {
+    fn sequence_has_explicit_return(&mut self, env: &GlobalEnv, seq: &[Exp]) {
         let Some(last_val) = seq.last() else { return };
 
         if self.report_if_return(env, last_val) {
             return;
         }
-        self.semicolon_case(env, seq, &last_val);
+        self.semicolon_case(env, seq, last_val);
     }
 
     // If the function returns `()`, check the previous one.
@@ -133,7 +133,7 @@ impl NeedlessReturn {
     //   }
     //
     // ```
-    fn semicolon_case(&mut self, env: &GlobalEnv, seq: &Vec<Exp>, expr: &ExpData) {
+    fn semicolon_case(&mut self, env: &GlobalEnv, seq: &[Exp], expr: &ExpData) {
         if seq.len() < 2 {
             return;
         }
