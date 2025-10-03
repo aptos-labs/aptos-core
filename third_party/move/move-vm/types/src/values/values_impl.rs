@@ -292,24 +292,6 @@ impl Container {
         }
     }
 
-    fn rc_count(&self) -> usize {
-        match self {
-            Self::Vec(r) => Rc::strong_count(r),
-            Self::Struct(r) => Rc::strong_count(r),
-
-            Self::VecU8(r) => Rc::strong_count(r),
-            Self::VecU16(r) => Rc::strong_count(r),
-            Self::VecU32(r) => Rc::strong_count(r),
-            Self::VecU64(r) => Rc::strong_count(r),
-            Self::VecU128(r) => Rc::strong_count(r),
-            Self::VecU256(r) => Rc::strong_count(r),
-            Self::VecBool(r) => Rc::strong_count(r),
-            Self::VecAddress(r) => Rc::strong_count(r),
-
-            Self::Locals(r) => Rc::strong_count(r),
-        }
-    }
-
     fn master_signer(x: AccountAddress) -> Self {
         Container::Struct(Rc::new(RefCell::new(vec![
             ValueImpl::U16(MASTER_SIGNER_VARIANT),
@@ -1747,23 +1729,10 @@ impl Locals {
         }
     }
 
-    fn swap_loc(&mut self, idx: usize, x: Value, violation_check: bool) -> PartialVMResult<Value> {
+    fn swap_loc(&mut self, idx: usize, x: Value) -> PartialVMResult<Value> {
         let mut v = self.0.borrow_mut();
         match v.get_mut(idx) {
-            Some(v) => {
-                if violation_check {
-                    if let ValueImpl::Container(c) = v {
-                        if c.rc_count() > 1 {
-                            return Err(PartialVMError::new(
-                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                            )
-                                .with_message("moving container with dangling references".to_string())
-                                .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EREFERENCE_COUNTING_FAILURE));
-                        }
-                    }
-                }
-                Ok(Value(std::mem::replace(v, x.0)))
-            },
+            Some(v) => Ok(Value(std::mem::replace(v, x.0))),
             None => Err(
                 PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
                     format!("local index out of bounds: got {}, len: {}", idx, v.len()),
@@ -1772,8 +1741,8 @@ impl Locals {
         }
     }
 
-    pub fn move_loc(&mut self, idx: usize, violation_check: bool) -> PartialVMResult<Value> {
-        match self.swap_loc(idx, Value(ValueImpl::Invalid), violation_check)? {
+    pub fn move_loc(&mut self, idx: usize) -> PartialVMResult<Value> {
+        match self.swap_loc(idx, Value(ValueImpl::Invalid))? {
             Value(ValueImpl::Invalid) => Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             )
@@ -1782,13 +1751,8 @@ impl Locals {
         }
     }
 
-    pub fn store_loc(
-        &mut self,
-        idx: usize,
-        x: Value,
-        violation_check: bool,
-    ) -> PartialVMResult<()> {
-        self.swap_loc(idx, x, violation_check)?;
+    pub fn store_loc(&mut self, idx: usize, x: Value) -> PartialVMResult<()> {
+        self.swap_loc(idx, x)?;
         Ok(())
     }
 
@@ -2759,9 +2723,8 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
 }
 
 impl VectorRef {
-    pub fn length_as_usize(&self, type_param: &Type) -> PartialVMResult<usize> {
+    pub fn length_as_usize(&self) -> PartialVMResult<usize> {
         let c: &Container = self.0.container();
-        check_elem_layout(type_param, c)?;
 
         let len = match c {
             Container::VecU8(r) => r.borrow().len(),
@@ -2778,13 +2741,12 @@ impl VectorRef {
         Ok(len)
     }
 
-    pub fn len(&self, type_param: &Type) -> PartialVMResult<Value> {
-        Ok(Value::u64(self.length_as_usize(type_param)? as u64))
+    pub fn len(&self) -> PartialVMResult<Value> {
+        Ok(Value::u64(self.length_as_usize()? as u64))
     }
 
-    pub fn push_back(&self, e: Value, type_param: &Type) -> PartialVMResult<()> {
+    pub fn push_back(&self, e: Value) -> PartialVMResult<()> {
         let c = self.0.container();
-        check_elem_layout(type_param, c)?;
 
         match c {
             Container::VecU8(r) => r.borrow_mut().push(e.value_as()?),
@@ -2803,9 +2765,8 @@ impl VectorRef {
         Ok(())
     }
 
-    pub fn borrow_elem(&self, idx: usize, type_param: &Type) -> PartialVMResult<Value> {
+    pub fn borrow_elem(&self, idx: usize) -> PartialVMResult<Value> {
         let c = self.0.container();
-        check_elem_layout(type_param, c)?;
         if idx >= c.len() {
             return Err(PartialVMError::new(StatusCode::VECTOR_OPERATION_ERROR)
                 .with_sub_status(INDEX_OUT_OF_BOUNDS));
@@ -2822,9 +2783,8 @@ impl VectorRef {
         }
     }
 
-    pub fn pop(&self, type_param: &Type) -> PartialVMResult<Value> {
+    pub fn pop(&self) -> PartialVMResult<Value> {
         let c = self.0.container();
-        check_elem_layout(type_param, c)?;
 
         macro_rules! err_pop_empty_vec {
             () => {
@@ -2877,9 +2837,8 @@ impl VectorRef {
         Ok(res)
     }
 
-    pub fn swap(&self, idx1: usize, idx2: usize, type_param: &Type) -> PartialVMResult<()> {
+    pub fn swap(&self, idx1: usize, idx2: usize) -> PartialVMResult<()> {
         let c = self.0.container();
-        check_elem_layout(type_param, c)?;
 
         macro_rules! swap {
             ($v:expr) => {{
@@ -3092,13 +3051,16 @@ impl Vector {
                 .map(Value::address)
                 .collect(),
             Container::Vec(r) => take_unique_ownership(r)?.into_iter().map(Value).collect(),
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                return Err(PartialVMError::new_invariant_violation(
+                    "Unexpected non-vector container",
+                ))
+            },
         };
         Ok(elements)
     }
 
-    pub fn unpack(self, type_param: &Type, expected_num: u64) -> PartialVMResult<Vec<Value>> {
-        check_elem_layout(type_param, &self.0)?;
+    pub fn unpack(self, expected_num: u64) -> PartialVMResult<Vec<Value>> {
         let elements = self.unpack_unchecked()?;
         if expected_num as usize == elements.len() {
             Ok(elements)
@@ -3108,8 +3070,8 @@ impl Vector {
         }
     }
 
-    pub fn destroy_empty(self, type_param: &Type) -> PartialVMResult<()> {
-        self.unpack(type_param, 0)?;
+    pub fn destroy_empty(self) -> PartialVMResult<()> {
+        self.unpack(0)?;
         Ok(())
     }
 

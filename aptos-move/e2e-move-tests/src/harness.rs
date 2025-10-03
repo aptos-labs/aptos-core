@@ -305,6 +305,24 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         result
     }
 
+    pub fn run_block_with_current_metadata(
+        &mut self,
+        txn_block: Vec<SignedTransaction>,
+    ) -> Vec<TransactionStatus> {
+        let mut result = vec![];
+        for output in self
+            .executor
+            .execute_block_with_current_metadata(txn_block)
+            .unwrap()
+        {
+            if matches!(output.status(), TransactionStatus::Keep(_)) {
+                self.executor.apply_write_set(output.write_set());
+            }
+            result.push(output.status().to_owned())
+        }
+        result
+    }
+
     /// Runs a block of signed transactions. On success, applies the write set.
     pub fn run_block_get_output(
         &mut self,
@@ -388,6 +406,11 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
     /// Runs a transaction and return gas used.
     pub fn evaluate_gas(&mut self, account: &Account, payload: TransactionPayload) -> u64 {
         let txn = self.create_transaction_payload(account, payload);
+        self.evaluate_gas_signed(txn)
+    }
+
+    /// Runs a transaction and return gas used.
+    pub fn evaluate_gas_signed(&mut self, txn: SignedTransaction) -> u64 {
         let output = self.run_raw(txn);
         assert_success!(output.status().to_owned());
         output.gas_used()
@@ -400,6 +423,14 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         payload: TransactionPayload,
     ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let txn = self.create_transaction_payload(account, payload);
+        self.evaluate_gas_with_profiler_signed(txn)
+    }
+
+    /// Runs a transaction with the gas profiler.
+    pub fn evaluate_gas_with_profiler_signed(
+        &mut self,
+        txn: SignedTransaction,
+    ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let (output, gas_log) = self
             .executor
             .execute_transaction_with_gas_profiler(txn, &AuxiliaryInfo::default())

@@ -22,7 +22,7 @@ use move_bytecode_verifier::dependencies;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, TypeTag, OPTION_MODULE_ID},
+    language_storage::{ModuleId, TypeTag, MEM_MODULE_ID, OPTION_MODULE_ID},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use move_vm_metrics::{Timer, VERIFIED_MODULE_CACHE_SIZE, VM_TIMER};
@@ -34,6 +34,7 @@ use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::Stru
 use std::sync::Arc;
 
 const OPTION_MODULE_BYTES: &[u8] = include_bytes!("option.mv");
+const MEM_MODULE_BYTES: &[u8] = include_bytes!("mem.mv");
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
 /// the code cache, possibly across multiple threads.
@@ -362,6 +363,10 @@ impl RuntimeEnvironment {
         Bytes::from(OPTION_MODULE_BYTES.to_vec())
     }
 
+    pub fn get_mem_module_bytes(&self) -> Bytes {
+        Bytes::from(MEM_MODULE_BYTES.to_vec())
+    }
+
     pub fn get_module_bytes_override(
         &self,
         addr: &AccountAddress,
@@ -371,6 +376,9 @@ impl RuntimeEnvironment {
         if enable_enum_option {
             if addr == OPTION_MODULE_ID.address() && *name == *OPTION_MODULE_ID.name() {
                 return Some(self.get_option_module_bytes());
+            }
+            if addr == MEM_MODULE_ID.address() && *name == *MEM_MODULE_ID.name() {
+                return Some(self.get_mem_module_bytes());
             }
         }
         None

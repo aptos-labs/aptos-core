@@ -146,8 +146,6 @@ pub fn aptos_prod_vm_config(
     timed_features: &TimedFeatures,
     ty_builder: TypeBuilder,
 ) -> VMConfig {
-    let check_invariant_in_swap_loc =
-        !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
     let paranoid_type_checks = get_paranoid_type_checks();
     let paranoid_ref_checks = get_paranoid_ref_checks();
 
@@ -175,7 +173,7 @@ pub fn aptos_prod_vm_config(
         verifier_config,
         deserializer_config,
         paranoid_type_checks,
-        check_invariant_in_swap_loc,
+        legacy_check_invariant_in_swap_loc: false,
         // Note: if updating, make sure the constant is in-sync.
         max_value_nest_depth: Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
         layout_max_size,
