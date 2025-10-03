@@ -9,7 +9,7 @@ use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
     errors::PartialVMResult,
-    file_format::{CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex, Visibility},
+    file_format::{CompiledScript, FunctionDefinitionIndex, SignatureIndex, Visibility},
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
 use move_vm_types::loaded_data::{
@@ -91,26 +91,15 @@ impl Script {
         let code = script.code.code.clone();
         let parameters = script.signature_at(script.parameters).clone();
 
-        let param_tys = parameters
-            .0
-            .iter()
-            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        let locals = Signature(
-            parameters
-                .0
-                .iter()
-                .chain(script.signature_at(script.code.locals).0.iter())
-                .cloned()
-                .collect(),
-        );
-        let local_tys = locals
-            .0
-            .iter()
-            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        let ty_param_abilities = script.type_parameters.clone();
+        let num_params = parameters.0.len();
+        let locals = &script.signature_at(script.code.locals).0;
+        let mut local_and_param_tys = Vec::with_capacity(num_params + locals.len());
+        for tok in parameters.0.iter().chain(locals.iter()) {
+            let ty = intern_type(BinaryIndexedView::Script(&script), tok, &struct_names)?;
+            local_and_param_tys.push(ty);
+        }
 
+        let ty_param_abilities = script.type_parameters.clone();
         let main: Arc<Function> = Arc::new(Function {
             file_format_version: script.version(),
             index: FunctionDefinitionIndex(0),
@@ -122,10 +111,10 @@ impl Script {
             is_entry: false,
             // TODO: main does not have a name. Revisit.
             name: ident_str!("main").to_owned(),
+            num_params,
+            param_and_local_tys: local_and_param_tys,
             // Script must not return values.
             return_tys: vec![],
-            local_tys,
-            param_tys,
             access_specifier: AccessSpecifier::Any,
             is_persistent: false,
             has_module_reentrancy_lock: false,

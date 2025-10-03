@@ -56,9 +56,10 @@ pub struct Function {
     pub(crate) visibility: Visibility,
     pub(crate) is_entry: bool,
     pub(crate) name: Identifier,
+    pub(crate) num_params: usize,
+    // Stores parameter types first (up until num_params) and then local types, if any.
+    pub(crate) param_and_local_tys: Vec<Type>,
     pub(crate) return_tys: Vec<Type>,
-    pub(crate) local_tys: Vec<Type>,
-    pub(crate) param_tys: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
@@ -554,15 +555,13 @@ impl Function {
             None => vec![],
         };
         let ty_param_abilities = handle.type_parameters.clone();
+
         let return_tys = signature_table[handle.return_.0 as usize].clone();
-        let local_tys = if let Some(code) = &def.code {
-            let mut local_tys = signature_table[handle.parameters.0 as usize].clone();
-            local_tys.append(&mut signature_table[code.locals.0 as usize].clone());
-            local_tys
-        } else {
-            vec![]
-        };
-        let param_tys = signature_table[handle.parameters.0 as usize].clone();
+        let mut param_and_local_tys = signature_table[handle.parameters.0 as usize].clone();
+        let num_params = param_and_local_tys.len();
+        if let Some(code) = &def.code {
+            param_and_local_tys.extend(signature_table[code.locals.0 as usize].clone());
+        }
 
         let access_specifier = load_access_specifier(
             BinaryIndexedView::Module(module),
@@ -581,9 +580,9 @@ impl Function {
             visibility: def.visibility,
             is_entry: def.is_entry,
             name,
-            local_tys,
+            num_params,
+            param_and_local_tys,
             return_tys,
-            param_tys,
             access_specifier,
             is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
             has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
@@ -597,7 +596,7 @@ impl Function {
     }
 
     pub fn param_count(&self) -> usize {
-        self.param_tys.len()
+        self.num_params
     }
 
     pub(crate) fn name(&self) -> &str {
@@ -617,8 +616,9 @@ impl Function {
         self.ty_param_abilities.len()
     }
 
+    /// Returns local types, including parameters and local variables.
     pub(crate) fn local_tys(&self) -> &[Type] {
-        &self.local_tys
+        &self.param_and_local_tys
     }
 
     pub fn return_tys(&self) -> &[Type] {
@@ -626,7 +626,7 @@ impl Function {
     }
 
     pub fn param_tys(&self) -> &[Type] {
-        &self.param_tys
+        &self.param_and_local_tys[..self.num_params]
     }
 
     pub fn is_persistent(&self) -> bool {
