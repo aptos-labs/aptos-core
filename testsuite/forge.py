@@ -29,7 +29,7 @@ from typing import (
     TypedDict,
     Union,
 )
-from urllib.parse import ParseResult, urlencode, urlunparse, urlparse
+from urllib.parse import ParseResult, urlencode, urlunparse
 from urllib.parse import quote as urlquote
 
 from test_framework.cluster import Cloud, ForgeCluster, ForgeJob, find_forge_cluster
@@ -106,12 +106,6 @@ try:
 except ImportError:
     install_dependency("psutil")
     import psutil
-
-try:
-    import github
-except ImportError:
-    install_dependency("PyGithub")
-    import github
 
 
 @click.group()
@@ -1140,58 +1134,6 @@ def find_recent_images(
 
     return ret
 
-def read_git_credentials(path = "~/.git-credentials"):
-    cred_path = os.path.expanduser(path)
-    token = None
-
-    if os.path.exists(cred_path):
-        with open(cred_path, "r") as f:
-            for line in f:
-                line = line.strip()
-                # Lines look like: https://USERNAME:TOKEN@github.com
-                if "github.com" in line:
-                    parsed = urlparse(line)
-                    # parsed.username and parsed.password may be None if not present
-                    token = parsed.password
-                    break
-
-    return token
-
-def find_recent_images_by_git_repo(
-    shell: Shell,
-    num_images: int,
-    git_repo: str,
-    image_name: str,
-    commit_threshold: int = 10,
-    cloud: Cloud = Cloud.GCP,
-) -> Sequence[str]:
-    token = read_git_credentials()    
-    if not token:
-        return []
-
-    auth = github.Auth.Token(token)
-    gh = github.Github(auth=auth)
-
-    repo = gh.get_repo(git_repo)
-    default_branch = repo.default_branch
-
-    # Get last `commit_threshold` commits from the default branch
-    commits = repo.get_commits(sha=default_branch)[:commit_threshold]
-
-    ret = []
-    for revision in commits:
-        image_tag = revision.sha
-        exists = image_exists(shell, image_name, image_tag, cloud=cloud)
-        if exists:
-            ret.append(image_tag)
-
-    if len(ret) < num_images:
-        raise Exception(
-            f"Could not find {num_images} recent images in repo {git_repo}"
-        )
-
-    return ret   
-
 
 def image_exists(
     shell: Shell,
@@ -1700,13 +1642,7 @@ def test(
         if forge_image_name == DEFAULT_FORGE_IMAGE_NAME:
             forge_image_tag = forge_image_tag or default_latest_image
         else:
-            latest_image_tag_for_forge_image_with_name = find_recent_images_by_git_repo(
-                shell,
-                1,
-                "aptos-labs/etna"
-                forge_image_name,
-                cloud=cloud_enum,
-            )[0]
+            latest_image_tag_for_forge_image_with_name = "main"
             forge_image_tag = (
                 forge_image_tag or latest_image_tag_for_forge_image_with_name
             )
