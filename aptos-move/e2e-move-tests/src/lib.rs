@@ -16,7 +16,7 @@ use move_symbol_pool::Symbol;
 pub use stake::*;
 
 #[cfg(test)]
-mod tests;
+pub mod tests;
 
 pub(crate) struct AptosPackageHooks {}
 
