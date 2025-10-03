@@ -39,14 +39,19 @@ fn quote_type_as_format(type_tag: &TypeTag) -> Format {
         U64 => Format::U64,
         U128 => Format::U128,
         U256 => Format::TypeName("U256".into()),
+        I8 => Format::I8,
+        I16 => Format::I16,
+        I32 => Format::I32,
+        I64 => Format::I64,
+        I128 => Format::I128,
+        I256 => Format::TypeName("I256".into()),
         Address => Format::TypeName("AccountAddress".into()),
         Vector(type_tag) => Format::Seq(Box::new(quote_type_as_format(type_tag))),
         Struct(tag) => match tag {
             tag if &**tag == Lazy::force(&str_tag) => Format::Seq(Box::new(Format::U8)),
             _ => type_not_allowed(type_tag),
         },
-        // TODO(#17645): signed integers
-        Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => type_not_allowed(type_tag),
+        Signer | Function(..) => type_not_allowed(type_tag),
     }
 }
 
@@ -107,6 +112,12 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
         U64 => "u64".into(),
         U128 => "u128".into(),
         U256 => "u256".into(),
+        I8 => "i8".into(),
+        I16 => "i16".into(),
+        I32 => "i32".into(),
+        I64 => "i64".into(),
+        I128 => "i128".into(),
+        I256 => "i256".into(),
         Address => "address".into(),
         Vector(type_tag) => match type_tag.as_ref() {
             U8 => "u8vector".into(),
@@ -123,8 +134,7 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
             tag if &**tag == Lazy::force(&str_tag) => "string".into(),
             _ => type_not_allowed(type_tag),
         },
-        // TODO(#17645): signed integers
-        Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => type_not_allowed(type_tag),
+        Signer | Function(..) => type_not_allowed(type_tag),
     }
 }
 

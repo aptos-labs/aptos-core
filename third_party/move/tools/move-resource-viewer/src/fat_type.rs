@@ -88,6 +88,13 @@ pub(crate) enum FatType {
     // the raw layout (no struct name, no field names).
     Runtime(Vec<FatType>),
     RuntimeVariants(Vec<Vec<FatType>>),
+    // NOTE: Added in bytecode version v9, do not reorder!
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
 }
 
 impl FatStructType {
@@ -251,6 +258,12 @@ impl FatType {
             U64 => U64,
             U128 => U128,
             U256 => U256,
+            I8 => I8,
+            I16 => I16,
+            I32 => I32,
+            I64 => I64,
+            I128 => I128,
+            I256 => I256,
             Address => Address,
             Signer => Signer,
             Vector(ty) => Vector(Box::new(ty.clone_with_limit(limit)?)),
@@ -296,6 +309,12 @@ impl FatType {
             U64 => U64,
             U128 => U128,
             U256 => U256,
+            I8 => I8,
+            I16 => I16,
+            I32 => I32,
+            I64 => I64,
+            I128 => I128,
+            I256 => I256,
             Address => Address,
             Signer => Signer,
             Vector(ty) => Vector(Box::new(ty.subst(ty_args, limit)?)),
@@ -335,6 +354,12 @@ impl FatType {
             U64 => TypeTag::U64,
             U128 => TypeTag::U128,
             U256 => TypeTag::U256,
+            I8 => TypeTag::I8,
+            I16 => TypeTag::I16,
+            I32 => TypeTag::I32,
+            I64 => TypeTag::I64,
+            I128 => TypeTag::I128,
+            I256 => TypeTag::I256,
             Address => TypeTag::Address,
             Signer => TypeTag::Signer,
             Vector(ty) => TypeTag::Vector(Box::new(ty.type_tag(limit)?)),
@@ -365,6 +390,12 @@ impl FatType {
             U64 => FatType::U64,
             U128 => FatType::U128,
             U256 => FatType::U256,
+            I8 => FatType::I8,
+            I16 => FatType::I16,
+            I32 => FatType::I32,
+            I64 => FatType::I64,
+            I128 => FatType::I128,
+            I256 => FatType::I256,
             Address => FatType::Address,
             Signer => FatType::Signer,
             Vector(ty) => FatType::Vector(Box::new(Self::from_runtime_layout(ty, limit)?)),
@@ -394,12 +425,6 @@ impl FatType {
                     layout
                 )))
             },
-            I8 | I16 | I32 | I64 | I128 | I256 => {
-                // TODO(#17645): implement fat types for supporting REST api
-                return Err(PartialVMError::new_invariant_violation(
-                    "signed integers not yet supported",
-                ));
-            },
         })
     }
 
@@ -424,21 +449,18 @@ impl From<&TypeTag> for FatType {
             TypeTag::U32 => U32,
             TypeTag::U64 => U64,
             TypeTag::U128 => U128,
+            TypeTag::I8 => I8,
+            TypeTag::I16 => I16,
+            TypeTag::I32 => I32,
+            TypeTag::I64 => I64,
+            TypeTag::I128 => I128,
+            TypeTag::I256 => I256,
             TypeTag::Address => Address,
             TypeTag::Signer => Signer,
             TypeTag::Vector(inner) => Vector(Box::new(inner.as_ref().into())),
             TypeTag::Struct(inner) => Struct(Box::new(inner.as_ref().into())),
             TypeTag::Function(inner) => Function(Box::new(inner.as_ref().into())),
             TypeTag::U256 => U256,
-            TypeTag::I8
-            | TypeTag::I16
-            | TypeTag::I32
-            | TypeTag::I64
-            | TypeTag::I128
-            | TypeTag::I256 => {
-                // TODO(#17645): implement for REST api support
-                panic!("signed integers not yet supported")
-            },
         }
     }
 }
@@ -527,6 +549,12 @@ impl TryInto<MoveTypeLayout> for &FatType {
             FatType::U64 => MoveTypeLayout::U64,
             FatType::U128 => MoveTypeLayout::U128,
             FatType::U256 => MoveTypeLayout::U256,
+            FatType::I8 => MoveTypeLayout::I8,
+            FatType::I16 => MoveTypeLayout::I16,
+            FatType::I32 => MoveTypeLayout::I32,
+            FatType::I64 => MoveTypeLayout::I64,
+            FatType::I128 => MoveTypeLayout::I128,
+            FatType::I256 => MoveTypeLayout::I256,
             FatType::Bool => MoveTypeLayout::Bool,
             FatType::Vector(v) => MoveTypeLayout::Vector(Box::new(v.as_ref().try_into()?)),
             FatType::Struct(s) => MoveTypeLayout::Struct(s.as_ref().try_into()?),

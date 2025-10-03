@@ -916,6 +916,12 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             MoveTypeLayout::U64 => serde_json::from_value::<crate::U64>(val)?.into(),
             MoveTypeLayout::U128 => serde_json::from_value::<crate::U128>(val)?.into(),
             MoveTypeLayout::U256 => serde_json::from_value::<crate::U256>(val)?.into(),
+            MoveTypeLayout::I8 => I8(serde_json::from_value::<i8>(val)?),
+            MoveTypeLayout::I16 => I16(serde_json::from_value::<i16>(val)?),
+            MoveTypeLayout::I32 => I32(serde_json::from_value::<i32>(val)?),
+            MoveTypeLayout::I64 => serde_json::from_value::<crate::I64>(val)?.into(),
+            MoveTypeLayout::I128 => serde_json::from_value::<crate::I128>(val)?.into(),
+            MoveTypeLayout::I256 => serde_json::from_value::<crate::I256>(val)?.into(),
             MoveTypeLayout::Address => serde_json::from_value::<crate::Address>(val)?.into(),
             MoveTypeLayout::Vector(item_layout) => {
                 self.try_into_vm_value_vector(item_layout.as_ref(), val)?
@@ -934,15 +940,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             // to see them here.
             MoveTypeLayout::Signer | MoveTypeLayout::Native(..) => {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
-            },
-            MoveTypeLayout::I8
-            | MoveTypeLayout::I16
-            | MoveTypeLayout::I32
-            | MoveTypeLayout::I64
-            | MoveTypeLayout::I128
-            | MoveTypeLayout::I256 => {
-                // TODO(#17645): signed integers
-                bail!("unimplemented support for signed integers")
             },
         })
     }
