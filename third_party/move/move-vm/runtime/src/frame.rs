@@ -477,7 +477,7 @@ impl Frame {
     pub(crate) fn instantiate_generic_function(
         &self,
         ty_context: &TypeContext,
-        gas_meter: Option<&mut impl GasMeter>,
+        gas_meter: &mut impl GasMeter,
         idx: FunctionInstantiationIndex,
     ) -> PartialVMResult<(Vec<Type>, TypeVecId)> {
         use LoadedFunctionOwner::*;
@@ -487,11 +487,9 @@ impl Frame {
         };
 
         let ty_args = self.function.ty_args();
-        if let Some(gas_meter) = gas_meter {
-            for ty in instantiation {
-                gas_meter
-                    .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
-            }
+        for ty in instantiation {
+            gas_meter
+                .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
         }
 
         let instantiation = instantiation

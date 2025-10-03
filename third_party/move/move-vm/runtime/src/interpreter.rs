@@ -7,9 +7,7 @@ use crate::{
     config::VMConfig,
     data_cache::{DataCacheEntry, TransactionDataCache},
     frame::Frame,
-    frame_type_cache::{
-        AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
-    },
+    frame_type_cache::FrameTypeCache,
     interpreter_caches::InterpreterFunctionCaches,
     loader::LazyLoadedFunction,
     module_traversal::TraversalContext,
@@ -247,19 +245,18 @@ where
         if interpreter.vm_config.paranoid_type_checks && !interpreter.vm_config.paranoid_ref_checks
         {
             if interpreter.vm_config.optimize_trusted_code {
-                interpreter
-                    .dispatch_execute_main::<UntrustedOnlyRuntimeTypeCheck, NoRuntimeRefCheck>(
-                        data_cache,
-                        function_caches,
-                        resource_resolver,
-                        gas_meter,
-                        traversal_context,
-                        extensions,
-                        function,
-                        args,
-                    )
+                interpreter.execute_main::<UntrustedOnlyRuntimeTypeCheck, NoRuntimeRefCheck>(
+                    data_cache,
+                    function_caches,
+                    resource_resolver,
+                    gas_meter,
+                    traversal_context,
+                    extensions,
+                    function,
+                    args,
+                )
             } else {
-                interpreter.dispatch_execute_main::<FullRuntimeTypeCheck, NoRuntimeRefCheck>(
+                interpreter.execute_main::<FullRuntimeTypeCheck, NoRuntimeRefCheck>(
                     data_cache,
                     function_caches,
                     resource_resolver,
@@ -273,7 +270,7 @@ where
         } else if interpreter.vm_config.paranoid_type_checks
             && interpreter.vm_config.paranoid_ref_checks
         {
-            interpreter.dispatch_execute_main::<FullRuntimeTypeCheck, FullRuntimeRefCheck>(
+            interpreter.execute_main::<FullRuntimeTypeCheck, FullRuntimeRefCheck>(
                 data_cache,
                 function_caches,
                 resource_resolver,
@@ -286,7 +283,7 @@ where
         } else if !interpreter.vm_config.paranoid_type_checks
             && !interpreter.vm_config.paranoid_ref_checks
         {
-            interpreter.dispatch_execute_main::<NoRuntimeTypeCheck, NoRuntimeRefCheck>(
+            interpreter.execute_main::<NoRuntimeTypeCheck, NoRuntimeRefCheck>(
                 data_cache,
                 function_caches,
                 resource_resolver,
@@ -297,7 +294,7 @@ where
                 args,
             )
         } else {
-            interpreter.dispatch_execute_main::<NoRuntimeTypeCheck, FullRuntimeRefCheck>(
+            interpreter.execute_main::<NoRuntimeTypeCheck, FullRuntimeRefCheck>(
                 data_cache,
                 function_caches,
                 resource_resolver,
@@ -321,7 +318,7 @@ where
         idx: FunctionInstantiationIndex,
     ) -> VMResult<LoadedFunction> {
         let (ty_args, ty_args_id) = current_frame
-            .instantiate_generic_function(self.ty_ctx, Some(gas_meter), idx)
+            .instantiate_generic_function(self.ty_ctx, gas_meter, idx)
             .map_err(|e| set_err_info!(current_frame, e))?;
         let function = current_frame
             .build_loaded_function_from_instantiation_and_ty_args(
@@ -359,53 +356,13 @@ where
         Ok(function)
     }
 
-    fn dispatch_execute_main<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
-        self,
-        data_cache: &mut TransactionDataCache,
-        function_caches: &mut InterpreterFunctionCaches,
-        resource_resolver: &impl ResourceResolver,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        extensions: &mut NativeContextExtensions,
-        function: Rc<LoadedFunction>,
-        args: Vec<Value>,
-    ) -> VMResult<Vec<Value>> {
-        if self.vm_config.use_call_tree_and_instruction_cache {
-            self.execute_main::<RTTCheck, RTRCheck, AllRuntimeCaches>(
-                data_cache,
-                function_caches,
-                resource_resolver,
-                gas_meter,
-                traversal_context,
-                extensions,
-                function,
-                args,
-            )
-        } else {
-            self.execute_main::<RTTCheck, RTRCheck, NoRuntimeCaches>(
-                data_cache,
-                function_caches,
-                resource_resolver,
-                gas_meter,
-                traversal_context,
-                extensions,
-                function,
-                args,
-            )
-        }
-    }
-
     /// Main loop for the execution of a function.
     ///
     /// This function sets up a `Frame` and calls `execute_code_unit` to execute code of the
     /// function represented by the frame. Control comes back to this function on return or
     /// on call. When that happens the frame is changes to a new one (call) or to the one
     /// at the top of the stack (return). If the call stack is empty execution is completed.
-    fn execute_main<
-        RTTCheck: RuntimeTypeCheck,
-        RTRCheck: RuntimeRefCheck,
-        RTCaches: RuntimeCacheTraits,
-    >(
+    fn execute_main<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         mut self,
         data_cache: &mut TransactionDataCache,
         function_caches: &mut InterpreterFunctionCaches,
@@ -431,7 +388,7 @@ where
         RTRCheck::init_entry(&function, &mut self.ref_state)
             .map_err(|err| self.set_location(err))?;
 
-        let frame_cache = function_caches.get_or_create_frame_cache::<RTCaches>(&function);
+        let frame_cache = function_caches.get_or_create_frame_cache(&function);
         let mut current_frame = Frame::make_new_frame::<RTTCheck>(
             gas_meter,
             CallType::Regular,
@@ -449,7 +406,7 @@ where
 
         loop {
             let exit_code = current_frame
-                .execute_code::<RTTCheck, RTRCheck, RTCaches>(
+                .execute_code::<RTTCheck, RTRCheck>(
                     &mut self,
                     data_cache,
                     resource_resolver,
@@ -534,31 +491,25 @@ where
                     }
                 },
                 ExitCode::Call(fh_idx) => {
-                    let (function, frame_cache) = if RTCaches::caches_enabled() {
+                    let (function, frame_cache) = if self.vm_config.enable_function_caches {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
-
-                        if let PerInstructionCache::Call(ref function, ref frame_cache) =
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize]
-                        {
-                            (Rc::clone(function), Rc::clone(frame_cache))
-                        } else {
-                            let function = Rc::new(self.load_function_no_visibility_checks(
-                                gas_meter,
-                                traversal_context,
-                                &current_frame,
-                                fh_idx,
-                            )?);
-                            let frame_cache =
-                                function_caches.get_or_create_frame_cache_non_generic(&function);
-
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
-                                PerInstructionCache::Call(
-                                    Rc::clone(&function),
-                                    Rc::clone(&frame_cache),
-                                );
-
-                            (function, frame_cache)
-                        }
+                        let function = FrameTypeCache::get_or(
+                            &mut current_frame_cache.loaded_function_cache,
+                            fh_idx,
+                            |idx| {
+                                self.load_function_no_visibility_checks(
+                                    gas_meter,
+                                    traversal_context,
+                                    &current_frame,
+                                    idx,
+                                )
+                                .map(Rc::new)
+                            },
+                        )?
+                        .clone();
+                        let frame_cache =
+                            function_caches.get_or_create_frame_cache_non_generic(&function);
+                        (function, frame_cache)
                     } else {
                         let function = Rc::new(self.load_function_no_visibility_checks(
                             gas_meter,
@@ -590,7 +541,7 @@ where
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if function.is_native() {
-                        self.call_native::<RTTCheck, RTRCheck, RTCaches>(
+                        self.call_native::<RTTCheck, RTRCheck>(
                             &mut current_frame,
                             data_cache,
                             function_caches,
@@ -605,7 +556,7 @@ where
                         continue;
                     }
 
-                    self.set_new_call_frame::<RTTCheck, RTRCheck, RTCaches>(
+                    self.set_new_call_frame::<RTTCheck, RTRCheck>(
                         &mut current_frame,
                         gas_meter,
                         function,
@@ -616,30 +567,25 @@ where
                     )?;
                 },
                 ExitCode::CallGeneric(idx) => {
-                    let (function, frame_cache) = if RTCaches::caches_enabled() {
+                    let (function, frame_cache) = if self.vm_config.enable_function_caches {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
-
-                        if let PerInstructionCache::CallGeneric(ref function, ref frame_cache) =
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize]
-                        {
-                            (Rc::clone(function), Rc::clone(frame_cache))
-                        } else {
-                            let function =
-                                Rc::new(self.load_generic_function_no_visibility_checks(
+                        let function = FrameTypeCache::get_or(
+                            &mut current_frame_cache.loaded_generic_function_cache,
+                            idx,
+                            |idx| {
+                                self.load_generic_function_no_visibility_checks(
                                     gas_meter,
                                     traversal_context,
                                     &current_frame,
                                     idx,
-                                )?);
-                            let frame_cache =
-                                function_caches.get_or_create_frame_cache_generic(&function);
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
-                                PerInstructionCache::CallGeneric(
-                                    Rc::clone(&function),
-                                    Rc::clone(&frame_cache),
-                                );
-                            (function, frame_cache)
-                        }
+                                )
+                                .map(Rc::new)
+                            },
+                        )?
+                        .clone();
+                        let frame_cache =
+                            function_caches.get_or_create_frame_cache_generic(&function);
+                        (function, frame_cache)
                     } else {
                         let function = Rc::new(self.load_generic_function_no_visibility_checks(
                             gas_meter,
@@ -678,7 +624,7 @@ where
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if function.is_native() {
-                        self.call_native::<RTTCheck, RTRCheck, RTCaches>(
+                        self.call_native::<RTTCheck, RTRCheck>(
                             &mut current_frame,
                             data_cache,
                             function_caches,
@@ -693,7 +639,7 @@ where
                         continue;
                     }
 
-                    self.set_new_call_frame::<RTTCheck, RTRCheck, RTCaches>(
+                    self.set_new_call_frame::<RTTCheck, RTRCheck>(
                         &mut current_frame,
                         gas_meter,
                         function,
@@ -766,7 +712,7 @@ where
 
                     // Call function
                     if callee.is_native() {
-                        self.call_native::<RTTCheck, RTRCheck, RTCaches>(
+                        self.call_native::<RTTCheck, RTRCheck>(
                             &mut current_frame,
                             data_cache,
                             function_caches,
@@ -779,9 +725,8 @@ where
                             captured_vec,
                         )?
                     } else {
-                        let frame_cache =
-                            function_caches.get_or_create_frame_cache::<RTCaches>(&callee);
-                        self.set_new_call_frame::<RTTCheck, RTRCheck, RTCaches>(
+                        let frame_cache = function_caches.get_or_create_frame_cache(&callee);
+                        self.set_new_call_frame::<RTTCheck, RTRCheck>(
                             &mut current_frame,
                             gas_meter,
                             callee,
@@ -834,11 +779,7 @@ where
         Ok(())
     }
 
-    fn set_new_call_frame<
-        RTTCheck: RuntimeTypeCheck,
-        RTRCheck: RuntimeRefCheck,
-        RTCaches: RuntimeCacheTraits,
-    >(
+    fn set_new_call_frame<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         &mut self,
         current_frame: &mut Frame,
         gas_meter: &mut impl GasMeter,
@@ -857,7 +798,7 @@ where
             .map_err(|e| self.set_location(e))?;
 
         let mut frame = self
-            .make_call_frame::<RTTCheck, RTRCheck, RTCaches>(
+            .make_call_frame::<RTTCheck, RTRCheck>(
                 current_frame,
                 gas_meter,
                 function,
@@ -889,11 +830,7 @@ where
     ///
     /// Native functions do not push a frame at the moment and as such errors from a native
     /// function are incorrectly attributed to the caller.
-    fn make_call_frame<
-        RTTCheck: RuntimeTypeCheck,
-        RTRCheck: RuntimeRefCheck,
-        RTCaches: RuntimeCacheTraits,
-    >(
+    fn make_call_frame<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         &mut self,
         current_frame: &Frame,
         gas_meter: &mut impl GasMeter,
@@ -951,11 +888,7 @@ where
     }
 
     /// Call a native functions.
-    fn call_native<
-        RTTCheck: RuntimeTypeCheck,
-        RTRCheck: RuntimeRefCheck,
-        RTCaches: RuntimeCacheTraits,
-    >(
+    fn call_native<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         &mut self,
         current_frame: &mut Frame,
         data_cache: &mut TransactionDataCache,
@@ -969,7 +902,7 @@ where
         captured: Vec<Value>,
     ) -> VMResult<()> {
         // Note: refactor if native functions push a frame on the stack
-        self.call_native_impl::<RTTCheck, RTRCheck, RTCaches>(
+        self.call_native_impl::<RTTCheck, RTRCheck>(
             current_frame,
             data_cache,
             function_caches,
@@ -999,11 +932,7 @@ where
         })
     }
 
-    fn call_native_impl<
-        RTTCheck: RuntimeTypeCheck,
-        RTRCheck: RuntimeRefCheck,
-        RTCaches: RuntimeCacheTraits,
-    >(
+    fn call_native_impl<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         &mut self,
         current_frame: &mut Frame,
         data_cache: &mut TransactionDataCache,
@@ -1186,9 +1115,8 @@ where
                     }
                 }
 
-                let frame_cache =
-                    function_caches.get_or_create_frame_cache::<RTCaches>(&target_func);
-                self.set_new_call_frame::<RTTCheck, RTRCheck, RTCaches>(
+                let frame_cache = function_caches.get_or_create_frame_cache(&target_func);
+                self.set_new_call_frame::<RTTCheck, RTRCheck>(
                     current_frame,
                     gas_meter,
                     Rc::new(target_func),
@@ -1927,11 +1855,7 @@ enum ExitCode {
 
 impl Frame {
     /// Execute a Move function until a return or a call opcode is found.
-    fn execute_code<
-        RTTCheck: RuntimeTypeCheck,
-        RTRCheck: RuntimeRefCheck,
-        RTCaches: RuntimeCacheTraits,
-    >(
+    fn execute_code<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         &mut self,
         interpreter: &mut InterpreterImpl<impl Loader>,
         data_cache: &mut TransactionDataCache,
@@ -1939,7 +1863,7 @@ impl Frame {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<ExitCode> {
-        self.execute_code_impl::<RTTCheck, RTRCheck, RTCaches>(
+        self.execute_code_impl::<RTTCheck, RTRCheck>(
             interpreter,
             data_cache,
             resource_resolver,
@@ -1965,11 +1889,7 @@ impl Frame {
         })
     }
 
-    fn execute_code_impl<
-        RTTCheck: RuntimeTypeCheck,
-        RTRCheck: RuntimeRefCheck,
-        RTCaches: RuntimeCacheTraits,
-    >(
+    fn execute_code_impl<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         &mut self,
         interpreter: &mut InterpreterImpl<impl Loader>,
         data_cache: &mut TransactionDataCache,
@@ -2249,33 +2169,14 @@ impl Frame {
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
-                        let mut get_field_count_charge_gas_and_check_depth =
-                            || -> PartialVMResult<u16> {
-                                let field_count = self.field_count(*sd_idx);
-                                let struct_type = self.get_struct_ty(*sd_idx);
-                                interpreter.ty_depth_checker.check_depth_of_type(
-                                    gas_meter,
-                                    traversal_context,
-                                    &struct_type,
-                                )?;
-                                Ok(field_count)
-                            };
+                        let struct_type = self.get_struct_ty(*sd_idx);
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            &struct_type,
+                        )?;
 
-                        let field_count = if RTCaches::caches_enabled() {
-                            let cached_field_count =
-                                &frame_cache.per_instruction_cache[self.pc as usize];
-                            if let PerInstructionCache::Pack(field_count) = cached_field_count {
-                                *field_count
-                            } else {
-                                let field_count = get_field_count_charge_gas_and_check_depth()?;
-                                frame_cache.per_instruction_cache[self.pc as usize] =
-                                    PerInstructionCache::Pack(field_count);
-                                field_count
-                            }
-                        } else {
-                            get_field_count_charge_gas_and_check_depth()?
-                        };
-
+                        let field_count = self.field_count(*sd_idx);
                         gas_meter.charge_pack(
                             false,
                             interpreter.operand_stack.last_n(field_count as usize)?,
@@ -2310,44 +2211,19 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
+                        let field_tys = frame_cache.get_struct_fields_types(*si_idx, self)?;
+                        for (_, ty_count) in field_tys {
+                            gas_meter.charge_create_ty(*ty_count)?;
+                        }
+                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                        gas_meter.charge_create_ty(ty_count)?;
 
-                        let mut get_field_count_charge_gas_and_check_depth =
-                            |frame_cache: &mut FrameTypeCache| -> PartialVMResult<u16> {
-                                let field_tys =
-                                    frame_cache.get_struct_fields_types(*si_idx, self)?;
-
-                                for (_, ty_count) in field_tys {
-                                    gas_meter.charge_create_ty(*ty_count)?;
-                                }
-
-                                let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
-                                gas_meter.charge_create_ty(ty_count)?;
-                                interpreter.ty_depth_checker.check_depth_of_type(
-                                    gas_meter,
-                                    traversal_context,
-                                    ty,
-                                )?;
-                                Ok(self.field_instantiation_count(*si_idx))
-                            };
-
-                        let field_count = if RTCaches::caches_enabled() {
-                            let cached_field_count =
-                                &frame_cache.per_instruction_cache[self.pc as usize];
-
-                            if let PerInstructionCache::PackGeneric(field_count) =
-                                cached_field_count
-                            {
-                                *field_count
-                            } else {
-                                let field_count =
-                                    get_field_count_charge_gas_and_check_depth(frame_cache)?;
-                                frame_cache.per_instruction_cache[self.pc as usize] =
-                                    PerInstructionCache::PackGeneric(field_count);
-                                field_count
-                            }
-                        } else {
-                            get_field_count_charge_gas_and_check_depth(frame_cache)?
-                        };
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            ty,
+                        )?;
+                        let field_count = self.field_instantiation_count(*si_idx);
 
                         gas_meter.charge_pack(
                             true,
@@ -2527,7 +2403,7 @@ impl Frame {
 
                         let (ty_args, ty_args_id) = self.instantiate_generic_function(
                             interpreter.ty_ctx,
-                            Some(gas_meter),
+                            gas_meter,
                             *fi_idx,
                         )?;
                         let function = self

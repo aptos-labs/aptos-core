@@ -5,44 +5,14 @@ use crate::{frame::Frame, LoadedFunction};
 use move_binary_format::{
     errors::*,
     file_format::{
-        FieldInstantiationIndex, SignatureIndex, StructDefInstantiationIndex,
-        StructVariantInstantiationIndex, VariantFieldInstantiationIndex,
+        FieldInstantiationIndex, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
+        StructDefInstantiationIndex, StructVariantInstantiationIndex,
+        VariantFieldInstantiationIndex,
     },
 };
 use move_core_types::gas_algebra::NumTypeNodes;
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
-
-pub(crate) trait RuntimeCacheTraits {
-    fn caches_enabled() -> bool;
-}
-
-pub(crate) struct NoRuntimeCaches;
-pub(crate) struct AllRuntimeCaches;
-
-impl RuntimeCacheTraits for NoRuntimeCaches {
-    fn caches_enabled() -> bool {
-        false
-    }
-}
-
-impl RuntimeCacheTraits for AllRuntimeCaches {
-    fn caches_enabled() -> bool {
-        true
-    }
-}
-
-/// Variants for each individual instruction cache. Should make sure
-/// that the memory footprint of each variant is small. This is an
-/// enum that is expected to grow in the future.
-#[derive(Clone)]
-pub(crate) enum PerInstructionCache {
-    Nothing,
-    Pack(u16),
-    PackGeneric(u16),
-    Call(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
-    CallGeneric(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
-}
 
 #[derive(Default)]
 pub(crate) struct FrameTypeCache {
@@ -62,28 +32,21 @@ pub(crate) struct FrameTypeCache {
     variant_field_instantiation:
         BTreeMap<VariantFieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
     single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
-    /// Stores a variant for each individual instruction in the
-    /// function's bytecode. We keep the size of the variant to be
-    /// small. The caches are indexed by the index of the given
-    /// bytecode instruction in the function body.
-    ///
-    /// Important! - If entry is present for a given instruction, then
-    /// we do NOT need to re-check for any errors that only depend on
-    /// the argument of the bytecode instructions, for which it is
-    /// guaranteed that everything will be exactly the same as when we
-    /// did the insertion.
-    pub(crate) per_instruction_cache: Vec<PerInstructionCache>,
+
+    pub(crate) loaded_function_cache: BTreeMap<FunctionHandleIndex, Rc<LoadedFunction>>,
+    pub(crate) loaded_generic_function_cache:
+        BTreeMap<FunctionInstantiationIndex, Rc<LoadedFunction>>,
 }
 
 impl FrameTypeCache {
     #[inline(always)]
-    fn get_or<K: Copy + Ord + Eq, V, F>(
+    pub(crate) fn get_or<K: Copy + Ord + Eq, V, F, E>(
         map: &mut BTreeMap<K, V>,
         idx: K,
         ty_func: F,
-    ) -> PartialVMResult<&V>
+    ) -> Result<&V, E>
     where
-        F: FnOnce(K) -> PartialVMResult<V>,
+        F: FnOnce(K) -> Result<V, E>,
     {
         match map.entry(idx) {
             std::collections::btree_map::Entry::Occupied(entry) => Ok(entry.into_mut()),
@@ -225,15 +188,5 @@ impl FrameTypeCache {
 
     pub(crate) fn make_rc() -> Rc<RefCell<Self>> {
         Rc::new(RefCell::<Self>::new(Default::default()))
-    }
-
-    pub(crate) fn make_rc_for_function(function: &LoadedFunction) -> Rc<RefCell<Self>> {
-        let frame_cache = Rc::new(RefCell::<Self>::new(Default::default()));
-
-        frame_cache
-            .borrow_mut()
-            .per_instruction_cache
-            .resize(function.code_size(), PerInstructionCache::Nothing);
-        frame_cache
     }
 }
