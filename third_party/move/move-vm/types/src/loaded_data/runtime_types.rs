@@ -300,6 +300,7 @@ pub struct TypePreorderTraversalIter<'a> {
 impl<'a> Iterator for TypePreorderTraversalIter<'a> {
     type Item = &'a Type;
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         use Type::*;
 
