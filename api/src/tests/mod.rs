@@ -17,6 +17,7 @@ mod objects;
 mod option_test;
 mod resource_groups;
 mod secp256k1_ecdsa;
+mod signed_int_test;
 mod simulation_test;
 mod state_test;
 mod string_resource_test;

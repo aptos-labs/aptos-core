@@ -203,7 +203,8 @@ pub(crate) fn is_valid_txn_arg(
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
     match ty {
-        Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
+        Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+        | Address => true,
         Vector(inner) => is_valid_txn_arg(runtime_environment, inner, allowed_structs),
         Struct { .. } | StructInstantiation { .. } => {
             // Note: Original behavior was to return false even if the module loading fails (e.g.,
@@ -219,10 +220,6 @@ pub(crate) fn is_valid_txn_arg(
                         identifier
                     ))
                 })
-        },
-        I8 | I16 | I32 | I64 | I128 | I256 => {
-            // TODO(#17645): implement signed integers
-            false
         },
         Signer | Reference(_) | MutableReference(_) | TyParam(_) | Function { .. } => false,
     }
@@ -283,7 +280,8 @@ fn construct_arg(
 ) -> Result<Vec<u8>, VMStatus> {
     use move_vm_types::loaded_data::runtime_types::Type::*;
     match ty {
-        Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => Ok(arg),
+        Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+        | Address => Ok(arg),
         Vector(_) | Struct { .. } | StructInstantiation { .. } => {
             let initial_cursor_len = arg.len();
             let mut cursor = Cursor::new(&arg[..]);
@@ -320,16 +318,9 @@ fn construct_arg(
                 Err(invalid_signature())
             }
         },
-        Reference(_)
-        | MutableReference(_)
-        | TyParam(_)
-        | Function { .. }
-        | I8
-        | I16
-        | I32
-        | I64
-        | I128
-        | I256 => Err(invalid_signature()),
+        Reference(_) | MutableReference(_) | TyParam(_) | Function { .. } => {
+            Err(invalid_signature())
+        },
     }
 }
 
@@ -400,23 +391,15 @@ pub(crate) fn recursively_construct_arg(
                 max_invocations,
             )?);
         },
-        Bool | U8 => read_n_bytes(1, cursor, arg)?,
-        U16 => read_n_bytes(2, cursor, arg)?,
-        U32 => read_n_bytes(4, cursor, arg)?,
-        U64 => read_n_bytes(8, cursor, arg)?,
-        U128 => read_n_bytes(16, cursor, arg)?,
-        U256 | Address => read_n_bytes(32, cursor, arg)?,
-        Signer
-        | Reference(_)
-        | MutableReference(_)
-        | TyParam(_)
-        | Function { .. }
-        | I8
-        | I16
-        | I32
-        | I64
-        | I128
-        | I256 => return Err(invalid_signature()),
+        Bool | U8 | I8 => read_n_bytes(1, cursor, arg)?,
+        U16 | I16 => read_n_bytes(2, cursor, arg)?,
+        U32 | I32 => read_n_bytes(4, cursor, arg)?,
+        U64 | I64 => read_n_bytes(8, cursor, arg)?,
+        U128 | I128 => read_n_bytes(16, cursor, arg)?,
+        U256 | I256 | Address => read_n_bytes(32, cursor, arg)?,
+        Signer | Reference(_) | MutableReference(_) | TyParam(_) | Function { .. } => {
+            return Err(invalid_signature())
+        },
     };
     Ok(())
 }

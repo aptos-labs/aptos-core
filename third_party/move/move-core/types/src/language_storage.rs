@@ -96,17 +96,17 @@ pub enum TypeTag {
     ),
 
     // NOTED: added in bytecode version v9
-    #[serde(rename = "i8")]
+    #[serde(rename = "i8", alias = "I8")]
     I8,
-    #[serde(rename = "i16")]
+    #[serde(rename = "i16", alias = "I16")]
     I16,
-    #[serde(rename = "i32")]
+    #[serde(rename = "i32", alias = "I32")]
     I32,
-    #[serde(rename = "i64")]
+    #[serde(rename = "i64", alias = "I64")]
     I64,
-    #[serde(rename = "i128")]
+    #[serde(rename = "i128", alias = "I128")]
     I128,
-    #[serde(rename = "i256")]
+    #[serde(rename = "i256", alias = "I256")]
     I256,
 }
 

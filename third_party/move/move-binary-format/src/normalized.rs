@@ -64,6 +64,19 @@ pub enum Type {
     U32,
     #[serde(rename = "u256")]
     U256,
+    // NOTE: Added in bytecode version v9, do not reorder!
+    #[serde(rename = "i8")]
+    I8,
+    #[serde(rename = "i16")]
+    I16,
+    #[serde(rename = "i32")]
+    I32,
+    #[serde(rename = "i64")]
+    I64,
+    #[serde(rename = "i128")]
+    I128,
+    #[serde(rename = "i256")]
+    I256,
 }
 
 /// Normalized version of a `FieldDefinition`. The `name` is included even though it is
@@ -211,6 +224,12 @@ impl Type {
             U64 => true,
             U128 => true,
             U256 => true,
+            I8 => true,
+            I16 => true,
+            I32 => true,
+            I64 => true,
+            I128 => true,
+            I256 => true,
             Address => true,
             Signer => true,
             Struct { type_arguments, .. } => type_arguments.iter().all(|t| t.is_closed()),
@@ -231,6 +250,12 @@ impl Type {
                     U64 => TypeTag::U64,
                     U128 => TypeTag::U128,
                     U256 => TypeTag::U256,
+                    I8 => TypeTag::I8,
+                    I16 => TypeTag::I16,
+                    I32 => TypeTag::I32,
+                    I64 => TypeTag::I64,
+                    I128 => TypeTag::I128,
+                    I256 => TypeTag::I256,
                     Address => TypeTag::Address,
                     Signer => TypeTag::Signer,
                     Vector(t) => TypeTag::Vector(Box::new(
@@ -273,7 +298,8 @@ impl Type {
     pub fn subst(&self, type_args: &[Type]) -> Self {
         use Type::*;
         match self {
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer => self.clone(),
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+            | Address | Signer => self.clone(),
             Reference(ty) => Reference(Box::new(ty.subst(type_args))),
             MutableReference(ty) => MutableReference(Box::new(ty.subst(type_args))),
             Vector(t) => Vector(Box::new(t.subst(type_args))),
@@ -444,6 +470,12 @@ impl std::fmt::Display for Type {
             Type::U64 => write!(f, "u64"),
             Type::U128 => write!(f, "u128"),
             Type::U256 => write!(f, "u256"),
+            Type::I8 => write!(f, "i8"),
+            Type::I16 => write!(f, "i16"),
+            Type::I32 => write!(f, "i32"),
+            Type::I64 => write!(f, "i64"),
+            Type::I128 => write!(f, "i128"),
+            Type::I256 => write!(f, "i256"),
             Type::Address => write!(f, "address"),
             Type::Signer => write!(f, "signer"),
             Type::Bool => write!(f, "bool"),
