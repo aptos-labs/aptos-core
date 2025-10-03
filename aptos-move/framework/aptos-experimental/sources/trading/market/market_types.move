@@ -104,7 +104,7 @@ module aptos_experimental::market_types {
             validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
             /// place_maker_order_f arguments: order_info, price, size
             place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64, u64| has drop + copy,
-            /// cleanup_order_f arguments: order_info, cleanup_size, price. This is called when an order is fully filled or cancelled.
+            /// cleanup_order_f arguments: order_info, cleanup_size, limit_price. This is called when an order is fully filled or cancelled.
             cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64, u64| has drop + copy,
             /// cleanup_bulk_orders_f arguments: account, is_bid, remaining_sizes
             cleanup_bulk_orders_f: |address, OrderIdType| has drop + copy,
@@ -247,9 +247,9 @@ module aptos_experimental::market_types {
         self: &MarketClearinghouseCallbacks<M, R>,
         order_info: MarketClearinghouseOrderInfo<M>,
         cleanup_size: u64,
-        price: u64
+        limit_price: u64
     ) {
-        (self.cleanup_order_f)(order_info, cleanup_size, price)
+        (self.cleanup_order_f)(order_info, cleanup_size, limit_price)
     }
 
     public fun cleanup_bulk_orders<M: store + copy + drop, R: store + copy + drop>(
