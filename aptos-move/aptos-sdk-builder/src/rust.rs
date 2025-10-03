@@ -733,15 +733,18 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             U64 => ("U64", "Some(value)".to_string()),
             U128 => ("U128", "Some(value)".to_string()),
             U256 => ("U256", "Some(value)".to_string()),
+            I8 => ("I8", "Some(value)".to_string()),
+            I16 => ("I16", "Some(value)".to_string()),
+            I32 => ("I32", "Some(value)".to_string()),
+            I64 => ("I64", "Some(value)".to_string()),
+            I128 => ("I128", "Some(value)".to_string()),
+            I256 => ("I256", "Some(value)".to_string()),
             Address => ("Address", "Some(value)".to_string()),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => ("U8Vector", "Some(value)".to_string()),
                 _ => common::type_not_allowed(type_tag),
             },
-            // TODO(#17645): signed integers
-            Struct(_) | Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
-                common::type_not_allowed(type_tag)
-            },
+            Struct(_) | Signer | Function(..) => common::type_not_allowed(type_tag),
         };
         writeln!(
             self.out,
@@ -876,6 +879,12 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
             U64 => "u64".into(),
             U128 => "u128".into(),
             U256 => "U256".into(),
+            I8 => "i8".into(),
+            I16 => "i16".into(),
+            I32 => "i32".into(),
+            I64 => "i64".into(),
+            I128 => "i128".into(),
+            I256 => "I256".into(),
             Address => "AccountAddress".into(),
             Vector(type_tag) => {
                 format!("Vec<{}>", Self::quote_type(type_tag.as_ref(), local_types))
@@ -884,10 +893,7 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
                 tag if &**tag == Lazy::force(&str_tag) => "Vec<u8>".into(),
                 _ => common::type_not_allowed(type_tag),
             },
-            // TODO(#17645): signed integers
-            Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
-                common::type_not_allowed(type_tag)
-            },
+            Signer | Function(..) => common::type_not_allowed(type_tag),
         }
     }
 
@@ -910,16 +916,19 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
             U64 => format!("TransactionArgument::U64({})", name),
             U128 => format!("TransactionArgument::U128({})", name),
             U256 => format!("TransactionArgument::U256({})", name),
+            I8 => format!("TransactionArgument::I8({})", name),
+            I16 => format!("TransactionArgument::I16({})", name),
+            I32 => format!("TransactionArgument::I32({})", name),
+            I64 => format!("TransactionArgument::I64({})", name),
+            I128 => format!("TransactionArgument::I128({})", name),
+            I256 => format!("TransactionArgument::I256({})", name),
             Address => format!("TransactionArgument::Address({})", name),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => format!("TransactionArgument::U8Vector({})", name),
                 _ => common::type_not_allowed(type_tag),
             },
 
-            // TODO(#17645): signed integers
-            Struct(_) | Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
-                common::type_not_allowed(type_tag)
-            },
+            Struct(_) | Signer | Function(..) => common::type_not_allowed(type_tag),
         }
     }
 }

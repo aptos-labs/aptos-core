@@ -674,15 +674,18 @@ func encode_{}_argument(arg {}) []byte {{
             U64 => ("U64", default_stmt),
             U128 => ("U128", default_stmt),
             U256 => ("U256", default_stmt),
+            I8 => ("I8", default_stmt),
+            I16 => ("I16", default_stmt),
+            I32 => ("I32", default_stmt),
+            I64 => ("I64", default_stmt),
+            I128 => ("I128", default_stmt),
+            I256 => ("I256", default_stmt),
             Address => ("Address", "value = arg.Value".into()),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => ("U8Vector", default_stmt),
                 _ => common::type_not_allowed(type_tag),
             },
-            Struct(_) | Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
-                // TODO(#17645): support for signed integers?
-                common::type_not_allowed(type_tag)
-            },
+            Struct(_) | Signer | Function(..) => common::type_not_allowed(type_tag),
         };
         writeln!(
             self.out,
@@ -795,6 +798,12 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
             U64 => "uint64".into(),
             U128 => "serde.Uint128".into(),
             U256 => unimplemented!(),
+            I8 => "sint8".into(),
+            I16 => "sint16".into(),
+            I32 => "sint32".into(),
+            I64 => "sint64".into(),
+            I128 => "serde.Sint128".into(),
+            I256 => unimplemented!(),
             Address => "aptostypes.AccountAddress".into(),
             Vector(type_tag) => {
                 format!("[]{}", Self::quote_type(type_tag))
@@ -803,10 +812,7 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
                 tag if &**tag == Lazy::force(&str_tag) => "[]uint8".into(),
                 _ => common::type_not_allowed(type_tag),
             },
-            // TODO(#17645): signed integers
-            Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
-                common::type_not_allowed(type_tag)
-            },
+            Signer | Function(..) => common::type_not_allowed(type_tag),
         }
     }
 
@@ -828,15 +834,18 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
             U64 => format!("(*aptostypes.TransactionArgument__U64)(&{})", name),
             U128 => format!("(*aptostypes.TransactionArgument__U128)(&{})", name),
             U256 => format!("(*aptostypes.TransactionArgument__U256)(&{})", name),
+            I8 => format!("(*aptostypes.TransactionArgument__I8)(&{})", name),
+            I16 => format!("(*aptostypes.TransactionArgument__I16)(&{})", name),
+            I32 => format!("(*aptostypes.TransactionArgument__I32)(&{})", name),
+            I64 => format!("(*aptostypes.TransactionArgument__I64)(&{})", name),
+            I128 => format!("(*aptostypes.TransactionArgument__I128)(&{})", name),
+            I256 => format!("(*aptostypes.TransactionArgument__I256)(&{})", name),
             Address => format!("&aptostypes.TransactionArgument__Address{{{}}}", name),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => format!("(*aptostypes.TransactionArgument__U8Vector)(&{})", name),
                 _ => common::type_not_allowed(type_tag),
             },
-            // TODO(#17645): signed integers
-            Struct(_) | Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
-                common::type_not_allowed(type_tag)
-            },
+            Struct(_) | Signer | Function(..) => common::type_not_allowed(type_tag),
         }
     }
 
@@ -856,6 +865,12 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
             U64 => Some("U64"),
             U128 => Some("U128"),
             U256 => None,
+            I8 => Some("I8"),
+            I16 => Some("I16"),
+            I32 => Some("I32"),
+            I64 => Some("I64"),
+            I128 => Some("I128"),
+            I256 => None,
             Address => None,
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => Some("Bytes"),
@@ -870,10 +885,7 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
                 tag if &**tag == Lazy::force(&str_tag) => Some("Bytes"),
                 _ => common::type_not_allowed(type_tag),
             },
-            // TODO(#17645): signed integers
-            Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
-                common::type_not_allowed(type_tag)
-            },
+            Signer | Function(..) => common::type_not_allowed(type_tag),
         }
     }
 }

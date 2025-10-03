@@ -35,6 +35,8 @@ const SIGNER: &str = "Signer";
 /// Name of the Move `u256` type in the serde registry
 const U256_SERDE_NAME: &str = "u256";
 
+const I256_SERDE_NAME: &str = "i256";
+
 /// Type for building a registry of serde-reflection friendly struct layouts for Move types.
 /// The layouts created by this type are intended to be passed to the serde-generate tool to create
 /// struct bindings for Move types in source languages that use Move-based services.
@@ -145,6 +147,12 @@ impl<'a, T: CompiledModuleView> SerdeLayoutBuilder<'a, T> {
             U64 => Format::U64,
             U128 => Format::U128,
             U256 => Format::TypeName(U256_SERDE_NAME.to_string()),
+            I8 => Format::I8,
+            I16 => Format::I16,
+            I32 => Format::I32,
+            I64 => Format::I64,
+            I128 => Format::I128,
+            I256 => Format::TypeName(I256_SERDE_NAME.to_string()),
             Address => Format::TypeName(ADDRESS.to_string()),
             Signer => Format::TypeName(SIGNER.to_string()),
             Struct {
