@@ -20,7 +20,8 @@ pub struct VMConfig {
     /// are more than type checks, for example, stack balancing, visibility, but the name
     /// is kept for historical reasons.
     pub paranoid_type_checks: bool,
-    pub check_invariant_in_swap_loc: bool,
+    /// Always set to false, no longer used, kept for compatibility.
+    pub legacy_check_invariant_in_swap_loc: bool,
     /// Maximum value nest depth for structs.
     pub max_value_nest_depth: Option<u64>,
     /// Maximum allowed number of nodes in a type layout. This includes the types of fields for
@@ -52,7 +53,7 @@ impl Default for VMConfig {
             verifier_config: VerifierConfig::default(),
             deserializer_config: DeserializerConfig::default(),
             paranoid_type_checks: false,
-            check_invariant_in_swap_loc: true,
+            legacy_check_invariant_in_swap_loc: false,
             max_value_nest_depth: Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
             layout_max_size: 512,
             layout_max_depth: 128,
