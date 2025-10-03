@@ -217,7 +217,8 @@ impl<'env> BoogieTranslator<'env> {
 
             // type name <-> type info: primitives
             for name in [
-                "Bool", "U8", "U16", "U32", "U64", "U128", "U256", "Address", "Signer",
+                "Bool", "U8", "U16", "U32", "U64", "U128", "U256", "I8", "I16", "I32", "I64",
+                "I128", "I256", "Address", "Signer",
             ]
             .into_iter()
             {
@@ -1795,24 +1796,21 @@ impl FunctionTranslator<'_> {
                     Constant::Bool(true) => "true".to_string(),
                     Constant::Bool(false) => "false".to_string(),
                     Constant::U8(num) => boogie_num_literal(&num.to_string(), 8, bv_flag),
+                    Constant::U16(num) => boogie_num_literal(&num.to_string(), 16, bv_flag),
+                    Constant::U32(num) => boogie_num_literal(&num.to_string(), 32, bv_flag),
                     Constant::U64(num) => boogie_num_literal(&num.to_string(), 64, bv_flag),
                     Constant::U128(num) => boogie_num_literal(&num.to_string(), 128, bv_flag),
                     Constant::U256(num) => boogie_num_literal(&num.to_string(), 256, bv_flag),
+                    Constant::I8(num) => boogie_num_literal(&num.to_string(), 8, bv_flag),
+                    Constant::I16(num) => boogie_num_literal(&num.to_string(), 16, bv_flag),
+                    Constant::I32(num) => boogie_num_literal(&num.to_string(), 32, bv_flag),
+                    Constant::I64(num) => boogie_num_literal(&num.to_string(), 64, bv_flag),
+                    Constant::I128(num) => boogie_num_literal(&num.to_string(), 128, bv_flag),
+                    Constant::I256(num) => boogie_num_literal(&num.to_string(), 256, bv_flag),
                     Constant::Address(val) => boogie_address(env, val),
                     Constant::ByteArray(val) => boogie_byte_blob(options, val, bv_flag),
                     Constant::AddressArray(val) => boogie_address_blob(env, options, val),
                     Constant::Vector(val) => boogie_constant_blob(env, options, val),
-                    Constant::U16(num) => boogie_num_literal(&num.to_string(), 16, bv_flag),
-                    Constant::U32(num) => boogie_num_literal(&num.to_string(), 32, bv_flag),
-                    Constant::I8(_)
-                    | Constant::I16(_)
-                    | Constant::I32(_)
-                    | Constant::I64(_)
-                    | Constant::I128(_)
-                    | Constant::I256(_) => {
-                        // TODO(#17645): add support
-                        unimplemented!("Signed integer types not supported")
-                    },
                 };
                 let dest_str = str_local(*dest);
                 emitln!(writer, "{} := {};", dest_str, value);
@@ -2458,10 +2456,14 @@ impl FunctionTranslator<'_> {
                         emitln!(writer, "assume false;");
                         emitln!(writer, "return;");
                     },
-                    CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 => {
+                    CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | CastI8
+                    | CastI16 | CastI32 | CastI64 | CastI128 | CastI256 => {
                         let src = srcs[0];
                         let dest = dests[0];
-                        let make_cast = |target_base: &str, src: TempIndex, dest: TempIndex| {
+                        let make_cast = |target_kind: &str,
+                                         target_base: &str,
+                                         src: TempIndex,
+                                         dest: TempIndex| {
                             let num_oper = global_state
                                 .get_temp_index_oper(mid, fid, src, baseline_flag)
                                 .unwrap();
@@ -2484,23 +2486,30 @@ impl FunctionTranslator<'_> {
                             } else {
                                 emitln!(
                                     writer,
-                                    "call {} := $CastU{}({});",
+                                    "call {} := $Cast{}{}({});",
                                     str_local(dest),
+                                    target_kind,
                                     target_base,
                                     str_local(src)
                                 );
                             }
                         };
-                        let target_base = match oper {
-                            CastU8 => "8",
-                            CastU16 => "16",
-                            CastU32 => "32",
-                            CastU64 => "64",
-                            CastU128 => "128",
-                            CastU256 => "256",
+                        let (target_kind, target_base) = match oper {
+                            CastU8 => ("U", "8"),
+                            CastU16 => ("U", "16"),
+                            CastU32 => ("U", "32"),
+                            CastU64 => ("U", "64"),
+                            CastU128 => ("U", "128"),
+                            CastU256 => ("U", "256"),
+                            CastI8 => ("I", "8"),
+                            CastI16 => ("I", "16"),
+                            CastI32 => ("I", "32"),
+                            CastI64 => ("I", "64"),
+                            CastI128 => ("I", "128"),
+                            CastI256 => ("I", "256"),
                             _ => unreachable!(),
                         };
-                        make_cast(target_base, src, dest);
+                        make_cast(target_kind, target_base, src, dest);
                     },
                     Not => {
                         let src = srcs[0];
@@ -2530,31 +2539,61 @@ impl FunctionTranslator<'_> {
 
                         let add_type = match &self.get_local_type(dest) {
                             Type::Primitive(PrimitiveType::U8) => {
-                                boogie_num_type_string_capital("8", bv_flag)
+                                boogie_num_type_string_capital("U", "8", bv_flag)
                             },
                             Type::Primitive(PrimitiveType::U16) => format!(
                                 "{}{}",
-                                boogie_num_type_string_capital("16", bv_flag),
+                                boogie_num_type_string_capital("U", "16", bv_flag),
                                 unchecked
                             ),
                             Type::Primitive(PrimitiveType::U32) => format!(
                                 "{}{}",
-                                boogie_num_type_string_capital("32", bv_flag),
+                                boogie_num_type_string_capital("U", "32", bv_flag),
                                 unchecked
                             ),
                             Type::Primitive(PrimitiveType::U64) => format!(
                                 "{}{}",
-                                boogie_num_type_string_capital("64", bv_flag),
+                                boogie_num_type_string_capital("U", "64", bv_flag),
                                 unchecked
                             ),
                             Type::Primitive(PrimitiveType::U128) => format!(
                                 "{}{}",
-                                boogie_num_type_string_capital("128", bv_flag),
+                                boogie_num_type_string_capital("U", "128", bv_flag),
                                 unchecked
                             ),
                             Type::Primitive(PrimitiveType::U256) => format!(
                                 "{}{}",
-                                boogie_num_type_string_capital("256", bv_flag),
+                                boogie_num_type_string_capital("U", "256", bv_flag),
+                                unchecked
+                            ),
+                            Type::Primitive(PrimitiveType::I8) => format!(
+                                "{}{}",
+                                boogie_num_type_string_capital("I", "8", bv_flag),
+                                unchecked
+                            ),
+                            Type::Primitive(PrimitiveType::I16) => format!(
+                                "{}{}",
+                                boogie_num_type_string_capital("I", "16", bv_flag),
+                                unchecked
+                            ),
+                            Type::Primitive(PrimitiveType::I32) => format!(
+                                "{}{}",
+                                boogie_num_type_string_capital("I", "32", bv_flag),
+                                unchecked
+                            ),
+                            Type::Primitive(PrimitiveType::I64) => format!(
+                                "{}{}",
+                                boogie_num_type_string_capital("I", "64", bv_flag),
+                                unchecked
+                            ),
+                            Type::Primitive(PrimitiveType::I128) => format!(
+                                "{}{}",
+                                boogie_num_type_string_capital("I", "128", bv_flag),
+                                unchecked
+                            ),
+                            Type::Primitive(PrimitiveType::I256) => format!(
+                                "{}{}",
+                                boogie_num_type_string_capital("I", "256", bv_flag),
                                 unchecked
                             ),
                             Type::Primitive(_)
@@ -2586,43 +2625,63 @@ impl FunctionTranslator<'_> {
                             .get_temp_index_oper(mid, fid, dest, baseline_flag)
                             .unwrap();
                         let bv_flag = self.bv_flag(num_oper);
-                        if bv_flag {
-                            let sub_type = match &self.get_local_type(dest) {
-                                Type::Primitive(PrimitiveType::U8) => "Bv8".to_string(),
-                                Type::Primitive(PrimitiveType::U16) => "Bv16".to_string(),
-                                Type::Primitive(PrimitiveType::U32) => "Bv32".to_string(),
-                                Type::Primitive(PrimitiveType::U64) => "Bv64".to_string(),
-                                Type::Primitive(PrimitiveType::U128) => "Bv128".to_string(),
-                                Type::Primitive(PrimitiveType::U256) => "Bv256".to_string(),
-                                Type::Primitive(_)
-                                | Type::Tuple(_)
-                                | Type::Vector(_)
-                                | Type::Struct(_, _, _)
-                                | Type::TypeParameter(_)
-                                | Type::Reference(_, _)
-                                | Type::Fun(..)
-                                | Type::TypeDomain(_)
-                                | Type::ResourceDomain(_, _, _)
-                                | Type::Error
-                                | Type::Var(_) => unreachable!(),
-                            };
-                            emitln!(
-                                writer,
-                                "call {} := $Sub{}({}, {});",
-                                str_local(dest),
-                                sub_type,
-                                str_local(op1),
-                                str_local(op2)
-                            );
-                        } else {
-                            emitln!(
-                                writer,
-                                "call {} := $Sub({}, {});",
-                                str_local(dest),
-                                str_local(op1),
-                                str_local(op2)
-                            );
-                        }
+                        let sub_type = match &self.get_local_type(dest) {
+                            Type::Primitive(PrimitiveType::U8) => {
+                                boogie_num_type_string_capital("U", "8", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::U16) => {
+                                boogie_num_type_string_capital("U", "16", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::U32) => {
+                                boogie_num_type_string_capital("U", "32", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::U64) => {
+                                boogie_num_type_string_capital("U", "64", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::U128) => {
+                                boogie_num_type_string_capital("U", "128", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::U256) => {
+                                boogie_num_type_string_capital("U", "256", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::I8) => {
+                                boogie_num_type_string_capital("I", "8", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::I16) => {
+                                boogie_num_type_string_capital("I", "16", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::I32) => {
+                                boogie_num_type_string_capital("I", "32", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::I64) => {
+                                boogie_num_type_string_capital("I", "64", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::I128) => {
+                                boogie_num_type_string_capital("I", "128", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::I256) => {
+                                boogie_num_type_string_capital("I", "256", bv_flag)
+                            },
+                            Type::Primitive(_)
+                            | Type::Tuple(_)
+                            | Type::Vector(_)
+                            | Type::Struct(_, _, _)
+                            | Type::TypeParameter(_)
+                            | Type::Reference(_, _)
+                            | Type::Fun(..)
+                            | Type::TypeDomain(_)
+                            | Type::ResourceDomain(_, _, _)
+                            | Type::Error
+                            | Type::Var(_) => unreachable!(),
+                        };
+                        emitln!(
+                            writer,
+                            "call {} := $Sub{}({}, {});",
+                            str_local(dest),
+                            sub_type,
+                            str_local(op1),
+                            str_local(op2)
+                        );
                     },
                     Mul => {
                         let dest = dests[0];
@@ -2634,22 +2693,40 @@ impl FunctionTranslator<'_> {
                         let bv_flag = self.bv_flag(num_oper);
                         let mul_type = match &self.get_local_type(dest) {
                             Type::Primitive(PrimitiveType::U8) => {
-                                boogie_num_type_string_capital("8", bv_flag)
+                                boogie_num_type_string_capital("U", "8", bv_flag)
                             },
                             Type::Primitive(PrimitiveType::U16) => {
-                                boogie_num_type_string_capital("16", bv_flag)
+                                boogie_num_type_string_capital("U", "16", bv_flag)
                             },
                             Type::Primitive(PrimitiveType::U32) => {
-                                boogie_num_type_string_capital("32", bv_flag)
+                                boogie_num_type_string_capital("U", "32", bv_flag)
                             },
                             Type::Primitive(PrimitiveType::U64) => {
-                                boogie_num_type_string_capital("64", bv_flag)
+                                boogie_num_type_string_capital("U", "64", bv_flag)
                             },
                             Type::Primitive(PrimitiveType::U128) => {
-                                boogie_num_type_string_capital("128", bv_flag)
+                                boogie_num_type_string_capital("U", "128", bv_flag)
                             },
                             Type::Primitive(PrimitiveType::U256) => {
-                                boogie_num_type_string_capital("256", bv_flag)
+                                boogie_num_type_string_capital("U", "256", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::I8) => {
+                                boogie_num_type_string_capital("I", "8", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::I16) => {
+                                boogie_num_type_string_capital("I", "16", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::I32) => {
+                                boogie_num_type_string_capital("I", "32", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::I64) => {
+                                boogie_num_type_string_capital("I", "64", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::I128) => {
+                                boogie_num_type_string_capital("I", "128", bv_flag)
+                            },
+                            Type::Primitive(PrimitiveType::I256) => {
+                                boogie_num_type_string_capital("I", "256", bv_flag)
                             },
                             Type::Primitive(_)
                             | Type::Tuple(_)
@@ -2750,6 +2827,41 @@ impl FunctionTranslator<'_> {
                             mod_type,
                             str_local(op1),
                             str_local(op2)
+                        );
+                    },
+                    Negate => {
+                        let dest = dests[0];
+                        let op = srcs[0];
+                        let num_oper = global_state
+                            .get_temp_index_oper(mid, fid, dest, baseline_flag)
+                            .unwrap();
+                        assert!(!self.bv_flag(num_oper), "Negate not enabled on bitvectors");
+
+                        let neg_type = match &self.get_local_type(dest) {
+                            Type::Primitive(PrimitiveType::I8) => "I8",
+                            Type::Primitive(PrimitiveType::I16) => "I16",
+                            Type::Primitive(PrimitiveType::I32) => "I32",
+                            Type::Primitive(PrimitiveType::I64) => "I64",
+                            Type::Primitive(PrimitiveType::I128) => "I128",
+                            Type::Primitive(PrimitiveType::I256) => "I256",
+                            Type::Primitive(_)
+                            | Type::Tuple(_)
+                            | Type::Vector(_)
+                            | Type::Struct(_, _, _)
+                            | Type::TypeParameter(_)
+                            | Type::Reference(_, _)
+                            | Type::Fun(..)
+                            | Type::TypeDomain(_)
+                            | Type::ResourceDomain(_, _, _)
+                            | Type::Error
+                            | Type::Var(_) => unreachable!(),
+                        };
+                        emitln!(
+                            writer,
+                            "call {} := $Negate{}({});",
+                            str_local(dest),
+                            neg_type,
+                            str_local(op),
                         );
                     },
                     Shl | Shr => {
@@ -3053,10 +3165,6 @@ impl FunctionTranslator<'_> {
                         self.track_global_mem(mem, node_id);
                     },
                     Vector => unimplemented!("vector"),
-                    CastI8 | CastI16 | CastI32 | CastI64 | CastI128 | CastI256 | Negate => {
-                        // TODO(#17645): add support
-                        panic!("signed integer operations not supported")
-                    },
                 }
                 if let Some(AbortAction(target, code)) = aa {
                     emitln!(writer, "if ($abort_flag) {");
