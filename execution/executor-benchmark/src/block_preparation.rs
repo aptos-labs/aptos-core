@@ -12,7 +12,10 @@ use aptos_logger::info;
 use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_types::{
     block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
-    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
+        AuxiliaryInfoTrait, Transaction,
+    },
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::time::Instant;
@@ -83,7 +86,15 @@ impl BlockPreparationStage {
                     .collect::<Vec<_>>()
             });
         let block: ExecutableBlock = match &self.maybe_partitioner {
-            None => (block_id, sig_verified_txns).into(),
+            None => {
+                // Create proper AuxiliaryInfo with correct transaction indices
+                let auxiliary_info: Vec<AuxiliaryInfo> = sig_verified_txns
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, _)| AuxiliaryInfo::auxiliary_info_at_txn_index(idx as u32))
+                    .collect();
+                (block_id, sig_verified_txns, auxiliary_info).into()
+            },
             Some(partitioner) => {
                 NUM_TXNS.inc_with_by(&["partition"], sig_verified_txns.len() as u64);
                 let analyzed_transactions =
