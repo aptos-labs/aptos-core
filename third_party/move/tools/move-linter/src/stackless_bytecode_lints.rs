@@ -7,6 +7,7 @@
 
 mod avoid_copy_on_identity_comparison;
 mod needless_mutable_reference;
+mod zero_address;
 
 use move_compiler_v2::external_checks::StacklessBytecodeChecker;
 use std::collections::BTreeMap;
@@ -16,7 +17,7 @@ pub fn get_default_linter_pipeline(
     config: &BTreeMap<String, String>,
 ) -> Vec<Box<dyn StacklessBytecodeChecker>> {
     // Start with the default set of checks.
-    let checks: Vec<Box<dyn StacklessBytecodeChecker>> = vec![
+    let mut checks: Vec<Box<dyn StacklessBytecodeChecker>> = vec![
         Box::new(avoid_copy_on_identity_comparison::AvoidCopyOnIdentityComparison {}),
         Box::new(needless_mutable_reference::NeedlessMutableReference {}),
     ];
@@ -26,6 +27,7 @@ pub fn get_default_linter_pipeline(
     }
     if checks_category == "experimental" {
         // Push experimental checks to `checks`.
+        checks.push(Box::<zero_address::ZeroAddress>::default());
     }
     checks
 }
