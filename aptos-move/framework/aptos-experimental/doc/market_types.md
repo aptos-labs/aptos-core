@@ -381,7 +381,7 @@
 <code>cleanup_order_f: |<a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, u64, u64| <b>has</b> <b>copy</b> + drop</code>
 </dt>
 <dd>
- cleanup_order_f arguments: order_info, cleanup_size, price
+ cleanup_order_f arguments: order_info, cleanup_size, limit_price. This is called when an order is fully filled or cancelled.
 </dd>
 <dt>
 <code>cleanup_bulk_orders_f: |<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>| <b>has</b> <b>copy</b> + drop</code>
@@ -1488,7 +1488,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_cleanup_order">cleanup_order</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, order_info: <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, cleanup_size: u64, price: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_cleanup_order">cleanup_order</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, order_info: <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info_MarketClearinghouseOrderInfo">market_clearinghouse_order_info::MarketClearinghouseOrderInfo</a>&lt;M&gt;, cleanup_size: u64, limit_price: u64)
 </code></pre>
 
 
@@ -1501,9 +1501,9 @@
     self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a>&lt;M, R&gt;,
     order_info: MarketClearinghouseOrderInfo&lt;M&gt;,
     cleanup_size: u64,
-    price: u64
+    limit_price: u64
 ) {
-    (self.cleanup_order_f)(order_info, cleanup_size, price)
+    (self.cleanup_order_f)(order_info, cleanup_size, limit_price)
 }
 </code></pre>
 
