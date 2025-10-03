@@ -493,23 +493,24 @@ where
                 ExitCode::Call(fh_idx) => {
                     let (function, frame_cache) = if self.vm_config.enable_function_caches {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
-                        let function = FrameTypeCache::get_or(
+                        let (function, frame_cache) = FrameTypeCache::get_or(
                             &mut current_frame_cache.loaded_function_cache,
                             fh_idx,
                             |idx| {
-                                self.load_function_no_visibility_checks(
-                                    gas_meter,
-                                    traversal_context,
-                                    &current_frame,
-                                    idx,
-                                )
-                                .map(Rc::new)
+                                let function = self
+                                    .load_function_no_visibility_checks(
+                                        gas_meter,
+                                        traversal_context,
+                                        &current_frame,
+                                        idx,
+                                    )
+                                    .map(Rc::new)?;
+                                let frame_cache = function_caches
+                                    .get_or_create_frame_cache_non_generic(&function);
+                                Ok((function, frame_cache))
                             },
-                        )?
-                        .clone();
-                        let frame_cache =
-                            function_caches.get_or_create_frame_cache_non_generic(&function);
-                        (function, frame_cache)
+                        )?;
+                        (function.clone(), frame_cache.clone())
                     } else {
                         let function = Rc::new(self.load_function_no_visibility_checks(
                             gas_meter,
@@ -569,23 +570,24 @@ where
                 ExitCode::CallGeneric(idx) => {
                     let (function, frame_cache) = if self.vm_config.enable_function_caches {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
-                        let function = FrameTypeCache::get_or(
+                        let (function, frame_cache) = FrameTypeCache::get_or(
                             &mut current_frame_cache.loaded_generic_function_cache,
                             idx,
                             |idx| {
-                                self.load_generic_function_no_visibility_checks(
-                                    gas_meter,
-                                    traversal_context,
-                                    &current_frame,
-                                    idx,
-                                )
-                                .map(Rc::new)
+                                let function = self
+                                    .load_generic_function_no_visibility_checks(
+                                        gas_meter,
+                                        traversal_context,
+                                        &current_frame,
+                                        idx,
+                                    )
+                                    .map(Rc::new)?;
+                                let frame_cache =
+                                    function_caches.get_or_create_frame_cache_generic(&function);
+                                Ok((function, frame_cache))
                             },
-                        )?
-                        .clone();
-                        let frame_cache =
-                            function_caches.get_or_create_frame_cache_generic(&function);
-                        (function, frame_cache)
+                        )?;
+                        (function.clone(), frame_cache.clone())
                     } else {
                         let function = Rc::new(self.load_generic_function_no_visibility_checks(
                             gas_meter,

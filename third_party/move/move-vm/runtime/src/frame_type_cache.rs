@@ -33,9 +33,10 @@ pub(crate) struct FrameTypeCache {
         BTreeMap<VariantFieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
     single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
 
-    pub(crate) loaded_function_cache: BTreeMap<FunctionHandleIndex, Rc<LoadedFunction>>,
+    pub(crate) loaded_function_cache:
+        BTreeMap<FunctionHandleIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
     pub(crate) loaded_generic_function_cache:
-        BTreeMap<FunctionInstantiationIndex, Rc<LoadedFunction>>,
+        BTreeMap<FunctionInstantiationIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
 }
 
 impl FrameTypeCache {
