@@ -272,6 +272,15 @@ pub fn convert_move_type(move_type: &MoveType) -> transaction::MoveType {
         MoveType::Reference { .. } => transaction::MoveTypes::Reference,
         MoveType::Function { .. } => transaction::MoveTypes::Unparsable,
         MoveType::Unparsable(_) => transaction::MoveTypes::Unparsable,
+        MoveType::I8
+        | MoveType::I16
+        | MoveType::I32
+        | MoveType::I64
+        | MoveType::I128
+        | MoveType::I256 => {
+            //TODO(#17645): support signed integers
+            transaction::MoveTypes::Unparsable
+        },
     };
     let content = match move_type {
         MoveType::Bool => None,
@@ -303,6 +312,15 @@ pub fn convert_move_type(move_type: &MoveType) -> transaction::MoveType {
         )),
         MoveType::Unparsable(string) => {
             Some(transaction::move_type::Content::Unparsable(string.clone()))
+        },
+        MoveType::I8
+        | MoveType::I16
+        | MoveType::I32
+        | MoveType::I64
+        | MoveType::I128
+        | MoveType::I256 => {
+            //TODO(#17645): make sure `None` is enough here
+            None
         },
     };
     transaction::MoveType {

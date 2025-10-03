@@ -848,8 +848,12 @@ impl PrimitiveType {
             U256 => MType::U256,
             Address => MType::Address,
             Signer => MType::Signer,
-            // TODO(#17645) add support
-            I8 | I16 | I32 | I64 | I128 | I256 => unimplemented!("signed int not supported"),
+            I8 => MType::I8,
+            I16 => MType::I16,
+            I32 => MType::I32,
+            I64 => MType::I64,
+            I128 => MType::I128,
+            I256 => MType::I256,
             Num | Range | EventStore => return None,
         })
     }

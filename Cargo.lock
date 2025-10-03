@@ -12165,7 +12165,6 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "petgraph 0.6.5",
- "serde-reflection",
 ]
 
 [[package]]
