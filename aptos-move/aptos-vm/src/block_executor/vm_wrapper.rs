@@ -33,8 +33,12 @@ impl ExecutorTask for AptosExecutorTask {
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
-    fn init(environment: &AptosEnvironment, state_view: &impl StateView) -> Self {
-        let vm = AptosVM::new(environment, state_view);
+    fn init(
+        environment: &AptosEnvironment,
+        state_view: &impl StateView,
+        trace_user_txn: bool,
+    ) -> Self {
+        let vm = AptosVM::new_for_block_executor(environment, state_view, trace_user_txn);
         let id = state_view.id();
         Self { vm, id }
     }

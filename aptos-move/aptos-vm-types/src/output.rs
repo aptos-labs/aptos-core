@@ -17,23 +17,28 @@ use aptos_types::{
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
     write_set::WriteOp,
 };
+use derivative::Derivative;
 use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
+use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, mem};
 
 /// Output produced by the VM after executing a transaction.
 ///
 /// **WARNING**: This type should only be used inside the VM. For storage backends,
 /// use `TransactionOutput`.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Derivative)]
+#[derivative(Debug, Clone, Eq, PartialEq)]
 pub struct VMOutput {
     change_set: VMChangeSet,
     module_write_set: ModuleWriteSet,
     fee_statement: FeeStatement,
     status: TransactionStatus,
+    #[derivative(PartialEq = "ignore", Debug = "ignore")]
+    trace: Trace,
 }
 
 impl VMOutput {
@@ -48,6 +53,7 @@ impl VMOutput {
             module_write_set,
             fee_statement,
             status,
+            trace: Trace::empty(),
         }
     }
 
@@ -57,6 +63,7 @@ impl VMOutput {
             module_write_set: ModuleWriteSet::empty(),
             fee_statement: FeeStatement::zero(),
             status,
+            trace: Trace::empty(),
         }
     }
 
@@ -96,6 +103,15 @@ impl VMOutput {
 
     pub fn status(&self) -> &TransactionStatus {
         &self.status
+    }
+
+    pub fn set_trace(&mut self, trace: Trace) {
+        let old = mem::replace(&mut self.trace, trace);
+        assert!(old.is_empty());
+    }
+
+    pub fn take_trace(&mut self) -> Trace {
+        mem::take(&mut self.trace)
     }
 
     pub fn materialized_size(&self) -> u64 {
@@ -171,6 +187,7 @@ impl VMOutput {
             module_write_set,
             fee_statement,
             status,
+            trace: _,
         } = self;
         let (write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
