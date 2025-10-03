@@ -72,6 +72,7 @@ impl CalibrationRunner {
         workload: CalibrationWorkload,
         name: String,
         to_skip: usize,
+        block_size: usize,
         to_evaluate: usize,
         tps: f64,
     ) {
@@ -100,7 +101,21 @@ impl CalibrationRunner {
         };
         let to_skip_txns = (0..to_skip).map(|_| generate_next()).collect::<Vec<_>>();
 
-        execute_block_expect_success(to_skip_txns, &mut self.harness);
+        for block in to_skip_txns.chunks(block_size) {
+            // Get current real time to keep blockchain time close to real time for orderless transactions
+            let current_time_usecs = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_micros() as u64;
+            self.harness.executor.new_block_with_timestamp(current_time_usecs);
+            execute_block_expect_success(block.to_vec(), &mut self.harness);
+        }
+        // Get current real time to keep blockchain time close to real time for orderless transactions
+        let current_time_usecs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+        self.harness.executor.new_block_with_timestamp(current_time_usecs);
 
         let mut aggregate_gas_log: Option<TransactionGasLog> = None;
         for i in 0..to_evaluate {
