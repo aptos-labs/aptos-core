@@ -25,8 +25,8 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage,
-    Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage, UnsyncModuleStorage,
-    WithRuntimeEnvironment,
+    Module, ModuleStorage, NoOpLayoutCache, RuntimeEnvironment, Script, UnsyncCodeStorage,
+    UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_types::{
     code::{ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ModuleCode, ScriptCache},
@@ -90,6 +90,8 @@ where
 pub struct AptosCodeStorageAdapter<'ctx, S, E> {
     storage: UnsyncCodeStorage<UnsyncModuleStorage<'ctx, StateViewAdapter<'ctx, S, E>>>,
 }
+
+impl<'ctx, S, E> NoOpLayoutCache for AptosCodeStorageAdapter<'ctx, S, E> {}
 
 #[delegate_to_methods]
 #[delegate(ScriptCache, target_ref = "as_script_cache")]

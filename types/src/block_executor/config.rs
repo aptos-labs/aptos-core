@@ -22,6 +22,8 @@ pub struct BlockExecutorModuleCacheLocalConfig {
     pub max_interned_tys: usize,
     /// The maximum number of type vectors to intern.
     pub max_interned_ty_vecs: usize,
+    /// The maximum number of layout entries.
+    pub max_layout_cache_size: usize,
 }
 
 impl Default for BlockExecutorModuleCacheLocalConfig {
@@ -36,6 +38,8 @@ impl Default for BlockExecutorModuleCacheLocalConfig {
             max_interned_tys: 10 * 1024 * 1024,
             // Use slightly less for vectors of types.
             max_interned_ty_vecs: 4 * 1024 * 1024,
+            // Maximum number of cached layouts.
+            max_layout_cache_size: 4_000_000,
         }
     }
 }
