@@ -1642,8 +1642,10 @@ def test(
         if forge_image_name == DEFAULT_FORGE_IMAGE_NAME:
             forge_image_tag = forge_image_tag or default_latest_image
         else:
-            latest_forge_image_with_name = "main"
-            forge_image_tag = forge_image_tag or latest_forge_image_with_name
+            latest_image_tag_for_forge_image_with_name = "main"
+            forge_image_tag = (
+                forge_image_tag or latest_image_tag_for_forge_image_with_name
+            )
 
         image_tag = image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image

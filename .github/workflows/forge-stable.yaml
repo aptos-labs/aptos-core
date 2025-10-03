@@ -110,6 +110,7 @@ on:
           # Run a production config (same as land blocking run) max load (via mempool backlog), but run it for 2 hours,
           # to check reliability and consistency of the newtork.
           - realistic-env-max-load-long
+          - etna
       JOB_PARALLELISM:
         required: false
         type: number
@@ -168,7 +169,8 @@ jobs:
               { TEST_NAME: 'changing-working-quorum-test', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'changing_working_quorum_test', FORGE_ENABLE_FAILPOINTS: true },
               { TEST_NAME: 'changing-working-quorum-test-high-load', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'changing_working_quorum_test_high_load', FORGE_ENABLE_FAILPOINTS: true },
               { TEST_NAME: 'pfn-const-tps-realistic-env', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'pfn_const_tps_with_realistic_env' },
-              { TEST_NAME: 'realistic-env-max-load-long', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'realistic_env_max_load_large' }
+              { TEST_NAME: 'realistic-env-max-load-long', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'realistic_env_max_load_large' },
+              { TEST_NAME: 'etna', FORGE_RUNNER_DURATION_SECS: 3600, FORGE_TEST_SUITE: 'etna', FORGE_IMAGE_NAME: 'etna-rust' }
             ];
 
             const matrix = testName != "all" ? tests.filter(test => test.TEST_NAME === testName) : tests;
@@ -200,7 +202,7 @@ jobs:
   # NOTE: this may be better as a separate workflow as the logic is quite complex but generalizable
   determine-test-metadata:
     runs-on: ubuntu-latest
-    needs: [ "generate-matrix" ]
+    needs: ["generate-matrix"]
     outputs:
       IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
       IMAGE_TAG_FOR_COMPAT_TEST: ${{ steps.get-last-released-image-tag-for-compat-test.outputs.IMAGE_TAG }}
@@ -275,7 +277,7 @@ jobs:
 
   run:
     name: forge-${{ matrix.TEST_NAME }}
-    needs: [ determine-test-metadata, generate-matrix ]
+    needs: [determine-test-metadata, generate-matrix]
     if: ${{ github.event_name != 'pull_request' }}
     strategy:
       fail-fast: false
@@ -290,6 +292,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: ${{ matrix.FORGE_RUNNER_DURATION_SECS }}
       FORGE_ENABLE_PERFORMANCE: ${{ matrix.FORGE_ENABLE_PERFORMANCE || false }}
       FORGE_ENABLE_FAILPOINTS: ${{ matrix.FORGE_ENABLE_FAILPOINTS || false }}
+      FORGE_IMAGE_NAME: ${{ matrix.FORGE_IMAGE_NAME }}
       POST_TO_SLACK: true
       SEND_RESULTS_TO_TRUNK: true
       FORGE_CONTINUOUS_TEST_MODE: true
