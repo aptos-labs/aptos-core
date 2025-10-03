@@ -21,7 +21,13 @@ pub enum TransactionArgument {
     U256(int256::U256),
     // Note: Gated by feature flag ALLOW_SERIALIZED_SCRIPT_ARGS
     Serialized(#[serde(with = "serde_bytes")] Vec<u8>),
-    // TODO(#17645): determine whether iNN types need support here
+    // NOTE: Added in bytecode version v9, do not reorder!
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    I128(i128),
+    I256(int256::I256),
 }
 
 impl fmt::Debug for TransactionArgument {
@@ -41,6 +47,12 @@ impl fmt::Debug for TransactionArgument {
             TransactionArgument::Serialized(value) => {
                 write!(f, "{{RAW_BYTES: {}}}", hex::encode(value))
             },
+            TransactionArgument::I8(value) => write!(f, "{{I8: {}}}", value),
+            TransactionArgument::I16(value) => write!(f, "{{I16: {}}}", value),
+            TransactionArgument::I32(value) => write!(f, "{{I32: {}}}", value),
+            TransactionArgument::I64(value) => write!(f, "{{I64: {}}}", value),
+            TransactionArgument::I128(value) => write!(f, "{{I128: {}}}", value),
+            TransactionArgument::I256(value) => write!(f, "{{I256: {}}}", value),
         }
     }
 }
@@ -58,6 +70,12 @@ impl From<TransactionArgument> for MoveValue {
             TransactionArgument::U32(i) => MoveValue::U32(i),
             TransactionArgument::U256(i) => MoveValue::U256(i),
             TransactionArgument::Serialized(value) => MoveValue::vector_u8(value),
+            TransactionArgument::I8(i) => MoveValue::I8(i),
+            TransactionArgument::I16(i) => MoveValue::I16(i),
+            TransactionArgument::I32(i) => MoveValue::I32(i),
+            TransactionArgument::I64(i) => MoveValue::I64(i),
+            TransactionArgument::I128(i) => MoveValue::I128(i),
+            TransactionArgument::I256(i) => MoveValue::I256(i),
         }
     }
 }
@@ -89,15 +107,12 @@ impl TryFrom<MoveValue> for TransactionArgument {
             MoveValue::U16(i) => TransactionArgument::U16(i),
             MoveValue::U32(i) => TransactionArgument::U32(i),
             MoveValue::U256(i) => TransactionArgument::U256(i),
-            MoveValue::I8(_)
-            | MoveValue::I16(_)
-            | MoveValue::I32(_)
-            | MoveValue::I64(_)
-            | MoveValue::I128(_)
-            | MoveValue::I256(_) => {
-                // TODO(#17645): determine signed int support
-                return Err(anyhow!("invalid transaction argument: {:?}", val));
-            },
+            MoveValue::I8(i) => TransactionArgument::I8(i),
+            MoveValue::I16(i) => TransactionArgument::I16(i),
+            MoveValue::I32(i) => TransactionArgument::I32(i),
+            MoveValue::I64(i) => TransactionArgument::I64(i),
+            MoveValue::I128(i) => TransactionArgument::I128(i),
+            MoveValue::I256(i) => TransactionArgument::I256(i),
         })
     }
 }
@@ -142,7 +157,9 @@ impl VecBytes {
 #[cfg(test)]
 mod tests {
     use crate::{
-        account_address::AccountAddress, int256::U256, transaction_argument::TransactionArgument,
+        account_address::AccountAddress,
+        int256::{I256, U256},
+        transaction_argument::TransactionArgument,
         value::MoveValue,
     };
     use std::convert::{From, TryInto};
@@ -156,6 +173,12 @@ mod tests {
             TransactionArgument::U64(u64::MAX),
             TransactionArgument::U128(u128::MAX),
             TransactionArgument::U256(U256::MAX),
+            TransactionArgument::I8(-1),
+            TransactionArgument::I16(i16::MIN),
+            TransactionArgument::I32(i32::MIN),
+            TransactionArgument::I64(i64::MIN),
+            TransactionArgument::I128(i128::MIN),
+            TransactionArgument::I256(I256::MIN),
             TransactionArgument::Bool(true),
             TransactionArgument::Address(AccountAddress::from_hex_literal("0x1").unwrap()),
             TransactionArgument::U8Vector(vec![1, 2, 3, 4]),

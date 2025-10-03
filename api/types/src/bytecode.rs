@@ -92,6 +92,12 @@ pub trait Bytecode {
             SignatureToken::U64 => MoveType::U64,
             SignatureToken::U128 => MoveType::U128,
             SignatureToken::U256 => MoveType::U256,
+            SignatureToken::I8 => MoveType::I8,
+            SignatureToken::I16 => MoveType::I16,
+            SignatureToken::I32 => MoveType::I32,
+            SignatureToken::I64 => MoveType::I64,
+            SignatureToken::I128 => MoveType::I128,
+            SignatureToken::I256 => MoveType::I256,
             SignatureToken::Address => MoveType::Address,
             SignatureToken::Signer => MoveType::Signer,
             SignatureToken::Vector(t) => MoveType::Vector {
@@ -121,15 +127,6 @@ pub trait Bytecode {
                     results: new_vec(result),
                     abilities: *abilities,
                 }
-            },
-            SignatureToken::I8
-            | SignatureToken::I16
-            | SignatureToken::I32
-            | SignatureToken::I64
-            | SignatureToken::I128
-            | SignatureToken::I256 => {
-                // TODO(#17645): signed integers
-                MoveType::Unparsable("signed integer NYI".to_string())
             },
         }
     }
