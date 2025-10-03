@@ -9,7 +9,7 @@ use aptos_forge::{
     prometheus_metrics::{LatencyBreakdown, LatencyBreakdownSlice, MetricSamples},
     success_criteria::{SuccessCriteria, SuccessCriteriaChecker, SuccessCriteriaResults},
     EmitJob, EmitJobMode, EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest,
-    Result, Test, TxnStats, WorkflowProgress,
+    Result, Test, TransactionType, TxnStats, WorkflowProgress,
 };
 use async_trait::async_trait;
 use log::{error, info};
@@ -33,6 +33,7 @@ pub struct SingleRunStats {
 pub enum Workloads {
     TPS(Vec<usize>),
     TRANSACTIONS(Vec<TransactionWorkload>),
+    RawTransactions(Vec<(String, TransactionType)>),
 }
 
 impl Workloads {
@@ -40,6 +41,7 @@ impl Workloads {
         match self {
             Self::TPS(tpss) => tpss.len(),
             Self::TRANSACTIONS(workloads) => workloads.len(),
+            Self::RawTransactions(workloads) => workloads.len(),
         }
     }
 
@@ -47,6 +49,7 @@ impl Workloads {
         match self {
             Self::TPS(_) => "Load (TPS)".to_string(),
             Self::TRANSACTIONS(_) => "Workload".to_string(),
+            Self::RawTransactions(_) => "RawWorkload".to_string(),
         }
     }
 
@@ -60,6 +63,7 @@ impl Workloads {
                     1
                 }
             },
+            Self::RawTransactions(_) => 1,
         }
     }
 
@@ -69,6 +73,9 @@ impl Workloads {
                 format!("TPS({})", tpss[index])
             },
             Self::TRANSACTIONS(workloads) => format!("TRANSACTIONS({:?})", workloads[index]),
+            Self::RawTransactions(workloads) => {
+                format!("RAW TRANSACTIONS({:?})", workloads[index].0)
+            },
         }
     }
 
@@ -88,6 +95,7 @@ impl Workloads {
                 },
                 workloads[index].phase_name(phase)
             ),
+            Self::RawTransactions(workloads) => format!("{}: {}", index, workloads[index].0),
         }
     }
 
@@ -95,6 +103,9 @@ impl Workloads {
         match self {
             Self::TPS(tpss) => request.mode(EmitJobMode::ConstTps { tps: tpss[index] }),
             Self::TRANSACTIONS(workloads) => workloads[index].configure(request),
+            Self::RawTransactions(workloads) => {
+                request.transaction_type(workloads[index].1.clone())
+            },
         }
     }
 
@@ -255,6 +266,7 @@ impl Test for LoadVsPerfBenchmark {
         match self.workloads {
             Workloads::TPS(_) => "load vs perf test",
             Workloads::TRANSACTIONS(_) => "workload vs perf test",
+            Workloads::RawTransactions(_) => "raw workload vs perf test",
         }
     }
 }
