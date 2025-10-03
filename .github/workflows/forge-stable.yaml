@@ -283,7 +283,7 @@ jobs:
       fail-fast: false
       max-parallel: ${{ inputs.JOB_PARALLELISM && fromJson(inputs.JOB_PARALLELISM) || 1 }}
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
-    uses: ./.github/workflows/workflow-run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ ((matrix.FORGE_TEST_SUITE == 'compat' && needs.determine-test-metadata.outputs.IMAGE_TAG_FOR_COMPAT_TEST) || needs.determine-test-metadata.outputs.IMAGE_TAG) }}
