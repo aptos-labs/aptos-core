@@ -74,7 +74,12 @@ impl CalibrationRunner {
         to_skip: usize,
         block_size: usize,
         to_evaluate: usize,
+        tps: Option<f64>,
+        print_header: bool,
     ) {
+        // execute first block that triggers epoch change
+        execute_block_expect_success(vec![], &mut self.harness);
+
         let cur_phase = Arc::new(AtomicUsize::new(0));
         let mut creator = workload
             .initialize(&mut self.harness, cur_phase.clone())
@@ -101,24 +106,19 @@ impl CalibrationRunner {
         let to_skip_txns = (0..to_skip).map(|_| generate_next()).collect::<Vec<_>>();
 
         for block in to_skip_txns.chunks(block_size) {
-            // Get current real time to keep blockchain time close to real time for orderless transactions
-            let current_time_usecs = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_micros() as u64;
-            self.harness.executor.new_block_with_timestamp(current_time_usecs);
             execute_block_expect_success(block.to_vec(), &mut self.harness);
         }
-        // Get current real time to keep blockchain time close to real time for orderless transactions
-        let current_time_usecs = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_micros() as u64;
-        self.harness.executor.new_block_with_timestamp(current_time_usecs);
 
-        let to_profile_txns = (0..to_evaluate).map(|_| generate_next()).collect::<Vec<_>>();
+        // update timestamp so profile transactions happen in a new block:
+        execute_block_expect_success(vec![], &mut self.harness);
 
-        print_gas_with_statement_and_summary_header();
+        let to_profile_txns = (0..to_evaluate)
+            .map(|_| generate_next())
+            .collect::<Vec<_>>();
+
+        if print_header {
+            print_gas_with_statement_summary_and_tps_header(tps.is_some());
+        }
 
         let mut aggregate_gas_log: Option<TransactionGasLog> = None;
         for (i, txn) in to_profile_txns.into_iter().enumerate() {
@@ -133,7 +133,7 @@ impl CalibrationRunner {
             } else {
                 name.clone()
             };
-            let log = self.run_signed(&cur_name, txn);
+            let log = self.run_signed_with_tps(&cur_name, txn, tps);
             if let Some(mut log) = log {
                 log.exec_io.call_graph = log.exec_io.call_graph.fold_unique_stack();
                 aggregate_gas_log = Some(
@@ -185,20 +185,21 @@ impl CalibrationRunner {
             let (log, gas_used, fee_statement) =
                 self.harness.evaluate_gas_with_profiler(account, payload);
             save_profiling_results(function, &log);
-            print_gas_cost_with_statement_and_tps(
+            print_gas_with_statement_summary_and_tps(
                 function,
                 gas_used,
                 fee_statement,
                 summarize_exe_and_io(&log),
-                tps,
+                Some(tps),
             );
         }
     }
 
-    pub fn run_signed(
+    pub fn run_signed_with_tps(
         &mut self,
         function: &str,
         txn: SignedTransaction,
+        tps: Option<f64>,
     ) -> Option<TransactionGasLog> {
         if !self.profile_gas {
             print_gas_cost(function, self.harness.evaluate_gas_signed(txn));
@@ -207,11 +208,12 @@ impl CalibrationRunner {
             let (log, gas_used, fee_statement) =
                 self.harness.evaluate_gas_with_profiler_signed(txn);
             save_profiling_results(function, &log);
-            print_gas_with_statement_and_summary(
+            print_gas_with_statement_summary_and_tps(
                 function,
                 gas_used,
                 fee_statement,
-                summarize_exe_and_io(&log)
+                summarize_exe_and_io(&log),
+                tps,
             );
             Some(log)
         }
@@ -308,7 +310,7 @@ async fn initialize_workflow_workload(
 }
 
 fn execute_block_expect_success(txns: Vec<SignedTransaction>, harness: &mut MoveHarnessSend) {
-    let outputs = harness.run_block(txns.clone());
+    let outputs = harness.run_block_with_current_metadata(txns.clone());
 
     for (idx, (status, txn)) in outputs.into_iter().zip(txns.into_iter()).enumerate() {
         assert!(
@@ -459,83 +461,47 @@ fn print_gas_cost_with_statement(
     );
 }
 
-pub fn print_gas_cost_with_statement_and_tps_header() {
+fn print_gas_with_statement_summary_and_tps_header(use_tps: bool) {
     println!(
-        "{:9} | {:9.6} | {:9.6} | {:9.6} | {:8} | {:8} | {:8} | {:8} | {:8} | {:8} | {:10}",
-        "gas units",
-        "$ at 5",
-        "$ at 15",
-        "$ at 30",
-        "exe+io g",
-        // "exe gas",
-        // "io gas",
-        "intrins",
-        "execut",
-        "read",
-        "write",
-        "gas / s",
-        "function",
-    );
-}
-
-fn print_gas_cost_with_statement_and_tps(
-    function: &str,
-    gas_units: u64,
-    fee_statement: Option<FeeStatement>,
-    summary: SummaryExeAndIO,
-    tps: f64,
-) {
-    let exe_and_io_gas = fee_statement.map_or(0, |fee_statement| {
-        fee_statement.execution_gas_used() + fee_statement.io_gas_used()
-    });
-    println!(
-        "{:9} | {:9.6} | {:9.6} | {:9.6} | {:8} | {:8.2} | {:8.2} | {:8.2} | {:8.2} | {:8.0} | {}",
-        gas_units,
-        dollar_cost(gas_units, 5),
-        dollar_cost(gas_units, 15),
-        dollar_cost(gas_units, 30),
-        exe_and_io_gas,
-        // fee_statement.unwrap().execution_gas_used(),
-        // fee_statement.unwrap().io_gas_used(),
-        summary.intrinsic_cost,
-        summary.execution_cost,
-        summary.read_cost,
-        summary.write_cost,
-        (exe_and_io_gas) as f64 * tps,
-        function,
-    );
-}
-
-
-pub fn print_gas_with_statement_and_summary_header() {
-    println!(
-        "{:8} | {:8} | {:8.2} | {:8.2} | {:8.2} | {:8.2} | {}",
+        "{:8} | {:8} | {:8.2} | {:8.2} | {:8.2} | {:8.2} | {}function",
         "gas units",
         "exe+io g",
         "intrins",
         "execut",
         "read",
         "write",
-        "function",
+        if use_tps {
+            format!("| {:8.2} ", "tps")
+        } else {
+            "".to_string()
+        },
     );
 }
 
-fn print_gas_with_statement_and_summary(
+fn print_gas_with_statement_summary_and_tps(
     function: &str,
     gas_units: u64,
     fee_statement: Option<FeeStatement>,
     summary: SummaryExeAndIO,
+    tps: Option<f64>,
 ) {
-    let exe_gas = fee_statement.as_ref().map_or(0, FeeStatement::execution_gas_used);
+    let exe_gas = fee_statement
+        .as_ref()
+        .map_or(0, FeeStatement::execution_gas_used);
     let io_gas = fee_statement.as_ref().map_or(0, FeeStatement::io_gas_used);
     println!(
-        "{:8} | {:8} | {:8.2} | {:8.2} | {:8.2} | {:8.2} | {}",
+        "{:8} | {:8} | {:8.2} | {:8.2} | {:8.2} | {:8.2} | {}{}",
         gas_units,
         exe_gas + io_gas,
         summary.intrinsic_cost,
         summary.execution_cost,
         summary.read_cost,
         summary.write_cost,
+        if let Some(tps) = tps {
+            format!("| {:8.2} ", (exe_gas + io_gas) as f64 * tps)
+        } else {
+            "".to_string()
+        },
         function,
     );
 }
@@ -543,7 +509,7 @@ fn print_gas_with_statement_and_summary(
 #[cfg(test)]
 mod tests {
     use crate::gas_profiling::{
-        print_gas_cost_with_statement_and_tps_header, CalibrationRunner, CalibrationWorkload,
+        print_gas_with_statement_summary_and_tps_header, CalibrationRunner, CalibrationWorkload,
     };
     use aptos_cached_packages::{aptos_stdlib, aptos_token_sdk_builder};
     use aptos_crypto::{bls12381, PrivateKey, Uniform};
@@ -919,7 +885,7 @@ mod tests {
 
         set_paranoid_type_checks(true);
 
-        print_gas_cost_with_statement_and_tps_header();
+        print_gas_with_statement_summary_and_tps_header(true);
 
         let use_large_db_numbers = true;
 
@@ -1011,9 +977,11 @@ mod tests {
                 .run_workload(
                     CalibrationWorkload::EntryPoint(Box::new(entry_point)),
                     name,
-                    0,
                     1,
-                    tps,
+                    1,
+                    1,
+                    Some(tps),
+                    false,
                 )
                 .await;
         }
@@ -1026,7 +994,15 @@ mod tests {
             };
             let name = format!("workflow_{workflow:?}");
             runner
-                .run_workload(CalibrationWorkload::Workflow(workflow), name, 0, 3, tps)
+                .run_workload(
+                    CalibrationWorkload::Workflow(workflow),
+                    name,
+                    0,
+                    1,
+                    3,
+                    Some(tps),
+                    false,
+                )
                 .await;
         }
 

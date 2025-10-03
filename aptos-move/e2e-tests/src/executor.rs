@@ -688,6 +688,29 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         )
     }
 
+    /// Executes the given block of transactions, with block metadata
+    ///
+    /// Typical tests will call this method and check that the output matches what was expected.
+    /// However, this doesn't apply the results of successful transactions to the data store.
+    pub fn execute_block_with_current_metadata(
+        &self,
+        txn_block: Vec<SignedTransaction>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        // Get current real time to keep blockchain time close to real time for orderless transactions
+        let current_time_usecs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+
+        self.execute_transaction_block_with_timestamp(
+            current_time_usecs,
+            txn_block
+                .into_iter()
+                .map(Transaction::UserTransaction)
+                .collect(),
+        )
+    }
+
     /// Executes the transaction as a singleton block and applies the resulting write set to the
     /// data store. Panics if execution fails
     pub fn execute_and_apply(&mut self, transaction: SignedTransaction) -> TransactionOutput {
@@ -963,6 +986,76 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         &self.state_store
     }
 
+    pub fn execute_transaction_block_with_timestamp(
+        &self,
+        time_microseconds: u64,
+        txn_block: Vec<Transaction>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let validator_set = ValidatorSet::fetch_config(&self.state_store)
+            .expect("Unable to retrieve the validator set from storage");
+        let proposer = *validator_set.payload().next().unwrap().account_address();
+        // when updating time, proposer cannot be ZERO.
+        self.execute_transaction_block_with_metadata(time_microseconds, proposer, vec![], txn_block)
+    }
+
+    pub fn execute_transaction_block_with_metadata(
+        &self,
+        time_microseconds: u64,
+        proposer: AccountAddress,
+        failed_proposer_indices: Vec<u32>,
+        mut txn_block: Vec<Transaction>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let validator_set = ValidatorSet::fetch_config(&self.state_store)
+            .expect("Unable to retrieve the validator set from storage");
+        let new_block_metadata = BlockMetadata::new(
+            HashValue::zero(),
+            0,
+            0,
+            proposer,
+            BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
+            failed_proposer_indices,
+            time_microseconds,
+        );
+        txn_block.insert(0, Transaction::BlockMetadata(new_block_metadata));
+        self.execute_transaction_block(txn_block).map(|outputs| {
+            // Check if we emit the expected event for block metadata, there might be more events for transaction fees.
+            let event = outputs[0].events()[0]
+                .v1()
+                .expect("The first event must be a block metadata v0 event")
+                .clone();
+            assert_eq!(event.key(), &new_block_event_key());
+            assert!(bcs::from_bytes::<NewBlockEvent>(event.event_data()).is_ok());
+            outputs
+        })
+    }
+
+    pub fn run_block_with_metadata(
+        &mut self,
+        proposer: AccountAddress,
+        failed_proposer_indices: Vec<u32>,
+        txns: Vec<SignedTransaction>,
+    ) -> Vec<(TransactionStatus, u64)> {
+        let txn_block: Vec<Transaction> =
+            txns.into_iter().map(Transaction::UserTransaction).collect();
+        let outputs = self
+            .execute_transaction_block_with_metadata(
+                self.block_time,
+                proposer,
+                failed_proposer_indices,
+                txn_block,
+            )
+            .expect("Must execute transactions");
+
+        let mut results = vec![];
+        for output in outputs {
+            if !output.status().is_discarded() {
+                self.apply_write_set(output.write_set());
+            }
+            results.push((output.status().clone(), output.gas_used()));
+        }
+        results
+    }
+
     pub fn new_block(&mut self) {
         self.new_block_with_timestamp(self.block_time + 1);
     }
@@ -975,49 +1068,6 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         let proposer = *validator_set.payload().next().unwrap().account_address();
         // when updating time, proposer cannot be ZERO.
         self.new_block_with_metadata(proposer, vec![])
-    }
-
-    pub fn run_block_with_metadata(
-        &mut self,
-        proposer: AccountAddress,
-        failed_proposer_indices: Vec<u32>,
-        txns: Vec<SignedTransaction>,
-    ) -> Vec<(TransactionStatus, u64)> {
-        let mut txn_block: Vec<Transaction> =
-            txns.into_iter().map(Transaction::UserTransaction).collect();
-        let validator_set = ValidatorSet::fetch_config(&self.state_store)
-            .expect("Unable to retrieve the validator set from storage");
-        let new_block_metadata = BlockMetadata::new(
-            HashValue::zero(),
-            0,
-            0,
-            proposer,
-            BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
-            failed_proposer_indices,
-            self.block_time,
-        );
-        txn_block.insert(0, Transaction::BlockMetadata(new_block_metadata));
-
-        let outputs = self
-            .execute_transaction_block(txn_block)
-            .expect("Must execute transactions");
-
-        // Check if we emit the expected event for block metadata, there might be more events for transaction fees.
-        let event = outputs[0].events()[0]
-            .v1()
-            .expect("The first event must be a block metadata v0 event")
-            .clone();
-        assert_eq!(event.key(), &new_block_event_key());
-        assert!(bcs::from_bytes::<NewBlockEvent>(event.event_data()).is_ok());
-
-        let mut results = vec![];
-        for output in outputs {
-            if !output.status().is_discarded() {
-                self.apply_write_set(output.write_set());
-            }
-            results.push((output.status().clone(), output.gas_used()));
-        }
-        results
     }
 
     pub fn new_block_with_metadata(

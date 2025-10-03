@@ -305,6 +305,24 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         result
     }
 
+    pub fn run_block_with_current_metadata(
+        &mut self,
+        txn_block: Vec<SignedTransaction>,
+    ) -> Vec<TransactionStatus> {
+        let mut result = vec![];
+        for output in self
+            .executor
+            .execute_block_with_current_metadata(txn_block)
+            .unwrap()
+        {
+            if matches!(output.status(), TransactionStatus::Keep(_)) {
+                self.executor.apply_write_set(output.write_set());
+            }
+            result.push(output.status().to_owned())
+        }
+        result
+    }
+
     /// Runs a block of signed transactions. On success, applies the write set.
     pub fn run_block_get_output(
         &mut self,
