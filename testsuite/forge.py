@@ -61,6 +61,7 @@ FORGE_TEST_RUNNER_TEMPLATE_PATH = "forge-test-runner-template.yaml"
 MULTIREGION_KUBECONFIG_DIR = "/etc/multiregion-kubeconfig"
 MULTIREGION_KUBECONFIG_PATH = f"{MULTIREGION_KUBECONFIG_DIR}/kubeconfig"
 GAR_REPO_NAME = "us-docker.pkg.dev/aptos-registry/docker"
+DEFAULT_FORGE_IMAGE_NAME = "forge"
 
 
 @dataclass
@@ -268,6 +269,7 @@ class ForgeContext:
     forge_namespace: str
     forge_args: Sequence[str]
 
+    forge_image_name: str
     forge_image_tag: str
     image_tag: str
     upgrade_image_tag: str
@@ -861,10 +863,11 @@ class K8sForgeRunner(ForgeRunner):
         if context.cloud == Cloud.AWS:
             forge_image_full = f"{context.aws_account_num}.dkr.ecr.{context.aws_region}.amazonaws.com/{ECR_REPO_PREFIX}/forge:{context.forge_image_tag}"
             validator_node_selector = "eks.amazonaws.com/nodegroup: validators"
-        elif (
-            context.cloud == Cloud.GCP
-        ):  # the GCP project for images is separate than the cluster
-            forge_image_full = f"{GAR_REPO_NAME}/forge:{context.forge_image_tag}"
+        elif context.cloud == Cloud.GCP:
+            # the GCP project for images is separate than the cluster
+            forge_image_full = (
+                f"{GAR_REPO_NAME}/{context.forge_image_name}:{context.forge_image_tag}"
+            )
             validator_node_selector = ""  # no selector
             # TODO: also no NAP node selector yet
             # TODO: also registries need to be set up such that the default compute service account can access it:  $PROJECT_ID-compute@developer.gserviceaccount.com
@@ -1403,6 +1406,7 @@ def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
 @envoption("FORGE_ENABLE_FAILPOINTS")
 @envoption("FORGE_ENABLE_PERFORMANCE")
 @envoption("FORGE_RUNNER_DURATION_SECS", "300")
+@envoption("FORGE_IMAGE_NAME")
 @envoption("FORGE_IMAGE_TAG")
 @envoption("FORGE_RETAIN_DEBUG_LOGS", "false")
 @envoption("FORGE_JUNIT_XML_PATH")
@@ -1451,6 +1455,7 @@ def test(
     forge_deployer_profile: Optional[str],
     forge_test_suite: str,
     forge_runner_duration_secs: str,
+    forge_image_name: Optional[str],
     forge_image_tag: Optional[str],
     forge_retain_debug_logs: str,
     forge_junit_xml_path: Optional[str],
@@ -1633,8 +1638,14 @@ def test(
             cloud=cloud_enum,
         )[0]
 
+        forge_image_name = forge_image_name or DEFAULT_FORGE_IMAGE_NAME
+        if forge_image_name == DEFAULT_FORGE_IMAGE_NAME:
+            forge_image_tag = forge_image_tag or default_latest_image
+        else:
+            latest_forge_image_with_name = "main"
+            forge_image_tag = forge_image_tag or latest_forge_image_with_name
+
         image_tag = image_tag or default_latest_image
-        forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image
 
     image_tag, upgrade_image_tag = ensure_provided_image_tags_has_profile_or_features(
@@ -1647,7 +1658,11 @@ def test(
     assert image_tag is not None, "Image tag is required"
     assert forge_image_tag is not None, "Forge image tag is required"
     assert upgrade_image_tag is not None, "Upgrade image tag is required"
+    assert forge_image_name is not None, "Forge image name is required"
 
+    log.info(
+        f"Using image name {forge_image_name} and tag {forge_image_tag} for forge runner"
+    )
     log.info("Using the following image tags:")
     log.info(f"\tforge:  {forge_image_tag}")
     log.info(f"\tswarm:  {image_tag}")
@@ -1697,6 +1712,7 @@ def test(
         aws_account_num=aws_account_num,
         aws_region=aws_region,
         gcp_zone=gcp_zone,
+        forge_image_name=forge_image_name,
         forge_image_tag=forge_image_tag,
         image_tag=image_tag,
         upgrade_image_tag=upgrade_image_tag,
