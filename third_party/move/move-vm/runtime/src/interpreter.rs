@@ -2195,10 +2195,12 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
+                        /*
                         let ((_, field_ty_count), (_, struct_ty_count)) =
                             frame_cache.get_field_type_and_struct_type(*fi_idx, self)?;
                         gas_meter.charge_create_ty(struct_ty_count)?;
                         gas_meter.charge_create_ty(field_ty_count)?;
+                         */
 
                         let instr = if matches!(instruction, Bytecode::MutBorrowFieldGeneric(_)) {
                             S::MutBorrowFieldGeneric
@@ -2241,10 +2243,12 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
+                        /*
                         let ((_, field_ty_count), (_, struct_ty_count)) =
                             frame_cache.get_variant_field_type_and_struct_type(*fi_idx, self)?;
                         gas_meter.charge_create_ty(struct_ty_count)?;
                         gas_meter.charge_create_ty(field_ty_count)?;
+                         */
 
                         let instr = match instruction {
                             Bytecode::MutBorrowVariantFieldGeneric(_) => {
