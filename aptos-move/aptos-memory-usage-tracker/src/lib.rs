@@ -78,6 +78,7 @@ macro_rules! delegate {
     ($(
         fn $fn: ident $(<$($lt: lifetime),*>)? (&self $(, $arg: ident : $ty: ty)* $(,)?) -> $ret_ty: ty;
     )*) => {
+        #[inline(always)]
         $(fn $fn $(<$($lt)*>)? (&self, $($arg: $ty),*) -> $ret_ty {
             self.base.$fn($($arg),*)
         })*
@@ -88,6 +89,7 @@ macro_rules! delegate_mut {
     ($(
         fn $fn: ident $(<$($lt: lifetime),*>)? (&mut self $(, $arg: ident : $ty: ty)* $(,)?) -> $ret_ty: ty;
     )*) => {
+        #[inline(always)]
         $(fn $fn $(<$($lt)*>)? (&mut self, $($arg: $ty),*) -> $ret_ty {
             self.base.$fn($($arg),*)
         })*

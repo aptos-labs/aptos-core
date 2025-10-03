@@ -143,6 +143,7 @@ where
 /// overflowing.
 macro_rules! check_depth_impl {
     () => {
+        #[inline(always)]
         fn check_depth(&self, depth: u64) -> PartialVMResult<()> {
             if self
                 .max_value_nest_depth
