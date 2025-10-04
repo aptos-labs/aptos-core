@@ -25,16 +25,13 @@
 
 module aptos_framework::ethereum_derivable_account {
     use aptos_framework::auth_data::AbstractionAuthData;
-    use aptos_framework::common_account_abstractions_utils::{network_name, entry_function_name};
+    use aptos_framework::common_account_abstractions_utils::{network_name, daa_authenticate};
     use aptos_framework::base16::base16_utf8_to_vec_u8;
     use aptos_std::secp256k1;
-    use aptos_std::option;
     use aptos_std::aptos_hash;
     use std::bcs_stream::{Self, deserialize_u8};
     use std::chain_id;
     use std::string_utils;
-    use std::transaction_context;
-    use std::vector;
     use std::string::{Self, String};
 
     /// Signature failed to verify.
@@ -138,7 +135,7 @@ module aptos_framework::ethereum_derivable_account {
         message.append(b"\nIssued At: ");
         message.append(*issued_at);
 
-        let msg_len = vector::length(message);
+        let msg_len = message.length();
 
         let prefix = b"\x19Ethereum Signed Message:\n";
         let msg_len_string = string_utils::to_string(&msg_len); // returns string
@@ -153,27 +150,27 @@ module aptos_framework::ethereum_derivable_account {
     }
 
     fun recover_public_key(signature_bytes: &vector<u8>, message: &vector<u8>): vector<u8> {
-        let rs = vector::slice(signature_bytes, 0, 64);
-        let v = *vector::borrow(signature_bytes, 64);
+        let rs = signature_bytes.slice(0, 64);
+        let v = signature_bytes[64];
         assert!(v == 27 || v == 28, EUNEXPECTED_V);
         let signature = secp256k1::ecdsa_signature_from_bytes(rs);
 
         let maybe_recovered = secp256k1::ecdsa_recover(*message, v - 27, &signature);
 
         assert!(
-            option::is_some(&maybe_recovered),
+            maybe_recovered.is_some(),
             EINVALID_SIGNATURE
         );
 
-        let pubkey = option::borrow(&maybe_recovered);
+        let pubkey = maybe_recovered.borrow();
 
         let pubkey_bytes = secp256k1::ecdsa_raw_public_key_to_bytes(pubkey);
 
         // Add 0x04 prefix to the public key, to match the
         // full uncompressed format from ethers.js
         let full_pubkey = &mut vector[];
-        vector::push_back(full_pubkey, 4u8);
-        vector::append(full_pubkey, pubkey_bytes);
+        full_pubkey.push_back(4u8);
+        full_pubkey.append(pubkey_bytes);
 
         *full_pubkey
     }
@@ -194,13 +191,13 @@ module aptos_framework::ethereum_derivable_account {
         let public_key_bytes = recover_public_key(&abstract_signature.signature, &hashed_message);
 
         // 1. Skip the 0x04 prefix (take the bytes after the first byte)
-        let public_key_without_prefix = vector::slice(&public_key_bytes, 1, vector::length(&public_key_bytes));
+        let public_key_without_prefix = public_key_bytes.slice(1, public_key_bytes.length());
         // 2. Run Keccak256 on the public key (without the 0x04 prefix)
         let kexHash = aptos_hash::keccak256(public_key_without_prefix);
         // 3. Slice the last 20 bytes (this is the Ethereum address)
-        let recovered_addr = vector::slice(&kexHash, 12, 32);
+        let recovered_addr = kexHash.slice(12, 32);
         // 4. Remove the 0x prefix from the utf8 account address
-        let ethereum_address_without_prefix = vector::slice(&abstract_public_key.ethereum_address, 2, vector::length(&abstract_public_key.ethereum_address));
+        let ethereum_address_without_prefix = abstract_public_key.ethereum_address.slice(2, abstract_public_key.ethereum_address.length());
 
         let account_address_vec = base16_utf8_to_vec_u8(ethereum_address_without_prefix);
         // Verify that the recovered address matches the domain account identity
@@ -209,16 +206,9 @@ module aptos_framework::ethereum_derivable_account {
 
     /// Authorization function for domain account abstraction.
     public fun authenticate(account: signer, aa_auth_data: AbstractionAuthData): signer {
-        let maybe_entry_function_payload = transaction_context::entry_function_payload();
-        if (maybe_entry_function_payload.is_some()) {
-            let entry_function_payload = maybe_entry_function_payload.destroy_some();
-            let entry_function_name = entry_function_name(&entry_function_payload);
-            authenticate_auth_data(aa_auth_data, &entry_function_name);
-            account
-        } else {
-            abort(EMISSING_ENTRY_FUNCTION_PAYLOAD)
-        }
+        daa_authenticate(account, aa_auth_data, |auth_data, entry_name| authenticate_auth_data(auth_data, entry_name))
     }
+
 
     #[test_only]
     use std::bcs;
