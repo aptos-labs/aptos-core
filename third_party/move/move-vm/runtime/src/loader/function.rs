@@ -88,6 +88,24 @@ impl Debug for LoadedFunctionOwner {
     }
 }
 
+impl LoadedFunctionOwner {
+    #[inline(always)]
+    pub fn module_or_script_id(&self) -> &ModuleId {
+        match self {
+            LoadedFunctionOwner::Module(m) => Module::self_id(m),
+            LoadedFunctionOwner::Script(_) => language_storage::pseudo_script_module_id(),
+        }
+    }
+
+    #[inline(always)]
+    pub fn module_or_script_id_hash(&self) -> [u8; 32] {
+        match self {
+            LoadedFunctionOwner::Module(m) => m.id_hash,
+            LoadedFunctionOwner::Script(_) => [0u8; 32],
+        }
+    }
+}
+
 /// A loaded runtime function representation along with type arguments used to instantiate it.
 #[derive(Clone)]
 pub struct LoadedFunction {
@@ -407,10 +425,7 @@ impl LoadedFunction {
 
     /// Returns the module id or, if it is a script, the pseudo module id for scripts.
     pub fn module_or_script_id(&self) -> &ModuleId {
-        match &self.owner {
-            LoadedFunctionOwner::Module(m) => Module::self_id(m),
-            LoadedFunctionOwner::Script(_) => language_storage::pseudo_script_module_id(),
-        }
+        self.owner.module_or_script_id()
     }
 
     /// Returns the name of this function.
