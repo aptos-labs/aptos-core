@@ -8,14 +8,16 @@
 //! define all the things that are appended to the transcript.
 
 use crate::{
+    algebra::homomorphism,
     pvss::{traits::Transcript, ThresholdConfig},
     range_proofs::traits::BatchedRangeProof,
+    sigma_protocol,
     utils::random::random_scalar_from_uniform_bytes,
-    SCALAR_NUM_BYTES,
 };
 use aptos_crypto::ValidCryptoMaterial;
 use ark_ec::pairing::Pairing;
-use ark_ff::Field;
+use ark_ff::{Field, PrimeField};
+use ark_serialize::CanonicalSerialize;
 use serde::Serialize;
 
 pub const PVSS_DOM_SEP: &[u8; 21] = b"APTOS_SCRAPE_PVSS_DST"; // TODO: Name needs work, but check backwards-compatibility
@@ -29,25 +31,48 @@ pub const PVSS_DOM_SEP: &[u8; 21] = b"APTOS_SCRAPE_PVSS_DST"; // TODO: Name need
 /// ⚠️ This trait is intentionally private: `challenge_scalars`
 /// should **only** be used internally to ensure properly
 /// labelled scalar generation across protocols.
-trait ScalarProtocol {
-    /// **Auxiliary** function to return random scalars
-    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<blstrs::Scalar>;
+pub trait ScalarProtocol<S: FromUniformBytes> {
+    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S>;
+
+    fn challenge_scalar(&mut self, label: &[u8]) -> S {
+        self.challenge_scalars(label, 1)[0]
+    }
 }
 
-impl ScalarProtocol for merlin::Transcript {
-    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<blstrs::Scalar> {
-        let mut buf = vec![0u8; num_scalars * 2 * SCALAR_NUM_BYTES];
+pub trait FromUniformBytes: Copy {
+    const BYTE_SIZE: usize;
+    fn from_uniform_bytes(bytes: &[u8]) -> Self;
+}
+
+/// This reason for this wrapper is to avoid "overlapping implementations" for blstrs::Scalar
+#[derive(Clone, Copy)]
+struct ArkworksScalar<E: Pairing>(E::ScalarField);
+
+impl<E: Pairing> FromUniformBytes for ArkworksScalar<E> {
+    const BYTE_SIZE: usize = (E::ScalarField::MODULUS_BIT_SIZE as usize) / 8;
+
+    fn from_uniform_bytes(bytes: &[u8]) -> Self {
+        Self(E::ScalarField::from_le_bytes_mod_order(bytes))
+    }
+}
+
+impl FromUniformBytes for blstrs::Scalar {
+    const BYTE_SIZE: usize = crate::SCALAR_NUM_BYTES;
+
+    fn from_uniform_bytes(bytes: &[u8]) -> Self {
+        random_scalar_from_uniform_bytes(bytes.try_into().expect("Wrong byte length"))
+    }
+}
+
+impl<S: FromUniformBytes> ScalarProtocol<S> for merlin::Transcript {
+    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S> {
+        let mut buf = vec![0u8; 2 * num_scalars * S::BYTE_SIZE];
         self.challenge_bytes(label, &mut buf);
 
-        let mut result = Vec::with_capacity(num_scalars);
-        for chunk in buf.chunks(2 * SCALAR_NUM_BYTES) {
-            match chunk.try_into() {
-                Ok(chunk) => {
-                    result.push(random_scalar_from_uniform_bytes(chunk));
-                },
-                Err(_) => panic!("Expected a 64-byte slice, but got a different size"),
-            }
-        }
+        let result = buf
+            .chunks(2 * S::BYTE_SIZE)
+            .map(S::from_uniform_bytes)
+            .collect::<Vec<_>>();
 
         debug_assert_eq!(result.len(), num_scalars);
         result
@@ -56,7 +81,7 @@ impl ScalarProtocol for merlin::Transcript {
 
 #[allow(non_snake_case)]
 #[allow(private_bounds)]
-pub trait PVSS<T: Transcript>: ScalarProtocol {
+pub trait PVSS<T: Transcript>: ScalarProtocol<blstrs::Scalar> {
     /// Append a domain separator for the PVSS protocol (in addition to the transcript-level DST used to initialise the FS transcript),
     /// consisting of a sharing configuration `sc`, which locks in the $t$ out of $n$ threshold.
     fn pvss_domain_sep(&mut self, sc: &ThresholdConfig);
@@ -92,9 +117,28 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 
     fn append_public_statement(&mut self, public_statement: B::PublicStatement);
 
-    fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1Affine], &[E::G2Affine]));
+    fn append_commitments<A: CanonicalSerialize>(&mut self, commitments: &A);
 
     fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<E::ScalarField>;
+}
+
+#[allow(private_bounds)]
+pub trait SigmaProtocol<E: Pairing, H: homomorphism::Map>:
+    ScalarProtocol<ArkworksScalar<E>>
+{
+    fn append_sigma_protocol_sep(&mut self, dst: &'static [u8]);
+
+    /// Append the claim of a sigma protocol.
+    fn append_sigma_protocol_public_statement(&mut self, public_statement: &H::Codomain);
+
+    /// Append the first message (the commitment) in a sigma protocol.
+    fn append_sigma_protocol_first_prover_message(&mut self, prover_first_message: &H::Codomain);
+
+    /// Append the last message (the masked witness) in a sigma protocol.
+    fn append_sigma_protocol_last_message(&mut self, prover_last_message: &H::Domain);
+
+    // Returns a single scalar `r` for use in a Sigma protocol
+    fn challenge_for_sigma_protocol(&mut self) -> E::ScalarField;
 }
 
 #[allow(non_snake_case)]
@@ -148,7 +192,7 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
         n_plus_1: usize,
     ) -> Vec<blstrs::Scalar> {
         let num_coeffs = n_plus_1 - t;
-        <merlin::Transcript as ScalarProtocol>::challenge_scalars(
+        <merlin::Transcript as ScalarProtocol<blstrs::Scalar>>::challenge_scalars(
             self,
             b"challenge_dual_code_word_polynomial",
             num_coeffs,
@@ -156,15 +200,13 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
     }
 
     fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<blstrs::Scalar> {
-        <merlin::Transcript as ScalarProtocol>::challenge_scalars(
+        <merlin::Transcript as ScalarProtocol<blstrs::Scalar>>::challenge_scalars(
             self,
             b"challenge_linear_combination",
             num_scalars,
         )
     }
 }
-
-use ark_serialize::CanonicalSerialize;
 
 #[allow(non_snake_case)]
 impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcript {
@@ -187,12 +229,12 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
         self.append_message(b"public-statements", public_statement_bytes.as_slice());
     }
 
-    fn append_bit_commitments(&mut self, bit_commitments: &(&[E::G1Affine], &[E::G2Affine])) {
-        let mut bit_commitments_bytes = Vec::new();
-        bit_commitments
-            .serialize_compressed(&mut bit_commitments_bytes)
-            .expect("bit_commitments serialization should succeed");
-        self.append_message(b"bit-commitments", bit_commitments_bytes.as_slice());
+    fn append_commitments<A: CanonicalSerialize>(&mut self, commitments: &A) {
+        let mut commitments_bytes = Vec::new();
+        commitments
+            .serialize_compressed(&mut commitments_bytes)
+            .expect("commitments serialization should succeed");
+        self.append_message(b"commitments", commitments_bytes.as_slice());
     }
 
     fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<E::ScalarField> {
@@ -216,6 +258,54 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
         assert_eq!(v.len(), num_scalars);
 
         v
+    }
+}
+
+impl<E: Pairing, H: homomorphism::Map> SigmaProtocol<E, H> for merlin::Transcript
+where
+    H::Domain: sigma_protocol::Domain<E>,
+    H::Codomain: sigma_protocol::Codomain,
+{
+    fn append_sigma_protocol_sep(&mut self, dst: &'static [u8]) {
+        self.append_message(b"dom-sep", dst);
+    }
+
+    fn append_sigma_protocol_public_statement(&mut self, public_statement: &H::Codomain) {
+        let mut public_statement_bytes = Vec::new();
+        public_statement
+            .serialize_compressed(&mut public_statement_bytes)
+            .expect("public_statement0 serialization should succeed");
+        self.append_message(b"sigma-protocol-claim", public_statement_bytes.as_slice());
+    }
+
+    fn append_sigma_protocol_first_prover_message(&mut self, prover_first_message: &H::Codomain) {
+        let mut prover_first_message_bytes = Vec::new();
+        prover_first_message
+            .serialize_compressed(&mut prover_first_message_bytes)
+            .expect("public_statement0 serialization should succeed");
+        self.append_message(
+            b"sigma-protocol-first-message",
+            prover_first_message_bytes.as_slice(),
+        );
+    }
+
+    fn append_sigma_protocol_last_message(&mut self, prover_last_message: &H::Domain) {
+        let mut prover_last_message_bytes = Vec::new();
+        prover_last_message
+            .serialize_compressed(&mut prover_last_message_bytes)
+            .expect("public_statement0 serialization should succeed");
+        self.append_message(
+            b"sigma-protocol-last-message",
+            prover_last_message_bytes.as_slice(),
+        );
+    }
+
+    fn challenge_for_sigma_protocol(&mut self) -> E::ScalarField {
+        <merlin::Transcript as ScalarProtocol<ArkworksScalar<E>>>::challenge_scalar(
+            self,
+            b"challenge_sigma_protocol",
+        )
+        .0
     }
 }
 

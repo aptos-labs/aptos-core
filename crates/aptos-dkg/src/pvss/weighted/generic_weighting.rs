@@ -105,6 +105,10 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Generi
     type SigningPubKey = T::SigningPubKey;
     type SigningSecretKey = T::SigningSecretKey;
 
+    const DST: &[u8] = T::DST;
+
+    // TODO: Maybe the DST needs to indicate weighting?
+
     fn scheme_name() -> String {
         format!("generic_weighted_{}", T::scheme_name())
     }

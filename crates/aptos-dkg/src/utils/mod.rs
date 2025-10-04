@@ -8,11 +8,11 @@ use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::PrimeField;
 use blstrs::{pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt};
 use group::{Curve, Group};
-use num_traits::Zero;
+use num_traits::{One, Zero};
 use pairing::{MillerLoopResult, MultiMillerLoop};
 use rayon::ThreadPool;
 use sha3::Digest;
-use std::ops::Mul;
+use std::ops::{Mul, MulAssign};
 
 pub(crate) mod biguint;
 pub mod parallel_multi_pairing;
@@ -200,4 +200,19 @@ pub(crate) fn msm_bool<G: AffineRepr>(bases: &[G], scalars: &[bool]) -> G::Group
         }
     }
     acc
+}
+
+pub fn powers<T>(base: T, count: usize) -> Vec<T>
+where
+    T: MulAssign + One + Copy,
+{
+    let mut powers = Vec::with_capacity(count);
+    let mut current = T::one();
+
+    for _ in 0..count {
+        powers.push(current);
+        current *= base;
+    }
+
+    powers
 }
