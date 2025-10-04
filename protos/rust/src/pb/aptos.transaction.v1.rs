@@ -710,6 +710,7 @@ pub mod multisig_transaction_payload {
     pub enum Type {
         Unspecified = 0,
         EntryFunctionPayload = 1,
+        ScriptPayload = 2,
     }
     impl Type {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -720,6 +721,7 @@ pub mod multisig_transaction_payload {
             match self {
                 Type::Unspecified => "TYPE_UNSPECIFIED",
                 Type::EntryFunctionPayload => "TYPE_ENTRY_FUNCTION_PAYLOAD",
+                Type::ScriptPayload => "TYPE_SCRIPT_PAYLOAD",
             }
         }
 
@@ -728,6 +730,7 @@ pub mod multisig_transaction_payload {
             match value {
                 "TYPE_UNSPECIFIED" => Some(Self::Unspecified),
                 "TYPE_ENTRY_FUNCTION_PAYLOAD" => Some(Self::EntryFunctionPayload),
+                "TYPE_SCRIPT_PAYLOAD" => Some(Self::ScriptPayload),
                 _ => None,
             }
         }
@@ -737,6 +740,8 @@ pub mod multisig_transaction_payload {
     pub enum Payload {
         #[prost(message, tag = "2")]
         EntryFunctionPayload(super::EntryFunctionPayload),
+        #[prost(message, tag="3")]
+        ScriptPayload(super::ScriptPayload),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
