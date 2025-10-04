@@ -181,7 +181,7 @@ spec:
          # If it falls more than 10 seconds behind, remove it from the service.
         readinessProbe:
           httpGet:
-            path: /v1/-/healthy?duration_secs=10
+            path: /v1/-/healthy?duration_secs=30
             port: 8080
           timeoutSeconds: 5
           periodSeconds: 3
