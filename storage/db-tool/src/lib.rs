@@ -9,6 +9,7 @@ mod bootstrap;
 mod gen_replay_verify_jobs;
 mod replay_on_archive;
 mod replay_verify;
+mod replay_verify_comparison;
 pub mod restore;
 #[cfg(test)]
 mod tests;

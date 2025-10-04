@@ -37,6 +37,9 @@ COPY --link --from=tools-builder /aptos/dist/aptos-release-builder /usr/local/bi
 COPY --link --from=tools-builder /aptos/aptos-move/framework/ /aptos/aptos-move/framework/
 COPY --link --from=tools-builder /aptos/aptos-move/aptos-release-builder/ /aptos/aptos-move/aptos-release-builder/
 
+# Copy replay verification config file
+COPY --link --from=tools-builder /aptos/testsuite/replay-verify/replay_verification_config.json /usr/local/share/replay_verification_config.json
+
 # Copy the example module to publish for api-tester
 COPY --link --from=tools-builder /aptos/aptos-move/framework/aptos-framework /aptos-move/framework/aptos-framework
 COPY --link --from=tools-builder /aptos/aptos-move/framework/aptos-stdlib /aptos-move/framework/aptos-stdlib
