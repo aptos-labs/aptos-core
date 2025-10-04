@@ -1,21 +1,13 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::PepperServiceError, utils};
+use crate::error::PepperServiceError;
 use aptos_infallible::duration_since_epoch;
 use aptos_keyless_pepper_common::{account_recovery_db::AccountRecoveryDbEntry, PepperInput};
-use aptos_logger::{info, warn};
+use aptos_logger::info;
 use firestore::{path, paths, FirestoreDb, FirestoreDbOptions};
 use std::io::Write;
 use tempfile::NamedTempFile;
-
-// Firestore DB environment variables
-const ENV_GOOGLE_PROJECT_ID: &str = "PROJECT_ID";
-const ENV_FIRESTORE_DATABASE_ID: &str = "DATABASE_ID";
-
-// Firestore DB constants for unknown values
-const UNKNOWN_GOOGLE_PROJECT_ID: &str = "unknown_project";
-const UNKNOWN_FIRESTORE_DATABASE_ID: &str = "unknown_database";
 
 // Firestore DB transaction constants
 const FIRESTORE_DB_COLLECTION_ID: &str = "accounts";
@@ -36,34 +28,16 @@ pub struct FirestoreAccountRecoveryDB {
 }
 
 impl FirestoreAccountRecoveryDB {
-    pub async fn new() -> Self {
-        // Get the Google project ID
-        let google_project_id = utils::read_environment_variable(ENV_GOOGLE_PROJECT_ID)
-            .unwrap_or_else(|error| {
-                warn!(
-                    "{} is not set! Using the default Google project ID: {}! Error: {}",
-                    ENV_GOOGLE_PROJECT_ID, UNKNOWN_GOOGLE_PROJECT_ID, error
-                );
-                UNKNOWN_GOOGLE_PROJECT_ID.into()
-            });
-
-        // Get the Firestore database ID
-        let firestore_database_id = utils::read_environment_variable(ENV_FIRESTORE_DATABASE_ID)
-            .unwrap_or_else(|error| {
-                warn!(
-                    "{} is not set! Using the default Firestore database ID: {}! Error: {}",
-                    ENV_FIRESTORE_DATABASE_ID, UNKNOWN_FIRESTORE_DATABASE_ID, error
-                );
-                UNKNOWN_FIRESTORE_DATABASE_ID.into()
-            });
-
-        // Create the FirestoreDB instance
+    pub async fn new(google_project_id: String, firestore_database_id: String) -> Self {
+        // Create the FirestoreDB options
         let firestore_db_options = FirestoreDbOptions {
             google_project_id,
             database_id: firestore_database_id,
             max_retries: 1,
             firebase_api_url: None,
         };
+
+        // Create the FirestoreDB instance
         match FirestoreDb::with_options(firestore_db_options).await {
             Ok(firestore_db) => Self { firestore_db },
             Err(error) => {

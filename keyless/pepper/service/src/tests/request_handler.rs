@@ -7,8 +7,9 @@ use crate::{
         keyless_config::OnChainKeylessConfiguration, resource_fetcher::CachedResources,
     },
     request_handler::{
-        handle_request, ABOUT_PATH, DEFAULT_PEPPER_SERVICE_PORT, FETCH_PATH, GROTH16_VK_PATH,
-        JWK_PATH, KEYLESS_CONFIG_PATH, SIGNATURE_PATH, VERIFY_PATH, VUF_PUB_KEY_PATH,
+        handle_request, ABOUT_PATH, DEFAULT_PEPPER_SERVICE_PORT, DELEGATED_FETCH_PATH, FETCH_PATH,
+        GROTH16_VK_PATH, JWK_PATH, KEYLESS_CONFIG_PATH, SIGNATURE_PATH, VERIFY_PATH,
+        VUF_PUB_KEY_PATH,
     },
     tests::utils,
 };
@@ -332,6 +333,23 @@ async fn test_get_invalid_path_or_method_request() {
 }
 
 #[tokio::test]
+async fn test_post_delegated_fetch_request_bad_request() {
+    // Send a POST request to the delegated fetch endpoint
+    let response = send_request_to_path(
+        Method::POST,
+        DELEGATED_FETCH_PATH,
+        Body::empty(),
+        None,
+        None,
+        None,
+    )
+    .await;
+
+    // Assert that the response is a 400 (bad request, since no body was provided)
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn test_post_fetch_request_bad_request() {
     // Send a POST request to the fetch endpoint
     let response =
@@ -413,6 +431,9 @@ async fn send_request_to_path(
     // Get or create cached resources
     let cached_resources = cached_resources.unwrap_or(CachedResources::new_for_testing());
 
+    // Create the account recovery managers
+    let account_recovery_managers = utils::get_empty_account_recovery_managers();
+
     // Create the mock account recovery DB
     let account_recovery_db = utils::get_mock_account_recovery_db();
 
@@ -422,6 +443,7 @@ async fn send_request_to_path(
         vuf_keypair,
         jwk_cache,
         cached_resources,
+        account_recovery_managers,
         account_recovery_db,
     )
     .await

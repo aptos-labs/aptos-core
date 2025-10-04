@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::PepperServiceError;
 use anyhow::{anyhow, ensure};
 use reqwest::Client;
 use std::time::Duration;
@@ -15,16 +14,6 @@ pub fn create_request_client() -> Client {
         .timeout(Duration::from_secs(CLIENT_REQUEST_TIMEOUT_SECS))
         .build()
         .expect("Failed to build the request client!")
-}
-
-/// Attempts to read an environment variable and returns an error if it fails
-pub fn read_environment_variable(variable_name: &str) -> Result<String, PepperServiceError> {
-    std::env::var(variable_name).map_err(|error| {
-        PepperServiceError::UnexpectedError(format!(
-            "Failed to read environment variable {}: {}",
-            variable_name, error
-        ))
-    })
 }
 
 /// Converts a hex-encoded string (with "0x" prefix) to a byte vector
