@@ -231,7 +231,7 @@ pub trait SimulationStateStore: TStateView<Key = StateKey> {
         &self,
         account: Account,
         balance: u64,
-        seq_num: u64,
+        seq_num: Option<u64>,
     ) -> Result<AccountData>
     where
         Self: Sized,

@@ -25,4 +25,5 @@ move-core-types = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
 proptest = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }

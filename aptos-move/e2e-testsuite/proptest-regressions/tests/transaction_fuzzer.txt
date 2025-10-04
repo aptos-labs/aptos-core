@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc eb327be9c6b0c52c32aebef61e5a4c7c2fe654f75745ba4f173aab257f0d5aca # shrinks to txns = [AptosGovernanceBatchPartialVote { stake_pools: [], proposal_id: 0, voting_power: 254178965444, should_pass: false }], use_txn_payload_v2_format = true, use_orderless_transactions = true
