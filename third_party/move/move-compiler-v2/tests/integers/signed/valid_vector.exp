@@ -1,0 +1,3561 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::valid_vector {
+    use std::vector;
+    enum E1 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i64>,
+        }
+    }
+    enum E2 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i128>,
+        }
+    }
+    enum E3<T> {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 {
+        x: u64,
+        y: i64,
+        z: i128,
+    }
+    struct S2 {
+        x: S1,
+        y: i64,
+        z: i128,
+    }
+    struct S3<T> {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    private fun test1(a: i64): vector<i64> {
+        {
+          let v: vector<i64> = vector::empty<i64>();
+          vector::push_back<i64>(Borrow(Mutable)(v), a);
+          vector::push_back<i64>(Borrow(Mutable)(v), a);
+          vector::push_back<i64>(Borrow(Mutable)(v), 1);
+          vector::push_back<i64>(Borrow(Mutable)(v), -1);
+          v
+        }
+    }
+    private fun test10(a: i64,b: i128): vector<E3<i128>> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s3: S3<i128> = pack valid_vector::S3<i128>(-1, s1, s2);
+              {
+                let e1: E3<i128> = pack valid_vector::E3::V1<i128>(s1);
+                {
+                  let e2: E3<i128> = pack valid_vector::E3::V2<i128>(s2);
+                  {
+                    let e3: E3<i128> = pack valid_vector::E3::V3<i128>(s3);
+                    {
+                      let v: vector<E3<i128>> = vector::empty<E3<i128>>();
+                      vector::push_back<E3<i128>>(Borrow(Mutable)(v), e1);
+                      vector::push_back<E3<i128>>(Borrow(Mutable)(v), e2);
+                      vector::push_back<E3<i128>>(Borrow(Mutable)(v), e3);
+                      v
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun test2(a: i128): vector<i128> {
+        {
+          let v: vector<i128> = vector::empty<i128>();
+          vector::push_back<i128>(Borrow(Mutable)(v), a);
+          vector::push_back<i128>(Borrow(Mutable)(v), a);
+          vector::push_back<i128>(Borrow(Mutable)(v), 1);
+          vector::push_back<i128>(Borrow(Mutable)(v), -1);
+          v
+        }
+    }
+    private fun test3(a: i64,b: i128): vector<S1> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, a, b);
+          {
+            let s11: S1 = pack valid_vector::S1(1, -1, -2);
+            {
+              let v: vector<S1> = vector::empty<S1>();
+              vector::push_back<S1>(Borrow(Mutable)(v), s1);
+              vector::push_back<S1>(Borrow(Mutable)(v), s11);
+              v
+            }
+          }
+        }
+    }
+    private fun test4(a: i64,b: i128): vector<S2> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s21: S2 = pack valid_vector::S2(s1, -1, -2);
+              {
+                let v: vector<S2> = vector::empty<S2>();
+                vector::push_back<S2>(Borrow(Mutable)(v), s2);
+                vector::push_back<S2>(Borrow(Mutable)(v), s21);
+                v
+              }
+            }
+          }
+        }
+    }
+    private fun test5(a: i64,b: i128): vector<S3<i64>> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s3: S3<i64> = pack valid_vector::S3<i64>(a, s1, s2);
+              {
+                let v: vector<S3<i64>> = vector::empty<S3<i64>>();
+                vector::push_back<S3<i64>>(Borrow(Mutable)(v), s3);
+                vector::push_back<S3<i64>>(Borrow(Mutable)(v), s3);
+                v
+              }
+            }
+          }
+        }
+    }
+    private fun test6(a: i64,b: i128): vector<S3<i128>> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s3: S3<i128> = pack valid_vector::S3<i128>(b, s1, s2);
+              {
+                let v: vector<S3<i128>> = vector::empty<S3<i128>>();
+                vector::push_back<S3<i128>>(Borrow(Mutable)(v), s3);
+                vector::push_back<S3<i128>>(Borrow(Mutable)(v), s3);
+                v
+              }
+            }
+          }
+        }
+    }
+    private fun test7(a: i64,b: i128): vector<E1> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s3: S3<i64> = pack valid_vector::S3<i64>(-1, s1, s2);
+              {
+                let e1: E1 = pack valid_vector::E1::V1(s1);
+                {
+                  let e2: E1 = pack valid_vector::E1::V2(s2);
+                  {
+                    let e3: E1 = pack valid_vector::E1::V3(s3);
+                    {
+                      let v: vector<E1> = vector::empty<E1>();
+                      vector::push_back<E1>(Borrow(Mutable)(v), e1);
+                      vector::push_back<E1>(Borrow(Mutable)(v), e2);
+                      vector::push_back<E1>(Borrow(Mutable)(v), e3);
+                      v
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun test8(a: i64,b: i128): vector<E2> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s3: S3<i128> = pack valid_vector::S3<i128>(-1, s1, s2);
+              {
+                let e1: E2 = pack valid_vector::E2::V1(s1);
+                {
+                  let e2: E2 = pack valid_vector::E2::V2(s2);
+                  {
+                    let e3: E2 = pack valid_vector::E2::V3(s3);
+                    {
+                      let v: vector<E2> = vector::empty<E2>();
+                      vector::push_back<E2>(Borrow(Mutable)(v), e1);
+                      vector::push_back<E2>(Borrow(Mutable)(v), e2);
+                      vector::push_back<E2>(Borrow(Mutable)(v), e3);
+                      v
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun test9(a: i64,b: i128): vector<E3<i64>> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s3: S3<i64> = pack valid_vector::S3<i64>(-1, s1, s2);
+              {
+                let e1: E3<i64> = pack valid_vector::E3::V1<i64>(s1);
+                {
+                  let e2: E3<i64> = pack valid_vector::E3::V2<i64>(s2);
+                  {
+                    let e3: E3<i64> = pack valid_vector::E3::V3<i64>(s3);
+                    {
+                      let v: vector<E3<i64>> = vector::empty<E3<i64>>();
+                      vector::push_back<E3<i64>>(Borrow(Mutable)(v), e1);
+                      vector::push_back<E3<i64>>(Borrow(Mutable)(v), e2);
+                      vector::push_back<E3<i64>>(Borrow(Mutable)(v), e3);
+                      v
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::valid_vector
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::valid_vector {
+    use std::vector;
+    enum E1 has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i64>,
+        }
+    }
+    enum E2 has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i128>,
+        }
+    }
+    enum E3<T> has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 has copy, drop {
+        x: u64,
+        y: i64,
+        z: i128,
+    }
+    struct S2 has copy, drop {
+        x: S1,
+        y: i64,
+        z: i128,
+    }
+    struct S3<T> has copy, drop {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    fun test1(a: i64): vector<i64> {
+        let v = 0x1::vector::empty<i64>();
+        0x1::vector::push_back<i64>(&mut v, a);
+        0x1::vector::push_back<i64>(&mut v, a);
+        0x1::vector::push_back<i64>(&mut v, 1i64);
+        0x1::vector::push_back<i64>(&mut v, -1i64);
+        v
+    }
+    fun test10(a: i64, b: i128): vector<E3<i128>> {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        let s2 = S2{x: s1, y: a, z: b};
+        let s3 = S3<i128>{x: -1i128, y: s1, z: s2};
+        let e1 = E3::V1<i128>{s: s1};
+        let e2 = E3::V2<i128>{s: s2};
+        let e3 = E3::V3<i128>{s: s3};
+        let v = 0x1::vector::empty<E3<i128>>();
+        0x1::vector::push_back<E3<i128>>(&mut v, e1);
+        0x1::vector::push_back<E3<i128>>(&mut v, e2);
+        0x1::vector::push_back<E3<i128>>(&mut v, e3);
+        v
+    }
+    fun test2(a: i128): vector<i128> {
+        let v = 0x1::vector::empty<i128>();
+        0x1::vector::push_back<i128>(&mut v, a);
+        0x1::vector::push_back<i128>(&mut v, a);
+        0x1::vector::push_back<i128>(&mut v, 1i128);
+        0x1::vector::push_back<i128>(&mut v, -1i128);
+        v
+    }
+    fun test3(a: i64, b: i128): vector<S1> {
+        let s1 = S1{x: 1, y: a, z: b};
+        let s11 = S1{x: 1, y: -1i64, z: -2i128};
+        let v = 0x1::vector::empty<S1>();
+        0x1::vector::push_back<S1>(&mut v, s1);
+        0x1::vector::push_back<S1>(&mut v, s11);
+        v
+    }
+    fun test4(a: i64, b: i128): vector<S2> {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        let s2 = S2{x: s1, y: a, z: b};
+        let s21 = S2{x: s1, y: -1i64, z: -2i128};
+        let v = 0x1::vector::empty<S2>();
+        0x1::vector::push_back<S2>(&mut v, s2);
+        0x1::vector::push_back<S2>(&mut v, s21);
+        v
+    }
+    fun test5(a: i64, b: i128): vector<S3<i64>> {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        let s2 = S2{x: s1, y: a, z: b};
+        let s3 = S3<i64>{x: a, y: s1, z: s2};
+        let v = 0x1::vector::empty<S3<i64>>();
+        0x1::vector::push_back<S3<i64>>(&mut v, s3);
+        0x1::vector::push_back<S3<i64>>(&mut v, s3);
+        v
+    }
+    fun test6(a: i64, b: i128): vector<S3<i128>> {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        let s2 = S2{x: s1, y: a, z: b};
+        let s3 = S3<i128>{x: b, y: s1, z: s2};
+        let v = 0x1::vector::empty<S3<i128>>();
+        0x1::vector::push_back<S3<i128>>(&mut v, s3);
+        0x1::vector::push_back<S3<i128>>(&mut v, s3);
+        v
+    }
+    fun test7(a: i64, b: i128): vector<E1> {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        let s2 = S2{x: s1, y: a, z: b};
+        let s3 = S3<i64>{x: -1i64, y: s1, z: s2};
+        let e1 = E1::V1{s: s1};
+        let e2 = E1::V2{s: s2};
+        let e3 = E1::V3{s: s3};
+        let v = 0x1::vector::empty<E1>();
+        0x1::vector::push_back<E1>(&mut v, e1);
+        0x1::vector::push_back<E1>(&mut v, e2);
+        0x1::vector::push_back<E1>(&mut v, e3);
+        v
+    }
+    fun test8(a: i64, b: i128): vector<E2> {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        let s2 = S2{x: s1, y: a, z: b};
+        let s3 = S3<i128>{x: -1i128, y: s1, z: s2};
+        let e1 = E2::V1{s: s1};
+        let e2 = E2::V2{s: s2};
+        let e3 = E2::V3{s: s3};
+        let v = 0x1::vector::empty<E2>();
+        0x1::vector::push_back<E2>(&mut v, e1);
+        0x1::vector::push_back<E2>(&mut v, e2);
+        0x1::vector::push_back<E2>(&mut v, e3);
+        v
+    }
+    fun test9(a: i64, b: i128): vector<E3<i64>> {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        let s2 = S2{x: s1, y: a, z: b};
+        let s3 = S3<i64>{x: -1i64, y: s1, z: s2};
+        let e1 = E3::V1<i64>{s: s1};
+        let e2 = E3::V2<i64>{s: s2};
+        let e3 = E3::V3<i64>{s: s3};
+        let v = 0x1::vector::empty<E3<i64>>();
+        0x1::vector::push_back<E3<i64>>(&mut v, e1);
+        0x1::vector::push_back<E3<i64>>(&mut v, e2);
+        0x1::vector::push_back<E3<i64>>(&mut v, e3);
+        v
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_vector::test1($t0: i64): vector<i64> {
+     var $t1: vector<i64>
+     var $t2: vector<i64>
+     var $t3: &mut vector<i64>
+     var $t4: &mut vector<i64>
+     var $t5: &mut vector<i64>
+     var $t6: i64
+     var $t7: &mut vector<i64>
+     var $t8: i64
+  0: $t2 := vector::empty<i64>()
+  1: $t3 := borrow_local($t2)
+  2: vector::push_back<i64>($t3, $t0)
+  3: $t4 := borrow_local($t2)
+  4: vector::push_back<i64>($t4, $t0)
+  5: $t5 := borrow_local($t2)
+  6: $t6 := 1
+  7: vector::push_back<i64>($t5, $t6)
+  8: $t7 := borrow_local($t2)
+  9: $t8 := -1
+ 10: vector::push_back<i64>($t7, $t8)
+ 11: $t1 := infer($t2)
+ 12: return $t1
+}
+
+
+[variant baseline]
+fun valid_vector::test10($t0: i64, $t1: i128): vector<0x42::valid_vector::E3<i128>> {
+     var $t2: vector<0x42::valid_vector::E3<i128>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i128>
+     var $t11: i128
+     var $t12: 0x42::valid_vector::S1
+     var $t13: 0x42::valid_vector::E3<i128>
+     var $t14: 0x42::valid_vector::E3<i128>
+     var $t15: 0x42::valid_vector::E3<i128>
+     var $t16: vector<0x42::valid_vector::E3<i128>>
+     var $t17: &mut vector<0x42::valid_vector::E3<i128>>
+     var $t18: &mut vector<0x42::valid_vector::E3<i128>>
+     var $t19: &mut vector<0x42::valid_vector::E3<i128>>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := -1
+  8: $t12 := infer($t3)
+  9: $t10 := pack 0x42::valid_vector::S3<i128>($t11, $t12, $t7)
+ 10: $t13 := pack_variant 0x42::valid_vector::E3<i128>::V1($t3)
+ 11: $t14 := pack_variant 0x42::valid_vector::E3<i128>::V2($t7)
+ 12: $t15 := pack_variant 0x42::valid_vector::E3<i128>::V3($t10)
+ 13: $t16 := vector::empty<0x42::valid_vector::E3<i128>>()
+ 14: $t17 := borrow_local($t16)
+ 15: vector::push_back<0x42::valid_vector::E3<i128>>($t17, $t13)
+ 16: $t18 := borrow_local($t16)
+ 17: vector::push_back<0x42::valid_vector::E3<i128>>($t18, $t14)
+ 18: $t19 := borrow_local($t16)
+ 19: vector::push_back<0x42::valid_vector::E3<i128>>($t19, $t15)
+ 20: $t2 := infer($t16)
+ 21: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test2($t0: i128): vector<i128> {
+     var $t1: vector<i128>
+     var $t2: vector<i128>
+     var $t3: &mut vector<i128>
+     var $t4: &mut vector<i128>
+     var $t5: &mut vector<i128>
+     var $t6: i128
+     var $t7: &mut vector<i128>
+     var $t8: i128
+  0: $t2 := vector::empty<i128>()
+  1: $t3 := borrow_local($t2)
+  2: vector::push_back<i128>($t3, $t0)
+  3: $t4 := borrow_local($t2)
+  4: vector::push_back<i128>($t4, $t0)
+  5: $t5 := borrow_local($t2)
+  6: $t6 := 1
+  7: vector::push_back<i128>($t5, $t6)
+  8: $t7 := borrow_local($t2)
+  9: $t8 := -1
+ 10: vector::push_back<i128>($t7, $t8)
+ 11: $t1 := infer($t2)
+ 12: return $t1
+}
+
+
+[variant baseline]
+fun valid_vector::test3($t0: i64, $t1: i128): vector<0x42::valid_vector::S1> {
+     var $t2: vector<0x42::valid_vector::S1>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: 0x42::valid_vector::S1
+     var $t7: u64
+     var $t8: i64
+     var $t9: i128
+     var $t10: vector<0x42::valid_vector::S1>
+     var $t11: &mut vector<0x42::valid_vector::S1>
+     var $t12: &mut vector<0x42::valid_vector::S1>
+  0: $t4 := 1
+  1: $t5 := infer($t0)
+  2: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t1)
+  3: $t7 := 1
+  4: $t8 := -1
+  5: $t9 := -2
+  6: $t6 := pack 0x42::valid_vector::S1($t7, $t8, $t9)
+  7: $t10 := vector::empty<0x42::valid_vector::S1>()
+  8: $t11 := borrow_local($t10)
+  9: vector::push_back<0x42::valid_vector::S1>($t11, $t3)
+ 10: $t12 := borrow_local($t10)
+ 11: vector::push_back<0x42::valid_vector::S1>($t12, $t6)
+ 12: $t2 := infer($t10)
+ 13: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test4($t0: i64, $t1: i128): vector<0x42::valid_vector::S2> {
+     var $t2: vector<0x42::valid_vector::S2>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S2
+     var $t11: 0x42::valid_vector::S1
+     var $t12: i64
+     var $t13: i128
+     var $t14: vector<0x42::valid_vector::S2>
+     var $t15: &mut vector<0x42::valid_vector::S2>
+     var $t16: &mut vector<0x42::valid_vector::S2>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := infer($t3)
+  8: $t12 := -1
+  9: $t13 := -2
+ 10: $t10 := pack 0x42::valid_vector::S2($t11, $t12, $t13)
+ 11: $t14 := vector::empty<0x42::valid_vector::S2>()
+ 12: $t15 := borrow_local($t14)
+ 13: vector::push_back<0x42::valid_vector::S2>($t15, $t7)
+ 14: $t16 := borrow_local($t14)
+ 15: vector::push_back<0x42::valid_vector::S2>($t16, $t10)
+ 16: $t2 := infer($t14)
+ 17: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test5($t0: i64, $t1: i128): vector<0x42::valid_vector::S3<i64>> {
+     var $t2: vector<0x42::valid_vector::S3<i64>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i64>
+     var $t11: i64
+     var $t12: 0x42::valid_vector::S1
+     var $t13: vector<0x42::valid_vector::S3<i64>>
+     var $t14: &mut vector<0x42::valid_vector::S3<i64>>
+     var $t15: &mut vector<0x42::valid_vector::S3<i64>>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := infer($t0)
+  8: $t12 := infer($t3)
+  9: $t10 := pack 0x42::valid_vector::S3<i64>($t11, $t12, $t7)
+ 10: $t13 := vector::empty<0x42::valid_vector::S3<i64>>()
+ 11: $t14 := borrow_local($t13)
+ 12: vector::push_back<0x42::valid_vector::S3<i64>>($t14, $t10)
+ 13: $t15 := borrow_local($t13)
+ 14: vector::push_back<0x42::valid_vector::S3<i64>>($t15, $t10)
+ 15: $t2 := infer($t13)
+ 16: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test6($t0: i64, $t1: i128): vector<0x42::valid_vector::S3<i128>> {
+     var $t2: vector<0x42::valid_vector::S3<i128>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i128>
+     var $t11: i128
+     var $t12: 0x42::valid_vector::S1
+     var $t13: vector<0x42::valid_vector::S3<i128>>
+     var $t14: &mut vector<0x42::valid_vector::S3<i128>>
+     var $t15: &mut vector<0x42::valid_vector::S3<i128>>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := infer($t1)
+  8: $t12 := infer($t3)
+  9: $t10 := pack 0x42::valid_vector::S3<i128>($t11, $t12, $t7)
+ 10: $t13 := vector::empty<0x42::valid_vector::S3<i128>>()
+ 11: $t14 := borrow_local($t13)
+ 12: vector::push_back<0x42::valid_vector::S3<i128>>($t14, $t10)
+ 13: $t15 := borrow_local($t13)
+ 14: vector::push_back<0x42::valid_vector::S3<i128>>($t15, $t10)
+ 15: $t2 := infer($t13)
+ 16: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test7($t0: i64, $t1: i128): vector<0x42::valid_vector::E1> {
+     var $t2: vector<0x42::valid_vector::E1>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i64>
+     var $t11: i64
+     var $t12: 0x42::valid_vector::S1
+     var $t13: 0x42::valid_vector::E1
+     var $t14: 0x42::valid_vector::E1
+     var $t15: 0x42::valid_vector::E1
+     var $t16: vector<0x42::valid_vector::E1>
+     var $t17: &mut vector<0x42::valid_vector::E1>
+     var $t18: &mut vector<0x42::valid_vector::E1>
+     var $t19: &mut vector<0x42::valid_vector::E1>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := -1
+  8: $t12 := infer($t3)
+  9: $t10 := pack 0x42::valid_vector::S3<i64>($t11, $t12, $t7)
+ 10: $t13 := pack_variant 0x42::valid_vector::E1::V1($t3)
+ 11: $t14 := pack_variant 0x42::valid_vector::E1::V2($t7)
+ 12: $t15 := pack_variant 0x42::valid_vector::E1::V3($t10)
+ 13: $t16 := vector::empty<0x42::valid_vector::E1>()
+ 14: $t17 := borrow_local($t16)
+ 15: vector::push_back<0x42::valid_vector::E1>($t17, $t13)
+ 16: $t18 := borrow_local($t16)
+ 17: vector::push_back<0x42::valid_vector::E1>($t18, $t14)
+ 18: $t19 := borrow_local($t16)
+ 19: vector::push_back<0x42::valid_vector::E1>($t19, $t15)
+ 20: $t2 := infer($t16)
+ 21: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test8($t0: i64, $t1: i128): vector<0x42::valid_vector::E2> {
+     var $t2: vector<0x42::valid_vector::E2>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i128>
+     var $t11: i128
+     var $t12: 0x42::valid_vector::S1
+     var $t13: 0x42::valid_vector::E2
+     var $t14: 0x42::valid_vector::E2
+     var $t15: 0x42::valid_vector::E2
+     var $t16: vector<0x42::valid_vector::E2>
+     var $t17: &mut vector<0x42::valid_vector::E2>
+     var $t18: &mut vector<0x42::valid_vector::E2>
+     var $t19: &mut vector<0x42::valid_vector::E2>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := -1
+  8: $t12 := infer($t3)
+  9: $t10 := pack 0x42::valid_vector::S3<i128>($t11, $t12, $t7)
+ 10: $t13 := pack_variant 0x42::valid_vector::E2::V1($t3)
+ 11: $t14 := pack_variant 0x42::valid_vector::E2::V2($t7)
+ 12: $t15 := pack_variant 0x42::valid_vector::E2::V3($t10)
+ 13: $t16 := vector::empty<0x42::valid_vector::E2>()
+ 14: $t17 := borrow_local($t16)
+ 15: vector::push_back<0x42::valid_vector::E2>($t17, $t13)
+ 16: $t18 := borrow_local($t16)
+ 17: vector::push_back<0x42::valid_vector::E2>($t18, $t14)
+ 18: $t19 := borrow_local($t16)
+ 19: vector::push_back<0x42::valid_vector::E2>($t19, $t15)
+ 20: $t2 := infer($t16)
+ 21: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test9($t0: i64, $t1: i128): vector<0x42::valid_vector::E3<i64>> {
+     var $t2: vector<0x42::valid_vector::E3<i64>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i64>
+     var $t11: i64
+     var $t12: 0x42::valid_vector::S1
+     var $t13: 0x42::valid_vector::E3<i64>
+     var $t14: 0x42::valid_vector::E3<i64>
+     var $t15: 0x42::valid_vector::E3<i64>
+     var $t16: vector<0x42::valid_vector::E3<i64>>
+     var $t17: &mut vector<0x42::valid_vector::E3<i64>>
+     var $t18: &mut vector<0x42::valid_vector::E3<i64>>
+     var $t19: &mut vector<0x42::valid_vector::E3<i64>>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := -1
+  8: $t12 := infer($t3)
+  9: $t10 := pack 0x42::valid_vector::S3<i64>($t11, $t12, $t7)
+ 10: $t13 := pack_variant 0x42::valid_vector::E3<i64>::V1($t3)
+ 11: $t14 := pack_variant 0x42::valid_vector::E3<i64>::V2($t7)
+ 12: $t15 := pack_variant 0x42::valid_vector::E3<i64>::V3($t10)
+ 13: $t16 := vector::empty<0x42::valid_vector::E3<i64>>()
+ 14: $t17 := borrow_local($t16)
+ 15: vector::push_back<0x42::valid_vector::E3<i64>>($t17, $t13)
+ 16: $t18 := borrow_local($t16)
+ 17: vector::push_back<0x42::valid_vector::E3<i64>>($t18, $t14)
+ 18: $t19 := borrow_local($t16)
+ 19: vector::push_back<0x42::valid_vector::E3<i64>>($t19, $t15)
+ 20: $t2 := infer($t16)
+ 21: return $t2
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_vector::test1($t0: i64): vector<i64> {
+     var $t1: vector<i64>
+     var $t2: vector<i64>
+     var $t3: &mut vector<i64>
+     var $t4: &mut vector<i64>
+     var $t5: &mut vector<i64>
+     var $t6: i64
+     var $t7: &mut vector<i64>
+     var $t8: i64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := vector::empty<i64>()
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  1: $t3 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => (mut) #3 via [local `v`] at line 30
+     #
+  2: vector::push_back<i64>($t3, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  3: $t4 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `v`] at line 31
+     #
+  4: vector::push_back<i64>($t4, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  5: $t5 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `v`] at line 32
+     #
+  6: $t6 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t6
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `v`] at line 32
+     #
+  7: vector::push_back<i64>($t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  8: $t7 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 33
+     #
+  9: $t8 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t7, $t8
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 33
+     #
+ 10: vector::push_back<i64>($t7, $t8)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 11: $t1 := infer($t2)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 12: return $t1
+}
+
+
+[variant baseline]
+fun valid_vector::test10($t0: i64, $t1: i128): vector<0x42::valid_vector::E3<i128>> {
+     var $t2: vector<0x42::valid_vector::E3<i128>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i128>
+     var $t11: i128
+     var $t12: 0x42::valid_vector::S1
+     var $t13: 0x42::valid_vector::E3<i128>
+     var $t14: 0x42::valid_vector::E3<i128>
+     var $t15: 0x42::valid_vector::E3<i128>
+     var $t16: vector<0x42::valid_vector::E3<i128>>
+     var $t17: &mut vector<0x42::valid_vector::E3<i128>>
+     var $t18: &mut vector<0x42::valid_vector::E3<i128>>
+     var $t19: &mut vector<0x42::valid_vector::E3<i128>>
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t5 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  2: $t6 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5, $t6
+     # refs: []
+     #
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  4: $t8 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8
+     # refs: []
+     #
+  5: $t9 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t8, $t9
+     # refs: []
+     #
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7
+     # refs: []
+     #
+  7: $t11 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+  8: $t12 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t11, $t12
+     # refs: []
+     #
+  9: $t10 := pack 0x42::valid_vector::S3<i128>($t11, $t12, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t10
+     # refs: []
+     #
+ 10: $t13 := pack_variant 0x42::valid_vector::E3<i128>::V1($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t10, $t13
+     # refs: []
+     #
+ 11: $t14 := pack_variant 0x42::valid_vector::E3<i128>::V2($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t13, $t14
+     # refs: []
+     #
+ 12: $t15 := pack_variant 0x42::valid_vector::E3<i128>::V3($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t14, $t15
+     # refs: []
+     #
+ 13: $t16 := vector::empty<0x42::valid_vector::E3<i128>>()
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t14, $t15, $t16
+     # refs: []
+     #
+ 14: $t17 := borrow_local($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t14, $t15, $t16, $t17
+     # refs: [$t17 => #17]
+     # #17
+     #   <no edges>
+     # #root
+     #   => (mut) #17 via [local `v`] at line 135
+     #
+ 15: vector::push_back<0x42::valid_vector::E3<i128>>($t17, $t13)
+     # abort state: {returns,aborts}
+     # live vars: $t14, $t15, $t16
+     # refs: []
+     #
+ 16: $t18 := borrow_local($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t14, $t15, $t16, $t18
+     # refs: [$t18 => #18]
+     # #18
+     #   <no edges>
+     # #root
+     #   => (mut) #18 via [local `v`] at line 136
+     #
+ 17: vector::push_back<0x42::valid_vector::E3<i128>>($t18, $t14)
+     # abort state: {returns,aborts}
+     # live vars: $t15, $t16
+     # refs: []
+     #
+ 18: $t19 := borrow_local($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t15, $t16, $t19
+     # refs: [$t19 => #19]
+     # #19
+     #   <no edges>
+     # #root
+     #   => (mut) #19 via [local `v`] at line 137
+     #
+ 19: vector::push_back<0x42::valid_vector::E3<i128>>($t19, $t15)
+     # abort state: {returns}
+     # live vars: $t16
+     # refs: []
+     #
+ 20: $t2 := infer($t16)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 21: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test2($t0: i128): vector<i128> {
+     var $t1: vector<i128>
+     var $t2: vector<i128>
+     var $t3: &mut vector<i128>
+     var $t4: &mut vector<i128>
+     var $t5: &mut vector<i128>
+     var $t6: i128
+     var $t7: &mut vector<i128>
+     var $t8: i128
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := vector::empty<i128>()
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  1: $t3 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => (mut) #3 via [local `v`] at line 39
+     #
+  2: vector::push_back<i128>($t3, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  3: $t4 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `v`] at line 40
+     #
+  4: vector::push_back<i128>($t4, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  5: $t5 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `v`] at line 41
+     #
+  6: $t6 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t6
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `v`] at line 41
+     #
+  7: vector::push_back<i128>($t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  8: $t7 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 42
+     #
+  9: $t8 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t7, $t8
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 42
+     #
+ 10: vector::push_back<i128>($t7, $t8)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 11: $t1 := infer($t2)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 12: return $t1
+}
+
+
+[variant baseline]
+fun valid_vector::test3($t0: i64, $t1: i128): vector<0x42::valid_vector::S1> {
+     var $t2: vector<0x42::valid_vector::S1>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: 0x42::valid_vector::S1
+     var $t7: u64
+     var $t8: i64
+     var $t9: i128
+     var $t10: vector<0x42::valid_vector::S1>
+     var $t11: &mut vector<0x42::valid_vector::S1>
+     var $t12: &mut vector<0x42::valid_vector::S1>
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t5 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4, $t5
+     # refs: []
+     #
+  2: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3
+     # refs: []
+     #
+  3: $t7 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7
+     # refs: []
+     #
+  4: $t8 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t8
+     # refs: []
+     #
+  5: $t9 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t8, $t9
+     # refs: []
+     #
+  6: $t6 := pack 0x42::valid_vector::S1($t7, $t8, $t9)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t6
+     # refs: []
+     #
+  7: $t10 := vector::empty<0x42::valid_vector::S1>()
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t6, $t10
+     # refs: []
+     #
+  8: $t11 := borrow_local($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t6, $t10, $t11
+     # refs: [$t11 => #11]
+     # #11
+     #   <no edges>
+     # #root
+     #   => (mut) #11 via [local `v`] at line 50
+     #
+  9: vector::push_back<0x42::valid_vector::S1>($t11, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t10
+     # refs: []
+     #
+ 10: $t12 := borrow_local($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t10, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => (mut) #12 via [local `v`] at line 51
+     #
+ 11: vector::push_back<0x42::valid_vector::S1>($t12, $t6)
+     # abort state: {returns}
+     # live vars: $t10
+     # refs: []
+     #
+ 12: $t2 := infer($t10)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 13: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test4($t0: i64, $t1: i128): vector<0x42::valid_vector::S2> {
+     var $t2: vector<0x42::valid_vector::S2>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S2
+     var $t11: 0x42::valid_vector::S1
+     var $t12: i64
+     var $t13: i128
+     var $t14: vector<0x42::valid_vector::S2>
+     var $t15: &mut vector<0x42::valid_vector::S2>
+     var $t16: &mut vector<0x42::valid_vector::S2>
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t5 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  2: $t6 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5, $t6
+     # refs: []
+     #
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  4: $t8 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8
+     # refs: []
+     #
+  5: $t9 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t8, $t9
+     # refs: []
+     #
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7
+     # refs: []
+     #
+  7: $t11 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t11
+     # refs: []
+     #
+  8: $t12 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t11, $t12
+     # refs: []
+     #
+  9: $t13 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t11, $t12, $t13
+     # refs: []
+     #
+ 10: $t10 := pack 0x42::valid_vector::S2($t11, $t12, $t13)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t10
+     # refs: []
+     #
+ 11: $t14 := vector::empty<0x42::valid_vector::S2>()
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t10, $t14
+     # refs: []
+     #
+ 12: $t15 := borrow_local($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t10, $t14, $t15
+     # refs: [$t15 => #15]
+     # #15
+     #   <no edges>
+     # #root
+     #   => (mut) #15 via [local `v`] at line 60
+     #
+ 13: vector::push_back<0x42::valid_vector::S2>($t15, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t14
+     # refs: []
+     #
+ 14: $t16 := borrow_local($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t14, $t16
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => (mut) #16 via [local `v`] at line 61
+     #
+ 15: vector::push_back<0x42::valid_vector::S2>($t16, $t10)
+     # abort state: {returns}
+     # live vars: $t14
+     # refs: []
+     #
+ 16: $t2 := infer($t14)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 17: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test5($t0: i64, $t1: i128): vector<0x42::valid_vector::S3<i64>> {
+     var $t2: vector<0x42::valid_vector::S3<i64>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i64>
+     var $t11: i64
+     var $t12: 0x42::valid_vector::S1
+     var $t13: vector<0x42::valid_vector::S3<i64>>
+     var $t14: &mut vector<0x42::valid_vector::S3<i64>>
+     var $t15: &mut vector<0x42::valid_vector::S3<i64>>
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t5 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  2: $t6 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5, $t6
+     # refs: []
+     #
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  4: $t8 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8
+     # refs: []
+     #
+  5: $t9 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8, $t9
+     # refs: []
+     #
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7
+     # refs: []
+     #
+  7: $t11 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+  8: $t12 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t11, $t12
+     # refs: []
+     #
+  9: $t10 := pack 0x42::valid_vector::S3<i64>($t11, $t12, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t10
+     # refs: []
+     #
+ 10: $t13 := vector::empty<0x42::valid_vector::S3<i64>>()
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t13
+     # refs: []
+     #
+ 11: $t14 := borrow_local($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t13, $t14
+     # refs: [$t14 => #14]
+     # #14
+     #   <no edges>
+     # #root
+     #   => (mut) #14 via [local `v`] at line 70
+     #
+ 12: vector::push_back<0x42::valid_vector::S3<i64>>($t14, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t13
+     # refs: []
+     #
+ 13: $t15 := borrow_local($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t13, $t15
+     # refs: [$t15 => #15]
+     # #15
+     #   <no edges>
+     # #root
+     #   => (mut) #15 via [local `v`] at line 71
+     #
+ 14: vector::push_back<0x42::valid_vector::S3<i64>>($t15, $t10)
+     # abort state: {returns}
+     # live vars: $t13
+     # refs: []
+     #
+ 15: $t2 := infer($t13)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 16: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test6($t0: i64, $t1: i128): vector<0x42::valid_vector::S3<i128>> {
+     var $t2: vector<0x42::valid_vector::S3<i128>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i128>
+     var $t11: i128
+     var $t12: 0x42::valid_vector::S1
+     var $t13: vector<0x42::valid_vector::S3<i128>>
+     var $t14: &mut vector<0x42::valid_vector::S3<i128>>
+     var $t15: &mut vector<0x42::valid_vector::S3<i128>>
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t5 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  2: $t6 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5, $t6
+     # refs: []
+     #
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  4: $t8 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8
+     # refs: []
+     #
+  5: $t9 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t8, $t9
+     # refs: []
+     #
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t7
+     # refs: []
+     #
+  7: $t11 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+  8: $t12 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t11, $t12
+     # refs: []
+     #
+  9: $t10 := pack 0x42::valid_vector::S3<i128>($t11, $t12, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t10
+     # refs: []
+     #
+ 10: $t13 := vector::empty<0x42::valid_vector::S3<i128>>()
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t13
+     # refs: []
+     #
+ 11: $t14 := borrow_local($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t13, $t14
+     # refs: [$t14 => #14]
+     # #14
+     #   <no edges>
+     # #root
+     #   => (mut) #14 via [local `v`] at line 80
+     #
+ 12: vector::push_back<0x42::valid_vector::S3<i128>>($t14, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t13
+     # refs: []
+     #
+ 13: $t15 := borrow_local($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t13, $t15
+     # refs: [$t15 => #15]
+     # #15
+     #   <no edges>
+     # #root
+     #   => (mut) #15 via [local `v`] at line 81
+     #
+ 14: vector::push_back<0x42::valid_vector::S3<i128>>($t15, $t10)
+     # abort state: {returns}
+     # live vars: $t13
+     # refs: []
+     #
+ 15: $t2 := infer($t13)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 16: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test7($t0: i64, $t1: i128): vector<0x42::valid_vector::E1> {
+     var $t2: vector<0x42::valid_vector::E1>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i64>
+     var $t11: i64
+     var $t12: 0x42::valid_vector::S1
+     var $t13: 0x42::valid_vector::E1
+     var $t14: 0x42::valid_vector::E1
+     var $t15: 0x42::valid_vector::E1
+     var $t16: vector<0x42::valid_vector::E1>
+     var $t17: &mut vector<0x42::valid_vector::E1>
+     var $t18: &mut vector<0x42::valid_vector::E1>
+     var $t19: &mut vector<0x42::valid_vector::E1>
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t5 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  2: $t6 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5, $t6
+     # refs: []
+     #
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  4: $t8 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8
+     # refs: []
+     #
+  5: $t9 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t8, $t9
+     # refs: []
+     #
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7
+     # refs: []
+     #
+  7: $t11 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+  8: $t12 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t11, $t12
+     # refs: []
+     #
+  9: $t10 := pack 0x42::valid_vector::S3<i64>($t11, $t12, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t10
+     # refs: []
+     #
+ 10: $t13 := pack_variant 0x42::valid_vector::E1::V1($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t10, $t13
+     # refs: []
+     #
+ 11: $t14 := pack_variant 0x42::valid_vector::E1::V2($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t13, $t14
+     # refs: []
+     #
+ 12: $t15 := pack_variant 0x42::valid_vector::E1::V3($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t14, $t15
+     # refs: []
+     #
+ 13: $t16 := vector::empty<0x42::valid_vector::E1>()
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t14, $t15, $t16
+     # refs: []
+     #
+ 14: $t17 := borrow_local($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t14, $t15, $t16, $t17
+     # refs: [$t17 => #17]
+     # #17
+     #   <no edges>
+     # #root
+     #   => (mut) #17 via [local `v`] at line 93
+     #
+ 15: vector::push_back<0x42::valid_vector::E1>($t17, $t13)
+     # abort state: {returns,aborts}
+     # live vars: $t14, $t15, $t16
+     # refs: []
+     #
+ 16: $t18 := borrow_local($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t14, $t15, $t16, $t18
+     # refs: [$t18 => #18]
+     # #18
+     #   <no edges>
+     # #root
+     #   => (mut) #18 via [local `v`] at line 94
+     #
+ 17: vector::push_back<0x42::valid_vector::E1>($t18, $t14)
+     # abort state: {returns,aborts}
+     # live vars: $t15, $t16
+     # refs: []
+     #
+ 18: $t19 := borrow_local($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t15, $t16, $t19
+     # refs: [$t19 => #19]
+     # #19
+     #   <no edges>
+     # #root
+     #   => (mut) #19 via [local `v`] at line 95
+     #
+ 19: vector::push_back<0x42::valid_vector::E1>($t19, $t15)
+     # abort state: {returns}
+     # live vars: $t16
+     # refs: []
+     #
+ 20: $t2 := infer($t16)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 21: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test8($t0: i64, $t1: i128): vector<0x42::valid_vector::E2> {
+     var $t2: vector<0x42::valid_vector::E2>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i128>
+     var $t11: i128
+     var $t12: 0x42::valid_vector::S1
+     var $t13: 0x42::valid_vector::E2
+     var $t14: 0x42::valid_vector::E2
+     var $t15: 0x42::valid_vector::E2
+     var $t16: vector<0x42::valid_vector::E2>
+     var $t17: &mut vector<0x42::valid_vector::E2>
+     var $t18: &mut vector<0x42::valid_vector::E2>
+     var $t19: &mut vector<0x42::valid_vector::E2>
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t5 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  2: $t6 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5, $t6
+     # refs: []
+     #
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  4: $t8 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8
+     # refs: []
+     #
+  5: $t9 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t8, $t9
+     # refs: []
+     #
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7
+     # refs: []
+     #
+  7: $t11 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+  8: $t12 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t11, $t12
+     # refs: []
+     #
+  9: $t10 := pack 0x42::valid_vector::S3<i128>($t11, $t12, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t10
+     # refs: []
+     #
+ 10: $t13 := pack_variant 0x42::valid_vector::E2::V1($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t10, $t13
+     # refs: []
+     #
+ 11: $t14 := pack_variant 0x42::valid_vector::E2::V2($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t13, $t14
+     # refs: []
+     #
+ 12: $t15 := pack_variant 0x42::valid_vector::E2::V3($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t14, $t15
+     # refs: []
+     #
+ 13: $t16 := vector::empty<0x42::valid_vector::E2>()
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t14, $t15, $t16
+     # refs: []
+     #
+ 14: $t17 := borrow_local($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t14, $t15, $t16, $t17
+     # refs: [$t17 => #17]
+     # #17
+     #   <no edges>
+     # #root
+     #   => (mut) #17 via [local `v`] at line 107
+     #
+ 15: vector::push_back<0x42::valid_vector::E2>($t17, $t13)
+     # abort state: {returns,aborts}
+     # live vars: $t14, $t15, $t16
+     # refs: []
+     #
+ 16: $t18 := borrow_local($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t14, $t15, $t16, $t18
+     # refs: [$t18 => #18]
+     # #18
+     #   <no edges>
+     # #root
+     #   => (mut) #18 via [local `v`] at line 108
+     #
+ 17: vector::push_back<0x42::valid_vector::E2>($t18, $t14)
+     # abort state: {returns,aborts}
+     # live vars: $t15, $t16
+     # refs: []
+     #
+ 18: $t19 := borrow_local($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t15, $t16, $t19
+     # refs: [$t19 => #19]
+     # #19
+     #   <no edges>
+     # #root
+     #   => (mut) #19 via [local `v`] at line 109
+     #
+ 19: vector::push_back<0x42::valid_vector::E2>($t19, $t15)
+     # abort state: {returns}
+     # live vars: $t16
+     # refs: []
+     #
+ 20: $t2 := infer($t16)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 21: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test9($t0: i64, $t1: i128): vector<0x42::valid_vector::E3<i64>> {
+     var $t2: vector<0x42::valid_vector::E3<i64>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i64>
+     var $t11: i64
+     var $t12: 0x42::valid_vector::S1
+     var $t13: 0x42::valid_vector::E3<i64>
+     var $t14: 0x42::valid_vector::E3<i64>
+     var $t15: 0x42::valid_vector::E3<i64>
+     var $t16: vector<0x42::valid_vector::E3<i64>>
+     var $t17: &mut vector<0x42::valid_vector::E3<i64>>
+     var $t18: &mut vector<0x42::valid_vector::E3<i64>>
+     var $t19: &mut vector<0x42::valid_vector::E3<i64>>
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t5 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  2: $t6 := -2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5, $t6
+     # refs: []
+     #
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  4: $t8 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8
+     # refs: []
+     #
+  5: $t9 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t8, $t9
+     # refs: []
+     #
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7
+     # refs: []
+     #
+  7: $t11 := -1
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+  8: $t12 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t11, $t12
+     # refs: []
+     #
+  9: $t10 := pack 0x42::valid_vector::S3<i64>($t11, $t12, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t10
+     # refs: []
+     #
+ 10: $t13 := pack_variant 0x42::valid_vector::E3<i64>::V1($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t10, $t13
+     # refs: []
+     #
+ 11: $t14 := pack_variant 0x42::valid_vector::E3<i64>::V2($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t13, $t14
+     # refs: []
+     #
+ 12: $t15 := pack_variant 0x42::valid_vector::E3<i64>::V3($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t14, $t15
+     # refs: []
+     #
+ 13: $t16 := vector::empty<0x42::valid_vector::E3<i64>>()
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t14, $t15, $t16
+     # refs: []
+     #
+ 14: $t17 := borrow_local($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t14, $t15, $t16, $t17
+     # refs: [$t17 => #17]
+     # #17
+     #   <no edges>
+     # #root
+     #   => (mut) #17 via [local `v`] at line 121
+     #
+ 15: vector::push_back<0x42::valid_vector::E3<i64>>($t17, $t13)
+     # abort state: {returns,aborts}
+     # live vars: $t14, $t15, $t16
+     # refs: []
+     #
+ 16: $t18 := borrow_local($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t14, $t15, $t16, $t18
+     # refs: [$t18 => #18]
+     # #18
+     #   <no edges>
+     # #root
+     #   => (mut) #18 via [local `v`] at line 122
+     #
+ 17: vector::push_back<0x42::valid_vector::E3<i64>>($t18, $t14)
+     # abort state: {returns,aborts}
+     # live vars: $t15, $t16
+     # refs: []
+     #
+ 18: $t19 := borrow_local($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t15, $t16, $t19
+     # refs: [$t19 => #19]
+     # #19
+     #   <no edges>
+     # #root
+     #   => (mut) #19 via [local `v`] at line 123
+     #
+ 19: vector::push_back<0x42::valid_vector::E3<i64>>($t19, $t15)
+     # abort state: {returns}
+     # live vars: $t16
+     # refs: []
+     #
+ 20: $t2 := infer($t16)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 21: return $t2
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::valid_vector {
+    use std::vector;
+    enum E1 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i64>,
+        }
+    }
+    enum E2 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i128>,
+        }
+    }
+    enum E3<T> {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 {
+        x: u64,
+        y: i64,
+        z: i128,
+    }
+    struct S2 {
+        x: S1,
+        y: i64,
+        z: i128,
+    }
+    struct S3<T> {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    private fun test1(a: i64): vector<i64> {
+        {
+          let v: vector<i64> = vector::empty<i64>();
+          vector::push_back<i64>(Borrow(Mutable)(v), a);
+          vector::push_back<i64>(Borrow(Mutable)(v), a);
+          vector::push_back<i64>(Borrow(Mutable)(v), 1);
+          vector::push_back<i64>(Borrow(Mutable)(v), -1);
+          v
+        }
+    }
+    private fun test10(a: i64,b: i128): vector<E3<i128>> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s3: S3<i128> = pack valid_vector::S3<i128>(-1, s1, s2);
+              {
+                let e1: E3<i128> = pack valid_vector::E3::V1<i128>(s1);
+                {
+                  let e2: E3<i128> = pack valid_vector::E3::V2<i128>(s2);
+                  {
+                    let e3: E3<i128> = pack valid_vector::E3::V3<i128>(s3);
+                    {
+                      let v: vector<E3<i128>> = vector::empty<E3<i128>>();
+                      vector::push_back<E3<i128>>(Borrow(Mutable)(v), e1);
+                      vector::push_back<E3<i128>>(Borrow(Mutable)(v), e2);
+                      vector::push_back<E3<i128>>(Borrow(Mutable)(v), e3);
+                      v
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun test2(a: i128): vector<i128> {
+        {
+          let v: vector<i128> = vector::empty<i128>();
+          vector::push_back<i128>(Borrow(Mutable)(v), a);
+          vector::push_back<i128>(Borrow(Mutable)(v), a);
+          vector::push_back<i128>(Borrow(Mutable)(v), 1);
+          vector::push_back<i128>(Borrow(Mutable)(v), -1);
+          v
+        }
+    }
+    private fun test3(a: i64,b: i128): vector<S1> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, a, b);
+          {
+            let s11: S1 = pack valid_vector::S1(1, -1, -2);
+            {
+              let v: vector<S1> = vector::empty<S1>();
+              vector::push_back<S1>(Borrow(Mutable)(v), s1);
+              vector::push_back<S1>(Borrow(Mutable)(v), s11);
+              v
+            }
+          }
+        }
+    }
+    private fun test4(a: i64,b: i128): vector<S2> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s21: S2 = pack valid_vector::S2(s1, -1, -2);
+              {
+                let v: vector<S2> = vector::empty<S2>();
+                vector::push_back<S2>(Borrow(Mutable)(v), s2);
+                vector::push_back<S2>(Borrow(Mutable)(v), s21);
+                v
+              }
+            }
+          }
+        }
+    }
+    private fun test5(a: i64,b: i128): vector<S3<i64>> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s3: S3<i64> = pack valid_vector::S3<i64>(a, s1, s2);
+              {
+                let v: vector<S3<i64>> = vector::empty<S3<i64>>();
+                vector::push_back<S3<i64>>(Borrow(Mutable)(v), s3);
+                vector::push_back<S3<i64>>(Borrow(Mutable)(v), s3);
+                v
+              }
+            }
+          }
+        }
+    }
+    private fun test6(a: i64,b: i128): vector<S3<i128>> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s3: S3<i128> = pack valid_vector::S3<i128>(b, s1, s2);
+              {
+                let v: vector<S3<i128>> = vector::empty<S3<i128>>();
+                vector::push_back<S3<i128>>(Borrow(Mutable)(v), s3);
+                vector::push_back<S3<i128>>(Borrow(Mutable)(v), s3);
+                v
+              }
+            }
+          }
+        }
+    }
+    private fun test7(a: i64,b: i128): vector<E1> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s3: S3<i64> = pack valid_vector::S3<i64>(-1, s1, s2);
+              {
+                let e1: E1 = pack valid_vector::E1::V1(s1);
+                {
+                  let e2: E1 = pack valid_vector::E1::V2(s2);
+                  {
+                    let e3: E1 = pack valid_vector::E1::V3(s3);
+                    {
+                      let v: vector<E1> = vector::empty<E1>();
+                      vector::push_back<E1>(Borrow(Mutable)(v), e1);
+                      vector::push_back<E1>(Borrow(Mutable)(v), e2);
+                      vector::push_back<E1>(Borrow(Mutable)(v), e3);
+                      v
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun test8(a: i64,b: i128): vector<E2> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s3: S3<i128> = pack valid_vector::S3<i128>(-1, s1, s2);
+              {
+                let e1: E2 = pack valid_vector::E2::V1(s1);
+                {
+                  let e2: E2 = pack valid_vector::E2::V2(s2);
+                  {
+                    let e3: E2 = pack valid_vector::E2::V3(s3);
+                    {
+                      let v: vector<E2> = vector::empty<E2>();
+                      vector::push_back<E2>(Borrow(Mutable)(v), e1);
+                      vector::push_back<E2>(Borrow(Mutable)(v), e2);
+                      vector::push_back<E2>(Borrow(Mutable)(v), e3);
+                      v
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun test9(a: i64,b: i128): vector<E3<i64>> {
+        {
+          let s1: S1 = pack valid_vector::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_vector::S2(s1, a, b);
+            {
+              let s3: S3<i64> = pack valid_vector::S3<i64>(-1, s1, s2);
+              {
+                let e1: E3<i64> = pack valid_vector::E3::V1<i64>(s1);
+                {
+                  let e2: E3<i64> = pack valid_vector::E3::V2<i64>(s2);
+                  {
+                    let e3: E3<i64> = pack valid_vector::E3::V3<i64>(s3);
+                    {
+                      let v: vector<E3<i64>> = vector::empty<E3<i64>>();
+                      vector::push_back<E3<i64>>(Borrow(Mutable)(v), e1);
+                      vector::push_back<E3<i64>>(Borrow(Mutable)(v), e2);
+                      vector::push_back<E3<i64>>(Borrow(Mutable)(v), e3);
+                      v
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::valid_vector
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_vector::test1($t0: i64): vector<i64> {
+     var $t1: vector<i64>
+     var $t2: vector<i64>
+     var $t3: &mut vector<i64>
+     var $t4: &mut vector<i64>
+     var $t5: &mut vector<i64>
+     var $t6: i64
+     var $t7: &mut vector<i64>
+     var $t8: i64
+  0: $t2 := vector::empty<i64>()
+  1: $t3 := borrow_local($t2)
+  2: vector::push_back<i64>($t3, $t0)
+  3: $t4 := borrow_local($t2)
+  4: vector::push_back<i64>($t4, $t0)
+  5: $t5 := borrow_local($t2)
+  6: $t6 := 1
+  7: vector::push_back<i64>($t5, $t6)
+  8: $t7 := borrow_local($t2)
+  9: $t8 := -1
+ 10: vector::push_back<i64>($t7, $t8)
+ 11: $t1 := infer($t2)
+ 12: return $t1
+}
+
+
+[variant baseline]
+fun valid_vector::test10($t0: i64, $t1: i128): vector<0x42::valid_vector::E3<i128>> {
+     var $t2: vector<0x42::valid_vector::E3<i128>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i128>
+     var $t11: i128
+     var $t12: 0x42::valid_vector::S1
+     var $t13: 0x42::valid_vector::E3<i128>
+     var $t14: 0x42::valid_vector::E3<i128>
+     var $t15: 0x42::valid_vector::E3<i128>
+     var $t16: vector<0x42::valid_vector::E3<i128>>
+     var $t17: &mut vector<0x42::valid_vector::E3<i128>>
+     var $t18: &mut vector<0x42::valid_vector::E3<i128>>
+     var $t19: &mut vector<0x42::valid_vector::E3<i128>>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := -1
+  8: $t12 := infer($t3)
+  9: $t10 := pack 0x42::valid_vector::S3<i128>($t11, $t12, $t7)
+ 10: $t13 := pack_variant 0x42::valid_vector::E3<i128>::V1($t3)
+ 11: $t14 := pack_variant 0x42::valid_vector::E3<i128>::V2($t7)
+ 12: $t15 := pack_variant 0x42::valid_vector::E3<i128>::V3($t10)
+ 13: $t16 := vector::empty<0x42::valid_vector::E3<i128>>()
+ 14: $t17 := borrow_local($t16)
+ 15: vector::push_back<0x42::valid_vector::E3<i128>>($t17, $t13)
+ 16: $t18 := borrow_local($t16)
+ 17: vector::push_back<0x42::valid_vector::E3<i128>>($t18, $t14)
+ 18: $t19 := borrow_local($t16)
+ 19: vector::push_back<0x42::valid_vector::E3<i128>>($t19, $t15)
+ 20: $t2 := infer($t16)
+ 21: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test2($t0: i128): vector<i128> {
+     var $t1: vector<i128>
+     var $t2: vector<i128>
+     var $t3: &mut vector<i128>
+     var $t4: &mut vector<i128>
+     var $t5: &mut vector<i128>
+     var $t6: i128
+     var $t7: &mut vector<i128>
+     var $t8: i128
+  0: $t2 := vector::empty<i128>()
+  1: $t3 := borrow_local($t2)
+  2: vector::push_back<i128>($t3, $t0)
+  3: $t4 := borrow_local($t2)
+  4: vector::push_back<i128>($t4, $t0)
+  5: $t5 := borrow_local($t2)
+  6: $t6 := 1
+  7: vector::push_back<i128>($t5, $t6)
+  8: $t7 := borrow_local($t2)
+  9: $t8 := -1
+ 10: vector::push_back<i128>($t7, $t8)
+ 11: $t1 := infer($t2)
+ 12: return $t1
+}
+
+
+[variant baseline]
+fun valid_vector::test3($t0: i64, $t1: i128): vector<0x42::valid_vector::S1> {
+     var $t2: vector<0x42::valid_vector::S1>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: 0x42::valid_vector::S1
+     var $t7: u64
+     var $t8: i64
+     var $t9: i128
+     var $t10: vector<0x42::valid_vector::S1>
+     var $t11: &mut vector<0x42::valid_vector::S1>
+     var $t12: &mut vector<0x42::valid_vector::S1>
+  0: $t4 := 1
+  1: $t5 := infer($t0)
+  2: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t1)
+  3: $t7 := 1
+  4: $t8 := -1
+  5: $t9 := -2
+  6: $t6 := pack 0x42::valid_vector::S1($t7, $t8, $t9)
+  7: $t10 := vector::empty<0x42::valid_vector::S1>()
+  8: $t11 := borrow_local($t10)
+  9: vector::push_back<0x42::valid_vector::S1>($t11, $t3)
+ 10: $t12 := borrow_local($t10)
+ 11: vector::push_back<0x42::valid_vector::S1>($t12, $t6)
+ 12: $t2 := infer($t10)
+ 13: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test4($t0: i64, $t1: i128): vector<0x42::valid_vector::S2> {
+     var $t2: vector<0x42::valid_vector::S2>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S2
+     var $t11: 0x42::valid_vector::S1
+     var $t12: i64
+     var $t13: i128
+     var $t14: vector<0x42::valid_vector::S2>
+     var $t15: &mut vector<0x42::valid_vector::S2>
+     var $t16: &mut vector<0x42::valid_vector::S2>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := infer($t3)
+  8: $t12 := -1
+  9: $t13 := -2
+ 10: $t10 := pack 0x42::valid_vector::S2($t11, $t12, $t13)
+ 11: $t14 := vector::empty<0x42::valid_vector::S2>()
+ 12: $t15 := borrow_local($t14)
+ 13: vector::push_back<0x42::valid_vector::S2>($t15, $t7)
+ 14: $t16 := borrow_local($t14)
+ 15: vector::push_back<0x42::valid_vector::S2>($t16, $t10)
+ 16: $t2 := infer($t14)
+ 17: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test5($t0: i64, $t1: i128): vector<0x42::valid_vector::S3<i64>> {
+     var $t2: vector<0x42::valid_vector::S3<i64>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i64>
+     var $t11: i64
+     var $t12: 0x42::valid_vector::S1
+     var $t13: vector<0x42::valid_vector::S3<i64>>
+     var $t14: &mut vector<0x42::valid_vector::S3<i64>>
+     var $t15: &mut vector<0x42::valid_vector::S3<i64>>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := infer($t0)
+  8: $t12 := infer($t3)
+  9: $t10 := pack 0x42::valid_vector::S3<i64>($t11, $t12, $t7)
+ 10: $t13 := vector::empty<0x42::valid_vector::S3<i64>>()
+ 11: $t14 := borrow_local($t13)
+ 12: vector::push_back<0x42::valid_vector::S3<i64>>($t14, $t10)
+ 13: $t15 := borrow_local($t13)
+ 14: vector::push_back<0x42::valid_vector::S3<i64>>($t15, $t10)
+ 15: $t2 := infer($t13)
+ 16: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test6($t0: i64, $t1: i128): vector<0x42::valid_vector::S3<i128>> {
+     var $t2: vector<0x42::valid_vector::S3<i128>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i128>
+     var $t11: i128
+     var $t12: 0x42::valid_vector::S1
+     var $t13: vector<0x42::valid_vector::S3<i128>>
+     var $t14: &mut vector<0x42::valid_vector::S3<i128>>
+     var $t15: &mut vector<0x42::valid_vector::S3<i128>>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := infer($t1)
+  8: $t12 := infer($t3)
+  9: $t10 := pack 0x42::valid_vector::S3<i128>($t11, $t12, $t7)
+ 10: $t13 := vector::empty<0x42::valid_vector::S3<i128>>()
+ 11: $t14 := borrow_local($t13)
+ 12: vector::push_back<0x42::valid_vector::S3<i128>>($t14, $t10)
+ 13: $t15 := borrow_local($t13)
+ 14: vector::push_back<0x42::valid_vector::S3<i128>>($t15, $t10)
+ 15: $t2 := infer($t13)
+ 16: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test7($t0: i64, $t1: i128): vector<0x42::valid_vector::E1> {
+     var $t2: vector<0x42::valid_vector::E1>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i64>
+     var $t11: i64
+     var $t12: 0x42::valid_vector::S1
+     var $t13: 0x42::valid_vector::E1
+     var $t14: 0x42::valid_vector::E1
+     var $t15: 0x42::valid_vector::E1
+     var $t16: vector<0x42::valid_vector::E1>
+     var $t17: &mut vector<0x42::valid_vector::E1>
+     var $t18: &mut vector<0x42::valid_vector::E1>
+     var $t19: &mut vector<0x42::valid_vector::E1>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := -1
+  8: $t12 := infer($t3)
+  9: $t10 := pack 0x42::valid_vector::S3<i64>($t11, $t12, $t7)
+ 10: $t13 := pack_variant 0x42::valid_vector::E1::V1($t3)
+ 11: $t14 := pack_variant 0x42::valid_vector::E1::V2($t7)
+ 12: $t15 := pack_variant 0x42::valid_vector::E1::V3($t10)
+ 13: $t16 := vector::empty<0x42::valid_vector::E1>()
+ 14: $t17 := borrow_local($t16)
+ 15: vector::push_back<0x42::valid_vector::E1>($t17, $t13)
+ 16: $t18 := borrow_local($t16)
+ 17: vector::push_back<0x42::valid_vector::E1>($t18, $t14)
+ 18: $t19 := borrow_local($t16)
+ 19: vector::push_back<0x42::valid_vector::E1>($t19, $t15)
+ 20: $t2 := infer($t16)
+ 21: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test8($t0: i64, $t1: i128): vector<0x42::valid_vector::E2> {
+     var $t2: vector<0x42::valid_vector::E2>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i128>
+     var $t11: i128
+     var $t12: 0x42::valid_vector::S1
+     var $t13: 0x42::valid_vector::E2
+     var $t14: 0x42::valid_vector::E2
+     var $t15: 0x42::valid_vector::E2
+     var $t16: vector<0x42::valid_vector::E2>
+     var $t17: &mut vector<0x42::valid_vector::E2>
+     var $t18: &mut vector<0x42::valid_vector::E2>
+     var $t19: &mut vector<0x42::valid_vector::E2>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := -1
+  8: $t12 := infer($t3)
+  9: $t10 := pack 0x42::valid_vector::S3<i128>($t11, $t12, $t7)
+ 10: $t13 := pack_variant 0x42::valid_vector::E2::V1($t3)
+ 11: $t14 := pack_variant 0x42::valid_vector::E2::V2($t7)
+ 12: $t15 := pack_variant 0x42::valid_vector::E2::V3($t10)
+ 13: $t16 := vector::empty<0x42::valid_vector::E2>()
+ 14: $t17 := borrow_local($t16)
+ 15: vector::push_back<0x42::valid_vector::E2>($t17, $t13)
+ 16: $t18 := borrow_local($t16)
+ 17: vector::push_back<0x42::valid_vector::E2>($t18, $t14)
+ 18: $t19 := borrow_local($t16)
+ 19: vector::push_back<0x42::valid_vector::E2>($t19, $t15)
+ 20: $t2 := infer($t16)
+ 21: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test9($t0: i64, $t1: i128): vector<0x42::valid_vector::E3<i64>> {
+     var $t2: vector<0x42::valid_vector::E3<i64>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64
+     var $t10: 0x42::valid_vector::S3<i64>
+     var $t11: i64
+     var $t12: 0x42::valid_vector::S1
+     var $t13: 0x42::valid_vector::E3<i64>
+     var $t14: 0x42::valid_vector::E3<i64>
+     var $t15: 0x42::valid_vector::E3<i64>
+     var $t16: vector<0x42::valid_vector::E3<i64>>
+     var $t17: &mut vector<0x42::valid_vector::E3<i64>>
+     var $t18: &mut vector<0x42::valid_vector::E3<i64>>
+     var $t19: &mut vector<0x42::valid_vector::E3<i64>>
+  0: $t4 := 1
+  1: $t5 := -1
+  2: $t6 := -2
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+  4: $t8 := infer($t3)
+  5: $t9 := infer($t0)
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t9, $t1)
+  7: $t11 := -1
+  8: $t12 := infer($t3)
+  9: $t10 := pack 0x42::valid_vector::S3<i64>($t11, $t12, $t7)
+ 10: $t13 := pack_variant 0x42::valid_vector::E3<i64>::V1($t3)
+ 11: $t14 := pack_variant 0x42::valid_vector::E3<i64>::V2($t7)
+ 12: $t15 := pack_variant 0x42::valid_vector::E3<i64>::V3($t10)
+ 13: $t16 := vector::empty<0x42::valid_vector::E3<i64>>()
+ 14: $t17 := borrow_local($t16)
+ 15: vector::push_back<0x42::valid_vector::E3<i64>>($t17, $t13)
+ 16: $t18 := borrow_local($t16)
+ 17: vector::push_back<0x42::valid_vector::E3<i64>>($t18, $t14)
+ 18: $t19 := borrow_local($t16)
+ 19: vector::push_back<0x42::valid_vector::E3<i64>>($t19, $t15)
+ 20: $t2 := infer($t16)
+ 21: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_vector::test1($t0: i64): vector<i64> {
+     var $t1: vector<i64>
+     var $t2: vector<i64>
+     var $t3: &mut vector<i64>
+     var $t4: &mut vector<i64> [unused]
+     var $t5: &mut vector<i64> [unused]
+     var $t6: i64 [unused]
+     var $t7: &mut vector<i64> [unused]
+     var $t8: i64 [unused]
+     # live vars: $t0
+  0: $t2 := vector::empty<i64>()
+     # live vars: $t0, $t2
+  1: $t3 := borrow_local($t2)
+     # live vars: $t0, $t2, $t3
+  2: vector::push_back<i64>($t3, $t0)
+     # live vars: $t0, $t2
+  3: $t3 := borrow_local($t2)
+     # live vars: $t0, $t2, $t3
+  4: vector::push_back<i64>($t3, $t0)
+     # live vars: $t2
+  5: $t3 := borrow_local($t2)
+     # live vars: $t2, $t3
+  6: $t0 := 1
+     # live vars: $t0, $t2, $t3
+  7: vector::push_back<i64>($t3, $t0)
+     # live vars: $t2
+  8: $t3 := borrow_local($t2)
+     # live vars: $t2, $t3
+  9: $t0 := -1
+     # live vars: $t0, $t2, $t3
+ 10: vector::push_back<i64>($t3, $t0)
+     # live vars: $t2
+ 11: $t1 := move($t2)
+     # live vars: $t1
+ 12: return $t1
+}
+
+
+[variant baseline]
+fun valid_vector::test10($t0: i64, $t1: i128): vector<0x42::valid_vector::E3<i128>> {
+     var $t2: vector<0x42::valid_vector::E3<i128>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64 [unused]
+     var $t10: 0x42::valid_vector::S3<i128>
+     var $t11: i128 [unused]
+     var $t12: 0x42::valid_vector::S1 [unused]
+     var $t13: 0x42::valid_vector::E3<i128>
+     var $t14: 0x42::valid_vector::E3<i128>
+     var $t15: 0x42::valid_vector::E3<i128>
+     var $t16: vector<0x42::valid_vector::E3<i128>>
+     var $t17: &mut vector<0x42::valid_vector::E3<i128>>
+     var $t18: &mut vector<0x42::valid_vector::E3<i128>> [unused]
+     var $t19: &mut vector<0x42::valid_vector::E3<i128>> [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t5 := -1
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t6 := -2
+     # live vars: $t0, $t1, $t4, $t5, $t6
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # live vars: $t0, $t1, $t3
+  4: $t8 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t8
+  5: $t0 := move($t0)
+     # live vars: $t0, $t1, $t3, $t8
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t0, $t1)
+     # live vars: $t3, $t7
+  7: $t1 := -1
+     # live vars: $t1, $t3, $t7
+  8: $t8 := copy($t3)
+     # live vars: $t1, $t3, $t7, $t8
+  9: $t10 := pack 0x42::valid_vector::S3<i128>($t1, $t8, $t7)
+     # live vars: $t3, $t7, $t10
+ 10: $t13 := pack_variant 0x42::valid_vector::E3<i128>::V1($t3)
+     # live vars: $t7, $t10, $t13
+ 11: $t14 := pack_variant 0x42::valid_vector::E3<i128>::V2($t7)
+     # live vars: $t10, $t13, $t14
+ 12: $t15 := pack_variant 0x42::valid_vector::E3<i128>::V3($t10)
+     # live vars: $t13, $t14, $t15
+ 13: $t16 := vector::empty<0x42::valid_vector::E3<i128>>()
+     # live vars: $t13, $t14, $t15, $t16
+ 14: $t17 := borrow_local($t16)
+     # live vars: $t13, $t14, $t15, $t16, $t17
+ 15: vector::push_back<0x42::valid_vector::E3<i128>>($t17, $t13)
+     # live vars: $t14, $t15, $t16
+ 16: $t17 := borrow_local($t16)
+     # live vars: $t14, $t15, $t16, $t17
+ 17: vector::push_back<0x42::valid_vector::E3<i128>>($t17, $t14)
+     # live vars: $t15, $t16
+ 18: $t17 := borrow_local($t16)
+     # live vars: $t15, $t16, $t17
+ 19: vector::push_back<0x42::valid_vector::E3<i128>>($t17, $t15)
+     # live vars: $t16
+ 20: $t2 := move($t16)
+     # live vars: $t2
+ 21: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test2($t0: i128): vector<i128> {
+     var $t1: vector<i128>
+     var $t2: vector<i128>
+     var $t3: &mut vector<i128>
+     var $t4: &mut vector<i128> [unused]
+     var $t5: &mut vector<i128> [unused]
+     var $t6: i128 [unused]
+     var $t7: &mut vector<i128> [unused]
+     var $t8: i128 [unused]
+     # live vars: $t0
+  0: $t2 := vector::empty<i128>()
+     # live vars: $t0, $t2
+  1: $t3 := borrow_local($t2)
+     # live vars: $t0, $t2, $t3
+  2: vector::push_back<i128>($t3, $t0)
+     # live vars: $t0, $t2
+  3: $t3 := borrow_local($t2)
+     # live vars: $t0, $t2, $t3
+  4: vector::push_back<i128>($t3, $t0)
+     # live vars: $t2
+  5: $t3 := borrow_local($t2)
+     # live vars: $t2, $t3
+  6: $t0 := 1
+     # live vars: $t0, $t2, $t3
+  7: vector::push_back<i128>($t3, $t0)
+     # live vars: $t2
+  8: $t3 := borrow_local($t2)
+     # live vars: $t2, $t3
+  9: $t0 := -1
+     # live vars: $t0, $t2, $t3
+ 10: vector::push_back<i128>($t3, $t0)
+     # live vars: $t2
+ 11: $t1 := move($t2)
+     # live vars: $t1
+ 12: return $t1
+}
+
+
+[variant baseline]
+fun valid_vector::test3($t0: i64, $t1: i128): vector<0x42::valid_vector::S1> {
+     var $t2: vector<0x42::valid_vector::S1>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64 [unused]
+     var $t6: 0x42::valid_vector::S1
+     var $t7: u64 [unused]
+     var $t8: i64 [unused]
+     var $t9: i128 [unused]
+     var $t10: vector<0x42::valid_vector::S1>
+     var $t11: &mut vector<0x42::valid_vector::S1>
+     var $t12: &mut vector<0x42::valid_vector::S1> [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t0 := move($t0)
+     # live vars: $t0, $t1, $t4
+  2: $t3 := pack 0x42::valid_vector::S1($t4, $t0, $t1)
+     # live vars: $t3
+  3: $t4 := 1
+     # live vars: $t3, $t4
+  4: $t0 := -1
+     # live vars: $t0, $t3, $t4
+  5: $t1 := -2
+     # live vars: $t0, $t1, $t3, $t4
+  6: $t6 := pack 0x42::valid_vector::S1($t4, $t0, $t1)
+     # live vars: $t3, $t6
+  7: $t10 := vector::empty<0x42::valid_vector::S1>()
+     # live vars: $t3, $t6, $t10
+  8: $t11 := borrow_local($t10)
+     # live vars: $t3, $t6, $t10, $t11
+  9: vector::push_back<0x42::valid_vector::S1>($t11, $t3)
+     # live vars: $t6, $t10
+ 10: $t11 := borrow_local($t10)
+     # live vars: $t6, $t10, $t11
+ 11: vector::push_back<0x42::valid_vector::S1>($t11, $t6)
+     # live vars: $t10
+ 12: $t2 := move($t10)
+     # live vars: $t2
+ 13: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test4($t0: i64, $t1: i128): vector<0x42::valid_vector::S2> {
+     var $t2: vector<0x42::valid_vector::S2>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64 [unused]
+     var $t10: 0x42::valid_vector::S2
+     var $t11: 0x42::valid_vector::S1 [unused]
+     var $t12: i64 [unused]
+     var $t13: i128 [unused]
+     var $t14: vector<0x42::valid_vector::S2>
+     var $t15: &mut vector<0x42::valid_vector::S2>
+     var $t16: &mut vector<0x42::valid_vector::S2> [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t5 := -1
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t6 := -2
+     # live vars: $t0, $t1, $t4, $t5, $t6
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # live vars: $t0, $t1, $t3
+  4: $t8 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t8
+  5: $t0 := move($t0)
+     # live vars: $t0, $t1, $t3, $t8
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t0, $t1)
+     # live vars: $t3, $t7
+  7: $t3 := move($t3)
+     # live vars: $t3, $t7
+  8: $t0 := -1
+     # live vars: $t0, $t3, $t7
+  9: $t1 := -2
+     # live vars: $t0, $t1, $t3, $t7
+ 10: $t10 := pack 0x42::valid_vector::S2($t3, $t0, $t1)
+     # live vars: $t7, $t10
+ 11: $t14 := vector::empty<0x42::valid_vector::S2>()
+     # live vars: $t7, $t10, $t14
+ 12: $t15 := borrow_local($t14)
+     # live vars: $t7, $t10, $t14, $t15
+ 13: vector::push_back<0x42::valid_vector::S2>($t15, $t7)
+     # live vars: $t10, $t14
+ 14: $t15 := borrow_local($t14)
+     # live vars: $t10, $t14, $t15
+ 15: vector::push_back<0x42::valid_vector::S2>($t15, $t10)
+     # live vars: $t14
+ 16: $t2 := move($t14)
+     # live vars: $t2
+ 17: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test5($t0: i64, $t1: i128): vector<0x42::valid_vector::S3<i64>> {
+     var $t2: vector<0x42::valid_vector::S3<i64>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64 [unused]
+     var $t10: 0x42::valid_vector::S3<i64>
+     var $t11: i64 [unused]
+     var $t12: 0x42::valid_vector::S1 [unused]
+     var $t13: vector<0x42::valid_vector::S3<i64>>
+     var $t14: &mut vector<0x42::valid_vector::S3<i64>>
+     var $t15: &mut vector<0x42::valid_vector::S3<i64>> [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t5 := -1
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t6 := -2
+     # live vars: $t0, $t1, $t4, $t5, $t6
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # live vars: $t0, $t1, $t3
+  4: $t8 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t8
+  5: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t3, $t5, $t8
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t5, $t1)
+     # live vars: $t0, $t3, $t7
+  7: $t0 := move($t0)
+     # live vars: $t0, $t3, $t7
+  8: $t3 := move($t3)
+     # live vars: $t0, $t3, $t7
+  9: $t10 := pack 0x42::valid_vector::S3<i64>($t0, $t3, $t7)
+     # live vars: $t10
+ 10: $t13 := vector::empty<0x42::valid_vector::S3<i64>>()
+     # live vars: $t10, $t13
+ 11: $t14 := borrow_local($t13)
+     # live vars: $t10, $t13, $t14
+ 12: vector::push_back<0x42::valid_vector::S3<i64>>($t14, $t10)
+     # live vars: $t10, $t13
+ 13: $t14 := borrow_local($t13)
+     # live vars: $t10, $t13, $t14
+ 14: vector::push_back<0x42::valid_vector::S3<i64>>($t14, $t10)
+     # live vars: $t13
+ 15: $t2 := move($t13)
+     # live vars: $t2
+ 16: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test6($t0: i64, $t1: i128): vector<0x42::valid_vector::S3<i128>> {
+     var $t2: vector<0x42::valid_vector::S3<i128>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64 [unused]
+     var $t10: 0x42::valid_vector::S3<i128>
+     var $t11: i128 [unused]
+     var $t12: 0x42::valid_vector::S1 [unused]
+     var $t13: vector<0x42::valid_vector::S3<i128>>
+     var $t14: &mut vector<0x42::valid_vector::S3<i128>>
+     var $t15: &mut vector<0x42::valid_vector::S3<i128>> [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t5 := -1
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t6 := -2
+     # live vars: $t0, $t1, $t4, $t5, $t6
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # live vars: $t0, $t1, $t3
+  4: $t8 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t8
+  5: $t0 := move($t0)
+     # live vars: $t0, $t1, $t3, $t8
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t0, $t1)
+     # live vars: $t1, $t3, $t7
+  7: $t1 := move($t1)
+     # live vars: $t1, $t3, $t7
+  8: $t3 := move($t3)
+     # live vars: $t1, $t3, $t7
+  9: $t10 := pack 0x42::valid_vector::S3<i128>($t1, $t3, $t7)
+     # live vars: $t10
+ 10: $t13 := vector::empty<0x42::valid_vector::S3<i128>>()
+     # live vars: $t10, $t13
+ 11: $t14 := borrow_local($t13)
+     # live vars: $t10, $t13, $t14
+ 12: vector::push_back<0x42::valid_vector::S3<i128>>($t14, $t10)
+     # live vars: $t10, $t13
+ 13: $t14 := borrow_local($t13)
+     # live vars: $t10, $t13, $t14
+ 14: vector::push_back<0x42::valid_vector::S3<i128>>($t14, $t10)
+     # live vars: $t13
+ 15: $t2 := move($t13)
+     # live vars: $t2
+ 16: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test7($t0: i64, $t1: i128): vector<0x42::valid_vector::E1> {
+     var $t2: vector<0x42::valid_vector::E1>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64 [unused]
+     var $t10: 0x42::valid_vector::S3<i64>
+     var $t11: i64 [unused]
+     var $t12: 0x42::valid_vector::S1 [unused]
+     var $t13: 0x42::valid_vector::E1
+     var $t14: 0x42::valid_vector::E1
+     var $t15: 0x42::valid_vector::E1
+     var $t16: vector<0x42::valid_vector::E1>
+     var $t17: &mut vector<0x42::valid_vector::E1>
+     var $t18: &mut vector<0x42::valid_vector::E1> [unused]
+     var $t19: &mut vector<0x42::valid_vector::E1> [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t5 := -1
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t6 := -2
+     # live vars: $t0, $t1, $t4, $t5, $t6
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # live vars: $t0, $t1, $t3
+  4: $t8 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t8
+  5: $t0 := move($t0)
+     # live vars: $t0, $t1, $t3, $t8
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t0, $t1)
+     # live vars: $t3, $t7
+  7: $t0 := -1
+     # live vars: $t0, $t3, $t7
+  8: $t8 := copy($t3)
+     # live vars: $t0, $t3, $t7, $t8
+  9: $t10 := pack 0x42::valid_vector::S3<i64>($t0, $t8, $t7)
+     # live vars: $t3, $t7, $t10
+ 10: $t13 := pack_variant 0x42::valid_vector::E1::V1($t3)
+     # live vars: $t7, $t10, $t13
+ 11: $t14 := pack_variant 0x42::valid_vector::E1::V2($t7)
+     # live vars: $t10, $t13, $t14
+ 12: $t15 := pack_variant 0x42::valid_vector::E1::V3($t10)
+     # live vars: $t13, $t14, $t15
+ 13: $t16 := vector::empty<0x42::valid_vector::E1>()
+     # live vars: $t13, $t14, $t15, $t16
+ 14: $t17 := borrow_local($t16)
+     # live vars: $t13, $t14, $t15, $t16, $t17
+ 15: vector::push_back<0x42::valid_vector::E1>($t17, $t13)
+     # live vars: $t14, $t15, $t16
+ 16: $t17 := borrow_local($t16)
+     # live vars: $t14, $t15, $t16, $t17
+ 17: vector::push_back<0x42::valid_vector::E1>($t17, $t14)
+     # live vars: $t15, $t16
+ 18: $t17 := borrow_local($t16)
+     # live vars: $t15, $t16, $t17
+ 19: vector::push_back<0x42::valid_vector::E1>($t17, $t15)
+     # live vars: $t16
+ 20: $t2 := move($t16)
+     # live vars: $t2
+ 21: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test8($t0: i64, $t1: i128): vector<0x42::valid_vector::E2> {
+     var $t2: vector<0x42::valid_vector::E2>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64 [unused]
+     var $t10: 0x42::valid_vector::S3<i128>
+     var $t11: i128 [unused]
+     var $t12: 0x42::valid_vector::S1 [unused]
+     var $t13: 0x42::valid_vector::E2
+     var $t14: 0x42::valid_vector::E2
+     var $t15: 0x42::valid_vector::E2
+     var $t16: vector<0x42::valid_vector::E2>
+     var $t17: &mut vector<0x42::valid_vector::E2>
+     var $t18: &mut vector<0x42::valid_vector::E2> [unused]
+     var $t19: &mut vector<0x42::valid_vector::E2> [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t5 := -1
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t6 := -2
+     # live vars: $t0, $t1, $t4, $t5, $t6
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # live vars: $t0, $t1, $t3
+  4: $t8 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t8
+  5: $t0 := move($t0)
+     # live vars: $t0, $t1, $t3, $t8
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t0, $t1)
+     # live vars: $t3, $t7
+  7: $t1 := -1
+     # live vars: $t1, $t3, $t7
+  8: $t8 := copy($t3)
+     # live vars: $t1, $t3, $t7, $t8
+  9: $t10 := pack 0x42::valid_vector::S3<i128>($t1, $t8, $t7)
+     # live vars: $t3, $t7, $t10
+ 10: $t13 := pack_variant 0x42::valid_vector::E2::V1($t3)
+     # live vars: $t7, $t10, $t13
+ 11: $t14 := pack_variant 0x42::valid_vector::E2::V2($t7)
+     # live vars: $t10, $t13, $t14
+ 12: $t15 := pack_variant 0x42::valid_vector::E2::V3($t10)
+     # live vars: $t13, $t14, $t15
+ 13: $t16 := vector::empty<0x42::valid_vector::E2>()
+     # live vars: $t13, $t14, $t15, $t16
+ 14: $t17 := borrow_local($t16)
+     # live vars: $t13, $t14, $t15, $t16, $t17
+ 15: vector::push_back<0x42::valid_vector::E2>($t17, $t13)
+     # live vars: $t14, $t15, $t16
+ 16: $t17 := borrow_local($t16)
+     # live vars: $t14, $t15, $t16, $t17
+ 17: vector::push_back<0x42::valid_vector::E2>($t17, $t14)
+     # live vars: $t15, $t16
+ 18: $t17 := borrow_local($t16)
+     # live vars: $t15, $t16, $t17
+ 19: vector::push_back<0x42::valid_vector::E2>($t17, $t15)
+     # live vars: $t16
+ 20: $t2 := move($t16)
+     # live vars: $t2
+ 21: return $t2
+}
+
+
+[variant baseline]
+fun valid_vector::test9($t0: i64, $t1: i128): vector<0x42::valid_vector::E3<i64>> {
+     var $t2: vector<0x42::valid_vector::E3<i64>>
+     var $t3: 0x42::valid_vector::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: i128
+     var $t7: 0x42::valid_vector::S2
+     var $t8: 0x42::valid_vector::S1
+     var $t9: i64 [unused]
+     var $t10: 0x42::valid_vector::S3<i64>
+     var $t11: i64 [unused]
+     var $t12: 0x42::valid_vector::S1 [unused]
+     var $t13: 0x42::valid_vector::E3<i64>
+     var $t14: 0x42::valid_vector::E3<i64>
+     var $t15: 0x42::valid_vector::E3<i64>
+     var $t16: vector<0x42::valid_vector::E3<i64>>
+     var $t17: &mut vector<0x42::valid_vector::E3<i64>>
+     var $t18: &mut vector<0x42::valid_vector::E3<i64>> [unused]
+     var $t19: &mut vector<0x42::valid_vector::E3<i64>> [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t5 := -1
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t6 := -2
+     # live vars: $t0, $t1, $t4, $t5, $t6
+  3: $t3 := pack 0x42::valid_vector::S1($t4, $t5, $t6)
+     # live vars: $t0, $t1, $t3
+  4: $t8 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t8
+  5: $t0 := move($t0)
+     # live vars: $t0, $t1, $t3, $t8
+  6: $t7 := pack 0x42::valid_vector::S2($t8, $t0, $t1)
+     # live vars: $t3, $t7
+  7: $t0 := -1
+     # live vars: $t0, $t3, $t7
+  8: $t8 := copy($t3)
+     # live vars: $t0, $t3, $t7, $t8
+  9: $t10 := pack 0x42::valid_vector::S3<i64>($t0, $t8, $t7)
+     # live vars: $t3, $t7, $t10
+ 10: $t13 := pack_variant 0x42::valid_vector::E3<i64>::V1($t3)
+     # live vars: $t7, $t10, $t13
+ 11: $t14 := pack_variant 0x42::valid_vector::E3<i64>::V2($t7)
+     # live vars: $t10, $t13, $t14
+ 12: $t15 := pack_variant 0x42::valid_vector::E3<i64>::V3($t10)
+     # live vars: $t13, $t14, $t15
+ 13: $t16 := vector::empty<0x42::valid_vector::E3<i64>>()
+     # live vars: $t13, $t14, $t15, $t16
+ 14: $t17 := borrow_local($t16)
+     # live vars: $t13, $t14, $t15, $t16, $t17
+ 15: vector::push_back<0x42::valid_vector::E3<i64>>($t17, $t13)
+     # live vars: $t14, $t15, $t16
+ 16: $t17 := borrow_local($t16)
+     # live vars: $t14, $t15, $t16, $t17
+ 17: vector::push_back<0x42::valid_vector::E3<i64>>($t17, $t14)
+     # live vars: $t15, $t16
+ 18: $t17 := borrow_local($t16)
+     # live vars: $t15, $t16, $t17
+ 19: vector::push_back<0x42::valid_vector::E3<i64>>($t17, $t15)
+     # live vars: $t16
+ 20: $t2 := move($t16)
+     # live vars: $t2
+ 21: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v9
+module 42.valid_vector {
+enum E1 has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<i64>
+ }
+}
+enum E2 has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<i128>
+ }
+}
+enum E3<T> has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<T>
+ }
+}
+struct S1 has copy, drop {
+	x: u64,
+	y: i64,
+	z: i128
+}
+struct S2 has copy, drop {
+	x: S1,
+	y: i64,
+	z: i128
+}
+struct S3<T> has copy, drop {
+	x: T,
+	y: S1,
+	z: S2
+}
+
+test1(a: i64): vector<i64> /* def_idx: 0 */ {
+L1:	v: vector<i64>
+B0:
+	0: VecPack(0, 0)
+	1: StLoc[1](v: vector<i64>)
+	2: MutBorrowLoc[1](v: vector<i64>)
+	3: CopyLoc[0](a: i64)
+	4: VecPushBack(0)
+	5: MutBorrowLoc[1](v: vector<i64>)
+	6: MoveLoc[0](a: i64)
+	7: VecPushBack(0)
+	8: MutBorrowLoc[1](v: vector<i64>)
+	9: LdI64(1)
+	10: VecPushBack(0)
+	11: MutBorrowLoc[1](v: vector<i64>)
+	12: LdI64(-1)
+	13: VecPushBack(0)
+	14: MoveLoc[1](v: vector<i64>)
+	15: Ret
+}
+test10(a: i64, b: i128): vector<E3<i128>> /* def_idx: 1 */ {
+L2:	s1: S1
+L3:	s2: S2
+L4:	e1: E3<i128>
+L5:	e2: E3<i128>
+L6:	e3: E3<i128>
+L7:	v: vector<E3<i128>>
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[3](S1)
+	4: StLoc[2](s1: S1)
+	5: CopyLoc[2](s1: S1)
+	6: MoveLoc[0](a: i64)
+	7: MoveLoc[1](b: i128)
+	8: Pack[4](S2)
+	9: StLoc[3](s2: S2)
+	10: LdI128(-1)
+	11: CopyLoc[2](s1: S1)
+	12: CopyLoc[3](s2: S2)
+	13: PackGeneric[0](S3<i128>)
+	14: MoveLoc[2](s1: S1)
+	15: PackVariantGeneric[0](E3/V1<i128>)
+	16: StLoc[4](e1: E3<i128>)
+	17: MoveLoc[3](s2: S2)
+	18: PackVariantGeneric[1](E3/V2<i128>)
+	19: StLoc[5](e2: E3<i128>)
+	20: PackVariantGeneric[2](E3/V3<i128>)
+	21: StLoc[6](e3: E3<i128>)
+	22: VecPack(5, 0)
+	23: StLoc[7](v: vector<E3<i128>>)
+	24: MutBorrowLoc[7](v: vector<E3<i128>>)
+	25: MoveLoc[4](e1: E3<i128>)
+	26: VecPushBack(5)
+	27: MutBorrowLoc[7](v: vector<E3<i128>>)
+	28: MoveLoc[5](e2: E3<i128>)
+	29: VecPushBack(5)
+	30: MutBorrowLoc[7](v: vector<E3<i128>>)
+	31: MoveLoc[6](e3: E3<i128>)
+	32: VecPushBack(5)
+	33: MoveLoc[7](v: vector<E3<i128>>)
+	34: Ret
+}
+test2(a: i128): vector<i128> /* def_idx: 2 */ {
+L1:	v: vector<i128>
+B0:
+	0: VecPack(4, 0)
+	1: StLoc[1](v: vector<i128>)
+	2: MutBorrowLoc[1](v: vector<i128>)
+	3: CopyLoc[0](a: i128)
+	4: VecPushBack(4)
+	5: MutBorrowLoc[1](v: vector<i128>)
+	6: MoveLoc[0](a: i128)
+	7: VecPushBack(4)
+	8: MutBorrowLoc[1](v: vector<i128>)
+	9: LdI128(1)
+	10: VecPushBack(4)
+	11: MutBorrowLoc[1](v: vector<i128>)
+	12: LdI128(-1)
+	13: VecPushBack(4)
+	14: MoveLoc[1](v: vector<i128>)
+	15: Ret
+}
+test3(a: i64, b: i128): vector<S1> /* def_idx: 3 */ {
+L2:	s1: S1
+L3:	s11: S1
+L4:	v: vector<S1>
+B0:
+	0: LdU64(1)
+	1: MoveLoc[0](a: i64)
+	2: MoveLoc[1](b: i128)
+	3: Pack[3](S1)
+	4: StLoc[2](s1: S1)
+	5: LdU64(1)
+	6: LdI64(-1)
+	7: LdI128(-2)
+	8: Pack[3](S1)
+	9: StLoc[3](s11: S1)
+	10: VecPack(9, 0)
+	11: StLoc[4](v: vector<S1>)
+	12: MutBorrowLoc[4](v: vector<S1>)
+	13: MoveLoc[2](s1: S1)
+	14: VecPushBack(9)
+	15: MutBorrowLoc[4](v: vector<S1>)
+	16: MoveLoc[3](s11: S1)
+	17: VecPushBack(9)
+	18: MoveLoc[4](v: vector<S1>)
+	19: Ret
+}
+test4(a: i64, b: i128): vector<S2> /* def_idx: 4 */ {
+L2:	s1: S1
+L3:	s2: S2
+L4:	s21: S2
+L5:	v: vector<S2>
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[3](S1)
+	4: StLoc[2](s1: S1)
+	5: CopyLoc[2](s1: S1)
+	6: MoveLoc[0](a: i64)
+	7: MoveLoc[1](b: i128)
+	8: Pack[4](S2)
+	9: StLoc[3](s2: S2)
+	10: MoveLoc[2](s1: S1)
+	11: LdI64(-1)
+	12: LdI128(-2)
+	13: Pack[4](S2)
+	14: StLoc[4](s21: S2)
+	15: VecPack(12, 0)
+	16: StLoc[5](v: vector<S2>)
+	17: MutBorrowLoc[5](v: vector<S2>)
+	18: MoveLoc[3](s2: S2)
+	19: VecPushBack(12)
+	20: MutBorrowLoc[5](v: vector<S2>)
+	21: MoveLoc[4](s21: S2)
+	22: VecPushBack(12)
+	23: MoveLoc[5](v: vector<S2>)
+	24: Ret
+}
+test5(a: i64, b: i128): vector<S3<i64>> /* def_idx: 5 */ {
+L2:	s1: S1
+L3:	s2: S2
+L4:	s3: S3<i64>
+L5:	v: vector<S3<i64>>
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[3](S1)
+	4: StLoc[2](s1: S1)
+	5: CopyLoc[2](s1: S1)
+	6: CopyLoc[0](a: i64)
+	7: MoveLoc[1](b: i128)
+	8: Pack[4](S2)
+	9: StLoc[3](s2: S2)
+	10: MoveLoc[0](a: i64)
+	11: MoveLoc[2](s1: S1)
+	12: MoveLoc[3](s2: S2)
+	13: PackGeneric[1](S3<i64>)
+	14: StLoc[4](s3: S3<i64>)
+	15: VecPack(15, 0)
+	16: StLoc[5](v: vector<S3<i64>>)
+	17: MutBorrowLoc[5](v: vector<S3<i64>>)
+	18: CopyLoc[4](s3: S3<i64>)
+	19: VecPushBack(15)
+	20: MutBorrowLoc[5](v: vector<S3<i64>>)
+	21: MoveLoc[4](s3: S3<i64>)
+	22: VecPushBack(15)
+	23: MoveLoc[5](v: vector<S3<i64>>)
+	24: Ret
+}
+test6(a: i64, b: i128): vector<S3<i128>> /* def_idx: 6 */ {
+L2:	s1: S1
+L3:	s2: S2
+L4:	s3: S3<i128>
+L5:	v: vector<S3<i128>>
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[3](S1)
+	4: StLoc[2](s1: S1)
+	5: CopyLoc[2](s1: S1)
+	6: MoveLoc[0](a: i64)
+	7: CopyLoc[1](b: i128)
+	8: Pack[4](S2)
+	9: StLoc[3](s2: S2)
+	10: MoveLoc[1](b: i128)
+	11: MoveLoc[2](s1: S1)
+	12: MoveLoc[3](s2: S2)
+	13: PackGeneric[0](S3<i128>)
+	14: StLoc[4](s3: S3<i128>)
+	15: VecPack(18, 0)
+	16: StLoc[5](v: vector<S3<i128>>)
+	17: MutBorrowLoc[5](v: vector<S3<i128>>)
+	18: CopyLoc[4](s3: S3<i128>)
+	19: VecPushBack(18)
+	20: MutBorrowLoc[5](v: vector<S3<i128>>)
+	21: MoveLoc[4](s3: S3<i128>)
+	22: VecPushBack(18)
+	23: MoveLoc[5](v: vector<S3<i128>>)
+	24: Ret
+}
+test7(a: i64, b: i128): vector<E1> /* def_idx: 7 */ {
+L2:	s1: S1
+L3:	s2: S2
+L4:	e1: E1
+L5:	e2: E1
+L6:	e3: E1
+L7:	v: vector<E1>
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[3](S1)
+	4: StLoc[2](s1: S1)
+	5: CopyLoc[2](s1: S1)
+	6: MoveLoc[0](a: i64)
+	7: MoveLoc[1](b: i128)
+	8: Pack[4](S2)
+	9: StLoc[3](s2: S2)
+	10: LdI64(-1)
+	11: CopyLoc[2](s1: S1)
+	12: CopyLoc[3](s2: S2)
+	13: PackGeneric[1](S3<i64>)
+	14: MoveLoc[2](s1: S1)
+	15: PackVariant[3](E1/V1)
+	16: StLoc[4](e1: E1)
+	17: MoveLoc[3](s2: S2)
+	18: PackVariant[4](E1/V2)
+	19: StLoc[5](e2: E1)
+	20: PackVariant[5](E1/V3)
+	21: StLoc[6](e3: E1)
+	22: VecPack(21, 0)
+	23: StLoc[7](v: vector<E1>)
+	24: MutBorrowLoc[7](v: vector<E1>)
+	25: MoveLoc[4](e1: E1)
+	26: VecPushBack(21)
+	27: MutBorrowLoc[7](v: vector<E1>)
+	28: MoveLoc[5](e2: E1)
+	29: VecPushBack(21)
+	30: MutBorrowLoc[7](v: vector<E1>)
+	31: MoveLoc[6](e3: E1)
+	32: VecPushBack(21)
+	33: MoveLoc[7](v: vector<E1>)
+	34: Ret
+}
+test8(a: i64, b: i128): vector<E2> /* def_idx: 8 */ {
+L2:	s1: S1
+L3:	s2: S2
+L4:	e1: E2
+L5:	e2: E2
+L6:	e3: E2
+L7:	v: vector<E2>
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[3](S1)
+	4: StLoc[2](s1: S1)
+	5: CopyLoc[2](s1: S1)
+	6: MoveLoc[0](a: i64)
+	7: MoveLoc[1](b: i128)
+	8: Pack[4](S2)
+	9: StLoc[3](s2: S2)
+	10: LdI128(-1)
+	11: CopyLoc[2](s1: S1)
+	12: CopyLoc[3](s2: S2)
+	13: PackGeneric[0](S3<i128>)
+	14: MoveLoc[2](s1: S1)
+	15: PackVariant[6](E2/V1)
+	16: StLoc[4](e1: E2)
+	17: MoveLoc[3](s2: S2)
+	18: PackVariant[7](E2/V2)
+	19: StLoc[5](e2: E2)
+	20: PackVariant[8](E2/V3)
+	21: StLoc[6](e3: E2)
+	22: VecPack(24, 0)
+	23: StLoc[7](v: vector<E2>)
+	24: MutBorrowLoc[7](v: vector<E2>)
+	25: MoveLoc[4](e1: E2)
+	26: VecPushBack(24)
+	27: MutBorrowLoc[7](v: vector<E2>)
+	28: MoveLoc[5](e2: E2)
+	29: VecPushBack(24)
+	30: MutBorrowLoc[7](v: vector<E2>)
+	31: MoveLoc[6](e3: E2)
+	32: VecPushBack(24)
+	33: MoveLoc[7](v: vector<E2>)
+	34: Ret
+}
+test9(a: i64, b: i128): vector<E3<i64>> /* def_idx: 9 */ {
+L2:	s1: S1
+L3:	s2: S2
+L4:	e1: E3<i64>
+L5:	e2: E3<i64>
+L6:	e3: E3<i64>
+L7:	v: vector<E3<i64>>
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[3](S1)
+	4: StLoc[2](s1: S1)
+	5: CopyLoc[2](s1: S1)
+	6: MoveLoc[0](a: i64)
+	7: MoveLoc[1](b: i128)
+	8: Pack[4](S2)
+	9: StLoc[3](s2: S2)
+	10: LdI64(-1)
+	11: CopyLoc[2](s1: S1)
+	12: CopyLoc[3](s2: S2)
+	13: PackGeneric[1](S3<i64>)
+	14: MoveLoc[2](s1: S1)
+	15: PackVariantGeneric[3](E3/V1<i64>)
+	16: StLoc[4](e1: E3<i64>)
+	17: MoveLoc[3](s2: S2)
+	18: PackVariantGeneric[4](E3/V2<i64>)
+	19: StLoc[5](e2: E3<i64>)
+	20: PackVariantGeneric[5](E3/V3<i64>)
+	21: StLoc[6](e3: E3<i64>)
+	22: VecPack(27, 0)
+	23: StLoc[7](v: vector<E3<i64>>)
+	24: MutBorrowLoc[7](v: vector<E3<i64>>)
+	25: MoveLoc[4](e1: E3<i64>)
+	26: VecPushBack(27)
+	27: MutBorrowLoc[7](v: vector<E3<i64>>)
+	28: MoveLoc[5](e2: E3<i64>)
+	29: VecPushBack(27)
+	30: MutBorrowLoc[7](v: vector<E3<i64>>)
+	31: MoveLoc[6](e3: E3<i64>)
+	32: VecPushBack(27)
+	33: MoveLoc[7](v: vector<E3<i64>>)
+	34: Ret
+}
+}
+============ bytecode verification succeeded ========

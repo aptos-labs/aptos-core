@@ -280,6 +280,10 @@ impl<'env> Abigen<'env> {
                     Num | Range | EventStore => {
                         bail!("Type {:?} is not allowed in scripts.", ty0)
                     },
+                    I8 | I16 | I32 | I64 | I128 | I256 => {
+                        // TODO(#17645) add support
+                        unimplemented!("signed integer not supported");
+                    },
                 }
             },
             Vector(ty) => {
