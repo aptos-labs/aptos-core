@@ -898,6 +898,7 @@ module aptos_framework::fungible_asset {
             store_obj,
             FungibleStore { metadata: object::convert(metadata), balance: 0, frozen: false }
         );
+        object::add_deletion_guarded_resource(store_obj);
 
         if (is_untransferable(metadata)) {
             object::set_untransferable(constructor_ref);
@@ -921,6 +922,8 @@ module aptos_framework::fungible_asset {
     ) acquires FungibleStore, FungibleAssetEvents, ConcurrentFungibleBalance {
         let store = object::object_from_delete_ref<FungibleStore>(delete_ref);
         let addr = object::object_address(&store);
+        object::remove_deletion_guarded_resource(addr);
+
         let FungibleStore { metadata, balance, frozen: _ } =
             move_from<FungibleStore>(addr);
         assert!(balance == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
