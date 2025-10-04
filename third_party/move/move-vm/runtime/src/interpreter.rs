@@ -1540,6 +1540,7 @@ where
     //
 
     /// If the error is invariant violation, attaches the state of the current frame.
+    #[cold]
     fn attach_state_if_invariant_violation(
         &self,
         mut err: VMError,
@@ -1683,10 +1684,12 @@ where
         internal_state
     }
 
+    #[cold]
     fn set_location(&self, err: PartialVMError) -> VMError {
         err.finish(self.call_stack.current_location())
     }
 
+    #[cold]
     fn get_internal_state(&self) -> ExecutionState {
         self.get_stack_frames(usize::MAX)
     }
@@ -1697,6 +1700,7 @@ where
     LoaderImpl: Loader,
 {
     #[allow(dead_code)]
+    #[cold]
     fn debug_print_stack_trace(
         &self,
         buf: &mut String,
