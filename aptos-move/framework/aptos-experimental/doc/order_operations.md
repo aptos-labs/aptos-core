@@ -315,7 +315,7 @@ Parameters:
         metadata
     ) = order.destroy_single_order();
     cleanup_order_internal(
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, client_order_id, single_order_book_type(), is_bid, time_in_force, remaining_size, metadata, callbacks
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, client_order_id, single_order_book_type(), is_bid, time_in_force, remaining_size, price, metadata, callbacks
     );
     <b>if</b> (emit_event) {
         market.emit_event_for_order(
