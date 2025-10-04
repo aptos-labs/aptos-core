@@ -163,6 +163,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                 return Ok(maybe_payload.expect("persisted value must exist"));
                             }
                             Err(err) => {
+                                // TODO: need fixing here???
                                 debug!("channel closed: {}", err);
                             }
                         };
