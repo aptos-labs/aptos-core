@@ -1753,9 +1753,9 @@ impl ExpTranslator<'_, '_, '_> {
                         );
                     }
                     // Insert freeze for each expression in the exp list
-                    let target_exp = if self.insert_freeze && expected_tys_opt.is_some() {
-                        let expected_tys =
-                            expected_tys_opt.expect("expected types should not be None");
+                    let target_exp = if self.insert_freeze
+                        && let Some(expected_tys) = expected_tys_opt
+                    {
                         let expected_ty_opt = expected_tys.get(i);
                         if let Some(expected_ty) = expected_ty_opt {
                             self.try_freeze(expected_ty, &ty, exp.into())

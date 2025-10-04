@@ -404,14 +404,16 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
     BlockExecutor<AptosVMBlockExecutor>,
     Waypoint,
 ) {
-    let (db, dbrw) = force_sharding
-        .then(|| {
+    let (db, dbrw) = if force_sharding {
+        {
             DbReaderWriter::wrap(AptosDB::new_for_test_with_sharding(
                 &path,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             ))
-        })
-        .unwrap_or_else(|| DbReaderWriter::wrap(AptosDB::new_for_test(&path)));
+        }
+    } else {
+        DbReaderWriter::wrap(AptosDB::new_for_test(&path))
+    };
     let waypoint = bootstrap_genesis::<AptosVMBlockExecutor>(&dbrw, genesis).unwrap();
     let executor = BlockExecutor::new(dbrw.clone());
 

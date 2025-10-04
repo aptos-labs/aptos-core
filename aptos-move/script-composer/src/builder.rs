@@ -114,10 +114,10 @@ impl TransactionComposer {
             parameters: vec![],
             locals_availability: vec![],
             locals_ty: vec![],
-            parameters_ty: std::iter::repeat(SignatureToken::Reference(Box::new(
-                SignatureToken::Signer,
-            )))
-            .take(signer_count.into())
+            parameters_ty: std::iter::repeat_n(
+                SignatureToken::Reference(Box::new(SignatureToken::Signer)),
+                signer_count.into(),
+            )
             .collect(),
 
             #[cfg(test)]

@@ -162,8 +162,8 @@ impl Execution {
             while ver_res.is_err() {
                 ver_res = index_reader.get_next_version();
             }
-            if ver_res.is_ok() {
-                if let Some(ver) = ver_res.unwrap() {
+            if let Ok(ver) = ver_res {
+                if let Some(ver) = ver {
                     cur_version = ver;
                 } else {
                     break;
