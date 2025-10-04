@@ -45,6 +45,7 @@ pub(crate) trait RuntimeTypeCheck {
 
     /// Performs a runtime check of the caller is allowed to call the callee for any type of call,
     /// including native dynamic dispatch or calling a closure.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_call_visibility(
         caller: &LoadedFunction,
         callee: &LoadedFunction,
@@ -107,6 +108,7 @@ pub(crate) trait RuntimeTypeCheck {
     ) -> PartialVMResult<()>;
 }
 
+#[cfg_attr(feature = "force-inline", inline(always))]
 fn verify_pack<'a>(
     operand_stack: &mut Stack,
     field_count: u16,
@@ -222,6 +224,7 @@ pub(crate) struct FullRuntimeTypeCheck;
 pub(crate) struct UntrustedOnlyRuntimeTypeCheck;
 
 impl RuntimeTypeCheck for NoRuntimeTypeCheck {
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn pre_execution_type_stack_transition(
         _frame: &Frame,
         _operand_stack: &mut Stack,
@@ -231,6 +234,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         Ok(())
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn post_execution_type_stack_transition(
         _frame: &Frame,
         _operand_stack: &mut Stack,
@@ -240,6 +244,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         Ok(())
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_operand_stack_balance(
         _for_fun: &Function,
         _operand_stack: &Stack,
@@ -247,16 +252,17 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         Ok(())
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn should_perform_checks(_for_fun: &Function) -> bool {
         false
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn is_partial_checker() -> bool {
         false
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_cross_module_regular_call_visibility(
         _caller: &LoadedFunction,
         _callee: &LoadedFunction,
@@ -268,6 +274,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
 impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// Note that most of the checks should happen after instruction execution, because gas charging will happen during
     /// instruction execution and we want to avoid running code without charging proper gas as much as possible.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn pre_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
@@ -399,6 +406,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// This function and `pre_execution_type_stack_transition` should
     /// constitute the full type stack transition for the paranoid
     /// mode.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn post_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
@@ -865,6 +873,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         Ok(())
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_operand_stack_balance(
         _for_fun: &Function,
         operand_stack: &Stack,
@@ -872,16 +881,17 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         operand_stack.check_balance()
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn should_perform_checks(_for_fun: &Function) -> bool {
         true
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn is_partial_checker() -> bool {
         false
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_cross_module_regular_call_visibility(
         caller: &LoadedFunction,
         callee: &LoadedFunction,
@@ -922,6 +932,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
 }
 
 impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn pre_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
@@ -940,6 +951,7 @@ impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn post_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
@@ -958,6 +970,7 @@ impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_operand_stack_balance(
         _for_fun: &Function,
         _operand_stack: &Stack,
@@ -971,11 +984,12 @@ impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
         !for_fun.is_trusted
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn is_partial_checker() -> bool {
         true
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_cross_module_regular_call_visibility(
         caller: &LoadedFunction,
         callee: &LoadedFunction,

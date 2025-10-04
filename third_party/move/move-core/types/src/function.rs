@@ -65,6 +65,7 @@ impl ClosureMask {
 
     /// Returns true if the i'th argument is captured. If `i` is out of range, false will
     /// be returned.
+    #[inline(always)]
     pub fn is_captured(&self, i: usize) -> bool {
         i < Self::MAX_ARGS && self.0 & (1 << i) != 0
     }

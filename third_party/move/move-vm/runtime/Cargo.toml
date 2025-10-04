@@ -55,6 +55,7 @@ testing = []
 stacktrace = []
 # Enable this features for tests that check bytecode verification.
 disable_verifier_cache = []
+force-inline = []
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
