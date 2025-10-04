@@ -3,7 +3,7 @@
 
 use crate::{
     delayed_values::error::code_invariant_error,
-    values::{Closure, Container, Value, ValueImpl},
+    values::{Closure, Container, Value},
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
@@ -16,30 +16,30 @@ pub fn find_identifiers_in_value(
     value: &Value,
     identifiers: &mut HashSet<u64>,
 ) -> PartialVMResult<()> {
-    find_identifiers_in_value_impl(&value.0, identifiers)
+    find_identifiers_in_value_impl(value, identifiers)
 }
 
 fn find_identifiers_in_value_impl(
-    value: &ValueImpl,
+    value: &Value,
     identifiers: &mut HashSet<u64>,
 ) -> PartialVMResult<()> {
     match value {
-        ValueImpl::U8(_)
-        | ValueImpl::U16(_)
-        | ValueImpl::U32(_)
-        | ValueImpl::U64(_)
-        | ValueImpl::U128(_)
-        | ValueImpl::U256(_)
-        | ValueImpl::I8(_)
-        | ValueImpl::I16(_)
-        | ValueImpl::I32(_)
-        | ValueImpl::I64(_)
-        | ValueImpl::I128(_)
-        | ValueImpl::I256(_)
-        | ValueImpl::Bool(_)
-        | ValueImpl::Address(_) => {},
+        Value::U8(_)
+        | Value::U16(_)
+        | Value::U32(_)
+        | Value::U64(_)
+        | Value::U128(_)
+        | Value::U256(_)
+        | Value::I8(_)
+        | Value::I16(_)
+        | Value::I32(_)
+        | Value::I64(_)
+        | Value::I128(_)
+        | Value::I256(_)
+        | Value::Bool(_)
+        | Value::Address(_) => {},
 
-        ValueImpl::Container(c) => match c {
+        Value::Container(c) => match c {
             Container::Locals(_) => {
                 return Err(PartialVMError::new(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -68,19 +68,19 @@ fn find_identifiers_in_value_impl(
             },
         },
 
-        ValueImpl::ClosureValue(Closure(_, captured)) => {
+        Value::ClosureValue(Closure(_, captured)) => {
             for val in captured.iter() {
                 find_identifiers_in_value_impl(val, identifiers)?;
             }
         },
 
-        ValueImpl::Invalid | ValueImpl::ContainerRef(_) | ValueImpl::IndexedRef(_) => {
+        Value::Invalid | Value::ContainerRef(_) | Value::IndexedRef(_) => {
             return Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             ))
         },
 
-        ValueImpl::DelayedFieldID { id } => {
+        Value::DelayedFieldID { id } => {
             if !identifiers.insert(id.as_u64()) {
                 return Err(code_invariant_error(
                     "Duplicated identifiers for Move value".to_string(),
