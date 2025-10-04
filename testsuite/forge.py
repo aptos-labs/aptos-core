@@ -864,7 +864,7 @@ class K8sForgeRunner(ForgeRunner):
             forge_image_full = f"{context.aws_account_num}.dkr.ecr.{context.aws_region}.amazonaws.com/{ECR_REPO_PREFIX}/forge:{context.forge_image_tag}"
             validator_node_selector = "eks.amazonaws.com/nodegroup: validators"
         elif context.cloud == Cloud.GCP:
-            # the GCP project for images is separate than the cluster
+            # the GCP project for images is separate from the cluster
             forge_image_full = (
                 f"{GAR_REPO_NAME}/{context.forge_image_name}:{context.forge_image_tag}"
             )
@@ -1626,6 +1626,7 @@ def test(
         image_tag = image_tag or second_latest_image
         forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image
+        forge_image_name = DEFAULT_FORGE_IMAGE_NAME
     else:
         # All other tests use just one image tag
         # Only try finding exactly 1 image
