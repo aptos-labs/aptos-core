@@ -216,13 +216,10 @@ impl AdminService {
             (hyper::Method::GET, "/debug/consensus/block") => {
                 let consensus_db = context.consensus_db.read().clone();
                 let quorum_store_db = context.quorum_store_db.read().clone();
-                if consensus_db.is_some() && quorum_store_db.is_some() {
-                    consensus::handle_dump_block_request(
-                        req,
-                        consensus_db.unwrap(),
-                        quorum_store_db.unwrap(),
-                    )
-                    .await
+                if let Some(consensus_db) = consensus_db
+                    && let Some(quorum_store_db) = quorum_store_db
+                {
+                    consensus::handle_dump_block_request(req, consensus_db, quorum_store_db).await
                 } else {
                     Ok(reply_with_status(
                         StatusCode::NOT_FOUND,
@@ -232,12 +229,9 @@ impl AdminService {
             },
             (hyper::Method::GET, "/debug/mempool/parking-lot/addresses") => {
                 let mempool_client_sender = context.mempool_client_sender.read().clone();
-                if mempool_client_sender.is_some() {
-                    mempool::mempool_handle_parking_lot_address_request(
-                        req,
-                        mempool_client_sender.unwrap(),
-                    )
-                    .await
+                if let Some(mempool_client_sender) = mempool_client_sender {
+                    mempool::mempool_handle_parking_lot_address_request(req, mempool_client_sender)
+                        .await
                 } else {
                     Ok(reply_with_status(
                         StatusCode::NOT_FOUND,
