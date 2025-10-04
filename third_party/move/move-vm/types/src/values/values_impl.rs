@@ -5071,7 +5071,7 @@ fn try_get_variant_field_layouts<'a>(
 }
 
 fn check_depth(depth: u64, max_depth: Option<u64>) -> PartialVMResult<()> {
-    if max_depth.map_or(false, |max_depth| depth > max_depth) {
+    if max_depth.is_some_and(|max_depth| depth > max_depth) {
         return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
     }
     Ok(())

@@ -176,7 +176,7 @@ impl Worker {
         } else if self.model.get_cdn_image_uri().is_some() {
             false
         } else {
-            self.model.get_raw_image_uri().map_or(true, |uri| {
+            self.model.get_raw_image_uri().is_none_or(|uri| {
                 match ParsedAssetUrisQuery::get_by_raw_image_uri(
                     &mut self.conn,
                     &self.asset_uri,
