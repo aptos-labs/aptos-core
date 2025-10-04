@@ -317,30 +317,6 @@ impl Container {
         }
     }
 
-    fn rc_count(&self) -> usize {
-        match self {
-            Self::Vec(r) => Rc::strong_count(r),
-            Self::Struct(r) => Rc::strong_count(r),
-
-            Self::VecU8(r) => Rc::strong_count(r),
-            Self::VecU16(r) => Rc::strong_count(r),
-            Self::VecU32(r) => Rc::strong_count(r),
-            Self::VecU64(r) => Rc::strong_count(r),
-            Self::VecU128(r) => Rc::strong_count(r),
-            Self::VecU256(r) => Rc::strong_count(r),
-            Self::VecI8(r) => Rc::strong_count(r),
-            Self::VecI16(r) => Rc::strong_count(r),
-            Self::VecI32(r) => Rc::strong_count(r),
-            Self::VecI64(r) => Rc::strong_count(r),
-            Self::VecI128(r) => Rc::strong_count(r),
-            Self::VecI256(r) => Rc::strong_count(r),
-            Self::VecBool(r) => Rc::strong_count(r),
-            Self::VecAddress(r) => Rc::strong_count(r),
-
-            Self::Locals(r) => Rc::strong_count(r),
-        }
-    }
-
     fn master_signer(x: AccountAddress) -> Self {
         Container::Struct(Rc::new(RefCell::new(vec![
             ValueImpl::U16(MASTER_SIGNER_VARIANT),
