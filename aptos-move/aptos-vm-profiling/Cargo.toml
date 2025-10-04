@@ -17,6 +17,7 @@ glob = { workspace = true }
 once_cell = { workspace = true }
 smallvec = { workspace = true }
 
+aptos-crypto = { workspace = true, features = ["cloneable-private-keys"] }
 aptos-block-executor = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-gas-schedule = { workspace = true }
