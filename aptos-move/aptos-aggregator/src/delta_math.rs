@@ -315,11 +315,11 @@ impl DeltaHistory {
     pub fn stricter_than(&self, other: &DeltaHistory) -> bool {
         self.max_achieved_positive_delta >= other.max_achieved_positive_delta
             && self.min_achieved_negative_delta >= other.min_achieved_negative_delta
-            && other.min_overflow_positive_delta.map_or(true, |other_v| {
+            && other.min_overflow_positive_delta.is_none_or(|other_v| {
                 self.min_overflow_positive_delta
                     .is_some_and(|self_v| self_v <= other_v)
             })
-            && other.max_underflow_negative_delta.map_or(true, |other_v| {
+            && other.max_underflow_negative_delta.is_none_or(|other_v| {
                 self.max_underflow_negative_delta
                     .is_some_and(|self_v| self_v <= other_v)
             })

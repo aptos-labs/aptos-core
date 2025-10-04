@@ -361,8 +361,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
             )));
         }
         let required_incarnation = active_reqs.versions.remove(&txn_idx);
-        if !required_incarnation.is_some_and(|(req_incarnation, _)| req_incarnation == incarnation)
-        {
+        if required_incarnation.is_none_or(|(req_incarnation, _)| req_incarnation != incarnation) {
             return Err(code_invariant_error(format!(
                 "Required incarnation {:?} != validated incarnation {} in validation_requirement_processed",
                 required_incarnation, incarnation

@@ -21,7 +21,7 @@ use std::str::FromStr;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HumanReadable<T>(pub T);
 
-impl<'a> Serialize for HumanReadable<&'a StateKey> {
+impl Serialize for HumanReadable<&StateKey> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -54,7 +54,7 @@ impl<T> HumanReadable<T> {
     }
 }
 
-impl<'a> std::fmt::Display for HumanReadable<&'a StateKey> {
+impl std::fmt::Display for HumanReadable<&StateKey> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.0.inner() {
             StateKeyInner::AccessPath(access_path) => {

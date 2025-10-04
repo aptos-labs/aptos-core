@@ -114,7 +114,7 @@ impl<T: Hashable> Buffer<T> {
     }
 
     pub fn exist(&self, cursor: &Cursor) -> bool {
-        cursor.map_or(false, |key| self.map.contains_key(&key))
+        cursor.is_some_and(|key| self.map.contains_key(&key))
     }
 
     /// find_elem returns the first item non-prior to `cursor` that compare(item) is true

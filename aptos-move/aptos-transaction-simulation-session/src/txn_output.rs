@@ -51,9 +51,9 @@ pub fn save_write_set(
 
                         json!(group_pretty)
                     },
-                    _ => json!(hex::encode(&data)),
+                    _ => json!(hex::encode(data)),
                 },
-                _ => json!(hex::encode(&data)),
+                _ => json!(hex::encode(data)),
             };
             Ok(val)
         };

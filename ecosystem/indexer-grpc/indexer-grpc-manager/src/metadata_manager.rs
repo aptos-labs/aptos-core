@@ -193,7 +193,7 @@ impl MetadataManager {
 
                 for kv in &self.fullnodes {
                     let (address, fullnode) = kv.pair();
-                    let need_ping = fullnode.recent_states.back().map_or(true, |s| {
+                    let need_ping = fullnode.recent_states.back().is_none_or(|s| {
                         Self::is_stale_timestamp(
                             s.timestamp.unwrap_or_default(),
                             Duration::from_secs(1),
@@ -222,7 +222,7 @@ impl MetadataManager {
                         unreachable_live_data_services.push(address.clone());
                         continue;
                     }
-                    let need_ping = live_data_service.recent_states.back().map_or(true, |s| {
+                    let need_ping = live_data_service.recent_states.back().is_none_or(|s| {
                         Self::is_stale_timestamp(
                             s.timestamp.unwrap_or_default(),
                             Duration::from_secs(5),
@@ -257,16 +257,15 @@ impl MetadataManager {
                         unreachable_historical_data_services.push(address.clone());
                         continue;
                     }
-                    let need_ping =
-                        historical_data_service
-                            .recent_states
-                            .back()
-                            .map_or(true, |s| {
-                                Self::is_stale_timestamp(
-                                    s.timestamp.unwrap_or_default(),
-                                    Duration::from_secs(5),
-                                )
-                            });
+                    let need_ping = historical_data_service
+                        .recent_states
+                        .back()
+                        .is_none_or(|s| {
+                            Self::is_stale_timestamp(
+                                s.timestamp.unwrap_or_default(),
+                                Duration::from_secs(5),
+                            )
+                        });
                     if need_ping {
                         let address = address.clone();
                         let client = historical_data_service.client.clone();

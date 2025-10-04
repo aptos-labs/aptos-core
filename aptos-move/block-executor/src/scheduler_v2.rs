@@ -648,7 +648,7 @@ impl SchedulerV2 {
             if self
                 .committed_marker
                 .get(next_to_commit_idx as usize)
-                .map_or(false, |marker| {
+                .is_some_and(|marker| {
                     marker.swap(CommitMarkerFlag::CommitStarted as u8, Ordering::Relaxed)
                         != CommitMarkerFlag::NotCommitted as u8
                 })

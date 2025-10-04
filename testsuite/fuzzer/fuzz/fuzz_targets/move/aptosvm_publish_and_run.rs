@@ -62,7 +62,7 @@ fn is_coverage_enabled() -> bool {
 
 fn check_for_invariant_violation_vmerror(e: VMError) {
     if e.status_type() == StatusType::InvariantViolation {
-        let is_known_false_positive = e.message().map_or(false, |msg| {
+        let is_known_false_positive = e.message().is_some_and(|msg| {
             KNOWN_FALSE_POSITIVES
                 .iter()
                 .any(|known| msg.starts_with(known))

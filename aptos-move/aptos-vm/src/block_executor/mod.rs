@@ -409,7 +409,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             return output
                 .status()
                 .as_kept_status()
-                .map_or(false, |status| status.is_success());
+                .is_ok_and(|status| status.is_success());
         }
         false
     }
@@ -426,7 +426,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             if !self
                 .vm_output
                 .as_ref()
-                .map_or(false, |output| output.status().is_retry())
+                .is_some_and(|output| output.status().is_retry())
             {
                 return Err(code_invariant_error(
                     "Non-committed output must exist with is_retry set.",

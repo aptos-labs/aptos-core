@@ -523,9 +523,9 @@ impl Payload {
         let unverified: Vec<_> = proofs
             .iter()
             .filter(|proof| {
-                proof_cache.get(proof.info()).map_or(true, |cached_proof| {
-                    cached_proof != *proof.multi_signature()
-                })
+                proof_cache
+                    .get(proof.info())
+                    .is_none_or(|cached_proof| cached_proof != *proof.multi_signature())
             })
             .collect();
         unverified

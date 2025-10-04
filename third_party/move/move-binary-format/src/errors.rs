@@ -399,7 +399,7 @@ impl PartialVMError {
             offsets,
         } = *self.0;
         static MOVE_TEST_DEBUG: Lazy<bool> = Lazy::new(|| {
-            std::env::var("MOVE_TEST_DEBUG").map_or(false, |v| matches!(v.as_str(), "true" | "1"))
+            std::env::var("MOVE_TEST_DEBUG").is_ok_and(|v| matches!(v.as_str(), "true" | "1"))
         });
         let message = if *MOVE_TEST_DEBUG {
             // Do this only if env var is set. Otherwise, we cannot use the output in baseline files

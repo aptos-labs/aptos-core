@@ -707,7 +707,7 @@ fn mock_fee_statement(total_gas: u64) -> FeeStatement {
     // Next two arguments are different kinds of execution gas that are counted
     // towards the block limit. We split the total into two pieces for these arguments.
     // TODO: add variety to generating fee statement based on total gas.
-    FeeStatement::new(total_gas, total_gas / 2, (total_gas + 1) / 2, 0, 0)
+    FeeStatement::new(total_gas, total_gas / 2, total_gas.div_ceil(2), 0, 0)
 }
 
 impl<K, E> TransactionOutput for MockOutput<K, E>
@@ -776,7 +776,7 @@ where
     }
 }
 
-impl<'a, K, E> BeforeMaterializationOutput<MockTransaction<K, E>> for &'a MockOutput<K, E>
+impl<K, E> BeforeMaterializationOutput<MockTransaction<K, E>> for &MockOutput<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
@@ -914,7 +914,7 @@ where
     }
 }
 
-impl<'a, K, E> AfterMaterializationOutput<MockTransaction<K, E>> for &'a MockOutput<K, E>
+impl<K, E> AfterMaterializationOutput<MockTransaction<K, E>> for &MockOutput<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,

@@ -363,7 +363,7 @@ where
                         metadata.origin == ConnectionOrigin::Inbound
                             && trusted_peers
                                 .get(peer_id)
-                                .map_or(true, |peer| peer.role == PeerRole::Unknown)
+                                .is_none_or(|peer| peer.role == PeerRole::Unknown)
                     })
                     .count();
 

@@ -3622,12 +3622,12 @@ impl<'a> TypeDisplayContext<'a> {
     pub fn is_current_addr(&self, module_address: &Address) -> bool {
         self.module_name
             .as_ref()
-            .map_or(false, |ctx_module| ctx_module.addr() == module_address)
+            .is_some_and(|ctx_module| ctx_module.addr() == module_address)
     }
 
     /// Check if the given module has the same string identifier as the current module
     pub fn is_current_name(&self, module_name: &str) -> bool {
-        self.module_name.as_ref().map_or(false, |ctx_module| {
+        self.module_name.as_ref().is_some_and(|ctx_module| {
             ctx_module
                 .name()
                 .display(self.env.symbol_pool())
@@ -3646,8 +3646,8 @@ impl<'a> TypeDisplayContext<'a> {
         self.used_modules.contains(module_id) || {
             // `used_modules` may not have been propagated yet, so let's check `use_decls` as a backup.
             let imported_module_env = self.env.get_module(*module_id);
-            self.module_name.as_ref().map_or(false, |ctx_module| {
-                self.env.find_module(ctx_module).map_or(false, |m| {
+            self.module_name.as_ref().is_some_and(|ctx_module| {
+                self.env.find_module(ctx_module).is_some_and(|m| {
                     m.get_use_decls()
                         .iter()
                         .any(|use_| use_.module_name == *imported_module_env.get_name())
