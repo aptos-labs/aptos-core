@@ -444,7 +444,13 @@ impl Compatibility {
             | (SignatureToken::U128, SignatureToken::U128)
             | (SignatureToken::U256, SignatureToken::U256)
             | (SignatureToken::Address, SignatureToken::Address)
-            | (SignatureToken::Signer, SignatureToken::Signer) => true,
+            | (SignatureToken::Signer, SignatureToken::Signer)
+            | (SignatureToken::I8, SignatureToken::I8)
+            | (SignatureToken::I16, SignatureToken::I16)
+            | (SignatureToken::I32, SignatureToken::I32)
+            | (SignatureToken::I64, SignatureToken::I64)
+            | (SignatureToken::I128, SignatureToken::I128)
+            | (SignatureToken::I256, SignatureToken::I256) => true,
             (SignatureToken::TypeParameter(old_idx), SignatureToken::TypeParameter(new_idx)) => {
                 old_idx == new_idx
             },
@@ -498,7 +504,13 @@ impl Compatibility {
             | (SignatureToken::TypeParameter(_), _)
             | (SignatureToken::U16, _)
             | (SignatureToken::U32, _)
-            | (SignatureToken::U256, _) => false,
+            | (SignatureToken::U256, _)
+            | (SignatureToken::I8, _)
+            | (SignatureToken::I16, _)
+            | (SignatureToken::I32, _)
+            | (SignatureToken::I64, _)
+            | (SignatureToken::I128, _)
+            | (SignatureToken::I256, _) => false,
         }
     }
 

@@ -15,12 +15,11 @@ arbitrary = { workspace = true, features = ["derive_arbitrary"], optional = true
 bcs = { workspace = true }
 bytes = { workspace = true }
 dearbitrary = { workspace = true, optional = true, features = ["derive"] }
-ethnum = { workspace = true }
+ethnum = { workspace = true, features = ["serde"] }
 hashbrown = { workspace = true }
 hex = { workspace = true }
 num = { workspace = true }
 once_cell = { workspace = true }
-primitive-types = { workspace = true, features = ["impl-serde"] }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 # Cannot use workspace version as aptos-core currently cannot be upgraded
@@ -30,7 +29,6 @@ ref-cast = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 thiserror = { workspace = true }
-uint = { workspace = true }
 
 [dev-dependencies]
 arbitrary = { workspace = true, features = ["derive_arbitrary"] }

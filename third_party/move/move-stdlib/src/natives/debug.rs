@@ -420,6 +420,42 @@ mod testing {
                     write!(out, "u256").map_err(fmt_error_to_partial_vm_error)?;
                 }
             },
+            MoveValue::I8(i8) => {
+                write!(out, "{}", i8).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i8").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I16(i16) => {
+                write!(out, "{}", i16).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i16").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I32(i32) => {
+                write!(out, "{}", i32).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i32").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I64(i64) => {
+                write!(out, "{}", i64).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i64").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I128(i128) => {
+                write!(out, "{}", i128).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i128").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I256(i256) => {
+                write!(out, "{}", i256).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i256").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
             MoveValue::Bool(b) => {
                 // Note that when `include_int_types` is enabled, the boolean `true` and `false`
                 // values unambiguously encode their type, since they are different than any integer
