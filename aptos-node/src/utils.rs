@@ -13,7 +13,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
-use std::cmp::min;
+use std::cmp::{max, min};
 
 /// Error message to display when non-production features are enabled
 pub const ERROR_MSG_BAD_FEATURE_FLAGS: &str = r#"
@@ -54,7 +54,7 @@ pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
     let effective_concurrency_level = if node_config.execution.concurrency_level == 0 {
         min(
             DEFAULT_EXECUTION_CONCURRENCY_LEVEL,
-            (num_cpus::get() / 2) as u16,
+            max(1, num_cpus::get() / 2),
         )
     } else {
         node_config.execution.concurrency_level
