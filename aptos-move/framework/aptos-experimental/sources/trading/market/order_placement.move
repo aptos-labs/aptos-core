@@ -308,10 +308,10 @@ module aptos_experimental::order_placement {
                 order_id,
                 client_order_id,
                 is_bid,
+                limit_price,
                 time_in_force,
                 metadata
             ),
-            limit_price,
             remaining_size,
         );
         market.get_order_book_mut().place_maker_order(
@@ -441,11 +441,11 @@ module aptos_experimental::order_placement {
                 order_id,
                 client_order_id,
                 is_bid,
+                limit_price,
                 time_in_force,
                 metadata
             ),
             size_delta,
-            limit_price
         );
         return OrderMatchResult {
             order_id,
@@ -476,11 +476,11 @@ module aptos_experimental::order_placement {
                     order_id,
                     client_order_id,
                     is_bid,
+                    price,
                     time_in_force,
                     metadata
                 ),
                 remaining_size,
-                price
             );
         } else {
             callbacks.cleanup_bulk_orders(
@@ -531,6 +531,7 @@ module aptos_experimental::order_placement {
                 order_id,
                 client_order_id,
                 is_bid,
+                price,
                 time_in_force,
                 metadata
             ),
@@ -539,6 +540,7 @@ module aptos_experimental::order_placement {
                 maker_order.get_order_id_from_match_details(),
                 maker_order.get_client_order_id_from_match_details(),
                 maker_order.is_bid_from_match_details(),
+                maker_order.get_price_from_match_details(),
                 maker_order.get_time_in_force_from_match_details(),
                 maker_order.get_metadata_from_match_details()
             ),
@@ -731,11 +733,11 @@ module aptos_experimental::order_placement {
                     order_id,
                     client_order_id,
                     is_bid,
+                    limit_price,
                     time_in_force,
                     metadata
                 ),
                 is_taker_order, // is_taker
-                limit_price,
                 remaining_size,
             )) {
             return cancel_single_order_internal(

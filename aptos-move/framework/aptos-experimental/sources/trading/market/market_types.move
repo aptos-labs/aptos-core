@@ -96,20 +96,20 @@ module aptos_experimental::market_types {
 
     enum MarketClearinghouseCallbacks<M: store + copy + drop, R: store + copy + drop> has drop {
         V1 {
-            /// settle_trade_f arguments: market, taker, maker, fill_id, price, size,
+            /// settle_trade_f arguments: market, taker, maker, fill_id, settled_price, settled_size,
             settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u64, u64, u64| SettleTradeResult<R> has drop + copy,
-            /// validate_settlement_update_f arguments: order_info, is_taker, price, size
-            validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64, u64| bool has drop + copy,
+            /// validate_settlement_update_f arguments: order_info, is_taker, size
+            validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64| bool has drop + copy,
             /// Validate the bulk order placement arguments: account, bids_prices, bids_sizes, asks_prices, asks_sizes
             validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
-            /// place_maker_order_f arguments: order_info, price, size
-            place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64, u64| has drop + copy,
-            /// cleanup_order_f arguments: order_info, cleanup_size, limit_price. This is called when an order is fully filled or cancelled.
-            cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64, u64| has drop + copy,
+            /// place_maker_order_f arguments: order_info, size
+            place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
+            /// cleanup_order_f arguments: order_info, cleanup_size,
+            cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
             /// cleanup_bulk_orders_f arguments: account, is_bid, remaining_sizes
             cleanup_bulk_orders_f: |address, OrderIdType| has drop + copy,
-            /// decrease_order_size_f arguments: order_info, price, size
-            decrease_order_size_f: |MarketClearinghouseOrderInfo<M>, u64, u64| has drop + copy,
+            /// decrease_order_size_f arguments: order_info, size
+            decrease_order_size_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
             /// get a string representation of order metadata to be used in events
             get_order_metadata_bytes: |M| vector<u8> has drop + copy
         }
@@ -131,12 +131,12 @@ module aptos_experimental::market_types {
 
     public fun new_market_clearinghouse_callbacks<M: store + copy + drop, R: store + copy + drop>(
         settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u64, u64, u64| SettleTradeResult<R> has drop + copy,
-        validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64, u64| bool has drop + copy,
+        validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64| bool has drop + copy,
         validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
-        place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64, u64| has drop + copy,
-        cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64, u64| has drop + copy,
+        place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
+        cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
         cleanup_bulk_orders_f: |address, OrderIdType| has drop + copy,
-        decrease_order_size_f: |MarketClearinghouseOrderInfo<M>, u64, u64| has drop + copy,
+        decrease_order_size_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
         get_order_metadata_bytes: |M| vector<u8> has drop + copy
     ): MarketClearinghouseCallbacks<M, R> {
         MarketClearinghouseCallbacks::V1 {
@@ -209,18 +209,17 @@ module aptos_experimental::market_types {
         taker: MarketClearinghouseOrderInfo<M>,
         maker: MarketClearinghouseOrderInfo<M>,
         fill_id: u64,
-        price: u64,
-        size: u64): SettleTradeResult<R> {
-        (self.settle_trade_f)(market, taker, maker, fill_id, price, size)
+        settled_price: u64,
+        settled_size: u64): SettleTradeResult<R> {
+        (self.settle_trade_f)(market, taker, maker, fill_id, settled_price, settled_size)
     }
 
     public fun validate_order_placement<M: store + copy + drop, R: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M, R>,
         order_info: MarketClearinghouseOrderInfo<M>,
         is_taker: bool,
-        price: u64,
         size: u64): bool {
-        (self.validate_order_placement_f)(order_info, is_taker, price, size)
+        (self.validate_order_placement_f)(order_info, is_taker, size)
     }
 
     public fun validate_bulk_order_placement<M: store + copy + drop, R: store + copy + drop>(
@@ -238,18 +237,16 @@ module aptos_experimental::market_types {
     public fun place_maker_order<M: store + copy + drop, R: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M, R>,
         order_info: MarketClearinghouseOrderInfo<M>,
-        price: u64,
         size: u64) {
-        (self.place_maker_order_f)(order_info, price, size)
+        (self.place_maker_order_f)(order_info, size)
     }
 
     public fun cleanup_order<M: store + copy + drop, R: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M, R>,
         order_info: MarketClearinghouseOrderInfo<M>,
         cleanup_size: u64,
-        limit_price: u64
     ) {
-        (self.cleanup_order_f)(order_info, cleanup_size, limit_price)
+        (self.cleanup_order_f)(order_info, cleanup_size)
     }
 
     public fun cleanup_bulk_orders<M: store + copy + drop, R: store + copy + drop>(
@@ -262,9 +259,8 @@ module aptos_experimental::market_types {
     public fun decrease_order_size<M: store + copy + drop, R: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M, R>,
         order_info: MarketClearinghouseOrderInfo<M>,
-        price: u64,
         size: u64) {
-        (self.decrease_order_size_f)(order_info, price, size)
+        (self.decrease_order_size_f)(order_info, size)
     }
 
     public fun get_order_metadata_bytes<M: store + copy + drop, R: store + copy + drop>(

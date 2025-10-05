@@ -242,10 +242,10 @@ Parameters:
             order_id,
             client_order_id,
             is_bid,
+            price,
             time_in_force,
             metadata
         ),
-        price,
         remaining_size
     );
 

@@ -200,22 +200,22 @@ module aptos_experimental::clearinghouse_test {
             |_market, taker_order_info, maker_order_info, _fill_id, _price, size| {
                 settle_trade(taker_order_info.get_account(), maker_order_info.get_account(), size, taker_order_info.is_bid())
             },
-            |order_info, _is_taker, _price, _size| {
+            |order_info, _is_taker, _size| {
                 validate_order_placement(order_info.get_order_id())
             },
             |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices, _order_metadata| {
                 validate_bulk_order_placement(account)
             },
-            |order_info, _price, _size| {
+            |order_info, _size| {
                 place_maker_order(order_info.get_order_id());
             },
-            |order_info, _price, _remaining_size| {
+            |order_info, _remaining_size| {
                 cleanup_order(order_info.get_order_id());
             },
             |account, _order_id| {
                 cleanup_bulk_order(account);
             },
-            |_order_info, _price, _size| {
+            |_order_info, _size| {
                 // decrease order size is not used in this test
             },
             |order_metadata| {
@@ -230,22 +230,22 @@ module aptos_experimental::clearinghouse_test {
             |_market, taker_order_info, maker_order_info, _fill_id, _price, size| {
                 settle_trade_with_taker_cancelled(taker_order_info.get_account(), maker_order_info.get_account(), size, taker_order_info.is_bid())
             },
-            |order_info, _is_taker, _price, _size| {
+            |order_info, _is_taker, _size| {
                 validate_order_placement(order_info.get_order_id())
             },
             |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices, _order_metadata| {
                 validate_bulk_order_placement(account)
             },
-            |_order_info, _price, _size| {
+            |_order_info, _size| {
                 // place_maker_order is not used in this test
             },
-            |order_info, _price, _remaining_size| {
+            |order_info, _remaining_size| {
                 cleanup_order(order_info.get_order_id());
             },
             |account, _order_id| {
                 cleanup_bulk_order(account);
             },
-            |_order_info, _price, _size| {
+            |_order_info, _size| {
                 // decrease order size is not used in this test
             },
             |order_metadata| {

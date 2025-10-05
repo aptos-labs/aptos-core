@@ -844,10 +844,10 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             order_id,
             client_order_id,
             is_bid,
+            limit_price,
             time_in_force,
             metadata
         ),
-        limit_price,
         remaining_size,
     );
     market.get_order_book_mut().place_maker_order(
@@ -1017,11 +1017,11 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             order_id,
             client_order_id,
             is_bid,
+            limit_price,
             time_in_force,
             metadata
         ),
         size_delta,
-        limit_price
     );
     <b>return</b> <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a> {
         order_id,
@@ -1072,11 +1072,11 @@ Places a market order - The order is guaranteed to be a taker order and will be 
                 order_id,
                 client_order_id,
                 is_bid,
+                price,
                 time_in_force,
                 metadata
             ),
             remaining_size,
-            price
         );
     } <b>else</b> {
         callbacks.cleanup_bulk_orders(
@@ -1147,6 +1147,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             order_id,
             client_order_id,
             is_bid,
+            price,
             time_in_force,
             metadata
         ),
@@ -1155,6 +1156,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             maker_order.get_order_id_from_match_details(),
             maker_order.get_client_order_id_from_match_details(),
             maker_order.is_bid_from_match_details(),
+            maker_order.get_price_from_match_details(),
             maker_order.get_time_in_force_from_match_details(),
             maker_order.get_metadata_from_match_details()
         ),
@@ -1367,11 +1369,11 @@ of fill limit violation  in the previous transaction and the order is just a con
                 order_id,
                 client_order_id,
                 is_bid,
+                limit_price,
                 time_in_force,
                 metadata
             ),
             is_taker_order, // is_taker
-            limit_price,
             remaining_size,
         )) {
         <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
