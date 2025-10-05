@@ -19,7 +19,7 @@ use crate::emitter::{
 use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
 use aptos_logger::{sample, sample::SampleRate};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
@@ -31,7 +31,7 @@ use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AccountType, TransactionType, SEND_AMOUNT,
 };
 use aptos_types::account_config::aptos_test_root_address;
-use futures::future::{try_join_all, FutureExt};
+use futures::future::{join_all, try_join_all, FutureExt};
 use log::{error, info, warn};
 use once_cell::sync::Lazy;
 use rand::{
@@ -993,6 +993,81 @@ fn pick_client(clients: &[RestClient]) -> &RestClient {
     clients.choose(&mut rand::thread_rng()).unwrap()
 }
 
+async fn wait_for_orderless_txns(
+    client: &RestClient,
+    account_orderless_txns: &HashMap<AccountAddress, Vec<HashValue>>,
+    txn_expiration_ts_secs: u64,
+    sleep_between_cycles: Duration,
+) -> HashMap<AccountAddress, Vec<HashValue>> {
+    let mut pending_account_txns = account_orderless_txns.clone();
+    let mut failed_by_account: HashMap<AccountAddress, Vec<HashValue>> = HashMap::new();
+    loop {
+        let futures = pending_account_txns
+            .into_iter()
+            .flat_map(|(account, txn_hashes)| {
+                txn_hashes.into_iter().map(move |hash| (account, hash))
+            })
+            .map(|(account, hash)| async move {
+                (account, hash, client.get_transaction_by_hash(hash).await)
+            });
+
+        pending_account_txns = join_all(futures)
+            .await
+            .into_iter()
+            .filter_map(|(account, txn_hash, result)| match result {
+                Ok(res) => {
+                    let (t, _) = res.into_parts();
+                    if t.is_pending() {
+                        Some((account, txn_hash))
+                    } else {
+                        if !t.success() {
+                            failed_by_account.entry(account).or_default().push(txn_hash);
+                        }
+                        None
+                    }
+                },
+                Err(_) => Some((account, txn_hash)),
+            })
+            .fold(HashMap::new(), |mut map, (account, txn_hash)| {
+                map.entry(account).or_default().push(txn_hash);
+                map
+            });
+
+        if pending_account_txns.is_empty() {
+            break;
+        }
+
+        sample!(SampleRate::Duration(Duration::from_secs(15)), {
+            warn!(
+                "Num accounts with pending orderless txns: {}",
+                pending_account_txns.len()
+            );
+            warn!(
+                "Pending orderless txns per account: {:?}",
+                pending_account_txns
+                    .iter()
+                    .map(|(account, hashes)| (account, hashes.len()))
+                    .collect::<HashMap<_, _>>()
+            );
+        });
+
+        if aptos_infallible::duration_since_epoch().as_secs() >= txn_expiration_ts_secs + 240 {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(15)),
+                error!(
+                    "[{}] Client cannot catch up to needed timestamp ({}), after additional 240s, aborting",
+                    client.path_prefix_string(),
+                    txn_expiration_ts_secs,
+                )
+            );
+            break;
+        }
+
+        time::sleep(sleep_between_cycles).await;
+    }
+    failed_by_account
+}
+
 /// This function waits for the submitted transactions to be committed, up to
 /// a wait_timeout (counted from the start_time passed in, not from the function call).
 /// It returns number of transactions that expired without being committed,
@@ -1011,6 +1086,11 @@ async fn wait_for_accounts_sequence(
     let mut latest_fetched_counts = HashMap::new();
 
     let mut sum_of_completion_timestamps_millis = 0u128;
+
+    if pending_addresses.is_empty() {
+        return (HashMap::new(), sum_of_completion_timestamps_millis);
+    }
+
     loop {
         match query_sequence_numbers(client, pending_addresses.iter()).await {
             Ok((sequence_numbers, ledger_timestamp_secs)) => {
