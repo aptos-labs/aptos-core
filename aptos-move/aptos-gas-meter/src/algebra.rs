@@ -111,6 +111,7 @@ impl<T> StandardGasAlgebra<'_, T>
 where
     T: BlockSynchronizationKillSwitch,
 {
+    #[inline(always)]
     fn charge(&mut self, amount: InternalGas) -> (InternalGas, PartialVMResult<()>) {
         match self.balance.checked_sub(amount) {
             Some(new_balance) => {
@@ -187,6 +188,7 @@ where
         Ok(())
     }
 
+    #[inline(always)]
     fn charge_execution(
         &mut self,
         abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + Debug,

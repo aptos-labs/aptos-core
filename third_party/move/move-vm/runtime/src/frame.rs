@@ -131,6 +131,7 @@ impl Frame {
         function_instantiation_handle_at
     );
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn make_new_frame<RTTCheck: RuntimeTypeCheck>(
         gas_meter: &mut impl GasMeter,
         call_type: CallType,
@@ -179,10 +180,12 @@ impl Frame {
         self.call_type
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn local_ty_at(&self, idx: usize) -> &Type {
         &self.local_tys[idx]
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn check_local_tys_have_drop_ability(&self) -> PartialVMResult<()> {
         for (idx, ty) in self.local_tys.iter().enumerate() {
             if !self.locals.is_invalid(idx)? {
@@ -192,11 +195,12 @@ impl Frame {
         Ok(())
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn untrusted_code(&self) -> bool {
         !self.function.function.is_trusted
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn constant_at(&self, idx: ConstantPoolIndex) -> &Constant {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -205,6 +209,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_struct_ty(&self, idx: StructDefinitionIndex) -> Type {
         use LoadedFunctionOwner::*;
         let struct_ty = match self.function.owner() {
@@ -254,6 +259,7 @@ impl Frame {
         )
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_field_ty(&self, idx: FieldHandleIndex) -> PartialVMResult<&Type> {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -265,6 +271,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_generic_field_ty(
         &self,
         idx: FieldInstantiationIndex,
@@ -312,6 +319,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_struct(&self, idx: StructDefinitionIndex) -> &Arc<StructType> {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -409,6 +417,7 @@ impl Frame {
         )
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_offset(&self, idx: FieldHandleIndex) -> usize {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -417,6 +426,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_instantiation_offset(&self, idx: FieldInstantiationIndex) -> usize {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -425,6 +435,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_count(&self, idx: StructDefinitionIndex) -> u16 {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -433,6 +444,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_instantiation_count(&self, idx: StructDefInstantiationIndex) -> u16 {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -441,6 +453,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> Type {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -452,6 +465,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_instantiation_to_struct(
         &self,
         idx: FieldInstantiationIndex,
