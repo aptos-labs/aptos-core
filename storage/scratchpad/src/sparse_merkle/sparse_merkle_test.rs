@@ -209,9 +209,7 @@ fn test_update_256_siblings_in_proof() {
     let leaf2 = SparseMerkleLeafNode::new(key2, value2_hash);
 
     let mut siblings: Vec<_> =
-        std::iter::repeat(NodeInProof::Other(*SPARSE_MERKLE_PLACEHOLDER_HASH))
-            .take(255)
-            .collect();
+        std::iter::repeat_n(NodeInProof::Other(*SPARSE_MERKLE_PLACEHOLDER_HASH), 255).collect();
     siblings.push(leaf2.into());
     let proof_of_key1 = SparseMerkleProofExt::new(Some(leaf1), siblings.clone());
 
