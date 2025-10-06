@@ -4,7 +4,8 @@
 use crate::{
     data_cache::get_resource_group_member_from_metadata,
     move_vm_ext::{
-        resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver, SessionId,
+        resource_state_key, write_op_converter::LegacyWriteOpConverter, AptosMoveResolver,
+        SessionId,
     },
 };
 use aptos_framework::natives::{
@@ -217,7 +218,7 @@ where
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.legacy_into_events();
 
-        let woc = WriteOpConverter::new(resolver, is_storage_slot_metadata_enabled);
+        let woc = LegacyWriteOpConverter::new(resolver, is_storage_slot_metadata_enabled);
 
         let change_set = Self::convert_change_set(
             &woc,
@@ -420,7 +421,7 @@ where
     }
 
     fn convert_change_set(
-        woc: &WriteOpConverter,
+        woc: &LegacyWriteOpConverter,
         change_set: ChangeSet,
         resource_group_change_set: ResourceGroupChangeSet,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
@@ -524,7 +525,7 @@ pub fn convert_modules_into_write_ops(
     module_storage: &impl AptosModuleStorage,
     verified_module_bundle: VerifiedModuleBundle<ModuleId, Bytes>,
 ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
-    let woc = WriteOpConverter::new(resolver, features.is_storage_slot_metadata_enabled());
+    let woc = LegacyWriteOpConverter::new(resolver, features.is_storage_slot_metadata_enabled());
     woc.convert_modules_into_write_ops(module_storage, verified_module_bundle.into_iter())
 }
 

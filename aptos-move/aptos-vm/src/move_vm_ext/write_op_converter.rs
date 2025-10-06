@@ -6,16 +6,17 @@ use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
-    write_set::WriteOp,
+    write_set::{WriteOp, WriteOpSize},
 };
 use aptos_vm_types::{
-    abstract_write_op::GroupWrite,
+    abstract_write_op::{AbstractResourceWriteOp, GroupWrite},
     module_and_script_storage::module_storage::AptosModuleStorage,
     module_write_set::ModuleWrite,
     resource_group_adapter::{
         check_size_and_existence_match, decrement_size_for_remove_tag, group_tagged_resource_size,
         increment_size_for_add_tag,
     },
+    write_info_builder::WriteOpInfoBuilder,
 };
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -25,10 +26,18 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
-use std::collections::BTreeMap;
+use move_vm_runtime::Loader;
+use move_vm_types::{
+    delayed_values::delayed_field_id::DelayedFieldID,
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
+    values::Value,
+};
+use std::{
+    collections::{BTreeMap, HashSet},
+};
 use triomphe::Arc as TriompheArc;
 
-pub(crate) struct WriteOpConverter<'r> {
+pub(crate) struct LegacyWriteOpConverter<'r> {
     remote: &'r dyn AptosMoveResolver,
     new_slot_metadata: Option<StateValueMetadata>,
 }
@@ -54,7 +63,7 @@ macro_rules! convert_impl {
     };
 }
 
-impl<'r> WriteOpConverter<'r> {
+impl<'r> LegacyWriteOpConverter<'r> {
     convert_impl!(convert_aggregator, get_aggregator_v1_state_value_metadata);
 
     pub(crate) fn new(
@@ -290,6 +299,176 @@ impl<'r> WriteOpConverter<'r> {
     }
 }
 
+/// Converts Move global storage operations into DB operations, computes their sizes and metadata.
+/// Unlike [LegacyWriteOpConverter], does not support "creation as modification" (for gas versions
+/// < 3), and disabled storage metadata.
+#[allow(dead_code)]
+pub(crate) struct WriteOpConverter<'a, LoaderImpl> {
+    woc: LegacyWriteOpConverter<'a>,
+    loader: &'a LoaderImpl,
+    delayed_field_ids: &'a HashSet<DelayedFieldID>,
+}
+
+impl<'a, LoaderImpl> WriteOpConverter<'a, LoaderImpl>
+where
+    LoaderImpl: Loader,
+{
+    #[allow(dead_code)]
+    pub(crate) fn new(
+        data_view: &'a dyn AptosMoveResolver,
+        loader: &'a LoaderImpl,
+        delayed_field_ids: &'a HashSet<DelayedFieldID>,
+    ) -> Self {
+        Self {
+            woc: LegacyWriteOpConverter::new(data_view, true),
+            loader,
+            delayed_field_ids,
+        }
+    }
+
+    /// Serializes value into bytes.
+    fn serialize(
+        &self,
+        value: &Value,
+        layout: &MoveTypeLayout,
+        contains_delayed_fields: bool,
+    ) -> PartialVMResult<Bytes> {
+        let function_value_extension = self.loader.as_function_value_extension();
+        let mut ctx = ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
+            .with_func_args_deserialization(&function_value_extension);
+        if contains_delayed_fields {
+            ctx = ctx.with_delayed_fields_serde();
+        }
+
+        ctx.serialize(value, layout)?
+            .map(Bytes::from)
+            .ok_or_else(|| PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR))
+    }
+
+    /// Returns serialized size of a value.
+    fn serialized_size(
+        &self,
+        value: &Value,
+        layout: &MoveTypeLayout,
+        contains_delayed_fields: bool,
+    ) -> PartialVMResult<u64> {
+        let function_value_extension = self.loader.as_function_value_extension();
+        let mut ctx = ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
+            .with_func_args_deserialization(&function_value_extension);
+        if contains_delayed_fields {
+            ctx = ctx.with_delayed_fields_serde();
+        }
+
+        Ok(ctx.serialized_size(value, layout)? as u64)
+    }
+}
+
+impl<'a, LoaderImpl> WriteOpInfoBuilder for WriteOpConverter<'a, LoaderImpl>
+where
+    LoaderImpl: Loader,
+{
+    fn get_resource_metadata_and_size(
+        &self,
+        key: &StateKey,
+        op: MoveStorageOp<&Value>,
+        layout: &MoveTypeLayout,
+        contains_delayed_fields: bool,
+        assert_no_creation: bool,
+    ) -> PartialVMResult<(StateValueMetadata, WriteOpSize)> {
+        use MoveStorageOp::*;
+
+        let prev_metadata = self
+            .woc
+            .remote
+            .as_executor_view()
+            .get_resource_state_value_metadata(key)?;
+
+        Ok(match (prev_metadata, op) {
+            (None, New(v)) => {
+                if assert_no_creation {
+                    return Err(PartialVMError::new_invariant_violation(format!(
+                        "Creation for {:?} found where it is not allowed",
+                        key
+                    )));
+                }
+
+                let metadata = match self.woc.new_slot_metadata.as_ref() {
+                    // If new slot metadata is not set, it means we were not able to fetch current
+                    // time, and need to use the legacy flow.
+                    None => StateValueMetadata::none(),
+                    Some(metadata) => metadata.clone(),
+                };
+                let write_len = self.serialized_size(v, layout, contains_delayed_fields)?;
+                (metadata, WriteOpSize::Creation { write_len })
+            },
+            (Some(metadata), Modify(v)) => {
+                let write_len = self.serialized_size(v, layout, contains_delayed_fields)?;
+                (metadata, WriteOpSize::Creation { write_len })
+            },
+            (Some(metadata), Delete) => (metadata, WriteOpSize::Deletion),
+            (None, Modify(_) | Delete) | (Some(_), New(_)) => {
+                // Possible under speculative execution, returning speculative error waiting for
+                // re-execution.
+                return Err(PartialVMError::new(
+                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                ));
+            },
+        })
+    }
+
+    fn get_resource_write_op(
+        &self,
+        op: MoveStorageOp<&Value>,
+        layout: Arc<MoveTypeLayout>,
+        contains_delayed_fields: bool,
+        metadata: StateValueMetadata,
+    ) -> PartialVMResult<AbstractResourceWriteOp> {
+        let write_op = match op {
+            Op::New(v) => WriteOp::creation(
+                self.serialize(v, &layout, contains_delayed_fields)?,
+                metadata,
+            ),
+            Op::Modify(v) => WriteOp::modification(
+                self.serialize(v, &layout, contains_delayed_fields)?,
+                metadata,
+            ),
+            Op::Delete => WriteOp::deletion(metadata),
+        };
+        let layout = contains_delayed_fields.then_some(layout);
+        Ok(AbstractResourceWriteOp::from_resource_write_with_maybe_layout(write_op, layout))
+    }
+
+    fn get_resource_metadata_and_size_for_read_with_delayed_fields(
+        &self,
+        key: &StateKey,
+    ) -> PartialVMResult<Option<(StateValueMetadata, WriteOpSize)>> {
+        // TODO(sessions): optimize this by accessing a single key instead!
+        let mut need_exchange = self
+            .woc
+            .remote
+            .as_executor_view()
+            .get_reads_needing_exchange(self.delayed_field_ids, &HashSet::new())?;
+        Ok(need_exchange
+            .remove(key)
+            .map(|(metadata, write_len, _)| (metadata, WriteOpSize::Modification { write_len })))
+    }
+
+    fn get_group_metadata_and_size_for_read_with_delayed_fields(
+        &self,
+        key: &StateKey,
+    ) -> PartialVMResult<Option<(StateValueMetadata, WriteOpSize)>> {
+        // TODO(sessions): optimize this by accessing a single key instead!
+        let mut need_exchange = self
+            .woc
+            .remote
+            .as_executor_view()
+            .get_group_reads_needing_exchange(self.delayed_field_ids, &HashSet::new())?;
+        Ok(need_exchange
+            .remove(key)
+            .map(|(metadata, write_len)| (metadata, WriteOpSize::Modification { write_len })))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -400,7 +579,7 @@ mod tests {
         let env = AptosEnvironment::new(&state_view);
         let code_storage = state_view.as_aptos_code_storage(&env);
         // Storage slot metadata is enabled on the mainnet.
-        let woc = WriteOpConverter::new(&resolver, true);
+        let woc = LegacyWriteOpConverter::new(&resolver, true);
 
         let modules = vec![
             (a.self_id(), a_bytes.clone()),
@@ -484,7 +663,7 @@ mod tests {
                 MoveStorageOp::Modify((vec![5, 5, 5, 5, 5].into(), None)),
             ),
         ]);
-        let converter = WriteOpConverter::new(&resolver, false);
+        let converter = LegacyWriteOpConverter::new(&resolver, false);
         let group_write = converter
             .convert_resource_group_v1(&key, group_changes)
             .unwrap();
@@ -530,7 +709,7 @@ mod tests {
             mock_tag_2(),
             MoveStorageOp::New((vec![3, 3, 3].into(), None)),
         )]);
-        let converter = WriteOpConverter::new(&resolver, true);
+        let converter = LegacyWriteOpConverter::new(&resolver, true);
         let group_write = converter
             .convert_resource_group_v1(&key, group_changes)
             .unwrap();
@@ -559,7 +738,7 @@ mod tests {
         let group_changes =
             BTreeMap::from([(mock_tag_1(), MoveStorageOp::New((vec![2, 2].into(), None)))]);
         let key = StateKey::raw(&[0]);
-        let converter = WriteOpConverter::new(&resolver, true);
+        let converter = LegacyWriteOpConverter::new(&resolver, true);
         let group_write = converter
             .convert_resource_group_v1(&key, group_changes)
             .unwrap();
@@ -596,7 +775,7 @@ mod tests {
             (mock_tag_0(), MoveStorageOp::Delete),
             (mock_tag_1(), MoveStorageOp::Delete),
         ]);
-        let converter = WriteOpConverter::new(&resolver, true);
+        let converter = LegacyWriteOpConverter::new(&resolver, true);
         let group_write = converter
             .convert_resource_group_v1(&key, group_changes)
             .unwrap();
