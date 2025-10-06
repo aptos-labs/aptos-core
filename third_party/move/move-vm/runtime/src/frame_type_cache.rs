@@ -84,7 +84,7 @@ pub(crate) struct FrameTypeCache {
 }
 
 impl FrameTypeCache {
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn get_or<K: Copy + Ord + Eq, V, F>(
         map: &mut BTreeMap<K, V>,
         idx: K,
@@ -102,7 +102,7 @@ impl FrameTypeCache {
         }
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_field_type_and_struct_type(
         &mut self,
         idx: FieldInstantiationIndex,
@@ -140,7 +140,7 @@ impl FrameTypeCache {
         Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_struct_type(
         &mut self,
         idx: StructDefInstantiationIndex,
@@ -154,7 +154,7 @@ impl FrameTypeCache {
         Ok((ty, *ty_count))
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_struct_variant_type(
         &mut self,
         idx: StructVariantInstantiationIndex,
@@ -173,7 +173,7 @@ impl FrameTypeCache {
         Ok((ty, *ty_count))
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_struct_fields_types(
         &mut self,
         idx: StructDefInstantiationIndex,
@@ -195,7 +195,7 @@ impl FrameTypeCache {
         )?)
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_struct_variant_fields_types(
         &mut self,
         idx: StructVariantInstantiationIndex,
@@ -217,7 +217,7 @@ impl FrameTypeCache {
         )?)
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_signature_index_type(
         &mut self,
         idx: SignatureIndex,
