@@ -10,20 +10,33 @@
 //! See [`Table.move`](../sources/Table.move) for language use.
 //! See [`README.md`](../README.md) for integration into an adapter.
 
+use aptos_gas_meter::AptosGasMeter;
 use aptos_gas_schedule::gas_params::natives::table::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
+use aptos_types::{
+    state_store::{
+        state_key::StateKey, state_value::StateValueMetadata,
+        table::TableHandle as AptosTableHandle,
+    },
+    vm::versioning::{CurrentVersion, VersionController, VersionedSlot, VersionedSlotDerivedData},
+    write_set::WriteOpSize,
+};
+use aptos_vm_types::{
+    abstract_write_op::{AbstractResourceWriteOp, InPlaceDelayedFieldChangeOp},
+    change_set::WriteOpInfo,
+    storage::change_set_configs::ChangeSetSizeAndRefundTracker,
+    write_info_builder::WriteOpInfoBuilder,
+};
 use better_any::{Tid, TidAble};
 use bytes::Bytes;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     account_address::AccountAddress, effects::Op, gas_algebra::NumBytes, identifier::Identifier,
     value::MoveTypeLayout, vm_status::StatusCode,
 };
-// ===========================================================================================
-// Public Data Structures and Constants
 pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
 use move_vm_runtime::{
     native_extensions::NativeExtensionSession,
@@ -69,9 +82,12 @@ const _NOT_EMPTY: u64 = (102 << 8) + _ECATEGORY_INVALID_STATE as u64;
 /// of the overall context so we can mutate while still accessing the overall context.
 #[derive(Default)]
 struct TableData {
-    new_tables: BTreeMap<TableHandle, TableInfo>,
-    removed_tables: BTreeSet<TableHandle>,
+    vc: VersionController,
     tables: BTreeMap<TableHandle, Table>,
+    new_tables_counter: u32,
+    // Below structures only support legacy, non-continuous session.
+    legacy_new_tables: BTreeMap<TableHandle, TableInfo>,
+    legacy_removed_tables: BTreeSet<TableHandle>,
 }
 
 /// A structure containing information about the layout of a value stored in a table. Needed in
@@ -81,12 +97,23 @@ struct LayoutInfo {
     contains_delayed_fields: bool,
 }
 
+/// An item in a table. For continuous session: a versioned global value. For legacy session model
+/// a single base version is kept at all times as the context is never saved or rolled back.
+struct TableItem {
+    /// Different version of the global storage slot.
+    gv: VersionedSlot<GlobalValue>,
+    /// Previous size (before any transaction side effects), in bytes.
+    prev_size: u64,
+    /// Metadata and sizes corresponding to different versions. Computed exactly once.
+    metadata_and_size: VersionedSlotDerivedData<(StateValueMetadata, WriteOpSize)>,
+}
+
 /// A structure representing a single table.
 struct Table {
     handle: TableHandle,
     key_layout: MoveTypeLayout,
     value_layout_info: LayoutInfo,
-    content: BTreeMap<Vec<u8>, GlobalValue>,
+    content: BTreeMap<Vec<u8>, TableItem>,
 }
 
 /// The field index of the `handle` field in the `Table` Move struct.
@@ -110,16 +137,21 @@ pub struct TableChange {
 
 impl<'a> NativeExtensionSession for NativeTableContext<'a> {
     fn abort(&mut self) {
-        // TODO(sessions): implement
+        self.table_data.borrow_mut().vc.undo();
     }
 
     fn finish(&mut self) {
-        // TODO(sessions): implement
+        self.table_data.borrow_mut().vc.save();
     }
 
     fn start(&mut self, txn_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
         self.txn_hash = *txn_hash;
-        // TODO(sessions): implement
+
+        let mut table_data = self.table_data.borrow_mut();
+        table_data.new_tables_counter = 0;
+        assert!(table_data.legacy_new_tables.is_empty());
+        assert!(table_data.legacy_removed_tables.is_empty());
+        // Note: tables are persisted on reset for continuous session.
     }
 }
 
@@ -134,17 +166,22 @@ impl<'a> NativeTableContext<'a> {
         }
     }
 
-    /// Computes the change set from a NativeTableContext.
-    pub fn into_change_set(
+    /// Computes the change set from a NativeTableContext. Used for legacy non-continuous session
+    /// only.
+    pub fn legacy_into_change_set(
         self,
         function_value_extension: &impl FunctionValueExtension,
     ) -> PartialVMResult<TableChangeSet> {
         let NativeTableContext { table_data, .. } = self;
         let TableData {
-            new_tables,
-            removed_tables,
+            vc,
+            legacy_new_tables: new_tables,
+            legacy_removed_tables: removed_tables,
             tables,
+            ..
         } = table_data.into_inner();
+
+        let version = vc.current_version();
         let mut changes = BTreeMap::new();
         for (handle, table) in tables {
             let Table {
@@ -153,8 +190,13 @@ impl<'a> NativeTableContext<'a> {
                 ..
             } = table;
             let mut entries = BTreeMap::new();
-            for (key, gv) in content {
-                let op = match gv.into_effect() {
+            for (key, mut table_item) in content {
+                let op = match table_item
+                    .gv
+                    .take(version)
+                    .expect("Global value always exist in non-continuous session")
+                    .into_effect()
+                {
                     Some(op) => op,
                     None => continue,
                 };
@@ -194,6 +236,141 @@ impl<'a> NativeTableContext<'a> {
             removed_tables,
             changes,
         })
+    }
+
+    /// Extracts latest version of writes from the extension. For writes for which the metadata was
+    /// not yet computed, recomputes it (not allowing any creations).
+    ///
+    /// Note: used only for continuous session.
+    pub fn take_write_ops(
+        &self,
+        write_op_info_builder: &impl WriteOpInfoBuilder,
+    ) -> PartialVMResult<BTreeMap<StateKey, AbstractResourceWriteOp>> {
+        let mut changes = BTreeMap::new();
+        let mut table_data = self.table_data.borrow_mut();
+
+        let current_version = table_data.vc.current_version();
+        for (handle, table) in table_data.tables.iter_mut() {
+            for (key, table_item) in table.content.iter_mut() {
+                let state_key = StateKey::table_item(&AptosTableHandle(handle.0), key);
+                let maybe_computed = table_item.metadata_and_size.take(current_version);
+                let (metadata, op_size) = match maybe_computed {
+                    Some(res) => res,
+                    None => {
+                        if !table_item.compute_metadata_and_size_once(
+                            write_op_info_builder,
+                            &state_key,
+                            &table.value_layout_info,
+                            current_version,
+                            true,
+                        )? {
+                            continue;
+                        }
+
+                        table_item
+                            .metadata_and_size
+                            .take(current_version)
+                            .ok_or_else(|| {
+                                PartialVMError::new_invariant_violation(
+                                    "Metadata and size must be computed",
+                                )
+                            })?
+                    },
+                };
+
+                let layout = table.value_layout_info.layout.clone();
+                let write_op = match table_item
+                    .gv
+                    .get(current_version)
+                    .expect("No-ops are already skipped during metadata computation")
+                    .effect()
+                {
+                    Some(op) => write_op_info_builder.get_resource_write_op(
+                        op,
+                        layout,
+                        table.value_layout_info.contains_delayed_fields,
+                        metadata,
+                    )?,
+                    None => {
+                        // This means there is a delayed field change (otherwise, we should have
+                        // continued the loop early when computing metadata).
+                        let materialized_size = match op_size {
+                            WriteOpSize::Modification { write_len } => write_len,
+                            WriteOpSize::Creation { .. } | WriteOpSize::Deletion => {
+                                return Err(PartialVMError::new_invariant_violation(
+                                    "In-place delayed field changes are always modifications",
+                                ));
+                            },
+                        };
+                        AbstractResourceWriteOp::InPlaceDelayedFieldChange(
+                            InPlaceDelayedFieldChangeOp {
+                                layout,
+                                materialized_size,
+                                metadata,
+                            },
+                        )
+                    },
+                };
+
+                changes.insert(state_key, write_op);
+            }
+        }
+
+        Ok(changes)
+    }
+
+    /// Charges gas for latest version of writes from the extension, computing their metadata and
+    /// refund.
+    ///
+    /// Note: used only for continuous session.
+    pub fn charge_write_ops(
+        &self,
+        write_op_info_builder: &impl WriteOpInfoBuilder,
+        change_set_size_tracker: &mut ChangeSetSizeAndRefundTracker,
+        gas_meter: &mut impl AptosGasMeter,
+    ) -> VMResult<()> {
+        let mut table_data = self.table_data.borrow_mut();
+
+        let current_version = table_data.vc.current_version();
+        for (handle, table) in table_data.tables.iter_mut() {
+            for (key, table_item) in table.content.iter_mut() {
+                let state_key = StateKey::table_item(&AptosTableHandle(handle.0), key);
+                if !table_item
+                    .compute_metadata_and_size_once(
+                        write_op_info_builder,
+                        &state_key,
+                        &table.value_layout_info,
+                        current_version,
+                        false,
+                    )
+                    .map_err(|err| err.finish(Location::Undefined))?
+                {
+                    continue;
+                }
+
+                let (metadata_mut, size) = table_item
+                    .metadata_and_size
+                    .get(current_version)
+                    .ok_or_else(|| {
+                        PartialVMError::new_invariant_violation(
+                            "Metadata and size must be computed",
+                        )
+                        .finish(Location::Undefined)
+                    })?;
+
+                let op_info = WriteOpInfo {
+                    key: &state_key,
+                    op_size: *size,
+                    prev_size: table_item.prev_size,
+                    metadata_mut,
+                };
+
+                change_set_size_tracker.count_write_op(&state_key, *size)?;
+                change_set_size_tracker.record_storage_fee_and_refund_write_op(op_info)?;
+                gas_meter.charge_io_gas_for_write(&state_key, size)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -237,49 +414,181 @@ impl LayoutInfo {
             contains_delayed_fields,
         })
     }
+
+    fn layout_ref_if_contains_delayed_fields(&self) -> Option<&MoveTypeLayout> {
+        self.contains_delayed_fields.then(|| self.layout.as_ref())
+    }
 }
 
 impl Table {
-    fn get_or_create_global_value(
+    /// If the entry corresponding to te key is vacant, or occupied but without any versions,
+    /// returns true.
+    fn table_item_needs_initialization(&mut self, key: &[u8], version: CurrentVersion) -> bool {
+        self.content
+            .get_mut(key)
+            .map(|table_item| table_item.gv.check_empty(version))
+            .unwrap_or(true)
+    }
+
+    /// Initializes the entry to the global value fetched from the on-chain, and returns a mutable
+    /// reference to the value as well as number of loaded bytes.
+    ///
+    /// Even though a mutable reference is returned, there is never any copy-on-write as the value
+    /// has just been inserted under the current working version.
+    fn initialize_table_item(
         &mut self,
         function_value_extension: &dyn FunctionValueExtension,
-        table_context: &NativeTableContext,
-        key: Vec<u8>,
-    ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
-        Ok(match self.content.entry(key) {
-            Entry::Vacant(entry) => {
-                // If there is an identifier mapping, we need to pass layout to
-                // ensure it gets recorded.
-                let data = table_context
-                    .resolver
-                    .resolve_table_entry_bytes_with_layout(
-                        &self.handle,
-                        entry.key(),
-                        if self.value_layout_info.contains_delayed_fields {
-                            Some(&self.value_layout_info.layout)
-                        } else {
-                            None
-                        },
-                    )?;
+        resolver: &dyn TableResolver,
+        key: &[u8],
+        version: CurrentVersion,
+    ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
+        // If there are delayed fields, we need to pass layout when resolving bytes from
+        // storage.
+        let layout_if_contains_delayed_fields = self
+            .value_layout_info
+            .layout_ref_if_contains_delayed_fields();
+        let data = resolver.resolve_table_entry_bytes_with_layout(
+            &self.handle,
+            key,
+            layout_if_contains_delayed_fields,
+        )?;
+        let prev_size = data.as_ref().map(|bytes| bytes.len() as u64).unwrap_or(0);
 
-                let (gv, loaded) = match data {
-                    Some(val_bytes) => {
-                        let val = deserialize_value(
-                            function_value_extension,
-                            &val_bytes,
-                            &self.value_layout_info,
-                        )?;
-                        (
-                            GlobalValue::cached(val)?,
-                            Some(NumBytes::new(val_bytes.len() as u64)),
-                        )
-                    },
-                    None => (GlobalValue::none(), None),
-                };
-                (entry.insert(gv), Some(loaded))
+        let (gv, bytes_loaded) = match data {
+            Some(val_bytes) => {
+                let val = deserialize_value(
+                    function_value_extension,
+                    &val_bytes,
+                    &self.value_layout_info,
+                )?;
+                (
+                    GlobalValue::cached(val)?,
+                    Some(NumBytes::new(val_bytes.len() as u64)),
+                )
             },
-            Entry::Occupied(entry) => (entry.into_mut(), None),
-        })
+            None => (GlobalValue::none(), None),
+        };
+
+        let gv = self
+            .content
+            .entry(key.to_vec())
+            .or_insert_with(|| TableItem::new(prev_size))
+            .gv
+            .set_empty(gv, version);
+        Ok((gv, bytes_loaded))
+    }
+
+    /// Returns an immutable reference to the global value.
+    fn get_or_create_table_item(
+        &mut self,
+        function_value_extension: &dyn FunctionValueExtension,
+        resolver: &dyn TableResolver,
+        key: Vec<u8>,
+        version: CurrentVersion,
+    ) -> PartialVMResult<(&GlobalValue, Option<Option<NumBytes>>)> {
+        let needs_initialization = self.table_item_needs_initialization(&key, version);
+        if needs_initialization {
+            let (gv, bytes_loaded) =
+                self.initialize_table_item(function_value_extension, resolver, &key, version)?;
+            Ok((gv, Some(bytes_loaded)))
+        } else {
+            let gv = self
+                .content
+                .get_mut(&key)
+                .expect("Table item exists")
+                .gv
+                .get(version)
+                .expect("Global value slot contains a value");
+            Ok((gv, None))
+        }
+    }
+
+    /// Returns a mutable reference to the global value. Global value is copied into the next
+    /// version if its current version was previously saved.
+    fn get_or_create_table_item_mut(
+        &mut self,
+        function_value_extension: &dyn FunctionValueExtension,
+        resolver: &dyn TableResolver,
+        key: Vec<u8>,
+        version: CurrentVersion,
+    ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
+        let needs_initialization = self.table_item_needs_initialization(&key, version);
+        if needs_initialization {
+            let (gv, bytes_loaded) =
+                self.initialize_table_item(function_value_extension, resolver, &key, version)?;
+            Ok((gv, Some(bytes_loaded)))
+        } else {
+            let gv = self
+                .content
+                .get_mut(&key)
+                .expect("Table item exists")
+                .gv
+                .get_mut(version)?
+                .expect("Global value slot contains a value");
+            Ok((gv, None))
+        }
+    }
+}
+
+impl TableItem {
+    fn new(prev_size: u64) -> Self {
+        Self {
+            prev_size,
+            gv: VersionedSlot::default(),
+            metadata_and_size: VersionedSlotDerivedData::default(),
+        }
+    }
+
+    /// Computes metadata and size for the value (with version being at most the current version)
+    /// and sets them at the current version.
+    ///
+    ///   - Returns true if the metadata has been computed.
+    ///   - Returns false if there was no need to compute it (i.e., no global state changes).
+    ///   - An error is returned on double-inserting metadata.
+    fn compute_metadata_and_size_once(
+        &mut self,
+        write_op_info_builder: &impl WriteOpInfoBuilder,
+        key: &StateKey,
+        layout_info: &LayoutInfo,
+        version: CurrentVersion,
+        assert_no_creation: bool,
+    ) -> PartialVMResult<bool> {
+        let gv = match self.gv.get(version) {
+            Some(gv) => gv,
+            None => {
+                // No-op.
+                return Ok(false);
+            },
+        };
+
+        let op = match gv.effect() {
+            Some(op) => op,
+            None => {
+                // If there are any delayed fields in the layout, it is possible that this read is
+                // a modification. We check this is the case, and if so, also store metadata and
+                // size.
+                if layout_info.contains_delayed_fields {
+                    if let Some(res) = write_op_info_builder
+                        .get_resource_metadata_and_size_for_read_with_delayed_fields(key)?
+                    {
+                        self.metadata_and_size.set_once(version, res)?;
+                        return Ok(true);
+                    }
+                }
+                return Ok(false);
+            },
+        };
+
+        // Otherwise, this is a change to the global state - get metadata and size and set them.
+        let res = write_op_info_builder.get_resource_metadata_and_size(
+            key,
+            op,
+            layout_info.layout.as_ref(),
+            layout_info.contains_delayed_fields,
+            assert_no_creation,
+        )?;
+        self.metadata_and_size.set_once(version, res)?;
+        Ok(true)
     }
 }
 
@@ -297,7 +606,7 @@ pub fn table_natives(
                 ("new_table_handle", native_new_table_handle as RawSafeNative),
                 ("add_box", native_add_box),
                 ("borrow_box", native_borrow_box),
-                ("borrow_box_mut", native_borrow_box),
+                ("borrow_box_mut", native_borrow_box_mut),
                 ("remove_box", native_remove_box),
                 ("contains_box", native_contains_box),
                 ("destroy_empty_box", native_destroy_empty_box),
@@ -353,6 +662,7 @@ fn native_new_table_handle(
 
     context.charge(NEW_TABLE_HANDLE_BASE)?;
 
+    let is_legacy_session_used = !context.get_feature_flags().is_aptos_vm_v2_enabled();
     let table_context = context.extensions().get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
@@ -360,18 +670,20 @@ fn native_new_table_handle(
     // produced so far, sha256 this to produce a unique handle. Given the txn hash
     // is unique, this should create a unique and deterministic global id.
     let mut digest = Sha3_256::new();
-    let table_len = table_data.new_tables.len() as u32; // cast usize to u32 to ensure same length
     Digest::update(&mut digest, table_context.txn_hash);
-    Digest::update(&mut digest, table_len.to_be_bytes());
+    Digest::update(&mut digest, table_data.new_tables_counter.to_be_bytes());
     let bytes = digest.finalize().to_vec();
     let handle = AccountAddress::from_bytes(&bytes[0..AccountAddress::LENGTH])
         .map_err(|_| partial_extension_error("Unable to create table handle"))?;
     let key_type = context.type_to_type_tag(&ty_args[0])?;
     let value_type = context.type_to_type_tag(&ty_args[1])?;
-    assert!(table_data
-        .new_tables
-        .insert(TableHandle(handle), TableInfo::new(key_type, value_type))
-        .is_none());
+    if is_legacy_session_used {
+        assert!(table_data
+            .legacy_new_tables
+            .insert(TableHandle(handle), TableInfo::new(key_type, value_type))
+            .is_none());
+    }
+    table_data.new_tables_counter += 1;
 
     Ok(smallvec![Value::address(handle)])
 }
@@ -390,6 +702,7 @@ fn native_add_box(
         context.extensions_with_loader_context_and_gas_params();
     let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
+    let current_version = table_data.vc.current_version();
 
     let val = args.pop_back().unwrap();
     let key = args.pop_back().unwrap();
@@ -402,8 +715,12 @@ fn native_add_box(
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = ADD_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_table_item_mut(
+        &function_value_extension,
+        table_context.resolver,
+        key_bytes,
+        current_version,
+    )?;
     let mem_usage = gv
         .view()
         .map(|val| {
@@ -435,6 +752,22 @@ fn native_add_box(
 fn native_borrow_box(
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
+    args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    native_borrow_box_impl::<false>(context, ty_args, args)
+}
+
+fn native_borrow_box_mut(
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    native_borrow_box_impl::<true>(context, ty_args, args)
+}
+
+fn native_borrow_box_impl<const IS_MUT: bool>(
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(ty_args.len(), 3);
@@ -446,6 +779,7 @@ fn native_borrow_box(
         context.extensions_with_loader_context_and_gas_params();
     let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
+    let current_version = table_data.vc.current_version();
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
@@ -457,8 +791,22 @@ fn native_borrow_box(
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = BORROW_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded): (&GlobalValue, _) = if IS_MUT {
+        let (gv, loaded) = table.get_or_create_table_item_mut(
+            &function_value_extension,
+            table_context.resolver,
+            key_bytes,
+            current_version,
+        )?;
+        (gv, loaded)
+    } else {
+        table.get_or_create_table_item(
+            &function_value_extension,
+            table_context.resolver,
+            key_bytes,
+            current_version,
+        )?
+    };
     let mem_usage = gv
         .view()
         .map(|val| {
@@ -501,6 +849,7 @@ fn native_contains_box(
         context.extensions_with_loader_context_and_gas_params();
     let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
+    let current_version = table_data.vc.current_version();
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
@@ -512,8 +861,12 @@ fn native_contains_box(
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = CONTAINS_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_table_item(
+        &function_value_extension,
+        table_context.resolver,
+        key_bytes,
+        current_version,
+    )?;
     let mem_usage = gv
         .view()
         .map(|val| {
@@ -550,6 +903,7 @@ fn native_remove_box(
         context.extensions_with_loader_context_and_gas_params();
     let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
+    let current_version = table_data.vc.current_version();
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
@@ -561,8 +915,12 @@ fn native_remove_box(
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = REMOVE_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_table_item_mut(
+        &function_value_extension,
+        table_context.resolver,
+        key_bytes,
+        current_version,
+    )?;
     let mem_usage = gv
         .view()
         .map(|val| {
@@ -601,6 +959,7 @@ fn native_destroy_empty_box(
 
     context.charge(DESTROY_EMPTY_BOX_BASE)?;
 
+    let is_legacy_session_used = !context.get_feature_flags().is_aptos_vm_v2_enabled();
     let (extensions, mut loader_context) = context.extensions_with_loader_context();
     let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
@@ -609,7 +968,9 @@ fn native_destroy_empty_box(
     // TODO: Can the following line be removed?
     table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
-    assert!(table_data.removed_tables.insert(handle));
+    if is_legacy_session_used {
+        assert!(table_data.legacy_removed_tables.insert(handle));
+    }
 
     Ok(smallvec![])
 }
@@ -695,4 +1056,198 @@ fn deserialize_value(
 
 fn partial_extension_error(msg: impl ToString) -> PartialVMError {
     PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(msg.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use move_core_types::value::MoveStructLayout;
+    use move_vm_types::values::{AbstractFunction, SerializedFunctionData};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct MockItem {
+        value: u64,
+    }
+
+    #[derive(Default)]
+    struct MockState {
+        data: BTreeMap<(TableHandle, Vec<u8>), Bytes>,
+    }
+
+    impl MockState {
+        fn insert_value(&mut self, key: Vec<u8>, value: u64) {
+            self.data.insert(
+                (TableHandle(AccountAddress::ONE), key),
+                bcs::to_bytes(&MockItem { value }).unwrap().into(),
+            );
+        }
+    }
+
+    impl TableResolver for MockState {
+        fn resolve_table_entry_bytes_with_layout(
+            &self,
+            handle: &TableHandle,
+            key: &[u8],
+            _layout: Option<&MoveTypeLayout>,
+        ) -> PartialVMResult<Option<Bytes>> {
+            Ok(self.data.get(&(*handle, key.to_vec())).cloned())
+        }
+    }
+
+    fn new_empty_table_for_test() -> Table {
+        Table {
+            // Handle and key layout are irrelevant.
+            handle: TableHandle(AccountAddress::ONE),
+            key_layout: MoveTypeLayout::U8,
+            value_layout_info: LayoutInfo {
+                // Values are structs with a single u64 field, so we make sure layout matches.
+                layout: Arc::new(MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![
+                    MoveTypeLayout::U64,
+                ]))),
+                contains_delayed_fields: false,
+            },
+            content: BTreeMap::new(),
+        }
+    }
+
+    struct MockFunctionValueExtension;
+
+    impl FunctionValueExtension for MockFunctionValueExtension {
+        fn create_from_serialization_data(
+            &self,
+            _data: SerializedFunctionData,
+        ) -> PartialVMResult<Box<dyn AbstractFunction>> {
+            unimplemented!("Irrelevant for the test")
+        }
+
+        fn get_serialization_data(
+            &self,
+            _fun: &dyn AbstractFunction,
+        ) -> PartialVMResult<SerializedFunctionData> {
+            unimplemented!("Irrelevant for the test")
+        }
+
+        fn max_value_nest_depth(&self) -> Option<u64> {
+            None
+        }
+    }
+
+    #[test]
+    fn test_extension_is_reset_correctly() {
+        let state = MockState::default();
+        let mut context = NativeTableContext::new([0u8; 32], &state);
+        context.table_data.borrow_mut().new_tables_counter = 10;
+
+        context.reset(&[1u8; 32], &[], 10);
+
+        let NativeTableContext {
+            resolver: _,
+            txn_hash,
+            table_data,
+        } = context;
+        let TableData {
+            vc: _,
+            tables: _,
+            new_tables_counter,
+            legacy_new_tables: _,
+            legacy_removed_tables: _,
+        } = table_data.into_inner();
+        assert_eq!(txn_hash, [1u8; 32]);
+        assert_eq!(new_tables_counter, 0);
+    }
+
+    #[test]
+    fn test_table_item_needs_initialization() {
+        let mut vc = VersionController::new();
+        vc.save();
+        let mut table = new_empty_table_for_test();
+
+        // Empty table should need initialization.
+        assert!(table.table_item_needs_initialization(b"key1", vc.current_version()));
+
+        let gv = GlobalValue::none();
+        table
+            .content
+            .entry(b"key1".to_vec())
+            .or_insert_with(|| TableItem::new(0))
+            .gv
+            .set_empty(gv, vc.current_version());
+
+        // Should no longer need initialization for existing key.
+        assert!(!table.table_item_needs_initialization(b"key1", vc.current_version()));
+        assert!(table.table_item_needs_initialization(b"key2", vc.current_version()));
+
+        // Back to version 1, we need to re-initialize now.
+        vc.undo();
+        assert!(table.table_item_needs_initialization(b"key1", vc.current_version()));
+    }
+
+    #[test]
+    fn test_table_item_versioning() {
+        let mut state = MockState::default();
+        state.insert_value(b"key1".to_vec(), 100);
+
+        let mut vc = VersionController::new();
+        let mut table = new_empty_table_for_test();
+
+        let (gv, bytes_loaded) = table
+            .get_or_create_table_item(
+                &MockFunctionValueExtension,
+                &state,
+                b"key1".to_vec(),
+                vc.current_version(),
+            )
+            .unwrap();
+
+        assert!(bytes_loaded.is_some());
+        assert!(gv.exists().unwrap());
+
+        // Save and advance to version 2.
+        vc.save();
+
+        // Mutable access - should trigger CoW.
+        let (gv, bytes_loaded) = table
+            .get_or_create_table_item_mut(
+                &MockFunctionValueExtension,
+                &state,
+                b"key1".to_vec(),
+                vc.current_version(),
+            )
+            .unwrap();
+        assert!(bytes_loaded.is_none());
+
+        // Delete the global value for version 2.
+        gv.move_from().unwrap();
+        assert!(!gv.exists().unwrap());
+        let versions = table
+            .content
+            .get(b"key1".as_slice())
+            .unwrap()
+            .gv
+            .to_versions_vec();
+        assert_eq!(versions, vec![1, 2]);
+
+        // Undo back to version 1
+        vc.undo();
+
+        let (gv, bytes_loaded) = table
+            .get_or_create_table_item(
+                &MockFunctionValueExtension,
+                &state,
+                b"key1".to_vec(),
+                vc.current_version(),
+            )
+            .unwrap();
+        assert!(bytes_loaded.is_none());
+        assert!(gv.exists().unwrap());
+
+        let versions = table
+            .content
+            .get(b"key1".as_slice())
+            .unwrap()
+            .gv
+            .to_versions_vec();
+        assert_eq!(versions, vec![1]);
+    }
 }
