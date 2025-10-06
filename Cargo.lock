@@ -4781,6 +4781,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml 0.8.26",
+ "smallvec",
  "strum 0.27.1",
  "strum_macros 0.27.1",
  "thiserror",
