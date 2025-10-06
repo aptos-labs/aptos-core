@@ -29,7 +29,7 @@ impl ExpChecker for EmptyIf {
             return;
         };
 
-        let ExpData::Call(nid, Operation::Tuple, args) = if_branch.as_ref() else {
+        let ExpData::Call(_, Operation::Tuple, args) = if_branch.as_ref() else {
             return;
         };
 
