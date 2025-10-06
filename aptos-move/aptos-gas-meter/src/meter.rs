@@ -466,9 +466,8 @@ where
     }
 
     #[inline]
-    fn charge_vec_pack<'a>(
+    fn charge_vec_pack(
         &mut self,
-        _ty: impl TypeView + 'a,
         args: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
         let num_args = NumArgs::new(args.len() as u64);
@@ -480,7 +479,6 @@ where
     #[inline]
     fn charge_vec_unpack(
         &mut self,
-        _ty: impl TypeView,
         expect_num_elements: NumArgs,
         _elems: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
@@ -489,17 +487,12 @@ where
     }
 
     #[inline]
-    fn charge_vec_len(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_len(&mut self) -> PartialVMResult<()> {
         self.algebra.charge_execution(VEC_LEN_BASE)
     }
 
     #[inline]
-    fn charge_vec_borrow(
-        &mut self,
-        is_mut: bool,
-        _ty: impl TypeView,
-        _is_success: bool,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_borrow(&mut self, is_mut: bool) -> PartialVMResult<()> {
         match is_mut {
             false => self.algebra.charge_execution(VEC_IMM_BORROW_BASE),
             true => self.algebra.charge_execution(VEC_MUT_BORROW_BASE),
@@ -507,25 +500,17 @@ where
     }
 
     #[inline]
-    fn charge_vec_push_back(
-        &mut self,
-        _ty: impl TypeView,
-        _val: impl ValueView,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_push_back(&mut self, _val: impl ValueView) -> PartialVMResult<()> {
         self.algebra.charge_execution(VEC_PUSH_BACK_BASE)
     }
 
     #[inline]
-    fn charge_vec_pop_back(
-        &mut self,
-        _ty: impl TypeView,
-        _val: Option<impl ValueView>,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_pop_back(&mut self, _val: Option<impl ValueView>) -> PartialVMResult<()> {
         self.algebra.charge_execution(VEC_POP_BACK_BASE)
     }
 
     #[inline]
-    fn charge_vec_swap(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_swap(&mut self) -> PartialVMResult<()> {
         self.algebra.charge_execution(VEC_SWAP_BASE)
     }
 

@@ -1238,7 +1238,7 @@ impl RefCheckState {
     /// Push `num` non-reference values onto the shadow stack.
     fn push_non_refs_to_shadow_stack(&mut self, num: usize) {
         self.shadow_stack
-            .extend(std::iter::repeat(Value::NonRef).take(num));
+            .extend(std::iter::repeat_n(Value::NonRef, num));
     }
 
     /// Push the given `ref_id` onto the shadow stack as a reference value.

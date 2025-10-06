@@ -3,7 +3,7 @@
 
 use crate::{
     accounts::{
-        account_managers::ACCOUNT_MANAGERS, account_recovery_db::AccountRecoveryDBInterface,
+        account_managers::AccountRecoveryManagers, account_recovery_db::AccountRecoveryDBInterface,
     },
     error::PepperServiceError,
     external_resources::{jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
@@ -54,7 +54,8 @@ pub async fn handle_pepper_request(
     epk_blinder: Vec<u8>,
     uid_key: Option<String>,
     derivation_path: Option<String>,
-    aud: Option<String>,
+    account_recovery_managers: Arc<AccountRecoveryManagers>,
+    aud_override: Option<String>,
     account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
 ) -> Result<(Vec<u8>, Vec<u8>, AccountAddress), PepperServiceError> {
     // Get the on-chain keyless configuration
@@ -83,8 +84,15 @@ pub async fn handle_pepper_request(
     let (uid_key, uid_val) = get_uid_key_and_value(uid_key, &claims)?;
 
     // Create the pepper input
-    let pepper_input =
-        create_pepper_input(aud, &claims, uid_key, uid_val, account_recovery_db).await?;
+    let pepper_input = create_pepper_input(
+        &claims,
+        uid_key,
+        uid_val,
+        account_recovery_managers,
+        aud_override,
+        account_recovery_db,
+    )
+    .await?;
 
     // Create the pepper base using the vuf private key and the pepper input
     let pepper_base = create_pepper_base(vuf_private_key, &pepper_input)?;
@@ -160,43 +168,51 @@ fn create_pepper_base(
 
 /// Creates the pepper input, and updates the account recovery DB
 async fn create_pepper_input(
-    aud: Option<String>,
     claims: &TokenData<Claims>,
     uid_key: String,
     uid_val: String,
+    account_recovery_managers: Arc<AccountRecoveryManagers>,
+    aud_override: Option<String>,
     account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
 ) -> Result<PepperInput, PepperServiceError> {
-    // Get the aud from the claims. Note: if the request is from an account manager,
-    // and a target aud is specified, we will override the aud and  generate the
-    // pepper input with the overridden aud. This is useful for pepper recovery.
+    let iss = claims.claims.iss.clone();
     let claims_aud = claims.claims.aud.clone();
-    let (aud, aud_overridden) =
-        if ACCOUNT_MANAGERS.contains(&(claims.claims.iss.clone(), claims.claims.aud.clone())) {
-            match aud {
-                Some(overridden_aud) => (overridden_aud, true),
-                None => (claims_aud, false),
-            }
-        } else {
-            (claims_aud, false)
-        };
+
+    // Get the aud for the pepper input. Note: if the request is from an account
+    // recovery manager, we will override the aud and generate the pepper input
+    // with the overridden aud. This is useful for pepper recovery.
+    let aud = if account_recovery_managers.contains(&iss, &claims_aud) {
+        match aud_override {
+            Some(aud_override) => aud_override, // Use the overridden aud
+            None => {
+                return Err(PepperServiceError::UnexpectedError(format!(
+                    "The issuer {} and aud {} correspond to an account recovery manager, but no aud override was provided!",
+                    &iss, &claims_aud
+                )));
+            },
+        }
+    } else if let Some(aud_override) = aud_override {
+        return Err(PepperServiceError::UnexpectedError(format!(
+            "The issuer {} and aud {} do not correspond to an account recovery manager, but an aud override was provided: {}!",
+            &iss, &claims_aud, &aud_override
+        )));
+    } else {
+        claims_aud // Use the aud directly from the claims
+    };
 
     // Create the pepper input
     let pepper_input = PepperInput {
-        iss: claims.claims.iss.clone(),
+        iss,
         uid_key,
         uid_val,
-        aud: aud.clone(),
+        aud,
     };
     info!("Successfully created PepperInput: {:?}", &pepper_input);
 
-    // Update the account recovery DB (unless the aud was overridden)
-    if aud_overridden {
-        info!("The aud was overridden ({}) for the pepper input. Skipping account recovery DB update!", aud);
-    } else {
-        account_recovery_db
-            .update_db_with_pepper_input(&pepper_input)
-            .await?;
-    }
+    // Update the account recovery DB
+    account_recovery_db
+        .update_db_with_pepper_input(&pepper_input)
+        .await?;
 
     Ok(pepper_input)
 }
@@ -407,7 +423,7 @@ fn verify_public_key_expiry_date_secs(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::utils;
+    use crate::{accounts::account_managers::AccountRecoveryManager, tests::utils};
     use aptos_keyless_pepper_common::vuf::slip_10::ed25519_dalek::Digest;
     use ark_ff::PrimeField;
 
@@ -415,6 +431,7 @@ mod tests {
     const TEST_TOKEN_ISSUER: &str = "token_issuer";
     const TEST_TOKEN_SUB: &str = "token_sub";
     const TEST_TOKEN_AUD: &str = "token_aud";
+    const TEST_TOKEN_AUD_OVERRIDE: &str = "token_aud_override";
     const TEST_TOKEN_EMAIL: &str = "token_email";
     const TEST_TOKEN_NONCE: &str = "token_nonce";
 
@@ -423,20 +440,29 @@ mod tests {
     // Note:
     // - These were generated using the tests in this file, and verified across
     //   several releases (to ensure backward compatibility).
-    // - The "sub" variants are for when the "sub" uid key is used, and the
-    //   "email" variants are for when the "email" uid key is used.
+    // - The "sub" variants are for when the "sub" uid key is used.
+    // - The "email" variants are for when the "email" uid key is used.
+    // - The "sub_override" variants are for when the "sub" uid key is used with an
+    //   account manager that has an aud override.
     const TEST_EMAIL_ACCOUNT_ADDRESS: &str =
         "0x526bcbdbdb4641f1b2f7bbc865c8eb41e976285a9849844b4f543ea17cff3dd3";
     const TEST_EMAIL_DERIVED_PEPPER_HEX: &str =
         "9c76d2f26e8717ffbd499caad7ef5d85fdf24ce493ed111c8313f34429d10d";
     const TEST_EMAIL_PEPPER_BASE_HEX: &str = "96ef6f0fa8534a24b917dd773f14fa75a934e3bd21480391b49699c6b14735915de0adbdacc2670be61f06cb7215a57c";
     const TEST_EMAIL_VUF_PRIVATE_KEY_SEED: [u8; 32] = [1; 32];
+
     const TEST_SUB_ACCOUNT_ADDRESS: &str =
         "0xafdfc88e30c9858d34b2b5f63854cb4c2740c03a16cbc4df3f4adbe7b2e6c63f";
     const TEST_SUB_DERIVED_PEPPER_HEX: &str =
         "42803a2ec0739390232b81a20a78651210e6e185d70edc4fa5bddbc2416b24";
     const TEST_SUB_PEPPER_BASE_HEX: &str = "b6d25395110bad7fda25f36bd44ee8220f37e952718bbb0e92cfae1061b6bb982bf34779d936f1b3cc412b832cf76d83";
     const TEST_SUB_VUF_PRIVATE_KEY_SEED: [u8; 32] = [2; 32];
+
+    const TEST_SUB_OVERRIDE_ACCOUNT_ADDRESS: &str =
+        "0xf357a030bf7da7f4c28a55dfda8bc1725339576acb2623b526e8d3eb2f366b79";
+    const TEST_SUB_OVERRIDE_DERIVED_PEPPER_HEX: &str =
+        "21a8d5768336a41a5872351c806d56cca994b0acbe7f054afeed22bee06ef2";
+    const TEST_SUB_OVERRIDE_PEPPER_BASE_HEX: &str = "b14111748bc9bde79f0a7edea91b06432800107c448dbe9cc89b47a49ec5094e2fe8976790f6574c7eb9abdc7c5b1df5";
 
     #[test]
     fn test_get_uid_key_and_value() {
@@ -480,11 +506,18 @@ mod tests {
         let (uid_key, uid_val) = get_uid_key_and_value(None, &claims).unwrap();
 
         // Create the pepper input
+        let accounts_managers_and_overrides = utils::get_empty_account_recovery_managers();
         let account_recovery_db = utils::get_mock_account_recovery_db();
-        let pepper_input =
-            create_pepper_input(None, &claims, uid_key, uid_val, account_recovery_db)
-                .await
-                .unwrap();
+        let pepper_input = create_pepper_input(
+            &claims,
+            uid_key,
+            uid_val,
+            accounts_managers_and_overrides,
+            None,
+            account_recovery_db,
+        )
+        .await
+        .unwrap();
 
         // Get the VUF private key
         let vuf_private_key = get_test_vuf_private_key(TEST_SUB_VUF_PRIVATE_KEY_SEED);
@@ -509,11 +542,18 @@ mod tests {
             get_uid_key_and_value(Some(EMAIL_UID_KEY.into()), &claims).unwrap();
 
         // Create the pepper input
+        let accounts_managers_and_overrides = utils::get_empty_account_recovery_managers();
         let account_recovery_db = utils::get_mock_account_recovery_db();
-        let pepper_input =
-            create_pepper_input(None, &claims, uid_key, uid_val, account_recovery_db)
-                .await
-                .unwrap();
+        let pepper_input = create_pepper_input(
+            &claims,
+            uid_key,
+            uid_val,
+            accounts_managers_and_overrides,
+            None,
+            account_recovery_db,
+        )
+        .await
+        .unwrap();
 
         // Get the VUF private key
         let vuf_private_key = get_test_vuf_private_key(TEST_EMAIL_VUF_PRIVATE_KEY_SEED);
@@ -537,11 +577,18 @@ mod tests {
         let (uid_key, uid_val) = get_uid_key_and_value(Some(SUB_UID_KEY.into()), &claims).unwrap();
 
         // Create the pepper input
+        let accounts_managers_and_overrides = utils::get_empty_account_recovery_managers();
         let account_recovery_db = utils::get_mock_account_recovery_db();
-        let pepper_input =
-            create_pepper_input(None, &claims, uid_key, uid_val, account_recovery_db)
-                .await
-                .unwrap();
+        let pepper_input = create_pepper_input(
+            &claims,
+            uid_key,
+            uid_val,
+            accounts_managers_and_overrides,
+            None,
+            account_recovery_db,
+        )
+        .await
+        .unwrap();
 
         // Get the VUF private key
         let vuf_private_key = get_test_vuf_private_key(TEST_SUB_VUF_PRIVATE_KEY_SEED);
@@ -553,6 +600,46 @@ mod tests {
             TEST_SUB_PEPPER_BASE_HEX,
             TEST_SUB_DERIVED_PEPPER_HEX,
             TEST_SUB_ACCOUNT_ADDRESS,
+        );
+    }
+
+    #[tokio::test]
+    async fn test_pepper_and_address_derivation_sub_aud_override() {
+        // Create test token data
+        let claims = create_test_token_data();
+
+        // Get the sub uid key and value
+        let (uid_key, uid_val) = get_uid_key_and_value(Some(SUB_UID_KEY.into()), &claims).unwrap();
+
+        // Create the account recovery managers
+        let account_recovery_manager =
+            AccountRecoveryManager::new(claims.claims.iss.clone(), claims.claims.aud.clone());
+        let account_recovery_managers =
+            Arc::new(AccountRecoveryManagers::new(vec![account_recovery_manager]));
+
+        // Create the pepper input with an aud override
+        let account_recovery_db = utils::get_mock_account_recovery_db();
+        let pepper_input = create_pepper_input(
+            &claims,
+            uid_key,
+            uid_val,
+            account_recovery_managers,
+            Some(TEST_TOKEN_AUD_OVERRIDE.into()),
+            account_recovery_db,
+        )
+        .await
+        .unwrap();
+
+        // Get the VUF private key
+        let vuf_private_key = get_test_vuf_private_key(TEST_SUB_VUF_PRIVATE_KEY_SEED);
+
+        // Verify the pepper base, derived pepper and account address
+        verify_base_pepper_and_address_generation(
+            &vuf_private_key,
+            &pepper_input,
+            TEST_SUB_OVERRIDE_PEPPER_BASE_HEX,
+            TEST_SUB_OVERRIDE_DERIVED_PEPPER_HEX,
+            TEST_SUB_OVERRIDE_ACCOUNT_ADDRESS,
         );
     }
 

@@ -300,43 +300,27 @@ pub trait GasMeter: NativeGasMeter {
         is_success: bool,
     ) -> PartialVMResult<()>;
 
-    fn charge_vec_pack<'a>(
+    fn charge_vec_pack(
         &mut self,
-        ty: impl TypeView + 'a,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()>;
 
-    fn charge_vec_len(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
+    fn charge_vec_len(&mut self) -> PartialVMResult<()>;
 
-    fn charge_vec_borrow(
-        &mut self,
-        is_mut: bool,
-        ty: impl TypeView,
-        is_success: bool,
-    ) -> PartialVMResult<()>;
+    fn charge_vec_borrow(&mut self, is_mut: bool) -> PartialVMResult<()>;
 
-    fn charge_vec_push_back(
-        &mut self,
-        ty: impl TypeView,
-        val: impl ValueView,
-    ) -> PartialVMResult<()>;
+    fn charge_vec_push_back(&mut self, val: impl ValueView) -> PartialVMResult<()>;
 
-    fn charge_vec_pop_back(
-        &mut self,
-        ty: impl TypeView,
-        val: Option<impl ValueView>,
-    ) -> PartialVMResult<()>;
+    fn charge_vec_pop_back(&mut self, val: Option<impl ValueView>) -> PartialVMResult<()>;
 
-    // TODO(Gas): Expose the elements
     fn charge_vec_unpack(
         &mut self,
-        ty: impl TypeView,
         expect_num_elements: NumArgs,
         elems: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()>;
 
     // TODO(Gas): Expose the two elements
-    fn charge_vec_swap(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
+    fn charge_vec_swap(&mut self) -> PartialVMResult<()>;
 
     /// Charges for loading a resource from storage. This is only called when the resource is not
     /// cached.
@@ -558,53 +542,38 @@ impl GasMeter for UnmeteredGasMeter {
         Ok(())
     }
 
-    fn charge_vec_pack<'a>(
+    fn charge_vec_pack(
         &mut self,
-        _ty: impl TypeView + 'a,
         _args: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_vec_len(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_len(&mut self) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_vec_borrow(
-        &mut self,
-        _is_mut: bool,
-        _ty: impl TypeView,
-        _is_success: bool,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_borrow(&mut self, _is_mut: bool) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_vec_push_back(
-        &mut self,
-        _ty: impl TypeView,
-        _val: impl ValueView,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_push_back(&mut self, _val: impl ValueView) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_vec_pop_back(
-        &mut self,
-        _ty: impl TypeView,
-        _val: Option<impl ValueView>,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_pop_back(&mut self, _val: Option<impl ValueView>) -> PartialVMResult<()> {
         Ok(())
     }
 
     fn charge_vec_unpack(
         &mut self,
-        _ty: impl TypeView,
         _expect_num_elements: NumArgs,
         _elems: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_vec_swap(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_swap(&mut self) -> PartialVMResult<()> {
         Ok(())
     }
 

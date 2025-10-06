@@ -382,7 +382,10 @@ impl StorageReader {
                 .get_events_iterator(start_version, num_transactions_to_fetch)?
         } else {
             // If events are not included, create a fake iterator (they will be dropped anyway)
-            Box::new(std::iter::repeat(Ok(vec![])).take(num_transactions_to_fetch as usize))
+            Box::new(std::iter::repeat_n(
+                Ok(vec![]),
+                num_transactions_to_fetch as usize,
+            ))
         };
         let persisted_auxiliary_info_iterator =
             self.storage.get_persisted_auxiliary_info_iterator(

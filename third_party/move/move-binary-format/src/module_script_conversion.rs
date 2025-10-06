@@ -70,7 +70,7 @@ pub fn module_into_script(
     } = main_handle;
     if signatures
         .get(return_.0 as usize)
-        .map_or(true, |s| !s.is_empty())
+        .is_none_or(|s| !s.is_empty())
     {
         bail!("main function must not return values")
     }

@@ -413,7 +413,7 @@ where
         let mut locals = Locals::new(num_locals);
         for (i, value) in args.into_iter().enumerate() {
             locals
-                .store_loc(i, value, self.vm_config.check_invariant_in_swap_loc)
+                .store_loc(i, value)
                 .map_err(|e| self.set_location(e))?;
         }
 
@@ -809,6 +809,7 @@ where
     }
 
     // Check whether the values on the operand stack have the expected return types.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_return_tys<RTTCheck: RuntimeTypeCheck>(
         &self,
         current_frame: &mut Frame,
@@ -845,6 +846,7 @@ where
         Ok(())
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn set_new_call_frame<
         RTTCheck: RuntimeTypeCheck,
         RTRCheck: RuntimeRefCheck,
@@ -900,6 +902,7 @@ where
     ///
     /// Native functions do not push a frame at the moment and as such errors from a native
     /// function are incorrectly attributed to the caller.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn make_call_frame<
         RTTCheck: RuntimeTypeCheck,
         RTRCheck: RuntimeRefCheck,
@@ -929,7 +932,7 @@ where
             } else {
                 self.operand_stack.pop()?
             };
-            locals.store_loc(i, value, self.vm_config.check_invariant_in_swap_loc)?;
+            locals.store_loc(i, value)?;
 
             if should_check && !is_captured {
                 // Only perform paranoid type check for actual operands on the stack.
@@ -1770,6 +1773,7 @@ impl Stack {
 
     /// Push a `Value` on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn push(&mut self, value: Value) -> PartialVMResult<()> {
         if self.value.len() < OPERAND_STACK_SIZE_LIMIT {
             self.value.push(value);
@@ -1780,6 +1784,7 @@ impl Stack {
     }
 
     /// Pop a `Value` off the stack or abort execution if the stack is empty.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn pop(&mut self) -> PartialVMResult<Value> {
         self.value
             .pop()
@@ -1788,6 +1793,8 @@ impl Stack {
 
     /// Pop a `Value` of a given type off the stack. Abort if the value is not of the given
     /// type or if the stack is empty.
+    // Note(inline): expensive to inline, adds a few seconds of compile time
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn pop_as<T>(&mut self) -> PartialVMResult<T>
     where
         Value: VMValueCast<T>,
@@ -1796,6 +1803,7 @@ impl Stack {
     }
 
     /// Pop n values off the stack.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn popn(&mut self, n: u16) -> PartialVMResult<Vec<Value>> {
         let remaining_stack_size = self
             .value
@@ -1806,6 +1814,7 @@ impl Stack {
         Ok(args)
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn last_n(&self, n: usize) -> PartialVMResult<impl ExactSizeIterator<Item = &Value> + Clone> {
         if self.value.len() < n {
             return Err(
@@ -1820,6 +1829,7 @@ impl Stack {
 
     /// Push a type on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn push_ty(&mut self, ty: Type) -> PartialVMResult<()> {
         if self.types.len() < OPERAND_STACK_SIZE_LIMIT {
             self.types.push(ty);
@@ -1830,6 +1840,7 @@ impl Stack {
     }
 
     /// Pop a type off the stack or abort execution if the stack is empty.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn pop_ty(&mut self) -> PartialVMResult<Type> {
         self.types.pop().ok_or_else(|| {
             PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
@@ -1837,6 +1848,7 @@ impl Stack {
         })
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn top_ty(&mut self) -> PartialVMResult<&Type> {
         self.types.last().ok_or_else(|| {
             PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
@@ -1845,6 +1857,7 @@ impl Stack {
     }
 
     /// Pop n types off the stack.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<Type>> {
         let remaining_stack_size = self.types.len().checked_sub(n as usize).ok_or_else(|| {
             PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
@@ -1877,6 +1890,7 @@ impl Stack {
         Ok(&self.types[(len - n)..])
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn check_balance(&self) -> PartialVMResult<()> {
         if self.types.len() != self.value.len() {
             return Err(
@@ -1900,6 +1914,7 @@ impl CallStack {
     }
 
     /// Push a `Frame` on the call stack.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn push(&mut self, frame: Frame) -> Result<(), Frame> {
         if self.0.len() < CALL_STACK_SIZE_LIMIT {
             self.0.push(frame);
@@ -1910,6 +1925,7 @@ impl CallStack {
     }
 
     /// Pop a `Frame` off the call stack.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn pop(&mut self) -> Option<Frame> {
         self.0.pop()
     }
@@ -1982,15 +1998,6 @@ impl Frame {
         traversal_context: &mut TraversalContext,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;
-
-        macro_rules! make_ty {
-            ($ty:expr) => {
-                TypeWithRuntimeEnvironment {
-                    ty: $ty,
-                    runtime_environment: interpreter.loader.runtime_environment(),
-                }
-            };
-        }
 
         let frame_cache = &mut *self.frame_cache.borrow_mut();
 
@@ -2126,10 +2133,7 @@ impl Frame {
                         interpreter.operand_stack.push(local)?;
                     },
                     Bytecode::MoveLoc(idx) => {
-                        let local = self.locals.move_loc(
-                            *idx as usize,
-                            interpreter.vm_config.check_invariant_in_swap_loc,
-                        )?;
+                        let local = self.locals.move_loc(*idx as usize)?;
                         gas_meter.charge_move_loc(&local)?;
 
                         interpreter.operand_stack.push(local)?;
@@ -2137,11 +2141,7 @@ impl Frame {
                     Bytecode::StLoc(idx) => {
                         let value_to_store = interpreter.operand_stack.pop()?;
                         gas_meter.charge_store_loc(&value_to_store)?;
-                        self.locals.store_loc(
-                            *idx as usize,
-                            value_to_store,
-                            interpreter.vm_config.check_invariant_in_swap_loc,
-                        )?;
+                        self.locals.store_loc(*idx as usize, value_to_store)?;
                     },
                     Bytecode::Call(idx) => {
                         return Ok(ExitCode::Call(*idx));
@@ -2872,66 +2872,60 @@ impl Frame {
                             traversal_context,
                             ty,
                         )?;
-                        gas_meter.charge_vec_pack(
-                            make_ty!(ty),
-                            interpreter.operand_stack.last_n(*num as usize)?,
-                        )?;
+                        gas_meter
+                            .charge_vec_pack(interpreter.operand_stack.last_n(*num as usize)?)?;
                         let elements = interpreter.operand_stack.popn(*num as u16)?;
                         let value = Vector::pack(ty, elements)?;
                         interpreter.operand_stack.push(value)?;
                     },
                     Bytecode::VecLen(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        gas_meter.charge_vec_len(make_ty!(ty))?;
-                        let value = vec_ref.len(ty)?;
+                        gas_meter.charge_vec_len()?;
+                        let value = vec_ref.len()?;
                         interpreter.operand_stack.push(value)?;
                     },
                     Bytecode::VecImmBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        let res = vec_ref.borrow_elem(idx, ty);
-                        gas_meter.charge_vec_borrow(false, make_ty!(ty), res.is_ok())?;
-                        interpreter.operand_stack.push(res?)?;
+                        gas_meter.charge_vec_borrow(false)?;
+                        let elem = vec_ref.borrow_elem(idx)?;
+                        interpreter.operand_stack.push(elem)?;
                     },
                     Bytecode::VecMutBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        let res = vec_ref.borrow_elem(idx, ty);
-                        gas_meter.charge_vec_borrow(true, make_ty!(ty), res.is_ok())?;
-                        interpreter.operand_stack.push(res?)?;
+                        gas_meter.charge_vec_borrow(true)?;
+                        let elem = vec_ref.borrow_elem(idx)?;
+                        interpreter.operand_stack.push(elem)?;
                     },
                     Bytecode::VecPushBack(si) => {
                         let elem = interpreter.operand_stack.pop()?;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        gas_meter.charge_vec_push_back(make_ty!(ty), &elem)?;
-                        vec_ref.push_back(elem, ty)?;
+                        gas_meter.charge_vec_push_back(&elem)?;
+                        vec_ref.push_back(elem)?;
                     },
                     Bytecode::VecPopBack(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        let res = vec_ref.pop(ty);
-                        gas_meter.charge_vec_pop_back(make_ty!(ty), res.as_ref().ok())?;
+                        let res = vec_ref.pop();
+                        gas_meter.charge_vec_pop_back(res.as_ref().ok())?;
                         interpreter.operand_stack.push(res?)?;
                     },
                     Bytecode::VecUnpack(si, num) => {
                         let vec_val = interpreter.operand_stack.pop_as::<Vector>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        gas_meter.charge_vec_unpack(
-                            make_ty!(ty),
-                            NumArgs::new(*num),
-                            vec_val.elem_views(),
-                        )?;
-                        let elements = vec_val.unpack(ty, *num)?;
+                        gas_meter.charge_vec_unpack(NumArgs::new(*num), vec_val.elem_views())?;
+                        let elements = vec_val.unpack(*num)?;
                         for value in elements {
                             interpreter.operand_stack.push(value)?;
                         }
@@ -2940,10 +2934,10 @@ impl Frame {
                         let idx2 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let idx1 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        gas_meter.charge_vec_swap(make_ty!(ty))?;
-                        vec_ref.swap(idx1, idx2, ty)?;
+                        gas_meter.charge_vec_swap()?;
+                        vec_ref.swap(idx1, idx2)?;
                     },
                 }
 

@@ -107,7 +107,7 @@ where
         let environment_requires_update = self.environment.as_ref() != Some(&storage_environment);
         if environment_requires_update {
             if storage_environment.gas_feature_version() >= RELEASE_V1_34 {
-                let flush_verifier_cache = self.environment.as_ref().map_or(true, |e| {
+                let flush_verifier_cache = self.environment.as_ref().is_none_or(|e| {
                     e.verifier_config_bytes() != storage_environment.verifier_config_bytes()
                 });
                 if flush_verifier_cache {
