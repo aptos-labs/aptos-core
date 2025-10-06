@@ -3,11 +3,10 @@
 
 mod model_ast_lints;
 mod stackless_bytecode_lints;
-mod assignment_tracker;
 mod utils;
 use move_compiler_v2::external_checks::{ExpChecker, ExternalChecks, StacklessBytecodeChecker};
-use std::sync::Arc;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// Holds collection of lint checks for Move.
 pub struct SecurityChecks {

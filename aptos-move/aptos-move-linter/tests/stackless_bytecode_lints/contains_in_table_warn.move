@@ -119,6 +119,56 @@ module 0x42::table_usage {
         move_to(account, table);
     }
 
+    // Use assert
+    public fun test_assert(account: &signer) {
+        let table = Table {
+            table: table::new<u64, u64>(),
+        };
+
+        assert!(table::contains(&table.table, 1));
+        table::borrow(&table.table, 1); // Should be SAFE - key exists
+        move_to(account, table);
+    }
+
+    // Use negated assert
+    public fun test_negated_assert(account: &signer) {
+        let table = Table {
+            table: table::new<u64, u64>(),
+        };
+
+        assert!(!table::contains(&table.table, 1));
+        table::add(&mut table.table, 1, 100); // Should be SAFE
+        move_to(account, table);
+    }
+
+    // Double negation
+    public fun test_double_negation(account: &signer) {
+        let table = Table {
+            table: table::new<u64, u64>(),
+        };
+
+        if (!!table::contains(&table.table, 1)) {
+            table::borrow(&table.table, 1); // Should be SAFE
+        };
+
+        move_to(account, table);
+    }
+
+    // Negation after assignment
+    public fun test_negation_after_assignment(account: &signer) {
+        let table = Table {
+            table: table::new<u64, u64>(),
+        };
+
+        let exists = table::contains(&table.table, 1);
+        let not_exists = !exists;
+        if (not_exists) {
+            table::add(&mut table.table, 1, 100); // Should be SAFE
+        };
+
+        move_to(account, table);
+    }
+
     // =================================================================
     // NEGATIVE TESTS - These should generate warnings
     // =================================================================
@@ -285,19 +335,6 @@ module 0x42::table_usage {
         if (table::contains(&table.table, 1)) {
             some_helper_function(); // Might invalidate knowledge
             table::borrow(&table.table, 1); // Should be SAFE, but what if helper modifies table?
-        };
-
-        move_to(account, table);
-    }
-
-    // Double negation
-    public fun test_double_negation(account: &signer) {
-        let table = Table {
-            table: table::new<u64, u64>(),
-        };
-
-        if (!!table::contains(&table.table, 1)) {
-            table::borrow(&table.table, 1); // Should be SAFE - linter does not handle this correctly!
         };
 
         move_to(account, table);

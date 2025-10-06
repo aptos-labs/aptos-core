@@ -6,7 +6,10 @@ use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use move_compiler_v2::{diagnostics::human::HumanEmitter, run_move_compiler, Experiment};
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_prover_test_utils::baseline_test;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 /// Extension for expected output files.
 pub const EXP_EXT: &str = "exp";
@@ -16,7 +19,10 @@ datatest_stable::harness!(test_runner, "tests", r".*\.move$");
 fn test_runner(path: &Path) -> datatest_stable::Result<()> {
     let compiler_options = move_compiler_v2::Options {
         sources: vec![path.display().to_string()],
-        dependencies: vec![path_from_crate_root("../framework/aptos-stdlib/sources"), path_from_crate_root("../framework/move-stdlib/sources")],
+        dependencies: vec![
+            path_from_crate_root("../framework/aptos-stdlib/sources"),
+            path_from_crate_root("../framework/move-stdlib/sources"),
+        ],
         named_address_mapping: vec![
             "std=0x1".to_string(),
             "aptos_std=0x1".to_string(),
@@ -25,7 +31,10 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         language_version: Some(LanguageVersion::latest_stable()),
         compiler_version: Some(CompilerVersion::latest_stable()),
         experiments: vec![Experiment::LINT_CHECKS.to_string()],
-        external_checks: vec![SecurityChecks::make()],
+        external_checks: vec![SecurityChecks::make(BTreeMap::from([(
+            "checks".to_string(),
+            "experimental".to_string(),
+        )]))],
         ..Default::default()
     };
     let mut output = String::new();

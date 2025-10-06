@@ -3157,6 +3157,7 @@ dependencies = [
  "legacy-move-compiler",
  "move-binary-format",
  "move-compiler-v2",
+ "move-linter",
  "move-model",
  "move-prover-test-utils",
  "move-stackless-bytecode",
