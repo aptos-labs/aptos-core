@@ -995,45 +995,71 @@ fn pick_client(clients: &[RestClient]) -> &RestClient {
 
 async fn wait_for_orderless_txns(
     client: &RestClient,
-    account_orderless_txns: &HashMap<AccountAddress, Vec<HashValue>>,
+    account_orderless_txns: &HashMap<AccountAddress, HashSet<HashValue>>,
     txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
-) -> HashMap<AccountAddress, Vec<HashValue>> {
+) -> HashMap<AccountAddress, HashSet<HashValue>> {
+    if account_orderless_txns.is_empty() {
+        return HashMap::new();
+    }
     let mut pending_account_txns = account_orderless_txns.clone();
-    let mut failed_by_account: HashMap<AccountAddress, Vec<HashValue>> = HashMap::new();
     loop {
-        let futures = pending_account_txns
-            .into_iter()
-            .flat_map(|(account, txn_hashes)| {
-                txn_hashes.into_iter().map(move |hash| (account, hash))
-            })
-            .map(|(account, hash)| async move {
-                (account, hash, client.get_transaction_by_hash(hash).await)
-            });
+        let futures = pending_account_txns.keys().map(|account| async move {
+            (
+                *account,
+                FETCH_ACCOUNT_RETRY_POLICY
+                    .retry(move || {
+                        client.get_account_transaction_summaries(*account, None, None, None)
+                    })
+                    .await,
+            )
+        });
 
-        pending_account_txns = join_all(futures)
-            .await
-            .into_iter()
-            .filter_map(|(account, txn_hash, result)| match result {
-                Ok(res) => {
-                    let (t, _) = res.into_parts();
-                    if t.is_pending() {
-                        Some((account, txn_hash))
-                    } else {
-                        if !t.success() {
-                            failed_by_account.entry(account).or_default().push(txn_hash);
+        let mut latest_ledger_ts_secs = u64::MAX;
+        for (account, txn_summaries_result) in join_all(futures).await {
+            match txn_summaries_result {
+                Ok(response) => {
+                    let ledger_timestamp =
+                        Duration::from_micros(response.state().timestamp_usecs).as_secs();
+                    latest_ledger_ts_secs = min(ledger_timestamp, latest_ledger_ts_secs);
+
+                    for txn_summary in response.into_inner() {
+                        let remove_account =
+                            if let Some(txn_hashes) = pending_account_txns.get_mut(&account) {
+                                txn_hashes.remove(&txn_summary.transaction_hash());
+                                txn_hashes.is_empty()
+                            } else {
+                                false
+                            };
+                        if remove_account {
+                            pending_account_txns.remove(&account);
                         }
-                        None
                     }
                 },
-                Err(_) => Some((account, txn_hash)),
-            })
-            .fold(HashMap::new(), |mut map, (account, txn_hash)| {
-                map.entry(account).or_default().push(txn_hash);
-                map
-            });
+                Err(err) => {
+                    error!(
+                        "Error retrieving summaries for account {}: {:?}",
+                        account, err
+                    );
+                },
+            }
+        }
 
         if pending_account_txns.is_empty() {
+            break;
+        }
+
+        if latest_ledger_ts_secs > txn_expiration_ts_secs {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(60)),
+                warn!(
+                    "[{}] Ledger timestamp {} exceeded txn expiration timestamp {} for {:?}",
+                    client.path_prefix_string(),
+                    latest_ledger_ts_secs,
+                    txn_expiration_ts_secs,
+                    pending_account_txns.keys(),
+                )
+            );
             break;
         }
 
@@ -1065,7 +1091,7 @@ async fn wait_for_orderless_txns(
 
         time::sleep(sleep_between_cycles).await;
     }
-    failed_by_account
+    pending_account_txns
 }
 
 /// This function waits for the submitted transactions to be committed, up to

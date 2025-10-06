@@ -29,7 +29,7 @@ use log::{debug, error, info, warn};
 use rand::seq::IteratorRandom;
 use std::{
     borrow::Borrow,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{atomic::AtomicU64, Arc},
     time::Instant,
 };
@@ -103,7 +103,7 @@ impl SubmissionWorker {
             let requests = self.gen_requests();
             if !requests.is_empty() {
                 let mut account_to_start_and_end_seq_num = HashMap::new();
-                let mut account_to_orderless_txns: HashMap<AccountAddress, Vec<HashValue>> =
+                let mut account_to_orderless_txns: HashMap<AccountAddress, HashSet<HashValue>> =
                     HashMap::new();
                 for req in requests.iter() {
                     match req.replay_protector() {
@@ -123,7 +123,7 @@ impl SubmissionWorker {
                         ReplayProtector::Nonce(_) => {
                             let txn_hashes =
                                 account_to_orderless_txns.entry(req.sender()).or_default();
-                            txn_hashes.push(req.committed_hash());
+                            txn_hashes.insert(req.committed_hash());
                         },
                     };
                 }
@@ -294,7 +294,7 @@ impl SubmissionWorker {
         start_time: Instant,
         avg_txn_offset_time: u64,
         account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64)>,
-        account_to_orderless_txns: HashMap<AccountAddress, Vec<HashValue>>,
+        account_to_orderless_txns: HashMap<AccountAddress, HashSet<HashValue>>,
         skip_latency_stats: bool,
         txn_expiration_ts_secs: u64,
         check_account_sleep_duration: Duration,
@@ -357,7 +357,7 @@ impl SubmissionWorker {
 
             if !skip_latency_stats {
                 let sum_latency = sum_of_completion_timestamps_millis
-                    - (avg_txn_offset_time as u128 * num_committed as u128);
+                    .saturating_sub(avg_txn_offset_time as u128 * num_committed as u128);
                 let avg_latency = (sum_latency / num_committed as u128) as u64;
                 loop_stats
                     .latency
@@ -436,8 +436,8 @@ fn update_account_seq_num(
 fn count_committed_expired_stats(
     account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64)>,
     latest_fetched_counts: HashMap<AccountAddress, u64>,
-    account_to_orderless_txns: HashMap<AccountAddress, Vec<HashValue>>,
-    failed_orderless_txns: HashMap<AccountAddress, Vec<HashValue>>,
+    account_to_orderless_txns: HashMap<AccountAddress, HashSet<HashValue>>,
+    failed_orderless_txns: HashMap<AccountAddress, HashSet<HashValue>>,
 ) -> (usize, usize) {
     let (seq_num_committed, seq_num_failed) = account_to_start_and_end_seq_num
         .iter()
