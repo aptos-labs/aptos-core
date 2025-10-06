@@ -138,10 +138,10 @@ module aptos_experimental::order_operations {
                 order_id,
                 client_order_id,
                 is_bid,
+                price,
                 time_in_force,
                 metadata
             ),
-            price,
             remaining_size
         );
 
@@ -191,7 +191,7 @@ module aptos_experimental::order_operations {
             metadata
         ) = order.destroy_single_order();
         cleanup_order_internal(
-            account, order_id, client_order_id, single_order_book_type(), is_bid, time_in_force, remaining_size, metadata, callbacks
+            account, order_id, client_order_id, single_order_book_type(), is_bid, time_in_force, remaining_size, price, metadata, callbacks
         );
         if (emit_event) {
             market.emit_event_for_order(
