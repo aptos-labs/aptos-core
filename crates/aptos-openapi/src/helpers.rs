@@ -193,13 +193,12 @@ mod test {
         }
     }
 
+    impl_poem_type!(This, "string", ());
+    impl_poem_type!(That, "string", ());
+    impl_poem_parameter!(That);
+
     #[test]
     fn test() {
-        impl_poem_type!(This, "string", ());
-
-        impl_poem_type!(That, "string", ());
-        impl_poem_parameter!(That);
-
         assert_eq!(
             That::parse_from_parameter("0x1::coin::CoinStore::%3C0x1::aptos_coin::AptosCoin%3E")
                 .unwrap()

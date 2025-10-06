@@ -81,35 +81,32 @@ impl TransactionDiff {
                     let left = left.as_ref();
                     let right = right.as_ref();
 
-                    if left.is_none() {
-                        let event_name = right.unwrap().type_tag().to_canonical_string();
-                        println!("{}", "========".yellow());
-                        println!("{}", format!("event {:?} emitted", event_name).red());
-                    } else if right.is_none() {
-                        let event_name = left.unwrap().type_tag().to_canonical_string();
-                        println!("{}", format!("event {:?} emitted", event_name).green());
-                        println!("{}", "========".yellow());
-                    } else {
-                        let event_name = left.unwrap().type_tag().to_canonical_string();
-                        println!(
-                            "{}",
-                            format!(
-                                "event {:?} data: {:?}",
-                                event_name,
-                                left.unwrap().event_data()
+                    match (left, right) {
+                        (None, Some(right)) => {
+                            let event_name = right.type_tag().to_canonical_string();
+                            println!("{}", "========".yellow());
+                            println!("{}", format!("event {:?} emitted", event_name).red());
+                        },
+                        (Some(left), None) => {
+                            let event_name = left.type_tag().to_canonical_string();
+                            println!("{}", format!("event {:?} emitted", event_name).green());
+                            println!("{}", "========".yellow());
+                        },
+                        (Some(left), Some(right)) => {
+                            let event_name = left.type_tag().to_canonical_string();
+                            println!(
+                                "{}",
+                                format!("event {:?} data: {:?}", event_name, left.event_data())
+                                    .green()
+                            );
+                            println!("{}", "========".yellow());
+                            println!(
+                                "{}",
+                                format!("event {:?} data: {:?}", event_name, right.event_data())
+                                    .red()
                             )
-                            .green()
-                        );
-                        println!("{}", "========".yellow());
-                        println!(
-                            "{}",
-                            format!(
-                                "event {:?} data: {:?}",
-                                event_name,
-                                right.unwrap().event_data()
-                            )
-                            .red()
-                        );
+                        },
+                        _ => (),
                     }
                 },
                 Diff::WriteSet {

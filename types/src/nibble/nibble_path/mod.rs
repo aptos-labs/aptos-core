@@ -117,7 +117,7 @@ impl NibblePath {
         assert!(num_nibbles <= ROOT_NIBBLE_HEIGHT);
         if num_nibbles % 2 == 1 {
             // Rounded up number of bytes to be considered
-            let num_bytes = (num_nibbles + 1) / 2;
+            let num_bytes = num_nibbles.div_ceil(2);
             assert!(bytes.len() >= num_bytes);
             let mut nibble_bytes = bytes[..num_bytes].to_vec();
             // If number of nibbles is odd, make sure to pad the last nibble with 0s.
@@ -214,7 +214,7 @@ impl NibblePath {
     pub fn truncate(&mut self, len: usize) {
         assert!(len <= self.num_nibbles);
         self.num_nibbles = len;
-        self.bytes.truncate((len + 1) / 2);
+        self.bytes.truncate(len.div_ceil(2));
         if len % 2 != 0 {
             *self.bytes.last_mut().expect("must exist.") &= 0xF0;
         }

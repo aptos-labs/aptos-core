@@ -323,7 +323,7 @@ fn native_format_impl(
             out.push('[');
             format_vector(
                 context,
-                std::iter::repeat(ty.as_ref()).take(values.len()),
+                std::iter::repeat_n(ty.as_ref(), values.len()),
                 values,
                 depth,
                 !context.single_line && !primitive_type(ty.as_ref()),

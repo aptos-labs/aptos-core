@@ -336,7 +336,7 @@ impl<'a> FunctionGenerator<'a> {
                 self.emit(FF::Bytecode::Branch(0));
             },
             Bytecode::Abort(_, temp) => {
-                self.balance_stack_end_of_block(ctx, &vec![*temp]);
+                self.balance_stack_end_of_block(ctx, vec![*temp]);
                 self.emit(FF::Bytecode::Abort);
                 self.abstract_pop(ctx)
             },
@@ -1060,7 +1060,7 @@ impl<'a> FunctionGenerator<'a> {
                     if ctx.is_alive_after(*temp, &temps_to_push[pos + 1..], true) {
                         if !fun_ctx.is_copyable(*temp) {
                             fun_ctx.module.internal_error(
-                                &ctx.fun_ctx.fun.get_bytecode_loc(ctx.attr_id),
+                                ctx.fun_ctx.fun.get_bytecode_loc(ctx.attr_id),
                                 format!("value in `$t{}` expected to be copyable", temp),
                             )
                         }

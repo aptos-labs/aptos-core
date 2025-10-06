@@ -594,7 +594,7 @@ impl ProposalGenerator {
             .path_from_ordered_root(parent_id)
             .ok_or_else(|| format_err!("Parent block {} already pruned", parent_id))?
             .iter()
-            .any(|block| !block.payload().map_or(true, |txns| txns.is_empty()));
+            .any(|block| !block.payload().is_none_or(|txns| txns.is_empty()));
 
         // All proposed blocks in a branch are guaranteed to have increasing timestamps
         // since their predecessor block will not be added to the BlockStore until

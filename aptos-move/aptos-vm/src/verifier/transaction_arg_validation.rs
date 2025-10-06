@@ -446,10 +446,10 @@ fn validate_and_construct(
         };
         // Short cut for the utf8 constructor, which is a special case.
         let len = get_len(cursor)?;
-        if !cursor
+        if cursor
             .position()
             .checked_add(len as u64)
-            .is_some_and(|l| l <= initial_cursor_len as u64)
+            .is_none_or(|l| l > initial_cursor_len as u64)
         {
             // We need to make sure we do not allocate more bytes than
             // needed.
@@ -546,7 +546,7 @@ fn read_n_bytes(n: usize, src: &mut Cursor<&[u8]>, dest: &mut Vec<u8>) -> Result
     // It is safer to limit the length under some big (but still reasonable
     // number).
     const MAX_NUM_BYTES: usize = 1_000_000;
-    if !len.checked_add(n).is_some_and(|s| s <= MAX_NUM_BYTES) {
+    if len.checked_add(n).is_none_or(|s| s > MAX_NUM_BYTES) {
         return Err(deserialization_error(&format!(
             "Couldn't read bytes: maximum limit of {} bytes exceeded",
             MAX_NUM_BYTES
