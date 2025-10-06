@@ -91,7 +91,7 @@ pub struct ServerProtocolVersionResponse {
 }
 
 /// A response for the node information request
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct NodeInformationResponse {
     pub build_information: BTreeMap<String, String>, // The build information of the node
     pub highest_synced_epoch: u64,                   // The highest synced epoch of the node
