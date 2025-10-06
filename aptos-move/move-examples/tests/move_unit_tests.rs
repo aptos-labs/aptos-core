@@ -59,7 +59,6 @@ pub fn run_tests_for_pkg(
         aptos_test_natives(),
         aptos_test_feature_flags_genesis(),
         /* gas limit */ Some(100_000),
-        /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
         true,

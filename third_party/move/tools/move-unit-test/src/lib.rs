@@ -27,9 +27,6 @@ use std::{
 };
 use test_reporter::UnitTestFactory;
 
-/// The default value bounding the amount of gas consumed in a test.
-const DEFAULT_EXECUTION_BOUND: u64 = 1_000_000;
-
 #[derive(Debug, Parser, Clone)]
 #[clap(author, version, about)]
 pub struct UnitTestingConfig {

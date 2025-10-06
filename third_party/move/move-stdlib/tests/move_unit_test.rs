@@ -36,7 +36,6 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, include_nursery_natives: bo
         natives,
         ChangeSet::new(),
         /* gas_limit */ Some(100_000),
-        /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
         false,

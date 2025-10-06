@@ -623,7 +623,6 @@ impl CliCommand<&'static str> for TestPackage {
             ),
             aptos_test_feature_flags_genesis(),
             None,
-            None,
             self.compute_coverage,
             &mut std::io::stdout(),
             true,

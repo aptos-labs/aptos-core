@@ -12275,7 +12275,6 @@ dependencies = [
  "move-stdlib",
  "move-unit-test",
  "move-vm-runtime",
- "move-vm-test-utils",
  "once_cell",
  "tempfile",
 ]
@@ -13035,8 +13034,6 @@ dependencies = [
  "move-table-extension",
  "move-vm-runtime",
  "move-vm-types",
- "once_cell",
- "serde",
 ]
 
 [[package]]
