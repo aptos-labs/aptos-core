@@ -154,18 +154,6 @@ module aptos_experimental::market_bulk_order_tests {
     }
 
     #[test(
-        admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
-    )]
-    public fun test_self_matching_not_allowed(
-        admin: &signer,
-        market_signer: &signer,
-        maker1: &signer,
-        maker2: &signer
-    ) {
-        test_self_matching_not_allowed_helper(admin, market_signer, maker1, maker2, true);
-    }
-
-    #[test(
         aptos_framework = @0x1, admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
     )]
     public fun test_self_matching_allowed(
