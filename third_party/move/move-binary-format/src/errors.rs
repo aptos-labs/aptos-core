@@ -104,9 +104,11 @@ impl VMError {
                 VMStatus::Executed
             },
             (StatusCode::ABORTED, Some(code), Location::Script) => {
+                assert_ne!(code, 25863);
                 VMStatus::MoveAbort(vm_status::AbortLocation::Script, code)
             },
             (StatusCode::ABORTED, Some(code), Location::Module(id)) => {
+                assert_ne!(code, 25863);
                 VMStatus::MoveAbort(vm_status::AbortLocation::Module(id), code)
             },
 
