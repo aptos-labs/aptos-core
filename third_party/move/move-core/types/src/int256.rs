@@ -276,7 +276,11 @@ macro_rules! arithmetics {
                 <$repr>::checked_rem(l.repr, r.repr).map(|r| r.into())
             }
         }
+    };
+}
 
+macro_rules! bitops {
+    ($wrapper:ty, $repr:ty) => {
         impl BitAnd for $wrapper {
             type Output = $wrapper;
 
@@ -320,6 +324,7 @@ macro_rules! arithmetics {
 }
 
 arithmetics!(U256, ethnum::U256);
+bitops!(U256, ethnum::U256);
 arithmetics!(I256, ethnum::I256);
 
 impl Neg for I256 {
