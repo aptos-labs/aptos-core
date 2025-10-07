@@ -52,10 +52,7 @@ pub fn fetch_chain_id(db: &DbReaderWriter) -> anyhow::Result<ChainId> {
 pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
     set_paranoid_type_checks(node_config.execution.paranoid_type_verification);
     let effective_concurrency_level = if node_config.execution.concurrency_level == 0 {
-        min(
-            DEFAULT_EXECUTION_CONCURRENCY_LEVEL,
-            max(1, (num_cpus::get() / 2) as u16),
-        )
+        ((num_cpus::get() / 2) as u16).clamp(1, DEFAULT_EXECUTION_CONCURRENCY_LEVEL)
     } else {
         node_config.execution.concurrency_level
     };
