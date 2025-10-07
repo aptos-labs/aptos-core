@@ -682,6 +682,7 @@ impl ReleaseConfig {
                 let proposal_name = format!("{}-{}", idx, script_name);
                 script_path.push(&proposal_name);
                 script_path.set_extension("move");
+                println!("script code: {script}");
 
                 std::fs::write(script_path.as_path(), append_script_hash(script).as_bytes())
                     .map_err(|err| {
