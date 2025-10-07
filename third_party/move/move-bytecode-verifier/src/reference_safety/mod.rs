@@ -22,9 +22,9 @@ use move_binary_format::{
     binary_views::{BinaryIndexedView, FunctionView},
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, IdentifierIndex,
-        MemberCount, SignatureIndex, SignatureToken, StructDefinition, StructVariantHandle,
-        VariantIndex,
+        find_offset_for_public_api, retrieve_struct_full_name_for_public_api, Bytecode, CodeOffset,
+        FunctionDefinitionIndex, FunctionHandle, IdentifierIndex, MemberCount, SignatureIndex,
+        SignatureToken, StructDefinition, StructVariantHandle, VariantIndex,
     },
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
@@ -37,6 +37,7 @@ struct ReferenceSafetyAnalysis<'a> {
     function_view: &'a FunctionView<'a>,
     name_def_map: &'a HashMap<IdentifierIndex, FunctionDefinitionIndex>,
     stack: Vec<AbstractValue>,
+    enable_public_api_borrow_check: bool,
 }
 
 impl<'a> ReferenceSafetyAnalysis<'a> {
@@ -44,12 +45,14 @@ impl<'a> ReferenceSafetyAnalysis<'a> {
         resolver: &'a BinaryIndexedView<'a>,
         function_view: &'a FunctionView<'a>,
         name_def_map: &'a HashMap<IdentifierIndex, FunctionDefinitionIndex>,
+        enable_public_api_borrow_check: bool,
     ) -> Self {
         Self {
             resolver,
             function_view,
             name_def_map,
             stack: vec![],
+            enable_public_api_borrow_check,
         }
     }
 }
@@ -59,10 +62,16 @@ pub(crate) fn verify<'a>(
     function_view: &FunctionView,
     name_def_map: &'a HashMap<IdentifierIndex, FunctionDefinitionIndex>,
     meter: &mut impl Meter,
+    enable_public_api_borrow_check: bool,
 ) -> PartialVMResult<()> {
     let initial_state = AbstractState::new(function_view);
 
-    let mut verifier = ReferenceSafetyAnalysis::new(resolver, function_view, name_def_map);
+    let mut verifier = ReferenceSafetyAnalysis::new(
+        resolver,
+        function_view,
+        name_def_map,
+        enable_public_api_borrow_check,
+    );
     verifier.analyze_function(initial_state, function_view, meter)
 }
 
@@ -73,6 +82,30 @@ fn call(
     function_handle: &FunctionHandle,
     meter: &mut impl Meter,
 ) -> PartialVMResult<()> {
+    if verifier.enable_public_api_borrow_check {
+        // Check function name, decide whether to call call_borrow
+        let func_name = verifier
+            .resolver
+            .identifier_at(function_handle.name)
+            .as_str()
+            .to_string();
+        if let Some(splited_names) = retrieve_struct_full_name_for_public_api(&func_name) {
+            if splited_names.len() >= 4 {
+                // TODO: check definition of the function
+                let oper = splited_names[0].clone();
+                if let Some(field_offset) = find_offset_for_public_api(&func_name) {
+                    if oper.contains("borrow") {
+                        let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
+                        let mut_ = oper.contains("mut");
+                        let value = state.borrow_field(offset, mut_, id, field_offset)?;
+                        verifier.stack.push(value);
+                        return Ok(());
+                    }
+                }
+            }
+        }
+    }
+
     let parameters = verifier.resolver.signature_at(function_handle.parameters);
     let arguments = parameters
         .0

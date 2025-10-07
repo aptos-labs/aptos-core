@@ -135,6 +135,8 @@ pub fn aptos_prod_verifier_config(gas_feature_version: u64, features: &Features)
         } else {
             None
         },
+        enable_public_api_borrow_check: features
+            .is_enabled(FeatureFlag::ENABLE_PUBLIC_API_BORROW_CHECK),
     }
 }
 

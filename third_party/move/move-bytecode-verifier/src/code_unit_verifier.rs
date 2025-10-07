@@ -20,6 +20,7 @@ use move_binary_format::{
     control_flow_graph::ControlFlowGraph,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
+        find_offset_for_public_api, retrieve_struct_full_name_for_public_api, Bytecode,
         CompiledModule, CompiledScript, FunctionDefinition, FunctionDefinitionIndex,
         IdentifierIndex, TableIndex,
     },
@@ -134,6 +135,58 @@ impl<'a> CodeUnitVerifier<'a> {
             None => return Ok(0),
         };
 
+        if verifier_config.enable_public_api_borrow_check {
+            let func_name = module
+                .identifier_at(module.function_handle_at(function_definition.function).name)
+                .as_str()
+                .to_string();
+            if let Some(splited_names) = retrieve_struct_full_name_for_public_api(&func_name) {
+                if splited_names.len() >= 4 {
+                    let oper = splited_names[0].clone();
+                    if oper.contains("borrow") {
+                        if find_offset_for_public_api(&func_name).is_some() {
+                            // Since the function will be type checked, we only check the instructions in the body
+                            if code.code.len() == 3 {
+                                let borrow_field_op = if oper.contains("mut") {
+                                    matches!(
+                                        code.code[1],
+                                        Bytecode::MutBorrowField(_)
+                                            | Bytecode::MutBorrowFieldGeneric(_)
+                                            | Bytecode::MutBorrowVariantField(_)
+                                            | Bytecode::MutBorrowVariantFieldGeneric(_)
+                                    )
+                                } else {
+                                    matches!(
+                                        code.code[1],
+                                        Bytecode::ImmBorrowField(_)
+                                            | Bytecode::ImmBorrowFieldGeneric(_)
+                                            | Bytecode::ImmBorrowVariantField(_)
+                                            | Bytecode::ImmBorrowVariantFieldGeneric(_)
+                                    )
+                                };
+                                let move_loc = matches!(code.code[0], Bytecode::MoveLoc(_));
+                                let ret = matches!(code.code[2], Bytecode::Ret);
+                                if !borrow_field_op && move_loc && ret {
+                                    return Err(PartialVMError::new(
+                                        StatusCode::PUBLIC_API_BORROW_NOT_PROPERLY_DEFINED,
+                                    )
+                                    .at_code_offset(index, 0));
+                                }
+                            } else {
+                                return Err(PartialVMError::new(
+                                    StatusCode::PUBLIC_API_BORROW_NOT_PROPERLY_DEFINED,
+                                )
+                                .at_code_offset(index, 0));
+                            }
+                        }
+                        return Err(PartialVMError::new(
+                            StatusCode::PUBLIC_API_BORROW_NOT_PROPERLY_DEFINED,
+                        )
+                        .at_code_offset(index, 0));
+                    }
+                }
+            }
+        }
         // create `FunctionView` and `BinaryIndexedView`
         let function_view = control_flow::verify_function(
             verifier_config,
@@ -189,6 +242,7 @@ impl<'a> CodeUnitVerifier<'a> {
             &self.function_view,
             self.name_def_map,
             meter,
+            verifier_config.enable_public_api_borrow_check,
         )
     }
 }

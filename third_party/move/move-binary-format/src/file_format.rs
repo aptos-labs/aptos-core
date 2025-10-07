@@ -52,6 +52,88 @@ use serde::{Deserialize, Serialize};
 use std::{fmt, fmt::Formatter};
 use variant_count::VariantCount;
 
+/// Safely split `s` into (prefix of exactly `n` chars, remainder).
+fn take_chars(s: &str, n: usize) -> Option<(&str, &str)> {
+    if n == 0 {
+        return Some(("", s));
+    }
+    let mut it = s.char_indices();
+    // advance to the start index of the (n)th character
+    let split_idx = (0..n).try_fold(0usize, |_, _| it.next().map(|(i, _)| i))?;
+    // Now move one more to get the end byte index
+    let end = it.next().map(|(i, _)| i).unwrap_or_else(|| s.len());
+    Some((&s[split_idx..end], &s[end..]))
+}
+
+/// Parse `_[oper]_[address]_[m]_[module]_[n]_[structname]_`
+pub fn retrieve_struct_full_name_for_public_api(s: &str) -> Option<[String; 4]> {
+    if !s.starts_with('_') {
+        return None;
+    }
+    let mut cur = &s[1..]; // drop leading '_'
+
+    // 1) oper
+    let i = cur.find('_')?;
+    let oper = &cur[..i];
+    if oper.is_empty() {
+        return None;
+    }
+    cur = &cur[i + 1..];
+
+    // 2) address
+    let i = cur.find('_')?;
+    let address = &cur[..i];
+    if address.is_empty() {
+        return None;
+    }
+    cur = &cur[i + 1..];
+
+    // 3) m (len of module, in chars)
+    let i = cur.find('_')?;
+    let m_str = &cur[..i];
+    let m: usize = m_str.parse().ok()?;
+    cur = &cur[i + 1..];
+
+    // 4) module: exactly m chars (can contain underscores)
+    let (module, rest) = take_chars(cur, m)?;
+    if module.is_empty() {
+        return None;
+    }
+    cur = rest;
+
+    // next must be '_' before n
+    if !cur.starts_with('_') {
+        return None;
+    }
+    cur = &cur[1..];
+
+    // 5) n
+    let i = cur.find('_')?;
+    let n_str = &cur[..i];
+    let n: usize = n_str.parse().ok()?;
+    cur = &cur[i + 1..];
+
+    // 6) structname: exactly n chars (can contain underscores)
+    let (structname, _tail) = take_chars(cur, n)?;
+    if structname.is_empty() {
+        return None;
+    }
+
+    Some([
+        oper.to_string(),
+        address.to_string(),
+        module.to_string(),
+        structname.to_string(),
+    ])
+}
+
+pub fn find_offset_for_public_api(s: &str) -> Option<u16> {
+    let s = s.trim_end_matches('_'); // allow a trailing "_"
+    let last = s.rsplit('_').next()?; // take the last segment
+    println!("last: {}", last);
+    last.parse::<u16>().ok() // only digits -> number
+}
+
 /// Generic index into one of the tables in the binary format.
 pub type TableIndex = u16;
 

@@ -1156,7 +1156,7 @@ impl AstDebug for (StructName, &StructDefinition) {
             w.write("native ");
         }
 
-        w.write(&format!("{} struct {}", visibility, name));
+        w.write(format!("{} struct {}", visibility, name));
         type_parameters.ast_debug(w);
         ability_modifiers_ast_debug(w, abilities);
         if let StructLayout::Singleton(fields, _) = fields {

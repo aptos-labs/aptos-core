@@ -56,6 +56,7 @@ pub struct VerifierConfig {
     /// If enabled, signature checker V2 also checks parameter and return types in function
     /// signatures.
     pub sig_checker_v2_fix_function_signatures: bool,
+    pub enable_public_api_borrow_check: bool,
 }
 
 /// Scope of verification.
@@ -271,6 +272,7 @@ impl Default for VerifierConfig {
 
             max_function_return_values: None,
             max_type_depth: None,
+            enable_public_api_borrow_check: true,
         }
     }
 }
@@ -320,6 +322,7 @@ impl VerifierConfig {
 
             max_function_return_values: Some(128),
             max_type_depth: Some(20),
+            enable_public_api_borrow_check: true,
         }
     }
 

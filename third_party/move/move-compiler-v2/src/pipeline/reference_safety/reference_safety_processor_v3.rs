@@ -906,13 +906,7 @@ impl LifetimeAnalysisStep<'_, '_> {
         self.replace(dest, AbstractValue::Reference(new_id))
     }
 
-    fn call_operation(
-        &mut self,
-        attr_id: AttrId,
-        oper: Operation,
-        dests: &[TempIndex],
-        srcs: &[TempIndex],
-    ) {
+    fn call_operation(&mut self, oper: Operation, dests: &[TempIndex], srcs: &[TempIndex]) {
         // If this is a Move function call, check access of resources.
         // If this is a struct api, also store the corresponding struct id, which is then used for printing out proper error message.
         if let Operation::Function(mid, fid, inst) = oper.clone() {
@@ -921,15 +915,30 @@ impl LifetimeAnalysisStep<'_, '_> {
             if let Some(splited_names) = fun_env.retrieve_struct_full_name_for_public_api() {
                 if splited_names.len() >= 4 {
                     let oper = splited_names[0].clone();
-                    let addr = splited_names[1].clone();
-                    let module_name = splited_names[2].clone();
+                    // let addr = splited_names[1].clone();
+                    // let module_name = splited_names[2].clone();
                     let struct_name = splited_names[3].clone();
                     if oper.contains("borrow") {
-                        let struct_api_borrow_info =
-                            format!("{}::{}::{}", addr, module_name, struct_name);
-                        self.state
-                            .struct_api_borrow_info
-                            .insert(attr_id, struct_api_borrow_info);
+                        // let struct_api_borrow_info =
+                        //     format!("{}::{}::{}", addr, module_name, struct_name);
+                        // self.state
+                        //     .struct_api_borrow_info
+                        //     .insert(attr_id, struct_api_borrow_info);
+                        let struct_id =
+                            StructId::new(self.global_env().symbol_pool().make(&struct_name));
+                        if let Some(offset) = fun_env.find_offset_for_public_api() {
+                            self.borrow_field(
+                                dests[0],
+                                srcs[0],
+                                fun_env
+                                    .module_env
+                                    .get_id()
+                                    .qualified(struct_id)
+                                    .instantiate(inst.clone()),
+                                offset,
+                            );
+                            return;
+                        }
                     }
                 }
             }
@@ -1110,7 +1119,7 @@ impl TransferFunctions for LifeTimeAnalysis<'_> {
             },
             Ret(_, srcs) => step.return_(instr, srcs),
             Branch(_, _, _, src) => step.branch(*src),
-            Call(attr_id, dests, oper, srcs, _) => {
+            Call(_, dests, oper, srcs, _) => {
                 use Operation::*;
                 match oper {
                     BorrowLoc => {
@@ -1140,7 +1149,7 @@ impl TransferFunctions for LifeTimeAnalysis<'_> {
                         step.move_from(dests[0], &mid.qualified_inst(*sid, inst.clone()), srcs[0])
                     },
                     Eq | Neq | Le | Lt | Ge | Gt => step.comparison(dests[0], srcs),
-                    _ => step.call_operation(*attr_id, oper.clone(), dests, srcs),
+                    _ => step.call_operation(oper.clone(), dests, srcs),
                 }
             },
             _ => {},
