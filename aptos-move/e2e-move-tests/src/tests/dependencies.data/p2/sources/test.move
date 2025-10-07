@@ -5,6 +5,10 @@ module 0xcafe::m2 {
         // Do nothing.
     }
 
+    public entry fun noop_generic<T>() {
+        // Do nothing.
+    }
+
     public entry fun load_m1() {
         m1::noop();
     }

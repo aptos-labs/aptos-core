@@ -12,6 +12,7 @@ use crate::{
     WithRuntimeEnvironment,
 };
 use move_binary_format::{
+    access::ScriptAccess,
     errors::{Location, PartialVMResult, VMResult},
     file_format::CompiledScript,
 };
@@ -126,7 +127,16 @@ where
 
         let hash = sha3_256(serialized_script);
         let deserialized_script = match self.module_storage.get_script(&hash) {
-            Some(Verified(script)) => return Ok(script),
+            Some(Verified(script)) => {
+                // Before returning early, meter modules because script might have been cached by
+                // other thread.
+                for (addr, name) in script.immediate_dependencies_iter() {
+                    let module_id = ModuleId::new(*addr, name.to_owned());
+                    self.charge_module(gas_meter, traversal_context, &module_id)
+                        .map_err(|err| err.finish(Location::Undefined))?;
+                }
+                return Ok(script);
+            },
             Some(Deserialized(deserialized_script)) => deserialized_script,
             None => self
                 .runtime_environment()
