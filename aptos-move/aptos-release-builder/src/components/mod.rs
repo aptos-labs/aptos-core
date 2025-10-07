@@ -10,7 +10,6 @@ use crate::{
     },
 };
 use anyhow::{anyhow, bail, Context, Result};
-use aptos::governance::GenerateExecutionHash;
 use aptos_crypto::HashValue;
 use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_infallible::duration_since_epoch;
@@ -27,6 +26,7 @@ use aptos_types::{
 use futures::executor::block_on;
 use handlebars::Handlebars;
 use move_binary_format::file_format_common::VERSION_DEFAULT_LANG_V2;
+use movement::governance::GenerateExecutionHash;
 use once_cell::sync::Lazy;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::{

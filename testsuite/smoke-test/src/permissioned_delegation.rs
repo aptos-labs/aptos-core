@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::move_tool::MemberId;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::SigningKey;
 use aptos_forge::Swarm;
 use aptos_types::function_info::FunctionInfo;
 use move_core_types::account_address::AccountAddress;
+use movement::move_tool::MemberId;
 use std::{str::FromStr, sync::Arc};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]

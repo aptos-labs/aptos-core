@@ -5,13 +5,13 @@ use crate::{
     smoke_test_environment::SwarmBuilder,
     utils::{update_consensus_config, MAX_CATCH_UP_WAIT_SECS},
 };
-use aptos::test::CliTestFramework;
 use aptos_forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_rest_client::Client;
 use aptos_types::on_chain_config::{
     ConsensusAlgorithmConfig, OnChainConsensusConfig, ValidatorTxnConfig,
 };
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
+use movement::test::CliTestFramework;
 use std::{sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
 

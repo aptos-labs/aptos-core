@@ -1,17 +1,16 @@
-# Homebrew Aptos
+# Homebrew Movement
 
 Homebrew is a package manager that works for MacOS Silicon and Intel chips as well as Linux distributions like Debian
 and Ubuntu.
 
-The [Aptos command line interface (CLI)](https://aptos.dev/tools/aptos-cli/install-cli/) may be installed
-via [Homebrew](https://brew.sh/) for simplicity. This is an in-depth overview of Homebrew and the Aptos formula. In this
+The [Movement command line interface (CLI)](https://github.com/movementlabsxyz/aptos-core/) may be installed
+via [Homebrew](https://brew.sh/) for simplicity. This is an in-depth overview of Homebrew and the Movement formula. In this
 guide, we go over each section of the Homebrew formula and steps to implement changes in the future.
 
 ## Quick guide
 
-- [Formula in Homebrew GitHub](https://github.com/Homebrew/homebrew-core/blob/master/Formula/aptos.rb)
-- [Aptos 1.0.3 New Formula PR for GitHub](https://github.com/Homebrew/homebrew-core/pull/119832)
-- [Aptos Formula Fix PR to use build_cli_release.sh](https://github.com/Homebrew/homebrew-core/pull/120051)
+- [Formula in Homebrew GitHub](https://github.com/Homebrew/homebrew-core/blob/master/Formula/movement.rb)
+- [Movement <version-number> New Formula PR for GitHub](<link-to-PR>)
 
 ## Getting started
 
@@ -27,7 +26,7 @@ brew help
 Once homebrew is installed, run
 
 ```bash
-brew install aptos
+brew install movement
 ```
 
 to test that it installed correctly, try
@@ -37,19 +36,19 @@ aptos --help
 
 # This should return something like
 
-# aptos 1.0.5
-# Aptos Labs <opensource@aptoslabs.com>
-# Command Line Interface (CLI) for developing and interacting with the Aptos blockchain
+# movement 7.4.0
+# Movement Labs <email-addr>
+# Command Line Interface (CLI) for developing and interacting with the Movement network
 # ...
 ```
 
 ## Change guide
 
-Note: This guide is for developers who are trying to update the Aptos homebrew formula.
+Note: This guide is for developers who are trying to update the Movement homebrew formula.
 
 You can get the latest formula here: https://github.com/Homebrew/homebrew-core/blob/master/Formula/a/aptos.rb
 
-Copy the `aptos.rb` file to your `homebrew` `formula` directory. For example, on macOS with an M1, this will likely be:
+Copy the `movement.rb` file to your `homebrew` `formula` directory. For example, on macOS with an M1, this will likely be:
 
 ```bash
 /opt/homebrew/Library/Taps/homebrew/homebrew-core/Formula
@@ -57,7 +56,7 @@ Copy the `aptos.rb` file to your `homebrew` `formula` directory. For example, on
 
 ### Development
 
-After you've copied `aptos.rb` to your local `homebrew` `formula` directory, you can modify it and use the commands
+After you've copied `movement.rb` to your local `homebrew` `formula` directory, you can modify it and use the commands
 below for testing.
 
 ```bash
@@ -65,17 +64,17 @@ below for testing.
 /opt/homebrew/Library/Taps/homebrew/homebrew-core/Formula
 
 # Before submitting changes run
-brew audit --new-formula aptos      # For new formula
-brew audit aptos --strict --online
-brew install aptos
-brew test aptos
+brew audit --new-formula movement      # For new formula
+brew audit movement --strict --online
+brew install movement
+brew test movement
 
 # For debugging issues during the installation process you can do
-brew install aptos --interactive    # Interactive, gives you access to the shell
-brew install aptos -d               # Debug mode
+brew install movement --interactive    # Interactive, gives you access to the shell
+brew install movement -d               # Debug mode
 
 # Livecheck
-brew livecheck --debug aptos
+brew livecheck --debug movement
 ```
 
 ### Committing changes
@@ -87,16 +86,16 @@ Once you have audited and tested your brew formula using the commands above, mak
    per [How to Open a Homebrew Pull Request](https://docs.brew.sh/How-To-Open-a-Homebrew-Pull-Request#formulae-related-pull-request).
 3. Create a PR on the [Homebrew Core](https://github.com/Homebrew/homebrew-core/pulls) repo with your changes.
 
-## Aptos.rb structure overview
+## movement.rb structure overview
 
 ### Header
 
 ```ruby
-class Aptos < Formula
+class Movement < Formula
   desc "Layer 1 blockchain built to support fair access to decentralized assets for all"
-  homepage "https://aptoslabs.com/"
-  url "https://github.com/aptos-labs/aptos-core/archive/refs/tags/aptos-cli-v1.0.3.tar.gz"
-  sha256 "670bb6cb841cb8a65294878af9a4f03d4cba2a598ab4550061fed3a4b1fe4e98"
+  homepage "https://movementnetwork.xyz/"
+  url "<tarball-URL>"
+  sha256 "<checksum>"
   license "Apache-2.0"
   ...
 ```
@@ -152,7 +151,7 @@ discussion.
 To run livecheck for testing, we recommend including the `--debug` argument:
 
 ```bash
-brew livecheck --debug aptos
+brew livecheck --debug movement
 ```
 
 ### Depends on and installation
@@ -203,7 +202,7 @@ brew livecheck --debug aptos
 To conduct tests, run:
 
 ```bash
-brew test aptos
+brew test movement
 ```
 
 The current test generates a new key via the Aptos CLI and ensures the shell output matches the filename(s) for that
@@ -212,7 +211,7 @@ key.
 ```ruby
   ...
   test do
-    assert_match(/output.pub/i, shell_output("#{bin}/aptos key generate --output-file output"))
+    assert_match(/output.pub/i, shell_output("#{bin}/movement key generate --output-file output"))
   end
   ...
 ```

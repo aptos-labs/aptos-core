@@ -3,7 +3,6 @@
 
 use crate::{smoke_test_environment::SwarmBuilder, utils::get_on_chain_resource};
 use anyhow::bail;
-use aptos::common::types::GasOptions;
 use aptos_config::config::{OverrideNodeConfig, PersistableConfig};
 use aptos_crypto::{bls12381, Uniform};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
@@ -13,6 +12,7 @@ use aptos_types::{
     on_chain_config::{ConfigurationResource, OnChainRandomnessConfig, ValidatorSet},
     validator_verifier::ValidatorVerifier,
 };
+use movement::common::types::GasOptions;
 use rand::{thread_rng, Rng};
 use std::{
     fs::File,

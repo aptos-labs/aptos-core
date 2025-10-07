@@ -6,15 +6,15 @@ use crate::{
     config::{ScriptTransaction, ScriptTransactions},
 };
 use anyhow::Context;
-use aptos::{
+use aptos_protos::{
+    indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest},
+    transaction::v1::Transaction,
+};
+use movement::{
     account::fund::FundWithFaucet,
     common::types::{CliCommand, MovePackageOptions, ScriptFunctionArguments, TransactionOptions},
     governance::CompileScriptFunction,
     move_tool::{CompileScript, RunScript},
-};
-use aptos_protos::{
-    indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest},
-    transaction::v1::Transaction,
 };
 use std::{
     collections::HashMap,

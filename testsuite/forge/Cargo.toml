@@ -15,7 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 again = { workspace = true }
 anyhow = { workspace = true, features = ["backtrace"] }
-aptos = { workspace = true }
+movement = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-cli-common = { workspace = true }
 aptos-config = { workspace = true }

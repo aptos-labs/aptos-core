@@ -28,7 +28,7 @@ impl Account {
             self.public_key, self.private_key, self.account
         );
         // create the folder.
-        let account_folder = profile_file_path.join(".aptos");
+        let account_folder = profile_file_path.join(".movement");
         tokio::fs::create_dir_all(account_folder.clone())
             .await
             .context(format!(
@@ -45,7 +45,7 @@ impl Account {
     }
 
     pub async fn delete_profile_file(&self, profile_file_path: &Path) -> anyhow::Result<()> {
-        let account_folder = profile_file_path.join(".aptos");
+        let account_folder = profile_file_path.join(".movement");
         tokio::fs::remove_dir_all(account_folder)
             .await
             .context(format!(

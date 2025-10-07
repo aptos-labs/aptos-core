@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Context;
-use aptos::node::local_testnet::{
+use aptos_config::config::DEFAULT_GRPC_STREAM_PORT;
+use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
+use movement::node::local_testnet::{
     faucet::FaucetManager,
     get_derived_test_dir,
     health_checker::HealthChecker,
     node::{build_node_config, NodeManager},
     traits::ServiceManager,
 };
-use aptos_config::config::DEFAULT_GRPC_STREAM_PORT;
-use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{collections::HashSet, net::Ipv4Addr, path::PathBuf};
 use tokio::{

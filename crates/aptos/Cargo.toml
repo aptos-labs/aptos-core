@@ -1,6 +1,6 @@
 [package]
-name = "aptos"
-description = "Aptos tool for management of nodes and interacting with the blockchain"
+name = "movement"
+description = "Movement tool for management of nodes and interacting with Movement"
 version = "7.4.0"
 
 # Workspace inherited keys

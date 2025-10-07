@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::aptos_cli::validator::generate_blob;
-use aptos::test::CliTestFramework;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{
     config::{NodeConfig, Peer, PeerRole, HANDSHAKE_VERSION},
@@ -20,6 +19,7 @@ use aptos_types::{
     on_chain_config::{OnChainConfig, OnChainConsensusConfig, OnChainExecutionConfig},
 };
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
+use movement::test::CliTestFramework;
 use rand::random;
 use std::{collections::HashSet, net::Ipv4Addr, sync::Arc, time::Duration};
 

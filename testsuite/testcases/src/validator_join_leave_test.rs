@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_forge::{
     reconfig, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt, Result, Swarm,
     SwarmExt, Test, TestReport, FORGE_KEY_SEED,
@@ -12,6 +11,7 @@ use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey};
 use async_trait::async_trait;
 use log::info;
+use movement::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use std::{sync::Arc, time::Duration};
 
 const MAX_NODE_LAG_SECS: u64 = 360;

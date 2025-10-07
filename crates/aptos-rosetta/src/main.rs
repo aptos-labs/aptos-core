@@ -277,7 +277,7 @@ impl ServerArgs for OfflineArgs {
 pub struct OnlineRemoteArgs {
     #[clap(flatten)]
     offline_args: OfflineArgs,
-    /// URL for the Aptos REST API. e.g. https://fullnode.devnet.aptoslabs.com
+    /// URL for the Aptos REST API. e.g. https://devnet.movementnetwork.xyz
     #[clap(long, default_value = "http://localhost:8080")]
     rest_api_url: url::Url,
     /// DEPRECATED: Owner addresses file as a YAML file with a list

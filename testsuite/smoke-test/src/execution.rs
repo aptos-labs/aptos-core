@@ -6,13 +6,13 @@ use crate::{
     aptos_cli::validator::generate_blob, smoke_test_environment::SwarmBuilder,
     utils::get_current_version,
 };
-use aptos::test::CliTestFramework;
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_rest_client::Client;
 use aptos_types::on_chain_config::{
     BlockGasLimitType, ExecutionConfigV4, OnChainExecutionConfig, TransactionDeduperType,
     TransactionShufflerType,
 };
+use movement::test::CliTestFramework;
 use std::{sync::Arc, time::Duration};
 
 const MAX_WAIT_SECS: u64 = 30;

@@ -63,7 +63,7 @@ const TESTNET_FOLDER: &str = "testnet";
 pub struct RunLocalnet {
     /// The directory to save all files for the node
     ///
-    /// Defaults to .aptos/testnet
+    /// Defaults to .movement/testnet
     #[clap(long, value_parser)]
     test_dir: Option<PathBuf>,
 

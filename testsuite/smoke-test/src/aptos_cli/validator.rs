@@ -5,15 +5,6 @@ use crate::{
     smoke_test_environment::SwarmBuilder,
     utils::{create_and_fund_account, MAX_CATCH_UP_WAIT_SECS},
 };
-use aptos::{
-    account::create::DEFAULT_FUNDED_COINS,
-    common::types::TransactionSummary,
-    node::analyze::{
-        analyze_validators::{AnalyzeValidators, EpochStats},
-        fetch_metadata::FetchMetadata,
-    },
-    test::{CliTestFramework, ValidatorPerformance},
-};
 use aptos_bitvec::BitVec;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, ValidCryptoMaterialStringExt};
@@ -31,6 +22,15 @@ use aptos_types::{
         ProposerAndVoterConfig, ProposerElectionType, TransactionShufflerType, ValidatorSet,
     },
     PeerId,
+};
+use movement::{
+    account::create::DEFAULT_FUNDED_COINS,
+    common::types::TransactionSummary,
+    node::analyze::{
+        analyze_validators::{AnalyzeValidators, EpochStats},
+        fetch_metadata::FetchMetadata,
+    },
+    test::{CliTestFramework, ValidatorPerformance},
 };
 use std::{
     collections::{HashMap, HashSet},

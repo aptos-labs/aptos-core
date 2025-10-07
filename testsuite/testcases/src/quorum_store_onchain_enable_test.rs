@@ -3,7 +3,6 @@
 
 use crate::{generate_onchain_config_blob, NetworkLoadTest};
 use anyhow::Ok;
-use aptos::test::CliTestFramework;
 use aptos_forge::{NetworkContextSynchronizer, NetworkTest, NodeExt, SwarmExt, Test};
 use aptos_sdk::bcs;
 use aptos_types::{
@@ -12,6 +11,7 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use log::info;
+use movement::test::CliTestFramework;
 use std::{sync::Arc, time::Duration};
 
 const MAX_NODE_LAG_SECS: u64 = 360;
