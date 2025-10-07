@@ -72,6 +72,7 @@ TimeBased(time): The order is triggered when the current time is greater than or
 -  [Function `place_limit_order`](#0x7_order_placement_place_limit_order)
 -  [Function `place_market_order`](#0x7_order_placement_place_market_order)
 -  [Function `place_maker_order_internal`](#0x7_order_placement_place_maker_order_internal)
+-  [Function `cancel_bulk_maker_order_internal`](#0x7_order_placement_cancel_bulk_maker_order_internal)
 -  [Function `cancel_maker_order_internal`](#0x7_order_placement_cancel_maker_order_internal)
 -  [Function `cancel_single_order_internal`](#0x7_order_placement_cancel_single_order_internal)
 -  [Function `cleanup_order_internal`](#0x7_order_placement_cleanup_order_internal)
@@ -83,6 +84,7 @@ TimeBased(time): The order is triggered when the current time is greater than or
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
+<b>use</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types">0x7::bulk_order_book_types</a>;
 <b>use</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info">0x7::market_clearinghouse_order_info</a>;
 <b>use</b> <a href="market_types.md#0x7_market_types">0x7::market_types</a>;
 <b>use</b> <a href="order_book.md#0x7_order_book">0x7::order_book</a>;
@@ -879,6 +881,56 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
 </details>
 
+<a id="0x7_order_placement_cancel_bulk_maker_order_internal"></a>
+
+## Function `cancel_bulk_maker_order_internal`
+
+
+
+<pre><code><b>fun</b> <a href="order_placement.md#0x7_order_placement_cancel_bulk_maker_order_internal">cancel_bulk_maker_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, maker_order: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, maker_address: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, unsettled_size: u64, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="order_placement.md#0x7_order_placement_cancel_bulk_maker_order_internal">cancel_bulk_maker_order_internal</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
+    market: &<b>mut</b> Market&lt;M&gt;,
+    maker_order: &OrderMatchDetails&lt;M&gt;,
+    maker_address: <b>address</b>,
+    order_id: OrderIdType,
+    unsettled_size: u64,
+    callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
+) {
+    <b>let</b> cancelled_size = unsettled_size + maker_order.get_remaining_size_from_match_details();
+    <b>if</b> (maker_order.get_remaining_size_from_match_details() != 0) {
+            // For bulk orders, we cancel all orders for the user
+            market.get_order_book_mut().cancel_bulk_order(maker_address);
+    };
+
+    callbacks.cleanup_bulk_order_at_price(
+        maker_address, order_id, maker_order.is_bid_from_match_details(), maker_order.get_price_from_match_details(), cancelled_size
+    );
+
+    <b>let</b> modified_order = market.get_order_book().get_bulk_order(maker_address);
+    <b>let</b> (_, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = modified_order.destroy_bulk_order();
+    market.emit_event_for_bulk_order_modified(
+        order_id,
+        maker_address,
+        bid_sizes,
+        bid_prices,
+        ask_sizes,
+        ask_prices
+    );
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_order_placement_cancel_maker_order_internal"></a>
 
 ## Function `cancel_maker_order_internal`
@@ -906,40 +958,38 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     time_in_force: TimeInForce,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
-    <b>let</b> maker_cancel_size = unsettled_size + maker_order.get_remaining_size_from_match_details();
     <b>let</b> is_bulk_order = maker_order.get_book_type_from_match_details() != single_order_book_type();
     <b>if</b> (is_bulk_order) {
-        market.emit_event_for_bulk_order_cancelled(
-            order_id,
+        <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_bulk_maker_order_internal">cancel_bulk_maker_order_internal</a>(
+            market,
+            maker_order,
             maker_address,
-        );
-    } <b>else</b> {
-        market.emit_event_for_order(
             order_id,
-            client_order_id,
-            maker_address,
-            maker_order.get_orig_size_from_match_details(),
-            0,
-            maker_cancel_size,
-            maker_order.get_price_from_match_details(),
-            maker_order.is_bid_from_match_details(),
-            <b>false</b>,
-            <a href="market_types.md#0x7_market_types_order_status_cancelled">market_types::order_status_cancelled</a>(),
-            maker_cancellation_reason,
-            metadata,
-            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
-            time_in_force,
+            unsettled_size,
             callbacks
         );
     };
+    <b>let</b> maker_cancel_size = unsettled_size + maker_order.get_remaining_size_from_match_details();
+    market.emit_event_for_order(
+        order_id,
+        client_order_id,
+        maker_address,
+        maker_order.get_orig_size_from_match_details(),
+        0,
+        maker_cancel_size,
+        maker_order.get_price_from_match_details(),
+        maker_order.is_bid_from_match_details(),
+        <b>false</b>,
+        <a href="market_types.md#0x7_market_types_order_status_cancelled">market_types::order_status_cancelled</a>(),
+        maker_cancellation_reason,
+        metadata,
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
+        time_in_force,
+        callbacks
+    );
     // If the maker is invalid cancel the maker order and <b>continue</b> <b>to</b> the next maker order
     <b>if</b> (maker_order.get_remaining_size_from_match_details() != 0) {
-        <b>if</b> (is_bulk_order) {
-            // For bulk orders, we cancel all orders for the user
-            market.get_order_book_mut().cancel_bulk_order(maker_address);
-        } <b>else</b> {
-            market.get_order_book_mut().cancel_order(maker_address, order_id);
-        };
+        market.get_order_book_mut().cancel_order(maker_address, order_id);
     };
     <a href="order_placement.md#0x7_order_placement_cleanup_order_internal">cleanup_order_internal</a>(
         maker_address,
@@ -1044,7 +1094,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_cleanup_order_internal">cleanup_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(user_addr: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, remaining_size: u64, price: u64, metadata: M, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_placement.md#0x7_order_placement_cleanup_order_internal">cleanup_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(user_addr: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, cleanup_size: u64, price: u64, metadata: M, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
 </code></pre>
 
 
@@ -1053,14 +1103,14 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_cleanup_order_internal">cleanup_order_internal</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>package</b>) <b>fun</b> <a href="order_placement.md#0x7_order_placement_cleanup_order_internal">cleanup_order_internal</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
     user_addr: <b>address</b>,
     order_id: OrderIdType,
     client_order_id: Option&lt;String&gt;,
     book_type: OrderBookType,
     is_bid: bool,
     time_in_force: TimeInForce,
-    remaining_size: u64,
+    cleanup_size: u64,
     price: u64,
     metadata: M,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
@@ -1076,11 +1126,11 @@ Places a market order - The order is guaranteed to be a taker order and will be 
                 time_in_force,
                 metadata
             ),
-            remaining_size,
+            cleanup_size,
         );
     } <b>else</b> {
-        callbacks.cleanup_bulk_orders(
-            user_addr, order_id
+        callbacks.cleanup_bulk_order_at_price(
+            user_addr, order_id, is_bid, price, cleanup_size
         );
     }
 }

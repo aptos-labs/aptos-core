@@ -106,6 +106,7 @@ sophisticated order matching, cancellation, and reinsertion capabilities.
 -  [Function `cancel_bulk_order`](#0x7_bulk_order_book_cancel_bulk_order)
     -  [Arguments:](#@Arguments:_19)
     -  [Aborts:](#@Aborts:_20)
+-  [Function `get_bulk_order`](#0x7_bulk_order_book_get_bulk_order)
 -  [Function `get_remaining_size`](#0x7_bulk_order_book_get_remaining_size)
 -  [Function `get_prices`](#0x7_bulk_order_book_get_prices)
 -  [Function `get_sizes`](#0x7_bulk_order_book_get_sizes)
@@ -663,7 +664,7 @@ with the same order ID in the future.
 - If no order exists for the specified account
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_bulk_order">cancel_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, u64, u64)
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_bulk_order">cancel_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;
 </code></pre>
 
 
@@ -676,20 +677,49 @@ with the same order ID in the future.
     self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> aptos_experimental::price_time_index::PriceTimeIndex,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>
-): (OrderIdType, u64, u64) {
+): BulkOrder&lt;M&gt; {
     <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
         <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
     };
     // For cancellation, instead of removing the order, we will just cancel the active orders and set the sizes <b>to</b> 0.
     // This allows us <b>to</b> reuse the order id for the same <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> in the future without creating a new order.
     <b>let</b> order = self.orders.remove(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
-    <b>let</b> order_id = order.get_order_id();
-    <b>let</b> remaining_bid_size = order.get_total_remaining_size(<b>true</b>);
-    <b>let</b> remaining_ask_size = order.get_total_remaining_size(<b>false</b>);
+    <b>let</b> order_copy = order;
     <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &order);
     order.set_empty();
     self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order);
-    (order_id, remaining_bid_size, remaining_ask_size)
+    order_copy
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_bulk_order_book_get_bulk_order"></a>
+
+## Function `get_bulk_order`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_bulk_order">get_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_bulk_order">get_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>
+): BulkOrder&lt;M&gt; {
+    <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
+        <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
+    };
+
+    self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>).destroy_some()
 }
 </code></pre>
 

@@ -30,6 +30,7 @@
 -  [Function `best_ask_price`](#0x7_order_book_best_ask_price)
 -  [Function `get_slippage_price`](#0x7_order_book_get_slippage_price)
 -  [Function `place_bulk_order`](#0x7_order_book_place_bulk_order)
+-  [Function `get_bulk_order`](#0x7_order_book_get_bulk_order)
 -  [Function `cancel_bulk_order`](#0x7_order_book_cancel_bulk_order)
 -  [Function `get_bulk_order_remaining_size`](#0x7_order_book_get_bulk_order_remaining_size)
 
@@ -770,13 +771,39 @@ Checks if the order is a taker order i.e., matched immediatedly with the active 
 
 </details>
 
+<a id="0x7_order_book_get_bulk_order"></a>
+
+## Function `get_bulk_order`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_bulk_order">get_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_bulk_order">get_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>
+): BulkOrder&lt;M&gt; {
+    self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_get_bulk_order">get_bulk_order</a>(order_creator)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_order_book_cancel_bulk_order"></a>
 
 ## Function `cancel_bulk_order`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_cancel_bulk_order">cancel_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, u64, u64)
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_cancel_bulk_order">cancel_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;
 </code></pre>
 
 
@@ -787,7 +814,7 @@ Checks if the order is a taker order i.e., matched immediatedly with the active 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_cancel_bulk_order">cancel_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>
-): (OrderIdType, u64, u64) {
+): BulkOrder&lt;M&gt; {
     self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_cancel_bulk_order">cancel_bulk_order</a>(&<b>mut</b> self.price_time_idx, order_creator)
 }
 </code></pre>
