@@ -1456,7 +1456,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > u8::MAX:
+        if int_val < 0 || int_val > u8::MAX:
             arithmetic error
         else:
             stack << int_val as u8
@@ -1474,7 +1474,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > u64::MAX:
+        if int_val < 0 || int_val > u64::MAX:
             arithmetic error
         else:
             stack << int_val as u64
@@ -1492,7 +1492,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > u128::MAX:
+        if int_val < 0 || int_val > u128::MAX:
             arithmetic error
         else:
             stack << int_val as u128
@@ -2830,7 +2830,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > u16::MAX:
+        if int_val < 0 || int_val > u16::MAX:
             arithmetic error
         else:
             stack << int_val as u16
@@ -2848,7 +2848,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > u32::MAX:
+        if int_val < 0 || int_val > u32::MAX:
             arithmetic error
         else:
             stack << int_val as u32
@@ -2865,7 +2865,10 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        stack << int_val as u256
+        if int_val < 0:
+            arithmetic error
+        else:
+            stack << int_val as u256
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> _
@@ -2922,7 +2925,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > i8::MAX:
+        if int_val < i8::MIN || int_val > i8::MAX:
             arithmetic error
         else:
             stack << int_val as i8
@@ -2940,7 +2943,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > i16::MAX:
+        if int_val < i16::MIN || int_val > i16::MAX:
             arithmetic error
         else:
             stack << int_val as i16
@@ -2958,7 +2961,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > i32::MAX:
+        if int_val < i32::MIN || int_val > i32::MAX:
             arithmetic error
         else:
             stack << int_val as i32
@@ -2976,7 +2979,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > i64::MAX:
+        if int_val < i64::MIN || int_val > i64::MAX:
             arithmetic error
         else:
             stack << int_val as i64
@@ -2994,7 +2997,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > i128::MAX:
+        if int_val < i128::MIN || int_val > i128::MAX:
             arithmetic error
         else:
             stack << int_val as i128
@@ -3011,7 +3014,10 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        stack << int_val as i256
+        if int_val > i256::MAX:
+            arithmetic error
+        else:
+            stack << int_val as i256
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> _
