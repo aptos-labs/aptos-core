@@ -54,7 +54,7 @@ pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
     let effective_concurrency_level = if node_config.execution.concurrency_level == 0 {
         min(
             DEFAULT_EXECUTION_CONCURRENCY_LEVEL,
-            max(1, num_cpus::get() / 2 as u16),
+            max(1, (num_cpus::get() / 2) as u16),
         )
     } else {
         node_config.execution.concurrency_level
