@@ -496,8 +496,10 @@ impl From<&U256> for EthnumU256 {
 impl TryFrom<U256> for u8 {
     type Error = U256CastError;
 
-    fn try_from(n: U256) -> Result<Self, Self::Error> {
-        let n = n.0.low_u64();
+    #[allow(unreachable_code)]
+    fn try_from(_n: U256) -> Result<Self, Self::Error> {
+        panic!("[Alert]: unsafe casting used!!!");
+        let n = _n.0.low_u64();
         if n > u8::MAX as u64 {
             Err(U256CastError::new(n, U256CastErrorKind::TooLargeForU8))
         } else {
@@ -509,8 +511,10 @@ impl TryFrom<U256> for u8 {
 impl TryFrom<U256> for u16 {
     type Error = U256CastError;
 
-    fn try_from(n: U256) -> Result<Self, Self::Error> {
-        let n = n.0.low_u64();
+    #[allow(unreachable_code)]
+    fn try_from(_n: U256) -> Result<Self, Self::Error> {
+        panic!("[Alert]: unsafe casting used!!!");
+        let n = _n.0.low_u64();
         if n > u16::MAX as u64 {
             Err(U256CastError::new(n, U256CastErrorKind::TooLargeForU16))
         } else {
@@ -522,8 +526,10 @@ impl TryFrom<U256> for u16 {
 impl TryFrom<U256> for u32 {
     type Error = U256CastError;
 
-    fn try_from(n: U256) -> Result<Self, Self::Error> {
-        let n = n.0.low_u64();
+    #[allow(unreachable_code)]
+    fn try_from(_n: U256) -> Result<Self, Self::Error> {
+        panic!("[Alert]: unsafe casting used!!!");
+        let n = _n.0.low_u64();
         if n > u32::MAX as u64 {
             Err(U256CastError::new(n, U256CastErrorKind::TooLargeForU32))
         } else {
@@ -535,8 +541,10 @@ impl TryFrom<U256> for u32 {
 impl TryFrom<U256> for u64 {
     type Error = U256CastError;
 
-    fn try_from(n: U256) -> Result<Self, Self::Error> {
-        let n = n.0.low_u128();
+    #[allow(unreachable_code)]
+    fn try_from(_n: U256) -> Result<Self, Self::Error> {
+        panic!("[Alert]: unsafe casting used!!!");
+        let n = _n.0.low_u128();
         if n > u64::MAX as u128 {
             Err(U256CastError::new(n, U256CastErrorKind::TooLargeForU64))
         } else {
