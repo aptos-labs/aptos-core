@@ -2684,6 +2684,23 @@ impl IntegerValue {
     {
         VMValueCast::cast(self)
     }
+
+    pub fn is_zero(self) -> bool {
+        match self {
+            Self::U8(x) => x == 0,
+            Self::U16(x) => x == 0,
+            Self::U32(x) => x == 0,
+            Self::U64(x) => x == 0,
+            Self::U128(x) => x == 0,
+            Self::U256(x) => x == int256::U256::ZERO,
+            Self::I8(x) => x == 0,
+            Self::I16(x) => x == 0,
+            Self::I32(x) => x == 0,
+            Self::I64(x) => x == 0,
+            Self::I128(x) => x == 0,
+            Self::I256(x) => x == int256::I256::ZERO,
+        }
+    }
 }
 
 /***************************************************************************************
@@ -2774,27 +2791,31 @@ impl IntegerValue {
 
     pub fn div_checked(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
-        let res = match (self, other) {
-            (U8(l), U8(r)) => u8::checked_div(l, r).map(U8),
-            (U16(l), U16(r)) => u16::checked_div(l, r).map(U16),
-            (U32(l), U32(r)) => u32::checked_div(l, r).map(U32),
-            (U64(l), U64(r)) => u64::checked_div(l, r).map(U64),
-            (U128(l), U128(r)) => u128::checked_div(l, r).map(U128),
-            (U256(l), U256(r)) => int256::U256::checked_div(l, r).map(U256),
-            (I8(l), I8(r)) => i8::checked_div(l, r).map(I8),
-            (I16(l), I16(r)) => i16::checked_div(l, r).map(I16),
-            (I32(l), I32(r)) => i32::checked_div(l, r).map(I32),
-            (I64(l), I64(r)) => i64::checked_div(l, r).map(I64),
-            (I128(l), I128(r)) => i128::checked_div(l, r).map(I128),
-            (I256(l), I256(r)) => int256::I256::checked_div(l, r).map(I256),
+        let res = match (self, &other) {
+            (U8(l), U8(r)) => u8::checked_div(l, *r).map(U8),
+            (U16(l), U16(r)) => u16::checked_div(l, *r).map(U16),
+            (U32(l), U32(r)) => u32::checked_div(l, *r).map(U32),
+            (U64(l), U64(r)) => u64::checked_div(l, *r).map(U64),
+            (U128(l), U128(r)) => u128::checked_div(l, *r).map(U128),
+            (U256(l), U256(r)) => int256::U256::checked_div(l, *r).map(U256),
+            (I8(l), I8(r)) => i8::checked_div(l, *r).map(I8),
+            (I16(l), I16(r)) => i16::checked_div(l, *r).map(I16),
+            (I32(l), I32(r)) => i32::checked_div(l, *r).map(I32),
+            (I64(l), I64(r)) => i64::checked_div(l, *r).map(I64),
+            (I128(l), I128(r)) => i128::checked_div(l, *r).map(I128),
+            (I256(l), I256(r)) => int256::I256::checked_div(l, *r).map(I256),
             (l, r) => {
                 let msg = format!("Cannot div {:?} by {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
         res.ok_or_else(|| {
-            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
-                .with_message("Division by zero".to_string())
+            let msg = if other.is_zero() {
+                "Division by zero".to_string()
+            } else {
+                "Division overflow".to_string()
+            };
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR).with_message(msg)
         })
     }
 
@@ -3375,11 +3396,11 @@ impl IntegerValue {
         use IntegerValue::*;
 
         match self {
-            U8(x) => Ok(int256::I256::from(x as i16)),
-            U16(x) => Ok(int256::I256::from(x as i32)),
-            U32(x) => Ok(int256::I256::from(x as i64)),
-            U64(x) => Ok(int256::I256::from(x as i128)),
-            U128(x) => cast_int_with_try_from!(u128, int256::I256, x),
+            U8(x) => Ok(int256::I256::from(x)),
+            U16(x) => Ok(int256::I256::from(x)),
+            U32(x) => Ok(int256::I256::from(x)),
+            U64(x) => Ok(int256::I256::from(x)),
+            U128(x) => Ok(int256::I256::from(x)),
             U256(x) => cast_int_with_try_from!(int256::U256, int256::I256, x),
             I8(x) => Ok(int256::I256::from(x)),
             I16(x) => Ok(int256::I256::from(x)),

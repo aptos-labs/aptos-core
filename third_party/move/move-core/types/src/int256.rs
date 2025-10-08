@@ -342,7 +342,9 @@ impl I256 {
 }
 
 // ---- Conversions
+// Semantics: conversions are fallible if the target type cannot represent the full range of the source type.
 
+// Conversions between wrapper types and primitive types where both directions are fallible.
 macro_rules! conversions {
     ($wrapper:ty, $repr:ty, $target:ty) => {
         impl TryFrom<$wrapper> for $target {
@@ -366,6 +368,7 @@ macro_rules! conversions {
     };
 }
 
+// Conversions where wrapper to primitive is fallible, but primitive to wrapper is infallible.
 macro_rules! conversions_infallible {
     ($wrapper:ty, $repr:ty, $target:ty) => {
         impl TryFrom<$wrapper> for $target {
@@ -397,11 +400,11 @@ conversions!(U256, ethnum::U256, i32);
 conversions!(U256, ethnum::U256, i64);
 conversions!(U256, ethnum::U256, i128);
 
-conversions!(I256, ethnum::I256, u8);
-conversions!(I256, ethnum::I256, u16);
-conversions!(I256, ethnum::I256, u32);
-conversions!(I256, ethnum::I256, u64);
-conversions!(I256, ethnum::I256, u128);
+conversions_infallible!(I256, ethnum::I256, u8);
+conversions_infallible!(I256, ethnum::I256, u16);
+conversions_infallible!(I256, ethnum::I256, u32);
+conversions_infallible!(I256, ethnum::I256, u64);
+conversions_infallible!(I256, ethnum::I256, u128);
 conversions_infallible!(I256, ethnum::I256, i8);
 conversions_infallible!(I256, ethnum::I256, i16);
 conversions_infallible!(I256, ethnum::I256, i32);
