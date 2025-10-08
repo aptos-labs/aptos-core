@@ -1,4 +1,4 @@
-processed 16 tasks
+processed 18 tasks
 task 0 lines 3-8:  run --verbose [script {]
 task 1 lines 11-16:  run --verbose [script {]
 Error: Script execution failed with VMError: {
@@ -84,7 +84,17 @@ Error: Script execution failed with VMError: {
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 task 12 lines 99-104:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Division overflow,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
 task 13 lines 107-112:  run --verbose [script {]
+task 14 lines 115-120:  run --verbose [script {]
 Error: Script execution failed with VMError: {
     message: Integer remainder by zero,
     major_status: ARITHMETIC_ERROR,
@@ -94,5 +104,15 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 14 lines 115-125:  publish [module 0xff::negate_i128 {]
-task 15 lines 128-128:  run 0xff::negate_i128::main
+task 15 lines 123-136:  publish [module 0xff::negate_i128 {]
+task 16 lines 139-139:  run 0xff::negate_i128::test1 --verbose
+task 17 lines 141-141:  run 0xff::negate_i128::test2 --verbose
+Error: Function execution failed with VMError: {
+    message: Integer negation overflow,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0xff::negate_i128,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 00000000000000000000000000000000000000000000000000000000000000ff, name: Identifier("negate_i128") }), FunctionDefinitionIndex(2), 1)] }),
+}

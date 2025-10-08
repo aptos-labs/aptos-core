@@ -76,6 +76,16 @@ fun main() {
 }
 }
 
+// Unsigned → i128 (overflow when ≥ 170141183460469231731687303715884105728)
+
+//# run --verbose
+script {
+fun main() {
+   let v0 = 170141183460469231731687303715884105728u128;
+   let v2 = v0 as i128; // expect to abort
+}
+}
+
 //# run --verbose
 script {
 fun main() {
@@ -83,6 +93,8 @@ fun main() {
    let v2 = v0 as i128; // expect to abort
 }
 }
+
+// Signed → i128 (overflow above i128::MAX)
 
 //# run --verbose
 script {
@@ -92,34 +104,12 @@ fun main() {
 }
 }
 
+// Signed → i128 (overflow below i128::MIN)
+
 //# run --verbose
 script {
 fun main() {
    let v0 = -170141183460469231731687303715884105729i256;
    let v2 = v0 as i128; // expect to abort
-}
-}
-
-//# run --verbose
-script {
-fun main() {
-   let v0 = 9223372036854775808i128;
-   let v2 = v0 as i64; // expect to abort
-}
-}
-
-//# run --verbose
-script {
-fun main() {
-   let v0 = -9223372036854775809i128;
-   let v2 = v0 as i64; // expect to abort
-}
-}
-
-//# run --verbose
-script {
-fun main() {
-   let v0 = 18446744073709551616i128; // one above u64::MAX
-   let v2 = v0 as u64; // expect to abort
 }
 }

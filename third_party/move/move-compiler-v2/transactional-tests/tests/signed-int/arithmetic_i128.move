@@ -144,6 +144,13 @@ fun main() {
 //# run --verbose
 script {
 fun main() {
+    -170141183460469231731687303715884105728i128 / -1i128; // expect to abort
+}
+}
+
+//# run --verbose
+script {
+fun main() {
     assert!(8i128 % 3i128 == 2i128, 5100);
     assert!(170141183460469231731687303715884105727i128 % 7i128 == 1i128, 5101);
     assert!(-170141183460469231731687303715884105727i128 % 7i128 == -1i128, 5102);
@@ -162,10 +169,16 @@ module 0xff::negate_i128 {
   fun negate(a: i128): i128 {
     -a
   }
-  public fun main(){
+  public fun test1(){
     let a = 20i128;
     assert!(-a == negate(a));
   }
+  public fun test2(){
+    let a = -170141183460469231731687303715884105728i128;
+    negate(a); // expect abort
+  }
 }
 
-//# run 0xff::negate_i128::main
+//# run 0xff::negate_i128::test1 --verbose
+
+//# run 0xff::negate_i128::test2 --verbose
