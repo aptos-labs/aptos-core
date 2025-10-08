@@ -88,12 +88,11 @@ module aptos_framework::validator_rewards {
     /// Singletons
     struct Global has key { config: Option<Config>, events: Events }
 
-    /// Public Constants (recommended defaults)
     /// Denominator for per-epoch fixed-point rate.
-    public const DEFAULT_DENOMINATOR: u64 = 1_000_000_000;
+    const DEFAULT_DENOMINATOR: u64 = 1_000_000_000;
 
     /// Example: with 2h epochs, ~4_380 per year.
-    public const DEFAULT_EPOCHS_PER_YEAR: u64 = 4_380;
+    const DEFAULT_EPOCHS_PER_YEAR: u64 = 4_380;
 
     /// View APIs
     public fun is_initialized(): bool acquires Global {
