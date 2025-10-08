@@ -13,7 +13,6 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
-use std::cmp::{max, min};
 
 /// Error message to display when non-production features are enabled
 pub const ERROR_MSG_BAD_FEATURE_FLAGS: &str = r#"
