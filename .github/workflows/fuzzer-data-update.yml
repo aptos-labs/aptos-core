@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - 'main'
+      - 'rustielin/fuzzer-data-update'
     paths:
       - 'testsuite/fuzzer/data/**'
+      - '.github/workflows/fuzzer-data-update.yml'
   workflow_dispatch:
 
 permissions:
@@ -20,8 +22,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
