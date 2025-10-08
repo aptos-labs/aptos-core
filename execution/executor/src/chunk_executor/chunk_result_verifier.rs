@@ -5,18 +5,11 @@ use anyhow::{ensure, Result};
 use aptos_executor_types::LedgerUpdateOutput;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_types::{
-    epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
-    proof::{accumulator::InMemoryTransactionAccumulator, TransactionInfoListWithProof},
-    transaction::TransactionInfo,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::TransactionInfo,
 };
 
 pub trait ChunkResultVerifier {
-    fn verify_chunk_result(
-        &self,
-        parent_accumulator: &InMemoryTransactionAccumulator,
-        ledger_update_output: &LedgerUpdateOutput,
-    ) -> Result<()>;
+    fn verify_chunk_result(&self, ledger_update_output: &LedgerUpdateOutput) -> Result<()>;
 
     fn transaction_infos(&self) -> &[TransactionInfo];
 
@@ -28,17 +21,13 @@ pub trait ChunkResultVerifier {
 }
 
 pub struct StateSyncChunkVerifier {
-    pub txn_infos_with_proof: TransactionInfoListWithProof,
+    pub transaction_infos: Vec<TransactionInfo>,
     pub verified_target_li: LedgerInfoWithSignatures,
     pub epoch_change_li: Option<LedgerInfoWithSignatures>,
 }
 
 impl ChunkResultVerifier for StateSyncChunkVerifier {
-    fn verify_chunk_result(
-        &self,
-        parent_accumulator: &InMemoryTransactionAccumulator,
-        ledger_update_output: &LedgerUpdateOutput,
-    ) -> Result<()> {
+    fn verify_chunk_result(&self, ledger_update_output: &LedgerUpdateOutput) -> Result<()> {
         // In consensus-only mode, we cannot verify the proof against the executed output,
         // because the proof returned by the remote peer is an empty one.
         if cfg!(feature = "consensus-only-perf-test") {
@@ -46,27 +35,13 @@ impl ChunkResultVerifier for StateSyncChunkVerifier {
         }
 
         THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-            let first_version = parent_accumulator.num_leaves();
-
-            // Verify the chunk extends the parent accumulator.
-            let parent_root_hash = parent_accumulator.root_hash();
-            let num_overlap = self.txn_infos_with_proof.verify_extends_ledger(
-                first_version,
-                parent_root_hash,
-                Some(first_version),
-            )?;
-            assert_eq!(num_overlap, 0, "overlapped chunks");
-
             // Verify transaction infos match
-            ledger_update_output
-                .ensure_transaction_infos_match(&self.txn_infos_with_proof.transaction_infos)?;
-
-            Ok(())
+            ledger_update_output.ensure_transaction_infos_match(&self.transaction_infos)
         })
     }
 
     fn transaction_infos(&self) -> &[TransactionInfo] {
-        &self.txn_infos_with_proof.transaction_infos
+        &self.transaction_infos
     }
 
     fn maybe_select_chunk_ending_ledger_info(
@@ -131,11 +106,7 @@ pub struct ReplayChunkVerifier {
 }
 
 impl ChunkResultVerifier for ReplayChunkVerifier {
-    fn verify_chunk_result(
-        &self,
-        _parent_accumulator: &InMemoryTransactionAccumulator,
-        ledger_update_output: &LedgerUpdateOutput,
-    ) -> Result<()> {
+    fn verify_chunk_result(&self, ledger_update_output: &LedgerUpdateOutput) -> Result<()> {
         ledger_update_output.ensure_transaction_infos_match(&self.transaction_infos)
     }
 

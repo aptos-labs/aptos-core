@@ -147,7 +147,7 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
             first_version: v.ok_or_else(|| anyhow!("first version is None"))?,
         };
         let chunk_verifier = Arc::new(StateSyncChunkVerifier {
-            txn_infos_with_proof,
+            transaction_infos: txn_infos_with_proof.transaction_infos,
             verified_target_li: verified_target_li.clone(),
             epoch_change_li: epoch_change_li.cloned(),
         });
@@ -191,7 +191,7 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
             first_version: v.ok_or_else(|| anyhow!("first version is None"))?,
         };
         let chunk_verifier = Arc::new(StateSyncChunkVerifier {
-            txn_infos_with_proof,
+            transaction_infos: txn_infos_with_proof.transaction_infos,
             verified_target_li: verified_target_li.clone(),
             epoch_change_li: epoch_change_li.cloned(),
         });
@@ -360,10 +360,10 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         let ledger_update_output = DoLedgerUpdate::run(
             &output.execution_output,
             &state_checkpoint_output,
-            parent_accumulator.clone(),
+            parent_accumulator,
         )?;
 
-        chunk_verifier.verify_chunk_result(&parent_accumulator, &ledger_update_output)?;
+        chunk_verifier.verify_chunk_result(&ledger_update_output)?;
 
         let ledger_info_opt = chunk_verifier.maybe_select_chunk_ending_ledger_info(
             &ledger_update_output,
