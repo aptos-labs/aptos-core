@@ -18,7 +18,7 @@ use move_core_types::{
     effects::{AccountChanges, ChangeSet, Changes},
     gas_algebra::NumBytes,
     language_storage::{StructTag, TypeTag},
-    value::MoveTypeLayout,
+    value::{MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
 use move_vm_types::{
@@ -173,25 +173,48 @@ impl TransactionDataCache {
             )?
         };
 
-        let function_value_extension = FunctionValueExtensionAdapter { module_storage };
         let (layout, contains_delayed_fields) = layout_with_delayed_fields.unpack();
         let value = match data {
             Some(blob) => {
+                let function_value_extension = FunctionValueExtensionAdapter { module_storage };
                 let max_value_nest_depth = function_value_extension.max_value_nest_depth();
-                let val = ValueSerDeContext::new(max_value_nest_depth)
-                    .with_func_args_deserialization(&function_value_extension)
-                    .with_delayed_fields_serde()
-                    .deserialize(&blob, &layout)
-                    .ok_or_else(|| {
-                        let msg = format!(
-                            "Failed to deserialize resource {} at {}!",
-                            struct_tag.to_canonical_string(),
-                            addr
-                        );
-                        PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
-                            .with_message(msg)
-                    })?;
-                GlobalValue::cached(val)?
+                if contains_delayed_fields || Self::layout_contains_functions(&layout) {
+                    // Need function value extension, directly parse here.
+                    let val = ValueSerDeContext::new(max_value_nest_depth)
+                        .with_func_args_deserialization(&function_value_extension)
+                        .with_delayed_fields_serde()
+                        .deserialize(&blob, &layout)
+                        .ok_or_else(|| {
+                            let msg = format!(
+                                "Failed to deserialize resource {} at {}!",
+                                struct_tag.to_canonical_string(),
+                                addr
+                            );
+                            PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
+                                .with_message(msg)
+                        })?;
+                    GlobalValue::cached(val)?
+                } else {
+                    // Do not need function value extension, can delay deserialization.
+                    let layout = layout.clone(); // too many clones for error case only
+                    let blob = blob.to_vec();
+                    let addr = *addr;
+                    let struct_tag = struct_tag.clone();
+                    let deserializer = move || {
+                        ValueSerDeContext::new(max_value_nest_depth)
+                            .deserialize(&blob, &layout)
+                            .ok_or_else(|| {
+                                let msg = format!(
+                                    "Failed to deserialize resource {} at {}!",
+                                    struct_tag.to_canonical_string(),
+                                    addr
+                                );
+                                PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
+                                    .with_message(msg)
+                            })
+                    };
+                    GlobalValue::fetched(deserializer)?
+                }
             },
             None => GlobalValue::none(),
         };
@@ -203,6 +226,41 @@ impl TransactionDataCache {
             value,
         };
         Ok((entry, NumBytes::new(bytes_loaded as u64)))
+    }
+
+    // HACK for benchmarking
+    fn layout_contains_functions(ly: &MoveTypeLayout) -> bool {
+        match ly {
+            MoveTypeLayout::Function => true,
+            MoveTypeLayout::Bool
+            | MoveTypeLayout::U8
+            | MoveTypeLayout::U64
+            | MoveTypeLayout::U128
+            | MoveTypeLayout::Address
+            | MoveTypeLayout::Signer
+            | MoveTypeLayout::U16
+            | MoveTypeLayout::U32
+            | MoveTypeLayout::U256
+            | MoveTypeLayout::Native(_, _) => false,
+            MoveTypeLayout::Vector(ly) => Self::layout_contains_functions(ly),
+            MoveTypeLayout::Struct(sly) => {
+                match sly {
+                    MoveStructLayout::Runtime(fields) => {
+                        fields.iter().any(Self::layout_contains_functions)
+                    },
+                    MoveStructLayout::RuntimeVariants(variants) => variants
+                        .iter()
+                        .flatten()
+                        .any(Self::layout_contains_functions),
+                    MoveStructLayout::WithFields(_)
+                    | MoveStructLayout::WithTypes { .. }
+                    | MoveStructLayout::WithVariants(_) => {
+                        // overapproximate
+                        true
+                    },
+                }
+            },
+        }
     }
 
     /// Returns true if resource has been inserted into the cache. Otherwise, returns false. The

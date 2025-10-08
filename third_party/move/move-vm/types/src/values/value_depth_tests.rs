@@ -74,7 +74,7 @@ fn test_copy_value() {
     test_unop_with_max_depth(|v, max_depth| v.copy_value_with_depth(max_depth));
 
     // Special-case: reference clone Rcs, so their depth can be larger.
-    let v = assert_ok!(GlobalValue::cached(Value::struct_(Struct::pack(vec![
+    let mut v = assert_ok!(GlobalValue::cached(Value::struct_(Struct::pack(vec![
         Value::u8(0)
     ]))));
     let v_ref = assert_ok!(v.borrow_global());
@@ -85,7 +85,7 @@ fn test_copy_value() {
 
 #[test]
 fn test_read_ref() {
-    let v = assert_ok!(GlobalValue::cached(Value::struct_(Struct::pack(vec![
+    let mut v = assert_ok!(GlobalValue::cached(Value::struct_(Struct::pack(vec![
         Value::u8(0)
     ]))));
     let v_ref = assert_ok!(assert_ok!(v.borrow_global()).value_as::<StructRef>());
@@ -206,7 +206,7 @@ where
     assert_eq!(err.major_status(), StatusCode::VM_MAX_VALUE_DEPTH_REACHED);
 
     // Create a reference to struct with 1 field (3 nodes).
-    let v = assert_ok!(GlobalValue::cached(Value::struct_(Struct::pack(vec![
+    let mut v = assert_ok!(GlobalValue::cached(Value::struct_(Struct::pack(vec![
         Value::u8(0)
     ]))));
     let v_ref = assert_ok!(v.borrow_global());
