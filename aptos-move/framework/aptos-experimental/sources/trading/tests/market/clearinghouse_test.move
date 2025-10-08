@@ -160,7 +160,7 @@ module aptos_experimental::clearinghouse_test {
         let bulk_open_asks = &mut global_state.bulk_open_asks;
         if (!bulk_open_bids.contains(account)
             && !bulk_open_asks.contains(account)) {
-            abort error::invalid_argument(E_ORDER_NOT_FOUND);
+            return
         };
         if (bulk_open_asks.contains(account)) {
             bulk_open_asks.remove(account);
@@ -212,7 +212,7 @@ module aptos_experimental::clearinghouse_test {
             |order_info, _remaining_size| {
                 cleanup_order(order_info.get_order_id());
             },
-            |account, _order_id| {
+            |account, _order_id, _is_bid, _price, _size| {
                 cleanup_bulk_order(account);
             },
             |_order_info, _size| {
@@ -242,7 +242,7 @@ module aptos_experimental::clearinghouse_test {
             |order_info, _remaining_size| {
                 cleanup_order(order_info.get_order_id());
             },
-            |account, _order_id| {
+            |account, _order_id, _is_bid, _price, _size| {
                 cleanup_bulk_order(account);
             },
             |_order_info, _size| {

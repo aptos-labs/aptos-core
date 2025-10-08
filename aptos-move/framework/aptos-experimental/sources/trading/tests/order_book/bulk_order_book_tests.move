@@ -390,7 +390,7 @@ module aptos_experimental::bulk_order_book_tests {
             ASK_PRICE_1,
             SIZE_1,
             false, // Should be an ask order
-            SIZE_2 + TOTAL_SIZE_PER_SIDE // Remaining size after first level consumed
+            0 // Remaining size after first level consumed
         );
 
         // Second attempt - should be no matches since first level is consumed
@@ -418,7 +418,7 @@ module aptos_experimental::bulk_order_book_tests {
             ASK_PRICE_2,
             SIZE_2,
             false, // Should be an ask order
-            0 + TOTAL_SIZE_PER_SIDE // Fully consumed
+            0 // Fully consumed
         );
 
         order_book.destroy_bulk_order_book();
@@ -445,7 +445,7 @@ module aptos_experimental::bulk_order_book_tests {
             BID_PRICE_1,
             SIZE_1,
             true, // Should be a bid order
-            SIZE_2 + TOTAL_SIZE_PER_SIDE // Remaining size after first level consumed
+            0 // Remaining size after first level consumed
         );
 
         // Second attempt - should be no matches since first level is consumed
@@ -473,7 +473,7 @@ module aptos_experimental::bulk_order_book_tests {
             BID_PRICE_2,
             SIZE_2,
             true, // Should be a bid order
-            0 + TOTAL_SIZE_PER_SIDE // Fully consumed
+            0 // Fully consumed
         );
 
         order_book.destroy_bulk_order_book();
@@ -501,7 +501,7 @@ module aptos_experimental::bulk_order_book_tests {
             ASK_PRICE_1,
             taker_size,
             false, // Should be an ask order
-            2 * TOTAL_SIZE_PER_SIDE - taker_size // Remaining size after partial consumption
+            taker_size // Remaining size after partial consumption
         );
 
         // Test taker ask with size smaller than the first bid level
@@ -520,7 +520,7 @@ module aptos_experimental::bulk_order_book_tests {
             BID_PRICE_1,
             taker_ask_size,
             true, // Should be a bid order
-            2 * TOTAL_SIZE_PER_SIDE - taker_size - taker_ask_size // Remaining size after partial consumption
+            SIZE_1 - taker_ask_size // Remaining size after partial consumption
         );
 
         price_time_index.destroy_price_time_idx();
@@ -552,7 +552,7 @@ module aptos_experimental::bulk_order_book_tests {
             ASK_PRICE_1,
             SIZE_1,
             false, // Should be an ask order
-            SIZE_2 + TOTAL_SIZE_PER_SIDE // Remaining size after first level
+            0 // Remaining size after first level
         );
 
         // Check second match (second ask level)
@@ -562,7 +562,7 @@ module aptos_experimental::bulk_order_book_tests {
             ASK_PRICE_2,
             SIZE_2,
             false, // Should be an ask order
-            0 + TOTAL_SIZE_PER_SIDE // Fully consumed
+            0  // Fully consumed
         );
 
         // Verify total matched size equals total bulk order size
@@ -595,7 +595,7 @@ module aptos_experimental::bulk_order_book_tests {
             ASK_PRICE_1,
             SIZE_1,
             false, // Should be an ask order
-            SIZE_2 + TOTAL_SIZE_PER_SIDE // Remaining size after first level
+            0 // Remaining size after first level
         );
 
         // Check second match
@@ -605,7 +605,7 @@ module aptos_experimental::bulk_order_book_tests {
             ASK_PRICE_2,
             SIZE_2,
             false, // Should be an ask order
-            0 + TOTAL_SIZE_PER_SIDE // Fully consumed
+            0 // Fully consumed
         );
 
         // Verify total matched size equals total bulk order size
@@ -640,7 +640,7 @@ module aptos_experimental::bulk_order_book_tests {
             ASK_PRICE_1,
             SIZE_1,
             false, // Should be an ask order
-            SIZE_2  + TOTAL_SIZE_PER_SIDE// Remaining size after first level
+            0 // Remaining size after first level
         );
 
         // Check second match (partially consumed)
@@ -650,7 +650,7 @@ module aptos_experimental::bulk_order_book_tests {
             ASK_PRICE_2,
             SIZE_2 / 2,
             false, // Should be an ask order
-            SIZE_2 / 2 + TOTAL_SIZE_PER_SIDE // Remaining size in second level
+            SIZE_2 / 2 // Remaining size in second level
         );
 
         // Verify total matched size equals partial size
@@ -721,7 +721,7 @@ module aptos_experimental::bulk_order_book_tests {
             ASK_PRICE_1,
             partial_size,
             false, // Should be an ask order
-            2 * TOTAL_SIZE_PER_SIDE - partial_size // Remaining size after partial consumption
+            SIZE_1 - partial_size // Remaining size after partial consumption
         );
 
         // Verify order is still active (second level should still be available)
@@ -779,7 +779,7 @@ module aptos_experimental::bulk_order_book_tests {
             ASK_PRICE_1,
             SIZE_1,
             false, // Should be an ask order
-            TOTAL_SIZE_PER_SIDE + SIZE_2 // Remaining size after first level
+            0 // Remaining size after first level
         );
 
         // Verify second match
@@ -789,7 +789,7 @@ module aptos_experimental::bulk_order_book_tests {
             ASK_PRICE_2,
             SIZE_2,
             false, // Should be an ask order
-            0 + TOTAL_SIZE_PER_SIDE // Fully consumed
+            0 // Fully consumed
         );
 
         // Verify order is no longer active after full consumption
@@ -892,7 +892,7 @@ module aptos_experimental::bulk_order_book_tests {
             ASK_PRICE_1,
             SIZE_1,
             false, // Should be an ask order
-            SIZE_2 + TOTAL_SIZE_PER_SIDE // Remaining size
+            0 // Remaining size
         );
 
         price_time_index.destroy_price_time_idx();

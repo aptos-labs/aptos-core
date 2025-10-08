@@ -265,20 +265,29 @@ module aptos_experimental::bulk_order_book {
         self: &mut BulkOrderBook<M>,
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
         account: address
-    ): (OrderIdType, u64, u64) {
+    ): BulkOrder<M> {
         if (!self.orders.contains(&account)) {
             abort EORDER_NOT_FOUND;
         };
         // For cancellation, instead of removing the order, we will just cancel the active orders and set the sizes to 0.
         // This allows us to reuse the order id for the same account in the future without creating a new order.
         let order = self.orders.remove(&account);
-        let order_id = order.get_order_id();
-        let remaining_bid_size = order.get_total_remaining_size(true);
-        let remaining_ask_size = order.get_total_remaining_size(false);
+        let order_copy = order;
         cancel_active_orders(price_time_idx, &order);
         order.set_empty();
         self.orders.add(account, order);
-        (order_id, remaining_bid_size, remaining_ask_size)
+        order_copy
+    }
+
+    public fun get_bulk_order<M: store + copy + drop>(
+        self: &BulkOrderBook<M>,
+        account: address
+    ): BulkOrder<M> {
+        if (!self.orders.contains(&account)) {
+            abort EORDER_NOT_FOUND;
+        };
+
+        self.orders.get(&account).destroy_some()
     }
 
 

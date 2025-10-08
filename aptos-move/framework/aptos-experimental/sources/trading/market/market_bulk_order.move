@@ -58,7 +58,7 @@ module aptos_experimental::market_bulk_order {
             ask_sizes,
             metadata,
         ));
-        let (order_id, _, _, _, _, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = bulk_order.destroy_bulk_order(); // We don't need to keep the bulk order struct after placement
+        let (order_id, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = bulk_order.destroy_bulk_order(); // We don't need to keep the bulk order struct after placement
         // Emit an event for the placed bulk order
         market.emit_event_for_bulk_order_placed(order_id, account, bid_sizes, bid_prices, ask_sizes, ask_prices);
         option::some(order_id)
@@ -86,9 +86,17 @@ module aptos_experimental::market_bulk_order {
         user: address,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
-        let (order_id, remaining_bid_size, remaining_ask_size) = market.get_order_book_mut().cancel_bulk_order(user);
-        if (remaining_bid_size > 0 || remaining_ask_size > 0) {
-            callbacks.cleanup_bulk_orders(user, order_id);
+        let cancelled_bulk_order = market.get_order_book_mut().cancel_bulk_order(user);
+        let (order_id, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = cancelled_bulk_order.destroy_bulk_order();
+        let i = 0;
+        while (i < bid_sizes.length()) {
+            callbacks.cleanup_bulk_order_at_price(user, order_id, true, bid_prices[i], bid_sizes[i]);
+            i += 1;
+        };
+        let j = 0;
+        while (j < ask_sizes.length()) {
+            callbacks.cleanup_bulk_order_at_price(user, order_id, false, ask_prices[j], ask_sizes[j]);
+            j += 1;
         };
         market.emit_event_for_bulk_order_cancelled(order_id, user);
     }

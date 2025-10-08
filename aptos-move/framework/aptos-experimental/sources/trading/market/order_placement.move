@@ -70,7 +70,7 @@ module aptos_experimental::order_placement {
     use aptos_experimental::market_types::{
         Self,
         MarketClearinghouseCallbacks,
-        Market, CallbackResult, new_callback_result_not_available,
+        Market, CallbackResult, new_callback_result_not_available, emit_event_for_bulk_order_modified,
     };
 
     // Error codes
@@ -338,6 +338,36 @@ module aptos_experimental::order_placement {
         }
     }
 
+    fun cancel_bulk_maker_order_internal<M: store + copy + drop, R: store + copy + drop>(
+        market: &mut Market<M>,
+        maker_order: &OrderMatchDetails<M>,
+        maker_address: address,
+        order_id: OrderIdType,
+        unsettled_size: u64,
+        callbacks: &MarketClearinghouseCallbacks<M, R>
+    ) {
+        let cancelled_size = unsettled_size + maker_order.get_remaining_size_from_match_details();
+        if (maker_order.get_remaining_size_from_match_details() != 0) {
+                // For bulk orders, we cancel all orders for the user
+                market.get_order_book_mut().cancel_bulk_order(maker_address);
+        };
+
+        callbacks.cleanup_bulk_order_at_price(
+            maker_address, order_id, maker_order.is_bid_from_match_details(), maker_order.get_price_from_match_details(), cancelled_size
+        );
+
+        let modified_order = market.get_order_book().get_bulk_order(maker_address);
+        let (_, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = modified_order.destroy_bulk_order();
+        market.emit_event_for_bulk_order_modified(
+            order_id,
+            maker_address,
+            bid_sizes,
+            bid_prices,
+            ask_sizes,
+            ask_prices
+        );
+    }
+
     fun cancel_maker_order_internal<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         maker_order: &OrderMatchDetails<M>,
@@ -350,40 +380,38 @@ module aptos_experimental::order_placement {
         time_in_force: TimeInForce,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
-        let maker_cancel_size = unsettled_size + maker_order.get_remaining_size_from_match_details();
         let is_bulk_order = maker_order.get_book_type_from_match_details() != single_order_book_type();
         if (is_bulk_order) {
-            market.emit_event_for_bulk_order_cancelled(
-                order_id,
+            return cancel_bulk_maker_order_internal(
+                market,
+                maker_order,
                 maker_address,
-            );
-        } else {
-            market.emit_event_for_order(
                 order_id,
-                client_order_id,
-                maker_address,
-                maker_order.get_orig_size_from_match_details(),
-                0,
-                maker_cancel_size,
-                maker_order.get_price_from_match_details(),
-                maker_order.is_bid_from_match_details(),
-                false,
-                market_types::order_status_cancelled(),
-                maker_cancellation_reason,
-                metadata,
-                option::none(), // trigger_condition
-                time_in_force,
+                unsettled_size,
                 callbacks
             );
         };
+        let maker_cancel_size = unsettled_size + maker_order.get_remaining_size_from_match_details();
+        market.emit_event_for_order(
+            order_id,
+            client_order_id,
+            maker_address,
+            maker_order.get_orig_size_from_match_details(),
+            0,
+            maker_cancel_size,
+            maker_order.get_price_from_match_details(),
+            maker_order.is_bid_from_match_details(),
+            false,
+            market_types::order_status_cancelled(),
+            maker_cancellation_reason,
+            metadata,
+            option::none(), // trigger_condition
+            time_in_force,
+            callbacks
+        );
         // If the maker is invalid cancel the maker order and continue to the next maker order
         if (maker_order.get_remaining_size_from_match_details() != 0) {
-            if (is_bulk_order) {
-                // For bulk orders, we cancel all orders for the user
-                market.get_order_book_mut().cancel_bulk_order(maker_address);
-            } else {
-                market.get_order_book_mut().cancel_order(maker_address, order_id);
-            };
+            market.get_order_book_mut().cancel_order(maker_address, order_id);
         };
         cleanup_order_internal(
             maker_address,
@@ -457,14 +485,14 @@ module aptos_experimental::order_placement {
         }
     }
 
-    public fun cleanup_order_internal<M: store + copy + drop, R: store + copy + drop>(
+    public(package) fun cleanup_order_internal<M: store + copy + drop, R: store + copy + drop>(
         user_addr: address,
         order_id: OrderIdType,
         client_order_id: Option<String>,
         book_type: OrderBookType,
         is_bid: bool,
         time_in_force: TimeInForce,
-        remaining_size: u64,
+        cleanup_size: u64,
         price: u64,
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M, R>
@@ -480,11 +508,11 @@ module aptos_experimental::order_placement {
                     time_in_force,
                     metadata
                 ),
-                remaining_size,
+                cleanup_size,
             );
         } else {
-            callbacks.cleanup_bulk_orders(
-                user_addr, order_id
+            callbacks.cleanup_bulk_order_at_price(
+                user_addr, order_id, is_bid, price, cleanup_size
             );
         }
     }
