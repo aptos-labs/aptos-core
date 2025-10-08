@@ -103,10 +103,36 @@ fun main() {
 }
 }
 
+// Unsigned → i16 (values ≥ 32768 overflow)
+
+//# run --verbose
+script {
+fun main() {
+   let v0 = 32768u16;
+   let v2 = v0 as i16; // expect to abort
+}
+}
+
 //# run --verbose
 script {
 fun main() {
    let v0 = 32768u32;
+   let v2 = v0 as i16; // expect to abort
+}
+}
+
+//# run --verbose
+script {
+fun main() {
+   let v0 = 32768u64;
+   let v2 = v0 as i16; // expect to abort
+}
+}
+
+//# run --verbose
+script {
+fun main() {
+   let v0 = 32768u128;
    let v2 = v0 as i16; // expect to abort
 }
 }
@@ -119,6 +145,8 @@ fun main() {
 }
 }
 
+// Signed → i16, overflow above 32767
+
 //# run --verbose
 script {
 fun main() {
@@ -126,6 +154,32 @@ fun main() {
    let v2 = v0 as i16; // expect to abort
 }
 }
+
+//# run --verbose
+script {
+fun main() {
+   let v0 = 32768i64;
+   let v2 = v0 as i16; // expect to abort
+}
+}
+
+//# run --verbose
+script {
+fun main() {
+   let v0 = 32768i128;
+   let v2 = v0 as i16; // expect to abort
+}
+}
+
+//# run --verbose
+script {
+fun main() {
+   let v0 = 32768i256;
+   let v2 = v0 as i16; // expect to abort
+}
+}
+
+// Signed → i16, overflow below -32768
 
 //# run --verbose
 script {
@@ -138,23 +192,23 @@ fun main() {
 //# run --verbose
 script {
 fun main() {
-   let v0 = 128i16;
-   let v2 = v0 as i8; // expect to abort
+   let v0 = -32769i64;
+   let v2 = v0 as i16; // expect to abort
 }
 }
 
 //# run --verbose
 script {
 fun main() {
-   let v0 = -129i16;
-   let v2 = v0 as i8; // expect to abort
+   let v0 = -32769i128;
+   let v2 = v0 as i16; // expect to abort
 }
 }
 
 //# run --verbose
 script {
 fun main() {
-   let v0 = 256i16;
-   let v2 = v0 as u8; // expect to abort
+   let v0 = -32769i256;
+   let v2 = v0 as i16; // expect to abort
 }
 }

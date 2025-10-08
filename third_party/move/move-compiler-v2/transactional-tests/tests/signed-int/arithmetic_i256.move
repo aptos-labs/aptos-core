@@ -138,10 +138,16 @@ module 0xff::negate_i256 {
   fun negate(a: i256): i256 {
     -a
   }
-  public fun main(){
+  public fun test1(){
     let a = 20i256;
     assert!(-a == negate(a));
   }
+  public fun test2(){
+    let a = -57896044618658097711785492504343953926634992332820282019728792003956564819968i256;
+    negate(a); // expect abort
+  }
 }
 
-//# run 0xff::negate_i256::main
+//# run 0xff::negate_i256::test1 --verbose
+
+//# run 0xff::negate_i256::test2 --verbose

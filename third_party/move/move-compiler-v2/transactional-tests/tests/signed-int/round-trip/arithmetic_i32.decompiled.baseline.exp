@@ -1,4 +1,4 @@
-processed 19 tasks
+processed 21 tasks
 task 0 lines 3-8:  run --verbose [script {]
 task 1 lines 11-16:  run --verbose [script {]
 Error: Script execution failed with VMError: {
@@ -104,9 +104,8 @@ Error: Script execution failed with VMError: {
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 task 14 lines 115-120:  run --verbose [script {]
-task 15 lines 123-128:  run --verbose [script {]
 Error: Script execution failed with VMError: {
-    message: Integer remainder by zero,
+    message: Division overflow,
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
@@ -114,6 +113,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
+task 15 lines 123-128:  run --verbose [script {]
 task 16 lines 131-136:  run --verbose [script {]
 Error: Script execution failed with VMError: {
     message: Integer remainder by zero,
@@ -124,5 +124,25 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 17 lines 139-149:  publish [module 0xff::negate_i32 {]
-task 18 lines 152-152:  run 0xff::negate_i32::main
+task 17 lines 139-144:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Integer remainder by zero,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 18 lines 147-160:  publish [module 0xff::negate_i32 {]
+task 19 lines 163-163:  run 0xff::negate_i32::test1 --verbose
+task 20 lines 165-165:  run 0xff::negate_i32::test2 --verbose
+Error: Function execution failed with VMError: {
+    message: Integer negation overflow,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0xff::negate_i32,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 00000000000000000000000000000000000000000000000000000000000000ff, name: Identifier("negate_i32") }), FunctionDefinitionIndex(2), 1)] }),
+}

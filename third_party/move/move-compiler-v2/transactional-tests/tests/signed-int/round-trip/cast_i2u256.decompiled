@@ -1,4 +1,4 @@
-//**** Cross-compiled for `move` syntax from `tests/signed-int/cast_i128.move`
+//**** Cross-compiled for `move` syntax from `tests/signed-int/cast_i2u256.move`
 
 //# run --verbose
 script {
@@ -11,7 +11,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        ()
+        let _v0 = -1i8 as u256;
     }
 }
 
@@ -19,7 +19,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        ()
+        let _v0 = -1i16 as u256;
     }
 }
 
@@ -27,7 +27,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 170141183460469231731687303715884105728u128 as i128;
+        let _v0 = -1i32 as u256;
     }
 }
 
@@ -35,7 +35,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 170141183460469231731687303715884105728u256 as i128;
+        let _v0 = -1i64 as u256;
     }
 }
 
@@ -43,7 +43,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 170141183460469231731687303715884105728i256 as i128;
+        let _v0 = -1i128 as u256;
     }
 }
 
@@ -51,6 +51,6 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -170141183460469231731687303715884105729i256 as i128;
+        let _v0 = -1i256 as u256;
     }
 }

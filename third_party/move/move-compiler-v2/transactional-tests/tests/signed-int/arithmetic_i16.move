@@ -171,6 +171,13 @@ fun main() {
 //# run --verbose
 script {
 fun main() {
+    -32768i16 / -1i16; // expect to abort
+}
+}
+
+//# run --verbose
+script {
+fun main() {
     assert!(0i16 % 1i16 == 0i16, 5000);
     assert!(1i16 % 1i16 == 0i16, 5001);
     assert!(1i16 % 2i16 == 1i16, 5002);
@@ -214,10 +221,16 @@ module 0xff::negate_i16 {
   fun negate(a: i16): i16 {
     -a
   }
-  public fun main(){
+  public fun test1(){
     let a = 20i16;
     assert!(-a == negate(a));
   }
+  public fun test2(){
+    let a = -32768i16;
+    negate(a); // expect abort
+  }
 }
 
-//# run 0xff::negate_i16::main
+//# run 0xff::negate_i16::test1 --verbose
+
+//# run 0xff::negate_i16::test2 --verbose

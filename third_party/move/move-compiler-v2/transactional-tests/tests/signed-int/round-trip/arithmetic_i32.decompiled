@@ -115,6 +115,14 @@ script {
 //# run --verbose
 script {
     fun main() {
+        let _v0 = -2147483648i32 / -1i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
         ()
     }
 }
@@ -138,15 +146,20 @@ script {
 
 //# publish
 module 0xff::negate_i32 {
-    public fun main() {
+    fun negate(p0: i32): i32 {
+        -p0
+    }
+    public fun test1() {
         let _v0 = -20i32;
         let _v1 = negate(20i32);
         assert!(_v0 == _v1, 14566554180833181696);
     }
-    fun negate(p0: i32): i32 {
-        -p0
+    public fun test2() {
+        let _v0 = negate(-2147483648i32);
     }
 }
 
 
-//# run 0xff::negate_i32::main
+//# run 0xff::negate_i32::test1 --verbose
+
+//# run 0xff::negate_i32::test2 --verbose
