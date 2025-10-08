@@ -1,4 +1,4 @@
-module aptos::validator_rewards {
+module aptos_framework::validator_rewards {
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
