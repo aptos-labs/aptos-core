@@ -75,7 +75,7 @@ Error: Script execution failed with VMError: {
 }
 task 11 lines 91-96:  run --verbose [script {]
 Error: Script execution failed with VMError: {
-    message: Division by zero,
+    message: Division overflow,
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
