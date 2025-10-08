@@ -64,15 +64,7 @@ fun main() {
 //# run --verbose
 script {
 fun main() {
-   let v0 = 57896044618658097711785492504343953926634992332820282019728792003956564819968u256;
-   let v2 = v0 as i128; // expect to abort
-}
-}
-
-//# run --verbose
-script {
-fun main() {
-   let v0 = 18446744073709551616i256; // one above u64::MAX
-   let v2 = v0 as u64; // expect to abort
+   let v0 = 57896044618658097711785492504343953926634992332820282019728792003956564819968u256; // one above i256::MAX
+   let v2 = v0 as i256; // expect to abort
 }
 }

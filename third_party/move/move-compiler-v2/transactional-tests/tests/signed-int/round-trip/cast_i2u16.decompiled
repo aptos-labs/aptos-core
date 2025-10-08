@@ -1,4 +1,4 @@
-//**** Cross-compiled for `move` syntax from `tests/signed-int/cast_i64.move`
+//**** Cross-compiled for `move` syntax from `tests/signed-int/cast_i2u16.move`
 
 //# run --verbose
 script {
@@ -11,7 +11,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        ()
+        let _v0 = -1i8 as u16;
     }
 }
 
@@ -19,7 +19,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        ()
+        let _v0 = -1i16 as u16;
     }
 }
 
@@ -27,7 +27,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 9223372036854775808 as i64;
+        let _v0 = -1i32 as u16;
     }
 }
 
@@ -35,7 +35,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 9223372036854775808u128 as i64;
+        let _v0 = -1i64 as u16;
     }
 }
 
@@ -43,7 +43,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 9223372036854775808u256 as i64;
+        let _v0 = -1i128 as u16;
     }
 }
 
@@ -51,7 +51,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 9223372036854775808i128 as i64;
+        let _v0 = -1i256 as u16;
     }
 }
 
@@ -59,7 +59,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 9223372036854775808i256 as i64;
+        let _v0 = 65536i32 as u16;
     }
 }
 
@@ -67,7 +67,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -9223372036854775809i128 as i64;
+        let _v0 = 65536i64 as u16;
     }
 }
 
@@ -75,6 +75,14 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -9223372036854775809i256 as i64;
+        let _v0 = 65536i128 as u16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 65536i256 as u16;
     }
 }

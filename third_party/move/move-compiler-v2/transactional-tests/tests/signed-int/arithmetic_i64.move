@@ -169,6 +169,13 @@ fun main() {
 //# run --verbose
 script {
 fun main() {
+    -9223372036854775808i64 / -1i64; // expect to abort
+}
+}
+
+//# run --verbose
+script {
+fun main() {
     assert!(0i64 % 1i64 == 0i64, 5000);
     assert!(1i64 % 1i64 == 0i64, 5001);
     assert!(1i64 % 2i64 == 1i64, 5002);
@@ -209,10 +216,16 @@ module 0xff::negate_i64 {
   fun negate(a: i64): i64 {
     -a
   }
-  public fun main(){
+  public fun test1(){
     let a = 20i64;
     assert!(-a == negate(a));
   }
+  public fun test2(){
+    let a = -9223372036854775808i64;
+    negate(a); // expect abort
+  }
 }
 
-//# run 0xff::negate_i64::main
+//# run 0xff::negate_i64::test1 --verbose
+
+//# run 0xff::negate_i64::test2 --verbose

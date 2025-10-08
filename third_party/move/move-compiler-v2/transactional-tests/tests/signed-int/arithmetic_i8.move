@@ -171,6 +171,13 @@ fun main() {
 //# run --verbose
 script {
 fun main() {
+    -128i8 / -1i8; // expect to abort
+}
+}
+
+//# run --verbose
+script {
+fun main() {
     assert!(0i8 % 1i8 == 0i8, 5000);
     assert!(1i8 % 1i8 == 0i8, 5001);
     assert!(1i8 % 2i8 == 1i8, 5002);
@@ -214,10 +221,16 @@ module 0xff::negate_i8 {
   fun negate(a: i8): i8 {
     -a
   }
-  public fun main(){
+  public fun test1(){
     let a = 20i8;
     assert!(-a == negate(a));
   }
+  public fun test2(){
+    let a = -128i8;
+    negate(a); // expect abort
+  }
 }
 
-//# run 0xff::negate_i8::main
+//# run 0xff::negate_i8::test1 --verbose
+
+//# run 0xff::negate_i8::test2 --verbose
