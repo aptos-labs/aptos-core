@@ -13,7 +13,7 @@ module aptos_experimental::clearinghouse_test {
         MarketClearinghouseCallbacks,
         new_market_clearinghouse_callbacks,
         new_callback_result_continue_matching,
-        new_callback_result_stop_matching
+        new_callback_result_stop_matching, ValidationResult, new_validation_result
     };
 
     const EINVALID_ADDRESS: u64 = 1;
@@ -65,14 +65,14 @@ module aptos_experimental::clearinghouse_test {
         );
     }
 
-    public(package) fun validate_order_placement(order_id: OrderIdType): bool acquires GlobalState {
+    public(package) fun validate_order_placement(order_id: OrderIdType): ValidationResult<u64> acquires GlobalState {
         let open_orders = &mut borrow_global_mut<GlobalState>(@0x1).open_orders;
         assert!(
             !open_orders.contains(order_id),
             error::invalid_argument(E_DUPLICATE_ORDER)
         );
         open_orders.add(order_id, true);
-        return true
+        return new_validation_result(option::none(), option::none())
     }
 
     public(package) fun validate_bulk_order_placement(account: address): bool acquires GlobalState {

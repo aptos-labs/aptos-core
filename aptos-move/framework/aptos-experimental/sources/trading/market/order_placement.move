@@ -70,7 +70,8 @@ module aptos_experimental::order_placement {
     use aptos_experimental::market_types::{
         Self,
         MarketClearinghouseCallbacks,
-        Market, CallbackResult, new_callback_result_not_available, emit_event_for_bulk_order_modified,
+        Market, CallbackResult, new_callback_result_not_available,
+        is_validation_result_valid,
     };
 
     // Error codes
@@ -732,6 +733,7 @@ module aptos_experimental::order_placement {
         let is_taker_order =
             market.get_order_book().is_taker_order(limit_price, is_bid, trigger_condition);
 
+        let callback_results = vector::empty();
         if (emit_taker_order_open && trigger_condition.is_none()) {
             // We don't emit order open events for orders with trigger conditions as they are not
             // actually placed in the order book until they are triggered.
@@ -754,20 +756,20 @@ module aptos_experimental::order_placement {
             );
         };
 
-        if (
-            !callbacks.validate_order_placement(
-                new_clearinghouse_order_info(
-                    user_addr,
-                    order_id,
-                    client_order_id,
-                    is_bid,
-                    limit_price,
-                    time_in_force,
-                    metadata
-                ),
-                is_taker_order, // is_taker
-                remaining_size,
-            )) {
+        let validation_result = callbacks.validate_order_placement(
+            new_clearinghouse_order_info(
+                user_addr,
+                order_id,
+                client_order_id,
+                is_bid,
+                limit_price,
+                time_in_force,
+                metadata
+            ),
+            is_taker_order, // is_taker
+            remaining_size,
+        );
+        if (!is_validation_result_valid(&validation_result)) {
             return cancel_single_order_internal(
                 market,
                 user_addr,
@@ -785,8 +787,13 @@ module aptos_experimental::order_placement {
                 metadata,
                 time_in_force,
                 callbacks,
-                vector[]
+                vector[],
             );
+        };
+
+        let validation_actions = validation_result.get_validation_actions();
+        if (validation_actions.is_some()) {
+            callback_results.push_back(validation_actions.destroy_some());
         };
 
         if (client_order_id.is_some()) {
@@ -886,7 +893,6 @@ module aptos_experimental::order_placement {
         };
         let fill_sizes = vector::empty();
         let match_count = 0;
-        let callback_results = vector::empty();
         loop {
             match_count += 1;
             let (taker_cancellation_reason, callback_result) =
