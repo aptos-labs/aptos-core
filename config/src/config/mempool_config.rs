@@ -54,6 +54,8 @@ pub struct MempoolConfig {
     pub max_broadcasts_per_peer: usize,
     /// Maximum number of inbound network messages to the Mempool application
     pub max_network_channel_size: usize,
+    /// The maximum amount of time a node can be out of sync before being considered unhealthy
+    pub max_sync_lag_before_unhealthy_secs: usize,
     /// The interval to take a snapshot of the mempool to logs, only used when trace logging is enabled
     pub mempool_snapshot_interval_secs: u64,
     /// The maximum amount of time to wait for an ACK of Mempool submission to an upstream node.
@@ -114,6 +116,7 @@ impl Default for MempoolConfig {
             shared_mempool_ack_timeout_ms: 2_000,
             shared_mempool_max_concurrent_inbound_syncs: 4,
             max_broadcasts_per_peer: 20,
+            max_sync_lag_before_unhealthy_secs: 300, // 5 minutes
             max_network_channel_size: 1024,
             mempool_snapshot_interval_secs: 180,
             capacity: 2_000_000,

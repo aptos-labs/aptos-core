@@ -2,14 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    accounts::account_recovery_db::AccountRecoveryDBInterface,
+    accounts::{
+        account_managers::AccountRecoveryManagers, account_recovery_db::AccountRecoveryDBInterface,
+    },
     dedicated_handlers::pepper_request::handle_pepper_request,
     error::PepperServiceError,
     external_resources::{jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_keyless_pepper_common::{
-    PepperRequest, PepperResponse, SignatureResponse, VerifyRequest, VerifyResponse,
+    PepperRequest, PepperRequestV2, PepperRequestWithAudOverride, PepperResponse,
+    SignatureResponse, VerifyRequest, VerifyResponse,
 };
 use aptos_types::{
     jwks::rsa::RSA_JWK,
@@ -41,8 +44,62 @@ pub trait HandlerTrait<TRequest, TResponse>: Send + Sync {
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: TRequest,
+        account_recovery_managers: Arc<AccountRecoveryManagers>,
         account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
     ) -> Result<TResponse, PepperServiceError>;
+}
+
+/// A handler for processing pepper fetch requests
+pub struct V0DelegatedFetchHandler;
+
+#[async_trait]
+impl HandlerTrait<PepperRequestV2, PepperResponse> for V0DelegatedFetchHandler {
+    async fn handle_request(
+        &self,
+        vuf_private_key: &ark_bls12_381::Fr,
+        jwk_cache: JWKCache,
+        cached_resources: CachedResources,
+        request: PepperRequestV2,
+        account_recovery_managers: Arc<AccountRecoveryManagers>,
+        account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
+    ) -> Result<PepperResponse, PepperServiceError> {
+        // Parse the request
+        let PepperRequestWithAudOverride {
+            aud_override,
+            pepper_request,
+        } = request.get_request_with_aud_override();
+        let PepperRequest {
+            jwt,
+            epk,
+            exp_date_secs,
+            epk_blinder,
+            uid_key,
+            derivation_path,
+        } = pepper_request;
+
+        // Fetch the pepper
+        let (_pepper_base, pepper, address) = handle_pepper_request(
+            vuf_private_key,
+            jwk_cache,
+            cached_resources,
+            jwt,
+            epk,
+            exp_date_secs,
+            epk_blinder,
+            uid_key,
+            derivation_path,
+            account_recovery_managers,
+            Some(aud_override),
+            account_recovery_db,
+        )
+        .await?;
+
+        // Return the pepper response
+        Ok(PepperResponse {
+            pepper,
+            address: address.to_vec(),
+        })
+    }
 }
 
 /// A handler for processing pepper fetch requests
@@ -56,6 +113,7 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: PepperRequest,
+        account_recovery_managers: Arc<AccountRecoveryManagers>,
         account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
     ) -> Result<PepperResponse, PepperServiceError> {
         // Parse the request
@@ -79,6 +137,7 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
             epk_blinder,
             uid_key,
             derivation_path,
+            account_recovery_managers,
             None,
             account_recovery_db,
         )
@@ -103,6 +162,7 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: PepperRequest,
+        account_recovery_managers: Arc<AccountRecoveryManagers>,
         account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
     ) -> Result<SignatureResponse, PepperServiceError> {
         // Parse the request
@@ -126,6 +186,7 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
             epk_blinder,
             uid_key,
             derivation_path,
+            account_recovery_managers,
             None,
             account_recovery_db,
         )
@@ -150,6 +211,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: VerifyRequest,
+        _account_recovery_managers: Arc<AccountRecoveryManagers>,
         _account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
     ) -> Result<VerifyResponse, PepperServiceError> {
         // Parse the request

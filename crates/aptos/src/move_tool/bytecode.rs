@@ -121,6 +121,10 @@ pub struct BytecodeCommand {
     /// only print out the metadata and bytecode version of the target bytecode
     #[clap(long)]
     pub print_metadata_only: bool,
+
+    /// print out module size in kb and number of instructions in each function
+    #[clap(long, num_args = 0.., value_delimiter = ',', default_missing_value = "", require_equals = false, hide(true))]
+    pub print_code_size: Option<Vec<String>>,
 }
 
 /// Allows to ensure that either one of both is selected (via  the `group` attribute).
@@ -221,12 +225,23 @@ impl BytecodeCommand {
                 )));
             }
 
+            let print_code_bool = self.print_code_size.as_ref().is_some_and(|v| {
+                (v.len() == 1 && v[0].is_empty())
+                    || v.contains(
+                        &bytecode_path
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string(),
+                    )
+            });
+
             let (output, extension) = match (command_type, version) {
                 (
                     BytecodeCommandType::Disassemble,
                     BinaryCommandVersion::DisassemblerVersion(DisassemblerVersion::V1),
                 ) => (
-                    self.disassemble(bytecode_path, DisassemblerVersion::V1)?,
+                    self.disassemble(bytecode_path, DisassemblerVersion::V1, print_code_bool)?,
                     DISASSEMBLER_EXTENSION_V1,
                 ),
 
@@ -234,7 +249,7 @@ impl BytecodeCommand {
                     BytecodeCommandType::Disassemble,
                     BinaryCommandVersion::DisassemblerVersion(DisassemblerVersion::V2),
                 ) => (
-                    self.disassemble(bytecode_path, DisassemblerVersion::V2)?,
+                    self.disassemble(bytecode_path, DisassemblerVersion::V2, print_code_bool)?,
                     DISASSEMBLER_EXTENSION_V2,
                 ),
 
@@ -330,15 +345,30 @@ impl BytecodeCommand {
         &self,
         bytecode_path: &Path,
         version: DisassemblerVersion,
+        print_code_size: bool,
     ) -> Result<String, CliError> {
         match version {
-            DisassemblerVersion::V1 => self.disassemble_v1(bytecode_path),
-            DisassemblerVersion::V2 => self.disassemble_v2(bytecode_path),
+            DisassemblerVersion::V1 => self.disassemble_v1(bytecode_path, print_code_size),
+            DisassemblerVersion::V2 => self.disassemble_v2(bytecode_path, print_code_size),
         }
     }
 
-    fn disassemble_v1(&self, bytecode_path: &Path) -> Result<String, CliError> {
+    fn disassemble_v1(
+        &self,
+        bytecode_path: &Path,
+        print_code_size: bool,
+    ) -> Result<String, CliError> {
         let bytecode_bytes = read_from_file(bytecode_path)?;
+        if print_code_size {
+            println!(
+                "Code size of module {} is: {} kbs",
+                bytecode_path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy(),
+                bytecode_bytes.len() / 1024
+            );
+        }
 
         let source = {
             let move_path = bytecode_path.with_extension(MOVE_EXTENSION);
@@ -382,7 +412,8 @@ impl BytecodeCommand {
             only_externally_visible: false,
             print_basic_blocks: true,
             print_locals: true,
-            print_bytecode_stats: false,
+            print_bytecode_stats: print_code_size,
+            print_code_size,
         };
         let no_loc = Spanned::unsafe_no_loc(()).loc;
         let module: CompiledModule;
@@ -429,8 +460,22 @@ impl BytecodeCommand {
             .map_err(|err| CliError::UnexpectedError(format!("Unable to disassemble: {}", err)))
     }
 
-    fn disassemble_v2(&self, bytecode_path: &Path) -> Result<String, CliError> {
+    fn disassemble_v2(
+        &self,
+        bytecode_path: &Path,
+        print_code_size: bool,
+    ) -> Result<String, CliError> {
         let bytecode_bytes = read_from_file(bytecode_path)?;
+        if print_code_size {
+            println!(
+                "Code size of module {} is: {} kbs",
+                bytecode_path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy(),
+                bytecode_bytes.len() / 1024
+            );
+        }
         if self.is_script {
             let script = CompiledScript::deserialize(&bytecode_bytes).context(format!(
                 "Script blob at {} can't be deserialized",
@@ -448,6 +493,7 @@ impl BytecodeCommand {
             Ok(move_asm::disassembler::disassemble_module(
                 String::new(),
                 &module,
+                print_code_size,
             )?)
         }
     }
