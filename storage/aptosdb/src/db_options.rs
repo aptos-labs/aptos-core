@@ -170,9 +170,8 @@ where
         rocksdb_config.pin_l0_filter_and_index_blocks_in_cache,
     );
     table_options.set_block_size(rocksdb_config.block_size as usize);
-    if let Some(cache) = block_cache {
-        table_options.set_block_cache(cache);
-    }
+    let cache = Cache::new_lru_cache(8 * (1 << 20));
+    table_options.set_block_cache(&cache);
 
     let mut cfds = Vec::with_capacity(cfs.len());
     for cf_name in cfs {

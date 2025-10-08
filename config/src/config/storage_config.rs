@@ -162,10 +162,10 @@ impl Default for RocksdbConfig {
             // This includes threads for flashing and compaction. Rocksdb will decide the # of
             // threads to use internally.
             max_background_jobs: 16,
-            block_cache_size: Self::DEFAULT_BLOCK_CACHE_SIZE,
+            block_cache_size: 8 * (1 << 20),
             block_size: Self::DEFAULT_BLOCK_SIZE,
             // Count index/filter blocks in block cache usage by default.
-            cache_index_and_filter_blocks: true,
+            cache_index_and_filter_blocks: false,
             // L0 index/filter blocks are usually small and used frequently.
             pin_l0_filter_and_index_blocks_in_cache: true,
             // Enable but use a less detailed option by default since there might be some overhead.
