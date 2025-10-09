@@ -96,19 +96,20 @@ impl VMError {
             location,
             message,
             mut offsets,
-            ..
+            exec_state,
+            indices,
         } = *self.0;
-        match (major_status, sub_status, location) {
+        match (major_status, sub_status, location.clone()) {
             (StatusCode::EXECUTED, sub_status, _) => {
                 debug_assert!(sub_status.is_none());
                 VMStatus::Executed
             },
             (StatusCode::ABORTED, Some(code), Location::Script) => {
-                assert_ne!(code, 25863);
+                assert_ne!(code, 25863, "{:?}\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}", major_status, sub_status, location, message, offsets, exec_state, indices);
                 VMStatus::MoveAbort(vm_status::AbortLocation::Script, code)
             },
             (StatusCode::ABORTED, Some(code), Location::Module(id)) => {
-                assert_ne!(code, 25863);
+                assert_ne!(code, 25863, "{:?}\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}", major_status, sub_status, location, message, offsets, exec_state, indices);
                 VMStatus::MoveAbort(vm_status::AbortLocation::Module(id), code)
             },
 

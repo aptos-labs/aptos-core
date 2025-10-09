@@ -177,6 +177,7 @@ Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow">borrow</a>&lt;K: <b>copy</b> + drop, V&gt;(self: &<a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K): &V {
+    <b>assert</b>!(self.<a href="table.md#0x1_table_contains">contains</a>(key), 55);
     &<a href="table.md#0x1_table_borrow_box">borrow_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key).val
 }
 </code></pre>
@@ -203,6 +204,7 @@ Returns specified default value if there is no entry for <code>key</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_with_default">borrow_with_default</a>&lt;K: <b>copy</b> + drop, V&gt;(self: &<a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K, default: &V): &V {
+    <b>assert</b>!(self.<a href="table.md#0x1_table_contains">contains</a>(key), 56);
     <b>if</b> (!self.<a href="table.md#0x1_table_contains">contains</a>(<b>copy</b> key)) {
         default
     } <b>else</b> {
@@ -233,6 +235,7 @@ Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b> + drop, V&gt;(self: &<b>mut</b> <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K): &<b>mut</b> V {
+    <b>assert</b>!(self.<a href="table.md#0x1_table_contains">contains</a>(key), 57);
     &<b>mut</b> <a href="table.md#0x1_table_borrow_box_mut">borrow_box_mut</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key).val
 }
 </code></pre>
@@ -319,6 +322,7 @@ Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_remove">remove</a>&lt;K: <b>copy</b> + drop, V&gt;(self: &<b>mut</b> <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K): V {
+    <b>assert</b>!(self.<a href="table.md#0x1_table_contains">contains</a>(key), 58);
     <b>let</b> <a href="table.md#0x1_table_Box">Box</a> { val } = <a href="table.md#0x1_table_remove_box">remove_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key);
     val
 }
@@ -561,6 +565,15 @@ and can be used only in modules that know by themselves that table is empty.
 ## Specification
 
 
+
+<a id="0x1_table_spec_get"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_get">spec_get</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): V;
+</code></pre>
+
+
+
 <a id="@Specification_0_Table"></a>
 
 ### Struct `Table`
@@ -768,15 +781,6 @@ and can be used only in modules that know by themselves that table is empty.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_set">spec_set</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K, v: V): <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;;
-</code></pre>
-
-
-
-
-<a id="0x1_table_spec_get"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_get">spec_get</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): V;
 </code></pre>
 
 

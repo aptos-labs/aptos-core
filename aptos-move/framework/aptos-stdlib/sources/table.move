@@ -31,12 +31,14 @@ module aptos_std::table {
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun borrow<K: copy + drop, V>(self: &Table<K, V>, key: K): &V {
+        assert!(self.contains(key), 55);
         &borrow_box<K, V, Box<V>>(self, key).val
     }
 
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Returns specified default value if there is no entry for `key`.
     public fun borrow_with_default<K: copy + drop, V>(self: &Table<K, V>, key: K, default: &V): &V {
+        assert!(self.contains(key), 56);
         if (!self.contains(copy key)) {
             default
         } else {
@@ -47,6 +49,7 @@ module aptos_std::table {
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun borrow_mut<K: copy + drop, V>(self: &mut Table<K, V>, key: K): &mut V {
+        assert!(self.contains(key), 57);
         &mut borrow_box_mut<K, V, Box<V>>(self, key).val
     }
 
@@ -73,6 +76,7 @@ module aptos_std::table {
     /// Remove from `self` and return the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun remove<K: copy + drop, V>(self: &mut Table<K, V>, key: K): V {
+        assert!(self.contains(key), 58);
         let Box { val } = remove_box<K, V, Box<V>>(self, key);
         val
     }
