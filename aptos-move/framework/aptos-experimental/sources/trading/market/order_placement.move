@@ -71,7 +71,7 @@ module aptos_experimental::order_placement {
         Self,
         MarketClearinghouseCallbacks,
         Market, CallbackResult, new_callback_result_not_available,
-        is_validation_result_valid, get_validation_cancellation_reason,
+        is_validation_result_valid,
     };
 
     // Error codes
@@ -428,6 +428,7 @@ module aptos_experimental::order_placement {
         );
     }
 
+    #[lint::skip(needless_mutable_reference)]
     fun cancel_single_order_internal<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user_addr: address,

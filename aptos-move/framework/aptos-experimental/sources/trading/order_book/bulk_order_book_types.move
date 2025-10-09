@@ -334,16 +334,16 @@ module aptos_experimental::bulk_order_book_types {
         i // Return the index of the first non-crossing level
     }
 
-
-    /// Creates a new single bulk order match result.
-    ///
-    /// # Arguments:
-    /// - `order`: Reference to the bulk order being matched
-    /// - `is_bid`: True if matching against bid side, false for ask side
-    /// - `matched_size`: Size that was matched in this operation
-    ///
-    /// # Returns:
-    /// A `SingleBulkOrderMatch` containing the match details.
+    #[lint::skip(needless_mutable_reference)]
+    // Creates a new single bulk order match result.
+    //
+    // Arguments:
+    // - order: Reference to the bulk order being matched
+    // - is_bid: True if matching against bid side, false for ask side
+    // - matched_size: Size that was matched in this operation
+    //
+    // Returns:
+    // A `SingleBulkOrderMatch` containing the match details.
     public(friend) fun new_bulk_order_match<M: store + copy + drop>(
         order: &mut BulkOrder<M>,
         is_bid: bool,

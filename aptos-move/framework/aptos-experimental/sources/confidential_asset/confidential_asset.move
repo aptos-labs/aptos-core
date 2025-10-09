@@ -642,7 +642,7 @@ module aptos_experimental::confidential_asset {
             error::not_found(ECA_STORE_NOT_PUBLISHED)
         );
 
-        borrow_global_mut<ConfidentialAssetStore>(get_user_address(user, token)).ek
+        borrow_global<ConfidentialAssetStore>(get_user_address(user, token)).ek
     }
 
     #[view]
