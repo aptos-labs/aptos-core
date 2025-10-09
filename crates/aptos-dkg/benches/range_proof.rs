@@ -23,12 +23,12 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(c: &mut Criterion, cur
     let ell = std::env::var("L")
         .unwrap_or(std::env::var("ELL").unwrap_or_default())
         .parse::<usize>()
-        .unwrap_or(48);
+        .unwrap_or(2); // 48
 
     let n = std::env::var("N")
         .unwrap_or_default()
         .parse::<usize>()
-        .unwrap_or(2048 - 1);
+        .unwrap_or(1); // 2048 - 1
 
     group.bench_function(format!("prove/ell={ell}/n={n}").as_str(), move |b| {
         b.iter_with_setup(

@@ -116,22 +116,22 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let (_, ck_L) = univariate_hiding_kzg::setup(L, group.clone(), xi, tau, rng);
 
         let n_plus_1_inv = E::ScalarField::from((num_omegas) as u64).inverse().unwrap();
-        let mut omega_in_pows: Vec<E::ScalarField> = (1..=max_n + 1) // TODO: uh =??
-            .map(|i| ck_S.roots_of_unity_in_eval_dom[(i * max_n) % (max_n + 1)]) // safe modulo access
-            .collect();
+        // let mut omega_in_pows: Vec<E::ScalarField> = (1..=max_n + 1) // TODO: uh =??
+        //     .map(|i| ck_S.roots_of_unity_in_eval_dom[(i * max_n) % (max_n + 1)]) // safe modulo access
+        //     .collect();
 
-        // Batch invert them
-        ark_ff::batch_inversion(&mut omega_in_pows);
+        // // Batch invert them
+        // ark_ff::batch_inversion(&mut omega_in_pows);
 
         // Compute results
         let mut precomputed_stuff = Vec::with_capacity(max_n + 1);
-        for (i, omega_in_inv) in omega_in_pows.into_iter().enumerate() {
-            let i_plus_1 = i + 1;
-            let omega_i = ck_S.roots_of_unity_in_eval_dom[i_plus_1 % (max_n + 1)];
-            let numerator = omega_i - E::ScalarField::ONE;
-            let value = numerator * n_plus_1_inv * omega_in_inv;
-            precomputed_stuff.push(value);
-        }
+        // for (i, omega_in_inv) in omega_in_pows.into_iter().enumerate() {
+        //     let i_plus_1 = i + 1;
+        //     let omega_i = ck_S.roots_of_unity_in_eval_dom[i_plus_1 % (max_n + 1)];
+        //     let numerator = omega_i - E::ScalarField::ONE;
+        //     let value = numerator * n_plus_1_inv * omega_in_inv;
+        //     precomputed_stuff.push(value);
+        // }
 
         let vk = VerificationKey {
             b: 2,
@@ -367,36 +367,66 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let N_prime: Vec<Vec<E::ScalarField>> = diff_f_js_evals
             .iter()
             .zip(f_j_evals.iter())
-            .map(|(diff_row, hat_row)| {
-                diff_row
+            .map(|(diff_f_j, f_j)| {
+                diff_f_j
                     .iter()
-                    .zip(hat_row.iter())
-                    .map(|(&diff, &hat)| diff * (E::ScalarField::from(2u64) * hat - E::ScalarField::ONE))
+                    .zip(f_j.iter())
+                    .map(|(&diff_f_j_i, &f_j_i)| diff_f_j_i * (E::ScalarField::from(2u64) * f_j_i - E::ScalarField::ONE))
                     .collect()
             })
             .collect();
 
-        let h_evals: Vec<E::ScalarField> = (0..diff_hat_f_evals.len())
+        // let h_evals: Vec<E::ScalarField> = (0..num_omegas)
+        //     .map(|i| {
+        //         // First term: beta * diff_hat_f_evals[i]
+        //         let mut val = beta * diff_hat_f_evals[i];
+
+        //         // Second term: -beta * sum_j 2^j * f_j_evals[j][i]
+        //         let sum1: E::ScalarField = f_j_evals
+        //             .iter()
+        //             .enumerate()
+        //             .map(|(j, row)| {
+        //                 let pow2 = E::ScalarField::from(1u64 << j); // 2^j
+        //                 pow2 * row[i]
+        //             })
+        //             .sum();
+        //         val -= beta * sum1;
+
+        //         // Third term: sum_j betas[j] * N_prime[j][i]
+        //         let sum2: E::ScalarField = N_prime
+        //             .iter()
+        //             .enumerate()
+        //             .map(|(j, row)| betas[j] * row[i])
+        //             .sum();
+        //         val += sum2;
+
+        //         // Divide by denoms[i]
+        //         val / denom[i]
+        //     })
+        //     .collect();
+
+        let h_evals: Vec<E::ScalarField> = (0..num_omegas)
             .map(|i| {
                 // First term: beta * diff_hat_f_evals[i]
-                let mut val = beta * diff_hat_f_evals[i];
+                let mut val = diff_hat_f_evals[i];
 
                 // Second term: -beta * sum_j 2^j * f_j_evals[j][i]
-                let sum1: E::ScalarField = f_j_evals
+                let sum1: E::ScalarField = diff_f_js_evals
                     .iter()
                     .enumerate()
-                    .map(|(j, row)| {
+                    .map(|(j, diff_f_j)| {
                         let pow2 = E::ScalarField::from(1u64 << j); // 2^j
-                        pow2 * row[i]
+                        pow2 * diff_f_j[i]
                     })
                     .sum();
-                val -= beta * sum1;
+                val -= sum1;
+                val *= beta;
 
                 // Third term: sum_j betas[j] * N_prime[j][i]
                 let sum2: E::ScalarField = N_prime
                     .iter()
                     .enumerate()
-                    .map(|(j, row)| betas[j] * row[i])
+                    .map(|(j, N_j_prime)| betas[j] * N_j_prime[i])
                     .sum();
                 val += sum2;
 
