@@ -1,0 +1,118 @@
+processed 18 tasks
+task 0 lines 1-13:  run --verbose [script {]
+task 1 lines 15-20:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Addition overflow,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 2 lines 22-27:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Addition overflow,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 3 lines 29-38:  run --verbose [script {]
+task 4 lines 40-46:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Subtraction overflow,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 5 lines 48-54:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Subtraction overflow,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 6 lines 56-66:  run --verbose [script {]
+task 7 lines 68-74:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Multiplication overflow,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 8 lines 76-82:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Multiplication overflow,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 9 lines 84-93:  run --verbose [script {]
+task 10 lines 95-101:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Division by zero,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 11 lines 103-109:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Division overflow,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 12 lines 111-118:  run --verbose [script {]
+task 13 lines 120-126:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Integer remainder by zero,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 14 lines 128-134:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Integer remainder by zero,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 15 lines 136-149:  publish [module 0xff::negate_i256 {]
+task 16 lines 151-151:  run 0xff::negate_i256::test1 --verbose
+task 17 lines 153-153:  run 0xff::negate_i256::test2 --verbose
+Error: Function execution failed with VMError: {
+    message: Integer negation overflow,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0xff::negate_i256,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
