@@ -71,7 +71,7 @@ module aptos_experimental::order_placement {
         Self,
         MarketClearinghouseCallbacks,
         Market, CallbackResult, new_callback_result_not_available,
-        is_validation_result_valid,
+        is_validation_result_valid, get_validation_cancellation_reason,
     };
 
     // Error codes
@@ -783,7 +783,7 @@ module aptos_experimental::order_placement {
                 is_bid,
                 is_taker_order, // is_taker
                 OrderCancellationReason::PositionUpdateViolation,
-                std::string::utf8(b"Position Update violation"),
+                validation_result.get_validation_cancellation_reason().destroy_some(),
                 metadata,
                 time_in_force,
                 callbacks,
