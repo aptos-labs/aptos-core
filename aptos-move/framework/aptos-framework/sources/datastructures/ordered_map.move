@@ -17,11 +17,15 @@
 /// Uses cmp::compare for ordering, which compares primitive types natively, and uses common
 /// lexicographical sorting for complex types.
 ///
-/// All iterator functions need to be carefully used, because they are just pointers into the
+/// Warning: All iterator functions need to be carefully used, because they are just pointers into the
 /// structure, and modification of the map invalidates them (without compiler being able to catch it).
 /// Type is also named IteratorPtr, so that Iterator is free to use later.
 /// Better guarantees would need future Move improvements that will allow references to be part of the struct,
 /// allowing cleaner iterator APIs.
+///
+/// That's why all functions returning iterators are prefixed with "internal_", to clarify nuances needed to make
+/// sure usage is correct.
+/// A set of inline utility methods is provided instead, to provide guaranteed valid usage to iterators.
 module aptos_std::ordered_map {
     friend aptos_std::big_ordered_map;
 
@@ -146,15 +150,15 @@ module aptos_std::ordered_map {
 
     /// Returns whether map contains a given key.
     public fun contains<K, V>(self: &OrderedMap<K, V>, key: &K): bool {
-        !self.find(key).iter_is_end(self)
+        !self.internal_find(key).iter_is_end(self)
     }
 
     public fun borrow<K, V>(self: &OrderedMap<K, V>, key: &K): &V {
-        self.find(key).iter_borrow(self)
+        self.internal_find(key).iter_borrow(self)
     }
 
     public fun borrow_mut<K, V>(self: &mut OrderedMap<K, V>, key: &K): &mut V {
-        self.find(key).iter_borrow_mut(self)
+        self.internal_find(key).iter_borrow_mut(self)
     }
 
     /// Changes the key, while keeping the same value attached to it
@@ -317,7 +321,7 @@ module aptos_std::ordered_map {
     }
 
     public fun prev_key<K: copy, V>(self: &OrderedMap<K, V>, key: &K): Option<K> {
-        let it = self.lower_bound(key);
+        let it = self.internal_lower_bound(key);
         if (it.iter_is_begin(self)) {
             option::none()
         } else {
@@ -326,7 +330,7 @@ module aptos_std::ordered_map {
     }
 
     public fun next_key<K: copy, V>(self: &OrderedMap<K, V>, key: &K): Option<K> {
-        let it = self.lower_bound(key);
+        let it = self.internal_lower_bound(key);
         if (it.iter_is_end(self)) {
             option::none()
         } else {
@@ -346,36 +350,46 @@ module aptos_std::ordered_map {
 
     // TODO: see if it is more understandable if iterator points between elements,
     // and there is iter_borrow_next and iter_borrow_prev, and provide iter_insert.
+    // This is called "cursor" in rust instead.
 
+    /// Warning: Marked as internal, as it is safer to utilize provided inline functions instead.
+    /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
+    ///
     /// Returns an iterator pointing to the first element that is greater or equal to the provided
     /// key, or an end iterator if such element doesn't exist.
-    public fun lower_bound<K, V>(self: &OrderedMap<K, V>, key: &K): IteratorPtr {
+    public fun internal_lower_bound<K, V>(self: &OrderedMap<K, V>, key: &K): IteratorPtr {
         let entries = &self.entries;
         let len = entries.length();
 
         let index = binary_search(key, entries, 0, len);
         if (index == len) {
-            self.new_end_iter()
+            self.internal_new_end_iter()
         } else {
             new_iter(index)
         }
     }
 
+    /// Warning: Marked as internal, as it is safer to utilize provided inline functions instead.
+    /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
+    ///
     /// Returns an iterator pointing to the element that equals to the provided key, or an end
     /// iterator if the key is not found.
-    public fun find<K, V>(self: &OrderedMap<K, V>, key: &K): IteratorPtr {
-        let lower_bound = self.lower_bound(key);
-        if (lower_bound.iter_is_end(self)) {
-            lower_bound
-        } else if (lower_bound.iter_borrow_key(self) == key) {
-            lower_bound
+    public fun internal_find<K, V>(self: &OrderedMap<K, V>, key: &K): IteratorPtr {
+        let internal_lower_bound = self.internal_lower_bound(key);
+        if (internal_lower_bound.iter_is_end(self)) {
+            internal_lower_bound
+        } else if (internal_lower_bound.iter_borrow_key(self) == key) {
+            internal_lower_bound
         } else {
-            self.new_end_iter()
+            self.internal_new_end_iter()
         }
     }
 
+    /// Warning: Marked as internal, as it is safer to utilize provided inline functions instead.
+    /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
+    ///
     /// Returns the begin iterator.
-    public fun new_begin_iter<K, V>(self: &OrderedMap<K, V>): IteratorPtr {
+    public fun internal_new_begin_iter<K, V>(self: &OrderedMap<K, V>): IteratorPtr {
         if (self.is_empty()) {
             return IteratorPtr::End;
         };
@@ -383,8 +397,11 @@ module aptos_std::ordered_map {
         new_iter(0)
     }
 
+    /// Warning: Marked as internal, as it is safer to utilize provided inline functions instead.
+    /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
+    ///
     /// Returns the end iterator.
-    public fun new_end_iter<K, V>(self: &OrderedMap<K, V>): IteratorPtr {
+    public fun internal_new_end_iter<K, V>(self: &OrderedMap<K, V>): IteratorPtr {
         IteratorPtr::End
     }
 
@@ -401,7 +418,7 @@ module aptos_std::ordered_map {
         if (index < map.entries.length()) {
             new_iter(index)
         } else {
-            map.new_end_iter()
+            map.internal_new_end_iter()
         }
     }
 
@@ -581,7 +598,7 @@ module aptos_std::ordered_map {
 
     /// Apply the function to a reference of each key-value pair in the map.
     public inline fun for_each_ref<K: copy + drop, V>(self: &OrderedMap<K, V>, f: |&K, &V|) {
-        let iter = self.new_begin_iter();
+        let iter = self.internal_new_begin_iter();
         while (!iter.iter_is_end(self)) {
             f(iter.iter_borrow_key(self), iter.iter_borrow(self));
             iter = iter.iter_next(self);
@@ -598,7 +615,7 @@ module aptos_std::ordered_map {
 
     /// Apply the function to a mutable reference of each key-value pair in the map.
     public inline fun for_each_mut<K: copy + drop, V>(self: &mut OrderedMap<K, V>, f: |&K, &mut V|) {
-        let iter = self.new_begin_iter();
+        let iter = self.internal_new_begin_iter();
         while (!iter.iter_is_end(self)) {
             let key = *iter.iter_borrow_key(self);
             f(&key, iter.iter_borrow_mut(self));
@@ -674,7 +691,7 @@ module aptos_std::ordered_map {
     fun validate_iteration<K: drop + copy + store, V: store>(self: &OrderedMap<K, V>) {
         let expected_num_elements = self.length();
         let num_elements = 0;
-        let it = self.new_begin_iter();
+        let it = self.internal_new_begin_iter();
         while (!it.iter_is_end(self)) {
             num_elements += 1;
             it = it.iter_next(self);
@@ -682,7 +699,7 @@ module aptos_std::ordered_map {
         assert!(num_elements == expected_num_elements, 2);
 
         let num_elements = 0;
-        let it = self.new_end_iter();
+        let it = self.internal_new_end_iter();
         while (!it.iter_is_begin(self)) {
             it = it.iter_prev(self);
             num_elements += 1;
@@ -1071,41 +1088,41 @@ module aptos_std::ordered_map {
     #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
     public fun test_iter_end_next_abort() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        map.new_end_iter().iter_next(&map);
+        map.internal_new_end_iter().iter_next(&map);
     }
 
     #[test]
     #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
     public fun test_iter_end_borrow_key_abort() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        map.new_end_iter().iter_borrow_key(&map);
+        map.internal_new_end_iter().iter_borrow_key(&map);
     }
 
     #[test]
     #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
     public fun test_iter_end_borrow_abort() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        map.new_end_iter().iter_borrow(&map);
+        map.internal_new_end_iter().iter_borrow(&map);
     }
 
     #[test]
     #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
     public fun test_iter_end_borrow_mut_abort() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        map.new_end_iter().iter_borrow_mut(&mut map);
+        map.internal_new_end_iter().iter_borrow_mut(&mut map);
     }
 
     #[test]
     #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
     public fun test_iter_begin_prev_abort() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        map.new_begin_iter().iter_prev(&map);
+        map.internal_new_begin_iter().iter_prev(&map);
     }
 
     #[test]
     public fun test_iter_is_begin_from_non_empty() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        let iter = map.new_begin_iter();
+        let iter = map.internal_new_begin_iter();
         assert!(iter.iter_is_begin(&map), 1);
         assert!(iter.iter_is_begin_from_non_empty(), 1);
 
@@ -1114,7 +1131,7 @@ module aptos_std::ordered_map {
         assert!(!iter.iter_is_begin_from_non_empty(), 1);
 
         let map = new<u64, u64>();
-        let iter = map.new_begin_iter();
+        let iter = map.internal_new_begin_iter();
         assert!(iter.iter_is_begin(&map), 1);
         assert!(!iter.iter_is_begin_from_non_empty(), 1);
     }
@@ -1122,7 +1139,7 @@ module aptos_std::ordered_map {
     #[test]
     public fun test_iter_remove() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        map.new_begin_iter().iter_next(&map).iter_remove(&mut map);
+        map.internal_new_begin_iter().iter_next(&map).iter_remove(&mut map);
         assert!(map == new_from(vector[1, 5], vector[10, 50]), 1);
     }
 
@@ -1130,13 +1147,13 @@ module aptos_std::ordered_map {
     #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
         public fun test_iter_remove_abort() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        map.new_end_iter().iter_remove(&mut map);
+        map.internal_new_end_iter().iter_remove(&mut map);
     }
 
     #[test]
     public fun test_iter_replace() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        map.new_begin_iter().iter_next(&map).iter_replace(&mut map, 35);
+        map.internal_new_begin_iter().iter_next(&map).iter_replace(&mut map, 35);
         assert!(map == new_from(vector[1, 3, 5], vector[10, 35, 50]), 1);
     }
 
@@ -1144,29 +1161,29 @@ module aptos_std::ordered_map {
     #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
         public fun test_iter_replace_abort() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        map.new_end_iter().iter_replace(&mut map, 35);
+        map.internal_new_end_iter().iter_replace(&mut map, 35);
     }
 
     #[test]
     public fun test_iter_add() {
         {
             let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-            map.new_begin_iter().iter_add(&mut map, 0, 5);
+            map.internal_new_begin_iter().iter_add(&mut map, 0, 5);
             assert!(map == new_from(vector[0, 1, 3, 5], vector[5, 10, 30, 50]), 1);
         };
         {
             let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-            map.new_begin_iter().iter_next(&map).iter_add(&mut map, 2, 20);
+            map.internal_new_begin_iter().iter_next(&map).iter_add(&mut map, 2, 20);
             assert!(map == new_from(vector[1, 2, 3, 5], vector[10, 20, 30, 50]), 2);
         };
         {
             let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-            map.new_end_iter().iter_add(&mut map, 6, 60);
+            map.internal_new_end_iter().iter_add(&mut map, 6, 60);
             assert!(map == new_from(vector[1, 3, 5, 6], vector[10, 30, 50, 60]), 3);
         };
         {
             let map = new();
-            map.new_end_iter().iter_add(&mut map, 1, 10);
+            map.internal_new_end_iter().iter_add(&mut map, 1, 10);
             assert!(map == new_from(vector[1], vector[10]), 4);
         };
     }
@@ -1175,28 +1192,28 @@ module aptos_std::ordered_map {
     #[expected_failure(abort_code = 0x10004, location = Self)] /// ENEW_KEY_NOT_IN_ORDER
     public fun test_iter_add_abort_1() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        map.new_begin_iter().iter_add(&mut map, 1, 5);
+        map.internal_new_begin_iter().iter_add(&mut map, 1, 5);
     }
 
     #[test]
     #[expected_failure(abort_code = 0x10004, location = Self)] /// ENEW_KEY_NOT_IN_ORDER
     public fun test_iter_add_abort_2() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        map.new_end_iter().iter_add(&mut map, 5, 55);
+        map.internal_new_end_iter().iter_add(&mut map, 5, 55);
     }
 
     #[test]
     #[expected_failure(abort_code = 0x10004, location = Self)] /// ENEW_KEY_NOT_IN_ORDER
     public fun test_iter_add_abort_3() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        map.new_begin_iter().iter_next(&map).iter_add(&mut map, 1, 15);
+        map.internal_new_begin_iter().iter_next(&map).iter_add(&mut map, 1, 15);
     }
 
     #[test]
     #[expected_failure(abort_code = 0x10004, location = Self)] /// ENEW_KEY_NOT_IN_ORDER
     public fun test_iter_add_abort_4() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
-        map.new_begin_iter().iter_next(&map).iter_add(&mut map, 3, 25);
+        map.internal_new_begin_iter().iter_next(&map).iter_add(&mut map, 3, 25);
     }
 
     #[test]
@@ -1257,12 +1274,12 @@ module aptos_std::ordered_map {
 
         for (i in 0..len) {
             let element = shuffled_data.borrow(i);
-            let it = map.find(element);
+            let it = map.internal_find(element);
             assert!(!it.iter_is_end(&map), 6);
             assert!(it.iter_borrow_key(&map) == element, 7);
 
             let it_next = it.iter_next(&map);
-            let it_after = map.lower_bound(&(*element + 1));
+            let it_after = map.internal_lower_bound(&(*element + 1));
 
             assert!(it_next == it_after, 8);
         };
