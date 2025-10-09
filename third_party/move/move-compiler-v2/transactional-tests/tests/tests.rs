@@ -176,6 +176,8 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/fv_as_keys.move",
     // needed until bug #17615 is fixed
     "misc/bug_14817_extended.move",
+    // run in verbose mode to unveil the exact error messages
+    "/signed-int/",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {
