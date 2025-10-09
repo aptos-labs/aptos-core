@@ -1,2 +1,2 @@
-#[cfg(feature = "consensus_fuzzer")]
+#[cfg(feature = "consensus-fuzzer")]
 pub mod rapture_hook;
