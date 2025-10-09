@@ -56,6 +56,7 @@ impl StateKvDb {
         rocksdb_configs: RocksdbConfigs,
         readonly: bool,
         ledger_db: Arc<DB>,
+        block_cache: Option<&Cache>,
     ) -> Result<Self> {
         let sharding = rocksdb_configs.enable_storage_sharding;
         if !sharding {
@@ -68,14 +69,10 @@ impl StateKvDb {
             });
         }
 
-        let block_cache = Cache::new_hyper_clock_cache(
-            rocksdb_configs.state_kv_db_config.block_cache_size as usize,
-            /* estimated_entry_charge = */ 0,
-        );
         Self::open_sharded(
             db_paths,
             rocksdb_configs.state_kv_db_config,
-            Some(&block_cache),
+            block_cache,
             readonly,
         )
     }
