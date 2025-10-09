@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-#![cfg_attr(not(feature = "consensus_fuzzer"), forbid(unsafe_code))]
+#![cfg_attr(not(feature = "consensus-fuzzer"), forbid(unsafe_code))]
 
 //! Consensus for the Aptos Core blockchain
 //!
@@ -24,13 +24,13 @@ mod epoch_manager;
 mod error;
 mod liveness;
 mod logging;
-#[cfg(not(feature = "consensus_fuzzer"))]
+#[cfg(not(feature = "consensus-fuzzer"))]
 mod metrics_safety_rules;
-#[cfg(not(feature = "consensus_fuzzer"))]
+#[cfg(not(feature = "consensus-fuzzer"))]
 mod network;
-#[cfg(feature = "consensus_fuzzer")]
+#[cfg(feature = "consensus-fuzzer")]
 pub mod metrics_safety_rules;
-#[cfg(feature = "consensus_fuzzer")]
+#[cfg(feature = "consensus-fuzzer")]
 pub mod network;
 #[cfg(test)]
 mod network_tests;
@@ -42,11 +42,11 @@ mod pending_votes_test;
 pub mod persistent_liveness_storage;
 mod pipeline;
 pub mod quorum_store;
-#[cfg(not(feature = "consensus_fuzzer"))]
+#[cfg(not(feature = "consensus-fuzzer"))]
 mod rand;
-#[cfg(feature = "consensus_fuzzer")]
+#[cfg(feature = "consensus-fuzzer")]
 pub mod rand;
-#[cfg(feature = "consensus_fuzzer")]
+#[cfg(feature = "consensus-fuzzer")]
 pub mod rapture_hook;
 mod recovery_manager;
 mod round_manager;

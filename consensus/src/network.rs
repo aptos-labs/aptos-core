@@ -63,8 +63,8 @@ use std::{
 use tokio::time::timeout;
 use cfg_if::cfg_if;
 
-#[cfg(feature = "consensus_fuzzer")]
-use crate::rapture_hook::consensus_msg_mutate;
+#[cfg(feature = "consensus-fuzzer")]
+use crate::rapture_hook::rapture_hook::consensus_msg_mutate;
 
 pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
@@ -372,7 +372,7 @@ impl NetworkSender {
             .with_label_values(&[msg.name()])
             .inc_by(other_validators.len() as u64);
         cfg_if! {
-            if #[cfg(feature = "consensus_fuzzer")] {
+            if #[cfg(feature = "consensus-fuzzer")] {
                 let mut fuzzing_msg = consensus_msg_mutate(msg.clone());
                 if let Err(err) = self
                     .consensus_network_client
