@@ -137,7 +137,6 @@ A set of inline utility methods is provided instead, to provide guaranteed valid
     -  [Function `internal_find`](#@Specification_1_internal_find)
     -  [Function `contains`](#@Specification_1_contains)
     -  [Function `borrow`](#@Specification_1_borrow)
-    -  [Function `get_and_map`](#@Specification_1_get_and_map)
     -  [Function `borrow_mut`](#@Specification_1_borrow_mut)
     -  [Function `borrow_front`](#@Specification_1_borrow_front)
     -  [Function `borrow_back`](#@Specification_1_borrow_back)
@@ -1633,7 +1632,7 @@ Returns a reference to the element with its key, aborts if the key is not found.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_get_and_map">get_and_map</a>&lt;K: drop + <b>copy</b> + store, V: <b>copy</b> + store, R&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K, f: |&V|R <b>has</b> drop): Option&lt;R&gt; {
+<pre><code><b>public</b> inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_get_and_map">get_and_map</a>&lt;K: drop + <b>copy</b> + store, V: <b>copy</b> + store, R&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K, f: |&V|R <b>has</b> drop): Option&lt;R&gt; {
     <b>let</b> iter = self.<a href="big_ordered_map.md#0x1_big_ordered_map_internal_find">internal_find</a>(key);
     <b>if</b> (iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(self)) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
@@ -3941,23 +3940,6 @@ Given a path to node (excluding the node itself), which is currently stored unde
 
 
 <pre><code><b>pragma</b> intrinsic;
-</code></pre>
-
-
-
-<a id="@Specification_1_get_and_map"></a>
-
-### Function `get_and_map`
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_get_and_map">get_and_map</a>&lt;K: <b>copy</b>, drop, store, V: <b>copy</b>, store, R&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K, f: |&V|R <b>has</b> drop): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;R&gt;
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> opaque;
-<b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

@@ -269,8 +269,9 @@ module aptos_experimental::bulk_order_book {
     ): BulkOrder<M> {
         // For cancellation, instead of removing the order, we will just cancel the active orders and set the sizes to 0.
         // This allows us to reuse the order id for the same account in the future without creating a new order.
-        let orders_option = self.orders.remove_or_none(&account);
-        assert!(orders_option.is_some(), EORDER_NOT_FOUND);
+        let order_opt = self.orders.remove_or_none(&account);
+        assert!(order_opt.is_some(), EORDER_NOT_FOUND);
+        let order = order_opt.destroy_some();
         let order_copy = order;
         cancel_active_orders(price_time_idx, &order);
         order.set_empty();
@@ -289,14 +290,14 @@ module aptos_experimental::bulk_order_book {
         self.orders.get(&account).destroy_some()
     }
 
-    public fun get_remaining_size(
+    public fun get_remaining_size<M: store + copy + drop>(
         self: &BulkOrderBook<M>,
         account: address,
         is_bid: bool
     ): u64 {
-        let order_option = self.orders.get(&account);
-        assert!(order_option.is_some(), EORDER_NOT_FOUND);
-        order_option.destroy_some().get_total_remaining_size(is_bid)
+        let result_option = self.orders.get_and_map(&account, |order| order.get_total_remaining_size(is_bid));
+        assert!(result_option.is_some(), EORDER_NOT_FOUND);
+        result_option.destroy_some()
     }
 
     public fun get_prices<M: store + copy + drop>(
@@ -304,9 +305,9 @@ module aptos_experimental::bulk_order_book {
         account: address,
         is_bid: bool
     ): vector<u64> {
-        let order_option = self.orders.get(&account);
-        assert!(order_option.is_some(), EORDER_NOT_FOUND);
-        order_option.destroy_some().get_all_prices(is_bid)
+        let result_option = self.orders.get_and_map(&account, |order| order.get_all_prices(is_bid));
+        assert!(result_option.is_some(), EORDER_NOT_FOUND);
+        result_option.destroy_some()
     }
 
     public fun get_sizes<M: store + copy + drop>(
@@ -314,9 +315,9 @@ module aptos_experimental::bulk_order_book {
         account: address,
         is_bid: bool
     ): vector<u64> {
-        let order_option = self.orders.get(&account);
-        assert!(order_option.is_some(), EORDER_NOT_FOUND);
-        order_option.destroy_some().get_all_sizes(is_bid)
+        let result_option = self.orders.get_and_map(&account, |order| order.get_all_sizes(is_bid));
+        assert!(result_option.is_some(), EORDER_NOT_FOUND);
+        result_option.destroy_some()
     }
 
     /// Places a new maker order in the bulk order book.

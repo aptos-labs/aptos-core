@@ -221,23 +221,25 @@ module aptos_experimental::single_order_book {
     ): Option<SingleOrder<M>> {
         let account_client_order_id =
             new_account_client_order_id(order_creator, client_order_id);
-        if (!self.client_order_ids.contains(&account_client_order_id)) {
+        let order_id = self.client_order_ids.get(&account_client_order_id);
+        if (order_id.is_none()) {
             return option::none();
         };
-        let order_id = self.client_order_ids.borrow(&account_client_order_id);
-        option::some(self.cancel_order(price_time_idx, order_creator, *order_id))
+        option::some(self.cancel_order(price_time_idx, order_creator, order_id.destroy_some()))
     }
 
     public(friend) fun try_cancel_order<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_creator: address, order_id: OrderIdType
     ): Option<SingleOrder<M>> {
-        if (!self.orders.contains(&order_id)) {
+        let is_creator = self.orders.get_and_map(
+            &order_id,
+            |order| order.get_order_from_state().get_account() == order_creator
+        );
+
+        if (is_creator.is_none() || !is_creator.destroy_some()) {
             return option::none();
         };
-        let order = self.orders.borrow(&order_id);
-        if (order.get_order_from_state().get_account() != order_creator) {
-            return option::none();
-        };
+
         option::some(self.cancel_order(price_time_idx, order_creator, order_id))
     }
 
@@ -319,14 +321,14 @@ module aptos_experimental::single_order_book {
         let order_id = reinsert_order.get_order_id_from_match_details();
         let unique_idx = reinsert_order.get_unique_priority_idx_from_match_details();
 
-        let iter = self.orders.find(&order_id);
-        if (iter.iter_is_end(&self.orders)) {
+        let reinsert_remaining_size = reinsert_order.get_remaining_size_from_match_details();
+        let present = self.orders.modify_if_present(&order_id, |order_with_state| {
+            order_with_state.increase_remaining_size(reinsert_remaining_size);
+        });
+        if (!present) {
             return self.place_ready_maker_order_with_unique_idx(price_time_idx, new_order_request_from_match_details(reinsert_order), unique_idx);
         };
 
-        iter.iter_modify(&mut self.orders, |order_with_state| {
-            order_with_state.increase_remaining_size(reinsert_order.get_remaining_size_from_match_details());
-        });
         price_time_idx.increase_order_size(
             reinsert_order.get_price_from_match_details(),
             unique_idx,
@@ -375,16 +377,16 @@ module aptos_experimental::single_order_book {
             active_matched_order.destroy_active_matched_order();
         assert!(order_book_type == single_order_book_type(), ENOT_SINGLE_ORDER_BOOK);
 
-        let iter_with_path = self.orders.find_with_path(&order_id);
-        let iter = iter_with_path.iter_with_path_get_iter();
-        iter.iter_modify(&mut self.orders, |order_with_state| {
-            order_with_state.set_remaining_size(remaining_size);
-        });
-
         let order_with_state = if (remaining_size == 0) {
-            iter_with_path.iter_remove(&mut self.orders)
+            let order = self.orders.remove(&order_id);
+            order.set_remaining_size(0);
+            order
         } else {
-            *iter.iter_borrow(&self.orders)
+            self.orders.modify_and_return(&order_id, |order_with_state| {
+                aptos_experimental::single_order_types::set_remaining_size(order_with_state, remaining_size);
+                // order_with_state.set_remaining_size(remaining_size);
+                *order_with_state
+            })
         };
 
         let (order, is_active) = order_with_state.destroy_order_from_state();
@@ -425,16 +427,22 @@ module aptos_experimental::single_order_book {
         order_id: OrderIdType,
         size_delta: u64
     ) {
-        let iter = self.orders.find(&order_id);
-        assert!(!iter.iter_is_end(&self.orders), EORDER_NOT_FOUND);
-        iter.iter_modify(&mut self.orders, |order_with_state| {
-            assert!(
-                order_creator == order_with_state.get_order_from_state().get_account(),
-                EORDER_CREATOR_MISMATCH
-            );
-            order_with_state.decrease_remaining_size(size_delta);
-        });
-        let order_with_state = *iter.iter_borrow(&self.orders);
+        let order_opt = self.orders.modify_if_present_and_return(
+            &order_id,
+            |order_with_state| {
+                assert!(
+                    order_creator == order_with_state.get_order_from_state().get_account(),
+                    EORDER_CREATOR_MISMATCH
+                );
+                // TODO should we be asserting that remaining size is greater than 0?
+                aptos_experimental::single_order_types::decrease_remaining_size(order_with_state, size_delta);
+                // order_with_state.decrease_remaining_size(size_delta);
+                *order_with_state
+            }
+        );
+
+        assert!(order_opt.is_some(), EORDER_NOT_FOUND);
+        let order_with_state = order_opt.destroy_some();
 
         if (order_with_state.is_active_order()) {
             let order = order_with_state.get_order_from_state();
@@ -453,60 +461,40 @@ module aptos_experimental::single_order_book {
     ): Option<OrderIdType> {
         let account_client_order_id =
             new_account_client_order_id(order_creator, client_order_id);
-        if (!self.client_order_ids.contains(&account_client_order_id)) {
-            return option::none();
-        };
-        option::some(*self.client_order_ids.borrow(&account_client_order_id))
+        self.client_order_ids.get(&account_client_order_id)
     }
 
     public(friend) fun get_order_metadata<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderIdType
     ): Option<M> {
-        let iter = self.orders.find(&order_id);
-        if (iter.iter_is_end(&self.orders)) {
-            return option::none();
-        };
-        option::some(iter.iter_borrow(&self.orders).get_metadata_from_state())
+        self.orders.get_and_map(&order_id, |order| order.get_metadata_from_state())
     }
 
     public(friend) fun set_order_metadata<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, order_id: OrderIdType, metadata: M
     ) {
-        let iter = self.orders.find(&order_id);
-        assert!(!iter.iter_is_end(&self.orders), EORDER_NOT_FOUND);
-        iter.iter_modify(&mut self.orders, |order_with_state| {
+        let present = self.orders.modify_if_present(&order_id, |order_with_state| {
             order_with_state.set_metadata_in_state(metadata);
         });
+        assert!(present, EORDER_NOT_FOUND);
     }
 
     public(friend) fun is_active_order<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderIdType
     ): bool {
-        let iter = self.orders.find(&order_id);
-        if (iter.iter_is_end(&self.orders)) {
-            return false;
-        };
-        iter.iter_borrow(&self.orders).is_active_order()
+        self.orders.get_and_map(&order_id, |order| order.is_active_order()).destroy_with_default(false)
     }
 
     public(friend) fun get_order<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderIdType
     ): Option<OrderWithState<M>> {
-        let iter = self.orders.find(&order_id);
-        if (iter.iter_is_end(&self.orders)) {
-            return option::none();
-        };
-        option::some(*iter.iter_borrow(&self.orders))
+        self.orders.get(&order_id)
     }
 
     public(friend) fun get_remaining_size<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderIdType
     ): u64 {
-        let iter = self.orders.find(&order_id);
-        if (iter.iter_is_end(&self.orders)) {
-            return 0;
-        };
-        iter.iter_borrow(&self.orders).get_remaining_size_from_state()
+        self.orders.get_and_map(&order_id, |order| order.get_remaining_size_from_state()).destroy_with_default(0)
     }
 
     /// Removes and returns the orders that are ready to be executed based on the current price.
@@ -559,11 +547,7 @@ module aptos_experimental::single_order_book {
     public(friend) fun get_unique_priority_idx<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderIdType
     ): Option<UniqueIdxType> {
-        let iter = self.orders.find(&order_id);
-        if (iter.iter_is_end(&self.orders)) {
-            return option::none();
-        };
-        option::some(iter.iter_borrow(&self.orders).get_unique_priority_idx_from_state())
+        self.orders.get_and_map(&order_id, |order| order.get_unique_priority_idx_from_state())
     }
 
     #[test_only]
