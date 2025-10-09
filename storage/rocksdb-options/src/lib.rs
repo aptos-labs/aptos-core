@@ -25,6 +25,9 @@ pub fn gen_rocksdb_options(config: &RocksdbConfig, readonly: bool) -> Options {
     db_opts.set_max_total_wal_size(config.max_total_wal_size);
     db_opts.set_max_background_jobs(config.max_background_jobs);
 
+    db_opts.set_use_direct_reads(true);
+    db_opts.set_use_direct_io_for_flush_and_compaction(true);
+
     if let Some(level) = config.stats_level {
         db_opts.enable_statistics();
         db_opts.set_statistics_level(convert_stats_level(level));
