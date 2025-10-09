@@ -321,7 +321,7 @@ impl BuiltPackage {
             }
 
             if let Some(model_options) = model.get_extension::<Options>() {
-                let has_target_warnings = model.has_warnings_in_primary_targets();
+                let has_target_warnings = model.has_diag_in_primary_targets(Severity::Warning);
                 if model_options.experiment_on(Experiment::FAIL_ON_WARNING) && has_target_warnings {
                     bail!("found warning(s), and `--fail-on-warning` is set")
                 } else if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
