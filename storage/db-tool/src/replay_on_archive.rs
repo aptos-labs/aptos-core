@@ -15,9 +15,13 @@ use aptos_storage_interface::{
     state_store::state_view::db_state_view::DbStateViewAtVersion, AptosDbError, DbReader,
 };
 use aptos_types::{
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata::TransactionSliceMetadata,
+    },
     contract_event::ContractEvent,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
         PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version,
     },
     write_set::WriteSet,
@@ -242,6 +246,7 @@ impl Verifier {
         let mut expected_writesets = Vec::new();
         let mut expected_txn_infos = Vec::new();
         let mut chunk_start_version = start;
+        let executor = AptosVMBlockExecutor::new();
         for item in txn_iter {
             // timeout check
             if let Some(duration) = self.timeout_secs {
@@ -273,6 +278,7 @@ impl Verifier {
                 while !cur_txns.is_empty() {
                     // verify results
                     let failed_txn_opt = self.execute_and_verify(
+                        &executor,
                         &mut chunk_start_version,
                         &mut cur_txns,
                         &mut cur_persisted_aux_info,
@@ -289,6 +295,7 @@ impl Verifier {
         }
         // verify results
         let fail_txns = self.execute_and_verify(
+            &executor,
             &mut chunk_start_version,
             &mut cur_txns,
             &mut cur_persisted_aux_info,
@@ -336,6 +343,7 @@ impl Verifier {
 
     fn execute_and_verify(
         &self,
+        executor: &AptosVMBlockExecutor,
         current_version: &mut Version,
         cur_txns: &mut Vec<Transaction>,
         cur_persisted_aux_info: &mut Vec<PersistedAuxiliaryInfo>,
@@ -357,12 +365,19 @@ impl Verifier {
                 .map(|info| AuxiliaryInfo::new(*info, None))
                 .collect(),
         );
-        let executed_outputs = AptosVMBlockExecutor::new().execute_block_no_limit(
-            &txns_provider,
-            &self
-                .arc_db
-                .state_view_at_version(current_version.checked_sub(1))?,
-        )?;
+        let executed_outputs = executor
+            .execute_block(
+                &txns_provider,
+                &self
+                    .arc_db
+                    .state_view_at_version(current_version.checked_sub(1))?,
+                BlockExecutorConfigFromOnchain::new_no_block_limit(),
+                TransactionSliceMetadata::Chunk {
+                    begin: *current_version,
+                    end: *current_version + cur_txns.len() as u64,
+                },
+            )
+            .map(BlockOutput::into_transaction_outputs_forced)?;
         assert_eq!(executed_outputs.len(), cur_txns.len());
 
         for idx in 0..cur_txns.len() {
