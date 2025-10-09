@@ -16,7 +16,7 @@ pub fn range_proof_random_instance<E: Pairing, B: BatchedRangeProof<E>, R: RngCo
     B::Commitment,
     B::CommitmentRandomness,
 ) {
-    let (pk, vk) = B::setup(n + 10, ell + 10, rng); // TODO: change these values?
+    let (pk, vk) = B::setup(n + 0, ell + 0, rng); // TODO: change these values?
 
     let zz: Vec<B::Input> = (0..n)
         .map(|_| {
@@ -25,6 +25,6 @@ pub fn range_proof_random_instance<E: Pairing, B: BatchedRangeProof<E>, R: RngCo
         })
         .collect();
 
-    let (cc, r) = B::commit(&pk, &zz, rng);
+    let (cc, r) = B::commit(&B::commitment_key_from_prover_key(&pk), &zz, rng);
     (pk, vk, zz, cc, r)
 }

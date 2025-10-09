@@ -2,66 +2,55 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::homomorphism::{DiagonalProductMap, LiftMap},
-    pcs::univariate_kzg,
+    pcs::univariate_kzg_commitment,
     pvss::chunked_elgamal_field::chunked_elgamal,
     sigma_protocol,
+    sigma_protocol::homomorphism::{LiftHomomorphism, TupleHomomorphism},
+    Scalar,
 };
+use aptos_crypto_derive::Witness;
 use ark_ec::pairing::Pairing;
-use ark_serialize::CanonicalSerialize;
-use ark_std::{
-    rand::{CryptoRng, RngCore},
-    UniformRand,
-};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::rand::{CryptoRng, RngCore};
 
-#[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
-pub struct ConsistencyDomain<E: Pairing>(
-    pub E::ScalarField,
-    pub Vec<Vec<E::ScalarField>>,
-    pub Vec<E::ScalarField>,
-);
-
-impl<E: Pairing> sigma_protocol::Domain<E> for ConsistencyDomain<E> {
-    type Scalar = E::ScalarField;
-
-    fn scaled_add(&self, other: &Self, c: E::ScalarField) -> Self {
-        ConsistencyDomain(
-            self.0 + (c * other.0),
-            self.1
-                .iter()
-                .zip(&other.1)
-                .map(|(r1, r2)| r1.iter().zip(r2).map(|(x, y)| *x + (c * *y)).collect())
-                .collect(),
-            self.2
-                .iter()
-                .zip(&other.2)
-                .map(|(x, y)| *x + (c * *y))
-                .collect(),
-        )
-    }
-
-    fn sample_randomness<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
-        ConsistencyDomain(
-            E::ScalarField::rand(rng),
-            self.1
-                .iter()
-                .map(|row| row.iter().map(|_| E::ScalarField::rand(rng)).collect())
-                .collect(),
-            self.2.iter().map(|_| E::ScalarField::rand(rng)).collect(),
-        )
-    }
+#[derive(Witness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct KzgElgamalWitness<E: Pairing> {
+    pub kzg_randomness: Scalar<E>,
+    pub chunked_plaintexts: Vec<Vec<Scalar<E>>>,
+    pub elgamal_randomness: Vec<Scalar<E>>,
 }
 
+// impl<E: Pairing> sigma_protocol::Witness<E> for KzgElgamalWitness<E> {
+//     type Scalar = E::ScalarField;
+
+//     fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self {
+//         Self {
+//             kzg_randomness: self.kzg_randomness.scaled_add(&other.kzg_randomness, c),
+//             chunked_plaintexts: self.chunked_plaintexts.scaled_add(&other.chunked_plaintexts, c),
+//             elgamal_randomness: self.elgamal_randomness.scaled_add(&other.elgamal_randomness, c),
+//         }
+//     }
+
+//     fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
+//         Self {
+//             kzg_randomness: self.kzg_randomness.rand(rng),
+//             chunked_plaintexts: self.chunked_plaintexts.rand(rng),
+//             elgamal_randomness: self.elgamal_randomness.rand(rng),
+//         }
+//     }
+// }
+
 #[allow(type_alias_bounds)]
-type LiftedKZG<'a, E: Pairing> = LiftMap<univariate_kzg::Map<'a, E>, ConsistencyDomain<E>>;
+type LiftedKZG<'a, E: Pairing> =
+    LiftHomomorphism<univariate_kzg_commitment::Homomorphism<'a, E>, KzgElgamalWitness<E>>;
 #[allow(type_alias_bounds)]
 type LiftedChunkedElGamal<'a, E: Pairing> =
-    LiftMap<chunked_elgamal::Map<'a, E>, ConsistencyDomain<E>>;
+    LiftHomomorphism<chunked_elgamal::Homomorphism<'a, E>, KzgElgamalWitness<E>>;
 
-pub type ConsistencyHomomorphism<'a, E> =
-    DiagonalProductMap<LiftedKZG<'a, E>, LiftedChunkedElGamal<'a, E>>;
+pub type KzgElgamalHomomorphism<'a, E> =
+    TupleHomomorphism<LiftedKZG<'a, E>, LiftedChunkedElGamal<'a, E>>;
 
-impl<'a, E: Pairing> ConsistencyHomomorphism<'a, E> {
+impl<'a, E: Pairing> KzgElgamalHomomorphism<'a, E> {
     pub fn new(
         lagr_g1: &'a [E::G1Affine],
         g_1: &'a E::G1Affine,
@@ -69,25 +58,38 @@ impl<'a, E: Pairing> ConsistencyHomomorphism<'a, E> {
         ek: &'a [E::G1Affine],
     ) -> Self {
         let lifted_kzg = LiftedKZG::<E> {
-            map: univariate_kzg::Map { lagr_g1 },
-            projection_map: |dom: &ConsistencyDomain<E>| {
-                let ConsistencyDomain(first, nested, _ignored) = dom;
-                let flattened: Vec<E::ScalarField> = nested.iter().flatten().cloned().collect();
-                (first.clone(), flattened)
+            hom: univariate_kzg_commitment::Homomorphism { lagr_g1 },
+            projection: |dom: &KzgElgamalWitness<E>| {
+                let KzgElgamalWitness {
+                    kzg_randomness,
+                    chunked_plaintexts,
+                    elgamal_randomness: _,
+                } = dom;
+                let flattened: Vec<E::ScalarField> = chunked_plaintexts
+                    .iter()
+                    .flatten()
+                    .map(|scalar| &scalar.0)
+                    .cloned()
+                    .collect();
+                (kzg_randomness.0, flattened)
             },
         };
 
         let lifted_chunked_elgamal = LiftedChunkedElGamal::<E> {
-            map: chunked_elgamal::Map { g_1, h_1, ek },
-            projection_map: |dom: &ConsistencyDomain<E>| {
-                let ConsistencyDomain(_ignored, first, second) = dom;
-                (first.clone(), second.clone())
+            hom: chunked_elgamal::Homomorphism { g_1, h_1, ek },
+            projection: |dom: &KzgElgamalWitness<E>| {
+                let KzgElgamalWitness {
+                    kzg_randomness: _,
+                    chunked_plaintexts,
+                    elgamal_randomness,
+                } = dom;
+                (chunked_plaintexts.clone(), elgamal_randomness.clone())
             },
         };
 
         Self {
-            map1: lifted_kzg,
-            map2: lifted_chunked_elgamal,
+            hom1: lifted_kzg,
+            hom2: lifted_chunked_elgamal,
         }
     }
 }

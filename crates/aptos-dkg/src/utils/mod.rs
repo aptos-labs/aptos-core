@@ -202,6 +202,7 @@ pub(crate) fn msm_bool<G: AffineRepr>(bases: &[G], scalars: &[bool]) -> G::Group
     acc
 }
 
+/// returns [1, x, x², ... x^{count-1}]
 pub fn powers<T>(base: T, count: usize) -> Vec<T>
 where
     T: MulAssign + One + Copy,

@@ -93,7 +93,9 @@ impl traits::Transcript for Transcript {
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
 
-    const DST: &[u8] = b"APTOS_DAS_WEIGHTED_PROVABLY_PVSS_FIAT_SHAMIR_DST";
+    fn dst() -> Vec<u8> {
+        b"APTOS_DAS_WEIGHTED_PROVABLY_PVSS_FIAT_SHAMIR_DST".to_vec()
+    }
 
     fn scheme_name() -> String {
         WEIGHTED_DAS_SK_IN_G1.to_string()
@@ -199,7 +201,7 @@ impl traits::Transcript for Transcript {
             spks,
             eks,
             auxs,
-            &Self::DST,
+            &Self::dst(),
             2 + W * 3, // 3W+1 for encryption check, 1 for SoK verification.
         );
 

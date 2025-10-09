@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::{homomorphism::Map, polynomials},
-    fiat_shamir,
-    pcs::univariate_kzg,
-    range_proofs::traits,
-    utils,
+    algebra::polynomials, fiat_shamir, pcs::univariate_kzg_commitment, range_proofs::traits,
+    sigma_protocol::homomorphism::Trait, utils,
 };
 use anyhow::ensure;
 use ark_ec::{
@@ -34,9 +31,9 @@ pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V1_RANGE_PROOF_DST";
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Proof<E: Pairing> {
-    d: E::G1,                // commitment to h(X) = \sum_{j=0}^{\ell-1} beta_j h_j(X)
-    c: Vec<E::G1Affine>,     // of size \ell
-    c_hat: Vec<E::G2Affine>, // of size \ell
+    pub d: E::G1,                // commitment to h(X) = \sum_{j=0}^{\ell-1} beta_j h_j(X)
+    pub c: Vec<E::G1Affine>,     // of size \ell
+    pub c_hat: Vec<E::G2Affine>, // of size \ell
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -62,7 +59,7 @@ where
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-pub struct Commitment<E: Pairing>(E::G1);
+pub struct Commitment<E: Pairing>(pub E::G1);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProverKey<E: Pairing> {
@@ -79,18 +76,18 @@ pub struct ProverKey<E: Pairing> {
 
 #[derive(CanonicalSerialize)]
 pub struct PublicStatement<E: Pairing> {
-    n: usize,
-    ell: usize,
-    comm: Commitment<E>,
+    pub n: usize,
+    pub ell: usize,
+    pub comm: Commitment<E>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
     max_ell: usize,
-    tau_1: E::G1,
-    tau_2: E::G2,
-    vanishing_com: E::G2, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - 1) used to test h(X)
-    powers_of_two: Vec<E::ScalarField>, // [1, 2, 4, ..., 2^{max_ell - 1}]
+    pub tau_1: E::G1,
+    pub tau_2: E::G2,
+    pub vanishing_com: E::G2, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - 1) used to test h(X)
+    pub powers_of_two: Vec<E::ScalarField>, // [1, 2, 4, ..., 2^{max_ell - 1}]
 }
 
 impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
@@ -120,6 +117,7 @@ impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
 
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type Commitment = Commitment<E>;
+    type CommitmentKey = ProverKey<E>;
     type CommitmentRandomness = E::ScalarField;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
@@ -127,6 +125,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type VerificationKey = VerificationKey<E>;
 
     const DST: &[u8] = DST;
+
+    fn commitment_key_from_prover_key(pk: &Self::ProverKey) -> Self::CommitmentKey {
+        pk.clone()
+    }
 
     // The main bottlenecks are `powers_of_tau` and the IFFT steps.
     fn setup<R: RngCore + CryptoRng>(
@@ -201,18 +203,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         values: &[Self::Input],
         r: &Self::CommitmentRandomness,
     ) -> Commitment<E> {
-        debug_assert!(
-            pk.lagr_g1.len() > values.len(),
-            "pk.lagr_g1 must have at least values.len() + 1 elements"
-        );
+        let kzg_commit_hom: univariate_kzg_commitment::Homomorphism<'_, E> =
+            univariate_kzg_commitment::Homomorphism {
+                lagr_g1: &pk.lagr_g1,
+            };
 
-        let kzg: univariate_kzg::Map<'_, E> = univariate_kzg::Map {
-            lagr_g1: &pk.lagr_g1,
-        };
+        let input = (*r, values.to_vec());
 
-        let kzg_input = (*r, values.to_vec());
-
-        Commitment(kzg.apply(&kzg_input))
+        Commitment(kzg_commit_hom.apply(&input))
     }
 
     #[allow(non_snake_case)]
@@ -635,7 +633,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 }
 
 /// Compute alpha, beta.
-fn fiat_shamir_challenges<E: Pairing>(
+pub fn fiat_shamir_challenges<E: Pairing>(
     vk: &VerificationKey<E>,
     public_statement: PublicStatement<E>,
     bit_commitments: &(&[E::G1Affine], &[E::G2Affine]), // TODO: make this generic over B?

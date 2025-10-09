@@ -1,0 +1,821 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::{
+    algebra::{polynomials, polynomials as OURpolynomials, GroupData},
+    pcs::{univariate_hiding_kzg, univariate_kzg_commitment},
+    range_proofs::traits,
+    sigma_protocol::{self, homomorphism, homomorphism::{Trait as HomomorphismTrait}, Trait},
+    utils, Scalar,
+};
+use anyhow::ensure;
+use ark_ec::{
+    pairing::{Pairing, PairingOutput},
+    CurveGroup, PrimeGroup, VariableBaseMSM,
+};
+use ark_ff::{AdditiveGroup, Field};
+use ark_poly::{self, EvaluationDomain, Polynomial, Radix2EvaluationDomain};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
+use ark_std::{
+    rand::{CryptoRng, RngCore},
+    UniformRand,
+};
+use std::{
+    io::Write,
+    iter::once,
+    ops::{AddAssign, Mul},
+};
+
+pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V2_RANGE_PROOF_DST";
+
+#[allow(non_snake_case)]
+#[derive(CanonicalSerialize, Clone, PartialEq, Eq, CanonicalDeserialize)] // TODO: add Debug here, CanonicalDeserialize
+pub struct Proof<E: Pairing> {
+    hatC: E::G1,
+    pi_PoK: sigma_protocol::Proof<E, two_term_msm::TwoTermMsm<E>>,
+    Cj: Vec<E::G1>,
+    D: E::G1,
+    a: E::ScalarField,
+    a_h: E::ScalarField,
+    aj: Vec<E::ScalarField>,
+    pi_gamma: univariate_hiding_kzg::Proof<E>,
+}
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct Commitment<E: Pairing>(E::G1);
+
+#[allow(non_snake_case)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProverKey<E: Pairing> {
+    vk: VerificationKey<E>,
+    ck_S: univariate_hiding_kzg::CommitmentKey<E>,
+    ck_L: univariate_hiding_kzg::CommitmentKey<E>,
+    max_n: usize,
+    precomputed_stuff: Vec<E::ScalarField>,
+    //    max_ell: usize,
+}
+
+#[derive(CanonicalSerialize)]
+pub struct PublicStatement<E: Pairing> {
+    n: usize,
+    ell: usize,
+    comm: Commitment<E>,
+}
+
+#[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
+pub struct VerificationKey<E: Pairing> {
+    b: usize,
+    xi_2: E::G2Affine,
+    tau_2: E::G2Affine,
+    group_data: GroupData<E>,
+    roots_of_unity: Vec<E::ScalarField>,
+}
+
+impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
+    type Commitment = Commitment<E>;
+    type CommitmentKey = univariate_hiding_kzg::CommitmentKey<E>;
+    type CommitmentRandomness = E::ScalarField;
+    type Input = E::ScalarField;
+    type ProverKey = ProverKey<E>;
+    type PublicStatement = PublicStatement<E>;
+    type VerificationKey = VerificationKey<E>;
+
+    const DST: &[u8] = DST;
+
+    fn commitment_key_from_prover_key(pk: &Self::ProverKey) -> Self::CommitmentKey {
+        pk.ck_S.clone()
+    }
+
+    #[allow(non_snake_case)]
+    fn setup<R: RngCore + CryptoRng>(
+        max_n: usize,
+        _max_ell: usize, // TODO: remove from trait?
+        rng: &mut R,
+    ) -> (ProverKey<E>, VerificationKey<E>) {
+        let group = GroupData::new(rng);
+        let GroupData { g1, g2 } = group; // TODO: make this part of setup(...) in trait?
+
+        let max_n = (max_n + 1).next_power_of_two() - 1;
+        let num_omegas = max_n + 1;
+        debug_assert!(num_omegas.is_power_of_two());
+
+        let xi = E::ScalarField::rand(rng);
+        let tau = E::ScalarField::rand(rng);
+
+        let (
+            univariate_hiding_kzg::VerificationKey {
+                xi_2,
+                tau_2,
+                group_data: _,
+            },
+            ck_S,
+        ) = univariate_hiding_kzg::setup(max_n, group.clone(), xi, tau, rng);
+
+        let L = 2 * num_omegas;
+
+        let (_, ck_L) = univariate_hiding_kzg::setup(L, group.clone(), xi, tau, rng);
+
+        let n_plus_1_inv = E::ScalarField::from((num_omegas) as u64).inverse().unwrap();
+        let mut omega_in_pows: Vec<E::ScalarField> = (1..=max_n + 1) // TODO: uh =??
+            .map(|i| ck_S.roots_of_unity_in_eval_dom[(i * max_n) % (max_n + 1)]) // safe modulo access
+            .collect();
+
+        // Batch invert them
+        ark_ff::batch_inversion(&mut omega_in_pows);
+
+        // Compute results
+        let mut precomputed_stuff = Vec::with_capacity(max_n + 1);
+        for (i, omega_in_inv) in omega_in_pows.into_iter().enumerate() {
+            let i_plus_1 = i + 1;
+            let omega_i = ck_S.roots_of_unity_in_eval_dom[i_plus_1 % (max_n + 1)];
+            let numerator = omega_i - E::ScalarField::ONE;
+            let value = numerator * n_plus_1_inv * omega_in_inv;
+            precomputed_stuff.push(value);
+        }
+
+        let vk = VerificationKey {
+            b: 2,
+            xi_2,
+            tau_2,
+            group_data: group,
+            roots_of_unity: ck_S.roots_of_unity_in_eval_dom.clone(),
+        };
+        let prk = ProverKey {
+            vk: vk.clone(),
+            ck_S,
+            ck_L,
+            max_n,
+            precomputed_stuff,
+        };
+
+        (prk, vk)
+    }
+
+    #[allow(non_snake_case)]
+    fn commit_with_randomness(
+        ck_S: &Self::CommitmentKey,
+        values: &[Self::Input],
+        rho: &Self::CommitmentRandomness,
+    ) -> Commitment<E> {
+        let mut values_shifted = vec![E::ScalarField::ZERO]; // start with 0
+        values_shifted.extend(values); // append all values from the original vector
+
+        let hiding_kzg_hom = univariate_hiding_kzg::Homomorphism::<E> {
+            lagr_g1: &ck_S.lagr_g1,
+            xi_1: ck_S.xi_1,
+        };
+
+        let hiding_kzg_input = (*rho, values_shifted);
+
+        Commitment(hiding_kzg_hom.apply(&hiding_kzg_input))
+    }
+
+    #[allow(non_snake_case)]
+    fn prove<R>(
+        pk: &ProverKey<E>,
+        values: &[Self::Input],
+        ell: usize,
+        comm: &Self::Commitment,
+        rho: &Self::CommitmentRandomness,
+        fs_transcript: &mut merlin::Transcript,
+        rng: &mut R,
+    ) -> Proof<E>
+    where
+        R: RngCore + CryptoRng,
+    {
+        // Step 1a
+        let ProverKey {
+            vk,
+            ck_S,
+            ck_L: _,
+            max_n,
+            precomputed_stuff,
+        } = pk;
+
+        let n = values.len();
+        assert!(
+            n <= *max_n,
+            "n (got {}) must be ≤ max_n (which is {})",
+            n,
+            max_n
+        );
+
+        let num_omegas = max_n + 1;
+
+        // assert!(
+        //     ell <= pk.max_ell,
+        //     "ell (got {}) must be ≤ max_ell (which is {})",
+        //     ell,
+        //     pk.max_ell
+        // );
+
+        let univariate_hiding_kzg::CommitmentKey {
+            xi_1,
+            tau_1,
+            lagr_g1,
+            eval_dom,
+            roots_of_unity_in_eval_dom: _,
+            one_1: _,
+        } = ck_S;
+        // let lagr2_g1 = ck_L.lagr_g1;
+
+        // Step 1b
+        fiat_shamir::append_initial_data(fs_transcript, DST, vk, n, ell, &comm);
+
+        // Step 2a
+        let r = E::ScalarField::rand(rng);
+        let delta_rho = E::ScalarField::rand(rng);
+        let hatC = *xi_1 * delta_rho + lagr_g1[0] * r + comm.0; // TODO change into MSMs?
+
+        // Step 2b
+        fiat_shamir::append_hat_f_commitment::<E>(fs_transcript, &hatC);
+
+        // Step 3a
+        let sigma_protocol = two_term_msm::SigmaProtocol {
+            zeroth_lagr: lagr_g1[0],
+            zeta: *xi_1,
+        };
+        let mut prover_transcript = merlin::Transcript::new(b"Sigma-Protocol-DeKART");
+        let pi_PoK = sigma_protocol.prove(
+            &two_term_msm::Witness {
+                kzg_randomness: Scalar(r),
+                hiding_kzg_randomness: Scalar(r),
+            },
+            &mut prover_transcript,
+            rng,
+        );
+
+        // Step 3b
+        fiat_shamir::append_sigma_proof(fs_transcript, &pi_PoK);
+
+        // Step 4a
+        let hkzg_commit = univariate_hiding_kzg::Homomorphism::<E> {
+            lagr_g1,
+            xi_1: *xi_1,
+        };
+
+        let mut zz = values.to_vec();
+        zz.resize(*max_n, E::ScalarField::ZERO);
+
+        let bits: Vec<Vec<bool>> = zz
+            .iter()
+            .map(|z_val| {
+                utils::scalar_to_bits_le::<E>(z_val)
+                    .into_iter()
+                    .take(ell)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        let f_j_evals_without_r: Vec<Vec<E::ScalarField>> = (0..ell)
+            .map(|j| {
+                bits.iter()
+                    .map(|row| E::ScalarField::from(row[j]))
+                    .collect()
+            })
+            .collect(); // This is just transposing the bits matrix
+
+        let rs: Vec<E::ScalarField> = std::iter::repeat_with(|| E::ScalarField::rand(rng))
+            .take(ell)
+            .collect();
+
+        let f_j_evals: Vec<Vec<E::ScalarField>> = (0..ell)
+            .map(|j| {
+                let mut row = Vec::with_capacity(f_j_evals_without_r[j].len() + 1); // should be max_n
+                row.push(rs[j]);
+                row.extend_from_slice(&f_j_evals_without_r[j]);
+                row
+            })
+            .collect();
+
+        let rhos: Vec<E::ScalarField> = std::iter::repeat_with(|| E::ScalarField::rand(rng))
+            .take(ell)
+            .collect();
+
+        let Cj: Vec<_> = f_j_evals
+            .iter()
+            .take(ell) // TODO: is the ell necessary?? probably not... could also zip over rhos btw
+            .zip(rhos.iter())
+            .map(|(f_j, rho)| {
+                let hkzg_commit_input = (*rho, f_j.clone());
+                hkzg_commit.apply(&hkzg_commit_input)
+            })
+            .collect();
+
+        // Step 4b
+        fiat_shamir::append_f_j_commitments::<E>(fs_transcript, &Cj);
+
+        // Step 6
+        let (beta, betas) = fiat_shamir::get_beta_and_betas::<E>(fs_transcript, ell);
+
+        let mut hat_f_evals = Vec::with_capacity(1 + values.len());
+        hat_f_evals.push(r);
+        hat_f_evals.extend_from_slice(values); // TODO: resize to max_n?
+
+        let mut hat_f_coeffs = hat_f_evals.clone();
+        eval_dom.ifft_in_place(&mut hat_f_coeffs);
+
+        let mut diff_hat_f = hat_f_coeffs.clone();
+        polynomials::differentiate_in_place(&mut diff_hat_f);
+
+        let mut diff_hat_f_evals = diff_hat_f.clone();
+        eval_dom.fft_in_place(&mut diff_hat_f_evals);
+
+        let f_j_coeffs: Vec<Vec<E::ScalarField>> = (0..ell)
+            .map(|j| {
+                let mut f_j = f_j_evals[j].clone();
+                assert_eq!(f_j.len(), pk.max_n + 1);
+                eval_dom.ifft_in_place(&mut f_j);
+                assert_eq!(f_j.len(), pk.max_n + 1);
+                f_j
+            })
+            .collect();
+
+        let mut h_evals = Vec::with_capacity(num_omegas);
+
+        let mut diff_f_js_evals = Vec::with_capacity(ell);
+
+        for j in 0..ell {
+            // Compute f'_j derivative
+            let mut diff_f_j = f_j_coeffs[j].clone();
+            polynomials::differentiate_in_place(&mut diff_f_j);
+            assert_eq!(diff_f_j.len(), pk.max_n);
+
+            // Evaluate f'_j at all (n+1)th roots of unity
+            let mut diff_f_j_evals = diff_f_j.clone();
+            eval_dom.fft_in_place(&mut diff_f_j_evals);
+            assert_eq!(diff_f_j_evals.len(), pk.max_n + 1);
+
+            diff_f_js_evals.push(diff_f_j_evals)
+        }
+
+        let n_plus_1_inv = E::ScalarField::from((num_omegas) as u64).inverse().unwrap();
+        // let mut omega_in_pows: Vec<E::ScalarField> = (1..=n + 1)
+        //     .map(|i| ck_S.roots_of_unity_in_eval_dom[(i * n) % (n + 1)]) // safe modulo access
+        //     .collect();
+
+        // // Batch invert them
+        // ark_ff::batch_inversion(&mut omega_in_pows);
+
+        // // Compute results
+        // let mut results = Vec::with_capacity(n + 1);
+        // for (i, omega_in_inv) in omega_in_pows.into_iter().enumerate() {
+        //     let i_plus_1 = i + 1;
+        //     let omega_i = ck_S.roots_of_unity_in_eval_dom[i_plus_1 % (n + 1)];
+        //     let numerator = omega_i - E::ScalarField::ONE;
+        //     let value = numerator * n_plus_1_inv * omega_in_inv;
+        //     results.push(value);
+        // }
+
+        let powers_of_two: Vec<E::ScalarField> = (0..ell)
+            .map(|j| E::ScalarField::from(1i64 << (j as u32)))
+            .collect();
+
+        // RHS'(\omega^0) = N(\omega^0) = sum_j beta_j r_j(r_j - 1) + beta^* (r - sum_j 2^{j-1} r_j)
+        h_evals.push({
+            let N_0 = {
+                let mut sum = E::ScalarField::ZERO;
+
+                for (j, (&r_j, &beta_j)) in rs.iter().zip(betas.iter()).enumerate() {
+                    // compute: r_j * (beta_j * (r_j - 1) - 2^(j-1) * beta^*)
+                    let term =
+                        r_j * (beta_j * (r_j - E::ScalarField::ONE) - powers_of_two[j] * beta);
+                    sum += term;
+                }
+
+                sum + beta * r
+            };
+
+            // h[0] = RHS'(\omega^0) / (n+1)
+            N_0 * n_plus_1_inv
+        });
+
+        for i in 1..num_omegas {
+            h_evals.push({
+                let mut sum = E::ScalarField::ZERO;
+
+                for (j, ((f_j_row, diff_f_j_row), &beta_j)) in f_j_evals
+                    .iter()
+                    .zip(diff_f_js_evals.iter())
+                    .zip(betas.iter())
+                    .enumerate()
+                {
+                    let fj = f_j_row[i];
+                    let diff_fj = diff_f_j_row[i];
+
+                    // term = diff_f_j[i] * (beta_j * (f_j[i] - 1) + f_j[i] - (2^(j-1) * betastar))
+                    let term = diff_fj
+                        * (beta_j * (fj - E::ScalarField::ONE) + fj - powers_of_two[j] * beta);
+                    sum += term;
+                }
+
+                (sum + beta * diff_hat_f_evals[i]) * precomputed_stuff[i - 1]
+            });
+        }
+
+        let rho_h = E::ScalarField::rand(rng);
+        let D = hkzg_commit.apply(&(rho_h, h_evals.clone()));
+
+        // Step 7b
+        fiat_shamir::append_h_commitment::<E>(fs_transcript, &D);
+
+        // Step 8
+        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(fs_transcript, ell);
+
+        let u_values: Vec<_> = (0..num_omegas)
+            .map(|i| {
+                mu * hat_f_evals[i]
+                    + mu_h * h_evals[i]
+                    + mus
+                        .iter()
+                        .zip(&f_j_evals)
+                        .map(|(&mu_j, f_j)| mu_j * f_j[i])
+                        .sum::<E::ScalarField>()
+            })
+            .collect();
+
+        // Step 9
+        let gamma =
+            fiat_shamir::get_gamma_challenge::<E>(fs_transcript, &ck_S.roots_of_unity_in_eval_dom);
+
+        let a: E::ScalarField = {
+            let poly = ark_poly::univariate::DensePolynomial {
+                coeffs: hat_f_coeffs,
+            };
+            poly.evaluate(&gamma)
+        }; // Should be Horner
+
+        let a_h =
+            OURpolynomials::barycentric_eval(&h_evals, &ck_S.roots_of_unity_in_eval_dom, gamma);
+
+        let a_j: Vec<E::ScalarField> = (0..ell)
+            .map(|i| {
+                let poly = ark_poly::univariate::DensePolynomial {
+                    coeffs: f_j_coeffs[i].clone(),
+                };
+                poly.evaluate(&gamma)
+            }) // Should be Horner
+            .collect();
+
+        // Step 10
+        let mut s = E::ScalarField::rand(rng);
+
+        let rho_u = mu * (*rho + delta_rho)
+            + mu_h * rho_h
+            + mus
+                .iter()
+                .zip(&rhos)
+                .map(|(&mu_j, &rho_j)| mu_j * rho_j)
+                .sum::<E::ScalarField>();
+
+        let pi_gamma = univariate_hiding_kzg::Homomorphism::open(
+            ck_S,
+            u_values,
+            rho_u,
+            gamma,
+            &univariate_hiding_kzg::CommitmentRandomness(s),
+        );
+
+        Proof {
+            hatC,
+            pi_PoK,
+            Cj,
+            D,
+            a,
+            a_h,
+            aj: a_j,
+            pi_gamma,
+        }
+    }
+
+    #[allow(non_snake_case)]
+    fn verify(
+        &self,
+        vk: &Self::VerificationKey,
+        n: usize,
+        ell: usize,
+        comm: &Self::Commitment,
+        fs_transcript: &mut merlin::Transcript,
+    ) -> anyhow::Result<()> {
+
+        // assert!(
+        //     ell <= vk.max_ell,
+        //     "ell (got {}) must be ≤ max_ell (which is {})",
+        //     ell,
+        //     vk.max_ell
+        // );
+
+        // Step 1
+        let VerificationKey {
+            b: _,
+            xi_2,
+            tau_2,
+            group_data,
+            roots_of_unity,
+        } = vk;
+        let Proof {
+            hatC,
+            pi_PoK,
+            Cj,
+            D,
+            a,
+            a_h,
+            aj,
+            pi_gamma,
+        } = self;
+
+        // Step 2a
+
+        fiat_shamir::append_initial_data(fs_transcript, DST, vk, n, ell, &comm);
+
+        // Step 2b
+        fiat_shamir::append_hat_f_commitment::<E>(fs_transcript, &hatC);
+
+        // Step 2c
+        fiat_shamir::append_sigma_proof(fs_transcript, &pi_PoK);
+
+        // Step 2d
+        fiat_shamir::append_f_j_commitments::<E>(fs_transcript, &Cj);
+
+        // Step 3
+        let (beta, betas) = fiat_shamir::get_beta_and_betas::<E>(fs_transcript, ell);
+
+        // Step 4
+        fiat_shamir::append_h_commitment::<E>(fs_transcript, &D);
+
+        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(fs_transcript, ell);
+
+        // Step 6
+        let U: E::G1 = *hatC * mu
+            + *D * mu_h
+            + Cj.iter()
+                .zip(&mus)
+                .map(|(&C_j, &mu_j)| C_j * mu_j)
+                .sum::<E::G1>();
+
+        // Step 7
+        let gamma = fiat_shamir::get_gamma_challenge::<E>(fs_transcript, &roots_of_unity);
+
+        // Step 8
+        let a_u = *a * mu
+            + *a_h * mu_h
+            + aj.iter()
+                .zip(&mus)
+                .map(|(&a_j, &mu_j)| a_j * mu_j)
+                .sum::<E::ScalarField>();
+
+        univariate_hiding_kzg::Homomorphism::verify(
+            univariate_hiding_kzg::VerificationKey {
+                xi_2: *xi_2,
+                tau_2: *tau_2,
+                group_data: group_data.clone()
+            },
+            univariate_hiding_kzg::Commitment(U),
+            gamma,
+            a_u,
+            pi_gamma.clone()
+        )?;
+
+        // Step 9
+        let gamma_pow = gamma.pow(&[(n + 1) as u64]); // gamma^(n+1) // TODO: change to some max_n ?
+        let V_eval_gamma = gamma_pow * (gamma - E::ScalarField::ONE).inverse().unwrap();
+
+        let powers_of_two: Vec<E::ScalarField> = (0..ell)
+            .map(|j| E::ScalarField::from(1i64 << (j as u32)))
+            .collect();
+
+        let LHS = *a_h * V_eval_gamma;
+
+        let sum1: E::ScalarField = powers_of_two
+            .iter()
+            .zip(aj.iter())
+            .map(|(p, a)| *p * *a)
+            .sum();
+
+        let sum2: E::ScalarField = betas
+            .iter()
+            .zip(aj.iter())
+            .map(|(b, a)| *b * *a * (*a - E::ScalarField::ONE))
+            .sum();
+
+        let RHS = beta * (*a - sum1) + sum2;
+
+        // assert_eq!(LHS, RHS); // TODO!!!!!
+
+        Ok(())
+    }
+
+    fn maul(&mut self) {
+        self.D = self.D + E::G1::generator();
+    }
+}
+
+mod fiat_shamir {
+    use super::*;
+    use crate::fiat_shamir::RangeProof;
+    use merlin::Transcript;
+
+    pub(crate) fn append_initial_data<E: Pairing>(
+        fs_transcript: &mut Transcript,
+        dst: &[u8],
+        vk: &VerificationKey<E>,
+        n: usize,
+        ell: usize,
+        comm: &Commitment<E>,
+    ) {
+        <Transcript as RangeProof<E, Proof<E>>>::append_sep(fs_transcript, dst);
+        <Transcript as RangeProof<E, Proof<E>>>::append_vk(fs_transcript, vk);
+        <Transcript as RangeProof<E, Proof<E>>>::append_public_statement(
+            fs_transcript,
+            PublicStatement {
+                n,
+                ell,
+                comm: comm.clone(),
+            },
+        );
+    }
+
+    #[allow(non_snake_case)]
+    pub(crate) fn append_hat_f_commitment<E: Pairing>(
+        fs_transcript: &mut Transcript,
+        hatC: &E::G1,
+    ) {
+        <Transcript as RangeProof<E, Proof<E>>>::append_hat_f_commitment(fs_transcript, hatC);
+    }
+
+    #[allow(non_snake_case)]
+    pub(crate) fn append_sigma_proof<E: Pairing>(
+        fs_transcript: &mut Transcript,
+        pi_PoK: &sigma_protocol::Proof<E, two_term_msm::TwoTermMsm<E>>,
+    ) {
+        <Transcript as RangeProof<E, Proof<E>>>::append_sigma_proof(fs_transcript, pi_PoK);
+    }
+
+    #[allow(non_snake_case)]
+    pub(crate) fn append_f_j_commitments<E: Pairing>(
+        fs_transcript: &mut Transcript,
+        Cj: &Vec<E::G1>,
+    ) {
+        <Transcript as RangeProof<E, Proof<E>>>::append_f_j_commitments(fs_transcript, Cj);
+    }
+
+    pub(crate) fn get_beta_and_betas<E: Pairing>(
+        fs_transcript: &mut Transcript,
+        ell: usize,
+    ) -> (E::ScalarField, Vec<E::ScalarField>) {
+        let mut betas =
+            <Transcript as RangeProof<E, Proof<E>>>::challenges_for_quotient_polynomials(
+                fs_transcript,
+                ell,
+            );
+        let beta = betas.pop().expect("betas must have at least one element");
+        (beta, betas)
+    }
+
+    #[allow(non_snake_case)]
+    pub(crate) fn append_h_commitment<E: Pairing>(fs_transcript: &mut Transcript, D: &E::G1) {
+        <Transcript as RangeProof<E, Proof<E>>>::append_h_commitment(fs_transcript, D);
+    }
+
+    pub(crate) fn get_mu_challenges<E: Pairing>(
+        fs_transcript: &mut Transcript,
+        ell: usize,
+    ) -> (E::ScalarField, E::ScalarField, Vec<E::ScalarField>) {
+        let mut mus = <Transcript as RangeProof<E, Proof<E>>>::challenges_for_linear_combination(
+            fs_transcript,
+            ell,
+        );
+
+        let mu = mus.pop().expect("mus must have at least one element");
+        let mu_h = mus.pop().expect("mus must have at least two elements");
+
+        (mu, mu_h, mus)
+    }
+
+    #[allow(non_snake_case)]
+    pub(crate) fn get_gamma_challenge<E: Pairing>(
+        fs_transcript: &mut Transcript,
+        roots_of_unity: &Vec<E::ScalarField>,
+    ) -> E::ScalarField {
+        loop {
+            let gamma =
+                <Transcript as RangeProof<E, Proof<E>>>::challenge_from_verifier(fs_transcript);
+            if !roots_of_unity.contains(&gamma) {
+                return gamma;
+            }
+        }
+    }
+}
+
+mod two_term_msm {
+    use super::*;
+    use crate::sigma_protocol::homomorphism::FixedBaseMsms;
+    use aptos_crypto_derive::Witness; // TODO: rename to SigmaProtocolWitness
+
+    #[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
+    pub(crate) struct SigmaProtocol<E: Pairing> {
+        pub zeroth_lagr: E::G1Affine,
+        pub zeta: E::G1Affine,
+    }
+
+    #[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
+    pub(crate) struct TwoTermMsm<E: Pairing> {
+        pub base_1: E::G1Affine,
+        pub base_2: E::G1Affine,
+    }
+
+    #[derive(Witness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+    pub(crate) struct Witness<E: Pairing> {
+        pub kzg_randomness: Scalar<E>,
+        pub hiding_kzg_randomness: Scalar<E>,
+    }
+
+    impl<'a, E: Pairing> homomorphism::Trait for TwoTermMsm<E> {
+        type Codomain = CodomainShape<E::G1>;
+        type Domain = Witness<E>;
+
+        fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+            self.apply_msm(self.msm_terms(input))
+        }
+
+        // fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+        //     let (bases, scalars) = &homomorphism::FixedBaseMSMs::msm_rows(self, input)[0];
+        //     E::G1::msm(bases, scalars).expect("Could not compute MSM for univariate hiding KZG")
+        // }
+    }
+
+    #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
+    pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq>(
+        T,
+    ); // TODO: this is a copy-paste... plus the two impl's below
+
+    // Implement EntrywiseMap for the wrapper
+    impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq>
+        homomorphism::EntrywiseMap<T> for CodomainShape<T>
+    {
+        type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> =
+            CodomainShape<U>;
+
+        fn map<U, F>(self, f: F) -> Self::Output<U>
+        where
+            F: Fn(T) -> U,
+            U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq,
+        {
+            CodomainShape(f(self.0))
+        }
+    }
+
+    impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> IntoIterator
+        for CodomainShape<T>
+    {
+        type IntoIter = std::iter::Once<T>;
+        type Item = T;
+
+        fn into_iter(self) -> Self::IntoIter {
+            std::iter::once(self.0)
+        }
+    }
+
+    impl<'a, E: Pairing> homomorphism::FixedBaseMsms for TwoTermMsm<E> {
+        type Base = E::G1Affine;
+        type CodomainShape<T>
+            = CodomainShape<T>
+        where
+            T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
+        type MsmInput = homomorphism::MsmInput<Self::Base, Self::Scalar>;
+        type MsmOutput = E::G1;
+        type Scalar = E::ScalarField;
+
+        fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+            let mut scalars = Vec::with_capacity(2);
+            scalars.push(input.kzg_randomness.0);
+            scalars.push(input.hiding_kzg_randomness.0);
+
+            let mut bases = Vec::with_capacity(2);
+            bases.push(self.base_1);
+            bases.push(self.base_2);
+
+            CodomainShape(homomorphism::MsmInput { bases, scalars })
+        }
+
+        fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
+            E::G1::msm(bases, scalars).expect("MSM failed in TwoTermMSM")
+        }
+    }
+
+    impl<E: Pairing> sigma_protocol::Trait<E> for SigmaProtocol<E> {
+        type Hom = TwoTermMsm<E>;
+        type Statement = CodomainShape<E::G1>;
+        type Witness = Witness<E>;
+
+        const DST: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL";
+        const DST_VERIFIER: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL_VERIFIER";
+
+        fn homomorphism(&self) -> Self::Hom {
+            TwoTermMsm {
+                base_1: self.zeroth_lagr,
+                base_2: self.zeta,
+            }
+        }
+    }
+}

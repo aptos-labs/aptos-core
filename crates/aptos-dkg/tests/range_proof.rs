@@ -1,10 +1,11 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(test)]
-use aptos_dkg::range_proofs::traits::BatchedRangeProof;
 use aptos_dkg::{
-    range_proofs::dekart_univariate::{Proof, DST},
+    range_proofs::{
+        dekart_univariate::{Proof, DST},
+        traits::BatchedRangeProof,
+    },
     utils::test_utils,
 };
 use ark_ec::pairing::Pairing;

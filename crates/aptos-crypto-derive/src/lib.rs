@@ -464,6 +464,47 @@ pub fn bcs_crypto_hash_dispatch(input: TokenStream) -> TokenStream {
     out.into()
 }
 
+#[proc_macro_derive(Witness)]
+pub fn derive_witness(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+
+    let fields = if let syn::Data::Struct(data) = &input.data {
+        match &data.fields {
+            syn::Fields::Named(fields_named) => &fields_named.named,
+            _ => panic!("Witness derive only supports named fields"),
+        }
+    } else {
+        panic!("Witness derive only supports structs");
+    };
+
+    let field_names: Vec<_> = fields.iter().map(|f| &f.ident).collect();
+
+    let expanded = quote! {
+        impl<E: Pairing> sigma_protocol::Witness<E> for #name<E> {
+            type Scalar = E::ScalarField;
+
+            fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self {
+                Self {
+                    #(
+                        #field_names: self.#field_names.scaled_add(&other.#field_names, c),
+                    )*
+                }
+            }
+
+            fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
+                Self {
+                    #(
+                        #field_names: self.#field_names.rand(rng),
+                    )*
+                }
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
 fn add_trait_bounds(mut generics: syn::Generics) -> syn::Generics {
     for param in generics.params.iter_mut() {
         if let syn::GenericParam::Type(type_param) = param {

@@ -1365,6 +1365,7 @@ dependencies = [
  "blst",
  "blstrs",
  "criterion",
+ "csv",
  "ff",
  "group",
  "hex",
@@ -1376,6 +1377,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "pairing",
+ "prettytable",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "rayon",
@@ -14842,6 +14844,20 @@ checksum = "64d1ec885c64d0457d564db4ec299b2dae3f9c02808b8ad9c3a089c591b18033"
 dependencies = [
  "proc-macro2",
  "syn 2.0.87",
+]
+
+[[package]]
+name = "prettytable"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46480520d1b77c9a3482d39939fcf96831537a250ec62d4fd8fbdf8e0302e781"
+dependencies = [
+ "csv",
+ "encode_unicode 1.0.0",
+ "is-terminal",
+ "lazy_static",
+ "term",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
