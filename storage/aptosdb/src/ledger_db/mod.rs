@@ -28,7 +28,9 @@ use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{batch::SchemaBatch, Cache, ColumnFamilyDescriptor, ColumnFamilyName, DB};
+use aptos_schemadb::{
+    batch::SchemaBatch, Cache, ColumnFamilyDescriptor, ColumnFamilyName, Env, DB,
+};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::{
@@ -120,6 +122,7 @@ impl LedgerDb {
     pub(crate) fn new<P: AsRef<Path>>(
         db_root_path: P,
         rocksdb_configs: RocksdbConfigs,
+        env: Option<&Env>,
         readonly: bool,
     ) -> Result<Self> {
         let sharding = rocksdb_configs.enable_storage_sharding;
@@ -137,6 +140,7 @@ impl LedgerDb {
                 LEDGER_DB_NAME
             },
             &rocksdb_configs.ledger_db_config,
+            env,
             &block_cache,
             readonly,
         )?);
@@ -187,6 +191,7 @@ impl LedgerDb {
                         ledger_db_folder.join(EVENT_DB_NAME),
                         EVENT_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        env,
                         &block_cache,
                         readonly,
                     )
@@ -203,6 +208,7 @@ impl LedgerDb {
                         ledger_db_folder.join(PERSISTED_AUXILIARY_INFO_DB_NAME),
                         PERSISTED_AUXILIARY_INFO_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        env,
                         &block_cache,
                         readonly,
                     )
@@ -215,6 +221,7 @@ impl LedgerDb {
                         ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME),
                         TRANSACTION_ACCUMULATOR_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        env,
                         &block_cache,
                         readonly,
                     )
@@ -227,6 +234,7 @@ impl LedgerDb {
                         ledger_db_folder.join(TRANSACTION_AUXILIARY_DATA_DB_NAME),
                         TRANSACTION_AUXILIARY_DATA_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        env,
                         &block_cache,
                         readonly,
                     )
@@ -239,6 +247,7 @@ impl LedgerDb {
                         ledger_db_folder.join(TRANSACTION_DB_NAME),
                         TRANSACTION_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        env,
                         &block_cache,
                         readonly,
                     )
@@ -251,6 +260,7 @@ impl LedgerDb {
                         ledger_db_folder.join(TRANSACTION_INFO_DB_NAME),
                         TRANSACTION_INFO_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        env,
                         &block_cache,
                         readonly,
                     )
@@ -263,6 +273,7 @@ impl LedgerDb {
                         ledger_db_folder.join(WRITE_SET_DB_NAME),
                         WRITE_SET_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        env,
                         &block_cache,
                         readonly,
                     )
@@ -310,7 +321,8 @@ impl LedgerDb {
             enable_storage_sharding: sharding,
             ..Default::default()
         };
-        let ledger_db = Self::new(db_root_path, rocksdb_configs, /*readonly=*/ false)?;
+        let env = None;
+        let ledger_db = Self::new(db_root_path, rocksdb_configs, env, /*readonly=*/ false)?;
         let cp_ledger_db_folder = cp_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
 
         info!(
@@ -443,19 +455,20 @@ impl LedgerDb {
         path: PathBuf,
         name: &str,
         db_config: &RocksdbConfig,
+        env: Option<&Env>,
         block_cache: &Cache,
         readonly: bool,
     ) -> Result<DB> {
         let db = if readonly {
             DB::open_cf_readonly(
-                &gen_rocksdb_options(db_config, true),
+                &gen_rocksdb_options(db_config, env, true),
                 path.clone(),
                 name,
                 Self::gen_cfds_by_name(db_config, block_cache, name),
             )?
         } else {
             DB::open_cf(
-                &gen_rocksdb_options(db_config, false),
+                &gen_rocksdb_options(db_config, env, false),
                 path.clone(),
                 name,
                 Self::gen_cfds_by_name(db_config, block_cache, name),
