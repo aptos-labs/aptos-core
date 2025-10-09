@@ -162,12 +162,8 @@ module aptos_experimental::clearinghouse_test {
             && !bulk_open_asks.contains(account)) {
             return
         };
-        if (bulk_open_asks.contains(account)) {
-            bulk_open_asks.remove(account);
-        };
-        if (bulk_open_bids.contains(account)) {
-            bulk_open_bids.remove(account);
-        }
+        bulk_open_asks.remove(account);
+        bulk_open_bids.remove(account);
     }
 
     public(package) fun order_exists(order_id: OrderIdType): bool acquires GlobalState {

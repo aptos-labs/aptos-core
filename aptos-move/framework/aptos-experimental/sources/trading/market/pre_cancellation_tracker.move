@@ -63,10 +63,14 @@ module aptos_experimental::pre_cancellation_tracker {
     ) {
         garbage_collect(tracker);
         let account_order_id = new_account_client_order_id(account, client_order_id);
-        if (tracker.account_order_ids.contains(&account_order_id)) {
+
+        // If the account_order_id already exists with a previously set expiration time,
+        // we update the expiration time.
+        let prev_expiration_time = tracker.account_order_ids.remove_or_none(&account_order_id);
+        if (prev_expiration_time.is_some()) {
             // If the account_order_id already exists with a previously set expiration time,
             // we update the expiration time.
-            let expiration_time = tracker.account_order_ids.remove(&account_order_id);
+            let expiration_time = prev_expiration_time.destroy_some();
             let order_id_with_expiration =
                 ExpirationAndOrderId { expiration_time, account_order_id };
             // If the mapping exists, then we remove the order ID with its expiration time.
