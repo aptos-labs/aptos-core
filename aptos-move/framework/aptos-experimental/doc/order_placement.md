@@ -1390,6 +1390,7 @@ of fill limit violation  in the previous transaction and the order is just a con
     <b>let</b> is_taker_order =
         market.get_order_book().is_taker_order(limit_price, is_bid, trigger_condition);
 
+    <b>let</b> callback_results = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     <b>if</b> (emit_taker_order_open && trigger_condition.is_none()) {
         // We don't emit order open events for orders <b>with</b> trigger conditions <b>as</b> they are not
         // actually placed in the order book until they are triggered.
@@ -1412,20 +1413,20 @@ of fill limit violation  in the previous transaction and the order is just a con
         );
     };
 
-    <b>if</b> (
-        !callbacks.validate_order_placement(
-            new_clearinghouse_order_info(
-                user_addr,
-                order_id,
-                client_order_id,
-                is_bid,
-                limit_price,
-                time_in_force,
-                metadata
-            ),
-            is_taker_order, // is_taker
-            remaining_size,
-        )) {
+    <b>let</b> validation_result = callbacks.validate_order_placement(
+        new_clearinghouse_order_info(
+            user_addr,
+            order_id,
+            client_order_id,
+            is_bid,
+            limit_price,
+            time_in_force,
+            metadata
+        ),
+        is_taker_order, // is_taker
+        remaining_size,
+    );
+    <b>if</b> (!is_validation_result_valid(&validation_result)) {
         <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
             market,
             user_addr,
@@ -1439,12 +1440,17 @@ of fill limit violation  in the previous transaction and the order is just a con
             is_bid,
             is_taker_order, // is_taker
             OrderCancellationReason::PositionUpdateViolation,
-            std::string::utf8(b"Position Update violation"),
+            validation_result.get_validation_cancellation_reason().destroy_some(),
             metadata,
             time_in_force,
             callbacks,
-            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
         );
+    };
+
+    <b>let</b> validation_actions = validation_result.get_validation_actions();
+    <b>if</b> (validation_actions.is_some()) {
+        callback_results.push_back(validation_actions.destroy_some());
     };
 
     <b>if</b> (client_order_id.is_some()) {
@@ -1544,7 +1550,6 @@ of fill limit violation  in the previous transaction and the order is just a con
     };
     <b>let</b> fill_sizes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     <b>let</b> match_count = 0;
-    <b>let</b> callback_results = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     <b>loop</b> {
         match_count += 1;
         <b>let</b> (taker_cancellation_reason, callback_result) =

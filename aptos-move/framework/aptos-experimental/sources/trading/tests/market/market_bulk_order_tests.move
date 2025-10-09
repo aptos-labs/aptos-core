@@ -25,7 +25,7 @@ module aptos_experimental::market_bulk_order_tests {
         test_gtc_taker_partially_filled_helper,
         test_post_only_success_helper,
         test_post_only_failure_helper,
-        test_taker_partial_cancelled_maker_reinserted_helper, test_self_matching_not_allowed_helper,
+        test_taker_partial_cancelled_maker_reinserted_helper,
         test_self_matching_allowed_helper,
     };
 

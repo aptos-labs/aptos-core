@@ -94,12 +94,20 @@ module aptos_experimental::market_types {
         }
     }
 
+    enum ValidationResult<R: store + copy + drop> has drop, copy {
+        V1 {
+            // If valid this is none, else contains the reason for invalidity
+            cancellation_reason: Option<String>,
+            validation_actions: Option<R>
+        }
+    }
+
     enum MarketClearinghouseCallbacks<M: store + copy + drop, R: store + copy + drop> has drop {
         V1 {
             /// settle_trade_f arguments: market, taker, maker, fill_id, settled_price, settled_size,
             settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u64, u64, u64| SettleTradeResult<R> has drop + copy,
             /// validate_settlement_update_f arguments: order_info, is_taker, size
-            validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64| bool has drop + copy,
+            validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64| ValidationResult<R> has drop + copy,
             /// Validate the bulk order placement arguments: account, bids_prices, bids_sizes, asks_prices, asks_sizes
             validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
             /// place_maker_order_f arguments: order_info, size
@@ -129,9 +137,19 @@ module aptos_experimental::market_types {
         }
     }
 
+    public fun new_validation_result<R: store + copy + drop>(
+        cancellation_reason: Option<String>,
+        validation_actions: Option<R>
+    ): ValidationResult<R> {
+        ValidationResult::V1 {
+            cancellation_reason,
+            validation_actions
+        }
+    }
+
     public fun new_market_clearinghouse_callbacks<M: store + copy + drop, R: store + copy + drop>(
         settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u64, u64, u64| SettleTradeResult<R> has drop + copy,
-        validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64| bool has drop + copy,
+        validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64| ValidationResult<R> has drop + copy,
         validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
         place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
         cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
@@ -167,19 +185,23 @@ module aptos_experimental::market_types {
         &self.callback_result
     }
 
+    public fun is_validation_result_valid<R: store + copy + drop>(self: &ValidationResult<R>): bool {
+        self.cancellation_reason.is_none()
+    }
+
+    public fun get_validation_cancellation_reason<R: store + copy + drop>(self: &ValidationResult<R>): Option<String> {
+        self.cancellation_reason
+    }
+
+    public fun get_validation_actions<R: store + copy + drop>(self: &ValidationResult<R>): Option<R> {
+        self.validation_actions
+    }
+
     public fun extract_results<R: store + copy + drop>(self: CallbackResult<R>): Option<R> {
         match (self) {
             CallbackResult::NOT_AVAILABLE => option::none(),
             CallbackResult::CONTINUE_MATCHING { result } => option::some(result),
             CallbackResult::STOP_MATCHING { result } => option::some(result),
-        }
-    }
-
-    public fun should_continue_matching<R: store + copy + drop>(self: &CallbackResult<R>): bool {
-        match (self) {
-            CallbackResult::CONTINUE_MATCHING { result: _ } => true,
-            CallbackResult::STOP_MATCHING { result: _ } => false,
-            CallbackResult::NOT_AVAILABLE => true,
         }
     }
 
@@ -218,7 +240,7 @@ module aptos_experimental::market_types {
         self: &MarketClearinghouseCallbacks<M, R>,
         order_info: MarketClearinghouseOrderInfo<M>,
         is_taker: bool,
-        size: u64): bool {
+        size: u64): ValidationResult<R> {
         (self.validate_order_placement_f)(order_info, is_taker, size)
     }
 
