@@ -1,0 +1,13 @@
+//**** Cross-compiled for `masm` syntax from `tests/assembler/dollar_names.masm`
+
+//# publish --verbose
+// Bytecode version v8
+module 0xcafe::m
+// Function definition at index 0
+fun $f()
+    ret
+
+// Function definition at index 1
+fun g$122$()
+    ret
+
