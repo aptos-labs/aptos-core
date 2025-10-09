@@ -123,6 +123,7 @@ impl From<RocksdbOpt> for RocksdbConfigs {
                 block_cache_size: opt.block_cache_size,
                 ..Default::default()
             },
+            ..Default::default()
         }
     }
 }
