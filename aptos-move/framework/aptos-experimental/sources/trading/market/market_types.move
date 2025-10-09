@@ -225,6 +225,7 @@ module aptos_experimental::market_types {
         CallbackResult::NOT_AVAILABLE
     }
 
+    #[lint::skip(needless_mutable_reference)]
     public fun settle_trade<M: store + copy + drop, R: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M, R>,
         market: &mut Market<M>,

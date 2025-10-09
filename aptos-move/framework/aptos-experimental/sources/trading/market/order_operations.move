@@ -164,13 +164,14 @@ module aptos_experimental::order_operations {
         );
     }
 
-    /// Internal helper function to cancel a single order.
-    /// This function handles the cleanup and event emission for order cancellation.
-    ///
-    /// Parameters:
-    /// - market: The market instance
-    /// - order: The order to cancel
-    /// - callbacks: The market clearinghouse callbacks for cleanup operations
+    #[lint::skip(needless_mutable_reference)]
+    // Internal helper function to cancel a single order.
+    // This function handles the cleanup and event emission for order cancellation.
+    //
+    // Parameters:
+    // - market: The market instance
+    // - order: The order to cancel
+    // - callbacks: The market clearinghouse callbacks for cleanup operations
     fun cancel_single_order_helper<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         order: SingleOrder<M>,
