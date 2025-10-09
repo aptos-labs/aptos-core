@@ -110,10 +110,10 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             | MoveBytecode::Branch(code_offset) = bytecode
             {
                 let offs = *code_offset as CodeOffset;
-                if !label_map.contains_key(&offs) {
-                    let label = Label::new(label_map.len());
-                    label_map.insert(offs, label);
-                }
+                let label_cnt = label_map.len();
+                let label = label_map.entry(offs).or_insert(Label::new(label_cnt));
+                // remove the label from the fallthrough set if exists
+                self.fallthrough_labels.remove(label);
             }
             if let MoveBytecode::BrTrue(_) | MoveBytecode::BrFalse(_) = bytecode {
                 let next_offs = (pos + 1) as CodeOffset;
