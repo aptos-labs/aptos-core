@@ -3,23 +3,19 @@
 
 use anyhow::Result;
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
-use aptos_transaction_simulation::{AccountData, InMemoryStateStore, SimulationStateStore};
-use aptos_types::{
-    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
-    write_set::WriteSet,
+use aptos_transaction_simulation::{
+    AccountData, InMemoryStateStore, SimulationStateStore, GENESIS_CHANGE_SET_HEAD,
+};
+use aptos_types::transaction::{
+    signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
-use std::io::{self, Read};
 
 fn main() -> Result<()> {
-    let mut blob = vec![];
-    io::stdin().read_to_end(&mut blob)?;
-    let genesis_write_set: WriteSet = bcs::from_bytes(&blob)?;
-
     println!("Start running");
 
     let state_store = InMemoryStateStore::new();
-    state_store.apply_write_set(&genesis_write_set)?;
+    state_store.apply_write_set(GENESIS_CHANGE_SET_HEAD.write_set())?;
 
     let alice = AccountData::new(100_000_000, 0);
     let bob = AccountData::new(100_000_000, 0);
@@ -52,6 +48,8 @@ fn main() -> Result<()> {
     for i in 0..NUM_TXNS {
         assert!(outputs[i as usize].status().status().unwrap().is_success());
     }
+
+    println!("All transactions executed successfully");
 
     Ok(())
 }
