@@ -2129,6 +2129,14 @@ Apply the function to a mutable reference of each key-value pair in the map.
 
 <pre><code><b>pragma</b> opaque;
 <b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; result == <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(<a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(<b>old</b>(self), key));
+<b>ensures</b> [abstract] !<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; result == <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_none">option::spec_none</a>();
+<b>ensures</b> [abstract] !<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, key);
+<b>ensures</b> [abstract] <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(result) ==&gt; self == <b>old</b>(self);
+<b>ensures</b> [abstract] <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(result) ==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(<b>old</b>(self)) == <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(self) + 1;
+<b>ensures</b> [abstract] <b>forall</b> k: K <b>where</b> k != key: <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) ==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(self, k) == <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(<b>old</b>(self), k);
+<b>ensures</b> [abstract] <b>forall</b> k: K <b>where</b> k != key: <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), k) == <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k);
 </code></pre>
 
 
