@@ -138,7 +138,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
             { RELEASE_V1_11.. => "storage_io_per_transaction_byte_write" },
             89,
         ],
-        [memory_quota: AbstractValueSize, { 1.. => "memory_quota" }, 10_000_000],
+        [memory_quota: AbstractValueSize, { 1.. => "memory_quota" }, 1_000_000_000],
         [
             legacy_free_write_bytes_quota: NumBytes,
             { 5.. => "free_write_bytes_quota" },
@@ -209,7 +209,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             max_execution_gas: InternalGas,
             { 7.. => "max_execution_gas" },
-            920_000_000, // 92ms of execution at 10k gas per ms
+            9_200_000_000, // 92ms of execution at 10k gas per ms
         ],
         [
             max_execution_gas_gov: InternalGas,
