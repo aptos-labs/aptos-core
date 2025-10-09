@@ -102,34 +102,32 @@ ask_sizes
     -  [Aborts:](#@Aborts:_22)
 -  [Function `discard_price_crossing_levels`](#0x7_bulk_order_book_types_discard_price_crossing_levels)
 -  [Function `new_bulk_order_match`](#0x7_bulk_order_book_types_new_bulk_order_match)
-    -  [Arguments:](#@Arguments:_23)
-    -  [Returns:](#@Returns:_24)
 -  [Function `get_total_remaining_size`](#0x7_bulk_order_book_types_get_total_remaining_size)
 -  [Function `get_unique_priority_idx`](#0x7_bulk_order_book_types_get_unique_priority_idx)
+    -  [Arguments:](#@Arguments:_23)
+    -  [Returns:](#@Returns:_24)
+-  [Function `get_order_id`](#0x7_bulk_order_book_types_get_order_id)
     -  [Arguments:](#@Arguments:_25)
     -  [Returns:](#@Returns:_26)
--  [Function `get_order_id`](#0x7_bulk_order_book_types_get_order_id)
+-  [Function `get_account`](#0x7_bulk_order_book_types_get_account)
     -  [Arguments:](#@Arguments:_27)
     -  [Returns:](#@Returns:_28)
--  [Function `get_account`](#0x7_bulk_order_book_types_get_account)
+-  [Function `get_active_price`](#0x7_bulk_order_book_types_get_active_price)
     -  [Arguments:](#@Arguments:_29)
     -  [Returns:](#@Returns:_30)
--  [Function `get_active_price`](#0x7_bulk_order_book_types_get_active_price)
-    -  [Arguments:](#@Arguments:_31)
-    -  [Returns:](#@Returns:_32)
 -  [Function `get_all_prices`](#0x7_bulk_order_book_types_get_all_prices)
 -  [Function `get_all_sizes`](#0x7_bulk_order_book_types_get_all_sizes)
 -  [Function `get_active_size`](#0x7_bulk_order_book_types_get_active_size)
-    -  [Arguments:](#@Arguments:_33)
-    -  [Returns:](#@Returns:_34)
+    -  [Arguments:](#@Arguments:_31)
+    -  [Returns:](#@Returns:_32)
 -  [Function `reinsert_order`](#0x7_bulk_order_book_types_reinsert_order)
-    -  [Arguments:](#@Arguments:_35)
+    -  [Arguments:](#@Arguments:_33)
 -  [Function `match_order_and_get_next`](#0x7_bulk_order_book_types_match_order_and_get_next)
-    -  [Arguments:](#@Arguments:_36)
-    -  [Returns:](#@Returns:_37)
-    -  [Aborts:](#@Aborts:_38)
+    -  [Arguments:](#@Arguments:_34)
+    -  [Returns:](#@Returns:_35)
+    -  [Aborts:](#@Aborts:_36)
 -  [Function `set_empty`](#0x7_bulk_order_book_types_set_empty)
-    -  [Arguments:](#@Arguments:_39)
+    -  [Arguments:](#@Arguments:_37)
 -  [Function `destroy_bulk_order`](#0x7_bulk_order_book_types_destroy_bulk_order)
 
 
@@ -872,26 +870,10 @@ Validates a bulk order request for correctness.
 
 ## Function `new_bulk_order_match`
 
-Creates a new single bulk order match result.
 
 
-<a id="@Arguments:_23"></a>
-
-### Arguments:
-
-- <code>order</code>: Reference to the bulk order being matched
-- <code>is_bid</code>: True if matching against bid side, false for ask side
-- <code>matched_size</code>: Size that was matched in this operation
-
-
-<a id="@Returns:_24"></a>
-
-### Returns:
-
-A <code>SingleBulkOrderMatch</code> containing the match details.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_match">new_bulk_order_match</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<b>mut</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, is_bid: bool, matched_size: u64): <a href="order_book_types.md#0x7_order_book_types_OrderMatch">order_book_types::OrderMatch</a>&lt;M&gt;
+<pre><code>#[lint::skip(#[needless_mutable_reference])]
+<b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_match">new_bulk_order_match</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<b>mut</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, is_bid: bool, matched_size: u64): <a href="order_book_types.md#0x7_order_book_types_OrderMatch">order_book_types::OrderMatch</a>&lt;M&gt;
 </code></pre>
 
 
@@ -971,14 +953,14 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
 Gets the unique priority index of a bulk order.
 
 
-<a id="@Arguments:_25"></a>
+<a id="@Arguments:_23"></a>
 
 ### Arguments:
 
 - <code>self</code>: Reference to the bulk order
 
 
-<a id="@Returns:_26"></a>
+<a id="@Returns:_24"></a>
 
 ### Returns:
 
@@ -1012,14 +994,14 @@ The unique priority index for time-based ordering.
 Gets the order ID of a bulk order.
 
 
-<a id="@Arguments:_27"></a>
+<a id="@Arguments:_25"></a>
 
 ### Arguments:
 
 - <code>self</code>: Reference to the bulk order
 
 
-<a id="@Returns:_28"></a>
+<a id="@Returns:_26"></a>
 
 ### Returns:
 
@@ -1053,14 +1035,14 @@ The unique order identifier.
 Gets the account of a bulk order.
 
 
-<a id="@Arguments:_29"></a>
+<a id="@Arguments:_27"></a>
 
 ### Arguments:
 
 - <code>self</code>: Reference to the bulk order
 
 
-<a id="@Returns:_30"></a>
+<a id="@Returns:_28"></a>
 
 ### Returns:
 
@@ -1094,7 +1076,7 @@ The account that placed the order.
 Gets the active price for a specific side of a bulk order.
 
 
-<a id="@Arguments:_31"></a>
+<a id="@Arguments:_29"></a>
 
 ### Arguments:
 
@@ -1102,7 +1084,7 @@ Gets the active price for a specific side of a bulk order.
 - <code>is_bid</code>: True to get bid price, false for ask price
 
 
-<a id="@Returns:_32"></a>
+<a id="@Returns:_30"></a>
 
 ### Returns:
 
@@ -1204,7 +1186,7 @@ An option containing the active price if available, none otherwise.
 Gets the active size for a specific side of a bulk order.
 
 
-<a id="@Arguments:_33"></a>
+<a id="@Arguments:_31"></a>
 
 ### Arguments:
 
@@ -1212,7 +1194,7 @@ Gets the active size for a specific side of a bulk order.
 - <code>is_bid</code>: True to get bid size, false for ask size
 
 
-<a id="@Returns:_34"></a>
+<a id="@Returns:_32"></a>
 
 ### Returns:
 
@@ -1262,7 +1244,7 @@ of the bulk order. If the price already exists at the first level, it increases
 the size; otherwise, it inserts the new price level at the front.
 
 
-<a id="@Arguments:_35"></a>
+<a id="@Arguments:_33"></a>
 
 ### Arguments:
 
@@ -1315,7 +1297,7 @@ This function reduces the size at the first price level by the matched size.
 If the first level becomes empty, it is removed and the next level becomes active.
 
 
-<a id="@Arguments:_36"></a>
+<a id="@Arguments:_34"></a>
 
 ### Arguments:
 
@@ -1324,14 +1306,14 @@ If the first level becomes empty, it is removed and the next level becomes activ
 - <code>matched_size</code>: Size that was matched in this operation
 
 
-<a id="@Returns:_37"></a>
+<a id="@Returns:_35"></a>
 
 ### Returns:
 
 A tuple containing the next active price and size as options.
 
 
-<a id="@Aborts:_38"></a>
+<a id="@Aborts:_36"></a>
 
 ### Aborts:
 
@@ -1383,7 +1365,7 @@ A tuple containing the next active price and size as options.
 Sets the bulk order to empty state by clearing all sizes.
 
 
-<a id="@Arguments:_39"></a>
+<a id="@Arguments:_37"></a>
 
 ### Arguments:
 
