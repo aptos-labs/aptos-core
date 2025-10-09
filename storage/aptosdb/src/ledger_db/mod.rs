@@ -121,13 +121,9 @@ impl LedgerDb {
         db_root_path: P,
         rocksdb_configs: RocksdbConfigs,
         readonly: bool,
+        block_cache: Option<&Cache>,
     ) -> Result<Self> {
         let sharding = rocksdb_configs.enable_storage_sharding;
-        let block_cache = Cache::new_hyper_clock_cache(
-            rocksdb_configs.ledger_db_config.block_cache_size as usize,
-            /* estimated_entry_charge = */ 0,
-        );
-
         let ledger_metadata_db_path = Self::metadata_db_path(db_root_path.as_ref(), sharding);
         let ledger_metadata_db = Arc::new(Self::open_rocksdb(
             ledger_metadata_db_path.clone(),
@@ -137,7 +133,7 @@ impl LedgerDb {
                 LEDGER_DB_NAME
             },
             &rocksdb_configs.ledger_db_config,
-            &block_cache,
+            block_cache,
             readonly,
         )?);
 
@@ -187,7 +183,7 @@ impl LedgerDb {
                         ledger_db_folder.join(EVENT_DB_NAME),
                         EVENT_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
-                        &block_cache,
+                        block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -203,7 +199,7 @@ impl LedgerDb {
                         ledger_db_folder.join(PERSISTED_AUXILIARY_INFO_DB_NAME),
                         PERSISTED_AUXILIARY_INFO_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
-                        &block_cache,
+                        block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -215,7 +211,7 @@ impl LedgerDb {
                         ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME),
                         TRANSACTION_ACCUMULATOR_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
-                        &block_cache,
+                        block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -227,7 +223,7 @@ impl LedgerDb {
                         ledger_db_folder.join(TRANSACTION_AUXILIARY_DATA_DB_NAME),
                         TRANSACTION_AUXILIARY_DATA_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
-                        &block_cache,
+                        block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -239,7 +235,7 @@ impl LedgerDb {
                         ledger_db_folder.join(TRANSACTION_DB_NAME),
                         TRANSACTION_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
-                        &block_cache,
+                        block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -251,7 +247,7 @@ impl LedgerDb {
                         ledger_db_folder.join(TRANSACTION_INFO_DB_NAME),
                         TRANSACTION_INFO_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
-                        &block_cache,
+                        block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -263,7 +259,7 @@ impl LedgerDb {
                         ledger_db_folder.join(WRITE_SET_DB_NAME),
                         WRITE_SET_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
-                        &block_cache,
+                        block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -310,7 +306,7 @@ impl LedgerDb {
             enable_storage_sharding: sharding,
             ..Default::default()
         };
-        let ledger_db = Self::new(db_root_path, rocksdb_configs, /*readonly=*/ false)?;
+        let ledger_db = Self::new(db_root_path, rocksdb_configs, /*readonly=*/ false, None)?;
         let cp_ledger_db_folder = cp_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
 
         info!(
@@ -443,7 +439,7 @@ impl LedgerDb {
         path: PathBuf,
         name: &str,
         db_config: &RocksdbConfig,
-        block_cache: &Cache,
+        block_cache: Option<&Cache>,
         readonly: bool,
     ) -> Result<DB> {
         let db = if readonly {
@@ -484,10 +480,9 @@ impl LedgerDb {
 
     fn gen_cfds_by_name(
         db_config: &RocksdbConfig,
-        block_cache: &Cache,
+        cache: Option<&Cache>,
         name: &str,
     ) -> Vec<ColumnFamilyDescriptor> {
-        let cache = Some(block_cache);
         match name {
             LEDGER_DB_NAME => gen_ledger_cfds(db_config, cache),
             LEDGER_METADATA_DB_NAME => gen_ledger_metadata_cfds(db_config, cache),

@@ -34,6 +34,7 @@ impl DbDir {
             },
             false,
             0,
+            None,
         )
     }
 
@@ -47,6 +48,7 @@ impl DbDir {
             },
             true,
             leger_db.metadata_db_arc(),
+            None,
         )
     }
 
@@ -58,6 +60,7 @@ impl DbDir {
                 ..Default::default()
             },
             true,
+            None,
         )
     }
 }

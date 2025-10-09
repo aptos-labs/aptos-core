@@ -143,12 +143,12 @@ pub struct RocksdbConfig {
 
 impl RocksdbConfig {
     /// Default block cache size is 1GB,
-    const DEFAULT_BLOCK_CACHE_SIZE: u64 = 1 << 30;
+    const DEFAULT_BLOCK_CACHE_SIZE: u64 = 2 << 30;
     /// Default block size is 4KB,
     const DEFAULT_BLOCK_SIZE: u64 = 4 * (1 << 10);
     /// Default block cache size for state kv db is 16GB, because the number of different keys
     /// being read is usually large.
-    const DEFAULT_STATE_KV_BLOCK_CACHE_SIZE: u64 = 16 * (1 << 30);
+    const DEFAULT_STATE_KV_BLOCK_CACHE_SIZE: u64 = 30 * (1 << 30);
 }
 
 impl Default for RocksdbConfig {
