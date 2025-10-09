@@ -9,6 +9,15 @@ warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the 
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+  ┌─ tests/model_ast_lints/nonminimal_bool.move:4:9
+  │
+4 │         if (true && x) ();
+  │         ^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] The right-hand side of `&&` evaluates to `true`. Recall that the expression `bexpr && true` is logically equivalent to `bexpr`. Consider simplifying.
   ┌─ tests/model_ast_lints/nonminimal_bool.move:5:13
   │
@@ -17,6 +26,15 @@ warning: [lint] The right-hand side of `&&` evaluates to `true`. Recall that the
   │
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+  ┌─ tests/model_ast_lints/nonminimal_bool.move:5:9
+  │
+5 │         if (x && true) ();
+  │         ^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] The left-hand side of `&&` evaluates to `false`. Recall that the expression `false && bexpr` is logically equivalent to `false`. Consider simplifying.
   ┌─ tests/model_ast_lints/nonminimal_bool.move:6:13
@@ -27,6 +45,15 @@ warning: [lint] The left-hand side of `&&` evaluates to `false`. Recall that the
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+  ┌─ tests/model_ast_lints/nonminimal_bool.move:6:9
+  │
+6 │         if (false && x) ();
+  │         ^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] The right-hand side of `&&` evaluates to `false`. Recall that the expression `bexpr && false` is logically equivalent to `false`. Consider simplifying.
   ┌─ tests/model_ast_lints/nonminimal_bool.move:7:13
   │
@@ -35,6 +62,15 @@ warning: [lint] The right-hand side of `&&` evaluates to `false`. Recall that th
   │
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+  ┌─ tests/model_ast_lints/nonminimal_bool.move:7:9
+  │
+7 │         if (x && false) ();
+  │         ^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] The left-hand side of `||` evaluates to `true`. Recall that the expression `true || bexpr` is logically equivalent to `true`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:11:13
@@ -45,6 +81,15 @@ warning: [lint] The left-hand side of `||` evaluates to `true`. Recall that the 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/nonminimal_bool.move:11:9
+   │
+11 │         if (true || x) ();
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] The right-hand side of `||` evaluates to `true`. Recall that the expression `bexpr || true` is logically equivalent to `true`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:12:13
    │
@@ -53,6 +98,15 @@ warning: [lint] The right-hand side of `||` evaluates to `true`. Recall that the
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/nonminimal_bool.move:12:9
+   │
+12 │         if (x || true) ();
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the expression `false || bexpr` is logically equivalent to `bexpr`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:13:13
@@ -63,6 +117,15 @@ warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/nonminimal_bool.move:13:9
+   │
+13 │         if (false || x) ();
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] The right-hand side of `||` evaluates to `false`. Recall that the expression `bexpr || false` is logically equivalent to `bexpr`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:14:13
    │
@@ -71,6 +134,15 @@ warning: [lint] The right-hand side of `||` evaluates to `false`. Recall that th
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/nonminimal_bool.move:14:9
+   │
+14 │         if (x || false) ();
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] The right-hand side of `<==>` evaluates to `true`. Recall that the expression `bexpr <==> true` is logically equivalent to `bexpr`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:19:20
@@ -153,6 +225,15 @@ warning: [lint] This expression evaluates to `false`. Recall that the expression
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/nonminimal_bool.move:36:9
+   │
+36 │         if (!true) ();
+   │         ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This expression evaluates to `true`. Recall that the expression `!false` is logically equivalent to `true`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:37:13
    │
@@ -161,6 +242,15 @@ warning: [lint] This expression evaluates to `true`. Recall that the expression 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/nonminimal_bool.move:37:9
+   │
+37 │         if (!false) ();
+   │         ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This expression evaluates to `false`. Recall that the expression `!true` is logically equivalent to `false`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:42:13
@@ -188,3 +278,12 @@ warning: [lint] The right-hand side of `||` evaluates to `true`. Recall that the
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/nonminimal_bool.move:42:9
+   │
+42 │         if (!true && false || true) ();
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
