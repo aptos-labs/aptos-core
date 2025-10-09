@@ -1440,7 +1440,7 @@ of fill limit violation  in the previous transaction and the order is just a con
             is_bid,
             is_taker_order, // is_taker
             OrderCancellationReason::PositionUpdateViolation,
-            std::string::utf8(b"Position Update violation"),
+            validation_result.get_validation_cancellation_reason().destroy_some(),
             metadata,
             time_in_force,
             callbacks,
