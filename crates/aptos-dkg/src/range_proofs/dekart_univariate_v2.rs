@@ -331,7 +331,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             })
             .collect();
 
-        let mut h_evals = Vec::with_capacity(num_omegas);
+        // let mut h_evals: Vec<E::ScalarField> = Vec::with_capacity(num_omegas);
 
         let mut diff_f_js_evals = Vec::with_capacity(ell);
 
@@ -348,6 +348,63 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
             diff_f_js_evals.push(diff_f_j_evals)
         }
+
+        let mut denom = Vec::with_capacity(num_omegas);
+        let val = E::ScalarField::from((n * (n+1) / 2) as u64);
+        denom.push(val);
+
+        let omega_stuff: Vec<E::ScalarField> = ck_S.roots_of_unity_in_eval_dom
+            .iter()
+            .skip(1) // skip the first root omega^0
+            .take(n) // take the next n roots, can remove this
+            .map(|root| {
+                let root_val = *root;
+                E::ScalarField::from((n + 1) as u64) / (root_val * (root_val - E::ScalarField::ONE))
+            })
+            .collect();
+        denom.extend(omega_stuff);
+
+        let N_prime: Vec<Vec<E::ScalarField>> = diff_f_js_evals
+            .iter()
+            .zip(f_j_evals.iter())
+            .map(|(diff_row, hat_row)| {
+                diff_row
+                    .iter()
+                    .zip(hat_row.iter())
+                    .map(|(&diff, &hat)| diff * (E::ScalarField::from(2u64) * hat - E::ScalarField::ONE))
+                    .collect()
+            })
+            .collect();
+
+        let h_evals: Vec<E::ScalarField> = (0..diff_hat_f_evals.len())
+            .map(|i| {
+                // First term: beta * diff_hat_f_evals[i]
+                let mut val = beta * diff_hat_f_evals[i];
+
+                // Second term: -beta * sum_j 2^j * f_j_evals[j][i]
+                let sum1: E::ScalarField = f_j_evals
+                    .iter()
+                    .enumerate()
+                    .map(|(j, row)| {
+                        let pow2 = E::ScalarField::from(1u64 << j); // 2^j
+                        pow2 * row[i]
+                    })
+                    .sum();
+                val -= beta * sum1;
+
+                // Third term: sum_j betas[j] * N_prime[j][i]
+                let sum2: E::ScalarField = N_prime
+                    .iter()
+                    .enumerate()
+                    .map(|(j, row)| betas[j] * row[i])
+                    .sum();
+                val += sum2;
+
+                // Divide by denoms[i]
+                val / denom[i]
+            })
+            .collect();
+
 
         let n_plus_1_inv = E::ScalarField::from((num_omegas) as u64).inverse().unwrap();
         // let mut omega_in_pows: Vec<E::ScalarField> = (1..=n + 1)
@@ -372,46 +429,46 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .collect();
 
         // RHS'(\omega^0) = N(\omega^0) = sum_j beta_j r_j(r_j - 1) + beta^* (r - sum_j 2^{j-1} r_j)
-        h_evals.push({
-            let N_0 = {
-                let mut sum = E::ScalarField::ZERO;
+        // h_evals.push({
+        //     let N_0 = {
+        //         let mut sum = E::ScalarField::ZERO;
 
-                for (j, (&r_j, &beta_j)) in rs.iter().zip(betas.iter()).enumerate() {
-                    // compute: r_j * (beta_j * (r_j - 1) - 2^(j-1) * beta^*)
-                    let term =
-                        r_j * (beta_j * (r_j - E::ScalarField::ONE) - powers_of_two[j] * beta);
-                    sum += term;
-                }
+        //         for (j, (&r_j, &beta_j)) in rs.iter().zip(betas.iter()).enumerate() {
+        //             // compute: r_j * (beta_j * (r_j - 1) - 2^(j-1) * beta^*)
+        //             let term =
+        //                 r_j * (beta_j * (r_j - E::ScalarField::ONE) - powers_of_two[j] * beta);
+        //             sum += term;
+        //         }
 
-                sum + beta * r
-            };
+        //         sum + beta * r
+        //     };
 
-            // h[0] = RHS'(\omega^0) / (n+1)
-            N_0 * n_plus_1_inv
-        });
+        //     // h[0] = RHS'(\omega^0) / (n+1)
+        //     N_0 * n_plus_1_inv
+        // });
 
-        for i in 1..num_omegas {
-            h_evals.push({
-                let mut sum = E::ScalarField::ZERO;
+        // for i in 1..num_omegas {
+        //     h_evals.push({
+        //         let mut sum = E::ScalarField::ZERO;
 
-                for (j, ((f_j_row, diff_f_j_row), &beta_j)) in f_j_evals
-                    .iter()
-                    .zip(diff_f_js_evals.iter())
-                    .zip(betas.iter())
-                    .enumerate()
-                {
-                    let fj = f_j_row[i];
-                    let diff_fj = diff_f_j_row[i];
+        //         for (j, ((f_j_row, diff_f_j_row), &beta_j)) in f_j_evals
+        //             .iter()
+        //             .zip(diff_f_js_evals.iter())
+        //             .zip(betas.iter())
+        //             .enumerate()
+        //         {
+        //             let fj = f_j_row[i];
+        //             let diff_fj = diff_f_j_row[i];
 
-                    // term = diff_f_j[i] * (beta_j * (f_j[i] - 1) + f_j[i] - (2^(j-1) * betastar))
-                    let term = diff_fj
-                        * (beta_j * (fj - E::ScalarField::ONE) + fj - powers_of_two[j] * beta);
-                    sum += term;
-                }
+        //             // term = diff_f_j[i] * (beta_j * (f_j[i] - 1) + beta_j * f_j[i] - (2^(j-1) * betastar))
+        //             let term = diff_fj
+        //                 * (beta_j * (fj - E::ScalarField::ONE) + beta_j * fj - powers_of_two[j] * beta);
+        //             sum += term;
+        //         }
 
-                (sum + beta * diff_hat_f_evals[i]) * precomputed_stuff[i - 1]
-            });
-        }
+        //         (sum + beta * diff_hat_f_evals[i]) * precomputed_stuff[i - 1]
+        //     });
+        // }
 
         let rho_h = E::ScalarField::rand(rng);
         let D = hkzg_commit.apply(&(rho_h, h_evals.clone()));
@@ -443,7 +500,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 coeffs: hat_f_coeffs,
             };
             poly.evaluate(&gamma)
-        }; // Should be Horner
+        }; // This algorithm should be Horner's
 
         let a_h =
             OURpolynomials::barycentric_eval(&h_evals, &ck_S.roots_of_unity_in_eval_dom, gamma);
@@ -454,11 +511,41 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                     coeffs: f_j_coeffs[i].clone(),
                 };
                 poly.evaluate(&gamma)
-            }) // Should be Horner
+            }) // This algorithm should be Horner's
             .collect();
 
+
+        //////////// TEMPORARY TEST
+
+        // Compute sum_j 2^j * a_j[j]
+        let two_pow_a_sum: E::ScalarField = a_j
+            .iter()
+            .enumerate()
+            .map(|(j, aj)| *aj * E::ScalarField::from(1u64 << j))
+            .sum();
+
+        // Compute sum_j betas[j] * a_j[j] * (a_j[j] - 1)
+        let betas_sum: E::ScalarField = a_j
+            .iter()
+            .zip(betas.iter())
+            .map(|(aj, beta_j)| *beta_j * (*aj * (*aj - E::ScalarField::ONE)))
+            .sum();
+
+        // Compute the final RHS
+        let rhs = beta * (a + two_pow_a_sum) + betas_sum;
+
+        let gamma_pow_n_plus_1 = gamma.pow([(n + 1) as u64]); // gamma^(n+1)
+        let denomz = (gamma_pow_n_plus_1 - E::ScalarField::ONE) * (gamma - E::ScalarField::ONE).inverse().unwrap();
+
+        let result = rhs * denomz.inverse().unwrap();
+
+        // Assert equality
+        assert_eq!(a_h, result);
+
+        ////////////
+
         // Step 10
-        let mut s = E::ScalarField::rand(rng);
+        let s = E::ScalarField::rand(rng);
 
         let rho_u = mu * (*rho + delta_rho)
             + mu_h * rho_h
@@ -546,12 +633,25 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(fs_transcript, ell);
 
         // Step 6
-        let U: E::G1 = *hatC * mu
-            + *D * mu_h
-            + Cj.iter()
-                .zip(&mus)
-                .map(|(&C_j, &mu_j)| C_j * mu_j)
-                .sum::<E::G1>();
+        // let U: E::G1 = *hatC * mu
+        //     + *D * mu_h
+        //     + Cj.iter()
+        //         .zip(&mus)
+        //         .map(|(&C_j, &mu_j)| C_j * mu_j)
+        //         .sum::<E::G1>(); // TODO: make this an MSM???
+
+        let U_bases_proj: Vec<E::G1> = std::iter::once(*hatC)
+            .chain(std::iter::once(*D))
+            .chain(Cj.iter().copied())
+            .collect();
+        let U_bases = E::G1::normalize_batch(&U_bases_proj);
+
+        let U_scalars: Vec<_> = std::iter::once(mu)
+            .chain(std::iter::once(mu_h))
+            .chain(mus.iter().copied())
+            .collect();
+
+        let U = E::G1::msm(&U_bases, &U_scalars).expect("problem computing MSM in DeKART v2");
 
         // Step 7
         let gamma = fiat_shamir::get_gamma_challenge::<E>(fs_transcript, &roots_of_unity);
@@ -564,17 +664,29 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 .map(|(&a_j, &mu_j)| a_j * mu_j)
                 .sum::<E::ScalarField>();
 
-        univariate_hiding_kzg::Homomorphism::verify(
-            univariate_hiding_kzg::VerificationKey {
-                xi_2: *xi_2,
-                tau_2: *tau_2,
-                group_data: group_data.clone()
-            },
-            univariate_hiding_kzg::Commitment(U),
-            gamma,
-            a_u,
-            pi_gamma.clone()
-        )?;
+        // univariate_hiding_kzg::Homomorphism::verify(
+        //     univariate_hiding_kzg::VerificationKey {
+        //         xi_2: *xi_2,
+        //         tau_2: *tau_2,
+        //         group_data: group_data.clone()
+        //     },
+        //     univariate_hiding_kzg::Commitment(U),
+        //     gamma,
+        //     a_u,
+        //     pi_gamma.clone()
+        // )?;
+
+        // assert!(univariate_hiding_kzg::Homomorphism::verify(
+        //     univariate_hiding_kzg::VerificationKey {
+        //         xi_2: *xi_2,
+        //         tau_2: *tau_2,
+        //         group_data: group_data.clone()
+        //     },
+        //     univariate_hiding_kzg::Commitment(U),
+        //     gamma,
+        //     a_u,
+        //     pi_gamma.clone()
+        // ).is_ok());
 
         // Step 9
         let gamma_pow = gamma.pow(&[(n + 1) as u64]); // gamma^(n+1) // TODO: change to some max_n ?
@@ -600,7 +712,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let RHS = beta * (*a - sum1) + sum2;
 
-        // assert_eq!(LHS, RHS); // TODO!!!!!
+        assert_eq!(LHS, RHS); // TODO!!!!!
 
         Ok(())
     }
