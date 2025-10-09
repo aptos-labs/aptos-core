@@ -1253,6 +1253,27 @@ impl GlobalEnv {
             .any(|(d, _)| d.severity >= Severity::Warning)
     }
 
+    /// Returns the number of diagnostics at or above `min_severity` that originate from
+    /// primary target files.
+    pub fn diag_count_in_primary_targets(&self, min_severity: Severity) -> usize {
+        self.diags
+            .borrow()
+            .iter()
+            .filter(|(d, _)| {
+                d.severity >= min_severity
+                    && d.labels
+                        .iter()
+                        .any(|label| self.file_id_is_primary_target.contains(&label.file_id))
+            })
+            .count()
+    }
+
+    /// Returns true if there are diagnostics with warning severity or worse that
+    /// originate only from primary target files.
+    pub fn has_warnings_in_primary_targets(&self) -> bool {
+        self.diag_count_in_primary_targets(Severity::Warning) > 0
+    }
+
     /// Writes accumulated diagnostics of given or higher severity.
     pub fn report_diag<W: WriteColor>(&self, writer: &mut W, severity: Severity) {
         self.report_diag_with_filter(
