@@ -15,6 +15,7 @@ use ark_ff::Field;
 use ark_poly::EvaluationDomain;
 use ark_serialize::CanonicalSerialize;
 use ark_std::rand::{CryptoRng, RngCore};
+use ark_serialize::CanonicalDeserialize;
 
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
@@ -108,32 +109,11 @@ pub struct Commitment<E: Pairing>(pub E::G1);
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct CommitmentRandomness<E: Pairing>(pub E::ScalarField);
 
-// struct CommitmentWithWitness<E: Pairing> {
-//     c: E::G1,
-//     f: Vec<E::ScalarField>, // assumed to be in evaluation form, so just a bunch of values really, but can be modified
-//     r: E::ScalarField,
-// }
-
-// struct Proof<E: Pairing> {
-//     pi: E::G1,
-//     phi: E::G1,
-//     s: E::ScalarField,
-// }
-
-use ark_serialize::CanonicalDeserialize;
-
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Proof<E: Pairing> {
     pi_1: Commitment<E>,
     pi_2: E::G1,
 }
-
-// pub struct Homomorphism<'a, E: Pairing> {
-//     pub lagr_g1: &'a [E::G1Affine],
-//     pub zeta: E::G1Affine,
-// }
-
-
 
 impl<'a, E: Pairing> Homomorphism<'a, E> {
     // fn compute_batch_eval_proof(pk: &CommitmentKey<E>, commitments: Vec<CommitmentWithWitness<E>>, xs: Vec<E::ScalarField>, s: E::ScalarField) -> Proof<E> {
@@ -400,16 +380,16 @@ mod tests {
             .map(|(i, _)| Fr::from((i as u64) + 1))
             .collect();
 
-        let s = CommitmentRandomness::<Bls12_381>(Fr::from(5u64));
-        let rho = Fr::from(2u64);
+        let rho = CommitmentRandomness::<Bls12_381>(Fr::from(5u64));
+        let s = CommitmentRandomness::<Bls12_381>(Fr::from(2u64));
         let x = Fr::from(3u64);
         let y = polynomials::barycentric_eval(&f_evals, &ck.roots_of_unity_in_eval_dom, x);
 
         // Commit to f
-        let C = super::commit_with_randomness(&ck, &f_evals, &s);
+        let C = super::commit_with_randomness(&ck, &f_evals, &rho);
 
         // Open at x
-        let proof = Homomorphism::<Bls12_381>::open(&ck, f_evals.clone(), rho, x, &s);
+        let proof = Homomorphism::<Bls12_381>::open(&ck, f_evals.clone(), rho.0, x, &s);
 
         // Verify proof
         let result = Homomorphism::<Bls12_381>::verify(vk, C, x, y, proof);
