@@ -25,7 +25,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{
     batch::{IntoRawBatch, RawBatch, SchemaBatch, WriteBatch},
-    Cache, DB,
+    Cache, Env, DB,
 };
 #[cfg(test)]
 use aptos_scratchpad::get_state_shard_id;
@@ -71,6 +71,7 @@ impl StateMerkleDb {
     pub(crate) fn new(
         db_paths: &StorageDirPaths,
         rocksdb_configs: RocksdbConfigs,
+        env: Option<&Env>,
         readonly: bool,
         // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
         // hacky, need to revisit.
@@ -97,6 +98,7 @@ impl StateMerkleDb {
                 state_merkle_db_path,
                 STATE_MERKLE_DB_NAME,
                 &state_merkle_db_config,
+                env,
                 &block_cache,
                 readonly,
             )?);
@@ -112,6 +114,7 @@ impl StateMerkleDb {
         Self::open(
             db_paths,
             state_merkle_db_config,
+            env,
             &block_cache,
             readonly,
             version_caches,
@@ -177,6 +180,7 @@ impl StateMerkleDb {
         let state_merkle_db = Self::new(
             &StorageDirPaths::from_path(db_root_path),
             rocksdb_configs,
+            /*env=*/ None,
             /*readonly=*/ false,
             /*max_nodes_per_lru_cache_shard=*/ 0,
         )?;
@@ -559,6 +563,7 @@ impl StateMerkleDb {
     fn open(
         db_paths: &StorageDirPaths,
         state_merkle_db_config: RocksdbConfig,
+        env: Option<&Env>,
         block_cache: &Cache,
         readonly: bool,
         version_caches: HashMap<Option<usize>, VersionedNodeCache>,
@@ -573,6 +578,7 @@ impl StateMerkleDb {
             state_merkle_metadata_db_path.clone(),
             STATE_MERKLE_METADATA_DB_NAME,
             &state_merkle_db_config,
+            env,
             block_cache,
             readonly,
         )?);
@@ -590,6 +596,7 @@ impl StateMerkleDb {
                     shard_root_path,
                     shard_id,
                     &state_merkle_db_config,
+                    env,
                     block_cache,
                     readonly,
                 )
@@ -628,6 +635,7 @@ impl StateMerkleDb {
         db_root_path: P,
         shard_id: usize,
         state_merkle_db_config: &RocksdbConfig,
+        env: Option<&Env>,
         block_cache: &Cache,
         readonly: bool,
     ) -> Result<DB> {
@@ -636,6 +644,7 @@ impl StateMerkleDb {
             Self::db_shard_path(db_root_path, shard_id),
             &db_name,
             state_merkle_db_config,
+            env,
             block_cache,
             readonly,
         )
@@ -645,19 +654,20 @@ impl StateMerkleDb {
         path: PathBuf,
         name: &str,
         state_merkle_db_config: &RocksdbConfig,
+        env: Option<&Env>,
         block_cache: &Cache,
         readonly: bool,
     ) -> Result<DB> {
         Ok(if readonly {
             DB::open_cf_readonly(
-                &gen_rocksdb_options(state_merkle_db_config, true),
+                &gen_rocksdb_options(state_merkle_db_config, env, true),
                 path,
                 name,
                 gen_state_merkle_cfds(state_merkle_db_config, Some(block_cache)),
             )?
         } else {
             DB::open_cf(
-                &gen_rocksdb_options(state_merkle_db_config, false),
+                &gen_rocksdb_options(state_merkle_db_config, env, false),
                 path,
                 name,
                 gen_state_merkle_cfds(state_merkle_db_config, Some(block_cache)),
