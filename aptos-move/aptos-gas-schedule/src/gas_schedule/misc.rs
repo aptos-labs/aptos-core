@@ -118,12 +118,10 @@ where
         [visit_i256, I256],
         [visit_bool, bool],
         [visit_address, AccountAddress],
+        // TODO(##17840): add supports for `visit_vec_u16`, `visit_vec_u32`, `visit_vec_u256`
         [visit_vec_u8, &[u8]],
-        [visit_vec_u16, &[u16]],
-        [visit_vec_u32, &[u32]],
         [visit_vec_u64, &[u64]],
         [visit_vec_u128, &[u128]],
-        [visit_vec_u256, &[U256]],
         [visit_vec_bool, &[bool]],
         [visit_vec_address, &[AccountAddress]],
         [visit_vec_i8, &[i8]],
