@@ -403,10 +403,9 @@ where
             // delayed fields is needed because enums cannot be delayed fields!
             StructLayout::Variants(variants) => {
                 let mut variant_contains_delayed_fields = false;
-                let _enum_option_enabled =
-                    self.runtime_environment().vm_config().enable_enum_option;
+                let enum_option_enabled = self.runtime_environment().vm_config().enable_enum_option;
                 // convert enum representation of option for backward compatibility
-                if ANNOTATED {
+                if enum_option_enabled && ANNOTATED {
                     let ty_tag_converter =
                         TypeTagConverter::new(self.struct_definition_loader.runtime_environment());
                     let struct_tag =
