@@ -52,8 +52,8 @@ use move_vm_types::{
     natives::function::NativeResult,
     resolver::ResourceResolver,
     values::{
-        self, AbstractFunction, Closure, GlobalValue, IntegerValue, Locals, Reference, SignerRef,
-        Struct, StructRef, VMValueCast, Value, Vector, VectorRef,
+        self, AbstractFunction, Closure, GlobalValue, Locals, Reference, SignerRef, Struct,
+        StructRef, VMValueCast, Value, Vector, VectorRef,
     },
     views::TypeView,
 };
@@ -1225,68 +1225,48 @@ where
     }
 
     /// Perform a binary operation to two values at the top of the stack.
-    fn binop<F, T>(&mut self, f: F) -> PartialVMResult<()>
+    #[inline(always)]
+    fn binop<F>(&mut self, f: F) -> PartialVMResult<()>
     where
-        Value: VMValueCast<T>,
-        F: FnOnce(T, T) -> PartialVMResult<Value>,
+        F: FnOnce(Value, Value) -> PartialVMResult<Value>,
     {
-        let rhs = self.operand_stack.pop_as::<T>()?;
-        let lhs = self.operand_stack.pop_as::<T>()?;
+        let rhs = self.operand_stack.pop()?;
+        let lhs = self.operand_stack.pop()?;
         let result = f(lhs, rhs)?;
         self.operand_stack.push(result)
     }
 
-    /// Perform a unary operation to one value at the top of the stack.
-    fn unop<F, T>(&mut self, f: F) -> PartialVMResult<()>
+    #[inline(always)]
+    fn binop_bool<F>(&mut self, f: F) -> PartialVMResult<()>
     where
-        Value: VMValueCast<T>,
-        F: FnOnce(T) -> PartialVMResult<Value>,
+        F: FnOnce(bool, bool) -> PartialVMResult<bool>,
     {
-        let arg = self.operand_stack.pop_as::<T>()?;
+        let rhs = self.operand_stack.pop_as::<bool>()?;
+        let lhs = self.operand_stack.pop_as::<bool>()?;
+        let result = f(lhs, rhs)?;
+        self.operand_stack.push(Value::bool(result))
+    }
+
+    #[inline(always)]
+    fn binop_rel<F>(&mut self, f: F) -> PartialVMResult<()>
+    where
+        F: FnOnce(Value, Value) -> PartialVMResult<bool>,
+    {
+        let rhs = self.operand_stack.pop()?;
+        let lhs = self.operand_stack.pop()?;
+        let result = f(lhs, rhs)?;
+        self.operand_stack.push(Value::bool(result))
+    }
+
+    /// Perform a unary operation to one value at the top of the stack.
+    #[inline(always)]
+    fn unop<F>(&mut self, f: F) -> PartialVMResult<()>
+    where
+        F: FnOnce(Value) -> PartialVMResult<Value>,
+    {
+        let arg = self.operand_stack.pop()?;
         let result = f(arg)?;
         self.operand_stack.push(result)
-    }
-
-    /// Perform a binary operation for integer values.
-    fn binop_int<F>(&mut self, f: F) -> PartialVMResult<()>
-    where
-        F: FnOnce(IntegerValue, IntegerValue) -> PartialVMResult<IntegerValue>,
-    {
-        self.binop(|lhs, rhs| Ok(Self::integer_value_to_value(f(lhs, rhs)?)))
-    }
-
-    /// Perform a unary operation for integer values.
-    fn unop_int<F>(&mut self, f: F) -> PartialVMResult<()>
-    where
-        F: FnOnce(IntegerValue) -> PartialVMResult<IntegerValue>,
-    {
-        self.unop(|arg| Ok(Self::integer_value_to_value(f(arg)?)))
-    }
-
-    fn integer_value_to_value(val: IntegerValue) -> Value {
-        match val {
-            IntegerValue::U8(x) => Value::u8(x),
-            IntegerValue::U16(x) => Value::u16(x),
-            IntegerValue::U32(x) => Value::u32(x),
-            IntegerValue::U64(x) => Value::u64(x),
-            IntegerValue::U128(x) => Value::u128(x),
-            IntegerValue::U256(x) => Value::u256(x),
-            IntegerValue::I8(x) => Value::i8(x),
-            IntegerValue::I16(x) => Value::i16(x),
-            IntegerValue::I32(x) => Value::i32(x),
-            IntegerValue::I64(x) => Value::i64(x),
-            IntegerValue::I128(x) => Value::i128(x),
-            IntegerValue::I256(x) => Value::i256(x),
-        }
-    }
-
-    /// Perform a binary operation for boolean values.
-    fn binop_bool<F, T>(&mut self, f: F) -> PartialVMResult<()>
-    where
-        Value: VMValueCast<T>,
-        F: FnOnce(T, T) -> PartialVMResult<bool>,
-    {
-        self.binop(|lhs, rhs| Ok(Value::bool(f(lhs, rhs)?)))
     }
 
     /// Creates a data cache entry for the specified address-type pair. Charges gas for the number
@@ -2626,84 +2606,84 @@ impl Frame {
                     },
                     Bytecode::CastU8 => {
                         gas_meter.charge_simple_instr(S::CastU8)?;
-                        let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
                             .push(Value::u8(integer_value.cast_u8()?))?;
                     },
                     Bytecode::CastU16 => {
                         gas_meter.charge_simple_instr(S::CastU16)?;
-                        let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
                             .push(Value::u16(integer_value.cast_u16()?))?;
                     },
                     Bytecode::CastU32 => {
                         gas_meter.charge_simple_instr(S::CastU32)?;
-                        let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
                             .push(Value::u32(integer_value.cast_u32()?))?;
                     },
                     Bytecode::CastU64 => {
                         gas_meter.charge_simple_instr(S::CastU64)?;
-                        let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
                             .push(Value::u64(integer_value.cast_u64()?))?;
                     },
                     Bytecode::CastU128 => {
                         gas_meter.charge_simple_instr(S::CastU128)?;
-                        let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
                             .push(Value::u128(integer_value.cast_u128()?))?;
                     },
                     Bytecode::CastU256 => {
                         gas_meter.charge_simple_instr(S::CastU256)?;
-                        let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
                             .push(Value::u256(integer_value.cast_u256()?))?;
                     },
                     Bytecode::CastI8 => {
                         gas_meter.charge_simple_instr(S::CastI8)?;
-                        let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
                             .push(Value::i8(integer_value.cast_i8()?))?;
                     },
                     Bytecode::CastI16 => {
                         gas_meter.charge_simple_instr(S::CastI16)?;
-                        let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
                             .push(Value::i16(integer_value.cast_i16()?))?;
                     },
                     Bytecode::CastI32 => {
                         gas_meter.charge_simple_instr(S::CastI32)?;
-                        let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
                             .push(Value::i32(integer_value.cast_i32()?))?;
                     },
                     Bytecode::CastI64 => {
                         gas_meter.charge_simple_instr(S::CastI64)?;
-                        let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
                             .push(Value::i64(integer_value.cast_i64()?))?;
                     },
                     Bytecode::CastI128 => {
                         gas_meter.charge_simple_instr(S::CastI128)?;
-                        let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
                             .push(Value::i128(integer_value.cast_i128()?))?;
                     },
                     Bytecode::CastI256 => {
                         gas_meter.charge_simple_instr(S::CastI256)?;
-                        let integer_value = interpreter.operand_stack.pop_as::<IntegerValue>()?;
+                        let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
                             .push(Value::i256(integer_value.cast_i256()?))?;
@@ -2712,55 +2692,51 @@ impl Frame {
                     // Arithmetic Operations
                     Bytecode::Add => {
                         gas_meter.charge_simple_instr(S::Add)?;
-                        interpreter.binop_int(IntegerValue::add_checked)?
+                        interpreter.binop(Value::add_checked)?
                     },
                     Bytecode::Sub => {
                         gas_meter.charge_simple_instr(S::Sub)?;
-                        interpreter.binop_int(IntegerValue::sub_checked)?
+                        interpreter.binop(Value::sub_checked)?
                     },
                     Bytecode::Mul => {
                         gas_meter.charge_simple_instr(S::Mul)?;
-                        interpreter.binop_int(IntegerValue::mul_checked)?
+                        interpreter.binop(Value::mul_checked)?
                     },
                     Bytecode::Mod => {
                         gas_meter.charge_simple_instr(S::Mod)?;
-                        interpreter.binop_int(IntegerValue::rem_checked)?
+                        interpreter.binop(Value::rem_checked)?
                     },
                     Bytecode::Div => {
                         gas_meter.charge_simple_instr(S::Div)?;
-                        interpreter.binop_int(IntegerValue::div_checked)?
+                        interpreter.binop(Value::div_checked)?
                     },
                     Bytecode::Negate => {
                         gas_meter.charge_simple_instr(S::Negate)?;
-                        interpreter.unop_int(IntegerValue::negate_checked)?
+                        interpreter.unop(Value::negate_checked)?
                     },
                     Bytecode::BitOr => {
                         gas_meter.charge_simple_instr(S::BitOr)?;
-                        interpreter.binop_int(IntegerValue::bit_or)?
+                        interpreter.binop(Value::bit_or)?
                     },
                     Bytecode::BitAnd => {
                         gas_meter.charge_simple_instr(S::BitAnd)?;
-                        interpreter.binop_int(IntegerValue::bit_and)?
+                        interpreter.binop(Value::bit_and)?
                     },
                     Bytecode::Xor => {
                         gas_meter.charge_simple_instr(S::Xor)?;
-                        interpreter.binop_int(IntegerValue::bit_xor)?
+                        interpreter.binop(Value::bit_xor)?
                     },
                     Bytecode::Shl => {
                         gas_meter.charge_simple_instr(S::Shl)?;
                         let rhs = interpreter.operand_stack.pop_as::<u8>()?;
-                        let lhs = interpreter.operand_stack.pop_as::<IntegerValue>()?;
-                        interpreter
-                            .operand_stack
-                            .push(lhs.shl_checked(rhs)?.into_value())?;
+                        let lhs = interpreter.operand_stack.pop()?;
+                        interpreter.operand_stack.push(lhs.shl_checked(rhs)?)?;
                     },
                     Bytecode::Shr => {
                         gas_meter.charge_simple_instr(S::Shr)?;
                         let rhs = interpreter.operand_stack.pop_as::<u8>()?;
-                        let lhs = interpreter.operand_stack.pop_as::<IntegerValue>()?;
-                        interpreter
-                            .operand_stack
-                            .push(lhs.shr_checked(rhs)?.into_value())?;
+                        let lhs = interpreter.operand_stack.pop()?;
+                        interpreter.operand_stack.push(lhs.shr_checked(rhs)?)?;
                     },
                     Bytecode::Or => {
                         gas_meter.charge_simple_instr(S::Or)?;
@@ -2772,19 +2748,19 @@ impl Frame {
                     },
                     Bytecode::Lt => {
                         gas_meter.charge_simple_instr(S::Lt)?;
-                        interpreter.binop_bool(IntegerValue::lt)?
+                        interpreter.binop_rel(Value::lt)?
                     },
                     Bytecode::Gt => {
                         gas_meter.charge_simple_instr(S::Gt)?;
-                        interpreter.binop_bool(IntegerValue::gt)?
+                        interpreter.binop_rel(Value::gt)?
                     },
                     Bytecode::Le => {
                         gas_meter.charge_simple_instr(S::Le)?;
-                        interpreter.binop_bool(IntegerValue::le)?
+                        interpreter.binop_rel(Value::le)?
                     },
                     Bytecode::Ge => {
                         gas_meter.charge_simple_instr(S::Ge)?;
-                        interpreter.binop_bool(IntegerValue::ge)?
+                        interpreter.binop_rel(Value::ge)?
                     },
                     Bytecode::Abort => {
                         gas_meter.charge_simple_instr(S::Abort)?;
