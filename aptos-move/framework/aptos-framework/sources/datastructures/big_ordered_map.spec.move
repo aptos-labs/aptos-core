@@ -97,7 +97,7 @@ spec aptos_std::big_ordered_map {
         pragma verify = false;
     }
 
-    spec lower_bound {
+    spec internal_lower_bound {
         pragma opaque;
         pragma verify = false;
     }
@@ -220,17 +220,17 @@ spec aptos_std::big_ordered_map {
     }
 
 
-    spec find {
+    spec internal_find {
         pragma opaque;
         pragma verify = false;
     }
 
-    spec new_begin_iter {
+    spec internal_new_begin_iter {
         pragma opaque;
         pragma verify = false;
     }
 
-    spec new_end_iter {
+    spec internal_new_end_iter {
         pragma opaque;
         pragma verify = false;
     }
