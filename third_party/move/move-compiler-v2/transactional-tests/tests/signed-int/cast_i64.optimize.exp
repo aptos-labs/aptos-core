@@ -1,0 +1,74 @@
+processed 10 tasks
+task 0 lines 1-43:  run --verbose [script {]
+task 1 lines 45-69:  run --verbose [script {]
+task 2 lines 71-88:  run --verbose [script {]
+task 3 lines 90-96:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast u64(9223372036854775808) to i64,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 4 lines 98-104:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast u128(9223372036854775808) to i64,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 5 lines 106-114:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast U256(9223372036854775808) to i64,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 6 lines 116-122:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i128(9223372036854775808) to i64,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 7 lines 124-132:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast I256(9223372036854775808) to i64,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 8 lines 134-140:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i128(-9223372036854775809) to i64,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 9 lines 142-148:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast I256(-9223372036854775809) to i64,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

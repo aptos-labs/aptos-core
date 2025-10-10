@@ -1,0 +1,1939 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::valid_struct {
+    enum E1 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i64>,
+        }
+    }
+    enum E2 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i128>,
+        }
+    }
+    enum E3<T> {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 {
+        x: u64,
+        y: i64,
+        z: i128,
+    }
+    struct S2 {
+        x: S1,
+        y: i64,
+        z: i128,
+    }
+    struct S3<T> {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    private fun test1(a: i64,b: i128): S3<i64> {
+        {
+          let s1: S1 = pack valid_struct::S1(1, a, b);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, a, b);
+            {
+              let s3: S3<i64> = pack valid_struct::S3<i64>(a, s1, s2);
+              s3
+            }
+          }
+        }
+    }
+    private fun test2(): S3<i64> {
+        {
+          let s1: S1 = pack valid_struct::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, -1, -2);
+            {
+              let s3: S3<i64> = pack valid_struct::S3<i64>(-1, s1, s2);
+              s3
+            }
+          }
+        }
+    }
+    private fun test3(a: i64,b: i128): S3<i128> {
+        {
+          let s1: S1 = pack valid_struct::S1(1, a, b);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, a, b);
+            {
+              let s3: S3<i128> = pack valid_struct::S3<i128>(b, s1, s2);
+              s3
+            }
+          }
+        }
+    }
+    private fun test4(): S3<i128> {
+        {
+          let s1: S1 = pack valid_struct::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, -1, -2);
+            {
+              let s3: S3<i128> = pack valid_struct::S3<i128>(-1, s1, s2);
+              s3
+            }
+          }
+        }
+    }
+    private fun test5(): E1 {
+        {
+          let s1: S1 = pack valid_struct::S1(1, -1, -2);
+          {
+            let e: E1 = pack valid_struct::E1::V1(s1);
+            e
+          }
+        }
+    }
+    private fun test6(): E2 {
+        {
+          let s1: S1 = pack valid_struct::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, -1, -2);
+            {
+              let e: E2 = pack valid_struct::E2::V2(s2);
+              e
+            }
+          }
+        }
+    }
+    private fun test7(): E3<i64> {
+        {
+          let s1: S1 = pack valid_struct::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, -1, -2);
+            {
+              let s3: S3<i64> = pack valid_struct::S3<i64>(-1, s1, s2);
+              {
+                let e: E3<i64> = pack valid_struct::E3::V3<i64>(s3);
+                e
+              }
+            }
+          }
+        }
+    }
+    private fun test8(): E3<i128> {
+        {
+          let s1: S1 = pack valid_struct::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, -1, -2);
+            {
+              let s3: S3<i128> = pack valid_struct::S3<i128>(-1, s1, s2);
+              {
+                let e: E3<i128> = pack valid_struct::E3::V3<i128>(s3);
+                e
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::valid_struct
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::valid_struct {
+    enum E1 has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i64>,
+        }
+    }
+    enum E2 has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i128>,
+        }
+    }
+    enum E3<T> has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 has copy, drop {
+        x: u64,
+        y: i64,
+        z: i128,
+    }
+    struct S2 has copy, drop {
+        x: S1,
+        y: i64,
+        z: i128,
+    }
+    struct S3<T> has copy, drop {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    fun test1(a: i64, b: i128): S3<i64> {
+        let s1 = S1{x: 1, y: a, z: b};
+        let s2 = S2{x: s1, y: a, z: b};
+        let s3 = S3<i64>{x: a, y: s1, z: s2};
+        s3
+    }
+    fun test2(): S3<i64> {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        let s2 = S2{x: s1, y: -1i64, z: -2i128};
+        let s3 = S3<i64>{x: -1i64, y: s1, z: s2};
+        s3
+    }
+    fun test3(a: i64, b: i128): S3<i128> {
+        let s1 = S1{x: 1, y: a, z: b};
+        let s2 = S2{x: s1, y: a, z: b};
+        let s3 = S3<i128>{x: b, y: s1, z: s2};
+        s3
+    }
+    fun test4(): S3<i128> {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        let s2 = S2{x: s1, y: -1i64, z: -2i128};
+        let s3 = S3<i128>{x: -1i128, y: s1, z: s2};
+        s3
+    }
+    fun test5(): E1 {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        let e = E1::V1{s: s1};
+        e
+    }
+    fun test6(): E2 {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        let s2 = S2{x: s1, y: -1i64, z: -2i128};
+        let e = E2::V2{s: s2};
+        e
+    }
+    fun test7(): E3<i64> {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        let s2 = S2{x: s1, y: -1i64, z: -2i128};
+        let s3 = S3<i64>{x: -1i64, y: s1, z: s2};
+        let e = E3::V3<i64>{s: s3};
+        e
+    }
+    fun test8(): E3<i128> {
+        let s1 = S1{x: 1, y: -1i64, z: -2i128};
+        let s2 = S2{x: s1, y: -1i64, z: -2i128};
+        let s3 = S3<i128>{x: -1i128, y: s1, z: s2};
+        let e = E3::V3<i128>{s: s3};
+        e
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_struct::test1($t0: i64, $t1: i128): 0x42::valid_struct::S3<i64> {
+     var $t2: 0x42::valid_struct::S3<i64>
+     var $t3: 0x42::valid_struct::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: 0x42::valid_struct::S2
+     var $t7: 0x42::valid_struct::S1
+     var $t8: i64
+     var $t9: 0x42::valid_struct::S3<i64>
+     var $t10: i64
+     var $t11: 0x42::valid_struct::S1
+  0: $t4 := 1
+  1: $t5 := infer($t0)
+  2: $t3 := pack 0x42::valid_struct::S1($t4, $t5, $t1)
+  3: $t7 := infer($t3)
+  4: $t8 := infer($t0)
+  5: $t6 := pack 0x42::valid_struct::S2($t7, $t8, $t1)
+  6: $t10 := infer($t0)
+  7: $t11 := infer($t3)
+  8: $t9 := pack 0x42::valid_struct::S3<i64>($t10, $t11, $t6)
+  9: $t2 := infer($t9)
+ 10: return $t2
+}
+
+
+[variant baseline]
+fun valid_struct::test2(): 0x42::valid_struct::S3<i64> {
+     var $t0: 0x42::valid_struct::S3<i64>
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::S3<i64>
+     var $t10: i64
+     var $t11: 0x42::valid_struct::S1
+  0: $t2 := 1
+  1: $t3 := -1
+  2: $t4 := -2
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+  4: $t6 := infer($t1)
+  5: $t7 := -1
+  6: $t8 := -2
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+  8: $t10 := -1
+  9: $t11 := infer($t1)
+ 10: $t9 := pack 0x42::valid_struct::S3<i64>($t10, $t11, $t5)
+ 11: $t0 := infer($t9)
+ 12: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test3($t0: i64, $t1: i128): 0x42::valid_struct::S3<i128> {
+     var $t2: 0x42::valid_struct::S3<i128>
+     var $t3: 0x42::valid_struct::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: 0x42::valid_struct::S2
+     var $t7: 0x42::valid_struct::S1
+     var $t8: i64
+     var $t9: 0x42::valid_struct::S3<i128>
+     var $t10: i128
+     var $t11: 0x42::valid_struct::S1
+  0: $t4 := 1
+  1: $t5 := infer($t0)
+  2: $t3 := pack 0x42::valid_struct::S1($t4, $t5, $t1)
+  3: $t7 := infer($t3)
+  4: $t8 := infer($t0)
+  5: $t6 := pack 0x42::valid_struct::S2($t7, $t8, $t1)
+  6: $t10 := infer($t1)
+  7: $t11 := infer($t3)
+  8: $t9 := pack 0x42::valid_struct::S3<i128>($t10, $t11, $t6)
+  9: $t2 := infer($t9)
+ 10: return $t2
+}
+
+
+[variant baseline]
+fun valid_struct::test4(): 0x42::valid_struct::S3<i128> {
+     var $t0: 0x42::valid_struct::S3<i128>
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::S3<i128>
+     var $t10: i128
+     var $t11: 0x42::valid_struct::S1
+  0: $t2 := 1
+  1: $t3 := -1
+  2: $t4 := -2
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+  4: $t6 := infer($t1)
+  5: $t7 := -1
+  6: $t8 := -2
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+  8: $t10 := -1
+  9: $t11 := infer($t1)
+ 10: $t9 := pack 0x42::valid_struct::S3<i128>($t10, $t11, $t5)
+ 11: $t0 := infer($t9)
+ 12: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test5(): 0x42::valid_struct::E1 {
+     var $t0: 0x42::valid_struct::E1
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::E1
+  0: $t2 := 1
+  1: $t3 := -1
+  2: $t4 := -2
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+  4: $t5 := pack_variant 0x42::valid_struct::E1::V1($t1)
+  5: $t0 := infer($t5)
+  6: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test6(): 0x42::valid_struct::E2 {
+     var $t0: 0x42::valid_struct::E2
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::E2
+  0: $t2 := 1
+  1: $t3 := -1
+  2: $t4 := -2
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+  4: $t6 := infer($t1)
+  5: $t7 := -1
+  6: $t8 := -2
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+  8: $t9 := pack_variant 0x42::valid_struct::E2::V2($t5)
+  9: $t0 := infer($t9)
+ 10: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test7(): 0x42::valid_struct::E3<i64> {
+     var $t0: 0x42::valid_struct::E3<i64>
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::S3<i64>
+     var $t10: i64
+     var $t11: 0x42::valid_struct::S1
+     var $t12: 0x42::valid_struct::E3<i64>
+  0: $t2 := 1
+  1: $t3 := -1
+  2: $t4 := -2
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+  4: $t6 := infer($t1)
+  5: $t7 := -1
+  6: $t8 := -2
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+  8: $t10 := -1
+  9: $t11 := infer($t1)
+ 10: $t9 := pack 0x42::valid_struct::S3<i64>($t10, $t11, $t5)
+ 11: $t12 := pack_variant 0x42::valid_struct::E3<i64>::V3($t9)
+ 12: $t0 := infer($t12)
+ 13: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test8(): 0x42::valid_struct::E3<i128> {
+     var $t0: 0x42::valid_struct::E3<i128>
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::S3<i128>
+     var $t10: i128
+     var $t11: 0x42::valid_struct::S1
+     var $t12: 0x42::valid_struct::E3<i128>
+  0: $t2 := 1
+  1: $t3 := -1
+  2: $t4 := -2
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+  4: $t6 := infer($t1)
+  5: $t7 := -1
+  6: $t8 := -2
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+  8: $t10 := -1
+  9: $t11 := infer($t1)
+ 10: $t9 := pack 0x42::valid_struct::S3<i128>($t10, $t11, $t5)
+ 11: $t12 := pack_variant 0x42::valid_struct::E3<i128>::V3($t9)
+ 12: $t0 := infer($t12)
+ 13: return $t0
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_struct::test1($t0: i64, $t1: i128): 0x42::valid_struct::S3<i64> {
+     var $t2: 0x42::valid_struct::S3<i64>
+     var $t3: 0x42::valid_struct::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: 0x42::valid_struct::S2
+     var $t7: 0x42::valid_struct::S1
+     var $t8: i64
+     var $t9: 0x42::valid_struct::S3<i64>
+     var $t10: i64
+     var $t11: 0x42::valid_struct::S1
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := 1
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t5 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  2: $t3 := pack 0x42::valid_struct::S1($t4, $t5, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  3: $t7 := infer($t3)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3, $t7
+     # refs: []
+     #
+  4: $t8 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3, $t7, $t8
+     # refs: []
+     #
+  5: $t6 := pack 0x42::valid_struct::S2($t7, $t8, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t3, $t6
+     # refs: []
+     #
+  6: $t10 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t3, $t6, $t10
+     # refs: []
+     #
+  7: $t11 := infer($t3)
+     # abort state: {returns}
+     # live vars: $t6, $t10, $t11
+     # refs: []
+     #
+  8: $t9 := pack 0x42::valid_struct::S3<i64>($t10, $t11, $t6)
+     # abort state: {returns}
+     # live vars: $t9
+     # refs: []
+     #
+  9: $t2 := infer($t9)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 10: return $t2
+}
+
+
+[variant baseline]
+fun valid_struct::test2(): 0x42::valid_struct::S3<i64> {
+     var $t0: 0x42::valid_struct::S3<i64>
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::S3<i64>
+     var $t10: i64
+     var $t11: 0x42::valid_struct::S1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  0: $t2 := 1
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := -1
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t4 := -2
+     # abort state: {returns}
+     # live vars: $t2, $t3, $t4
+     # refs: []
+     #
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  4: $t6 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t1, $t6
+     # refs: []
+     #
+  5: $t7 := -1
+     # abort state: {returns}
+     # live vars: $t1, $t6, $t7
+     # refs: []
+     #
+  6: $t8 := -2
+     # abort state: {returns}
+     # live vars: $t1, $t6, $t7, $t8
+     # refs: []
+     #
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+     # abort state: {returns}
+     # live vars: $t1, $t5
+     # refs: []
+     #
+  8: $t10 := -1
+     # abort state: {returns}
+     # live vars: $t1, $t5, $t10
+     # refs: []
+     #
+  9: $t11 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t5, $t10, $t11
+     # refs: []
+     #
+ 10: $t9 := pack 0x42::valid_struct::S3<i64>($t10, $t11, $t5)
+     # abort state: {returns}
+     # live vars: $t9
+     # refs: []
+     #
+ 11: $t0 := infer($t9)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 12: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test3($t0: i64, $t1: i128): 0x42::valid_struct::S3<i128> {
+     var $t2: 0x42::valid_struct::S3<i128>
+     var $t3: 0x42::valid_struct::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: 0x42::valid_struct::S2
+     var $t7: 0x42::valid_struct::S1
+     var $t8: i64
+     var $t9: 0x42::valid_struct::S3<i128>
+     var $t10: i128
+     var $t11: 0x42::valid_struct::S1
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := 1
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t5 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  2: $t3 := pack 0x42::valid_struct::S1($t4, $t5, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  3: $t7 := infer($t3)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3, $t7
+     # refs: []
+     #
+  4: $t8 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t3, $t7, $t8
+     # refs: []
+     #
+  5: $t6 := pack 0x42::valid_struct::S2($t7, $t8, $t1)
+     # abort state: {returns}
+     # live vars: $t1, $t3, $t6
+     # refs: []
+     #
+  6: $t10 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t3, $t6, $t10
+     # refs: []
+     #
+  7: $t11 := infer($t3)
+     # abort state: {returns}
+     # live vars: $t6, $t10, $t11
+     # refs: []
+     #
+  8: $t9 := pack 0x42::valid_struct::S3<i128>($t10, $t11, $t6)
+     # abort state: {returns}
+     # live vars: $t9
+     # refs: []
+     #
+  9: $t2 := infer($t9)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 10: return $t2
+}
+
+
+[variant baseline]
+fun valid_struct::test4(): 0x42::valid_struct::S3<i128> {
+     var $t0: 0x42::valid_struct::S3<i128>
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::S3<i128>
+     var $t10: i128
+     var $t11: 0x42::valid_struct::S1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  0: $t2 := 1
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := -1
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t4 := -2
+     # abort state: {returns}
+     # live vars: $t2, $t3, $t4
+     # refs: []
+     #
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  4: $t6 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t1, $t6
+     # refs: []
+     #
+  5: $t7 := -1
+     # abort state: {returns}
+     # live vars: $t1, $t6, $t7
+     # refs: []
+     #
+  6: $t8 := -2
+     # abort state: {returns}
+     # live vars: $t1, $t6, $t7, $t8
+     # refs: []
+     #
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+     # abort state: {returns}
+     # live vars: $t1, $t5
+     # refs: []
+     #
+  8: $t10 := -1
+     # abort state: {returns}
+     # live vars: $t1, $t5, $t10
+     # refs: []
+     #
+  9: $t11 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t5, $t10, $t11
+     # refs: []
+     #
+ 10: $t9 := pack 0x42::valid_struct::S3<i128>($t10, $t11, $t5)
+     # abort state: {returns}
+     # live vars: $t9
+     # refs: []
+     #
+ 11: $t0 := infer($t9)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 12: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test5(): 0x42::valid_struct::E1 {
+     var $t0: 0x42::valid_struct::E1
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::E1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  0: $t2 := 1
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := -1
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t4 := -2
+     # abort state: {returns}
+     # live vars: $t2, $t3, $t4
+     # refs: []
+     #
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  4: $t5 := pack_variant 0x42::valid_struct::E1::V1($t1)
+     # abort state: {returns}
+     # live vars: $t5
+     # refs: []
+     #
+  5: $t0 := infer($t5)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  6: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test6(): 0x42::valid_struct::E2 {
+     var $t0: 0x42::valid_struct::E2
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::E2
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  0: $t2 := 1
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := -1
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t4 := -2
+     # abort state: {returns}
+     # live vars: $t2, $t3, $t4
+     # refs: []
+     #
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  4: $t6 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t6
+     # refs: []
+     #
+  5: $t7 := -1
+     # abort state: {returns}
+     # live vars: $t6, $t7
+     # refs: []
+     #
+  6: $t8 := -2
+     # abort state: {returns}
+     # live vars: $t6, $t7, $t8
+     # refs: []
+     #
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+     # abort state: {returns}
+     # live vars: $t5
+     # refs: []
+     #
+  8: $t9 := pack_variant 0x42::valid_struct::E2::V2($t5)
+     # abort state: {returns}
+     # live vars: $t9
+     # refs: []
+     #
+  9: $t0 := infer($t9)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 10: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test7(): 0x42::valid_struct::E3<i64> {
+     var $t0: 0x42::valid_struct::E3<i64>
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::S3<i64>
+     var $t10: i64
+     var $t11: 0x42::valid_struct::S1
+     var $t12: 0x42::valid_struct::E3<i64>
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  0: $t2 := 1
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := -1
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t4 := -2
+     # abort state: {returns}
+     # live vars: $t2, $t3, $t4
+     # refs: []
+     #
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  4: $t6 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t1, $t6
+     # refs: []
+     #
+  5: $t7 := -1
+     # abort state: {returns}
+     # live vars: $t1, $t6, $t7
+     # refs: []
+     #
+  6: $t8 := -2
+     # abort state: {returns}
+     # live vars: $t1, $t6, $t7, $t8
+     # refs: []
+     #
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+     # abort state: {returns}
+     # live vars: $t1, $t5
+     # refs: []
+     #
+  8: $t10 := -1
+     # abort state: {returns}
+     # live vars: $t1, $t5, $t10
+     # refs: []
+     #
+  9: $t11 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t5, $t10, $t11
+     # refs: []
+     #
+ 10: $t9 := pack 0x42::valid_struct::S3<i64>($t10, $t11, $t5)
+     # abort state: {returns}
+     # live vars: $t9
+     # refs: []
+     #
+ 11: $t12 := pack_variant 0x42::valid_struct::E3<i64>::V3($t9)
+     # abort state: {returns}
+     # live vars: $t12
+     # refs: []
+     #
+ 12: $t0 := infer($t12)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 13: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test8(): 0x42::valid_struct::E3<i128> {
+     var $t0: 0x42::valid_struct::E3<i128>
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::S3<i128>
+     var $t10: i128
+     var $t11: 0x42::valid_struct::S1
+     var $t12: 0x42::valid_struct::E3<i128>
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  0: $t2 := 1
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := -1
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t4 := -2
+     # abort state: {returns}
+     # live vars: $t2, $t3, $t4
+     # refs: []
+     #
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  4: $t6 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t1, $t6
+     # refs: []
+     #
+  5: $t7 := -1
+     # abort state: {returns}
+     # live vars: $t1, $t6, $t7
+     # refs: []
+     #
+  6: $t8 := -2
+     # abort state: {returns}
+     # live vars: $t1, $t6, $t7, $t8
+     # refs: []
+     #
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+     # abort state: {returns}
+     # live vars: $t1, $t5
+     # refs: []
+     #
+  8: $t10 := -1
+     # abort state: {returns}
+     # live vars: $t1, $t5, $t10
+     # refs: []
+     #
+  9: $t11 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t5, $t10, $t11
+     # refs: []
+     #
+ 10: $t9 := pack 0x42::valid_struct::S3<i128>($t10, $t11, $t5)
+     # abort state: {returns}
+     # live vars: $t9
+     # refs: []
+     #
+ 11: $t12 := pack_variant 0x42::valid_struct::E3<i128>::V3($t9)
+     # abort state: {returns}
+     # live vars: $t12
+     # refs: []
+     #
+ 12: $t0 := infer($t12)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 13: return $t0
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::valid_struct {
+    enum E1 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i64>,
+        }
+    }
+    enum E2 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i128>,
+        }
+    }
+    enum E3<T> {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 {
+        x: u64,
+        y: i64,
+        z: i128,
+    }
+    struct S2 {
+        x: S1,
+        y: i64,
+        z: i128,
+    }
+    struct S3<T> {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    private fun test1(a: i64,b: i128): S3<i64> {
+        {
+          let s1: S1 = pack valid_struct::S1(1, a, b);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, a, b);
+            {
+              let s3: S3<i64> = pack valid_struct::S3<i64>(a, s1, s2);
+              s3
+            }
+          }
+        }
+    }
+    private fun test2(): S3<i64> {
+        {
+          let s1: S1 = pack valid_struct::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, -1, -2);
+            {
+              let s3: S3<i64> = pack valid_struct::S3<i64>(-1, s1, s2);
+              s3
+            }
+          }
+        }
+    }
+    private fun test3(a: i64,b: i128): S3<i128> {
+        {
+          let s1: S1 = pack valid_struct::S1(1, a, b);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, a, b);
+            {
+              let s3: S3<i128> = pack valid_struct::S3<i128>(b, s1, s2);
+              s3
+            }
+          }
+        }
+    }
+    private fun test4(): S3<i128> {
+        {
+          let s1: S1 = pack valid_struct::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, -1, -2);
+            {
+              let s3: S3<i128> = pack valid_struct::S3<i128>(-1, s1, s2);
+              s3
+            }
+          }
+        }
+    }
+    private fun test5(): E1 {
+        {
+          let s1: S1 = pack valid_struct::S1(1, -1, -2);
+          {
+            let e: E1 = pack valid_struct::E1::V1(s1);
+            e
+          }
+        }
+    }
+    private fun test6(): E2 {
+        {
+          let s1: S1 = pack valid_struct::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, -1, -2);
+            {
+              let e: E2 = pack valid_struct::E2::V2(s2);
+              e
+            }
+          }
+        }
+    }
+    private fun test7(): E3<i64> {
+        {
+          let s1: S1 = pack valid_struct::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, -1, -2);
+            {
+              let s3: S3<i64> = pack valid_struct::S3<i64>(-1, s1, s2);
+              {
+                let e: E3<i64> = pack valid_struct::E3::V3<i64>(s3);
+                e
+              }
+            }
+          }
+        }
+    }
+    private fun test8(): E3<i128> {
+        {
+          let s1: S1 = pack valid_struct::S1(1, -1, -2);
+          {
+            let s2: S2 = pack valid_struct::S2(s1, -1, -2);
+            {
+              let s3: S3<i128> = pack valid_struct::S3<i128>(-1, s1, s2);
+              {
+                let e: E3<i128> = pack valid_struct::E3::V3<i128>(s3);
+                e
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::valid_struct
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_struct::test1($t0: i64, $t1: i128): 0x42::valid_struct::S3<i64> {
+     var $t2: 0x42::valid_struct::S3<i64>
+     var $t3: 0x42::valid_struct::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: 0x42::valid_struct::S2
+     var $t7: 0x42::valid_struct::S1
+     var $t8: i64
+     var $t9: 0x42::valid_struct::S3<i64>
+     var $t10: i64
+     var $t11: 0x42::valid_struct::S1
+  0: $t4 := 1
+  1: $t5 := infer($t0)
+  2: $t3 := pack 0x42::valid_struct::S1($t4, $t5, $t1)
+  3: $t7 := infer($t3)
+  4: $t8 := infer($t0)
+  5: $t6 := pack 0x42::valid_struct::S2($t7, $t8, $t1)
+  6: $t10 := infer($t0)
+  7: $t11 := infer($t3)
+  8: $t9 := pack 0x42::valid_struct::S3<i64>($t10, $t11, $t6)
+  9: $t2 := infer($t9)
+ 10: return $t2
+}
+
+
+[variant baseline]
+fun valid_struct::test2(): 0x42::valid_struct::S3<i64> {
+     var $t0: 0x42::valid_struct::S3<i64>
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::S3<i64>
+     var $t10: i64
+     var $t11: 0x42::valid_struct::S1
+  0: $t2 := 1
+  1: $t3 := -1
+  2: $t4 := -2
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+  4: $t6 := infer($t1)
+  5: $t7 := -1
+  6: $t8 := -2
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+  8: $t10 := -1
+  9: $t11 := infer($t1)
+ 10: $t9 := pack 0x42::valid_struct::S3<i64>($t10, $t11, $t5)
+ 11: $t0 := infer($t9)
+ 12: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test3($t0: i64, $t1: i128): 0x42::valid_struct::S3<i128> {
+     var $t2: 0x42::valid_struct::S3<i128>
+     var $t3: 0x42::valid_struct::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: 0x42::valid_struct::S2
+     var $t7: 0x42::valid_struct::S1
+     var $t8: i64
+     var $t9: 0x42::valid_struct::S3<i128>
+     var $t10: i128
+     var $t11: 0x42::valid_struct::S1
+  0: $t4 := 1
+  1: $t5 := infer($t0)
+  2: $t3 := pack 0x42::valid_struct::S1($t4, $t5, $t1)
+  3: $t7 := infer($t3)
+  4: $t8 := infer($t0)
+  5: $t6 := pack 0x42::valid_struct::S2($t7, $t8, $t1)
+  6: $t10 := infer($t1)
+  7: $t11 := infer($t3)
+  8: $t9 := pack 0x42::valid_struct::S3<i128>($t10, $t11, $t6)
+  9: $t2 := infer($t9)
+ 10: return $t2
+}
+
+
+[variant baseline]
+fun valid_struct::test4(): 0x42::valid_struct::S3<i128> {
+     var $t0: 0x42::valid_struct::S3<i128>
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::S3<i128>
+     var $t10: i128
+     var $t11: 0x42::valid_struct::S1
+  0: $t2 := 1
+  1: $t3 := -1
+  2: $t4 := -2
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+  4: $t6 := infer($t1)
+  5: $t7 := -1
+  6: $t8 := -2
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+  8: $t10 := -1
+  9: $t11 := infer($t1)
+ 10: $t9 := pack 0x42::valid_struct::S3<i128>($t10, $t11, $t5)
+ 11: $t0 := infer($t9)
+ 12: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test5(): 0x42::valid_struct::E1 {
+     var $t0: 0x42::valid_struct::E1
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::E1
+  0: $t2 := 1
+  1: $t3 := -1
+  2: $t4 := -2
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+  4: $t5 := pack_variant 0x42::valid_struct::E1::V1($t1)
+  5: $t0 := infer($t5)
+  6: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test6(): 0x42::valid_struct::E2 {
+     var $t0: 0x42::valid_struct::E2
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::E2
+  0: $t2 := 1
+  1: $t3 := -1
+  2: $t4 := -2
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+  4: $t6 := infer($t1)
+  5: $t7 := -1
+  6: $t8 := -2
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+  8: $t9 := pack_variant 0x42::valid_struct::E2::V2($t5)
+  9: $t0 := infer($t9)
+ 10: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test7(): 0x42::valid_struct::E3<i64> {
+     var $t0: 0x42::valid_struct::E3<i64>
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::S3<i64>
+     var $t10: i64
+     var $t11: 0x42::valid_struct::S1
+     var $t12: 0x42::valid_struct::E3<i64>
+  0: $t2 := 1
+  1: $t3 := -1
+  2: $t4 := -2
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+  4: $t6 := infer($t1)
+  5: $t7 := -1
+  6: $t8 := -2
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+  8: $t10 := -1
+  9: $t11 := infer($t1)
+ 10: $t9 := pack 0x42::valid_struct::S3<i64>($t10, $t11, $t5)
+ 11: $t12 := pack_variant 0x42::valid_struct::E3<i64>::V3($t9)
+ 12: $t0 := infer($t12)
+ 13: return $t0
+}
+
+
+[variant baseline]
+fun valid_struct::test8(): 0x42::valid_struct::E3<i128> {
+     var $t0: 0x42::valid_struct::E3<i128>
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64
+     var $t8: i128
+     var $t9: 0x42::valid_struct::S3<i128>
+     var $t10: i128
+     var $t11: 0x42::valid_struct::S1
+     var $t12: 0x42::valid_struct::E3<i128>
+  0: $t2 := 1
+  1: $t3 := -1
+  2: $t4 := -2
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+  4: $t6 := infer($t1)
+  5: $t7 := -1
+  6: $t8 := -2
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t7, $t8)
+  8: $t10 := -1
+  9: $t11 := infer($t1)
+ 10: $t9 := pack 0x42::valid_struct::S3<i128>($t10, $t11, $t5)
+ 11: $t12 := pack_variant 0x42::valid_struct::E3<i128>::V3($t9)
+ 12: $t0 := infer($t12)
+ 13: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_struct::test1($t0: i64, $t1: i128): 0x42::valid_struct::S3<i64> {
+     var $t2: 0x42::valid_struct::S3<i64> [unused]
+     var $t3: 0x42::valid_struct::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: 0x42::valid_struct::S2
+     var $t7: 0x42::valid_struct::S1
+     var $t8: i64 [unused]
+     var $t9: 0x42::valid_struct::S3<i64>
+     var $t10: i64 [unused]
+     var $t11: 0x42::valid_struct::S1 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t3 := pack 0x42::valid_struct::S1($t4, $t5, $t1)
+     # live vars: $t0, $t1, $t3
+  3: $t7 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t7
+  4: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t3, $t5, $t7
+  5: $t6 := pack 0x42::valid_struct::S2($t7, $t5, $t1)
+     # live vars: $t0, $t3, $t6
+  6: $t0 := move($t0)
+     # live vars: $t0, $t3, $t6
+  7: $t3 := move($t3)
+     # live vars: $t0, $t3, $t6
+  8: $t9 := pack 0x42::valid_struct::S3<i64>($t0, $t3, $t6)
+     # live vars: $t9
+  9: return $t9
+}
+
+
+[variant baseline]
+fun valid_struct::test2(): 0x42::valid_struct::S3<i64> {
+     var $t0: 0x42::valid_struct::S3<i64> [unused]
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64 [unused]
+     var $t8: i128 [unused]
+     var $t9: 0x42::valid_struct::S3<i64>
+     var $t10: i64 [unused]
+     var $t11: 0x42::valid_struct::S1 [unused]
+     # live vars:
+  0: $t2 := 1
+     # live vars: $t2
+  1: $t3 := -1
+     # live vars: $t2, $t3
+  2: $t4 := -2
+     # live vars: $t2, $t3, $t4
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+     # live vars: $t1
+  4: $t6 := copy($t1)
+     # live vars: $t1, $t6
+  5: $t3 := -1
+     # live vars: $t1, $t3, $t6
+  6: $t4 := -2
+     # live vars: $t1, $t3, $t4, $t6
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t3, $t4)
+     # live vars: $t1, $t5
+  8: $t3 := -1
+     # live vars: $t1, $t3, $t5
+  9: $t1 := move($t1)
+     # live vars: $t1, $t3, $t5
+ 10: $t9 := pack 0x42::valid_struct::S3<i64>($t3, $t1, $t5)
+     # live vars: $t9
+ 11: return $t9
+}
+
+
+[variant baseline]
+fun valid_struct::test3($t0: i64, $t1: i128): 0x42::valid_struct::S3<i128> {
+     var $t2: 0x42::valid_struct::S3<i128> [unused]
+     var $t3: 0x42::valid_struct::S1
+     var $t4: u64
+     var $t5: i64
+     var $t6: 0x42::valid_struct::S2
+     var $t7: 0x42::valid_struct::S1
+     var $t8: i64 [unused]
+     var $t9: 0x42::valid_struct::S3<i128>
+     var $t10: i128 [unused]
+     var $t11: 0x42::valid_struct::S1 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t3 := pack 0x42::valid_struct::S1($t4, $t5, $t1)
+     # live vars: $t0, $t1, $t3
+  3: $t7 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t7
+  4: $t0 := move($t0)
+     # live vars: $t0, $t1, $t3, $t7
+  5: $t6 := pack 0x42::valid_struct::S2($t7, $t0, $t1)
+     # live vars: $t1, $t3, $t6
+  6: $t1 := move($t1)
+     # live vars: $t1, $t3, $t6
+  7: $t3 := move($t3)
+     # live vars: $t1, $t3, $t6
+  8: $t9 := pack 0x42::valid_struct::S3<i128>($t1, $t3, $t6)
+     # live vars: $t9
+  9: return $t9
+}
+
+
+[variant baseline]
+fun valid_struct::test4(): 0x42::valid_struct::S3<i128> {
+     var $t0: 0x42::valid_struct::S3<i128> [unused]
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64 [unused]
+     var $t8: i128 [unused]
+     var $t9: 0x42::valid_struct::S3<i128>
+     var $t10: i128 [unused]
+     var $t11: 0x42::valid_struct::S1 [unused]
+     # live vars:
+  0: $t2 := 1
+     # live vars: $t2
+  1: $t3 := -1
+     # live vars: $t2, $t3
+  2: $t4 := -2
+     # live vars: $t2, $t3, $t4
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+     # live vars: $t1
+  4: $t6 := copy($t1)
+     # live vars: $t1, $t6
+  5: $t3 := -1
+     # live vars: $t1, $t3, $t6
+  6: $t4 := -2
+     # live vars: $t1, $t3, $t4, $t6
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t3, $t4)
+     # live vars: $t1, $t5
+  8: $t4 := -1
+     # live vars: $t1, $t4, $t5
+  9: $t1 := move($t1)
+     # live vars: $t1, $t4, $t5
+ 10: $t9 := pack 0x42::valid_struct::S3<i128>($t4, $t1, $t5)
+     # live vars: $t9
+ 11: return $t9
+}
+
+
+[variant baseline]
+fun valid_struct::test5(): 0x42::valid_struct::E1 {
+     var $t0: 0x42::valid_struct::E1 [unused]
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::E1
+     # live vars:
+  0: $t2 := 1
+     # live vars: $t2
+  1: $t3 := -1
+     # live vars: $t2, $t3
+  2: $t4 := -2
+     # live vars: $t2, $t3, $t4
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+     # live vars: $t1
+  4: $t5 := pack_variant 0x42::valid_struct::E1::V1($t1)
+     # live vars: $t5
+  5: return $t5
+}
+
+
+[variant baseline]
+fun valid_struct::test6(): 0x42::valid_struct::E2 {
+     var $t0: 0x42::valid_struct::E2 [unused]
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1 [unused]
+     var $t7: i64 [unused]
+     var $t8: i128 [unused]
+     var $t9: 0x42::valid_struct::E2
+     # live vars:
+  0: $t2 := 1
+     # live vars: $t2
+  1: $t3 := -1
+     # live vars: $t2, $t3
+  2: $t4 := -2
+     # live vars: $t2, $t3, $t4
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+     # live vars: $t1
+  4: $t1 := move($t1)
+     # live vars: $t1
+  5: $t3 := -1
+     # live vars: $t1, $t3
+  6: $t4 := -2
+     # live vars: $t1, $t3, $t4
+  7: $t5 := pack 0x42::valid_struct::S2($t1, $t3, $t4)
+     # live vars: $t5
+  8: $t9 := pack_variant 0x42::valid_struct::E2::V2($t5)
+     # live vars: $t9
+  9: return $t9
+}
+
+
+[variant baseline]
+fun valid_struct::test7(): 0x42::valid_struct::E3<i64> {
+     var $t0: 0x42::valid_struct::E3<i64> [unused]
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64 [unused]
+     var $t8: i128 [unused]
+     var $t9: 0x42::valid_struct::S3<i64>
+     var $t10: i64 [unused]
+     var $t11: 0x42::valid_struct::S1 [unused]
+     var $t12: 0x42::valid_struct::E3<i64>
+     # live vars:
+  0: $t2 := 1
+     # live vars: $t2
+  1: $t3 := -1
+     # live vars: $t2, $t3
+  2: $t4 := -2
+     # live vars: $t2, $t3, $t4
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+     # live vars: $t1
+  4: $t6 := copy($t1)
+     # live vars: $t1, $t6
+  5: $t3 := -1
+     # live vars: $t1, $t3, $t6
+  6: $t4 := -2
+     # live vars: $t1, $t3, $t4, $t6
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t3, $t4)
+     # live vars: $t1, $t5
+  8: $t3 := -1
+     # live vars: $t1, $t3, $t5
+  9: $t1 := move($t1)
+     # live vars: $t1, $t3, $t5
+ 10: $t9 := pack 0x42::valid_struct::S3<i64>($t3, $t1, $t5)
+     # live vars: $t9
+ 11: $t12 := pack_variant 0x42::valid_struct::E3<i64>::V3($t9)
+     # live vars: $t12
+ 12: return $t12
+}
+
+
+[variant baseline]
+fun valid_struct::test8(): 0x42::valid_struct::E3<i128> {
+     var $t0: 0x42::valid_struct::E3<i128> [unused]
+     var $t1: 0x42::valid_struct::S1
+     var $t2: u64
+     var $t3: i64
+     var $t4: i128
+     var $t5: 0x42::valid_struct::S2
+     var $t6: 0x42::valid_struct::S1
+     var $t7: i64 [unused]
+     var $t8: i128 [unused]
+     var $t9: 0x42::valid_struct::S3<i128>
+     var $t10: i128 [unused]
+     var $t11: 0x42::valid_struct::S1 [unused]
+     var $t12: 0x42::valid_struct::E3<i128>
+     # live vars:
+  0: $t2 := 1
+     # live vars: $t2
+  1: $t3 := -1
+     # live vars: $t2, $t3
+  2: $t4 := -2
+     # live vars: $t2, $t3, $t4
+  3: $t1 := pack 0x42::valid_struct::S1($t2, $t3, $t4)
+     # live vars: $t1
+  4: $t6 := copy($t1)
+     # live vars: $t1, $t6
+  5: $t3 := -1
+     # live vars: $t1, $t3, $t6
+  6: $t4 := -2
+     # live vars: $t1, $t3, $t4, $t6
+  7: $t5 := pack 0x42::valid_struct::S2($t6, $t3, $t4)
+     # live vars: $t1, $t5
+  8: $t4 := -1
+     # live vars: $t1, $t4, $t5
+  9: $t1 := move($t1)
+     # live vars: $t1, $t4, $t5
+ 10: $t9 := pack 0x42::valid_struct::S3<i128>($t4, $t1, $t5)
+     # live vars: $t9
+ 11: $t12 := pack_variant 0x42::valid_struct::E3<i128>::V3($t9)
+     # live vars: $t12
+ 12: return $t12
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v9
+module 42.valid_struct {
+enum E1 has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<i64>
+ }
+}
+enum E2 has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<i128>
+ }
+}
+enum E3<T> has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<T>
+ }
+}
+struct S1 has copy, drop {
+	x: u64,
+	y: i64,
+	z: i128
+}
+struct S2 has copy, drop {
+	x: S1,
+	y: i64,
+	z: i128
+}
+struct S3<T> has copy, drop {
+	x: T,
+	y: S1,
+	z: S2
+}
+
+test1(a: i64, b: i128): S3<i64> /* def_idx: 0 */ {
+L2:	s1: S1
+L3:	s2: S2
+B0:
+	0: LdU64(1)
+	1: CopyLoc[0](a: i64)
+	2: CopyLoc[1](b: i128)
+	3: Pack[3](S1)
+	4: StLoc[2](s1: S1)
+	5: CopyLoc[2](s1: S1)
+	6: CopyLoc[0](a: i64)
+	7: MoveLoc[1](b: i128)
+	8: Pack[4](S2)
+	9: StLoc[3](s2: S2)
+	10: MoveLoc[0](a: i64)
+	11: MoveLoc[2](s1: S1)
+	12: MoveLoc[3](s2: S2)
+	13: PackGeneric[0](S3<i64>)
+	14: Ret
+}
+test2(): S3<i64> /* def_idx: 1 */ {
+L0:	s1: S1
+L1:	s2: S2
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[3](S1)
+	4: StLoc[0](s1: S1)
+	5: CopyLoc[0](s1: S1)
+	6: LdI64(-1)
+	7: LdI128(-2)
+	8: Pack[4](S2)
+	9: StLoc[1](s2: S2)
+	10: LdI64(-1)
+	11: MoveLoc[0](s1: S1)
+	12: MoveLoc[1](s2: S2)
+	13: PackGeneric[0](S3<i64>)
+	14: Ret
+}
+test3(a: i64, b: i128): S3<i128> /* def_idx: 2 */ {
+L2:	s1: S1
+L3:	s2: S2
+B0:
+	0: LdU64(1)
+	1: CopyLoc[0](a: i64)
+	2: CopyLoc[1](b: i128)
+	3: Pack[3](S1)
+	4: StLoc[2](s1: S1)
+	5: CopyLoc[2](s1: S1)
+	6: MoveLoc[0](a: i64)
+	7: CopyLoc[1](b: i128)
+	8: Pack[4](S2)
+	9: StLoc[3](s2: S2)
+	10: MoveLoc[1](b: i128)
+	11: MoveLoc[2](s1: S1)
+	12: MoveLoc[3](s2: S2)
+	13: PackGeneric[1](S3<i128>)
+	14: Ret
+}
+test4(): S3<i128> /* def_idx: 3 */ {
+L0:	s1: S1
+L1:	s2: S2
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[3](S1)
+	4: StLoc[0](s1: S1)
+	5: CopyLoc[0](s1: S1)
+	6: LdI64(-1)
+	7: LdI128(-2)
+	8: Pack[4](S2)
+	9: StLoc[1](s2: S2)
+	10: LdI128(-1)
+	11: MoveLoc[0](s1: S1)
+	12: MoveLoc[1](s2: S2)
+	13: PackGeneric[1](S3<i128>)
+	14: Ret
+}
+test5(): E1 /* def_idx: 4 */ {
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[3](S1)
+	4: PackVariant[0](E1/V1)
+	5: Ret
+}
+test6(): E2 /* def_idx: 5 */ {
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[3](S1)
+	4: LdI64(-1)
+	5: LdI128(-2)
+	6: Pack[4](S2)
+	7: PackVariant[1](E2/V2)
+	8: Ret
+}
+test7(): E3<i64> /* def_idx: 6 */ {
+L0:	s1: S1
+L1:	s2: S2
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[3](S1)
+	4: StLoc[0](s1: S1)
+	5: CopyLoc[0](s1: S1)
+	6: LdI64(-1)
+	7: LdI128(-2)
+	8: Pack[4](S2)
+	9: StLoc[1](s2: S2)
+	10: LdI64(-1)
+	11: MoveLoc[0](s1: S1)
+	12: MoveLoc[1](s2: S2)
+	13: PackGeneric[0](S3<i64>)
+	14: PackVariantGeneric[0](E3/V3<i64>)
+	15: Ret
+}
+test8(): E3<i128> /* def_idx: 7 */ {
+L0:	s1: S1
+L1:	s2: S2
+B0:
+	0: LdU64(1)
+	1: LdI64(-1)
+	2: LdI128(-2)
+	3: Pack[3](S1)
+	4: StLoc[0](s1: S1)
+	5: CopyLoc[0](s1: S1)
+	6: LdI64(-1)
+	7: LdI128(-2)
+	8: Pack[4](S2)
+	9: StLoc[1](s2: S2)
+	10: LdI128(-1)
+	11: MoveLoc[0](s1: S1)
+	12: MoveLoc[1](s2: S2)
+	13: PackGeneric[1](S3<i128>)
+	14: PackVariantGeneric[1](E3/V3<i128>)
+	15: Ret
+}
+}
+============ bytecode verification succeeded ========
