@@ -63,8 +63,6 @@ impl ExecutorTask for AptosExecutorTask {
             .execute_single_transaction(txn, &resolver, view, &log_context, auxiliary_info)
         {
             Ok((vm_status, vm_output)) => {
-                println!("Txn {} uses {} gas ({:?}), status: {:?}", txn_idx, vm_output.gas_used(), vm_output.fee_statement(), vm_output.status());
-
                 if vm_output.status().is_discarded() {
                     speculative_trace!(
                         &log_context,

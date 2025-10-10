@@ -62,7 +62,7 @@ use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
     cmp::min,
-    collections::{BTreeSet, VecDeque},
+    collections::{btree_map::Entry, BTreeSet, VecDeque},
     fmt::{Debug, Write},
     rc::Rc,
     str::FromStr,
@@ -625,12 +625,21 @@ where
                             (Rc::clone(function), Rc::clone(frame_cache))
                         } else {
                             let function =
-                                Rc::new(self.load_generic_function_no_visibility_checks(
-                                    gas_meter,
-                                    traversal_context,
-                                    &current_frame,
-                                    idx,
-                                )?);
+                                match current_frame_cache.generic_sub_frame_cache.entry(idx) {
+                                    Entry::Vacant(e) => {
+                                        let function = Rc::new(
+                                            self.load_generic_function_no_visibility_checks(
+                                                gas_meter,
+                                                traversal_context,
+                                                &current_frame,
+                                                idx,
+                                            )?,
+                                        );
+                                        e.insert(function.clone());
+                                        function
+                                    },
+                                    Entry::Occupied(e) => e.into_mut().clone(),
+                                };
                             let frame_cache =
                                 function_caches.get_or_create_frame_cache_generic(&function);
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize] =

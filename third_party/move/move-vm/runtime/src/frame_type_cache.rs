@@ -5,8 +5,9 @@ use crate::{frame::Frame, LoadedFunction};
 use move_binary_format::{
     errors::*,
     file_format::{
-        FieldInstantiationIndex, SignatureIndex, StructDefInstantiationIndex,
-        StructVariantInstantiationIndex, VariantFieldInstantiationIndex,
+        FieldInstantiationIndex, FunctionInstantiationIndex, SignatureIndex,
+        StructDefInstantiationIndex, StructVariantInstantiationIndex,
+        VariantFieldInstantiationIndex,
     },
 };
 use move_core_types::gas_algebra::NumTypeNodes;
@@ -73,6 +74,7 @@ pub(crate) struct FrameTypeCache {
     /// guaranteed that everything will be exactly the same as when we
     /// did the insertion.
     pub(crate) per_instruction_cache: Vec<PerInstructionCache>,
+    pub(crate) generic_sub_frame_cache: BTreeMap<FunctionInstantiationIndex, Rc<LoadedFunction>>,
 
     /// Cached instantiated local types for generic functions.
     pub(crate) instantiated_local_tys: Option<Rc<[Type]>>,
