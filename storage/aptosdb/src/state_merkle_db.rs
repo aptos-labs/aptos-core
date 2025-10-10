@@ -75,6 +75,7 @@ impl StateMerkleDb {
         // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
         // hacky, need to revisit.
         max_nodes_per_lru_cache_shard: usize,
+        block_cache: Option<&Cache>,
     ) -> Result<Self> {
         let sharding = rocksdb_configs.enable_storage_sharding;
         let state_merkle_db_config = rocksdb_configs.state_merkle_db_config;
@@ -85,10 +86,6 @@ impl StateMerkleDb {
             version_caches.insert(Some(i), VersionedNodeCache::new());
         }
         let lru_cache = NonZeroUsize::new(max_nodes_per_lru_cache_shard).map(LruNodeCache::new);
-        let block_cache = Cache::new_hyper_clock_cache(
-            state_merkle_db_config.block_cache_size as usize,
-            /* estimated_entry_charge = */ 0,
-        );
 
         if !sharding {
             info!("Sharded state merkle DB is not enabled!");
@@ -97,7 +94,7 @@ impl StateMerkleDb {
                 state_merkle_db_path,
                 STATE_MERKLE_DB_NAME,
                 &state_merkle_db_config,
-                &block_cache,
+                block_cache,
                 readonly,
             )?);
             return Ok(Self {
@@ -112,7 +109,7 @@ impl StateMerkleDb {
         Self::open(
             db_paths,
             state_merkle_db_config,
-            &block_cache,
+            block_cache,
             readonly,
             version_caches,
             lru_cache,
@@ -179,6 +176,7 @@ impl StateMerkleDb {
             rocksdb_configs,
             /*readonly=*/ false,
             /*max_nodes_per_lru_cache_shard=*/ 0,
+            None,
         )?;
         let cp_state_merkle_db_path = cp_root_path.as_ref().join(STATE_MERKLE_DB_FOLDER_NAME);
 
@@ -559,7 +557,7 @@ impl StateMerkleDb {
     fn open(
         db_paths: &StorageDirPaths,
         state_merkle_db_config: RocksdbConfig,
-        block_cache: &Cache,
+        block_cache: Option<&Cache>,
         readonly: bool,
         version_caches: HashMap<Option<usize>, VersionedNodeCache>,
         lru_cache: Option<LruNodeCache>,
@@ -628,7 +626,7 @@ impl StateMerkleDb {
         db_root_path: P,
         shard_id: usize,
         state_merkle_db_config: &RocksdbConfig,
-        block_cache: &Cache,
+        block_cache: Option<&Cache>,
         readonly: bool,
     ) -> Result<DB> {
         let db_name = format!("state_merkle_db_shard_{}", shard_id);
@@ -645,7 +643,7 @@ impl StateMerkleDb {
         path: PathBuf,
         name: &str,
         state_merkle_db_config: &RocksdbConfig,
-        block_cache: &Cache,
+        block_cache: Option<&Cache>,
         readonly: bool,
     ) -> Result<DB> {
         Ok(if readonly {
@@ -653,14 +651,14 @@ impl StateMerkleDb {
                 &gen_rocksdb_options(state_merkle_db_config, true),
                 path,
                 name,
-                gen_state_merkle_cfds(state_merkle_db_config, Some(block_cache)),
+                gen_state_merkle_cfds(state_merkle_db_config, block_cache),
             )?
         } else {
             DB::open_cf(
                 &gen_rocksdb_options(state_merkle_db_config, false),
                 path,
                 name,
-                gen_state_merkle_cfds(state_merkle_db_config, Some(block_cache)),
+                gen_state_merkle_cfds(state_merkle_db_config, block_cache),
             )?
         })
     }
