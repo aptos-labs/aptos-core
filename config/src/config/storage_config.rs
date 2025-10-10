@@ -161,7 +161,7 @@ impl Default for RocksdbConfig {
             max_total_wal_size: 1u64 << 30,
             // This includes threads for flashing and compaction. Rocksdb will decide the # of
             // threads to use internally.
-            max_background_jobs: 16,
+            max_background_jobs: 8,
             block_cache_size: Self::DEFAULT_BLOCK_CACHE_SIZE,
             block_size: Self::DEFAULT_BLOCK_SIZE,
             // Count index/filter blocks in block cache usage by default.
