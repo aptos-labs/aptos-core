@@ -470,6 +470,18 @@ impl Type {
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
+    pub fn paranoid_check_is_sint_ty(&self) -> PartialVMResult<()> {
+        if !matches!(
+            self,
+            Self::I8 | Self::I16 | Self::I32 | Self::I64 | Self::I128 | Self::I256
+        ) {
+            let msg = format!("Expected signed integer type, got {}", self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_is_u64_ty(&self) -> PartialVMResult<()> {
         if !matches!(self, Self::U64) {
             let msg = format!("Expected U64 type, got {}", self);
