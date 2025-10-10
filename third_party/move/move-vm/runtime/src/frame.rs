@@ -36,6 +36,18 @@ use move_vm_types::{
 };
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
+/// Represents types of locals of a Move function. Actual types are only need for runtime checks,
+/// and for non-generic functions can be borrowed directly from the function definition. For
+/// generic functions, type instantiations are cached by interpreter.
+pub(crate) enum LocalTys {
+    /// Used when runtime type checks are not enabled.
+    None,
+    /// Used for non-generic functions to avoid type clones around locals.
+    BorrowFromFunction,
+    /// Used for generic functions, where types are cached per-instantiation.
+    BorrowFromFunctionGeneric(Rc<[Type]>),
+}
+
 /// Represents the execution context for a function. When calls are made, frames are
 /// pushed and then popped to/from the call stack.
 pub(crate) struct Frame {
@@ -47,7 +59,7 @@ pub(crate) struct Frame {
     call_type: CallType,
     // Locals for this execution context and their instantiated types.
     pub(crate) locals: Locals,
-    pub(crate) local_tys: Vec<Type>,
+    pub(crate) local_tys: LocalTys,
     // Cache of types accessed in this frame, to improve performance when accessing
     // and constructing types.
     pub(crate) frame_cache: Rc<RefCell<FrameTypeCache>>,
@@ -141,24 +153,54 @@ impl Frame {
         frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {
         let ty_args = function.ty_args();
-        for ty in function.local_tys() {
-            gas_meter
-                .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
-        }
 
         let ty_builder = vm_config.ty_builder.clone();
-        let local_tys = if RTTCheck::should_perform_checks(&function.function) {
-            if ty_args.is_empty() {
-                function.local_tys().to_vec()
+        let local_tys = if ty_args.is_empty() {
+            // Function is not generic - avoid cloning types.
+            for ty in function.local_tys() {
+                gas_meter.charge_create_ty(NumTypeNodes::new(ty.num_nodes() as u64))?;
+            }
+
+            if RTTCheck::should_perform_checks(&function.function) {
+                LocalTys::BorrowFromFunction
             } else {
-                function
-                    .local_tys()
-                    .iter()
-                    .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
-                    .collect::<PartialVMResult<Vec<_>>>()?
+                LocalTys::None
             }
         } else {
-            vec![]
+            // Try cached instantiated locals in frame cache. This way we instantiate only once per
+            // usage of the function.
+            let mut cache_borrow = frame_cache.borrow_mut();
+            if let Some(local_ty_counts) = cache_borrow.instantiated_local_ty_counts.as_ref() {
+                for cnt in local_ty_counts.iter() {
+                    gas_meter.charge_create_ty(*cnt)?;
+                }
+            } else {
+                let local_tys = function.local_tys();
+                let mut local_ty_counts = Vec::with_capacity(local_tys.len());
+                for ty in local_tys {
+                    let cnt = NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64);
+                    gas_meter.charge_create_ty(cnt)?;
+                    local_ty_counts.push(cnt);
+                }
+                cache_borrow.instantiated_local_ty_counts = Some(Rc::from(local_ty_counts));
+            }
+
+            if RTTCheck::should_perform_checks(&function.function) {
+                if let Some(local_tys) = cache_borrow.instantiated_local_tys.as_ref().cloned() {
+                    LocalTys::BorrowFromFunctionGeneric(local_tys)
+                } else {
+                    let local_tys: Rc<[Type]> = function
+                        .local_tys()
+                        .iter()
+                        .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
+                        .collect::<PartialVMResult<Vec<_>>>()
+                        .map(Rc::from)?;
+                    cache_borrow.instantiated_local_tys = Some(local_tys.clone());
+                    LocalTys::BorrowFromFunctionGeneric(local_tys)
+                }
+            } else {
+                LocalTys::None
+            }
         };
 
         Ok(Frame {
@@ -180,14 +222,27 @@ impl Frame {
         self.call_type
     }
 
+    /// Returns a local type at specified index. Used for runtime type checks only, and if called
+    /// in non-type checking context will panic!
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn local_ty_at(&self, idx: usize) -> &Type {
-        &self.local_tys[idx]
+        match &self.local_tys {
+            LocalTys::None => {
+                unreachable!("Local types are not used when there are no runtime type checks")
+            },
+            LocalTys::BorrowFromFunction => &self.function.local_tys()[idx],
+            LocalTys::BorrowFromFunctionGeneric(tys) => &tys[idx],
+        }
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn check_local_tys_have_drop_ability(&self) -> PartialVMResult<()> {
-        for (idx, ty) in self.local_tys.iter().enumerate() {
+        let local_tys = match &self.local_tys {
+            LocalTys::None => return Ok(()),
+            LocalTys::BorrowFromFunction => self.function.local_tys(),
+            LocalTys::BorrowFromFunctionGeneric(tys) => tys,
+        };
+        for (idx, ty) in local_tys.iter().enumerate() {
             if !self.locals.is_invalid(idx)? {
                 ty.paranoid_check_has_ability(Ability::Drop)?;
             }

@@ -9,7 +9,7 @@ use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
     errors::PartialVMResult,
-    file_format::{CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex, Visibility},
+    file_format::{CompiledScript, FunctionDefinitionIndex, SignatureIndex, Visibility},
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
 use move_vm_types::loaded_data::{
@@ -96,17 +96,10 @@ impl Script {
             .iter()
             .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()?;
-        let locals = Signature(
-            parameters
-                .0
-                .iter()
-                .chain(script.signature_at(script.code.locals).0.iter())
-                .cloned()
-                .collect(),
-        );
-        let local_tys = locals
+        let local_tys = parameters
             .0
             .iter()
+            .chain(script.signature_at(script.code.locals).0.iter())
             .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let ty_param_abilities = script.type_parameters.clone();

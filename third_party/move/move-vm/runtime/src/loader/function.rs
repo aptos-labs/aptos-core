@@ -57,6 +57,10 @@ pub struct Function {
     pub(crate) is_entry: bool,
     pub(crate) name: Identifier,
     pub(crate) return_tys: Vec<Type>,
+    // For non-native functions: parameter types first and then local types, if any.
+    // For native functions, an empty vector (there are no locals). This is very important because
+    // gas is charged based on number of locals which should be 0 for native calls (to be backwards
+    // compatible).
     pub(crate) local_tys: Vec<Type>,
     pub(crate) param_tys: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
@@ -557,10 +561,11 @@ impl Function {
             None => vec![],
         };
         let ty_param_abilities = handle.type_parameters.clone();
+
         let return_tys = signature_table[handle.return_.0 as usize].clone();
         let local_tys = if let Some(code) = &def.code {
             let mut local_tys = signature_table[handle.parameters.0 as usize].clone();
-            local_tys.append(&mut signature_table[code.locals.0 as usize].clone());
+            local_tys.extend(signature_table[code.locals.0 as usize].clone());
             local_tys
         } else {
             vec![]
@@ -620,6 +625,7 @@ impl Function {
         self.ty_param_abilities.len()
     }
 
+    /// Returns local types, including parameters and local variables.
     pub(crate) fn local_tys(&self) -> &[Type] {
         &self.local_tys
     }
