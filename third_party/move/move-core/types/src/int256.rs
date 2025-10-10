@@ -17,7 +17,7 @@ use std::{
 
 // ---- U256 Representation
 
-#[derive(Debug, Clone, Copy, Default, Hash, PartialOrd, PartialEq, Ord, Eq)]
+#[derive(Clone, Copy, Default, Hash, PartialOrd, PartialEq, Ord, Eq)]
 pub struct U256 {
     repr: ethnum::U256,
 }
@@ -74,9 +74,15 @@ impl From<U256> for BigInt {
     }
 }
 
+impl std::fmt::Debug for U256 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "U256({})", self.repr)
+    }
+}
+
 // ---- I256 Representation
 
-#[derive(Debug, Clone, Copy, Default, Hash, PartialOrd, PartialEq, Ord, Eq)]
+#[derive(Clone, Copy, Default, Hash, PartialOrd, PartialEq, Ord, Eq)]
 pub struct I256 {
     repr: ethnum::I256,
 }
@@ -130,6 +136,12 @@ impl From<I256> for ethnum::I256 {
 impl From<I256> for BigInt {
     fn from(value: I256) -> Self {
         BigInt::from_signed_bytes_le(&value.to_le_bytes())
+    }
+}
+
+impl std::fmt::Debug for I256 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "I256({})", self.repr)
     }
 }
 
