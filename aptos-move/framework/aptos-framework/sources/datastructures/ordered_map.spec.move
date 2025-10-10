@@ -51,6 +51,21 @@ spec aptos_std::ordered_map {
         pragma intrinsic;
     }
 
+    spec get {
+        pragma opaque;
+        pragma verify = false;
+        aborts_if [abstract] false;
+        ensures [abstract] spec_contains_key(self, key) ==> result == option::spec_some(spec_get(self, key));
+        ensures [abstract] !spec_contains_key(self, key) ==> result == option::spec_none();
+    }
+
+    spec get_and_map {
+        pragma opaque;
+        pragma verify = false;
+        ensures [abstract] spec_contains_key(self, key) ==> result == option::spec_some(f(spec_get(self, key)));
+        ensures [abstract] !spec_contains_key(self, key) ==> result == option::spec_none();
+    }
+
     spec remove {
         pragma opaque;
         pragma verify = false;

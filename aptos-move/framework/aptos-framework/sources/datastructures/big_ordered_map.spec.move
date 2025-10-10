@@ -220,6 +220,20 @@ spec aptos_std::big_ordered_map {
             std::cmp::compare(option::spec_borrow(result), k) == std::cmp::Ordering::Less);
     }
 
+    spec get {
+        pragma opaque;
+        pragma verify = false;
+        aborts_if [abstract] false;
+        ensures [abstract] spec_contains_key(self, key) ==> result == option::spec_some(spec_get(self, key));
+        ensures [abstract] !spec_contains_key(self, key) ==> result == option::spec_none();
+    }
+
+    spec get_and_map {
+        pragma opaque;
+        pragma verify = false;
+        ensures [abstract] spec_contains_key(self, key) ==> result == option::spec_some(f(spec_get(self, key)));
+        ensures [abstract] !spec_contains_key(self, key) ==> result == option::spec_none();
+    }
 
     spec internal_find {
         pragma opaque;
@@ -242,6 +256,11 @@ spec aptos_std::big_ordered_map {
     }
 
     spec iter_prev {
+        pragma opaque;
+        pragma verify = false;
+    }
+
+    spec iter_modify {
         pragma opaque;
         pragma verify = false;
     }
