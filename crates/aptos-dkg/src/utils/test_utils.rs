@@ -18,13 +18,13 @@ pub fn range_proof_random_instance<E: Pairing, B: BatchedRangeProof<E>, R: RngCo
 ) {
     let (pk, vk) = B::setup(n + 0, ell + 0, rng); // TODO: change these values?
 
-    let zz: Vec<B::Input> = (0..n)
+    let ell_bit_values: Vec<B::Input> = (0..n)
         .map(|_| {
             let val = rng.next_u64() >> (64 - ell);
             B::Input::from(val)
         })
         .collect();
 
-    let (cc, r) = B::commit(&B::commitment_key_from_prover_key(&pk), &zz, rng);
-    (pk, vk, zz, cc, r)
+    let (comm, r) = B::commit(&B::commitment_key_from_prover_key(&pk), &ell_bit_values, rng);
+    (pk, vk, ell_bit_values, comm, r)
 }

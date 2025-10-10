@@ -531,13 +531,15 @@ where
     let c =
         fiat_shamir_challenge_for_sigma_protocol::<E, H>(fs_transcript, &prover_first_message, dst);
 
-    // Step 2: Compute verifier-specific challenge (used for weighted MSM)
-    let beta = fiat_shamir_challenge_for_msm_verifier::<E, H>(
-        fs_transcript,
-        public_statement,
-        prover_last_message,
-        dst_verifier,
-    );
+        // Step 2: Compute verifier-specific challenge (used for weighted MSM)
+    // let beta = fiat_shamir_challenge_for_msm_verifier::<E, H>(
+    //     fs_transcript,
+    //     public_statement,
+    //     prover_last_message,
+    //     dst_verifier,
+    // ); TODO??? problem is that it's not in the prover
+    let mut rng = ark_std::rand::thread_rng();
+    let beta = E::ScalarField::rand(&mut rng);
 
     let msm_terms = homomorphism.msm_terms(prover_last_message);
     let powers_of_beta = utils::powers(beta, msm_terms.clone().into_iter().count()); // TODO get rid of clone. is .count() an efficient way to get the length?

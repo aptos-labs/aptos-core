@@ -23,12 +23,12 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(c: &mut Criterion, cur
     let ell = std::env::var("L")
         .unwrap_or(std::env::var("ELL").unwrap_or_default())
         .parse::<usize>()
-        .unwrap_or(2); // 48
+        .unwrap_or(48); // 48
 
     let n = std::env::var("N")
         .unwrap_or_default()
         .parse::<usize>()
-        .unwrap_or(1); // 2048 - 1
+        .unwrap_or(2048 - 1); // 2048 - 1
 
     group.bench_function(format!("prove/ell={ell}/n={n}").as_str(), move |b| {
         b.iter_with_setup(
@@ -96,7 +96,7 @@ use prettytable::{Cell, Row, Table};
 use std::time::Instant;
 
 fn run_param_sweep<E: Pairing, B: BatchedRangeProof<E>>(curve_name: &str) {
-    let ells = [4, 8, 16, 32, 64];
+    let ells = [4, 8, 16, 32];
     let ns = [1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047];
 
     // store results in microseconds
@@ -105,6 +105,7 @@ fn run_param_sweep<E: Pairing, B: BatchedRangeProof<E>>(curve_name: &str) {
 
     for (i, &ell) in ells.iter().enumerate() {
         for (j, &n) in ns.iter().enumerate() {
+            // println!("NOW DOING ELL {} N {}", ell, n);
             let mut rng = thread_rng();
             let (pk, vk, values, comm, r) =
                 test_utils::range_proof_random_instance::<_, B, _>(n, ell, &mut rng);

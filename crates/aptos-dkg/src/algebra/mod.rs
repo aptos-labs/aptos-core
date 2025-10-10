@@ -10,6 +10,7 @@ use ark_ec::pairing::Pairing;
 use ark_ff::UniformRand;
 use ark_serialize::CanonicalSerialize;
 use ark_std::rand::{CryptoRng, RngCore};
+use ark_ec::AffineRepr;
 
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct GroupData<E: Pairing> {
@@ -23,6 +24,8 @@ impl<E: Pairing> GroupData<E> {
         Self {
             g1: E::G1Affine::rand(rng),
             g2: E::G2Affine::rand(rng),
+            // g1: E::G1Affine::generator(),
+            // g2: E::G2Affine::generator(),
         }
     }
 }

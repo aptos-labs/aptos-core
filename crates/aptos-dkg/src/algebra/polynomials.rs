@@ -93,7 +93,8 @@ pub fn barycentric_eval<F: Field>(evals: &[F], roots_of_unity_in_eval_dom: &[F],
     let prefactor = z_pow_n * n_inv;
 
     // Efficient batch inversion and multiply by prefactor in place
-    ark_ff::batch_inversion_and_mul(&mut denoms, &prefactor);
+    //ark_ff::batch_inversion_and_mul(&mut denoms, &prefactor);
+    ark_ff::batch_inversion(&mut denoms);
 
     // Compute sum_j (omega^j * f(omega^j) * (prefactor / (z - omega^j)))
     let mut sum = F::zero();
@@ -104,7 +105,7 @@ pub fn barycentric_eval<F: Field>(evals: &[F], roots_of_unity_in_eval_dom: &[F],
     {
         sum += *omega_j * f_j * inv_pref_denom_j;
     }
-
+    sum *= prefactor; ///////
     sum
 }
 

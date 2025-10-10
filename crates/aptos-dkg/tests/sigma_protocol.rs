@@ -199,3 +199,19 @@ fn test_schnorr() {
 //     let witness_bls = Domain(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng));
 //     test_sigma_protocol::<Bls12_381, _>(ChaumPedersen::default(), witness_bls);
 // }
+
+#[test]
+fn test_dekart_sigma() {
+    use aptos_dkg::range_proofs::dekart_univariate_v2::two_term_msm::*;
+    use aptos_dkg::Scalar;
+
+    let mut rng = thread_rng();
+
+    // ---- Bn254 ----
+    let witness_bn = Witness{kzg_randomness: Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng)), hiding_kzg_randomness: Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng))};
+    test_sigma_protocol::<Bn254, _>(SigmaProtocol::default(), witness_bn);
+
+    // // ---- Bls12_381 ----
+    // let witness_bls = Domain(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng));
+    // test_sigma_protocol::<Bls12_381, _>(Schnorr::default(), witness_bls);
+}

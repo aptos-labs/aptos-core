@@ -294,10 +294,10 @@ impl<'a, E: Pairing> homomorphism::FixedBaseMsms for Homomorphism<'a, E> {
     type Scalar = E::ScalarField;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-        debug_assert!(
+        assert!(
             self.lagr_g1.len() >= input.1.len(),
             "Not enough Lagrange basis elements for univariate KZG: required {}, got {}",
-            input.1.len() + 1,
+            input.1.len(),
             self.lagr_g1.len()
         );
 

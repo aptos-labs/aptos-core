@@ -51,7 +51,7 @@ pub mod weighted_vuf;
 /// #[repr(transparent)]
 #[repr(transparent)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Scalar<E: Pairing>(E::ScalarField);
+pub struct Scalar<E: Pairing>(pub E::ScalarField);
 
 impl<E: Pairing> Scalar<E> {
     /// Converts a `Vec<Scalar<E>>` into a `Vec<E::ScalarField>` without copying.
