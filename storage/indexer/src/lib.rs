@@ -61,12 +61,13 @@ impl Indexer {
         rocksdb_config: RocksdbConfig,
     ) -> Result<Self> {
         let db_path = db_root_path.as_ref().join(INDEX_DB_NAME);
+        let env = None;
 
         let db = DB::open(
             db_path,
             "index_db",
             column_families(),
-            &gen_rocksdb_options(&rocksdb_config, false),
+            &gen_rocksdb_options(&rocksdb_config, env, false),
         )?;
 
         let next_version = db
