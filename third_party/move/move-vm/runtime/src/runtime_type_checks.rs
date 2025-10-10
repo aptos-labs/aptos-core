@@ -772,6 +772,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // operand_stack.push_ty(rhs_ty)?;
             },
             Bytecode::Negate => {
+                operand_stack.top_ty()?.paranoid_check_is_sint_ty()?;
                 // NO-OP, leave stack as is
             },
             Bytecode::Shl | Bytecode::Shr => {
