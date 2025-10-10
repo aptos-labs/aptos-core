@@ -2668,4 +2668,54 @@ module aptos_std::big_ordered_map {
         aborts_if !spec_contains_key(map, 1);
      }
 
+    #[verify_only]
+    fun test_verify_get() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let res1 = map.get(&1);
+        let res2 = map.get(&4);
+        spec {
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert keys[2] == 3;
+            assert res1 == option::spec_some(4 as u64);
+            assert res2 == option::spec_none();
+            assert spec_len(map) == 3;
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_get {
+        pragma verify = true;
+        aborts_if false;
+     }
+
+    #[verify_only]
+    fun test_verify_get_and_map() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let res1 = map.get_and_map(&1, |x : &u64| *x + 1);
+        let res2 = map.get_and_map(&4, |x : &u64| *x + 1);
+        spec {
+            assert keys[0] == 1;
+            assert false;
+            assert res1 == option::spec_some(2 as u64);
+            assert res2 == option::spec_none();
+            assert spec_len(map) == 3;
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_get_and_map {
+        pragma verify = true;
+     }
+
 }

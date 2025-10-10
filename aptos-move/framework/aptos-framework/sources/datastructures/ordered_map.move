@@ -1506,4 +1506,34 @@ module aptos_std::ordered_map {
         aborts_if !spec_contains_key(map, 1);
      }
 
+    #[verify_only]
+    fun test_verify_get() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let res1 = map.get(&1);
+        let res2 = map.get(&4);
+        spec {
+            assert keys[0] == 1;
+            assert res1 == option::spec_some(4 as u64);
+            assert res2 == option::spec_none();
+            assert spec_len(map) == 3;
+        };
+    }
+
+    #[verify_only]
+    fun test_verify_get_and_map() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let res1 = map.get_and_map(&1, |x : &u64| *x + 1);
+        let res2 = map.get_and_map(&4, |x : &u64| *x + 1);
+        spec {
+            assert keys[0] == 1;
+            assert res1 == option::spec_some(5 as u64);
+            assert res2 == option::spec_none();
+            assert spec_len(map) == 3;
+        };
+    }
+
 }
