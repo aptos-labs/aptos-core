@@ -23,6 +23,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
+use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use clap::Parser;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
@@ -72,6 +73,13 @@ pub struct Opt {
         help = "The maximum time in seconds to wait for each transaction replay"
     )]
     pub timeout_secs: Option<u64>,
+
+    #[clap(
+        long,
+        default_value_t = false,
+        help = "Enable paranoid type checks in the Move VM"
+    )]
+    pub paranoid_type_checks: bool,
 }
 
 impl Opt {
@@ -170,6 +178,7 @@ impl Verifier {
         // calculate a valid start and limit
         let (start, limit) =
             Self::get_start_and_limit(&arc_db, config.start_version, config.end_version)?;
+        set_paranoid_type_checks(config.paranoid_type_checks);
         info!(
             start_version = start,
             limit = limit,

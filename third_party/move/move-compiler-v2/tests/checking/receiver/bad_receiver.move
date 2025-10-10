@@ -25,14 +25,14 @@ module aptos_std::ordered_map {
         &map.entries.borrow(self.index).key
     }
 
-    public fun find<K, V>(self: &OrderedMap<K, V>, key: &K): Iterator {
-        let lower_bound = self.lower_bound(key);
-        if (lower_bound.iter_is_end(self)) {
-            lower_bound
-        } else if (lower_bound.iter_borrow_key(self) == key) {
-            lower_bound
+    public fun internal_find<K, V>(self: &OrderedMap<K, V>, key: &K): Iterator {
+        let internal_lower_bound = self.internal_lower_bound(key);
+        if (internal_lower_bound.iter_is_end(self)) {
+            internal_lower_bound
+        } else if (internal_lower_bound.iter_borrow_key(self) == key) {
+            internal_lower_bound
         } else {
-            self.new_end_iter()
+            self.internal_new_end_iter()
         }
     }
 
@@ -40,7 +40,7 @@ module aptos_std::ordered_map {
         self.find(key).iter_borrow(self)
     }
 
-    public fun new_end_iter<K, V>(self: &OrderedMap<K, V>): Iterator {
+    public fun internal_new_end_iter<K, V>(self: &OrderedMap<K, V>): Iterator {
         Iterator::End
     }
 
