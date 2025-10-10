@@ -392,11 +392,10 @@ pub static GLOBAL_LAYOUT_CACHE_NUM_NON_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static GLOBAL_LAYOUT_CACHE_MISSES: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
+pub static GLOBAL_LAYOUT_CACHE_MISSES: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
         "global_layout_cache_misses",
         "Number of misses when fetching struct/enum layouts from the global cache",
-        &["name"],
     )
     .unwrap()
 });

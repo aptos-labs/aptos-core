@@ -3,7 +3,7 @@
 
 pub use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_gas_schedule::{
-    gas_feature_versions::{RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34},
+    gas_feature_versions::{RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38},
     AptosGasParameters,
 };
 use aptos_types::{
@@ -210,6 +210,7 @@ pub fn aptos_prod_vm_config(
         enable_capture_option,
         enable_enum_option,
         enable_layout_caches,
+        propagate_dependency_limit_error: gas_feature_version >= RELEASE_V1_38,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

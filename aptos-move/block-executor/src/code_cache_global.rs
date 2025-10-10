@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::counters::GLOBAL_LAYOUT_CACHE_MISSES;
-use aptos_metrics_core::IntCounterVecHelper;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     error::PanicError, transaction::BlockExecutableTransaction, vm::modules::AptosModuleExtension,
@@ -156,7 +155,7 @@ where
     pub(crate) fn get_struct_layout_entry(&self, key: &StructKey) -> Option<LayoutCacheEntry> {
         match self.struct_layouts.get(key) {
             None => {
-                GLOBAL_LAYOUT_CACHE_MISSES.inc_with(&["non_generic"]);
+                GLOBAL_LAYOUT_CACHE_MISSES.inc();
                 None
             },
             Some(e) => Some(e.deref().clone()),
