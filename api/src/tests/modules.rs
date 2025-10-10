@@ -95,4 +95,15 @@ async fn test_abi(use_txn_payload_v2_format: bool, use_orderless_transactions: b
         .unwrap();
 
     assert_eq!(my_struct["is_event"], false);
+
+    // Confirm that MyEnum is considered an enum.
+    let my_enum = structs
+        .iter()
+        .find(|s| s["name"].as_str().unwrap() == "MyEnum")
+        .unwrap();
+
+    assert_eq!(my_enum["is_enum"], true);
+
+    // Confirm that State is not considered an enum.
+    assert_eq!(my_struct["is_enum"], false);
 }

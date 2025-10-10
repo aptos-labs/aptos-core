@@ -1253,6 +1253,15 @@ impl GlobalEnv {
             .any(|(d, _)| d.severity >= Severity::Warning)
     }
 
+    pub fn has_diag_in_primary_targets(&self, min_severity: Severity) -> bool {
+        self.diags.borrow().iter().any(|(d, _)| {
+            d.severity >= min_severity
+                && d.labels
+                    .iter()
+                    .any(|label| self.file_id_is_primary_target.contains(&label.file_id))
+        })
+    }
+
     /// Writes accumulated diagnostics of given or higher severity.
     pub fn report_diag<W: WriteColor>(&self, writer: &mut W, severity: Severity) {
         self.report_diag_with_filter(

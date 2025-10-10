@@ -121,6 +121,7 @@
         "name": "GUID",
         "is_native": false,
         "is_event": false,
+        "is_enum": false,
         "abilities": [
           "drop",
           "store"
@@ -137,6 +138,7 @@
         "name": "ID",
         "is_native": false,
         "is_event": false,
+        "is_enum": false,
         "abilities": [
           "copy",
           "drop",
