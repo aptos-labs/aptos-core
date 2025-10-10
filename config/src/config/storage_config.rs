@@ -122,7 +122,7 @@ pub struct RocksdbConfig {
     pub max_open_files: i32,
     /// Maximum size of the RocksDB write ahead log (WAL)
     pub max_total_wal_size: u64,
-    /// Maximum number of background threads for Rocks DB
+    /// Maximum number of background jobs for Rocks DB
     pub max_background_jobs: i32,
     /// Block cache size for Rocks DB
     pub block_cache_size: u64,
@@ -159,9 +159,9 @@ impl Default for RocksdbConfig {
             // For now we set the max total WAL size to be 1G. This config can be useful when column
             // families are updated at non-uniform frequencies.
             max_total_wal_size: 1u64 << 30,
-            // This includes threads for flashing and compaction. Rocksdb will decide the # of
+            // This includes jobs for flush and compaction. Rocksdb will decide the # of
             // threads to use internally.
-            max_background_jobs: 16,
+            max_background_jobs: 4,
             block_cache_size: Self::DEFAULT_BLOCK_CACHE_SIZE,
             block_size: Self::DEFAULT_BLOCK_SIZE,
             // Count index/filter blocks in block cache usage by default.
@@ -186,6 +186,8 @@ pub struct RocksdbConfigs {
     pub index_db_config: RocksdbConfig,
     #[serde(default = "default_to_true")]
     pub enable_storage_sharding: bool,
+    pub high_priority_background_threads: i32,
+    pub low_priority_background_threads: i32,
 }
 
 fn default_to_true() -> bool {
@@ -206,6 +208,8 @@ impl Default for RocksdbConfigs {
                 ..Default::default()
             },
             enable_storage_sharding: true,
+            high_priority_background_threads: 4,
+            low_priority_background_threads: 4,
         }
     }
 }
