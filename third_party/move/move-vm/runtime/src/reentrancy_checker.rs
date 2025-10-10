@@ -51,6 +51,7 @@ impl CallType {
     /// Returns true of the call to callee needs to lock the module. This is the case if:
     ///   1. we are dispatching via native,
     ///   2. the callee has `#[module_lock]` attribute.
+    #[cfg_attr(feature = "inline-interpreter-helpers", inline(always))]
     fn is_locking(&self, callee: &LoadedFunction) -> bool {
         match self {
             Self::NativeDynamicDispatch => true,
@@ -60,7 +61,8 @@ impl CallType {
 }
 
 impl ReentrancyChecker {
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): as `call_type` is sometimes a fixed value, this inline is very valuable
+    #[cfg_attr(feature = "inline-interpreter-helpers", inline(always))]
     pub fn enter_function(
         &mut self,
         caller_module: Option<&ModuleId>,
@@ -108,7 +110,7 @@ impl ReentrancyChecker {
         Ok(())
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): bloats code, not a hot path
     pub fn exit_function(
         &mut self,
         caller_module: &ModuleId,
