@@ -14,7 +14,7 @@ packages = [{include = "aptos_protos"}]
 generate = "./generate.sh"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.9,<3.12"
 grpcio = "^1.57.0"
 protobuf = "^4.24.2"
 grpclib = "^0.4.5"

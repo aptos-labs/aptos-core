@@ -1042,6 +1042,8 @@ pub struct MoveStruct {
     pub is_native: bool,
     /// Whether the struct is marked with the #[event] annotation
     pub is_event: bool,
+    /// Whether the struct is an enum (i.e. enum MyEnum vs struct MyStruct).
+    pub is_enum: bool,
     /// Abilities associated with the struct
     pub abilities: Vec<MoveAbility>,
     /// Generic types associated with the struct

@@ -54,6 +54,13 @@ pub trait Bytecode {
         }
     }
 
+    fn struct_is_enum(&self, def: &StructDefinition) -> bool {
+        matches!(
+            def.field_information,
+            StructFieldInformation::DeclaredVariants(_)
+        )
+    }
+
     fn new_move_struct_field(&self, def: &FieldDefinition) -> MoveStructField {
         MoveStructField {
             name: self.identifier_at(def.name).to_owned().into(),
@@ -136,6 +143,7 @@ pub trait Bytecode {
         };
         let name = self.identifier_at(handle.name).to_owned();
         let is_event = self.struct_is_event(&name);
+        let is_enum = self.struct_is_enum(def);
         let abilities = handle
             .abilities
             .into_iter()
@@ -150,6 +158,7 @@ pub trait Bytecode {
             name: name.into(),
             is_native,
             is_event,
+            is_enum,
             abilities,
             generic_type_params,
             fields,

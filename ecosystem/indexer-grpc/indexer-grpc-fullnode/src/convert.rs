@@ -60,6 +60,7 @@ pub fn convert_move_struct(move_struct: &MoveStruct) -> transaction::MoveStruct 
         name: move_struct.name.0.to_string(),
         is_native: move_struct.is_native,
         is_event: move_struct.is_event,
+        is_enum: move_struct.is_enum,
         abilities: move_struct
             .abilities
             .iter()
