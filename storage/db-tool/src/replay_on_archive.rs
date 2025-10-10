@@ -214,14 +214,13 @@ impl Verifier {
             .thread_name(|i| format!("replay-verify-{}", i))
             .build()?;
         let chunk_size = self.chunk_size as u64;
-        let total_chunks = (self.limit + chunk_size - 1) / chunk_size;
+        let total_chunks = self.limit.div_ceil(chunk_size);
         let res: Vec<_> = thread_pool.install(|| {
             (0..total_chunks)
                 .into_par_iter()
                 .map(|i| {
                     let start = self.start + i * chunk_size;
-                    let end =
-                        std::cmp::min(start + chunk_size * i - 1, self.start + self.limit - 1);
+                    let end = std::cmp::min(start + chunk_size - 1, self.start + self.limit - 1);
                     self.verify(start, end - start + 1)
                 })
                 .collect()
