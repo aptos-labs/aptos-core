@@ -965,7 +965,6 @@ Includes fills and cancels
     Market::V1 {
         parent: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(parent),
         <a href="market.md#0x7_market">market</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="market.md#0x7_market">market</a>),
-        order_id_generator: new_ascending_id_generator(),
         next_fill_id: 0,
         config,
         <a href="order_book.md#0x7_order_book">order_book</a>: new_order_book(),

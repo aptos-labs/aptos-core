@@ -687,7 +687,6 @@ module aptos_experimental::market_types {
         let Market::V1 {
             parent: _parent,
             market: _market,
-            order_id_generator: _order_id_generator,
             next_fill_id: _next_fill_id,
             config,
             order_book,
