@@ -7,7 +7,7 @@
 use crate::{
     gas_schedule::VMGasParameters,
     traits::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule},
-    ver::gas_feature_versions::RELEASE_V1_33,
+    ver::gas_feature_versions::{RELEASE_V1_33, RELEASE_V1_38},
 };
 use aptos_gas_algebra::{AbstractValueSize, AbstractValueSizePerArg};
 use move_core_types::{
@@ -36,6 +36,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [u64: AbstractValueSize, "u64", 40],
         [u128: AbstractValueSize, "u128", 40],
         [u256: AbstractValueSize, { 5.. => "u256" }, 40],
+        [i8: AbstractValueSize, { RELEASE_V1_38.. => "i8" }, 40],
+        [i16: AbstractValueSize, { RELEASE_V1_38.. => "i16" }, 40],
+        [i32: AbstractValueSize, { RELEASE_V1_38.. => "i32" }, 40],
+        [i64: AbstractValueSize, { RELEASE_V1_38.. => "i64" }, 40],
+        [i128: AbstractValueSize, { RELEASE_V1_38.. => "i128" }, 40],
+        [i256: AbstractValueSize, { RELEASE_V1_38.. => "i256" }, 40],
         [bool: AbstractValueSize, "bool", 40],
         [address: AbstractValueSize, "address", 40],
         [struct_: AbstractValueSize, "struct", 40],
@@ -249,42 +255,42 @@ impl ValueVisitor for AbstractValueSizeVisitor<'_> {
     #[inline]
     fn visit_i8(&mut self, depth: u64, _val: i8) -> PartialVMResult<()> {
         self.check_depth(depth)?;
-        self.size += self.params.u8; // using same parameters as for u8
+        self.size += self.params.i8;
         Ok(())
     }
 
     #[inline]
     fn visit_i16(&mut self, depth: u64, _val: i16) -> PartialVMResult<()> {
         self.check_depth(depth)?;
-        self.size += self.params.u16;
+        self.size += self.params.i16;
         Ok(())
     }
 
     #[inline]
     fn visit_i32(&mut self, depth: u64, _val: i32) -> PartialVMResult<()> {
         self.check_depth(depth)?;
-        self.size += self.params.u32;
+        self.size += self.params.i32;
         Ok(())
     }
 
     #[inline]
     fn visit_i64(&mut self, depth: u64, _val: i64) -> PartialVMResult<()> {
         self.check_depth(depth)?;
-        self.size += self.params.u64;
+        self.size += self.params.i64;
         Ok(())
     }
 
     #[inline]
     fn visit_i128(&mut self, depth: u64, _val: i128) -> PartialVMResult<()> {
         self.check_depth(depth)?;
-        self.size += self.params.u128;
+        self.size += self.params.i128;
         Ok(())
     }
 
     #[inline]
     fn visit_i256(&mut self, depth: u64, _val: I256) -> PartialVMResult<()> {
         self.check_depth(depth)?;
-        self.size += self.params.u256;
+        self.size += self.params.i256;
         Ok(())
     }
 

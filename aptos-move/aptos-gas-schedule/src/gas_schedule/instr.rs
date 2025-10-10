@@ -4,7 +4,7 @@
 //! This module defines the gas parameters for all Move instructions.
 
 use crate::{
-    gas_feature_versions::{RELEASE_V1_18, RELEASE_V1_33},
+    gas_feature_versions::{RELEASE_V1_18, RELEASE_V1_33, RELEASE_V1_38},
     gas_schedule::VMGasParameters,
 };
 use aptos_gas_algebra::{
@@ -37,6 +37,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [ld_u64: InternalGas, "ld_u64", 220],
         [ld_u128: InternalGas, "ld_u128", 294],
         [ld_u256: InternalGas, { 5.. => "ld_u256" }, 294],
+        [ld_i8: InternalGas, { RELEASE_V1_38.. => "ld_i8" }, 220],
+        [ld_i16: InternalGas, { RELEASE_V1_38.. => "ld_i16" }, 220],
+        [ld_i32: InternalGas, { RELEASE_V1_38.. => "ld_i32" }, 220],
+        [ld_i64: InternalGas, { RELEASE_V1_38.. => "ld_i64" }, 220],
+        [ld_i128: InternalGas, { RELEASE_V1_38.. => "ld_i128" }, 294],
+        [ld_i256: InternalGas, { RELEASE_V1_38.. => "ld_i256" }, 294],
         [ld_true: InternalGas, "ld_true", 220],
         [ld_false: InternalGas, "ld_false", 220],
         [ld_const_base: InternalGas, "ld_const.base", 2389],
@@ -101,12 +107,19 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [cast_u64: InternalGas, "cast_u64", 441],
         [cast_u128: InternalGas, "cast_u128", 441],
         [cast_u256: InternalGas, { 5.. => "cast_u256" }, 441],
+        [cast_i8: InternalGas, { RELEASE_V1_38.. => "cast_i8" }, 441],
+        [cast_i16: InternalGas, { RELEASE_V1_38.. => "cast_i16" }, 441],
+        [cast_i32: InternalGas, { RELEASE_V1_38.. => "cast_i32" }, 441],
+        [cast_i64: InternalGas, { RELEASE_V1_38.. => "cast_i64" }, 441],
+        [cast_i128: InternalGas, { RELEASE_V1_38.. => "cast_i128" }, 441],
+        [cast_i256: InternalGas, { RELEASE_V1_38.. => "cast_i256" }, 441],
         // arithmetic
         [add: InternalGas, "add", 588],
         [sub: InternalGas, "sub", 588],
         [mul: InternalGas, "mul", 588],
         [mod_: InternalGas, "mod", 588],
         [div: InternalGas, "div", 588],
+        [negate: InternalGas, { RELEASE_V1_38.. =>  "negate" }, 588],
         // bitwise
         [bit_or: InternalGas, "bit_or", 588],
         [bit_and: InternalGas, "bit_and", 588],
