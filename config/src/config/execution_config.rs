@@ -53,6 +53,8 @@ pub struct ExecutionConfig {
     pub genesis_waypoint: Option<WaypointConfig>,
     /// Whether to use BlockSTMv2 for parallel execution.
     pub blockstm_v2_enabled: bool,
+    /// Enables long-living concurrent caches for Move type layouts.
+    pub layout_caches_enabled: bool,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -85,6 +87,8 @@ impl Default for ExecutionConfig {
             processed_transactions_detailed_counters: false,
             genesis_waypoint: None,
             blockstm_v2_enabled: false,
+            // TODO: consider setting to be true by default.
+            layout_caches_enabled: false,
         }
     }
 }

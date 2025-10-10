@@ -154,7 +154,6 @@ pub enum FeatureFlag {
     EnableTrustedCode,
     EnableEnumOption,
     VMBinaryFormatV9,
-    EnableLayoutCaches,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -408,7 +407,6 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::EnableTrustedCode => AptosFeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::EnableEnumOption => AptosFeatureFlag::ENABLE_ENUM_OPTION,
             FeatureFlag::VMBinaryFormatV9 => AptosFeatureFlag::VM_BINARY_FORMAT_V9,
-            FeatureFlag::EnableLayoutCaches => AptosFeatureFlag::ENABLE_LAYOUT_CACHES,
         }
     }
 }
@@ -589,7 +587,6 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ENABLE_TRUSTED_CODE => FeatureFlag::EnableTrustedCode,
             AptosFeatureFlag::ENABLE_ENUM_OPTION => FeatureFlag::EnableEnumOption,
             AptosFeatureFlag::VM_BINARY_FORMAT_V9 => FeatureFlag::VMBinaryFormatV9,
-            AptosFeatureFlag::ENABLE_LAYOUT_CACHES => FeatureFlag::EnableLayoutCaches,
         }
     }
 }

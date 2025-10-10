@@ -150,8 +150,6 @@ pub enum FeatureFlag {
     ENABLE_ENUM_OPTION = 101,
     /// Enables bytecode version v9
     VM_BINARY_FORMAT_V9 = 102,
-    /// If true, layouts for Move VM values are cached in long-living concurrent cache.
-    ENABLE_LAYOUT_CACHES = 103,
 }
 
 impl FeatureFlag {
@@ -255,11 +253,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_CAPTURE_OPTION,
             FeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::ENABLE_ENUM_OPTION,
-<<<<<<< HEAD
             FeatureFlag::VM_BINARY_FORMAT_V9,
-=======
-            FeatureFlag::ENABLE_LAYOUT_CACHES,
->>>>>>> c46d7699e2 ([vm] Add layout caches)
         ]
     }
 }
@@ -407,10 +401,6 @@ impl Features {
 
     pub fn is_refundable_bytes_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
-    }
-
-    pub fn are_layout_caches_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::ENABLE_LAYOUT_CACHES)
     }
 
     pub fn is_abort_if_multisig_payload_mismatch_enabled(&self) -> bool {
