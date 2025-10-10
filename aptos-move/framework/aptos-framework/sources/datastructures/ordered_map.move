@@ -1449,4 +1449,47 @@ module aptos_std::ordered_map {
         aborts_if !spec_contains_key(map, 1);
      }
 
+    #[verify_only]
+    fun test_verify_remove_or_none() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        spec {
+            assert spec_len(map) == 3;
+        };
+        let (_key, _value) = map.borrow_back();
+        spec{
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+        };
+        let result_1 = map.remove_or_none(&1);
+        spec {
+            assert spec_contains_key(map, 2);
+            assert spec_get(map, 2) == 5;
+            assert option::spec_is_some(result_1);
+            assert option::spec_borrow(result_1) == 4;
+            assert spec_len(map) == 2;
+            assert !spec_contains_key(map, 1);
+            assert !spec_contains_key(map, 4);
+        };
+        let result_2 = map.remove_or_none(&4);
+        spec {
+            assert spec_contains_key(map, 2);
+            assert spec_get(map, 2) == 5;
+            assert option::spec_is_none(result_2);
+            assert spec_len(map) == 2;
+            assert !spec_contains_key(map, 4);
+        };
+        map.remove(&2);
+        map.remove(&3);
+        spec {
+            assert !spec_contains_key(map, 1);
+            assert !spec_contains_key(map, 2);
+            assert !spec_contains_key(map, 3);
+            assert spec_len(map) == 0;
+        };
+        map.destroy_empty();
+    }
 }
