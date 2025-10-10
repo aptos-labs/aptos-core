@@ -28,12 +28,16 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
-pub fn create_option_u64(value: Option<u64>) -> Value {
-    match value {
-        Some(value) => Value::struct_(Struct::pack_variant(OPTION_SOME_TAG, vec![Value::u64(
-            value,
-        )])),
-        None => Value::struct_(Struct::pack_variant(OPTION_NONE_TAG, vec![])),
+pub fn create_option_u64(enum_option_enabled: bool, value: Option<u64>) -> Value {
+    if enum_option_enabled {
+        match value {
+            Some(value) => Value::struct_(Struct::pack_variant(OPTION_SOME_TAG, vec![Value::u64(
+                value,
+            )])),
+            None => Value::struct_(Struct::pack_variant(OPTION_NONE_TAG, vec![])),
+        }
+    } else {
+        Value::struct_(Struct::pack(vec![Value::vector_u64(value)]))
     }
 }
 
@@ -183,8 +187,9 @@ fn native_constant_serialized_size(
     context
         .charge(BCS_CONSTANT_SERIALIZED_SIZE_PER_TYPE_NODE * NumTypeNodes::new(visited_count))?;
 
+    let enum_option_enabled = context.get_feature_flags().is_enum_option_enabled();
     let result = match serialized_size_result {
-        Ok(value) => create_option_u64(value.map(|v| v as u64)),
+        Ok(value) => create_option_u64(enum_option_enabled, value.map(|v| v as u64)),
         Err(_) => {
             context.charge(BCS_SERIALIZED_SIZE_FAILURE)?;
 
